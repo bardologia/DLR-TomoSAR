@@ -4,19 +4,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import AttentionUNetConfig
+from .config import AttentionUNetConfig, build_activation, build_norm2d, build_upsample, initialize_weights
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0):
+    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0,
+                 activation: str = "relu", normalization: str = "batch", bias: bool = False):
         super().__init__()
         layers = [
-            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
+            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
         ]
         if dropout > 0:
             layers.append(nn.Dropout2d(dropout))
@@ -27,19 +28,20 @@ class ConvBlock(nn.Module):
 
 
 class AttentionGate(nn.Module):
-    def __init__(self, gate_channels: int, skip_channels: int, intermediate_channels: int):
+    def __init__(self, gate_channels: int, skip_channels: int, intermediate_channels: int,
+                 normalization: str = "batch", bias: bool = False):
         super().__init__()
         self.gate_projection = nn.Sequential(
-            nn.Conv2d(gate_channels, intermediate_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(intermediate_channels),
+            nn.Conv2d(gate_channels, intermediate_channels, kernel_size=1, bias=bias),
+            build_norm2d(normalization, intermediate_channels),
         )
         self.skip_projection = nn.Sequential(
-            nn.Conv2d(skip_channels, intermediate_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(intermediate_channels),
+            nn.Conv2d(skip_channels, intermediate_channels, kernel_size=1, bias=bias),
+            build_norm2d(normalization, intermediate_channels),
         )
         self.attention_score = nn.Sequential(
-            nn.Conv2d(intermediate_channels, 1, kernel_size=1, bias=False),
-            nn.BatchNorm2d(1),
+            nn.Conv2d(intermediate_channels, 1, kernel_size=1, bias=bias),
+            build_norm2d(normalization, 1),
             nn.Sigmoid(),
         )
         self.relu = nn.ReLU(inplace=True)
@@ -85,11 +87,13 @@ class AttentionUNet(nn.Module):
         self.downsample_layers = nn.ModuleList()
         channels = config.in_channels
         for feature_size in feature_sizes:
-            self.encoder_blocks.append(ConvBlock(channels, feature_size, config.dropout))
+            self.encoder_blocks.append(ConvBlock(channels, feature_size, config.dropout,
+                                                  config.activation, config.normalization, config.conv_bias))
             self.downsample_layers.append(nn.MaxPool2d(2))
             channels = feature_size
 
-        self.bottleneck = ConvBlock(feature_sizes[-1], bottleneck_channels, config.dropout)
+        self.bottleneck = ConvBlock(feature_sizes[-1], bottleneck_channels, config.dropout,
+                                    config.activation, config.normalization, config.conv_bias)
 
         reversed_features = [bottleneck_channels] + feature_sizes[::-1]
         self.upsample_layers = nn.ModuleList()
@@ -100,20 +104,25 @@ class AttentionUNet(nn.Module):
             intermediate_channels = max(1, int(decoder_channels * config.attention_intermediate_ratio))
 
             self.upsample_layers.append(
-                nn.ConvTranspose2d(reversed_features[index], decoder_channels, kernel_size=2, stride=2)
+                build_upsample(config.upsample_mode, reversed_features[index], decoder_channels)
             )
             self.attention_gates.append(
                 AttentionGate(
                     gate_channels=decoder_channels,
                     skip_channels=decoder_channels,
                     intermediate_channels=intermediate_channels,
+                    normalization=config.normalization,
+                    bias=config.conv_bias,
                 )
             )
             self.decoder_blocks.append(
-                ConvBlock(reversed_features[index], decoder_channels, config.dropout)
+                ConvBlock(reversed_features[index], decoder_channels, config.dropout,
+                           config.activation, config.normalization, config.conv_bias)
             )
 
         self.output_head = nn.Conv2d(feature_sizes[0], config.out_channels, kernel_size=1)
+
+        initialize_weights(self, config.init_mode)
 
     def forward(self, x):
         skip_connections = []

@@ -4,11 +4,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import SwinUNetConfig
+from .config import SwinUNetConfig, build_activation, DropPath, initialize_weights
 
 
 class WindowAttention(nn.Module):
-    def __init__(self, embedding_dim: int, window_size: int, num_heads: int, dropout: float = 0.0):
+    def __init__(self, embedding_dim: int, window_size: int, num_heads: int,
+                 dropout: float = 0.0, attention_dropout: float = 0.0):
         super().__init__()
         self.window_size = window_size
         self.num_heads = num_heads
@@ -17,7 +18,7 @@ class WindowAttention(nn.Module):
 
         self.query_key_value = nn.Linear(embedding_dim, embedding_dim * 3)
         self.output_projection = nn.Linear(embedding_dim, embedding_dim)
-        self.attention_dropout = nn.Dropout(dropout)
+        self.attention_dropout = nn.Dropout(attention_dropout)
 
         self.relative_position_bias_table = nn.Parameter(
             torch.zeros((2 * window_size - 1) * (2 * window_size - 1), num_heads)
@@ -76,6 +77,9 @@ class SwinTransformerBlock(nn.Module):
         shift_size: int = 0,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
+        attention_dropout: float = 0.0,
+        ffn_activation: str = "gelu",
+        drop_path_rate: float = 0.0,
     ):
         super().__init__()
         self.window_size = window_size
@@ -83,12 +87,13 @@ class SwinTransformerBlock(nn.Module):
         self.embedding_dim = embedding_dim
 
         self.norm_1 = nn.LayerNorm(embedding_dim)
-        self.attention = WindowAttention(embedding_dim, window_size, num_heads, dropout)
+        self.attention = WindowAttention(embedding_dim, window_size, num_heads, dropout, attention_dropout)
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
         self.norm_2 = nn.LayerNorm(embedding_dim)
         hidden_dim = int(embedding_dim * mlp_ratio)
         self.feed_forward = nn.Sequential(
             nn.Linear(embedding_dim, hidden_dim),
-            nn.GELU(),
+            build_activation(ffn_activation),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, embedding_dim),
             nn.Dropout(dropout),
@@ -175,8 +180,8 @@ class SwinTransformerBlock(nn.Module):
         if pad_bottom > 0 or pad_right > 0:
             x_2d = x_2d[:, :height, :width, :]
 
-        x = shortcut + x_2d.view(batch_size, height * width, channels)
-        x = x + self.feed_forward(self.norm_2(x))
+        x = shortcut + self.drop_path(x_2d.view(batch_size, height * width, channels))
+        x = x + self.drop_path(self.feed_forward(self.norm_2(x)))
         return x
 
 
@@ -237,13 +242,17 @@ class PatchExpanding(nn.Module):
 
 
 class SwinEncoderStage(nn.Module):
-    def __init__(self, embedding_dim: int, depth: int, num_heads: int, window_size: int, mlp_ratio: float, dropout: float):
+    def __init__(self, embedding_dim: int, depth: int, num_heads: int, window_size: int, mlp_ratio: float,
+                 dropout: float, attention_dropout: float = 0.0, ffn_activation: str = "gelu",
+                 drop_path_rates: list[float] | None = None):
         super().__init__()
         self.blocks = nn.ModuleList()
         for block_index in range(depth):
             shift = 0 if block_index % 2 == 0 else window_size // 2
+            dpr = drop_path_rates[block_index] if drop_path_rates else 0.0
             self.blocks.append(
-                SwinTransformerBlock(embedding_dim, num_heads, window_size, shift, mlp_ratio, dropout)
+                SwinTransformerBlock(embedding_dim, num_heads, window_size, shift, mlp_ratio, dropout,
+                                     attention_dropout, ffn_activation, dpr)
             )
 
     def forward(self, x, height, width):
@@ -253,13 +262,17 @@ class SwinEncoderStage(nn.Module):
 
 
 class SwinDecoderStage(nn.Module):
-    def __init__(self, embedding_dim: int, depth: int, num_heads: int, window_size: int, mlp_ratio: float, dropout: float):
+    def __init__(self, embedding_dim: int, depth: int, num_heads: int, window_size: int, mlp_ratio: float,
+                 dropout: float, attention_dropout: float = 0.0, ffn_activation: str = "gelu",
+                 drop_path_rates: list[float] | None = None):
         super().__init__()
         self.blocks = nn.ModuleList()
         for block_index in range(depth):
             shift = 0 if block_index % 2 == 0 else window_size // 2
+            dpr = drop_path_rates[block_index] if drop_path_rates else 0.0
             self.blocks.append(
-                SwinTransformerBlock(embedding_dim, num_heads, window_size, shift, mlp_ratio, dropout)
+                SwinTransformerBlock(embedding_dim, num_heads, window_size, shift, mlp_ratio, dropout,
+                                     attention_dropout, ffn_activation, dpr)
             )
 
     def forward(self, x, height, width):
@@ -283,6 +296,15 @@ class SwinUNet(nn.Module):
         num_stages = len(config.depths)
         dims = [config.embedding_dim * (2 ** i) for i in range(num_stages)]
 
+        # Compute linearly increasing drop path rates per block
+        total_depth = sum(config.depths)
+        dpr = [x.item() for x in torch.linspace(0, config.stochastic_depth_rate, total_depth)]
+        dpr_splits = []
+        cursor = 0
+        for d in config.depths:
+            dpr_splits.append(dpr[cursor:cursor + d])
+            cursor += d
+
         self.encoder_stages = nn.ModuleList()
         self.downsample_layers = nn.ModuleList()
         for stage_index in range(num_stages):
@@ -290,6 +312,7 @@ class SwinUNet(nn.Module):
                 SwinEncoderStage(
                     dims[stage_index], config.depths[stage_index], config.num_heads[stage_index],
                     config.window_size, config.mlp_ratio, config.dropout,
+                    config.attention_dropout, config.ffn_activation, dpr_splits[stage_index],
                 )
             )
             if stage_index < num_stages - 1:
@@ -311,6 +334,7 @@ class SwinUNet(nn.Module):
                 SwinDecoderStage(
                     dims[decoder_index], config.depths[decoder_index], config.num_heads[decoder_index],
                     config.window_size, config.mlp_ratio, config.dropout,
+                    config.attention_dropout, config.ffn_activation, dpr_splits[decoder_index],
                 )
             )
 
@@ -318,6 +342,8 @@ class SwinUNet(nn.Module):
             dims[0], dims[0], kernel_size=config.patch_size, stride=config.patch_size,
         )
         self.output_head = nn.Conv2d(dims[0], config.out_channels, kernel_size=1)
+
+        initialize_weights(self, config.init_mode)
 
     def forward(self, x):
         x = self.patch_embed(x)

@@ -4,19 +4,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import TransUNetConfig
+from .config import TransUNetConfig, build_activation, build_norm2d, build_upsample, DropPath, initialize_weights
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0):
+    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0,
+                 activation: str = "relu", normalization: str = "batch", bias: bool = False):
         super().__init__()
         layers = [
-            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
+            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
         ]
         if dropout > 0:
             layers.append(nn.Dropout2d(dropout))
@@ -27,7 +28,8 @@ class ConvBlock(nn.Module):
 
 
 class MultiHeadSelfAttention(nn.Module):
-    def __init__(self, embedding_dim: int, num_heads: int, dropout: float = 0.0):
+    def __init__(self, embedding_dim: int, num_heads: int, dropout: float = 0.0,
+                 attention_dropout: float = 0.0):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = embedding_dim // num_heads
@@ -35,7 +37,7 @@ class MultiHeadSelfAttention(nn.Module):
 
         self.query_key_value = nn.Linear(embedding_dim, embedding_dim * 3)
         self.output_projection = nn.Linear(embedding_dim, embedding_dim)
-        self.attention_dropout = nn.Dropout(dropout)
+        self.attention_dropout = nn.Dropout(attention_dropout)
 
     def forward(self, x):
         batch_size, sequence_length, embedding_dim = x.shape
@@ -55,23 +57,25 @@ class MultiHeadSelfAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embedding_dim: int, num_heads: int, mlp_ratio: float = 4.0, dropout: float = 0.0):
+    def __init__(self, embedding_dim: int, num_heads: int, mlp_ratio: float = 4.0, dropout: float = 0.0,
+                 attention_dropout: float = 0.0, ffn_activation: str = "gelu", drop_path_rate: float = 0.0):
         super().__init__()
         self.norm_1 = nn.LayerNorm(embedding_dim)
-        self.attention = MultiHeadSelfAttention(embedding_dim, num_heads, dropout)
+        self.attention = MultiHeadSelfAttention(embedding_dim, num_heads, dropout, attention_dropout)
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
         self.norm_2 = nn.LayerNorm(embedding_dim)
         hidden_dim = int(embedding_dim * mlp_ratio)
         self.feed_forward = nn.Sequential(
             nn.Linear(embedding_dim, hidden_dim),
-            nn.GELU(),
+            build_activation(ffn_activation),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, embedding_dim),
             nn.Dropout(dropout),
         )
 
     def forward(self, x):
-        x = x + self.attention(self.norm_1(x))
-        x = x + self.feed_forward(self.norm_2(x))
+        x = x + self.drop_path(self.attention(self.norm_1(x)))
+        x = x + self.drop_path(self.feed_forward(self.norm_2(x)))
         return x
 
 
@@ -123,11 +127,13 @@ class TransUNet(nn.Module):
         self.downsample_layers = nn.ModuleList()
         channels = config.in_channels
         for feature_size in cnn_features:
-            self.encoder_blocks.append(ConvBlock(channels, feature_size, config.dropout))
+            self.encoder_blocks.append(ConvBlock(channels, feature_size, config.dropout,
+                                                  config.activation, config.normalization, config.conv_bias))
             self.downsample_layers.append(nn.MaxPool2d(2))
             channels = feature_size
 
-        self.pre_transformer_conv = ConvBlock(cnn_features[-1], bottleneck_channels, config.dropout)
+        self.pre_transformer_conv = ConvBlock(cnn_features[-1], bottleneck_channels, config.dropout,
+                                               config.activation, config.normalization, config.conv_bias)
 
         self.patch_embedding = PatchEmbedding(
             in_channels=bottleneck_channels,
@@ -135,14 +141,18 @@ class TransUNet(nn.Module):
             patch_size=config.patch_size,
         )
 
+        drop_path_rates = [x.item() for x in torch.linspace(0, config.stochastic_depth_rate, config.transformer_layers)]
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(
                 embedding_dim=bottleneck_channels,
                 num_heads=config.transformer_heads,
                 mlp_ratio=config.transformer_mlp_ratio,
                 dropout=config.dropout,
+                attention_dropout=config.attention_dropout,
+                ffn_activation=config.ffn_activation,
+                drop_path_rate=drop_path_rates[i],
             )
-            for _ in range(config.transformer_layers)
+            for i in range(config.transformer_layers)
         ])
         self.transformer_norm = nn.LayerNorm(bottleneck_channels)
 
@@ -151,13 +161,16 @@ class TransUNet(nn.Module):
         self.decoder_blocks = nn.ModuleList()
         for index in range(len(reversed_features) - 1):
             self.upsample_layers.append(
-                nn.ConvTranspose2d(reversed_features[index], reversed_features[index + 1], kernel_size=2, stride=2)
+                build_upsample(config.upsample_mode, reversed_features[index], reversed_features[index + 1])
             )
             self.decoder_blocks.append(
-                ConvBlock(reversed_features[index], reversed_features[index + 1], config.dropout)
+                ConvBlock(reversed_features[index], reversed_features[index + 1], config.dropout,
+                           config.activation, config.normalization, config.conv_bias)
             )
 
         self.output_head = nn.Conv2d(cnn_features[0], config.out_channels, kernel_size=1)
+
+        initialize_weights(self, config.init_mode)
 
     def forward(self, x):
         skip_connections = []

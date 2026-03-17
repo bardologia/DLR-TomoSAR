@@ -4,19 +4,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import UNetPlusPlusConfig
+from .config import UNetPlusPlusConfig, build_activation, build_norm2d, initialize_weights
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0):
+    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0,
+                 activation: str = "relu", normalization: str = "batch", bias: bool = False):
         super().__init__()
         layers = [
-            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
+            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
         ]
         if dropout > 0:
             layers.append(nn.Dropout2d(dropout))
@@ -51,29 +52,32 @@ class UNetPlusPlus(nn.Module):
         level_0, level_1, level_2, level_3 = feature_sizes
         bottleneck_width = level_3 * config.bottleneck_factor
         dropout = config.dropout
+        act = config.activation
+        norm = config.normalization
+        bias = config.conv_bias
 
         self.pool = nn.MaxPool2d(2)
         self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
 
-        self.encoder_0_0 = ConvBlock(config.in_channels, level_0, dropout)
-        self.encoder_1_0 = ConvBlock(level_0, level_1, dropout)
-        self.encoder_2_0 = ConvBlock(level_1, level_2, dropout)
-        self.encoder_3_0 = ConvBlock(level_2, level_3, dropout)
-        self.encoder_4_0 = ConvBlock(level_3, bottleneck_width, dropout)
+        self.encoder_0_0 = ConvBlock(config.in_channels, level_0, dropout, act, norm, bias)
+        self.encoder_1_0 = ConvBlock(level_0, level_1, dropout, act, norm, bias)
+        self.encoder_2_0 = ConvBlock(level_1, level_2, dropout, act, norm, bias)
+        self.encoder_3_0 = ConvBlock(level_2, level_3, dropout, act, norm, bias)
+        self.encoder_4_0 = ConvBlock(level_3, bottleneck_width, dropout, act, norm, bias)
 
-        self.dense_0_1 = ConvBlock(level_0 + level_1, level_0, dropout)
-        self.dense_1_1 = ConvBlock(level_1 + level_2, level_1, dropout)
-        self.dense_2_1 = ConvBlock(level_2 + level_3, level_2, dropout)
-        self.dense_3_1 = ConvBlock(level_3 + bottleneck_width, level_3, dropout)
+        self.dense_0_1 = ConvBlock(level_0 + level_1, level_0, dropout, act, norm, bias)
+        self.dense_1_1 = ConvBlock(level_1 + level_2, level_1, dropout, act, norm, bias)
+        self.dense_2_1 = ConvBlock(level_2 + level_3, level_2, dropout, act, norm, bias)
+        self.dense_3_1 = ConvBlock(level_3 + bottleneck_width, level_3, dropout, act, norm, bias)
 
-        self.dense_0_2 = ConvBlock(level_0 * 2 + level_1, level_0, dropout)
-        self.dense_1_2 = ConvBlock(level_1 * 2 + level_2, level_1, dropout)
-        self.dense_2_2 = ConvBlock(level_2 * 2 + level_3, level_2, dropout)
+        self.dense_0_2 = ConvBlock(level_0 * 2 + level_1, level_0, dropout, act, norm, bias)
+        self.dense_1_2 = ConvBlock(level_1 * 2 + level_2, level_1, dropout, act, norm, bias)
+        self.dense_2_2 = ConvBlock(level_2 * 2 + level_3, level_2, dropout, act, norm, bias)
 
-        self.dense_0_3 = ConvBlock(level_0 * 3 + level_1, level_0, dropout)
-        self.dense_1_3 = ConvBlock(level_1 * 3 + level_2, level_1, dropout)
+        self.dense_0_3 = ConvBlock(level_0 * 3 + level_1, level_0, dropout, act, norm, bias)
+        self.dense_1_3 = ConvBlock(level_1 * 3 + level_2, level_1, dropout, act, norm, bias)
 
-        self.dense_0_4 = ConvBlock(level_0 * 4 + level_1, level_0, dropout)
+        self.dense_0_4 = ConvBlock(level_0 * 4 + level_1, level_0, dropout, act, norm, bias)
 
         if self.deep_supervision:
             self.output_heads = nn.ModuleList(
@@ -81,6 +85,8 @@ class UNetPlusPlus(nn.Module):
             )
         else:
             self.output_head = nn.Conv2d(level_0, config.out_channels, kernel_size=1)
+
+        initialize_weights(self, config.init_mode)
 
     def _upsample_and_match(self, source, reference):
         return match_spatial_size(self.upsample(source), reference)

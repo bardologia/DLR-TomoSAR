@@ -4,26 +4,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import ResUNetConfig
+from .config import ResUNetConfig, build_activation, build_norm2d, build_upsample, initialize_weights
 
 
 class ResidualConvBlock(nn.Module):
-    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0):
+    def __init__(self, input_channels: int, output_channels: int, dropout: float = 0.0,
+                 activation: str = "relu", normalization: str = "batch", bias: bool = False):
         super().__init__()
         layers = [
-            nn.BatchNorm2d(input_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(output_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=False),
+            build_norm2d(normalization, input_channels),
+            build_activation(activation),
+            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
+            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=bias),
         ]
         if dropout > 0:
             layers.append(nn.Dropout2d(dropout))
         self.layers = nn.Sequential(*layers)
 
         if input_channels != output_channels:
-            self.shortcut = nn.Conv2d(input_channels, output_channels, kernel_size=1, bias=False)
+            self.shortcut = nn.Conv2d(input_channels, output_channels, kernel_size=1, bias=bias)
         else:
             self.shortcut = nn.Identity()
 
@@ -52,28 +53,32 @@ class ResUNet(nn.Module):
         feature_sizes = config.features
         bottleneck_channels = feature_sizes[-1] * config.bottleneck_factor
 
-        self.encoder_blocks = nn.ModuleList()
+        self.encoder_blocks    = nn.ModuleList()
         self.downsample_layers = nn.ModuleList()
         channels = config.in_channels
         for feature_size in feature_sizes:
-            self.encoder_blocks.append(ResidualConvBlock(channels, feature_size, config.dropout))
+            self.encoder_blocks.append(ResidualConvBlock(channels, feature_size, config.dropout, config.activation, config.normalization, config.conv_bias))
             self.downsample_layers.append(nn.MaxPool2d(2))
             channels = feature_size
 
-        self.bottleneck = ResidualConvBlock(feature_sizes[-1], bottleneck_channels, config.dropout)
+        self.bottleneck = ResidualConvBlock(feature_sizes[-1], bottleneck_channels, config.dropout,
+                                            config.activation, config.normalization, config.conv_bias)
 
         reversed_features = [bottleneck_channels] + feature_sizes[::-1]
         self.upsample_layers = nn.ModuleList()
         self.decoder_blocks = nn.ModuleList()
         for index in range(len(reversed_features) - 1):
             self.upsample_layers.append(
-                nn.ConvTranspose2d(reversed_features[index], reversed_features[index + 1], kernel_size=2, stride=2)
+                build_upsample(config.upsample_mode, reversed_features[index], reversed_features[index + 1])
             )
             self.decoder_blocks.append(
-                ResidualConvBlock(reversed_features[index], reversed_features[index + 1], config.dropout)
+                ResidualConvBlock(reversed_features[index], reversed_features[index + 1], config.dropout,
+                                   config.activation, config.normalization, config.conv_bias)
             )
 
         self.output_head = nn.Conv2d(feature_sizes[0], config.out_channels, kernel_size=1)
+
+        initialize_weights(self, config.init_mode)
 
     def forward(self, x):
         skip_connections = []
