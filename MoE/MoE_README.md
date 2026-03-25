@@ -72,7 +72,7 @@ The model comprises two components:
 The gating network receives the same input as the experts and outputs a probability map. Let $\mathbf{z} = g_{\text{logits}}(\mathbf{x}) \in \mathbb{R}^{B \times K \times H \times W}$ denote the raw logits. The assignment probabilities are obtained via temperature-scaled softmax:
 
 $$
-\mathbf{G}_{b,k,h,w} = \frac{\exp\!\bigl(\mathbf{z}_{b,k,h,w} \,/\, \tau\bigr)}{\displaystyle\sum_{j=1}^{K} \exp\!\bigl(\mathbf{z}_{b,j,h,w} \,/\, \tau\bigr)}
+\mathbf{G}_{b,k,h,w} = \frac{\exp(\mathbf{z}_{b,k,h,w} / \tau)}{\sum_{j=1}^{K} \exp(\mathbf{z}_{b,j,h,w} / \tau)}
 $$
 
 where $\tau > 0$ is the temperature. Lower temperatures sharpen the distribution toward hard selection; higher temperatures encourage softer mixing.
@@ -81,9 +81,9 @@ Three gating architectures are provided, offering a trade-off between capacity a
 
 | Architecture | Structure | Parameters |
 |:---|:---|:---|
-| **Lightweight CNN** | Sequential $3\!\times\!3$ convolution blocks with batch normalization and max-pooling, followed by a $1\!\times\!1$ projection head and bilinear upsampling to input resolution. | Low |
-| **Encoder–Only** | Multi-scale encoder with progressive downsampling, followed by symmetric upsampling stages (without skip connections), and a $1\!\times\!1$ head. | Medium |
-| **Linear Probe** | A single $1\!\times\!1$ convolution applied directly to the input. | Minimal |
+| **Lightweight CNN** | Sequential $3 \times 3$ convolution blocks with batch normalization and max-pooling, followed by a $1 \times 1$ projection head and bilinear upsampling to input resolution. | Low |
+| **Encoder–Only** | Multi-scale encoder with progressive downsampling, followed by symmetric upsampling stages (without skip connections), and a $1 \times 1$ head. | Medium |
+| **Linear Probe** | A single $1 \times 1$ convolution applied directly to the input. | Minimal |
 
 ### 3.2 Routing
 
@@ -98,23 +98,23 @@ $$
 **Hard routing.** Winner-take-all. Each pixel is assigned to the single highest-probability expert:
 
 $$
-k^{*}(b,h,w) = \arg\max_{k} \; \mathbf{G}_{b,k,h,w}
+k^{\ast}(b,h,w) = \underset{k}{\mathrm{argmax}} \; \mathbf{G}_{b,k,h,w}
 $$
 
 $$
-\mathbf{M}_{b,k,h,w} = \mathbb{1}\bigl[k = k^{*}(b,h,w)\bigr]
+\mathbf{M}_{b,k,h,w} = \mathbf{1}\left[ k = k^{\ast}(b,h,w) \right]
 $$
 
 Only experts that win at least one pixel across the entire batch are included in $\mathcal{A}$.
 
-**Top-$\boldsymbol{k}$ routing.** Each pixel is assigned to the $k$ experts with the highest gating probabilities. The selected weights are renormalized:
+**Top-$k$ routing.** Each pixel is assigned to the $k$ experts with the highest gating probabilities. The selected weights are renormalized:
 
 $$
-\mathcal{S}(b,h,w) = \operatorname{top\text{-}k}\bigl(\mathbf{G}_{b,:,h,w}\bigr)
+\mathcal{S}(b,h,w) = \text{top-}k\left(\mathbf{G}_{b,:,h,w}\right)
 $$
 
 $$
-\tilde{\mathbf{G}}_{b,j,h,w} = \frac{\mathbf{G}_{b,j,h,w}}{\displaystyle\sum_{j' \in \mathcal{S}(b,h,w)} \mathbf{G}_{b,j',h,w} + \epsilon}
+\tilde{\mathbf{G}}_{b,j,h,w} = \frac{\mathbf{G}_{b,j,h,w}}{\sum_{j' \in \mathcal{S}(b,h,w)} \mathbf{G}_{b,j',h,w} + \epsilon}
 \quad \text{for } j \in \mathcal{S}(b,h,w)
 $$
 
@@ -135,7 +135,7 @@ Inactive experts are never evaluated, yielding proportional savings in hard and 
 Because experts produce outputs of different dimensionalities ($C_k \neq C_j$ in general), each expert output is zero-padded along the channel axis to $C_{\max}$ before aggregation:
 
 $$
-\tilde{\mathbf{o}}_k = \operatorname{Pad}(\mathbf{o}_k,\; C_{\max}) \in \mathbb{R}^{B \times C_{\max} \times H \times W}
+\tilde{\mathbf{o}}_k = \text{Pad}(\mathbf{o}_k, \; C_{\max}) \in \mathbb{R}^{B \times C_{\max} \times H \times W}
 $$
 
 The padded channels carry a constant fill value (zero by default) and do not contribute meaningful gradients, ensuring that expert $k$ is only supervised on its own $C_k$ channels.
@@ -153,7 +153,7 @@ $$
 **Hard aggregation:**
 
 $$
-\hat{\mathbf{y}}_{b,:,h,w} = \tilde{\mathbf{o}}_{k^{*}(b,h,w),\; b,:,h,w}
+\hat{\mathbf{y}}_{b,:,h,w} = \tilde{\mathbf{o}}_{k^{\ast}(b,h,w), \; b,:,h,w}
 $$
 
 **Top-$k$ aggregation:**
@@ -174,15 +174,15 @@ Two variants are supported depending on the training configuration.
 **Aggregated reconstruction.** A standard pixel-wise loss applied to the final (aggregated) prediction:
 
 $$
-\mathcal{L}_{\text{recon}} = \ell\!\bigl(\hat{\mathbf{y}},\; \mathbf{y}^{*}\bigr)
+\mathcal{L}_{\text{recon}} = \ell\left(\hat{\mathbf{y}}, \; \mathbf{y}^{\ast}\right)
 $$
 
-where $\ell$ is MSE, $L_1$, or Smooth-$L_1$, and $\mathbf{y}^{*}$ is the ground-truth target.
+where $\ell$ is MSE, $L_1$, or Smooth-$L_1$, and $\mathbf{y}^{\ast}$ is the ground-truth target.
 
 **Per-expert reconstruction.** Each expert is individually supervised on the first $C_k$ channels of the target, weighted by its gating probability. This provides a stronger learning signal for specialization:
 
 $$
-\mathcal{L}_{\text{per-expert}} = \sum_{k \in \mathcal{A}} \frac{1}{BHW} \sum_{b,h,w} \mathbf{G}_{b,k,h,w} \cdot \bigl\| \mathbf{o}_{k,\,b,:,h,w} - \mathbf{y}^{*}_{b,\,1:C_k,\,h,w} \bigr\|_2^2
+\mathcal{L}_{\text{per-expert}} = \sum_{k \in \mathcal{A}} \frac{1}{BHW} \sum_{b,h,w} \mathbf{G}_{b,k,h,w} \cdot \left\| \mathbf{o}_{k, b,:,h,w} - \mathbf{y}^{\ast}_{b, 1:C_k, h,w} \right\|_2^2
 $$
 
 The weighting by $\mathbf{G}$ ensures that each expert's reconstruction loss is concentrated on the pixels that the gate has assigned to it.
@@ -196,7 +196,7 @@ $$
 $$
 
 $$
-\mathcal{L}_{\text{balance}} = \frac{\operatorname{Var}(\bar{g}_1, \ldots, \bar{g}_K)}{\bigl[\operatorname{Mean}(\bar{g}_1, \ldots, \bar{g}_K)\bigr]^2 + \epsilon}
+\mathcal{L}_{\text{balance}} = \frac{\text{Var}(\bar{g}_1, \ldots, \bar{g}_K)}{\left[\text{Mean}(\bar{g}_1, \ldots, \bar{g}_K)\right]^2 + \epsilon}
 $$
 
 This term equals zero when all experts receive identical average load ($\bar{g}_1 = \cdots = \bar{g}_K$), and grows as the load distribution becomes more skewed.
