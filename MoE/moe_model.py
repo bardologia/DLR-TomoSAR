@@ -91,6 +91,7 @@ class DenseMoE(nn.Module):
         gate_probs  : torch.Tensor,
         mask        : torch.Tensor,
     ) -> torch.Tensor:
+        
         b, k, h, w = gate_probs.shape
         c          = self.config.max_out_channels
         agg        = self.config.aggregation
