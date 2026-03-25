@@ -11,7 +11,7 @@ This document formalizes the architecture, the three routing strategies, the com
 
 ## 2. Problem Statement
 
-Let $\mathbf{x} \in \mathbb{R}^{B \times C_{\text{in}} \times H \times W}$ be a batch of input images. The task is to produce a dense prediction $\hat{\mathbf{y}} \in \mathbb{R}^{B \times C_{\max} \times H \times W}$, where $C_{\max} = \max_k C_k$ and $C_k$ is the output dimensionality of expert $k$. Each spatial location $(h, w)$ may require a different number of active output channels, determined by the local signal complexity.
+Let $\mathbf{x}$ be a batch of input images in $\mathbb{R}^{B \times C_{in} \times H \times W}$. The task is to produce a dense prediction $\hat{\mathbf{y}}$ in $\mathbb{R}^{B \times C_{max} \times H \times W}$, where $C_{max} = \max_k C_k$ and $C_k$ is the output dimensionality of expert $k$. Each spatial location $(h, w)$ may require a different number of active output channels, determined by the local signal complexity.
 
 
 ## 3. Architecture
@@ -63,19 +63,29 @@ Let $\mathbf{x} \in \mathbb{R}^{B \times C_{\text{in}} \times H \times W}$ be a 
 
 The model comprises two components:
 
-- **Expert pool** $\{E_k\}_{k=1}^{K}$: each expert $E_k : \mathbb{R}^{C_{\text{in}} \times H \times W} \to \mathbb{R}^{C_k \times H \times W}$ is a dense prediction network (e.g., UNet). Different experts have different output channel counts ($C_1 < C_2 < \cdots < C_K$).
+- **Expert pool** $\lbrace E_k \rbrace_{k=1}^{K}$ : each expert is a dense prediction network (e.g., UNet) mapping
 
-- **Gating network** $g : \mathbb{R}^{C_{\text{in}} \times H \times W} \to \mathbb{R}^{K \times H \times W}$: produces a per-pixel probability distribution over experts.
+$$
+E_k : \mathbb{R}^{C_{\text{in}} \times H \times W} \to \mathbb{R}^{C_k \times H \times W}
+$$
+
+  Different experts have different output channel counts ( $C_1 \lt C_2 \lt \cdots \lt C_K$ ).
+
+- **Gating network** produces a per-pixel probability distribution over experts:
+
+$$
+g : \mathbb{R}^{C_{\text{in}} \times H \times W} \to \mathbb{R}^{K \times H \times W}
+$$
 
 ### 3.1 Gating Network
 
-The gating network receives the same input as the experts and outputs a probability map. Let $\mathbf{z} = g_{\text{logits}}(\mathbf{x}) \in \mathbb{R}^{B \times K \times H \times W}$ denote the raw logits. The assignment probabilities are obtained via temperature-scaled softmax:
+The gating network receives the same input as the experts and outputs a probability map. Let $\mathbf{z} = g _{\text{logits}}(\mathbf{x})$ denote the raw logits in $\mathbb{R}^{B \times K \times H \times W}$. The assignment probabilities are obtained via temperature-scaled softmax:
 
 $$
 \mathbf{G}_{b,k,h,w} = \frac{\exp(\mathbf{z}_{b,k,h,w} / \tau)}{\sum_{j=1}^{K} \exp(\mathbf{z}_{b,j,h,w} / \tau)}
 $$
 
-where $\tau > 0$ is the temperature. Lower temperatures sharpen the distribution toward hard selection; higher temperatures encourage softer mixing.
+where $\tau \gt 0$ is the temperature. Lower temperatures sharpen the distribution toward hard selection; higher temperatures encourage softer mixing.
 
 Three gating architectures are provided, offering a trade-off between capacity and cost:
 
@@ -87,7 +97,7 @@ Three gating architectures are provided, offering a trade-off between capacity a
 
 ### 3.2 Routing
 
-Given the gate probabilities $\mathbf{G}$, a routing step determines the set of active experts $\mathcal{A}$ and an expert mask $\mathbf{M} \in \{0, 1\}^{B \times K \times H \times W}$. Three modes are supported:
+Given the gate probabilities $\mathbf{G}$, a routing step determines the set of active experts $\mathcal{A}$ and an expert mask $\mathbf{M} \in \lbrace 0, 1 \rbrace^{B \times K \times H \times W}$. Three modes are supported:
 
 **Soft routing.** All experts are active. Every pixel is served by all $K$ experts, weighted by $\mathbf{G}$:
 
@@ -177,7 +187,7 @@ $$
 \mathcal{L}_{\text{recon}} = \ell\left(\hat{\mathbf{y}}, \; \mathbf{y}^{\ast}\right)
 $$
 
-where $\ell$ is MSE, $L_1$, or Smooth-$L_1$, and $\mathbf{y}^{\ast}$ is the ground-truth target.
+where $\ell$ is MSE, $L\_1$, or Smooth- $L\_1$, and $\mathbf{y}^{\ast}$ is the ground-truth target.
 
 **Per-expert reconstruction.** Each expert is individually supervised on the first $C_k$ channels of the target, weighted by its gating probability. This provides a stronger learning signal for specialization:
 
@@ -189,7 +199,7 @@ The weighting by $\mathbf{G}$ ensures that each expert's reconstruction loss is 
 
 ### 4.2 Load-Balance Loss
 
-Without regularization, the gating network can collapse to routing all pixels to a single expert, leaving the remaining experts unused. The load-balance loss penalizes imbalanced utilization by measuring the squared coefficient of variation ($\mathrm{CV}^2$) of the mean expert assignment:
+Without regularization, the gating network can collapse to routing all pixels to a single expert, leaving the remaining experts unused. The load-balance loss penalizes imbalanced utilization by measuring the squared coefficient of variation ( $\text{CV}^2$ ) of the mean expert assignment:
 
 $$
 \bar{g}_k = \frac{1}{BHW} \sum_{b,h,w} \mathbf{G}_{b,k,h,w}
@@ -199,7 +209,7 @@ $$
 \mathcal{L}_{\text{balance}} = \frac{\text{Var}(\bar{g}_1, \ldots, \bar{g}_K)}{\left[\text{Mean}(\bar{g}_1, \ldots, \bar{g}_K)\right]^2 + \epsilon}
 $$
 
-This term equals zero when all experts receive identical average load ($\bar{g}_1 = \cdots = \bar{g}_K$), and grows as the load distribution becomes more skewed.
+This term equals zero when all experts receive identical average load ( $\bar{g}\_1 = \cdots = \bar{g}\_K$ ), and grows as the load distribution becomes more skewed.
 
 ### 4.3 Gating Entropy Loss
 
@@ -209,7 +219,7 @@ $$
 \mathcal{L}_{\text{entropy}} = -\frac{1}{BHW} \sum_{b,h,w} \sum_{k=1}^{K} \mathbf{G}_{b,k,h,w} \log \mathbf{G}_{b,k,h,w}
 $$
 
-The minimum ($\mathcal{L}_{\text{entropy}} = 0$) is achieved when the gate assigns probability 1 to a single expert at every pixel. The maximum ($\mathcal{L}_{\text{entropy}} = \log K$) occurs when the gate assigns uniform probability $1/K$ everywhere.
+The minimum ( $\mathcal{L} _{\text{entropy}} = 0$ ) is achieved when the gate assigns probability 1 to a single expert at every pixel. The maximum ( $\mathcal{L} _{\text{entropy}} = \log K$ ) occurs when the gate assigns uniform probability $1/K$ everywhere.
 
 **Interplay between balance and entropy.** The load-balance loss and the entropy loss exert competing pressures. The balance loss pushes toward uniform global utilization, while the entropy loss pushes toward deterministic per-pixel decisions. Together, they encourage the gate to specialize experts for different regions while keeping all experts active.
 
@@ -219,7 +229,7 @@ $$
 \mathcal{L}_{\text{total}} = \lambda_{\text{recon}} \, \mathcal{L}_{\text{recon}} + \lambda_{\text{balance}} \, \mathcal{L}_{\text{balance}} + \lambda_{\text{entropy}} \, \mathcal{L}_{\text{entropy}}
 $$
 
-Default weights: $\lambda_{\text{recon}} = 1.0$, $\lambda_{\text{balance}} = 0.01$, $\lambda_{\text{entropy}} = 0.01$.
+Default weights: $\lambda _{\text{recon}} = 1.0$, $\lambda _{\text{balance}} = 0.01$, $\lambda _{\text{entropy}} = 0.01$.
 
 
 ## 5. Training Regimes
@@ -232,11 +242,11 @@ Three training modes decouple the expert and gating learning phases.
 | **Gate-only** | Frozen | Trainable | Pretrained experts; learn routing on top. |
 | **Experts-only** | Trainable | Frozen | Fixed routing policy; refine expert weights. |
 
-In gate-only mode, separate learning rates are used for experts (frozen, $\eta_E = 0$) and the gating network ($\eta_G$), enabling stable training when only one component is active.
+In gate-only mode, separate learning rates are used for experts (frozen, $\eta_E = 0$) and the gating network ( $\eta_G$ ), enabling stable training when only one component is active.
 
 ### 5.1 Optimization
 
-The optimizer supports separate parameter groups with different learning rates for experts ($\eta_E$) and gating ($\eta_G$). Only parameters with active gradients are registered. Available optimizers include Adam, AdamW, and SGD (with momentum 0.9). Learning rate scheduling follows cosine annealing or step decay.
+The optimizer supports separate parameter groups with different learning rates for experts ( $\eta_E$ ) and gating ( $\eta_G$ ). Only parameters with active gradients are registered. Available optimizers include Adam, AdamW, and SGD (with momentum 0.9). Learning rate scheduling follows cosine annealing or step decay.
 
 
 ## 6. Summary
