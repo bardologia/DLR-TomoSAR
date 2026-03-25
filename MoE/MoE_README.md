@@ -11,61 +11,41 @@ This document formalizes the architecture, the three routing strategies, the com
 
 ## 2. Notation
 
-The following table summarizes all symbols used throughout.
+All operations are applied independently at every pixel. To keep equations clean, we write them **for a single pixel** and omit batch/spatial indices unless needed for clarity. Tensors have shape *(batch, channels, height, width)*.
 
-| Symbol | Description |
+| Symbol | Meaning |
 |:---|:---|
-| *B* | Batch size |
-| *H*, *W* | Spatial height and width of the input/output |
-| *C_in* | Number of input channels |
 | *K* | Number of experts |
-| *C_k* | Number of output channels for expert *k* |
-| *C_max* | Maximum output channels across all experts, equal to max(*C_1*, ..., *C_K*) |
-| **x** | Input tensor of shape (*B*, *C_in*, *H*, *W*) |
-| **y*** | Ground-truth target tensor of shape (*B*, *C_max*, *H*, *W*) |
-| **ŷ** | Predicted output tensor of shape (*B*, *C_max*, *H*, *W*) |
-| *E_k* | The *k*-th expert network |
+| *x* | Input image |
+| *y* | Ground-truth target |
+| *E_k* | Expert network *k*, producing *C_k* output channels |
+| *C_k* | Output channels of expert *k* (e.g. 3, 6, 9) |
+| *C_max* | Largest *C_k* across all experts |
 | *g* | Gating network |
-| **z** | Raw gating logits of shape (*B*, *K*, *H*, *W*) |
-| tau | Temperature parameter for the softmax in the gating network |
-| **G** | Gating probability tensor of shape (*B*, *K*, *H*, *W*), after softmax |
-| **M** | Binary expert mask of shape (*B*, *K*, *H*, *W*) |
-| A | Set of active expert indices determined by routing |
-| S(b,h,w) | Set of selected expert indices for pixel *(b, h, w)* in top-*k* routing |
-| **o_k** | Output of expert *k* before padding, shape (*B*, *C_k*, *H*, *W*) |
-| **õ_k** | Output of expert *k* after zero-padding to *C_max* channels |
-| **G̃** | Renormalized gating weights used in top-*k* aggregation |
-| *k** | Winning expert index for a given pixel in hard routing |
-| epsilon | Small constant for numerical stability |
-| L_recon | Reconstruction loss |
-| L_balance | Load-balance loss |
-| L_entropy | Gating entropy loss |
-| L_total | Weighted sum of all loss terms |
-| lambda_recon | Weight for the reconstruction loss (default 1.0) |
-| lambda_balance | Weight for the load-balance loss (default 0.01) |
-| lambda_entropy | Weight for the entropy loss (default 0.01) |
-| eta_E | Learning rate for expert parameters |
-| eta_G | Learning rate for gating parameters |
-| ell | Reconstruction loss function (e.g. MSE, L1, or Smooth L1) |
+| *z_k* | Raw logit for expert *k* (before softmax) |
+| *p_k* | Gating probability for expert *k* (after softmax) |
+| *T* | Temperature of the softmax |
+| *A* | Set of active expert indices after routing |
+| *w* | Winner expert index in hard routing |
 
 
 ## 3. Problem Statement
 
-The input is a batch of images **x** with shape *(B, C_in, H, W)*. The goal is to produce a dense prediction **ŷ** with shape *(B, C_max, H, W)*, where *C_max* is the largest output dimensionality among all experts. Each spatial location *(h, w)* may require a different number of active output channels, determined by the local signal complexity.
+Given an input image *x*, the goal is a dense per-pixel prediction with *C_max* output channels. Each pixel may only need a subset of those channels (e.g. 3 out of 9), and the MoE framework lets the gating network select the appropriate expert for each location.
 
 
 ## 4. Architecture
 
 ```
                         ┌─────────────────────┐
-                        │  Input (B,Cin,H,W)  │
+                        │       Input x       │
                         └──────────┬──────────┘
                        ┌───────────┴──────────┐
                        │                      │
                        ▼                      │
               ┌─────────────────┐             │
-              │   Gating g(x)   │             │
-              │  softmax(z / τ) │             │
+              │  Gating g(x)    │             │
+              │  softmax(z / T) │             │
               └────────┬────────┘             │
                        │                      │
                        ▼                      │
@@ -79,191 +59,173 @@ The input is a batch of images **x** with shape *(B, C_in, H, W)*. The goal is t
             ┌──────────┼──────────┐           │
             │          │          │           │
             ▼          ▼          ▼           │
-       ┌─────────┐┌─────────┐┌─────────┐     │
-       │ Expert 1││ Expert 2││ Expert 3│◄────┘
-       │ (C₁=3)  ││ (C₂=6)  ││ (C₃=9)  │  only active
+       ┌─────────┐┌─────────┐┌─────────┐      │
+       │ Expert 1││ Expert 2││ Expert 3│◄─────┘
+       │  C=3    ││  C=6    ││  C=9    │  only active
        └────┬────┘└────┬────┘└────┬────┘  experts run
             │          │          │
             ▼          ▼          ▼
        ┌──────────────────────────────┐
-       │    Pad to Cmax channels      │
+       │  Pad all outputs to C_max    │
        └──────────────┬───────────────┘
                       │
                       ▼
        ┌──────────────────────────────┐
-       │    Aggregate (G-weighted)    │
+       │  Weighted aggregation        │
        └──────────────┬───────────────┘
                       │
                       ▼
               ┌─────────────────────┐
-              │ Output (B,Cmax,H,W) │
+              │    Prediction ŷ     │
               └─────────────────────┘
 ```
 
-The model comprises two components:
+The model has two components:
 
-- **Expert pool**: *K* expert networks, where each *E_k* maps an input with *C_in* channels to an output with *C_k* channels. The experts have ordered output sizes *C_1 < C_2 < ... < C_K*.
+- **Expert pool**: *K* networks. Expert *k* takes the input *x* and produces an output with *C_k* channels. The experts are ordered by complexity: *C_1 < C_2 < ... < C_K* (e.g. 3, 6, 9).
 
-- **Gating network** *g*: produces a per-pixel probability distribution over the *K* experts, outputting a tensor of shape *(B, K, H, W)*.
+- **Gating network** *g*: takes the same input *x* and produces one probability per expert per pixel.
+
 
 ### 4.1 Gating Network
 
-The gating network receives the same input as the experts. It first produces raw logits **z** of shape *(B, K, H, W)*, then converts them to assignment probabilities **G** via temperature-scaled softmax:
+The gating network outputs one logit *z_k* per expert, then converts to probabilities via temperature-scaled softmax:
 
 $$
-G_{b,k,h,w} = \frac{\exp(z_{b,k,h,w} \;/\; \tau)}{\sum_{j=1}^{K} \exp(z_{b,j,h,w} \;/\; \tau)}
+p_k = \frac{\exp(z_k \;/\; T)}{\sum_{j=1}^{K} \exp(z_j \;/\; T)}
 $$
 
-A lower tau sharpens the distribution toward hard selection; a higher tau encourages softer mixing.
+A low *T* makes the distribution sharp (close to one-hot); a high *T* makes it uniform. Three gating architectures are provided:
 
-Three gating architectures are provided, offering a trade-off between capacity and cost:
-
-| Architecture | Structure | Param. count |
+| Architecture | Structure | Cost |
 |:---|:---|:---|
-| **Lightweight CNN** | Sequential 3x3 conv blocks with batch normalization and max-pooling, followed by a 1x1 projection head and bilinear upsampling to input resolution. | Low |
-| **Encoder–Only** | Multi-scale encoder with progressive downsampling, followed by symmetric upsampling stages (without skip connections), and a 1x1 head. | Medium |
-| **Linear Probe** | A single 1x1 convolution applied directly to the input. | Minimal |
+| **Lightweight CNN** | 3x3 conv blocks with batch norm and pooling, then a 1x1 head with bilinear upsampling. | Low |
+| **Encoder–Only** | Multi-scale down/up path (no skip connections), then a 1x1 head. | Medium |
+| **Linear Probe** | A single 1x1 convolution. | Minimal |
+
 
 ### 4.2 Routing
 
-Given the gate probabilities **G**, a routing step determines the active expert set A and a binary mask **M** of shape *(B, K, H, W)*. Three modes are supported:
+Using the probabilities *p_1, ..., p_K*, the routing step decides which experts are active. Three modes:
 
-**Soft routing.** All experts are active. Every pixel is served by all *K* experts, each weighted by its gating probability:
+**Soft:** all experts are active, weighted by their probabilities.
 
-$$
-A = \lbrace 1, \dots, K \rbrace, \quad M_{b,k,h,w} = 1 \;\;\forall\; k
-$$
-
-**Hard routing.** Winner-take-all. Each pixel is assigned to the single highest-probability expert. The winning index *k** is:
+**Hard (winner-take-all):** each pixel picks the single best expert:
 
 $$
-k^{\ast}(b,h,w) = \underset{k}{\text{argmax}} \; G_{b,k,h,w}
+w = \underset{k}{\text{argmax}} \; p_k
 $$
 
-The mask selects only the winner:
+Only experts that win at least one pixel in the batch actually run.
+
+**Top-*k*:** each pixel picks the *k* best experts; their probabilities are renormalized to sum to 1:
 
 $$
-M_{b,k,h,w} = \begin{cases} 1 & \text{if } k = k^{\ast}(b,h,w) \\\ 0 & \text{otherwise} \end{cases}
+p'_j = \frac{p_j}{\sum_{j' \in \text{top-}k} p_{j'}}
 $$
 
-Only experts that win at least one pixel across the entire batch are included in A.
-
-**Top-*k* routing.** Each pixel is assigned to the *k* experts with the highest gating probabilities. Let S(b,h,w) denote that selected set. The selected weights are renormalized:
-
-$$
-\tilde{G}_{b,j,h,w} = \frac{G_{b,j,h,w}}{\sum_{j' \in S(b,h,w)} G_{b,j',h,w} + \epsilon} \quad \text{for } j \in S(b,h,w)
-$$
-
-Only experts that appear in at least one pixel's selection set are included in A.
 
 ### 4.3 Conditional Expert Execution
 
-The key computational benefit of the gate-first design is that only experts in A are executed:
+Only experts in the active set *A* are executed. For each active expert:
 
 $$
-o_k = E_k(x) \quad \text{for each } k \in A
+o_k = E_k(x)
 $$
 
-Each output *o_k* has shape *(B, C_k, H, W)*. Inactive experts are never evaluated, yielding proportional computational savings in hard and top-*k* modes.
+Inactive experts are skipped entirely, saving computation in hard and top-*k* modes.
+
 
 ### 4.4 Channel Padding
 
-Because experts produce outputs of different dimensionalities, each expert output is zero-padded along the channel axis to *C_max* before aggregation:
+Each expert output *o_k* has *C_k* channels, but aggregation requires a common size. All outputs are zero-padded to *C_max* channels:
 
 $$
 \tilde{o}_k = \text{Pad}(o_k, \; C_{\text{max}})
 $$
 
-The padded tensor has shape *(B, C_max, H, W)*. The extra channels carry a constant fill value (zero by default) and do not contribute meaningful gradients, ensuring that expert *k* is only supervised on its own *C_k* channels.
+The padded channels are filled with zeros and do not receive meaningful gradients, so expert *k* is only trained on its own *C_k* channels.
+
 
 ### 4.5 Aggregation
 
-The padded expert outputs are combined into the final prediction **ŷ**.
+The padded outputs are combined into the final prediction.
 
-**Soft aggregation** — weighted sum over all experts:
-
-$$
-\hat{y}_{b,:,h,w} = \sum_{k=1}^{K} G_{b,k,h,w} \cdot \tilde{o}_{k,b,:,h,w}
-$$
-
-**Hard aggregation** — output of the winning expert only:
+**Soft** — weighted sum over all experts:
 
 $$
-\hat{y}_{b,:,h,w} = \tilde{o}_{k^{\ast}(b,h,w),\;b,:,h,w}
+\hat{y} = \sum_{k=1}^{K} p_k \cdot \tilde{o}_k
 $$
 
-**Top-*k* aggregation** — renormalized weighted sum over selected experts:
+**Hard** — output of the winning expert:
 
 $$
-\hat{y}_{b,:,h,w} = \sum_{j \in S(b,h,w)} \tilde{G}_{b,j,h,w} \cdot \tilde{o}_{j,b,:,h,w}
+\hat{y} = \tilde{o}_w
+$$
+
+**Top-*k*** — renormalized weighted sum over the selected experts:
+
+$$
+\hat{y} = \sum_{j \in \text{top-}k} p'_j \cdot \tilde{o}_j
 $$
 
 
 ## 5. Loss Function
 
-Training is guided by a composite objective consisting of three terms.
+The total loss combines three terms.
 
 ### 5.1 Reconstruction Loss
 
-Two variants are supported.
-
-**Aggregated reconstruction.** A standard pixel-wise loss applied to the final prediction:
+**Aggregated variant.** A standard loss (MSE, L1, or Smooth L1) on the final prediction:
 
 $$
-L_{\text{recon}} = \ell(\hat{y}, \; y^{\ast})
+L_{\text{recon}} = \text{loss}(\hat{y}, \; y)
 $$
 
-where ell is a reconstruction criterion — MSE, L1, or Smooth L1 — and **y*** is the ground-truth target.
-
-**Per-expert reconstruction.** Each expert is individually supervised on the first *C_k* channels of the target, weighted by its gating probability. This provides a stronger learning signal for specialization:
+**Per-expert variant.** Each expert is supervised individually on the first *C_k* channels of the target, weighted by the gating probability. This gives each expert a direct learning signal on the pixels the gate assigns to it:
 
 $$
-L_{\text{per-expert}} = \sum_{k \in A} \frac{1}{BHW} \sum_{b,h,w} G_{b,k,h,w} \cdot \left\| o_{k,b,:,h,w} - y^{\ast}_{b,1:C_k,h,w} \right\|_2^2
+L_{\text{expert}} = \sum_{k \in A} \; p_k \cdot \| \; o_k - y_{1:C_k} \; \|^2
 $$
 
-The weighting by **G** ensures that each expert's loss is concentrated on the pixels the gate has assigned to it.
+averaged over all pixels in the batch.
+
 
 ### 5.2 Load-Balance Loss
 
-Without regularization, the gating network can collapse to routing all pixels to a single expert, leaving the rest unused. The load-balance loss penalizes imbalanced utilization by measuring the squared coefficient of variation (CV²) of the mean expert load. First, compute the average gating probability per expert:
+Prevents the gate from collapsing onto a single expert. It measures how evenly the experts are used across all pixels, via the squared coefficient of variation (CV²). Let *f_k* be the average gating probability for expert *k* across the batch:
 
 $$
-\bar{g}_k = \frac{1}{BHW} \sum_{b,h,w} G_{b,k,h,w}
+L_{\text{balance}} = \frac{\text{Var}(f_1, \ldots, f_K)}{\text{Mean}(f_1, \ldots, f_K)^2}
 $$
 
-Then:
+This is zero when all experts get equal load, and grows when load is imbalanced.
 
-$$
-L_{\text{balance}} = \frac{\text{Var}(\bar{g}_1, \ldots, \bar{g}_K)}{\left[\text{Mean}(\bar{g}_1, \ldots, \bar{g}_K)\right]^2 + \epsilon}
-$$
-
-This term equals zero when all experts receive identical average load, and grows as the distribution becomes more skewed.
 
 ### 5.3 Gating Entropy Loss
 
-The entropy of the per-pixel gating distribution measures how uncertain the gate is at each location. Minimizing entropy encourages the gate to make sharper, more decisive assignments:
+Encourages the gate to make confident (low-entropy) decisions at each pixel:
 
 $$
-L_{\text{entropy}} = -\frac{1}{BHW} \sum_{b,h,w} \sum_{k=1}^{K} G_{b,k,h,w} \log G_{b,k,h,w}
+L_{\text{entropy}} = - \sum_{k=1}^{K} p_k \log p_k
 $$
 
-When the gate assigns all probability to one expert at every pixel, the entropy is zero. When the gate assigns uniform probability 1/*K* everywhere, the entropy reaches its maximum of log *K*.
+averaged over all pixels. Entropy is zero when the gate is fully decisive (one expert gets probability 1) and maximal (log *K*) when the gate is uniform.
 
-**Interplay between balance and entropy.** These two losses exert competing pressures. The balance loss pushes toward uniform global utilization, while the entropy loss pushes toward deterministic per-pixel decisions. Together, they encourage the gate to specialize experts for different regions while keeping all experts active.
+**Interplay.** These two losses pull in opposite directions: balance wants all experts used equally across the image, while entropy wants each individual pixel to commit to one expert. Together they encourage specialization — each expert owns a region of the image, but no expert is left idle.
+
 
 ### 5.4 Total Objective
 
 $$
-L_{\text{total}} = \lambda_{\text{recon}} \cdot L_{\text{recon}} + \lambda_{\text{balance}} \cdot L_{\text{balance}} + \lambda_{\text{entropy}} \cdot L_{\text{entropy}}
+L_{\text{total}} = \lambda_r \cdot L_{\text{recon}} + \lambda_b \cdot L_{\text{balance}} + \lambda_e \cdot L_{\text{entropy}}
 $$
 
-The default loss weights are:
-
-| Weight | Default value | Role |
+| Weight | Default | Role |
 |:---|:---:|:---|
-| lambda_recon | 1.0 | Reconstruction fidelity |
-| lambda_balance | 0.01 | Expert utilization balance |
-| lambda_entropy | 0.01 | Gating decision sharpness |
+| *λ_r* | 1.0 | Reconstruction fidelity |
+| *λ_b* | 0.01 | Expert utilization balance |
+| *λ_e* | 0.01 | Gating decision sharpness |
 
 
 ## 6. Training Regimes
