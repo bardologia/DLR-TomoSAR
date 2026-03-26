@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 
+# Randomly drops entire residual branches during training for regularization
 class DropPath(nn.Module):
     """Stochastic depth / drop path regularization."""
 
@@ -23,6 +24,7 @@ class DropPath(nn.Module):
         return x / keep_prob * random_tensor
 
 
+# Factory: maps string name to the corresponding activation function
 def build_activation(name: str) -> nn.Module:
     """Create an activation module from a string name."""
     factories = {
@@ -37,6 +39,7 @@ def build_activation(name: str) -> nn.Module:
     return factories[name]()
 
 
+# Factory: maps string name to the corresponding 2D normalization layer
 def build_norm2d(name: str, num_features: int) -> nn.Module:
     """Create a 2D normalization layer from a string name."""
     if name == "batch":
@@ -53,18 +56,39 @@ def build_norm2d(name: str, num_features: int) -> nn.Module:
     raise ValueError(f"Unknown normalization '{name}'. Available: batch, instance, group, none")
 
 
-def build_upsample(mode: str, in_channels: int, out_channels: int, scale_factor: int = 2) -> nn.Module:
+# Factory: creates upsampling layer (learned ConvTranspose or bilinear + 1x1 conv)
+def build_upsample(
+    mode:         str,
+    in_channels:  int,
+    out_channels: int,
+    scale_factor: int = 2,
+) -> nn.Module:
     """Create an upsampling module."""
     if mode == "convtranspose":
-        return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=scale_factor, stride=scale_factor)
+        return nn.ConvTranspose2d(
+            in_channels  = in_channels,
+            out_channels = out_channels,
+            kernel_size  = scale_factor,
+            stride       = scale_factor,
+        )
     if mode == "bilinear":
         return nn.Sequential(
-            nn.Upsample(scale_factor=scale_factor, mode="bilinear", align_corners=False),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.Upsample(
+                scale_factor  = scale_factor,
+                mode          = "bilinear",
+                align_corners = False,
+            ),
+            nn.Conv2d(
+                in_channels  = in_channels,
+                out_channels = out_channels,
+                kernel_size  = 1,
+                bias         = False,
+            ),
         )
     raise ValueError(f"Unknown upsample mode '{mode}'. Available: convtranspose, bilinear")
 
 
+# Applies Kaiming or Xavier initialization to Conv, Linear, and Norm layers
 def initialize_weights(module: nn.Module, mode: str) -> None:
     """Apply weight initialization to all layers of a module."""
     if mode == "default":
@@ -90,6 +114,8 @@ def initialize_weights(module: nn.Module, mode: str) -> None:
             if hasattr(m, "bias") and m.bias is not None:
                 nn.init.zeros_(m.bias)
 
+
+# ----- Model configuration dataclasses -----
 
 @dataclass
 class UNetConfig:
@@ -155,10 +181,10 @@ class FCNConfig:
     out_channels: int = 6
     features: list[int] = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor: int = 2
+    variant: str = "8s"
     dropout: float = 0.0
     activation: str = "relu"
     normalization: str = "batch"
-    upsample_mode: str = "convtranspose"
     conv_bias: bool = False
     init_mode: str = "default"
 
@@ -199,6 +225,7 @@ class SwinUNetConfig:
 class TransUNetConfig:
     in_channels: int = 1
     out_channels: int = 6
+    image_size: int = 256
     cnn_features: list[int] = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor: int = 2
     transformer_layers: int = 12
