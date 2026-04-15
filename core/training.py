@@ -5,43 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from core.logger import ShapeLogger, ModelSummary, Tracker
+from core.config import GaussianConfig
 from tqdm import tqdm
 import gc
 from pathlib import Path
-
-
-GAUSSIAN_PARAM_NAMES = ["a1", "mu1", "sig1", "a2", "mu2", "sig2"]
-NOISE_PARAM_NAME    = "log_noise_var"
-PARAM_NAMES         = GAUSSIAN_PARAM_NAMES  # kept for backward compat
-
-
-def reconstruct_double_gaussian(params: torch.Tensor, x_axis: torch.Tensor) -> torch.Tensor:
-    """
-    Reconstruct 2 superimposed Gaussian curves from predicted parameters.
-
-    Args:
-        params: (B, 6, H, W) — [a1, mu1, sigma1, a2, mu2, sigma2]
-        x_axis: (N,) — discrete x values where curves are evaluated
-
-    Returns:
-        (B, N, H, W) — reconstructed curves
-    """
-    eps  = 1e-8
-    x_axis = x_axis.to(params.device)
-
-    a1   = params[:, 0:1, :, :]
-    mu1  = params[:, 1:2, :, :]
-    sig1 = params[:, 2:3, :, :]
-    a2   = params[:, 3:4, :, :]
-    mu2  = params[:, 4:5, :, :]
-    sig2 = params[:, 5:6, :, :]
-
-    x = x_axis.reshape(1, -1, 1, 1)                           # (1, N, 1, 1)
-
-    g1 = a1 * torch.exp(-((x - mu1) ** 2) / (2 * sig1 ** 2 + eps))
-    g2 = a2 * torch.exp(-((x - mu2) ** 2) / (2 * sig2 ** 2 + eps))
-
-    return g1 + g2                                             # (B, N, H, W)
 
 
 class EarlyStopping:
@@ -350,28 +317,27 @@ class Checkpoint:
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker):
-        self.x_axis  = x_axis
-        self.logger  = logger
-        self.tracker = tracker
+    def __init__(self, x_axis, logger, tracker, reconstruct_fn, gaussian_cfg: GaussianConfig):
+        self.x_axis        = x_axis
+        self.logger        = logger
+        self.tracker       = tracker
+        self.reconstruct   = reconstruct_fn
+        self.gaussian_cfg  = gaussian_cfg
 
         self.logger.section("[Loss Function]")
-        self.logger.subsection(f"Curve reconstruction MSE (double Gaussian vs experimental)")
-        self.logger.subsection(f"Heteroscedastic noise head: enabled when out_channels > 6")
+        self.logger.subsection(f"Curve reconstruction MSE (K-Gaussian superposition vs experimental)")
+        self.logger.subsection(f"Heteroscedastic noise head: enabled when out_channels is not divisible by {self.gaussian_cfg.params_per_gaussian}")
         self.logger.subsection(f"X-axis sample points : {len(x_axis)} \n")
 
     def __call__(self, pred_params, exp_curves, epoch):
-        gaussian_params = pred_params[:, :6]                                         # (B, 6, H, W)
-        pred_curves     = reconstruct_double_gaussian(gaussian_params, self.x_axis)  # (B, N, H, W)
+        ppg             = self.gaussian_cfg.params_per_gaussian
+        n_gauss_ch      = (pred_params.shape[1] // ppg) * ppg
+        gaussian_params = pred_params[:, :n_gauss_ch]                      # (B, 3*K, H, W)
+        pred_curves     = self.reconstruct(gaussian_params)                # (B, N, H, W)
         mse_loss        = F.mse_loss(pred_curves, exp_curves)
 
-        if pred_params.shape[1] > 6:
-            # ── Heteroscedastic noise model ──────────────────────────
-            # The 7th channel is log(σ) per pixel. We model:
-            #   y ~ N(gaussians(θ), σ²)     →   NLL ∝ ||g-y||²/(2σ²) + log(σ)
-            # This lets the Gaussians stay sharp; noisy pixels get high σ
-            # and contribute less to the parameter gradients.
-            log_sigma   = pred_params[:, 6:7, :, :]                        # (B, 1, H, W)
+        if pred_params.shape[1] > n_gauss_ch:
+            log_sigma   = pred_params[:, n_gauss_ch:n_gauss_ch+1, :, :]    # (B, 1, H, W)
             sigma       = torch.exp(log_sigma).clamp(min=1e-4, max=10.0)
             sq_diff     = (pred_curves - exp_curves) ** 2                  # (B, N, H, W)
             nll         = 0.5 * sq_diff / (sigma ** 2 + 1e-8) + log_sigma  # broadcast over N
@@ -407,11 +373,86 @@ class Loss:
 
 
 class Metrics:
-    def __init__(self, verbose: bool, tracker, logger, x_axis):
-        self.verbose = verbose
-        self.tracker = tracker
-        self.logger  = logger
-        self.x_axis  = x_axis
+    def __init__(self, verbose: bool, tracker, logger, x_axis, gaussian_cfg: GaussianConfig):
+        self.verbose      = verbose
+        self.tracker      = tracker
+        self.logger       = logger
+        self.x_axis       = x_axis
+        self.gaussian_cfg = gaussian_cfg
+
+    def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
+        C   = params.shape[1]
+        ppg = self.gaussian_cfg.params_per_gaussian
+        assert C % ppg == 0, (f"Gaussian param channels ({C}) must be divisible by {ppg}")
+        n_gaussians = C // ppg
+        x_axis = self.x_axis.to(params.device)
+        x = x_axis.reshape(1, -1, 1, 1)                                    # (1, N, 1, 1)
+
+        result = torch.zeros(
+            params.shape[0], x_axis.shape[0], params.shape[2], params.shape[3],
+            device=params.device, dtype=params.dtype,
+        )
+
+        for i in range(n_gaussians):
+            a   = params[:, 3 * i    : 3 * i + 1, :, :]
+            mu  = params[:, 3 * i + 1: 3 * i + 2, :, :]
+            sig = params[:, 3 * i + 2: 3 * i + 3, :, :]
+            result = result + a * torch.exp(-((x - mu) ** 2) / (2 * sig ** 2 + 1e-8))
+
+        return result                                                       # (B, N, H, W)
+
+    @staticmethod
+    def spectral_coherence(pred_curves: torch.Tensor, exp_curves: torch.Tensor, win: int = 7) -> torch.Tensor:
+
+        # Promote to complex so the conjugate product captures phase structure
+        p = pred_curves.to(torch.complex64)           # (B, N, H, W)
+        e = exp_curves.to(torch.complex64)
+
+        # 1-D uniform smoothing along the spectral axis N (dim=1)
+        kernel = torch.ones(1, 1, win, 1, 1, device=pred_curves.device) / win
+        pad    = win // 2
+
+        def _smooth(x: torch.Tensor) -> torch.Tensor:
+            # x: (B, N, H, W) → (B, 1, N, H, W) for 3-D conv with kernel along N
+            return F.conv3d(x.unsqueeze(1), kernel, padding=(pad, 0, 0)).squeeze(1)
+
+        num = _smooth(p * torch.conj(e)).abs()        # |<p·e*>|
+        den = torch.sqrt(
+            _smooth((p * torch.conj(p)).real) *
+            _smooth((e * torch.conj(e)).real)
+        ).clamp(min=1e-8)
+
+        coh = (num / den).mean(dim=1).real             # average over N → (B, H, W)
+        return coh.clamp(0.0, 1.0)
+
+    @staticmethod
+    def compare_params(pred_params: torch.Tensor, gt_params: torch.Tensor, param_names: list[str]) -> dict:
+
+        n_ch = min(pred_params.shape[1], gt_params.shape[1])
+        stats: dict = {}
+        total_mse = 0.0
+        total_mae = 0.0
+
+        for i in range(n_ch):
+            p = pred_params[:, i]
+            g = gt_params[:, i]
+            diff   = p - g
+            mse_i  = (diff ** 2).mean().item()
+            mae_i  = diff.abs().mean().item()
+            ss_res = (diff ** 2).sum().item()
+            ss_tot = ((g - g.mean()) ** 2).sum().item()
+            r2_i   = 1.0 - ss_res / (ss_tot + 1e-8) if ss_tot > 0 else 0.0
+
+            name = param_names[i] if i < len(param_names) else f"ch{i}"
+            stats[f"gt_{name}_mse"] = mse_i
+            stats[f"gt_{name}_mae"] = mae_i
+            stats[f"gt_{name}_r2"]  = r2_i
+            total_mse += mse_i
+            total_mae += mae_i
+
+        stats["gt_param_mse_avg"] = total_mse / max(1, n_ch)
+        stats["gt_param_mae_avg"] = total_mae / max(1, n_ch)
+        return stats
 
     def track_results(self, results: dict, epoch: int, stage: str = "validation"):
         self.tracker.log_dict(f"{stage}_curve_fit", {
@@ -450,23 +491,44 @@ class Metrics:
             "min"    : float(results["pixel_mae_min"]),
         }, epoch)
 
-        param_stats = {name: float(results[f"{name}_mean"]) for name in GAUSSIAN_PARAM_NAMES}
+        noise_name  = self.gaussian_cfg.noise_param_name
+        _exclude    = ("pixel_r2", "cos_sim", "pixel_mse", "pixel_mae", "sigma",
+                       "spectral_coh", "gt_param_mse", "gt_param_mae", noise_name)
+        gauss_names = [k.replace("_mean", "") for k in results if k.endswith("_mean") and k.replace("_mean", "") not in _exclude
+                       and not k.startswith("gt_")]
+        param_stats = {name: float(results[f"{name}_mean"]) for name in gauss_names}
         self.tracker.log_dict(f"{stage}_param_means", param_stats, epoch)
 
-        if f"{NOISE_PARAM_NAME}_mean" in results:
+        if f"{noise_name}_mean" in results:
             self.tracker.log_dict(f"{stage}_noise", {
-                "log_sigma_mean" : float(results[f"{NOISE_PARAM_NAME}_mean"]),
+                "log_sigma_mean" : float(results[f"{noise_name}_mean"]),
                 "sigma_mean"     : float(results["sigma_mean"]),
                 "sigma_std"      : float(results["sigma_std"]),
                 "sigma_min"      : float(results["sigma_min"]),
                 "sigma_max"      : float(results["sigma_max"]),
             }, epoch)
 
-    def calculate(self, epoch, pred_params, exp_curves, stage="validation"):
-        # pred_params: (B, 6+, H, W)  —  predicted Gaussian params [+ optional noise channel]
-        # exp_curves:  (B, N, H, W)   —  experimental curves
-        gaussian_params = pred_params[:, :6]  # always first 6 channels
-        pred_curves     = reconstruct_double_gaussian(gaussian_params, self.x_axis)
+        # ── SAR spectral coherence ──
+        if "spectral_coh_mean" in results:
+            self.tracker.log_dict(f"{stage}_spectral_coherence", {
+                "mean"   : float(results["spectral_coh_mean"]),
+                "std"    : float(results["spectral_coh_std"]),
+                "median" : float(results["spectral_coh_median"]),
+                "min"    : float(results["spectral_coh_min"]),
+                "max"    : float(results["spectral_coh_max"]),
+            }, epoch)
+
+        # ── Ground-truth parameter comparison ──
+        if "gt_param_mse_avg" in results:
+            gt_keys = {k: float(v) for k, v in results.items() if k.startswith("gt_")}
+            self.tracker.log_dict(f"{stage}_gt_param_comparison", gt_keys, epoch)
+
+    def calculate(self, epoch, pred_params, exp_curves, stage="validation", gt_params=None):
+        ppg             = self.gaussian_cfg.params_per_gaussian
+        n_gauss_ch      = (pred_params.shape[1] // ppg) * ppg
+        n_gaussians     = n_gauss_ch // ppg
+        gaussian_params = pred_params[:, :n_gauss_ch]
+        pred_curves     = self.reconstruct_gaussians(gaussian_params)
         diff            = pred_curves - exp_curves
         abs_diff        = torch.abs(diff)
 
@@ -483,6 +545,9 @@ class Metrics:
         # ── Per-pixel cosine similarity ──
         cos_sim = F.cosine_similarity(pred_curves, exp_curves, dim=1)  # (B, H, W)
 
+        # ── SAR spectral coherence (interferometric-style) ──
+        spec_coh = self.spectral_coherence(pred_curves, exp_curves)    # (B, H, W)
+
         # ── Overall curve-level metrics ──
         curve_mse  = pixel_mse.mean().item()
         curve_mae  = pixel_mae.mean().item()
@@ -493,8 +558,9 @@ class Metrics:
         overall_r2     = 1 - (overall_ss_res / overall_ss_tot) if overall_ss_tot > 0 else 0
 
         # ── Predicted-parameter distribution (no ground-truth params needed) ──
-        param_stats = {}
-        for i, name in enumerate(GAUSSIAN_PARAM_NAMES):
+        param_stats  = {}
+        gauss_names  = self.gaussian_cfg.make_param_names(n_gaussians)
+        for i, name in enumerate(gauss_names):
             p = gaussian_params[:, i]
             param_stats[f"{name}_mean"] = p.mean().item()
             param_stats[f"{name}_std"]  = p.std().item()
@@ -502,31 +568,49 @@ class Metrics:
             param_stats[f"{name}_max"]  = p.max().item()
 
         # ── Noise head statistics (if model predicts noise channel) ──
-        if pred_params.shape[1] > 6:
-            log_sigma = pred_params[:, 6]
+        if pred_params.shape[1] > n_gauss_ch:
+            log_sigma = pred_params[:, n_gauss_ch]
             sigma     = torch.exp(log_sigma).clamp(min=1e-4, max=10.0)
-            param_stats[f"{NOISE_PARAM_NAME}_mean"] = log_sigma.mean().item()
-            param_stats[f"{NOISE_PARAM_NAME}_std"]  = log_sigma.std().item()
+            noise_name = self.gaussian_cfg.noise_param_name
+            param_stats[f"{noise_name}_mean"] = log_sigma.mean().item()
+            param_stats[f"{noise_name}_std"]  = log_sigma.std().item()
             param_stats["sigma_mean"]                = sigma.mean().item()
             param_stats["sigma_std"]                 = sigma.std().item()
             param_stats["sigma_min"]                 = sigma.min().item()
             param_stats["sigma_max"]                 = sigma.max().item()
+
+        # ── Ground-truth parameter comparison (optional, computed early for logging) ──
+        gt_param_stats = {}
+        if gt_params is not None:
+            gt_param_stats = self.compare_params(gaussian_params, gt_params, gauss_names)
 
         if self.verbose:
             self.logger.section(f"[Epoch {epoch}] Curve Fitting — {stage.capitalize()}")
             self.logger.subsection(f"Curve : MSE={curve_mse:.6f}  MAE={curve_mae:.6f}  RMSE={curve_rmse:.6f}")
             self.logger.subsection(f"R²    : Overall={overall_r2:.4f}  Pixel Mean={pixel_r2.mean():.4f}  Median={pixel_r2.median():.4f}  Min={pixel_r2.min():.4f}")
             self.logger.subsection(f"CosSim: Mean={cos_sim.mean():.4f}  Median={cos_sim.median():.4f}")
-            for name in GAUSSIAN_PARAM_NAMES:
+            for name in gauss_names:
                 self.logger.subsection(
                     f"  {name}: mean={param_stats[f'{name}_mean']:.4f}  std={param_stats[f'{name}_std']:.4f}  "
                     f"min={param_stats[f'{name}_min']:.4f}  max={param_stats[f'{name}_max']:.4f}"
                 )
-            if pred_params.shape[1] > 6:
+            if pred_params.shape[1] > n_gauss_ch:
                 self.logger.subsection(
                     f"  Noise σ: mean={param_stats['sigma_mean']:.4f}  std={param_stats['sigma_std']:.4f}  "
                     f"min={param_stats['sigma_min']:.4f}  max={param_stats['sigma_max']:.4f}"
                 )
+            self.logger.subsection(
+                f"SpCoh : Mean={spec_coh.mean():.4f}  Median={spec_coh.median():.4f}  "
+                f"Min={spec_coh.min():.4f}  Max={spec_coh.max():.4f}"
+            )
+            if gt_params is not None:
+                self.logger.subsection(f"GT Param Comparison (avg MSE={gt_param_stats['gt_param_mse_avg']:.6f}  avg MAE={gt_param_stats['gt_param_mae_avg']:.6f}):")
+                for name in gauss_names:
+                    self.logger.subsection(
+                        f"  {name}: MSE={gt_param_stats.get(f'gt_{name}_mse', 0):.6f}  "
+                        f"MAE={gt_param_stats.get(f'gt_{name}_mae', 0):.6f}  "
+                        f"R²={gt_param_stats.get(f'gt_{name}_r2', 0):.4f}"
+                    )
             self.logger.subsection("")
 
         results = {
@@ -556,17 +640,28 @@ class Metrics:
             "pixel_mae_median" : pixel_mae.median().item(),
             "pixel_mae_max"    : pixel_mae.max().item(),
             "pixel_mae_min"    : pixel_mae.min().item(),
+
+            "spectral_coh_mean"   : spec_coh.mean().item(),
+            "spectral_coh_std"    : spec_coh.std().item(),
+            "spectral_coh_median" : spec_coh.median().item(),
+            "spectral_coh_min"    : spec_coh.min().item(),
+            "spectral_coh_max"    : spec_coh.max().item(),
         }
         results.update(param_stats)
+
+        # ── Merge ground-truth param stats (already computed above) ──
+        if gt_param_stats:
+            results.update(gt_param_stats)
 
         self.track_results(results, epoch, stage)
         return results
 
 
 class Trainer:
-    def __init__(self, model, x_axis, config, run_dir, logger):
-        self.logger = logger
-        self.config = config
+    def __init__(self, model, x_axis, config, run_dir, logger, gaussian_cfg: GaussianConfig = GaussianConfig()):
+        self.logger       = logger
+        self.config       = config
+        self.gaussian_cfg = gaussian_cfg
         
         self.logger.section("[Training Start]")
         self.logger.subsection(f"Device Name   : {torch.cuda.get_device_name(0)}")
@@ -595,8 +690,8 @@ class Trainer:
         self.ema            = EMA(self.model, self.config, self.logger, self.tracker)
         self.early_stopping = EarlyStopping(self.config, self.logger, self.tracker)
         self.lr_scheduler   = Scheduler(self.optimizer, self.warmup, self.config, self.logger, self.tracker)
-        self.criterion      = Loss(self.x_axis, self.logger, self.tracker)
-        self.metrics        = Metrics(self.config.training.verbose, self.tracker, logger=self.logger, x_axis=self.x_axis)
+        self.metrics        = Metrics(self.config.training.verbose, self.tracker, logger=self.logger, x_axis=self.x_axis, gaussian_cfg=self.gaussian_cfg)
+        self.criterion      = Loss(self.x_axis, self.logger, self.tracker, self.metrics.reconstruct_gaussians, self.gaussian_cfg)
         self.checkpoint     = Checkpoint(self.logger, self.tracker)
         self.shape_logger   = ShapeLogger(model = self.model, logger = self.logger).attach()
         self.summary        = ModelSummary(logger = self.logger, model = self.model)
