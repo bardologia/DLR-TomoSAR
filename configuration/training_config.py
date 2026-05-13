@@ -38,6 +38,7 @@ class LossConfig:
     ssim_data_range          : float = 1.0
     ssim_k1                  : float = 0.01
     ssim_k2                  : float = 0.03
+    ssim_axis                : str   = "elevation"   # "elevation" | "azimuth" | "range"
 
     use_param_l1             : bool  = False
     weight_param_l1          : float = 0.1
@@ -51,14 +52,6 @@ class LossConfig:
 
     use_smoothness_tv        : bool  = False
     weight_smoothness_tv     : float = 1e-4
-
-    use_masked_param           : bool  = False
-    weight_masked_param        : float = 1.0
-    masked_param_kind          : str   = "mse"     
-    masked_param_huber_delta   : float = 1.0
-    masked_param_a_ths         : float = 0.0001
-    masked_param_w_ths         : float = 0.0
-    masked_param_percent       : float = 0.01
 
     log_components_every     : int   = 1
 

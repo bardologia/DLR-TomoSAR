@@ -15,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 import torch
 
-from pipelines.inference_pipeline.config   import InferenceConfig
+from configuration.inference_config        import InferenceConfig
 from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 

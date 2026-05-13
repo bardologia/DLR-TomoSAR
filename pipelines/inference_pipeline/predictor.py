@@ -33,14 +33,7 @@ def prepare_gt_params_for_reconstruction(
     n_gaussians: int,
     normalizer,  # Optional[Normalizer] — None if no output normalisation
 ) -> torch.Tensor:
-    """Prepare GT params for curve reconstruction.
 
-    GT params are already stored in canonical **(a, mu, sig)** order
-    (see tools/gaussian_params.py), which is the same order expected by
-    ``reconstruct_curves()``.  The only processing needed is to undo any
-    z-score output normalisation that was applied at dataset-creation time.
-    """
-    # Denormalise (z-score invert) if the dataset had output normalisation
     if normalizer is not None and normalizer.stats.output_stats is not None:
         gt_params = normalizer.denormalize_output(gt_params)
 
@@ -49,20 +42,18 @@ def prepare_gt_params_for_reconstruction(
 
 @dataclass
 class PredictionResult:
-    pred_curves        : np.ndarray   # Gaussian reconstruction from predicted params
-    gt_curves          : np.ndarray   # Gaussian reconstruction from extracted GT params
-    raw_curves         : np.ndarray   # raw beamforming tomogram
+    pred_curves        : np.ndarray  
+    gt_curves          : np.ndarray   
+    raw_curves         : np.ndarray   
     params_pred        : np.ndarray
     params_gt          : np.ndarray
 
-    # pred vs gt_curves (Gaussian)
     pixel_mse          : np.ndarray
     pixel_mae          : np.ndarray
     pixel_r2           : np.ndarray
     pixel_cosine       : np.ndarray
     pixel_peak_err_idx : np.ndarray
 
-    # pred vs raw_curves
     pixel_mse_raw          : np.ndarray
     pixel_mae_raw          : np.ndarray
     pixel_r2_raw           : np.ndarray
@@ -136,10 +127,10 @@ class Predictor:
         self.logger.subsection(f"Cube dtype : {self.cube_dtype}\n")
 
         H, W = run.grid.spatial_size
-        pred_curve_stitcher = self._new_stitcher(n_elev,                   "pred_curves")
-        raw_curve_stitcher  = self._new_stitcher(n_elev,                   "raw_curves")
-        gt_curve_stitcher   = self._new_stitcher(n_elev,                   "gt_curves")
-        param_pred_stitcher = self._new_stitcher(params_ch,                "params_pred")
+        pred_curve_stitcher = self._new_stitcher(n_elev,                    "pred_curves")
+        raw_curve_stitcher  = self._new_stitcher(n_elev,                    "raw_curves")
+        gt_curve_stitcher   = self._new_stitcher(n_elev,                    "gt_curves")
+        param_pred_stitcher = self._new_stitcher(params_ch,                 "params_pred")
         gt_param_stitcher   = self._new_stitcher(n_K * PARAMS_PER_GAUSSIAN, "params_gt")
 
         pixel_mse      = np.zeros((H, W), dtype=np.float32)

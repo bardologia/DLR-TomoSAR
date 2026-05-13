@@ -36,22 +36,11 @@ class InferenceConfig:
     gif_max_frames     : int           = 150
     gif_dpi            : int           = 110
 
-    cmap_intensity     : str           = "viridis"
+    cmap_intensity     : str           = "jet"
     cmap_error         : str           = "magma"
+    normalize_intensity: bool          = True
     fig_dpi            : int           = 150
     save_dpi           : int           = 300
 
     seed               : int           = 0
     log_level          : str           = "INFO"
-
-    def __post_init__(self) -> None:
-        self.run_directory = Path(self.run_directory)
-        if not self.run_directory.exists():
-            raise FileNotFoundError(f"Run directory not found: {self.run_directory}")
-        if self.split not in ("train", "val", "test"):
-            raise ValueError(f"split must be one of train/val/test, got {self.split!r}")
-        if self.stitch_window not in ("hann", "triangular", "uniform"):
-            raise ValueError(f"stitch_window must be hann|triangular|uniform, got {self.stitch_window!r}")
-        for axis in self.gif_axes:
-            if axis not in ("elevation", "range", "azimuth"):
-                raise ValueError(f"Each gif_axis must be elevation|range|azimuth, got {axis!r}")

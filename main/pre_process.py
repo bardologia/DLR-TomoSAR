@@ -21,13 +21,13 @@ from pipelines.pre_processing_pipeline.pipeline import PreProcessingPipeline
 def main() -> None:
     global_crop = CropRegion(
         azimuth_start = 1000,
-        azimuth_end   = 1050,
+        azimuth_end   = 16000,
         range_start   = 500,
-        range_end     = 550,
+        range_end     = 4000,
     )
 
-    tomogram_workers = 1
-    pyrat_threads    = 1
+    tomogram_workers = 12
+    pyrat_threads    = 8
 
     total_azimuth_width    = global_crop.azimuth_end - global_crop.azimuth_start
     max_crop_azimuth_width = total_azimuth_width // tomogram_workers   

@@ -102,17 +102,6 @@ def main() -> None:
         ),
 
         loss = LossConfig(
-            use_mse_curve     = True,
-            weight_mse_curve  = 1.0,
-            
-            use_masked_param           = False,
-            weight_masked_param        = 1.0,
-            masked_param_kind          = "mse",    
-            masked_param_huber_delta   = 1.0,
-            masked_param_a_ths         = 0.0001,
-            masked_param_w_ths         = 0.0,
-            masked_param_percent       = 0.01,
-
             use_ssim_curve    = True,
             weight_ssim_curve = 1.0,
             ssim_window_size  = 11,
@@ -120,6 +109,7 @@ def main() -> None:
             ssim_data_range   = 1.0,
             ssim_k1           = 0.01,
             ssim_k2           = 0.03,
+            ssim_axis         = "elevation",
         ),
     )
 

@@ -22,12 +22,12 @@ def main() -> None:
         print(f"{'='*50}")
 
         config = ExtractionConfig(
-            processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/new_good"),
+            processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/run_1000a16000a500a4000_dtmf_Xtomo_id2X_20260513_155626"),
             pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat"),
 
             output_prefix     = f"params_g{n_gaussians}",
             output_suffix     = None,
-            tomogram_filename = "tomofull_1000a16000a500a4000_1_Xparams_id2X.hd5",
+            tomogram_filename = "tomofull_1000a16000a500a4000_1_Xparams_id2X.npy",
             height_range      = None,
 
             fit_settings = FitSettings(

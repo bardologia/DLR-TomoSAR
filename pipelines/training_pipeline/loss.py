@@ -1,7 +1,6 @@
 import torch
 import torch.nn.functional as F
 from configuration.training_config import GaussianConfig, LossConfig
-from pipelines.training_pipeline.param_mask import MaskedParamLoss
 
 
 class Loss:
@@ -26,7 +25,6 @@ class Loss:
             ("param_l1",          cfg.use_param_l1,           cfg.weight_param_l1),
             ("param_huber",       cfg.use_param_huber,        cfg.weight_param_huber),
             ("smoothness_tv",     cfg.use_smoothness_tv,      cfg.weight_smoothness_tv),
-            ("masked_param",      cfg.use_masked_param,       cfg.weight_masked_param),
         ]
 
         self.logger.section("[Loss Function]")
@@ -35,19 +33,10 @@ class Loss:
         self.logger.subsection("Active terms (term : weight):")
         for name, is_used, weight in active_terms:
             if is_used:
-                self.logger.subsection(f"  • {name:<20s} weight={weight:g}")
+                extra = f"  [axis={cfg.ssim_axis}]" if name == "ssim_curve" else ""
+                self.logger.subsection(f"  • {name:<20s} weight={weight:g}{extra}")
         self.logger.subsection("")
 
-        self.masked_param_fn = (
-            MaskedParamLoss(
-                gaussian_cfg = gaussian_cfg,
-                loss_cfg     = cfg,
-                norm_stats   = norm_stats,
-                logger       = logger,
-            )
-            if cfg.use_masked_param
-            else None
-        )
 
     @staticmethod
     def _charbonnier(diff: torch.Tensor, eps: float) -> torch.Tensor:
@@ -62,12 +51,21 @@ class Loss:
         return kernel_2d.unsqueeze(0).unsqueeze(0)               
 
     @staticmethod
-    def _ssim_loss(pred_curves: torch.Tensor, exp_curves: torch.Tensor, window_size: int, sigma: float, data_range: float, k1: float, k2: float) -> torch.Tensor:
+    def _ssim_loss(pred_curves: torch.Tensor, exp_curves: torch.Tensor, window_size: int, sigma: float, data_range: float, k1: float, k2: float, axis: str = "elevation") -> torch.Tensor:
         batch_size, num_points, height, width = pred_curves.shape
         device, dtype = pred_curves.device, pred_curves.dtype
 
-        x = pred_curves.reshape(batch_size * num_points, 1, height, width)
-        y = exp_curves.reshape(batch_size * num_points, 1, height, width)
+        if axis == "elevation":
+            x = pred_curves.reshape(batch_size * num_points, 1, height, width)
+            y = exp_curves.reshape(batch_size * num_points, 1, height, width)
+        elif axis == "azimuth":
+            x = pred_curves.permute(0, 2, 1, 3).reshape(batch_size * height, 1, num_points, width)
+            y = exp_curves.permute(0, 2, 1, 3).reshape(batch_size * height, 1, num_points, width)
+        elif axis == "range":
+            x = pred_curves.permute(0, 3, 1, 2).reshape(batch_size * width, 1, num_points, height)
+            y = exp_curves.permute(0, 3, 1, 2).reshape(batch_size * width, 1, num_points, height)
+        else:
+            raise ValueError(f"ssim_axis must be 'elevation', 'azimuth', or 'range', got '{axis}'")
 
         kernel  = Loss._gaussian_window(window_size, sigma, device, dtype)
         padding = window_size // 2
@@ -208,6 +206,7 @@ class Loss:
                 data_range  = cfg.ssim_data_range,
                 k1          = cfg.ssim_k1,
                 k2          = cfg.ssim_k2,
+                axis        = cfg.ssim_axis,
             )
             components["ssim_curve"] = val
             weighted["ssim_curve"]   = cfg.weight_ssim_curve * val
@@ -231,12 +230,6 @@ class Loss:
             components["smoothness_tv"] = val
             weighted["smoothness_tv"]   = cfg.weight_smoothness_tv * val
             total_loss = total_loss + weighted["smoothness_tv"]
-
-        if cfg.use_masked_param and gt_params is not None and self.masked_param_fn is not None:
-            val = self.masked_param_fn(pred_params, gt_params)
-            components["masked_param"] = val
-            weighted["masked_param"]   = cfg.weight_masked_param * val
-            total_loss = total_loss + weighted["masked_param"]
 
         if cfg.log_components_every > 0 and step is not None and step % cfg.log_components_every == 0:
             comp_scalars = {key: float(val.item()) for key, val in components.items()}

@@ -13,7 +13,6 @@ from tools.logger                                    import Logger
 from configuration.dataset_config                    import (
     DatasetCreationConfiguration,
     InputConfig,
-    PassDropConfig,
     PatchConfiguration,
     SplitRegions,
     TargetMode,
@@ -96,9 +95,6 @@ class RunDirectoryLoader:
             split_regions                = split_regions,
             patch                        = patch,
             input_config                 = InputConfig.from_dict(payload["input_config"]),
-            pass_drop_train              = PassDropConfig(**payload["pass_drop_train"]),
-            pass_drop_val                = PassDropConfig(**payload["pass_drop_val"]),
-            pass_drop_test               = PassDropConfig(**payload["pass_drop_test"]),
             batch_size                   = batch_size if batch_size is not None else int(payload["batch_size"]),
             num_workers                  = int(num_workers),
             shuffle_train                = False,

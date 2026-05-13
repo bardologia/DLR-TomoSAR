@@ -9,7 +9,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot    as plt
 import numpy                as np
 
-from pipelines.inference_pipeline.plots import _shared_clim, apply_style
+from pipelines.inference_pipeline.plots import Ploter
 
 
 def make_walk_gif(
@@ -25,10 +25,11 @@ def make_walk_gif(
     fps        : int = 12,
     max_frames : int = 150,
     dpi        : int = 110,
-    cmap       : str = "viridis",
-    err_cmap   : str = "magma",
+    cmap       : str  = "jet",
+    err_cmap   : str  = "magma",
+    normalize  : bool = False,
 ) -> Path:
-    apply_style(fig_dpi=dpi, save_dpi=dpi)
+    Ploter(fig_dpi=dpi, save_dpi=dpi)._apply_style()
 
     N_elev, az, rg = pred_cube.shape
 
@@ -43,14 +44,16 @@ def make_walk_gif(
         n_total = rg
         def get_slice(i):
             return pred_cube[:, :, i], gt_cube[:, :, i], raw_cube[:, :, i]
-        extent           = [az_offset, az_offset + az, float(x_axis[-1]), float(x_axis[0])]
+        # bottom=x_axis[0], top=x_axis[-1] so elevation increases upward
+        extent           = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "azimuth index", "elevation [m]"
         title_fn         = lambda i: f"range = {i + rg_offset}"
     elif axis == "azimuth":
         n_total = az
         def get_slice(i):
             return pred_cube[:, i, :], gt_cube[:, i, :], raw_cube[:, i, :]
-        extent           = [rg_offset, rg_offset + rg, float(x_axis[-1]), float(x_axis[0])]
+        # bottom=x_axis[0], top=x_axis[-1] so elevation increases upward
+        extent           = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "range index", "elevation [m]"
         title_fn         = lambda i: f"azimuth = {i + az_offset}"
     else:
@@ -65,14 +68,26 @@ def make_walk_gif(
     pred_sample = np.stack([get_slice(int(i))[0] for i in sample_idx])
     gt_sample   = np.stack([get_slice(int(i))[1] for i in sample_idx])
     raw_sample  = np.stack([get_slice(int(i))[2] for i in sample_idx])
-    vmin, vmax  = _shared_clim(pred_sample, gt_sample, raw_sample)
+    vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample, raw_sample)
     emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample),  99.0))
     emax_raw    = float(np.percentile(np.abs(pred_sample - raw_sample), 99.0))
     if emax_gt  <= 0.0: emax_gt  = 1.0
     if emax_raw <= 0.0: emax_raw = 1.0
 
+    def _get(i):
+        p, g, r = get_slice(i)
+        if normalize:
+            p = Ploter._normalize_01(p)
+            g = Ploter._normalize_01(g)
+            r = Ploter._normalize_01(r)
+        return p, g, r
+
+    int_label = "intensity [0–1]" if normalize else "intensity"
+    if normalize:
+        vmin, vmax = 0.0, 1.0
+
     fig, axes          = plt.subplots(2, 3, figsize=(18, 8.0))
-    p0, g0, r0         = get_slice(int(frame_indices[0]))
+    p0, g0, r0         = _get(int(frame_indices[0]))
     eg0                = np.abs(p0 - g0)
     er0                = np.abs(p0 - r0)
 
@@ -92,9 +107,9 @@ def make_walk_gif(
     axes[0, 0].set_ylabel(y_label)
     axes[1, 0].set_ylabel(y_label)
 
-    fig.colorbar(im_raw,  ax=axes[0, 0], fraction=0.045, pad=0.02).set_label("intensity")
-    fig.colorbar(im_gt,   ax=axes[0, 1], fraction=0.045, pad=0.02).set_label("intensity")
-    fig.colorbar(im_pred, ax=axes[0, 2], fraction=0.045, pad=0.02).set_label("intensity")
+    fig.colorbar(im_raw,  ax=axes[0, 0], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(im_gt,   ax=axes[0, 1], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(im_pred, ax=axes[0, 2], fraction=0.045, pad=0.02).set_label(int_label)
     fig.colorbar(im_egt,  ax=axes[1, 0], fraction=0.045, pad=0.02).set_label("|error|")
     fig.colorbar(im_eraw, ax=axes[1, 1], fraction=0.045, pad=0.02).set_label("|error|")
 
@@ -103,7 +118,7 @@ def make_walk_gif(
 
     def update(frame_pos):
         i          = int(frame_indices[frame_pos])
-        p, g, r    = get_slice(i)
+        p, g, r    = _get(i)
         eg         = np.abs(p - g)
         er         = np.abs(p - r)
         im_raw.set_data(r)
