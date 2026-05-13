@@ -160,4 +160,7 @@ class ResUNet(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 
-        return self.output_head(x)
+        out = self.output_head(x)
+        out = out.clone()
+        out[:, 0::self.config.params_per_gaussian] = functional.softplus(out[:, 0::self.config.params_per_gaussian])
+        return out

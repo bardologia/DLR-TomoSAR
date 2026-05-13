@@ -317,4 +317,9 @@ class TransUNet(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 
-        return self.output_head(x)
+        out  = self.output_head(x)
+        ppg  = self.config.params_per_gaussian
+        mask = torch.zeros(out.shape[1], dtype=torch.bool, device=out.device)
+        mask[0::ppg] = True
+        out  = torch.where(mask.view(1, -1, 1, 1), functional.softplus(out), out)
+        return out

@@ -228,4 +228,6 @@ class FCN(nn.Module):
                 align_corners = False,
             )
 
+        score = score.clone()
+        score[:, 0::self.config.params_per_gaussian] = functional.softplus(score[:, 0::self.config.params_per_gaussian])
         return score

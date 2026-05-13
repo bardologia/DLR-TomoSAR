@@ -25,27 +25,27 @@ from .TransUNet import TransUNet
 from .UNETR import UNETR
 
 MODEL_REGISTRY: dict[str, type] = {
-    "unet": UNet,
-    "resunet": ResUNet,
-    "attention_unet": AttentionUNet,
-    "unetplusplus": UNetPlusPlus,
-    "fcn": FCN,
-    "linknet": LinkNet,
-    "swin_unet": SwinUNet,
-    "transunet": TransUNet,
-    "unetr": UNETR,
+    "unet"           : UNet,
+    "resunet"        : ResUNet,
+    "attention_unet" : AttentionUNet,
+    "unetplusplus"   : UNetPlusPlus,
+    "fcn"            : FCN,
+    "linknet"        : LinkNet,
+    "swin_unet"      : SwinUNet,
+    "transunet"      : TransUNet,
+    "unetr"          : UNETR,
 }
 
 CONFIG_REGISTRY: dict[str, type] = {
-    "unet": UNetConfig,
-    "resunet": ResUNetConfig,
-    "attention_unet": AttentionUNetConfig,
-    "unetplusplus": UNetPlusPlusConfig,
-    "fcn": FCNConfig,
-    "linknet": LinkNetConfig,
-    "swin_unet": SwinUNetConfig,
-    "transunet": TransUNetConfig,
-    "unetr": UNETRConfig,
+    "unet"           : UNetConfig,
+    "resunet"        : ResUNetConfig,
+    "attention_unet" : AttentionUNetConfig,
+    "unetplusplus"   : UNetPlusPlusConfig,
+    "fcn"            : FCNConfig,
+    "linknet"        : LinkNetConfig,
+    "swin_unet"      : SwinUNetConfig,
+    "transunet"      : TransUNetConfig,
+    "unetr"          : UNETRConfig,
 }
 
 

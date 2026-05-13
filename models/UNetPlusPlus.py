@@ -158,11 +158,15 @@ class UNetPlusPlus(nn.Module):
         node_0_4 = self.dense_0_4(torch.cat([node_0_0, node_0_1, node_0_2, node_0_3, up_1_3], dim=1))
 
         # Output: deep supervision returns predictions from multiple columns, otherwise final node only
+        ppg = self.config.params_per_gaussian
         if self.deep_supervision:
-            return [
-                self.output_heads[0](node_0_1),
-                self.output_heads[1](node_0_2),
-                self.output_heads[2](node_0_3),
-                self.output_heads[3](node_0_4),
-            ]
-        return self.output_head(node_0_4)
+            outs = [self.output_heads[i](n) for i, n in enumerate([node_0_1, node_0_2, node_0_3, node_0_4])]
+            mask = torch.zeros(outs[0].shape[1], dtype=torch.bool, device=outs[0].device)
+            mask[0::ppg] = True
+            outs = [torch.where(mask.view(1, -1, 1, 1), functional.softplus(o), o) for o in outs]
+            return outs
+        out  = self.output_head(node_0_4)
+        mask = torch.zeros(out.shape[1], dtype=torch.bool, device=out.device)
+        mask[0::ppg] = True
+        out  = torch.where(mask.view(1, -1, 1, 1), functional.softplus(out), out)
+        return out
