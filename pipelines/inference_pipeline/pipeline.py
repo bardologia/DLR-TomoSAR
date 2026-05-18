@@ -5,15 +5,14 @@ from pathlib  import Path
 from typing   import Dict
 
 import numpy as np
-import torch
 
 from pipelines.inference_pipeline.animation import make_walk_gif
 from configuration.inference_config         import InferenceConfig
 from pipelines.inference_pipeline.loader    import RunDirectoryLoader
-from pipelines.inference_pipeline.metrics   import MetricsComputer
+from pipelines.inference_pipeline.metrics   import Metrics
 from pipelines.inference_pipeline.plots     import Ploter
 from pipelines.inference_pipeline.predictor import Predictor
-from pipelines.inference_pipeline.report    import ReportAssembler, write_metrics_json
+from pipelines.inference_pipeline.report    import Report, write_metrics_json
 from tools.logger                           import Logger
 
 
@@ -58,7 +57,7 @@ class InferencePipeline:
             "cos_raw" : result.pixel_cosine_raw,
         }
 
-        selected = MetricsComputer.select_pixels(
+        selected = Metrics.select_pixels(
             result.pixel_mse,
             n_best   = cfg.n_best_profiles,
             n_worst  = cfg.n_worst_profiles,
@@ -162,6 +161,7 @@ class InferencePipeline:
                 az_offset   = result.azimuth_offset,
                 rg_offset   = result.range_offset,
             )
+        
         logger.subsection(f"Param plots     : distributions, scatter, error maps written to {figures_dir}")
 
         for s_idx, i in enumerate(slice_range_idx):
@@ -201,6 +201,7 @@ class InferencePipeline:
                 rg_offset  = result.range_offset,
                 ssim_value = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
             )
+        
         logger.subsection(f"Slices written  : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices}")
 
         figure_paths["ssim_range"] = plotter.plot_ssim_curves(
@@ -229,6 +230,7 @@ class InferencePipeline:
             slice_indices  = all_elev_idx,
             ax_offset      = 0,
         )
+       
         logger.subsection(f"SSIM plots      : range, azimuth, elev written to {figures_dir}\n")
 
         figure_paths["elev_metric_curves"] = plotter.plot_elev_metric_curves(
@@ -237,6 +239,7 @@ class InferencePipeline:
             n_elev         = _N_elev,
             x_axis         = x_axis_np,
         )
+        
         logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {figures_dir}\n")
 
         return figure_paths
@@ -255,20 +258,20 @@ class InferencePipeline:
         for axis in cfg.gif_axes:
             try:
                 gif_paths[f"walk_{axis}"] = make_walk_gif(
-                    pred_cube  = result.pred_curves,
-                    gt_cube    = result.gt_curves,
-                    raw_cube   = result.raw_curves,
-                    axis       = axis,
-                    out_path   = gif_dir / f"walk_{axis}.gif",
-                    x_axis     = x_axis_np,
-                    az_offset  = result.azimuth_offset,
-                    rg_offset  = result.range_offset,
-                    fps        = cfg.gif_fps,
-                    max_frames = cfg.gif_max_frames,
-                    dpi        = cfg.gif_dpi,
-                    cmap       = cfg.cmap_intensity,
-                    err_cmap   = cfg.cmap_error,
-                    normalize  = cfg.normalize_intensity,
+                    pred_cube   = result.pred_curves,
+                    gt_cube     = result.gt_curves,
+                    raw_cube    = result.raw_curves,
+                    axis        = axis,
+                    out_path    = gif_dir / f"walk_{axis}.gif",
+                    x_axis      = x_axis_np,
+                    az_offset   = result.azimuth_offset,
+                    rg_offset   = result.range_offset,
+                    fps         = cfg.gif_fps,
+                    max_frames  = cfg.gif_max_frames,
+                    dpi         = cfg.gif_dpi,
+                    cmap        = cfg.cmap_intensity,
+                    err_cmap    = cfg.cmap_error,
+                    num_workers = cfg.gif_workers,
                 )
                 logger.subsection(f"GIF ({axis:<9}) : {gif_paths[f'walk_{axis}']}")
             except Exception as exc:
@@ -326,7 +329,7 @@ class InferencePipeline:
             "num_workers"        : cfg.num_workers,
         }
 
-        return ReportAssembler(
+        return Report(
             output_dir       = output_dir,
             run_summary      = run_summary_payload,
             inference_config = inference_cfg_payload,
@@ -338,7 +341,6 @@ class InferencePipeline:
 
     def run(self) -> Path:
         cfg = self.config
-        torch.manual_seed(cfg.seed)
         np.random.seed(cfg.seed)
         
         plotter = Ploter(
@@ -401,7 +403,7 @@ class InferencePipeline:
         all_range_idx = np.arange(_rg)
         all_az_idx    = np.arange(_az)
 
-        global_metrics = MetricsComputer(result, x_axis_np, run.n_gaussians).compute(
+        global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
             elev_indices  = all_elev_idx,
             range_indices = all_range_idx,
             az_indices    = all_az_idx,
@@ -439,7 +441,6 @@ class InferencePipeline:
             run            = run,
             cfg            = cfg,
             x_axis_np      = x_axis_np,
-            result         = result,
             global_metrics = global_metrics,
             figure_paths   = figure_paths,
             gif_paths      = gif_paths,

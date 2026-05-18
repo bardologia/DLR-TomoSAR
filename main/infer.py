@@ -5,6 +5,11 @@ os.environ["MKL_NUM_THREADS"]     = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["OMP_NUM_THREADS"]     = "4"
 
+N_GPUS            = 1
+
+_VISIBLE = ", ".join(str(i) for i in range(N_GPUS))
+os.environ["CUDA_VISIBLE_DEVICES"] = _VISIBLE
+
 import sys
 from dataclasses import dataclass, field
 from pathlib     import Path
@@ -21,7 +26,7 @@ from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 @dataclass
 class RunInferenceConfig:
-    run_directory      : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_v1")
+    run_directory      : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_SSMI_MSE")
     output_subdir      : str  = ""
     split              : str  = "test"
     device             : str  = "cuda" if torch.cuda.is_available() else "cpu"

@@ -18,6 +18,8 @@ class InferenceConfig:
     batch_size         : Optional[int] = None
     num_workers        : int           = 4
 
+    gif_workers        : int           = 40
+
     stitch_window      : str           = "hann"
     cube_dtype         : str           = "float32"
     save_cubes         : bool          = True

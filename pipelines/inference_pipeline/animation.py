@@ -1,15 +1,71 @@
 from __future__ import annotations
 
-from pathlib import Path
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from io                 import BytesIO
+from pathlib            import Path
+from typing             import Any
 
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.animation as animation
-import matplotlib.pyplot    as plt
-import numpy                as np
+import matplotlib.pyplot as plt
+import numpy             as np
+from PIL                 import Image
+from tqdm                import tqdm
 
 from pipelines.inference_pipeline.plots import Ploter
+
+
+def _render_frame(args: tuple) -> tuple[int, bytes]:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from io import BytesIO
+
+    frame_order, r, g, p, vmin, vmax, emax_gt, emax_raw, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
+
+    eg = np.abs(p - g)
+    er = np.abs(p - r)
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 8.0))
+
+    ims = [
+        axes[0, 0].imshow(r,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
+        axes[0, 1].imshow(g,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
+        axes[0, 2].imshow(p,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
+        axes[1, 0].imshow(eg, cmap=err_cmap, vmin=0.0,      vmax=emax_gt,  extent=extent, aspect="auto", origin=_origin),
+        axes[1, 1].imshow(er, cmap=err_cmap, vmin=0.0,      vmax=emax_raw, extent=extent, aspect="auto", origin=_origin),
+    ]
+    axes[1, 2].set_visible(False)
+
+    for ax, label in zip(axes[0], ("Raw Tomogram", "GT (Gaussian)", "Prediction")):
+        ax.set_title(label)
+        ax.set_xlabel(x_label)
+    
+    for ax, label in zip(axes[1, :2], ("|Pred - GT|", "|Pred - Raw|")):
+        ax.set_title(label)
+        ax.set_xlabel(x_label)
+    
+    axes[0, 0].set_ylabel(y_label)
+    axes[1, 0].set_ylabel(y_label)
+
+    int_label = "intensity"
+    fig.colorbar(ims[0], ax=axes[0, 0], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(ims[1], ax=axes[0, 1], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(ims[2], ax=axes[0, 2], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(ims[3], ax=axes[1, 0], fraction=0.045, pad=0.02).set_label("|error|")
+    fig.colorbar(ims[4], ax=axes[1, 1], fraction=0.045, pad=0.02).set_label("|error|")
+
+    fig.suptitle(title, fontsize=13)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi)
+    plt.close(fig)
+    buf.seek(0)
+    return frame_order, buf.read()
 
 
 def make_walk_gif(
@@ -25,13 +81,18 @@ def make_walk_gif(
     fps        : int = 12,
     max_frames : int = 150,
     dpi        : int = 110,
-    cmap       : str  = "jet",
-    err_cmap   : str  = "magma",
-    normalize  : bool = False,
+    cmap       : str = "jet",
+    err_cmap   : str = "magma",
+    num_workers: int | None = None,
 ) -> Path:
     Ploter(fig_dpi=dpi, save_dpi=dpi)._apply_style()
 
     N_elev, az, rg = pred_cube.shape
+
+    _sort_idx = None
+    if axis in ("range", "azimuth"):
+        _sort_idx = np.argsort(x_axis)
+        x_axis    = x_axis[_sort_idx]
 
     if axis == "elevation":
         n_total = N_elev
@@ -40,19 +101,25 @@ def make_walk_gif(
         extent           = [rg_offset, rg_offset + rg, az_offset + az, az_offset]
         x_label, y_label = "range index", "azimuth index"
         title_fn         = lambda i: f"elevation = {x_axis[i]:.2f} m  (idx {i}/{N_elev - 1})"
+    
     elif axis == "range":
         n_total = rg
         def get_slice(i):
-            return pred_cube[:, :, i], gt_cube[:, :, i], raw_cube[:, :, i]
-        # bottom=x_axis[0], top=x_axis[-1] so elevation increases upward
+            p, g, r = pred_cube[:, :, i], gt_cube[:, :, i], raw_cube[:, :, i]
+            if _sort_idx is not None:
+                p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+            return p, g, r
         extent           = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "azimuth index", "elevation [m]"
         title_fn         = lambda i: f"range = {i + rg_offset}"
+    
     elif axis == "azimuth":
         n_total = az
         def get_slice(i):
-            return pred_cube[:, i, :], gt_cube[:, i, :], raw_cube[:, i, :]
-        # bottom=x_axis[0], top=x_axis[-1] so elevation increases upward
+            p, g, r = pred_cube[:, i, :], gt_cube[:, i, :], raw_cube[:, i, :]
+            if _sort_idx is not None:
+                p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+            return p, g, r
         extent           = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "range index", "elevation [m]"
         title_fn         = lambda i: f"azimuth = {i + az_offset}"
@@ -74,64 +141,50 @@ def make_walk_gif(
     if emax_gt  <= 0.0: emax_gt  = 1.0
     if emax_raw <= 0.0: emax_raw = 1.0
 
-    def _get(i):
+    _origin = "lower" if axis in ("range", "azimuth") else "upper"
+
+    tasks: list[tuple[Any, ...]] = []
+    for frame_order, fi in enumerate(frame_indices):
+        i       = int(fi)
         p, g, r = get_slice(i)
-        if normalize:
-            p = Ploter._normalize_01(p)
-            g = Ploter._normalize_01(g)
-            r = Ploter._normalize_01(r)
-        return p, g, r
+        tasks.append((
+            frame_order,
+            r.copy(), g.copy(), p.copy(),
+            vmin, vmax,
+            emax_gt, emax_raw,
+            extent,
+            x_label, y_label,
+            cmap, err_cmap,
+            dpi,
+            _origin,
+            title_fn(i),
+        ))
 
-    int_label = "intensity [0–1]" if normalize else "intensity"
-    if normalize:
-        vmin, vmax = 0.0, 1.0
+    n_workers = num_workers if num_workers is not None else min(len(tasks), os.cpu_count() or 1)
+    png_bytes: dict[int, bytes] = {}
 
-    fig, axes          = plt.subplots(2, 3, figsize=(18, 8.0))
-    p0, g0, r0         = _get(int(frame_indices[0]))
-    eg0                = np.abs(p0 - g0)
-    er0                = np.abs(p0 - r0)
+    with ProcessPoolExecutor(max_workers=n_workers) as pool:
+        futures = {pool.submit(_render_frame, t): t[0] for t in tasks}
+        with tqdm(total=len(futures), desc=f"Rendering {axis} frames", unit="frame") as pbar:
+            for fut in as_completed(futures):
+                order, data = fut.result()
+                png_bytes[order] = data
+                pbar.update(1)
 
-    im_raw  = axes[0, 0].imshow(r0,  cmap=cmap,     vmin=vmin,  vmax=vmax,    extent=extent, aspect="auto")
-    im_gt   = axes[0, 1].imshow(g0,  cmap=cmap,     vmin=vmin,  vmax=vmax,    extent=extent, aspect="auto")
-    im_pred = axes[0, 2].imshow(p0,  cmap=cmap,     vmin=vmin,  vmax=vmax,    extent=extent, aspect="auto")
-    im_egt  = axes[1, 0].imshow(eg0, cmap=err_cmap, vmin=0.0,   vmax=emax_gt, extent=extent, aspect="auto")
-    im_eraw = axes[1, 1].imshow(er0, cmap=err_cmap, vmin=0.0,   vmax=emax_raw,extent=extent, aspect="auto")
-    axes[1, 2].set_visible(False)
+    frames: list[Image.Image] = [
+        Image.open(BytesIO(png_bytes[k])).convert("P", dither=Image.Dither.NONE)
+        for k in sorted(png_bytes)
+    ]
 
-    for ax, label in zip(axes[0], ("Raw Tomogram", "GT (Gaussian)", "Prediction")):
-        ax.set_title(label)
-        ax.set_xlabel(x_label)
-    for ax, label in zip(axes[1, :2], ("|Pred - GT|", "|Pred - Raw|")):
-        ax.set_title(label)
-        ax.set_xlabel(x_label)
-    axes[0, 0].set_ylabel(y_label)
-    axes[1, 0].set_ylabel(y_label)
-
-    fig.colorbar(im_raw,  ax=axes[0, 0], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(im_gt,   ax=axes[0, 1], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(im_pred, ax=axes[0, 2], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(im_egt,  ax=axes[1, 0], fraction=0.045, pad=0.02).set_label("|error|")
-    fig.colorbar(im_eraw, ax=axes[1, 1], fraction=0.045, pad=0.02).set_label("|error|")
-
-    suptitle = fig.suptitle(title_fn(int(frame_indices[0])), fontsize=13)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
-
-    def update(frame_pos):
-        i          = int(frame_indices[frame_pos])
-        p, g, r    = _get(i)
-        eg         = np.abs(p - g)
-        er         = np.abs(p - r)
-        im_raw.set_data(r)
-        im_gt.set_data(g)
-        im_pred.set_data(p)
-        im_egt.set_data(eg)
-        im_eraw.set_data(er)
-        suptitle.set_text(title_fn(i))
-        return im_raw, im_gt, im_pred, im_egt, im_eraw, suptitle
-
-    ani = animation.FuncAnimation(fig, update, frames=len(frame_indices), blit=False, interval=1000.0 / max(1, fps))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    writer = animation.PillowWriter(fps=fps)
-    ani.save(str(out_path), writer=writer, dpi=dpi)
-    plt.close(fig)
+    duration_ms = int(round(1000.0 / max(1, fps)))
+    frames[0].save(
+        str(out_path),
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        loop=0,
+        duration=duration_ms,
+        optimize=False,
+    )
     return out_path

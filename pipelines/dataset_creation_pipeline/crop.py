@@ -34,12 +34,15 @@ class Cropper:
         parameters_full = np.load(str(self.layout.artifact_path("parameters")),    mmap_mode="r", allow_pickle=False)
         tomogram_full   = np.load(str(self.layout.artifact_path("full_tomogram")), mmap_mode="r", allow_pickle=False)
 
-        inputs_split     = inputs_full    [..., az_slice, rg_slice]
-        parameters_split = parameters_full[..., az_slice, rg_slice]
-        tomogram_split   = tomogram_full  [..., az_slice, rg_slice]
+        inputs_split     = np.ascontiguousarray(inputs_full    [..., az_slice, rg_slice])
+        parameters_split = np.ascontiguousarray(parameters_full[..., az_slice, rg_slice])
+        tomogram_split   = tomogram_full[..., az_slice, rg_slice]  
 
-        self.logger.subsection(f"[Crop Loaded] inputs={inputs_split.shape}  params={parameters_split.shape}  tomo={tomogram_split.shape}")
-        
+        self.logger.section(f"[Crop Loaded]")
+        self.logger.subsection(f" Inputs     = {inputs_split.shape}  (resident, {inputs_split.nbytes/1e9:.2f} GB)")
+        self.logger.subsection(f" Parameters = {parameters_split.shape}  (resident, {parameters_split.nbytes/1e9:.2f} GB)")
+        self.logger.subsection(f" Tomogram   = {tomogram_split.shape}  (mmap)\n")
+
         return {
             "inputs"     : inputs_split,
             "parameters" : parameters_split,

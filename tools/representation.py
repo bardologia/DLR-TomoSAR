@@ -27,28 +27,43 @@ class Representation(Enum):
         return _CHANNELS_PER_PASS[self.value]
 
     def convert(self, data: np.ndarray) -> np.ndarray:
+        # Hot path: this is called per-patch in DataLoader workers. Only compute
+        # the intermediates the active representation actually needs and avoid
+        # the unconditional final ``np.nan_to_num`` scan.
         n_samples, n_passes, h, w = data.shape
         cpp                       = _CHANNELS_PER_PASS[self.value]
 
-        magnitude     = np.abs(data)
-        log_magnitude = np.log1p(magnitude)
-        safe_mag      = np.where(magnitude > 0, magnitude, 1.0)
-        normalised_re = data.real / safe_mag
-        normalised_im = data.imag / safe_mag
-        phase         = np.angle(data)
+        if self is Representation.MAG_ONLY:
+            channels = [np.log1p(np.abs(data))]
 
-        Re, Im = data.real, data.imag
-        channels = {
-            Representation.REAL_IMAG     : [Re, Im],
-            Representation.MAG_REAL_IMAG : [log_magnitude, normalised_re, normalised_im],
-            Representation.MAG_ANGLE     : [log_magnitude, phase],
-            Representation.MAG_RI_ANGLE  : [log_magnitude, normalised_re, normalised_im, phase],
-            Representation.ANGLE_ONLY    : [phase],
-            Representation.MAG_ONLY      : [log_magnitude],
-        }[self]
+        elif self is Representation.ANGLE_ONLY:
+            channels = [np.angle(data)]
+
+        elif self is Representation.REAL_IMAG:
+            channels = [data.real, data.imag]
+
+        elif self is Representation.MAG_ANGLE:
+            channels = [np.log1p(np.abs(data)), np.angle(data)]
+
+        elif self is Representation.MAG_REAL_IMAG:
+            magnitude = np.abs(data)
+            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
+            channels  = [np.log1p(magnitude), data.real / safe_mag, data.imag / safe_mag]
+
+        elif self is Representation.MAG_RI_ANGLE:
+            magnitude = np.abs(data)
+            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
+            channels  = [
+                np.log1p(magnitude),
+                data.real / safe_mag,
+                data.imag / safe_mag,
+                np.angle(data),
+            ]
+        else:
+            raise ValueError(f"Unsupported representation: {self}")
 
         out = np.empty((n_samples, n_passes * cpp, h, w), dtype=np.float32)
         for c, arr in enumerate(channels):
             out[:, c::cpp] = arr
 
-        return np.nan_to_num(out, nan=0.0)
+        return out

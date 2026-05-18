@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 import psutil
 import pynvml
-import torch
 
 
 class ResourceMonitor:
@@ -205,16 +204,6 @@ class ResourceMonitor:
         
         return gpu_used, gpu_total
 
-    def _sample_torch_cuda_metrics(self, metrics):
-        for i in range(torch.cuda.device_count()):
-            try:
-                metrics[f"torch_cuda{i}_alloc_gb"] = self._bytes_to_gb(torch.cuda.memory_allocated(i))
-                metrics[f"torch_cuda{i}_reserved_gb"] = self._bytes_to_gb(torch.cuda.memory_reserved(i))
-                metrics[f"torch_cuda{i}_max_alloc_gb"] = self._bytes_to_gb(torch.cuda.max_memory_allocated(i))
-                metrics[f"torch_cuda{i}_max_reserv_gb"] = self._bytes_to_gb(torch.cuda.max_memory_reserved(i))
-            except Exception:
-                continue
-
     def _update_peak_metrics(self, metrics):
         for k in list(self.peak.keys()):
             if k in metrics and metrics[k] > self.peak[k]:
@@ -268,8 +257,7 @@ class ResourceMonitor:
         self._sample_disk_io_metrics(metrics)
         
         gpu_used, gpu_total = self._sample_gpu_nvml_metrics(metrics)
-        self._sample_torch_cuda_metrics(metrics)
-        
+
         vram_pct_overall = (100.0 * gpu_used / gpu_total) if gpu_total > 0 else 0.0
         metrics["vram_used_gb"] = gpu_used
         metrics["vram_pct"] = vram_pct_overall

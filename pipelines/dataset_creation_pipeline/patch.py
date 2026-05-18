@@ -8,7 +8,7 @@ import numpy as np
 
 
 @dataclass
-class PatchGridInfo:
+class GridInfo:
     n_v                    : int
     n_h                    : int
     pad_top                : int
@@ -54,17 +54,11 @@ class PatchGridInfo:
 
 
 class Patcher:
-    def __init__(self, grid: PatchGridInfo) -> None:
+    def __init__(self, grid: GridInfo) -> None:
         self.grid = grid
 
     @classmethod
-    def build(
-        cls,
-        spatial_size           : Tuple[int, int],
-        patch_size             : Tuple[int, int],
-        stride                 : int,
-        use_reflective_padding : bool = True,
-    ) -> "Patcher":
+    def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : int, use_reflective_padding : bool = True) -> "Patcher":
         ph, pw = patch_size
         H, W   = spatial_size
 
@@ -77,7 +71,7 @@ class Patcher:
         pad_top, pad_bot    = pad_v // 2, pad_v - pad_v // 2
         pad_left, pad_right = pad_h // 2, pad_h - pad_h // 2
 
-        grid = PatchGridInfo(
+        grid = GridInfo(
             n_v                    = n_v,
             n_h                    = n_h,
             pad_top                = pad_top,
@@ -89,6 +83,7 @@ class Patcher:
             spatial_size           = (H, W),
             use_reflective_padding = use_reflective_padding,
         )
+        
         return cls(grid)
 
     def extract(self, array: np.ndarray, idx: int) -> np.ndarray:
@@ -107,8 +102,8 @@ class Patcher:
         pad_left  = max(0, -h0)
         pad_right = max(0, h1 - W)
 
-        v0c, v1c = max(0, v0), min(H, v1)
-        h0c, h1c = max(0, h0), min(W, h1)
+        v0c, v1c  = max(0, v0), min(H, v1)
+        h0c, h1c  = max(0, h0), min(W, h1)
 
         sub = np.ascontiguousarray(array[..., v0c:v1c, h0c:h1c])
 

@@ -184,7 +184,7 @@ def make_tomo_gif(
         for rn_idx in slice_indices:
             frame_paths.append(Path(_render_gif_frame(rn_idx)))
     else:
-        ctx = mp.get_context('fork')
+        ctx = mp.get_context('spawn')
         chunksize = max(1, n_frames // (n_workers_eff * 4))
         with ProcessPoolExecutor(
             max_workers=n_workers_eff,

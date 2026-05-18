@@ -1,4 +1,4 @@
-from tools                                import Logger, ModelSummary, ShapeLogger, Tracker
+from tools                                    import Logger, ModelSummary, ShapeLogger, Tracker
 from pipelines.training_pipeline.metadata import TrainingRunMetadata
 
 
@@ -9,10 +9,8 @@ def __getattr__(name):
     if name == "TrainingPipeline":
         from pipelines.training_pipeline.pipeline import TrainingPipeline
         return TrainingPipeline
-    if name == "MaskedParamLoss":
-        from pipelines.training_pipeline.param_mask import MaskedParamLoss
-        return MaskedParamLoss
-    raise AttributeError(f"module 'training' has no attribute '{name}'")
+    raise AttributeError(f"module 'training_pipeline' has no attribute '{name}'")
+
 
 __all__ = [
     "Logger",
@@ -22,5 +20,4 @@ __all__ = [
     "Trainer",
     "TrainingPipeline",
     "TrainingRunMetadata",
-    "MaskedParamLoss",
 ]

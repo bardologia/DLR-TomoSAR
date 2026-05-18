@@ -31,7 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import torch
+import jax
 
 from configuration.dataset_config import (
     DatasetCreationConfiguration,
@@ -187,7 +187,7 @@ def _build_trainer_config(bench: BenchmarkConfig, model_name: str, gpu_id: int) 
         optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
         io             = IOConfig(logdir=logdir),
         training       = TrainingConfigInner(
-            device                      = f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu",
+            device                      = "gpu" if jax.devices("gpu") else "cpu",
             epochs                      = bench.epochs,
             validation_frequency        = bench.validation_frequency,
             use_amp                     = False,
@@ -317,10 +317,10 @@ def main() -> None:
     # ── Resolve GPU list ────────────────────────────────────────────────
     if bench.gpus:
         gpu_ids = bench.gpus
-    elif torch.cuda.is_available():
-        gpu_ids = list(range(torch.cuda.device_count()))
+    elif jax.devices("gpu"):
+        gpu_ids = list(range(len(jax.devices("gpu"))))
     else:
-        _log.warning("No CUDA devices found — falling back to CPU (gpu_id=0).")
+        _log.warning("No GPU devices found — falling back to device 0.")
         gpu_ids = [0]
 
     if bench.max_gpus > 0:

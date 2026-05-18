@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from pathlib     import Path
 from typing      import Dict
 
+import jax.numpy as jnp
 import numpy as np
-import torch
-import torch.nn.functional as F
 
 from pipelines.inference_pipeline.loader    import LoadedRun
 from pipelines.inference_pipeline.stitching import CubeStitcher, make_patch_window
@@ -16,23 +15,24 @@ from tools.logger                           import Logger
 PARAMS_PER_GAUSSIAN = 3
 
 
-def reconstruct_curves(params: torch.Tensor, x_axis: torch.Tensor, n_gaussians: int) -> torch.Tensor:
+def reconstruct_curves(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> np.ndarray:
     B, _, H, W = params.shape
-    x   = x_axis.to(params.device, dtype=params.dtype).reshape(1, -1, 1, 1)
-    out = torch.zeros((B, x.shape[1], H, W), device=params.device, dtype=params.dtype)
+    p   = jnp.asarray(params, dtype=jnp.float32)
+    x   = jnp.asarray(x_axis, dtype=jnp.float32).reshape(1, -1, 1, 1)
+    out = jnp.zeros((B, x.shape[1], H, W), dtype=jnp.float32)
     for k in range(n_gaussians):
-        a   = params[:, 3 * k     : 3 * k + 1]
-        mu  = params[:, 3 * k + 1 : 3 * k + 2]
-        sig = params[:, 3 * k + 2 : 3 * k + 3]
-        out = out + a * torch.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
-    return out
+        a   = p[:, 3 * k     : 3 * k + 1]
+        mu  = p[:, 3 * k + 1 : 3 * k + 2]
+        sig = p[:, 3 * k + 2 : 3 * k + 3]
+        out = out + a * jnp.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
+    return np.asarray(out)
 
 
 def prepare_gt_params_for_reconstruction(
-    gt_params  : torch.Tensor,
+    gt_params  : np.ndarray,
     n_gaussians: int,
     normalizer,  # Optional[Normalizer] — None if no output normalisation
-) -> torch.Tensor:
+) -> np.ndarray:
 
     if normalizer is not None and normalizer.stats.output_stats is not None:
         gt_params = normalizer.denormalize_output(gt_params)
@@ -41,7 +41,7 @@ def prepare_gt_params_for_reconstruction(
 
 
 @dataclass
-class PredictionResult:
+class Result:
     pred_curves        : np.ndarray  
     gt_curves          : np.ndarray   
     raw_curves         : np.ndarray   
@@ -96,32 +96,34 @@ class Predictor:
         )
 
     @staticmethod
-    def _peak_index_diff(pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        return (pred.argmax(dim=1) - gt.argmax(dim=1)).abs().to(torch.int32)
+    def _peak_index_diff(pred: np.ndarray, gt: np.ndarray) -> np.ndarray:
+        return np.abs(pred.argmax(axis=1) - gt.argmax(axis=1)).astype(np.int32)
 
     @staticmethod
-    def _per_pixel_metrics(pred: torch.Tensor, gt: torch.Tensor) -> Dict[str, torch.Tensor]:
-        diff   = pred - gt
-        mse    = (diff * diff).mean(dim=1)
-        mae    = diff.abs().mean(dim=1)
-        ss_res = (diff * diff).sum(dim=1)
-        gmean  = gt.mean(dim=1, keepdim=True)
-        ss_tot = ((gt - gmean) * (gt - gmean)).sum(dim=1)
-        r2     = 1.0 - ss_res / (ss_tot + 1e-8)
-        cos    = F.cosine_similarity(pred, gt, dim=1)
+    def _per_pixel_metrics(pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:
+        diff    = pred - gt
+        mse     = (diff * diff).mean(axis=1)
+        mae     = np.abs(diff).mean(axis=1)
+        ss_res  = (diff * diff).sum(axis=1)
+        gmean   = gt.mean(axis=1, keepdims=True)
+        ss_tot  = ((gt - gmean) * (gt - gmean)).sum(axis=1)
+        r2      = 1.0 - ss_res / (ss_tot + 1e-8)
+        dot     = (pred * gt).sum(axis=1)
+        norm_p  = np.sqrt((pred * pred).sum(axis=1)) + 1e-8
+        norm_g  = np.sqrt((gt   * gt  ).sum(axis=1)) + 1e-8
+        cos     = dot / (norm_p * norm_g)
         return {"mse": mse, "mae": mae, "r2": r2, "cos": cos}
 
-    @torch.no_grad()
-    def run_inference(self) -> PredictionResult:
+    def run_inference(self) -> Result:
         run       = self.run
-        device    = next(run.model.parameters()).device
         n_elev    = run.x_axis_length
         n_K       = run.n_gaussians
         out_ch    = run.out_channels
         params_ch = out_ch
 
+        import jax
         self.logger.section("[Inference: Predict]")
-        self.logger.subsection(f"Device     : {device}")
+        self.logger.subsection(f"Backend    : {jax.default_backend()}")
         self.logger.subsection(f"Cube dir   : {self.cube_dir}")
         self.logger.subsection(f"Window     : {self.window_kind}")
         self.logger.subsection(f"Cube dtype : {self.cube_dtype}\n")
@@ -150,26 +152,23 @@ class Predictor:
         win2d  = make_patch_window(run.grid.patch_size, kind=self.window_kind)
         ph, pw = run.grid.patch_size
 
-        run.model.eval()
         sample_count = 0
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task("[section]Inference[/section]", total=len(run.loader))
             for batch_idx, batch in enumerate(run.loader):
-                images, raw_curves_b, gt_params_b = batch[0], batch[1], batch[2]
+                images, _target_curves_b, gt_params_b, raw_curves_b = batch[0], batch[1], batch[2], batch[3]
 
-                images       = images.to(device, non_blocking=True).float()
-                raw_curves_b = raw_curves_b.to(device, non_blocking=True).float()
-                gt_params_b  = gt_params_b.to(device, non_blocking=True).float()
+                images       = np.asarray(images,       dtype=np.float32)
+                raw_curves_b = np.asarray(raw_curves_b, dtype=np.float32)
+                gt_params_b  = np.asarray(gt_params_b,  dtype=np.float32)
 
                 pred_params = run.model(images)
                 pred_gauss  = pred_params[:, : (out_ch // PARAMS_PER_GAUSSIAN) * PARAMS_PER_GAUSSIAN]
                 pred_curves = reconstruct_curves(pred_gauss, run.x_axis, n_K)
 
-                gt_params_ready = prepare_gt_params_for_reconstruction(
-                    gt_params_b[:, : n_K * PARAMS_PER_GAUSSIAN],
-                    n_K,
-                    run.dataset.norm_stats,
-                )
+                pred_params_phys = pred_params
+
+                gt_params_ready = prepare_gt_params_for_reconstruction(gt_params_b[:, : n_K * PARAMS_PER_GAUSSIAN], n_K, run.dataset.norm_stats,)
                 gt_curves_b = reconstruct_curves(gt_params_ready, run.x_axis, n_K)
 
                 mets     = self._per_pixel_metrics(pred_curves, gt_curves_b)
@@ -177,21 +176,21 @@ class Predictor:
                 peak     = self._peak_index_diff(pred_curves, gt_curves_b)
                 peak_raw = self._peak_index_diff(pred_curves, raw_curves_b)
 
-                pred_curves_np = pred_curves.detach().cpu().numpy().astype(self.cube_dtype, copy=False)
-                raw_curves_np  = raw_curves_b.detach().cpu().numpy().astype(self.cube_dtype, copy=False)
-                gt_curves_np   = gt_curves_b.detach().cpu().numpy().astype(self.cube_dtype, copy=False)
-                params_pred_np = pred_params.detach().cpu().numpy().astype(self.cube_dtype, copy=False)
-                params_gt_np   = gt_params_ready.detach().cpu().numpy().astype(self.cube_dtype, copy=False)
-                mse_np         = mets["mse"].detach().cpu().numpy()
-                mae_np         = mets["mae"].detach().cpu().numpy()
-                r2_np          = mets["r2"].detach().cpu().numpy()
-                cos_np         = mets["cos"].detach().cpu().numpy()
-                peak_np        = peak.detach().cpu().numpy().astype(np.float32)
-                mse_raw_np     = mets_raw["mse"].detach().cpu().numpy()
-                mae_raw_np     = mets_raw["mae"].detach().cpu().numpy()
-                r2_raw_np      = mets_raw["r2"].detach().cpu().numpy()
-                cos_raw_np     = mets_raw["cos"].detach().cpu().numpy()
-                peak_raw_np    = peak_raw.detach().cpu().numpy().astype(np.float32)
+                pred_curves_np = pred_curves.astype(self.cube_dtype)
+                raw_curves_np  = raw_curves_b.astype(self.cube_dtype)
+                gt_curves_np   = gt_curves_b.astype(self.cube_dtype)
+                params_pred_np = pred_params_phys.astype(self.cube_dtype)
+                params_gt_np   = gt_params_ready.astype(self.cube_dtype)
+                mse_np         = mets["mse"]
+                mae_np         = mets["mae"]
+                r2_np          = mets["r2"]
+                cos_np         = mets["cos"]
+                peak_np        = peak.astype(np.float32)
+                mse_raw_np     = mets_raw["mse"]
+                mae_raw_np     = mets_raw["mae"]
+                r2_raw_np      = mets_raw["r2"]
+                cos_raw_np     = mets_raw["cos"]
+                peak_raw_np    = peak_raw.astype(np.float32)
 
                 B        = images.shape[0]
                 base_idx = sample_count
@@ -236,15 +235,15 @@ class Predictor:
         params_gt_cube   = gt_param_stitcher.finalize()
 
         w_safe             = np.where(pixel_w > 0, pixel_w, 1.0)
-        pixel_mse          = (pixel_mse     / w_safe).astype(np.float32)
-        pixel_mae          = (pixel_mae     / w_safe).astype(np.float32)
-        pixel_r2           = (pixel_r2      / w_safe).astype(np.float32)
-        pixel_cos          = (pixel_cos     / w_safe).astype(np.float32)
-        pixel_peak_idx     = np.rint(pixel_peak     / w_safe).astype(np.int32)
-        pixel_mse_raw      = (pixel_mse_raw / w_safe).astype(np.float32)
-        pixel_mae_raw      = (pixel_mae_raw / w_safe).astype(np.float32)
-        pixel_r2_raw       = (pixel_r2_raw  / w_safe).astype(np.float32)
-        pixel_cos_raw      = (pixel_cos_raw / w_safe).astype(np.float32)
+        pixel_mse          = (pixel_mse         / w_safe).astype(np.float32)
+        pixel_mae          = (pixel_mae         / w_safe).astype(np.float32)
+        pixel_r2           = (pixel_r2          / w_safe).astype(np.float32)
+        pixel_cos          = (pixel_cos         / w_safe).astype(np.float32)
+        pixel_peak_idx     = np.rint(pixel_peak / w_safe).astype(np.int32)
+        pixel_mse_raw      = (pixel_mse_raw     / w_safe).astype(np.float32)
+        pixel_mae_raw      = (pixel_mae_raw     / w_safe).astype(np.float32)
+        pixel_r2_raw       = (pixel_r2_raw      / w_safe).astype(np.float32)
+        pixel_cos_raw      = (pixel_cos_raw     / w_safe).astype(np.float32)
         pixel_peak_idx_raw = np.rint(pixel_peak_raw / w_safe).astype(np.int32)
 
         if self.save_cubes:
@@ -277,7 +276,7 @@ class Predictor:
         self.logger.subsection(f"Mean pixel MSE raw : {pixel_mse_raw.mean():.4g}  (pred vs raw)")
         self.logger.subsection(f"Mean pixel R² raw  : {pixel_r2_raw.mean():.4g}  (pred vs raw)\n")
 
-        return PredictionResult(
+        return Result(
             pred_curves            = pred_curves_cube,
             gt_curves              = gt_curves_cube,
             raw_curves             = raw_curves_cube,

@@ -6,7 +6,7 @@ from pathlib     import Path
 
 from configuration.dataset_config               import DatasetCreationConfiguration
 from configuration.preprocessing_config         import CropRegion
-from pipelines.dataset_creation_pipeline.patch  import PatchGridInfo
+from pipelines.dataset_creation_pipeline.patch  import GridInfo
 from tools.logger                               import Logger
 
 
@@ -55,7 +55,6 @@ class DatasetMetadataWriter:
         
         payload["preprocessing_run_directory"] = str(config.preprocessing_run_directory)
         payload["input_config"]                = config.input_config.as_dict()
-        payload["target_mode"]                 = config.target_mode.value
         payload.pop("x_axis", None)   
         
         with open(out_path, "w", encoding="utf-8") as f:
@@ -80,7 +79,7 @@ class DatasetMetadataWriter:
         
         return out_path
 
-    def save_patch_metadata(self, grids: dict[str, PatchGridInfo]) -> Path:
+    def save_patch_metadata(self, grids: dict[str, GridInfo]) -> Path:
         out_path = self.metadata_directory / "patch.json"
         payload  = {name: grid.as_dict() for name, grid in grids.items()}
         

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import gc
 import multiprocessing as mp
-import threading
 import warnings
 from pathlib import Path
 from typing import Tuple
@@ -10,9 +9,15 @@ from typing import Tuple
 import numpy as np
 from scipy.optimize import OptimizeWarning, curve_fit, minimize
 
-from configuration.param_extraction_config import FitMode, FitSettings
+from configuration.param_extraction_config              import FitMode, FitSettings
 from pipelines.param_extraction_pipeline.gaussian_model import GaussianModel
-from tools.logger import Logger
+from tools.logger                                       import Logger
+
+try:
+    from pipelines.param_extraction_pipeline.gpu_fitting import GPUParameterExtractor, gpu_is_available
+    _GPU_MODULE_OK = True
+except Exception:
+    _GPU_MODULE_OK = False
 
 
 class FittingMethods:
@@ -61,6 +66,7 @@ class FittingMethods:
         fit_config          : FitMode.Adaptive,
         progress_queue      = None,
     ) -> tuple[list[np.ndarray], int, int, float, int]:
+        
         threshold_factor   = fit_config.threshold_factor
         truncation_index   = fit_config.truncation_index
         configured_initial = fit_config.initial_guess
@@ -220,9 +226,11 @@ class FittingMethods:
                             fitted_parameters = result.x
                             predicted_profile = model.multi_gaussian(height_axis, *fitted_parameters)
                             r2_score          = FittingMethods._compute_r2(absolute_profile, predicted_profile)
+                            
                             if np.isfinite(r2_score):
                                 quality_sum   += float(r2_score)
                                 quality_count += 1
+                            
                             fitted_parameters_for_slice[:, azimuth_index] = fitted_parameters
                             previous_valid_parameters = fitted_parameters
                         
@@ -250,13 +258,48 @@ class ParameterExtractor:
         parameter_extraction : FitSettings,
         parameter_workers    : int,
         logger               : Logger,
+        use_gpu              : bool                = True,
+        gpu_batch_size       : int                 = 256,
+        adam_steps           : int                 = 800,
+        adam_lr              : float               = 1e-2,
+        adam_b1              : float               = 0.9,
+        adam_b2              : float               = 0.999,
+        gpu_device_ids       : list | None         = None,
+        r2_sample_cap        : int                 = 4096,
     ) -> None:
         self.parameter_extraction = parameter_extraction
         self.parameter_workers    = parameter_workers
         self.logger               = logger
+        self.use_gpu              = use_gpu
+        self.gpu_batch_size       = gpu_batch_size
+        self.adam_steps           = adam_steps
+        self.adam_lr              = adam_lr
+        self.adam_b1              = adam_b1
+        self.adam_b2              = adam_b2
+        self.gpu_device_ids       = gpu_device_ids
+
+        self._gpu_extractor = None
+        if use_gpu and _GPU_MODULE_OK:
+            try:
+                self._gpu_extractor = GPUParameterExtractor(
+                    fit_settings     = parameter_extraction,
+                    logger           = logger,
+                    range_batch_size = gpu_batch_size,
+                    adam_steps       = adam_steps,
+                    adam_lr          = adam_lr,
+                    adam_b1          = adam_b1,
+                    adam_b2          = adam_b2,
+                    gpu_device_ids   = gpu_device_ids,
+                    r2_sample_cap    = r2_sample_cap,
+                )
+            except Exception as exc:  # pragma: no cover
+                logger.subsection(f"GPU extractor init failed ({exc}); falling back to CPU.")
 
         self.logger.section("[Parameter Extractor Initialized]")
-        self.logger.subsection(f"Workers : {self.parameter_workers}")
+        if self._gpu_extractor is not None:
+            self.logger.subsection(f"Backend : JAX GPU")
+        else:
+            self.logger.subsection(f"Backend : CPU (workers={self.parameter_workers})")
         self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
 
     def _read_tomogram_shape(self, tomogram_path: Path) -> Tuple[int, int, int]:
@@ -275,43 +318,23 @@ class ParameterExtractor:
         fit_config          : object,
         max_fit_iterations  : int,
     ) -> tuple[list[np.ndarray], int, int, float]:
-       
+        
         target_function = FittingMethods.REGISTRY.get(type(fit_config))
-        chunk_size      = total_range_bins // max(1, number_of_workers)
-        manager         = mp.Manager()
-        progress_queue  = manager.Queue()
-        tasks           = []
-
-        for worker_index in range(number_of_workers):
-            start_index = worker_index * chunk_size
-            end_index   = total_range_bins if worker_index == (number_of_workers - 1) else (worker_index + 1) * chunk_size
-            tasks.append((
-                start_index, end_index, tomogram_file_path, height_range_start, height_range_end,
-                number_of_gaussians, max_fit_iterations, fit_config, progress_queue,
-            ))
+        tasks = [(r, r + 1, tomogram_file_path, height_range_start, height_range_end, number_of_gaussians, max_fit_iterations, fit_config, None,) for r in range(total_range_bins)]
 
         progress_bar = self.logger.track(transient=True)
         progress     = progress_bar.__enter__()
-        bar_task     = progress.add_task("  [section]Fitting range bins[/section]", total=total_range_bins)
-        stop_listener = threading.Event()
+        bar_task     = progress.add_task("  [section]Fitting range bins (CPU)[/section]", total=total_range_bins)
 
-        def _listen() -> None:
-            while not (stop_listener.is_set() and progress_queue.empty()):
-                try:
-                    progress_queue.get(timeout=0.2)
-                except Exception:
-                    continue
-                progress.advance(bar_task)
-
-        listener_thread = threading.Thread(target=_listen, daemon=True)
-        listener_thread.start()
-
+        results = []
         try:
             with mp.Pool(processes=number_of_workers) as pool:
-                results = pool.starmap(target_function, tasks)
+                async_result = pool.starmap_async(target_function, tasks)
+                while not async_result.ready():
+                    pass
+                results = async_result.get()
+                progress.advance(bar_task, advance=total_range_bins)
         finally:
-            stop_listener.set()
-            listener_thread.join(timeout=2.0)
             progress_bar.__exit__(None, None, None)
 
         all_slices      = []
@@ -330,8 +353,29 @@ class ParameterExtractor:
         average_quality = (total_q_sum / total_q_count) if total_q_count > 0 else float("nan")
         return all_slices, total_failed, total_attempted, average_quality
 
+    @staticmethod
+    def _sort_gaussians_by_mu(parameters_array: np.ndarray, n_gaussians: int) -> np.ndarray:
+        n_params, Az, R = parameters_array.shape
+        out             = parameters_array.copy()
+        mu_rows         = np.array([1 + 3 * g for g in range(n_gaussians)])
+        for ai in range(Az):
+            for ri in range(R):
+                mus   = parameters_array[mu_rows, ai, ri]
+                order = np.argsort(mus)
+                for new_pos, old_pos in enumerate(order):
+                    out[new_pos * 3 + 0, ai, ri] = parameters_array[old_pos * 3 + 0, ai, ri]
+                    out[new_pos * 3 + 1, ai, ri] = parameters_array[old_pos * 3 + 1, ai, ri]
+                    out[new_pos * 3 + 2, ai, ri] = parameters_array[old_pos * 3 + 2, ai, ri]
+        return out
+
     def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> np.ndarray:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
+
+        if self._gpu_extractor is not None:
+            parameters_array = self._gpu_extractor.run(tomogram_path, height_range)
+            parameters_array = self._sort_gaussians_by_mu(parameters_array, self.parameter_extraction.number_of_gaussians)
+            self.logger.subsection("[Extraction Complete]")
+            return parameters_array
 
         _, _, range_size = self._read_tomogram_shape(tomogram_path)
 
@@ -349,6 +393,8 @@ class ParameterExtractor:
         parameters_array = np.stack(fitted_results, axis=-1)
         del fitted_results
         gc.collect()
+
+        parameters_array = self._sort_gaussians_by_mu(parameters_array, self.parameter_extraction.number_of_gaussians)
 
         failed_ratio = (100.0 * failed_fits / attempted_fits) if attempted_fits > 0 else 0.0
         self.logger.subsection(f"Failed fits: {failed_fits}/{attempted_fits} ({failed_ratio:.2f}%)")

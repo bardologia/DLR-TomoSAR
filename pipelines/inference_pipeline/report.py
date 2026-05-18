@@ -13,7 +13,7 @@ def write_metrics_json(metrics: Dict[str, object], path: Path) -> Path:
     return path
 
 
-class ReportAssembler:
+class Report:
 
     _DATASET_KEYS = frozenset({
         "gt_mean", "gt_std", "gt_max",
@@ -58,12 +58,12 @@ class ReportAssembler:
     def _kv_table(rows: List[Tuple[str, Any]], header: Tuple[str, str] = ("Key", "Value")) -> str:
         out = [f"| {header[0]} | {header[1]} |", "| --- | --- |"]
         for k, v in rows:
-            out.append(f"| `{k}` | {ReportAssembler._fmt(v)} |")
+            out.append(f"| `{k}` | {Report._fmt(v)} |")
         return "\n".join(out)
 
     @staticmethod
     def _dict_table(d: Dict[str, Any]) -> str:
-        return ReportAssembler._kv_table(sorted(d.items()))
+        return Report._kv_table(sorted(d.items()))
 
     @staticmethod
     def _four_col_table(
@@ -72,7 +72,7 @@ class ReportAssembler:
     ) -> str:
         out = [f"| {header[0]} | {header[1]} | {header[2]} | {header[3]} |", "| --- | --- | --- | --- |"]
         for label, gt_val, raw_val, desc in rows:
-            out.append(f"| {label} | {ReportAssembler._fmt(gt_val)} | {ReportAssembler._fmt(raw_val)} | {desc} |")
+            out.append(f"| {label} | {Report._fmt(gt_val)} | {Report._fmt(raw_val)} | {desc} |")
         return "\n".join(out)
 
     def _rel(self, p: Path) -> str:

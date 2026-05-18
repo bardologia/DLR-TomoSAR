@@ -28,6 +28,14 @@ class ParamExtractionPipeline:
             parameter_extraction = config.fit_settings,
             parameter_workers    = config.parameter_workers,
             logger               = self.logger,
+            use_gpu              = config.use_gpu,
+            gpu_batch_size       = config.gpu_batch_size,
+            adam_steps           = config.adam_steps,
+            adam_lr              = config.adam_lr,
+            adam_b1              = config.adam_b1,
+            adam_b2              = config.adam_b2,
+            gpu_device_ids       = config.gpu_device_ids,
+            r2_sample_cap        = config.r2_sample_cap,
         )
         self.metadata_manager = ExtractionMetadataManager(config, logger=self.logger)
 
@@ -43,10 +51,8 @@ class ParamExtractionPipeline:
         npy_path.parent.mkdir(parents=True, exist_ok=True)
 
         self.logger.subsection("[Active] Extracting multi-Gaussian parameters")
-        parameters_array = self.parameter_extractor.run(
-            tomogram_path = self.tomogram_path,
-            height_range  = self.height_range,
-        )
+       
+        parameters_array = self.parameter_extractor.run(tomogram_path = self.tomogram_path, height_range  = self.height_range)
 
         self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk...")
         np.save(str(npy_path), np.ascontiguousarray(parameters_array), allow_pickle=False)

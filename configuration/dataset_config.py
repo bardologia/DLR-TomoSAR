@@ -11,6 +11,35 @@ from tools.representation  import Representation
 from tools.split_regions   import SplitRegions 
 
 
+@dataclass
+class ChannelStats:
+    mean  : list[float]
+    std   : list[float]
+    names : Optional[list[str]] = None
+
+    @property
+    def n_channels(self) -> int:
+        return len(self.mean)
+
+    def as_dict(self) -> dict:
+        entries = []
+        for i, (m, s) in enumerate(zip(self.mean, self.std)):
+            entry: dict = {"name": self.names[i] if self.names else f"ch{i}", "mean": m, "std": s}
+            entries.append(entry)
+        return {"channels": entries}
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "ChannelStats":
+        if "channels" in payload:
+            entries = payload["channels"]
+            return cls(
+                mean  = [e["mean"]  for e in entries],
+                std   = [e["std"]   for e in entries],
+                names = [e["name"]  for e in entries],
+            )
+        return cls(mean=list(payload["mean"]), std=list(payload["std"]))
+
+
 class InputNormalizationMode(Enum):
     PER_CHANNEL = "per_channel"
     GROUPED     = "grouped"
@@ -20,11 +49,6 @@ class OutputNormalizationMode(Enum):
     DISABLED    = "disabled"
     PER_CHANNEL = "per_channel"
     GROUPED     = "grouped"
-
-
-class TargetMode(Enum):
-    RAW          = "raw"          
-    GAUSSIAN_FIT = "gaussian_fit"  
 
 
 @dataclass
@@ -122,11 +146,10 @@ class DatasetCreationConfiguration:
     patch                       : PatchConfiguration      = field(default_factory=PatchConfiguration)
     input_config                : InputConfig             = field(default_factory=InputConfig)      
     batch_size                  : int                     = 8
-    num_workers                 : int                     = 2
+    num_workers                 : int                     = 16
     shuffle_train               : bool                    = True
     pin_memory                  : bool                    = True
     input_normalization_mode    : InputNormalizationMode  = InputNormalizationMode.PER_CHANNEL
     output_normalization_mode   : OutputNormalizationMode = OutputNormalizationMode.DISABLED
-    target_mode                 : TargetMode              = TargetMode.RAW
     x_axis                      : Optional[np.ndarray]    = field(default=None, repr=False)
     n_gaussians                 : int                     = 1

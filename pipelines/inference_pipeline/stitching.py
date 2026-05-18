@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 import numpy as np
 
 from tools.logger                              import Logger as _Logger
-from pipelines.dataset_creation_pipeline.patch import PatchGridInfo
+from pipelines.dataset_creation_pipeline.patch import GridInfo
 
 
 def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.ndarray:
@@ -24,13 +24,14 @@ def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.nda
 
     wv = np.clip(wv, 1e-3, None).astype(np.float32)
     wh = np.clip(wh, 1e-3, None).astype(np.float32)
+    
     return np.outer(wv, wh)
 
 
 class CubeStitcher:
     def __init__(
         self,
-        grid           : PatchGridInfo,
+        grid           : GridInfo,
         n_channels     : int,
         window_kind    : str           = "hann",
         dtype          : str           = "float32",
@@ -84,4 +85,5 @@ class CubeStitcher:
         weight_safe = np.where(self._weight > 0, self._weight, 1.0)
         cube        = self._accum / weight_safe[None, :, :]
         cube        = cube[:, pad_t:pad_t + H, pad_l:pad_l + W]
+        
         return np.ascontiguousarray(cube.astype(self.dtype, copy=False))

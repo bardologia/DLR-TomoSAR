@@ -35,6 +35,7 @@ def _run_pyrat(
     apply_presumming      : bool,
     pyrat_threads         : int,
 ) -> int:
+    
     if pyrat_root_path not in sys.path:
         sys.path.insert(0, pyrat_root_path)
 
@@ -58,12 +59,6 @@ def _run_pyrat(
         dir          = output_directory,
         resampling   = apply_resampling,
     )
-
-    expected_output_directory = Path(output_directory) / "TOMO" / "TOMO-SR"
-    if not expected_output_directory.is_dir() or not any(expected_output_directory.iterdir()):
-        raise RuntimeError(
-            f"PyRat worker (suffix={suffix!r}, crop={crop_tuple}) produced no output in {expected_output_directory}."
-        )
 
     gc.collect()
     return 0
@@ -98,12 +93,14 @@ class TomogramProcessor:
 
         subsections     = []
         current_azimuth = azimuth_start
+        
         while current_azimuth < azimuth_end:
             next_azimuth = min(current_azimuth + max_width, azimuth_end)
             subsections.append((current_azimuth, next_azimuth, crop.range_start, crop.range_end))
             current_azimuth = next_azimuth
 
         self.logger.subsection(f"Crop subdivided into {len(subsections)} sections.")
+        
         return subsections
 
     def _dispatch_workers(
@@ -138,7 +135,8 @@ class TomogramProcessor:
             ))
 
         self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {parallel_config.tomogram_workers} workers...")
-        with ProcessPoolExecutor(max_workers=parallel_config.tomogram_workers, mp_context=mp.get_context("fork")) as executor:
+
+        with ProcessPoolExecutor(max_workers=parallel_config.tomogram_workers, mp_context=mp.get_context("spawn")) as executor:
             futures = [executor.submit(_run_pyrat, *task) for task in tasks]
             for future in as_completed(futures):
                 future.result()
@@ -173,11 +171,13 @@ class TomogramProcessor:
             with h5py.File(str(partial_file_path), "r") as hdf5_file:
                 hdf5_file["DEM"]     .read_direct(combined_dem,      dest_sel=np.s_[dem_offset:dem_offset + dem_shape[0]])
                 hdf5_file["tomogram"].read_direct(combined_tomogram, dest_sel=np.s_[:, tomogram_offset:tomogram_offset + tomogram_shape[1], :])
+            
             dem_offset      += dem_shape[0]
             tomogram_offset += tomogram_shape[1]
 
         self.logger.subsection(f"-> Combined DEM shape      : {combined_dem.shape}")
         self.logger.subsection(f"-> Combined Tomogram shape : {combined_tomogram.shape}")
+      
         return combined_dem, combined_tomogram
 
     def _save_tomo(self, output_path: Path, dem_array: np.ndarray, tomogram_array: np.ndarray) -> None:
@@ -198,6 +198,7 @@ class TomogramProcessor:
             combined_dem, combined_tomogram = self._concatenate_tomos(temporary_directory)
             self._save_tomo(output_path, combined_dem, combined_tomogram)
             self.logger.subsection(f"-> Full tomogram saved: {output_path}")
+        
         finally:
             self._cleanup_temp_dir(temporary_directory)
             gc.collect()

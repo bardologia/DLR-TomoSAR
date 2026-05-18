@@ -17,7 +17,7 @@ from pipelines.param_extraction_pipeline.pipeline import ParamExtractionPipeline
 
 def main() -> None:
     config = ExtractionConfig(
-        processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/toy2"),
+        processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset"),
         pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat"),
 
         output_prefix     = "params",

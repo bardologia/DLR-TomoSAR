@@ -59,7 +59,7 @@ class ProfileDataset(Dataset):
         self.split_name   = split_name
         self.logger       = logger
 
-        self.patch_h, self.patch_w = tomo_dataset.grid.patch_size
+        self.patch_h, self.patch_w = tomo_dataset.grid.grid.patch_size
         self.pixels_per_patch      = self.patch_h * self.patch_w
         self.profile_length        = int(tomo_dataset.target_channels)
 
@@ -175,6 +175,7 @@ class LoaderBuilder:
             "batch_size"         : self.batch_size,
             "num_workers"        : self.num_workers,
             "pin_memory"         : self.pin_memory,
+            "multiprocessing_context" : "forkserver" if self.num_workers > 0 else None,
             "persistent_workers" : self.persistent_workers,
             "prefetch_factor"    : self.prefetch_factor,
         }

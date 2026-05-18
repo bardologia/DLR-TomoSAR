@@ -53,7 +53,7 @@ class LossConfig:
     use_smoothness_tv        : bool  = False
     weight_smoothness_tv     : float = 1e-4
 
-    log_components_every     : int   = 1
+    log_components_every     : int   = 50
 
 
 @dataclass
@@ -100,12 +100,25 @@ class WarmupConfig:
     warmup_steps        : int   = 200
     warmup_start_factor : float = 0.1
     warmup_enabled      : bool  = True
+    warmup_mode         : str   = "linear"   
+    warmup_poly_power   : float = 2.0    
 
 
 @dataclass
 class SchedulerConfig:
-    epochs  : int   = 100
-    eta_min : float = 1e-6
+    type         : str   = "cosine_annealing"
+    epochs       : int   = 100
+    eta_min      : float = 1e-6
+    step_size    : int   = 30
+    gamma        : float = 0.1
+    milestones   : list  = field(default_factory=lambda: [30, 60, 90])
+    start_factor : float = 1.0
+    end_factor   : float = 0.1
+    total_iters  : int   = 100
+    power        : float = 1.0
+    factor       : float = 0.1
+    patience     : int   = 10
+    threshold    : float = 1e-4
 
 
 @dataclass
@@ -126,6 +139,7 @@ class IOConfig:
 
 @dataclass
 class OptimizerConfig:
+    lr    : float = 1e-3
     betas : tuple = (0.9, 0.999)
     eps   : float = 1e-8
 
@@ -139,10 +153,15 @@ class TrainingConfigInner:
     gradient_accumulation_steps : int   = 1
     max_grad_norm               : float = None
     verbose                     : bool  = True
+    
     overfit_enabled             : bool  = False
+    overfit_max_steps           : int   = 50
+    overfit_stop_threshold      : float = 1e-6
+    overfit_batch_size          : int   = 1
+    
     deep_validation             : bool  = True
     eval_train_split            : bool  = False
-    log_debug                   : bool  = True   
+    log_debug                   : bool  = False   
 
 
 @dataclass
@@ -151,8 +170,8 @@ class MemoryConfig:
     eval_keep_pixel_arrays       : bool = True   
     eval_pixel_subsample         : int  = 0      
     clear_cache_every_n_steps    : int  = 0      
-    clear_cache_after_eval       : bool = True   
-    clear_cache_after_epoch      : bool = True   
+    clear_cache_after_eval       : bool = False  
+    clear_cache_after_epoch      : bool = False 
 
 
 @dataclass
@@ -171,15 +190,27 @@ class ResourceConfig:
 
 
 @dataclass
+class GradientClipperConfig:
+    clip_mode            : str   = "disabled"   # disabled | fixed | adaptive_percentile | adaptive_mean_std
+    max_grad_norm        : float = 1.0        
+    adaptive_window      : int   = 200        
+    adaptive_percentile  : float = 95.0      
+    adaptive_mean_std_k  : float = 2.0        
+    clip_epsilon         : float = 1e-6      
+    log_histogram_freq   : int   = 100       
+
+
+@dataclass
 class TrainerConfig:
     gaussian       : GaussianConfig
-    early_stopping : EarlyStoppingConfig = field(default_factory=EarlyStoppingConfig)
-    warmup         : WarmupConfig        = field(default_factory=WarmupConfig)
-    scheduler      : SchedulerConfig     = field(default_factory=SchedulerConfig)
-    ema            : EMAConfig           = field(default_factory=EMAConfig)
-    io             : IOConfig            = field(default_factory=IOConfig)
-    optimizer      : OptimizerConfig     = field(default_factory=OptimizerConfig)
-    training       : TrainingConfigInner = field(default_factory=TrainingConfigInner)
-    loss           : LossConfig          = field(default_factory=LossConfig)
-    resources      : ResourceConfig      = field(default_factory=ResourceConfig)
-    memory         : MemoryConfig        = field(default_factory=MemoryConfig)
+    early_stopping   : EarlyStoppingConfig    = field(default_factory=EarlyStoppingConfig)
+    warmup           : WarmupConfig            = field(default_factory=WarmupConfig)
+    scheduler        : SchedulerConfig         = field(default_factory=SchedulerConfig)
+    ema              : EMAConfig               = field(default_factory=EMAConfig)
+    io               : IOConfig                = field(default_factory=IOConfig)
+    optimizer        : OptimizerConfig         = field(default_factory=OptimizerConfig)
+    training         : TrainingConfigInner     = field(default_factory=TrainingConfigInner)
+    loss             : LossConfig              = field(default_factory=LossConfig)
+    resources        : ResourceConfig          = field(default_factory=ResourceConfig)
+    memory           : MemoryConfig            = field(default_factory=MemoryConfig)
+    gradient_clipper : GradientClipperConfig   = field(default_factory=GradientClipperConfig)

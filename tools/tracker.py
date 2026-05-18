@@ -1,5 +1,4 @@
-import torch
-from torch import nn
+import numpy as np
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-v0_8-darkgrid')
@@ -49,10 +48,7 @@ class Tracker:
     def log_histogram(self, tag, values, step, bins="auto"):
         if self.writer is None:
             return
-        if isinstance(values, torch.Tensor):
-            v = values.detach().float().cpu()
-        else:
-            v = values
+        v = np.asarray(values).ravel().astype(np.float32)
         try:
             self.writer.add_histogram(tag, v, step, bins=bins)
         except (ValueError, RuntimeError):
@@ -61,16 +57,12 @@ class Tracker:
     def log_image(self, tag, img, step, dataformats="CHW"):
         if self.writer is None:
             return
-        if isinstance(img, torch.Tensor):
-            img = img.detach().float().cpu()
-        self.writer.add_image(tag, img, step, dataformats=dataformats)
+        self.writer.add_image(tag, np.asarray(img), step, dataformats=dataformats)
 
     def log_images(self, tag, imgs, step, dataformats="NCHW"):
         if self.writer is None:
             return
-        if isinstance(imgs, torch.Tensor):
-            imgs = imgs.detach().float().cpu()
-        self.writer.add_images(tag, imgs, step, dataformats=dataformats)
+        self.writer.add_images(tag, np.asarray(imgs), step, dataformats=dataformats)
 
     def log_figure(self, tag, fig, step, close=True):
         if self.writer is None:
@@ -105,96 +97,44 @@ class Tracker:
         except Exception:
             pass
 
-    def log_gradients(self, model, step, max_grad_norm=None, prefix="debug/grads"):
+    def log_optimizer(self, lr: float, step, name: str = "lr"):
+        """Log a scalar learning rate value."""
         if self.writer is None or not self.debug:
             return
-        total_norm  = 0.0
-        max_abs     = 0.0
-        n_with_grad = 0
-        for name, param in model.named_parameters():
-            if param.grad is None:
-                continue
-            n_with_grad += 1
-            g = param.grad.detach()
-            self.writer.add_histogram(f"{prefix}/{name}", g, step)
-            total_norm += g.norm(2).item() ** 2
-            max_abs    = max(max_abs, g.abs().max().item())
-
-        total_norm = total_norm ** 0.5
-        self.writer.add_scalar(f"{prefix}/total_norm", total_norm, step)
-        self.writer.add_scalar(f"{prefix}/global_max", max_abs,    step)
-        if max_grad_norm is not None:
-            self.writer.add_scalar(f"{prefix}/clip_ratio",
-                                   total_norm / max(max_grad_norm, 1e-12), step)
-
-    def log_optimizer(self, optimizer, step):
-        if self.writer is None or not self.debug:
-            return
-        for i, group in enumerate(optimizer.param_groups):
-            name = group.get("name", f"group_{i}")
-            self.writer.add_scalar(f"debug/optimizer/lr_{name}", group["lr"], step)
-            if "weight_decay" in group:
-                self.writer.add_scalar(f"optimizer/wd_{name}", group["weight_decay"], step)
-            if "betas" in group:
-                b1, b2 = group["betas"]
-                self.writer.add_scalar(f"optimizer/beta1_{name}", b1, step)
-                self.writer.add_scalar(f"optimizer/beta2_{name}", b2, step)
-            if "eps" in group:
-                self.writer.add_scalar(f"optimizer/eps_{name}", group["eps"], step)
+        self.writer.add_scalar(f"debug/optimizer/{name}", lr, step)
 
     def log_activations(self, model, step_box):
-        hooks = []
-        if self.writer is None or not self.debug:
-            return hooks
-
-        def _step():
-            if isinstance(step_box, int):
-                return step_box
-            if isinstance(step_box, (list, tuple)) and len(step_box) > 0:
-                return int(step_box[0])
-            if isinstance(step_box, dict):
-                return int(step_box.get("step", 0))
-            return 0
-
-        def hook_fn(name):
-            def fn(module, _input, output):
-                if isinstance(output, torch.Tensor):
-                    s = _step()
-                    self.writer.add_histogram(f"debug/activations/{name}", output.detach(), s)
-                    self.writer.add_scalar(f"debug/activations_mean/{name}", output.mean().item(), s)
-                    self.writer.add_scalar(f"debug/activations_std/{name}",  output.std().item(),  s)
-            return fn
-
-        for name, module in model.named_modules():
-            if isinstance(module, (nn.Conv2d, nn.Linear, nn.BatchNorm2d, nn.ReLU, nn.GELU, nn.SiLU)):
-                hooks.append(module.register_forward_hook(hook_fn(name)))
-
-        return hooks
-
-    def log_weights(self, model, step):
-        if self.writer is None or not self.debug:
-            return
-        for name, param in model.named_parameters():
-            self.writer.add_histogram(f"debug/weights/{name}", param.detach(), step)
-
+        """No-op: activation hooks are PyTorch-specific and not applicable to Flax."""
+        return []
 
     def log_param_stats(self, name, tensor, step):
-        if self.writer is None or tensor.numel() == 0:
+        if self.writer is None:
             return
-        t = tensor.detach().float()
-        self.writer.add_scalar(f"{name}/mean", t.mean().item(), step)
-        self.writer.add_scalar(f"{name}/std",  t.std().item(),  step)
-        self.writer.add_scalar(f"{name}/min",  t.min().item(),  step)
-        self.writer.add_scalar(f"{name}/max",  t.max().item(),  step)
-        self.writer.add_scalar(f"{name}/norm", t.norm(2).item(), step)
+        t = np.asarray(tensor, dtype=np.float32).ravel()
+        if t.size == 0:
+            return
+        self.writer.add_scalar(f"{name}/mean", float(t.mean()), step)
+        self.writer.add_scalar(f"{name}/std",  float(t.std()),  step)
+        self.writer.add_scalar(f"{name}/min",  float(t.min()),  step)
+        self.writer.add_scalar(f"{name}/max",  float(t.max()),  step)
+        self.writer.add_scalar(f"{name}/norm", float(np.linalg.norm(t)), step)
 
     def log_memory(self, step, device=None):
-        if self.writer is None or not torch.cuda.is_available():
+        import torch
+        if self.writer is None:
+            return
+        if not torch.cuda.is_available():
             return
         dev = device if device is not None else torch.cuda.current_device()
-        self.writer.add_scalar("system/gpu_mem_alloc_GB",     torch.cuda.memory_allocated(dev)     / 1024 ** 3, step)
-        self.writer.add_scalar("system/gpu_mem_reserved_GB",  torch.cuda.memory_reserved(dev)      / 1024 ** 3, step)
-        self.writer.add_scalar("system/gpu_mem_max_alloc_GB", torch.cuda.max_memory_allocated(dev) / 1024 ** 3, step)
+        try:
+            alloc_gb    = torch.cuda.memory_allocated(dev) / 1024 ** 3
+            reserved_gb = torch.cuda.memory_reserved(dev)  / 1024 ** 3
+            peak_gb     = torch.cuda.max_memory_allocated(dev) / 1024 ** 3
+            self.writer.add_scalar("system/gpu_mem_alloc_GB",     alloc_gb,    step)
+            self.writer.add_scalar("system/gpu_mem_reserved_GB",  reserved_gb, step)
+            self.writer.add_scalar("system/gpu_mem_peak_alloc_GB", peak_gb,    step)
+        except Exception:
+            pass
 
     def flush(self):
         if self.writer is not None:

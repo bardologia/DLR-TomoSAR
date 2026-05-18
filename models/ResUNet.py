@@ -162,5 +162,7 @@ class ResUNet(nn.Module):
 
         out = self.output_head(x)
         out = out.clone()
-        out[:, 0::self.config.params_per_gaussian] = functional.softplus(out[:, 0::self.config.params_per_gaussian])
+        ppg = self.config.params_per_gaussian
+        out[:, 0::ppg]       = functional.softplus(out[:, 0::ppg])
+        out[:, ppg - 1::ppg] = functional.softplus(out[:, ppg - 1::ppg])
         return out

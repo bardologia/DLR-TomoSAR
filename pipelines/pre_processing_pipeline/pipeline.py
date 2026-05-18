@@ -18,12 +18,7 @@ class PreProcessingPipeline:
         log_dir     = run_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        self.logger = logger or Logger(
-            log_dir = str(log_dir),
-            name    = "preprocessing",
-            level   = "INFO",
-        )
-
+        self.logger                = logger or Logger(log_dir = str(log_dir), name = "preprocessing", level = "INFO")
         self.metadata_manager      = MetadataManager  (config,    logger=self.logger)
         self.tomogram_processor    = TomogramProcessor (config,   logger=self.logger)
         self.interferogram_builder = InterferogramBuilder(config, logger=self.logger)
@@ -57,8 +52,8 @@ class PreProcessingPipeline:
 
     def _stage_full_tomogram(self) -> Path:
         output_path = self.metadata_manager.artifact_path("full_tomogram")
-    
         self.logger.subsection("[Active] Generating full tomogram...")
+        
         self.tomogram_processor.run(
             output_path      = output_path,
             stack_identifier = self.config.full_stack_identifier,
@@ -71,6 +66,7 @@ class PreProcessingPipeline:
             identifier_tag   = self.config.parameter_tag,
             metadata_entries = self._tomogram_metadata(output_path, self.config.full_stack_identifier, cfg),
         )
+        
         self._clear_memory()
         return output_path
 
@@ -90,6 +86,7 @@ class PreProcessingPipeline:
             identifier_tag   = self.config.tomogram_tag,
             metadata_entries = self._tomogram_metadata(output_path, self.config.reduced_stack_identifier, cfg),
         )
+       
         self._clear_memory()
         return output_path
 
@@ -106,6 +103,7 @@ class PreProcessingPipeline:
         self.metadata_manager.save_stage_metadata(
             stage_name       = "inputs",
             identifier_tag   = self.config.tomogram_tag,
+            
             metadata_entries = {
                 "tomofull"     : str(output_path),
                 "crop"         : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
@@ -118,6 +116,7 @@ class PreProcessingPipeline:
                 "data_type"    : self.config.dataset_type,
             },
         )
+       
         self._clear_memory()
         return output_path
 

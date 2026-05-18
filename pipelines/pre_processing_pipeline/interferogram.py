@@ -8,7 +8,7 @@ from typing import Tuple
 import numpy as np
 
 from configuration.preprocessing_config import PreProcessingConfiguration
-from tools.logger                                          import Logger
+from tools.logger                       import Logger
 
 
 class InterferogramBuilder:
@@ -62,6 +62,7 @@ class InterferogramBuilder:
 
         self.logger.subsection(f"[FSAR] Master: {tomography_object.master}")
         self.logger.subsection(f"[FSAR] Slaves ({len(tomography_object.slaves)}):")
+        
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 

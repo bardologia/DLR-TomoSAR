@@ -244,7 +244,16 @@ class Ploter:
         err_gt_slice  = np.abs(pred_slice - gt_slice)
         err_raw_slice = np.abs(pred_slice - raw_slice)
 
-        extent_int = [x_extent_lo, x_extent_hi, float(x_axis[0]), float(x_axis[-1])]
+        # Sort elevation axis ascending so row 0 = lowest elevation → origin='lower' is correct
+        sort_idx      = np.argsort(x_axis)
+        x_axis_sorted = x_axis[sort_idx]
+        pred_slice    = pred_slice   [sort_idx]
+        gt_slice      = gt_slice     [sort_idx]
+        raw_slice     = raw_slice    [sort_idx]
+        err_gt_slice  = err_gt_slice [sort_idx]
+        err_raw_slice = err_raw_slice[sort_idx]
+
+        extent_int = [x_extent_lo, x_extent_hi, float(x_axis_sorted[0]), float(x_axis_sorted[-1])]
 
         pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice = self._maybe_normalize(pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice)
 
@@ -266,13 +275,13 @@ class Ploter:
         ]
 
         for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[0], top_panels):
-            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi)
+            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi, origin="lower")
             ax_i.set_title(label)
             ax_i.set_xlabel(x_label)
             fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(self._int_label)
 
         for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[1], bot_panels):
-            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi)
+            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi, origin="lower")
             ax_i.set_title(label)
             ax_i.set_xlabel(x_label)
             fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label("|error|")

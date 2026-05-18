@@ -196,10 +196,11 @@ class UNet(nn.Module):
         x                   = self.bottleneck(x)
         # Expanding path: recover spatial resolution using skip connections
         x                   = self.decoder(x, skip_connections[::-1])
-        # Final 1x1 conv; softplus enforces strictly positive Gaussian amplitudes
+        # Final 1x1 conv; softplus enforces strictly positive Gaussian amplitudes and sigmas
         out = self.output_head(x)
         ppg  = self.config.params_per_gaussian
         mask = torch.zeros(out.shape[1], dtype=torch.bool, device=out.device)
-        mask[0::ppg] = True
+        mask[0::ppg]       = True
+        mask[ppg - 1::ppg] = True
         out  = torch.where(mask.view(1, -1, 1, 1), functional.softplus(out), out)
         return out

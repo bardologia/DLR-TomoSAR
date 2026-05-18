@@ -57,6 +57,16 @@ class ExtractionConfig:
     fit_settings         : FitSettings                   = field(default_factory=FitSettings)
     parameter_workers    : int                           = 20
 
+    use_gpu              : bool                          = True
+    gpu_batch_size       : int                           = 256
+    adam_steps           : int                           = 1000
+    adam_lr              : float                         = 2e-1
+    adam_b1              : float                         = 0.95
+    adam_b2              : float                         = 0.999
+    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 2, 3])
+    r2_sample_cap        : int                           = 4096
+
+
     @property
     def data_directory(self) -> Path:
         return Path(self.processed_data_path) / "data"

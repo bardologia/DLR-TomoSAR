@@ -1,22 +1,31 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing             import Dict, Optional, Tuple
 
 import numpy                as np
 from skimage.metrics import structural_similarity as ssim
-from pipelines.inference_pipeline.predictor import PredictionResult
+from tqdm                   import tqdm
+from pipelines.inference_pipeline.predictor import Result
 
 
-class MetricsComputer:
+class Metrics:
 
     _EPS : float = 1e-12
 
-    def __init__(self, result: PredictionResult, x_axis: np.ndarray, n_gaussians: int) -> None:
+    def __init__(
+        self,
+        result      : Result,
+        x_axis      : np.ndarray,
+        n_gaussians : int,
+    ) -> None:
 
         self.result      = result
         self.x_axis      = x_axis
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
+        self.num_workers = 40
 
     @staticmethod
     def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
@@ -78,78 +87,70 @@ class MetricsComputer:
 
         out: Dict[str, float] = {}
 
-        def _axis(indices: np.ndarray, axis: int, label: str) -> None:
-            vals = []
+        tasks: list[tuple[str, np.ndarray, np.ndarray]] = []
+
+        def _enqueue(indices: np.ndarray, axis: int, label: str) -> None:
             for i, idx in enumerate(indices):
                 if axis == 0:
-                    p_sl = pred[idx, :, :]
-                    r_sl = ref [idx, :, :]
+                    p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
                 elif axis == 1:
-                    p_sl = pred[:, idx, :]
-                    r_sl = ref [:, idx, :]
+                    p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
                 else:
-                    p_sl = pred[:, :, idx]
-                    r_sl = ref [:, :, idx]
-                v = self._ssim_2d(p_sl.astype(np.float64), r_sl.astype(np.float64))
-                out[f"ssim_{prefix}_{label}_{i}"] = v
-                if np.isfinite(v):
-                    vals.append(v)
-            out[f"ssim_{prefix}_{label}_mean"] = float(np.mean(vals)) if vals else float("nan")
+                    p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
+                tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
 
         if elev_indices  is not None and len(elev_indices):
-            _axis(elev_indices,  axis=0, label="elev")
+            _enqueue(elev_indices,  axis=0, label="elev")
         if range_indices is not None and len(range_indices):
-            _axis(range_indices, axis=2, label="range")
+            _enqueue(range_indices, axis=2, label="range")
         if az_indices    is not None and len(az_indices):
-            _axis(az_indices,    axis=1, label="azimuth")
+            _enqueue(az_indices,    axis=1, label="azimuth")
+
+        if not tasks:
+            return out
+
+        with ThreadPoolExecutor(max_workers=self.num_workers) as pool:
+            futures = {pool.submit(self._ssim_2d, p, r): key for key, _label, p, r in tasks}
+            with tqdm(total=len(futures), desc=f"SSIM ({prefix})", unit="slice", leave=False) as pbar:
+                for fut in as_completed(futures):
+                    key = futures[fut]
+                    out[key] = fut.result()
+                    pbar.update(1)
+
+        labels_seen = {t[1] for t in tasks}
+        for label in labels_seen:
+            vals = [v for (key, lbl, _, _) in tasks if lbl == label and np.isfinite(v := out.get(key, float("nan")))]
+            out[f"ssim_{prefix}_{label}_mean"] = float(np.mean(vals)) if vals else float("nan")
 
         return out
 
     def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray, raw: np.ndarray) -> Dict[str, np.ndarray]:
+        eps = self._EPS
 
-        n_elev    = pred.shape[0]
-        eps       = self._EPS
+        P = pred.reshape(pred.shape[0], -1).astype(np.float64)
+        G = gt  .reshape(gt  .shape[0], -1).astype(np.float64)
+        R = raw .reshape(raw .shape[0], -1).astype(np.float64)
 
-        gt_sum    = gt  .sum(axis=0, keepdims=True).clip(eps, None)
-        pred_sum  = pred.sum(axis=0, keepdims=True).clip(eps, None)
-        raw_sum   = raw .sum(axis=0, keepdims=True).clip(eps, None)
-        gt_prob   = gt   / gt_sum
-        pred_prob = pred / pred_sum
-        raw_prob  = raw  / raw_sum
+        diff_g = P - G
+        diff_r = P - R
 
-        mae_gt   = np.zeros(n_elev, dtype=np.float64)
-        rmse_gt  = np.zeros(n_elev, dtype=np.float64)
-        r2_gt    = np.zeros(n_elev, dtype=np.float64)
-        ce_gt    = np.zeros(n_elev, dtype=np.float64)
+        mae_gt  = np.abs(diff_g).mean(axis=1)
+        rmse_gt = np.sqrt((diff_g ** 2).mean(axis=1))
+        g_var   = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + eps
+        r2_gt   = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
 
-        mae_raw  = np.zeros(n_elev, dtype=np.float64)
-        rmse_raw = np.zeros(n_elev, dtype=np.float64)
-        r2_raw   = np.zeros(n_elev, dtype=np.float64)
-        ce_raw   = np.zeros(n_elev, dtype=np.float64)
+        mae_raw  = np.abs(diff_r).mean(axis=1)
+        rmse_raw = np.sqrt((diff_r ** 2).mean(axis=1))
+        r_var    = ((R - R.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + eps
+        r2_raw   = 1.0 - (diff_r ** 2).sum(axis=1) / r_var
 
-        for e in range(n_elev):
-            p = pred[e].ravel().astype(np.float64)
-            g = gt  [e].ravel().astype(np.float64)
-            r = raw [e].ravel().astype(np.float64)
+        gt_prob   = G / G.sum(axis=0, keepdims=True).clip(eps, None)
+        pred_prob = P / P.sum(axis=0, keepdims=True).clip(eps, None)
+        raw_prob  = R / R.sum(axis=0, keepdims=True).clip(eps, None)
 
-            diff_g = p - g
-            diff_r = p - r
-
-            mae_gt [e] = float(np.abs(diff_g).mean())
-            rmse_gt[e] = float(np.sqrt((diff_g ** 2).mean()))
-            g_var      = float(((g - g.mean()) ** 2).sum()) + eps
-            r2_gt  [e] = float(1.0 - (diff_g ** 2).sum() / g_var)
-
-            mae_raw [e] = float(np.abs(diff_r).mean())
-            rmse_raw[e] = float(np.sqrt((diff_r ** 2).mean()))
-            r_var       = float(((r - r.mean()) ** 2).sum()) + eps
-            r2_raw  [e] = float(1.0 - (diff_r ** 2).sum() / r_var)
-
-            gp = gt_prob  [e].ravel().astype(np.float64)
-            pp = pred_prob [e].ravel().astype(np.float64)
-            rp = raw_prob  [e].ravel().astype(np.float64)
-            ce_gt [e] = float(-(gp * np.log(pp.clip(eps, None))).mean())
-            ce_raw[e] = float(-(rp * np.log(pp.clip(eps, None))).mean())
+        log_pp = np.log(pred_prob.clip(eps, None))
+        ce_gt  = -(gt_prob  * log_pp).mean(axis=1)
+        ce_raw = -(raw_prob * log_pp).mean(axis=1)
 
         return {
             "elev_mae_gt"   : mae_gt,
