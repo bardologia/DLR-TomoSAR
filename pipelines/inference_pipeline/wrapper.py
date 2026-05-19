@@ -1,43 +1,38 @@
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 class ModelWrapper:
     def __init__(
         self,
-        apply_fn,
-        params,
-        batch_stats,
+        model,
+        device,
         *,
         params_per_gaussian: int = 3,
         normalizer=None,
     ) -> None:
 
-        self._apply_fn            = apply_fn
-        self._params              = params
-        self._batch_stats         = batch_stats
+        self._model               = model
+        self._device              = device
         self._params_per_gaussian = params_per_gaussian
         self._normalizer          = normalizer
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
-        x_jax = jnp.asarray(x, dtype=jnp.float32)
+        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self._device)
 
-        variables: dict = {"params": self._params}
-        if self._batch_stats is not None:
-            variables["batch_stats"] = self._batch_stats
-
-        out_jax = self._apply_fn(variables, x_jax, training=False)
+        with torch.no_grad():
+            out = self._model(x_t)
 
         if self._normalizer is not None:
-            out_jax = self._normalizer.denormalize_output_jax(out_jax)
+            out = self._normalizer.denormalize_output(out)
 
         ppg = self._params_per_gaussian
-        for i in range(0, out_jax.shape[1], ppg):
-            out_jax = out_jax.at[:, i].set(jax.nn.softplus(out_jax[:, i]))      # amplitude → strictly positive
-            if i + 2 < out_jax.shape[1]:
-                out_jax = out_jax.at[:, i + 2].set(jnp.abs(out_jax[:, i + 2])) # sigma     → non-negative
+        for i in range(0, out.shape[1], ppg):
+            out[:, i]     = F.softplus(out[:, i])
+            if i + 2 < out.shape[1]:
+                out[:, i + 2] = torch.abs(out[:, i + 2])
 
-        return np.asarray(out_jax)
+        return out.cpu().numpy()

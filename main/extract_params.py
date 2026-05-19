@@ -23,11 +23,11 @@ def main() -> None:
         output_prefix     = "params",
         output_suffix     = None,
         
-        tomogram_filename = "tomofull_1000a1050a500a550_1_Xparams_id2X.npy",
+        tomogram_filename = "tomofull_1000a16000a500a4000_1_Xparams_id2X",
         height_range      = None,
 
         fit_settings = FitSettings(
-            number_of_gaussians = 2,
+            number_of_gaussians = 5,
             max_fit_iterations  = 5000,
             fit_config          = FitMode.Adaptive(
                 initial_guess = None,

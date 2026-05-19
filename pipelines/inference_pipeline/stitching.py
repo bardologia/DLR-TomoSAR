@@ -3,10 +3,7 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 import numpy as np
-
-from tools.logger                              import Logger as _Logger
 from pipelines.dataset_creation_pipeline.patch import GridInfo
-
 
 def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.ndarray:
     ph, pw = patch_size
@@ -58,23 +55,16 @@ class CubeStitcher:
         return self.grid.number_of_patches
 
     def add(self, idx: int, patch: np.ndarray) -> None:
-        if patch.ndim != 3 or patch.shape[0] != self.n_channels:
-            raise ValueError(f"Patch shape {patch.shape} incompatible with C={self.n_channels} and patch_size={self.grid.patch_size}")
         ph, pw = self.grid.patch_size
-        if patch.shape[1] != ph or patch.shape[2] != pw:
-            raise ValueError(f"Patch spatial shape {patch.shape[1:]} != grid patch_size {self.grid.patch_size}")
-
         iv, ih = divmod(idx, self.grid.n_h)
         v0     = iv * self.grid.stride
         h0     = ih * self.grid.stride
-
-        w = self.window
+        w      = self.window
+        
         self._accum[:, v0:v0 + ph, h0:h0 + pw] += (patch * w[None, :, :]).astype(self.dtype, copy=False)
         self._weight[v0:v0 + ph, h0:h0 + pw]   += w
 
     def add_batch(self, indices: np.ndarray, batch_patches: np.ndarray) -> None:
-        if batch_patches.ndim != 4:
-            raise ValueError(f"Expected (B,C,ph,pw), got {batch_patches.shape}")
         for b, idx in enumerate(indices):
             self.add(int(idx), batch_patches[b])
 

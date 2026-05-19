@@ -86,8 +86,7 @@ class Report:
 
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:
-        for prefix in ("ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_",
-                       "ssim_raw_elev_", "ssim_raw_range_", "ssim_raw_azimuth_"):
+        for prefix in ("ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_", "ssim_raw_elev_", "ssim_raw_range_", "ssim_raw_azimuth_"):
             if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
                 return True
         for prefix in (

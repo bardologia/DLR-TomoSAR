@@ -64,13 +64,17 @@ class GaussianConfig:
     params_per_gaussian : int   = 3
 
     @classmethod
-    def from_dataset(cls, dataset_dir: str | Path) -> "GaussianConfig":
+    def from_dataset(cls, dataset_dir: str | Path, params_subdir: str | None = None) -> "GaussianConfig":
         meta_dir   = Path(dataset_dir) / "meta"
         candidates = sorted(meta_dir.glob("config_state_*.json"))
         cfg = json.loads(candidates[0].read_text())
         height_range = cfg["output_configs"]["height_range"]
         params_dir   = Path(dataset_dir) / "params"
-        param_meta   = json.loads(sorted(params_dir.glob("*/param_extraction_meta.json"))[0].read_text())
+        if params_subdir is not None:
+            meta_path = params_dir / params_subdir / "param_extraction_meta.json"
+        else:
+            meta_path = sorted(params_dir.glob("*/param_extraction_meta.json"))[0]
+        param_meta   = json.loads(Path(meta_path).read_text())
         n_gaussians  = param_meta["number_of_gaussians"]
 
         return cls(

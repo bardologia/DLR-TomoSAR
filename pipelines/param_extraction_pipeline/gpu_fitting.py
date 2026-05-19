@@ -146,10 +146,11 @@ class PmapAdamKernel:
 
 
 class GPUParameterExtractor:
-    def __init__(self, fit_settings: FitSettings, logger: Logger, range_batch_size: int = 256, adam_steps: int = 1500, adam_lr: float = 1e-2, adam_b1: float = 0.9, adam_b2: float = 0.999, gpu_device_ids: Optional[List[int]] = None, r2_sample_cap: int = 4096) -> None:
-        self.fit_settings     = fit_settings
-        self.logger           = logger
-        self.range_batch_size = range_batch_size
+    def __init__(self, fit_settings: FitSettings, logger: Logger, range_batch_size: int = 256, adam_steps: int = 1500, adam_lr: float = 1e-2, adam_b1: float = 0.9, adam_b2: float = 0.999, gpu_device_ids: Optional[List[int]] = None, r2_sample_cap: int = 4096, gpu_pixel_batch_size: int = 8192) -> None:
+        self.fit_settings        = fit_settings
+        self.logger              = logger
+        self.range_batch_size    = range_batch_size
+        self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self.adam_steps       = adam_steps
         self.adam_lr          = adam_lr
         self.adam_b1          = adam_b1
@@ -170,7 +171,7 @@ class GPUParameterExtractor:
             self._n_devices = 1
 
         self.logger.subsection(f"JAX active devices : {active_devices}")
-        self.logger.subsection(f"range_batch_size={range_batch_size}  adam_steps={adam_steps}  n_devices={self._n_devices}")
+        self.logger.subsection(f"range_batch_size={range_batch_size}  gpu_pixel_batch_size={gpu_pixel_batch_size}  adam_steps={adam_steps}  n_devices={self._n_devices}")
 
     def _build_finite_upper_bounds(self, lower_b: list, upper_b: list, n_params: int, height_span: float) -> list:
         amp_indices = set(range(0, n_params, 3))
@@ -284,19 +285,27 @@ class GPUParameterExtractor:
                     if next_r < R:
                         prefetch_future = pool.submit(_load_and_prepare, next_r)
 
-                    init_j   = jnp.array(init_all,     dtype=jnp.float32)
-                    prof_j   = jnp.array(profiles_norm, dtype=jnp.float32)
-                    fitted_j = self._kernel(init_j, height_ax_j, prof_j, lower_j, upper_j, n_steps=self.adam_steps, lr=self.adam_lr, b1=self.adam_b1, b2=self.adam_b2)
-                    fitted   = np.array(fitted_j, dtype=np.float32)
-                    del fitted_j
-
-                    for ai in amp_indices:
-                        fitted[:, ai] *= safe_scale[:, 0]
-
                     init_rescaled = init_all.copy()
                     for ai in amp_indices:
                         init_rescaled[:, ai] *= safe_scale[:, 0]
-                    fitted = np.where(active[:, None], fitted, init_rescaled)
+
+                    fitted       = init_rescaled.copy()
+                    active_idx   = np.where(active)[0]
+                    n_active     = len(active_idx)
+                    pb           = self.gpu_pixel_batch_size
+
+                    for pb_start in range(0, n_active, pb):
+                        pb_end   = min(pb_start + pb, n_active)
+                        idx_sub  = active_idx[pb_start:pb_end]
+                        init_j   = jnp.array(init_all[idx_sub],      dtype=jnp.float32)
+                        prof_j   = jnp.array(profiles_norm[idx_sub],  dtype=jnp.float32)
+                        fitted_j = self._kernel(init_j, height_ax_j, prof_j, lower_j, upper_j, n_steps=self.adam_steps, lr=self.adam_lr, b1=self.adam_b1, b2=self.adam_b2)
+                        fitted_sub = np.array(fitted_j, dtype=np.float32)
+                        del fitted_j, init_j, prof_j
+                        for ai in amp_indices:
+                            fitted_sub[:, ai] *= safe_scale[idx_sub, 0]
+                        fitted[idx_sub] = fitted_sub
+                        del fitted_sub
 
                     output[:, :, r:r_end] = fitted.reshape(r_count, Az, n_params).transpose(2, 1, 0)
                     del fitted, profiles_flat, profiles_norm, init_all, safe_scale

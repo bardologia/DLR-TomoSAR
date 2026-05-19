@@ -105,7 +105,7 @@ $$
 
 1. `complex_patch = grid.extract(self.inputs, idx)` — shape `(N_passes, p_h, p_w)` complex.
 2. `target_patch  = grid.extract(self.targets, idx)` — shape `(N_h, p_h, p_w)` complex.
-3. `converted = input_config.build_tensor(complex_patch[None,...])[0]` — applies the master / slaves / interferograms conversion to produce real channels of shape `(C_in, p_h, p_w)`.
+3. `input_tensor = self._build_input_tensor(complex_patch)` — applies the master / slaves / interferograms conversion and returns a contiguous `float32` tensor of shape `(C_in, p_h, p_w)`.
 4. `gt_t = grid.extract(self.gt_parameters, idx)` — shape `(3K, p_h, p_w)`.
 5. **Target construction** depends on `target_mode`:
    - `TargetMode.RAW`: target is `|target_patch|` (magnitude tomogram).

@@ -59,6 +59,7 @@ class ExtractionConfig:
 
     use_gpu              : bool                          = True
     gpu_batch_size       : int                           = 256
+    gpu_pixel_batch_size : int                           = 24576
     adam_steps           : int                           = 1000
     adam_lr              : float                         = 2e-1
     adam_b1              : float                         = 0.95

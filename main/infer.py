@@ -26,7 +26,7 @@ from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 @dataclass
 class RunInferenceConfig:
-    run_directory      : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_SSMI_MSE")
+    run_directory      : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/gaussians_sweep/Ng2_adapt_gpu0/run_jax_unet_20260518_154356")
     output_subdir      : str  = ""
     split              : str  = "test"
     device             : str  = "cuda" if torch.cuda.is_available() else "cpu"

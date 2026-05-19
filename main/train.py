@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+GPU_ID = 0  
+os.environ["CUDA_VISIBLE_DEVICES"]    = str(GPU_ID)
 os.environ["MKL_NUM_THREADS"]     = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["OMP_NUM_THREADS"]     = "4" 
@@ -39,8 +41,13 @@ from pipelines.training_pipeline.pipeline import TrainingPipeline
 
 
 def main() -> None:
+    n_gaussians  = 4         
+   
     model_name   = "unet"
     dataset_path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset")
+
+    params_subdir = f"params_Ng{n_gaussians}_adapt"
+    params_path   = dataset_path / "params" / params_subdir / f"parameters_Ng{n_gaussians}_adapt.npy"
 
     with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
         layout = json.load(f)
@@ -54,17 +61,17 @@ def main() -> None:
 
     dataset_config = DatasetCreationConfiguration(
         preprocessing_run_directory = dataset_path,
-        parameters_path             = dataset_path / "params" / "params_Ng2_adapt" / "parameters_Ng2_adapt.npy",
+        parameters_path             = params_path,
         split_regions               = split_regions,
         patch                       = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
 
         input_config = InputConfig(
-            use_master         = False, master_representation         = Representation.MAG_ONLY,
+            use_master         = True, master_representation          = Representation.MAG_ONLY,
             use_slaves         = True,  slaves_representation         = Representation.MAG_ONLY,
             use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
         ),
 
-        batch_size                  = 400,
+        batch_size                  = 256,
         num_workers                 = 8,
 
         shuffle_train               = True,
@@ -75,17 +82,17 @@ def main() -> None:
     )
 
     trainer_config = TrainerConfig(
-        gaussian       = GaussianConfig.from_dataset(dataset_path),
-        early_stopping = EarlyStoppingConfig(patience=30, min_delta=0.0001, restore_best=True),
+        gaussian       = GaussianConfig.from_dataset(dataset_path, params_subdir=params_subdir),
+        early_stopping = EarlyStoppingConfig(patience=15, min_delta=0.0001, restore_best=True),
         warmup         = WarmupConfig(warmup_steps=50, warmup_start_factor=0.1, warmup_enabled=True),
-        scheduler      = SchedulerConfig(epochs=200, eta_min=1e-6),
+        scheduler      = SchedulerConfig(epochs=150, eta_min=1e-6),
         ema            = EMAConfig(use_ema=False, ema_decay=0.999),
         optimizer      = OptimizerConfig(lr=2e-3, betas=(0.9, 0.999), eps=1e-8),
         io             = IOConfig(logdir="/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"),
 
         training = TrainingConfigInner(
             device                      = "gpu",
-            epochs                      = 200,
+            epochs                      = 150,
             validation_frequency        = 5,
             use_amp                     = False,
             gradient_accumulation_steps = 1,
@@ -97,7 +104,7 @@ def main() -> None:
         ),
 
         loss = LossConfig(
-            use_ssim_curve    = True,
+            use_ssim_curve    = False,
             weight_ssim_curve = 1.0,
             ssim_window_size  = 11,
             ssim_sigma        = 1.5,

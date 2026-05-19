@@ -244,7 +244,6 @@ class Ploter:
         err_gt_slice  = np.abs(pred_slice - gt_slice)
         err_raw_slice = np.abs(pred_slice - raw_slice)
 
-        # Sort elevation axis ascending so row 0 = lowest elevation → origin='lower' is correct
         sort_idx      = np.argsort(x_axis)
         x_axis_sorted = x_axis[sort_idx]
         pred_slice    = pred_slice   [sort_idx]
@@ -427,11 +426,7 @@ class Ploter:
         n_elev         : int,
         x_axis         : np.ndarray,
     ) -> Path:
-        """Four-panel figure with per-elevation-bin MAE, RMSE, R² and cross-entropy.
-
-        Each panel overlays the pred-vs-GT curve (blue) and pred-vs-Raw curve (red)
-        together with their respective means as dashed horizontal lines.
-        """
+    
         metric_specs = [
             ("elev_mae",  "MAE",           "mean absolute error"),
             ("elev_rmse", "RMSE",          "root mean squared error"),

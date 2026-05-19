@@ -266,12 +266,14 @@ class ParameterExtractor:
         adam_b2              : float               = 0.999,
         gpu_device_ids       : list | None         = None,
         r2_sample_cap        : int                 = 4096,
+        gpu_pixel_batch_size : int                 = 8192,
     ) -> None:
         self.parameter_extraction = parameter_extraction
         self.parameter_workers    = parameter_workers
         self.logger               = logger
         self.use_gpu              = use_gpu
         self.gpu_batch_size       = gpu_batch_size
+        self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self.adam_steps           = adam_steps
         self.adam_lr              = adam_lr
         self.adam_b1              = adam_b1
@@ -284,13 +286,14 @@ class ParameterExtractor:
                 self._gpu_extractor = GPUParameterExtractor(
                     fit_settings     = parameter_extraction,
                     logger           = logger,
-                    range_batch_size = gpu_batch_size,
-                    adam_steps       = adam_steps,
-                    adam_lr          = adam_lr,
-                    adam_b1          = adam_b1,
-                    adam_b2          = adam_b2,
-                    gpu_device_ids   = gpu_device_ids,
-                    r2_sample_cap    = r2_sample_cap,
+                    range_batch_size     = gpu_batch_size,
+                    adam_steps           = adam_steps,
+                    adam_lr              = adam_lr,
+                    adam_b1              = adam_b1,
+                    adam_b2              = adam_b2,
+                    gpu_device_ids       = gpu_device_ids,
+                    r2_sample_cap        = r2_sample_cap,
+                    gpu_pixel_batch_size = gpu_pixel_batch_size,
                 )
             except Exception as exc:  # pragma: no cover
                 logger.subsection(f"GPU extractor init failed ({exc}); falling back to CPU.")
@@ -358,6 +361,7 @@ class ParameterExtractor:
         n_params, Az, R = parameters_array.shape
         out             = parameters_array.copy()
         mu_rows         = np.array([1 + 3 * g for g in range(n_gaussians)])
+        
         for ai in range(Az):
             for ri in range(R):
                 mus   = parameters_array[mu_rows, ai, ri]
@@ -366,6 +370,7 @@ class ParameterExtractor:
                     out[new_pos * 3 + 0, ai, ri] = parameters_array[old_pos * 3 + 0, ai, ri]
                     out[new_pos * 3 + 1, ai, ri] = parameters_array[old_pos * 3 + 1, ai, ri]
                     out[new_pos * 3 + 2, ai, ri] = parameters_array[old_pos * 3 + 2, ai, ri]
+        
         return out
 
     def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> np.ndarray:

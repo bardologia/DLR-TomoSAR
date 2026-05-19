@@ -145,22 +145,22 @@ class InferencePipeline:
             out_path    = figures_dir / "param_distributions.png",
         )
         
-        if result.params_gt is not None:
-            figure_paths["param_scatter"] = plotter.plot_param_scatter(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = result.params_gt  [: run.n_gaussians * 3],
-                n_gaussians = run.n_gaussians,
-                out_path    = figures_dir / "param_scatter.png",
-            )
-            
-            figure_paths["param_error_maps"] = plotter.plot_param_error_maps(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = result.params_gt  [: run.n_gaussians * 3],
-                n_gaussians = run.n_gaussians,
-                out_path    = figures_dir / "param_error_maps.png",
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-            )
+        
+        figure_paths["param_scatter"] = plotter.plot_param_scatter(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_path    = figures_dir / "param_scatter.png",
+        )
+        
+        figure_paths["param_error_maps"] = plotter.plot_param_error_maps(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_path    = figures_dir / "param_error_maps.png",
+            az_offset   = result.azimuth_offset,
+            rg_offset   = result.range_offset,
+        )
         
         logger.subsection(f"Param plots     : distributions, scatter, error maps written to {figures_dir}")
 

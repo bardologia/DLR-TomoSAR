@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import pickle
 from dataclasses import dataclass
 from pathlib     import Path
 from typing      import Optional, Tuple
@@ -10,11 +9,11 @@ import numpy as np
 from torch.utils.data                                import DataLoader
 from pipelines.inference_pipeline.wrapper            import ModelWrapper
 from tools.logger                                    import Logger
-from configuration.dataset_config                    import DatasetCreationConfiguration,InputConfig, PatchConfiguration, SplitRegions
+from configuration.dataset_config                    import DatasetCreationConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
 from configuration.preprocessing_config              import CropRegion
 from pipelines.dataset_creation_pipeline.crop        import Cropper, DatasetLayout
 from pipelines.dataset_creation_pipeline.load        import PatchDataset
-from pipelines.dataset_creation_pipeline.normalize   import NormalizationStats, Normalizer
+from pipelines.dataset_creation_pipeline.normalize   import Stats, Normalizer
 from pipelines.dataset_creation_pipeline.patch       import Patcher, GridInfo
 from models                                          import MODEL_REGISTRY, get_model
 
@@ -25,7 +24,7 @@ _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 @dataclass
 class LoadedRun:
     run_directory   : Path
-    model           : object          # ModelWrapper (JAX) or torch.nn.Module (legacy)
+    model           : object         
     model_name      : str
     in_channels     : int
     out_channels    : int
@@ -45,8 +44,6 @@ class LoadedRun:
 
 
 class RunDirectoryLoader:
-    PARAMS_PER_GAUSSIAN = 3
-
     def __init__(self, run_directory: Path, logger: Logger) -> None:
         self.run_directory  = Path(run_directory)
         self.logger         = logger
@@ -87,6 +84,7 @@ class RunDirectoryLoader:
             split_regions                = split_regions,
             patch                        = patch,
             input_config                 = InputConfig.from_dict(payload["input_config"]),
+            output_config                = OutputConfig.from_dict(payload.get("output_config", {})),
             batch_size                   = batch_size if batch_size is not None else int(payload["batch_size"]),
             num_workers                  = int(num_workers),
             shuffle_train                = False,
@@ -116,7 +114,7 @@ class RunDirectoryLoader:
         )
 
         gt_parameters = arrays["parameters"]
-        norm_stats    = NormalizationStats.load(run_directory / "meta", self.logger) if run_directory else None
+        norm_stats    = Stats.load(run_directory / "meta", self.logger) if run_directory else None
         if norm_stats is not None and norm_stats.input_stats is None:
             norm_stats = None
 
@@ -125,6 +123,7 @@ class RunDirectoryLoader:
             gt_parameters    = gt_parameters,
             grid             = grid,
             input_config     = dataset_config.input_config,
+            output_config    = dataset_config.output_config,
             split_name       = split_name,
             logger           = self.logger,
             norm_stats       = norm_stats,
@@ -183,8 +182,8 @@ class RunDirectoryLoader:
         out_channels  = int(run_summary["out_channels"])
         x_axis_length = int(run_summary["x_axis_length"])
 
-        n_gaussians    = out_channels // self.PARAMS_PER_GAUSSIAN
-        has_noise_head = (out_channels % self.PARAMS_PER_GAUSSIAN) != 0
+        n_gaussians    = out_channels // 3
+        has_noise_head = (out_channels % 3) != 0
 
         if n_gaussians < 1:
             raise ValueError(f"out_channels={out_channels} is not consistent with at least 1 Gaussian (3 params each).")
@@ -197,89 +196,50 @@ class RunDirectoryLoader:
 
         self.logger.subsection(f"Checkpoint    : {ckpt_path}")
 
-        norm_stats = NormalizationStats.load(self.run_directory / "meta", self.logger)
+        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
         if norm_stats is not None and norm_stats.input_stats is None:
             norm_stats = None
             print("[WARNING] Loaded normalization stats has no input_stats; ignoring normalization stats.")
 
-        is_jax_ckpt = ckpt_path.suffix == ".pkl"
-        used_ema    = False
+        used_ema = False
 
-        if is_jax_ckpt:
-            self.logger.subsection("Backend : JAX")
-            with open(ckpt_path, "rb") as _f:
-                ckpt = pickle.load(_f)
+        import torch
+        self.logger.subsection("Backend : PyTorch")
+        model = self._build_model(model_name, in_channels=in_channels, out_channels=out_channels, image_size=image_size)
+        model = model.to(device)
 
-            params      = ckpt["params"]
-            batch_stats = ckpt.get("batch_stats")
+        ckpt = torch.load(str(ckpt_path), map_location=device, weights_only=False)
+        state_dict_key = "model_state_dict" if "model_state_dict" in ckpt else "params"
+        model.load_state_dict(ckpt[state_dict_key])
 
-            if use_ema and ckpt.get("ema_shadow") is not None:
-                params   = ckpt["ema_shadow"]
-                used_ema = True
-                self.logger.subsection("EMA : using ema_shadow params")
-            else:
-                self.logger.subsection("EMA : not applied (using raw params)")
+        if use_ema:
+            ema_key = "ema_state_dict" if "ema_state_dict" in ckpt else "ema_shadow"
+            n_applied = self._apply_ema(model, ckpt.get(ema_key, {}) or {}, self.logger)
+            used_ema  = n_applied > 0
+            self.logger.subsection(f"EMA : applied to {n_applied} parameters")
 
-            from models.jax_models import get_jax_model
-            
-            jax_model = get_jax_model(
-                model_name,
-                in_channels  = in_channels,
-                out_channels = out_channels,
-            ) 
-            
-            model = ModelWrapper(
-                apply_fn    = jax_model.apply,
-                params      = params,
-                batch_stats = batch_stats,
-                params_per_gaussian      = self.PARAMS_PER_GAUSSIAN,
-                normalizer               = Normalizer(norm_stats) if norm_stats is not None else None,
-            )
+        model.eval()
+        model = ModelWrapper(
+            model      = model,
+            device     = device,
+            params_per_gaussian = 3,
+            normalizer          = Normalizer(norm_stats) if norm_stats is not None else None,
+        )
 
-            x_axis_raw = ckpt.get("x_axis", None)
-            if x_axis_raw is None:
-                x_axis_np = np.linspace(-20.0, 60.0, x_axis_length, dtype=np.float32)
-                self.logger.warning("No x_axis in checkpoint; falling back to linspace(-20, 60, x_axis_length).")
-            else:
-                x_axis_np = np.asarray(x_axis_raw, dtype=np.float32).copy()
-
-            ckpt_meta = {
-                "epoch"         : int(ckpt.get("epoch", -1)),
-                "best_val_loss" : float(ckpt.get("best_val_loss", float("nan"))),
-                "best_epoch"    : int(ckpt.get("best_epoch", -1)),
-                "best_metrics"  : dict(ckpt.get("best_metrics", {}) or {}),
-            }
-
+        x_axis_raw = ckpt.get("x_axis", None)
+        if x_axis_raw is None:
+            x_axis_np = np.linspace(-20.0, 60.0, x_axis_length, dtype=np.float32)
+            self.logger.warning("No x_axis in checkpoint; falling back to linspace(-20, 60, x_axis_length).")
         else:
-            import torch
-            self.logger.subsection("Backend : PyTorch")
-            model = self._build_model(model_name, in_channels=in_channels, out_channels=out_channels, image_size=image_size)
-            model = model.to(device)
+            t = x_axis_raw
+            x_axis_np = t.cpu().numpy().astype(np.float32) if hasattr(t, "cpu") else np.asarray(t, dtype=np.float32)
 
-            ckpt = torch.load(str(ckpt_path), map_location=device, weights_only=False)
-            model.load_state_dict(ckpt["model_state_dict"])
-
-            if use_ema:
-                n_applied = self._apply_ema(model, ckpt.get("ema_state_dict", {}) or {}, self.logger)
-                used_ema  = n_applied > 0
-                self.logger.subsection(f"EMA : applied to {n_applied} parameters")
-
-            model.eval()
-
-            x_axis_raw = ckpt.get("x_axis", None)
-            if x_axis_raw is None:
-                x_axis_np = np.linspace(-20.0, 60.0, x_axis_length, dtype=np.float32)
-                self.logger.warning("No x_axis in checkpoint; falling back to linspace(-20, 60, x_axis_length).")
-            else:
-                t = x_axis_raw
-                x_axis_np = t.cpu().numpy().astype(np.float32) if hasattr(t, "cpu") else np.asarray(t, dtype=np.float32)
-
-            ckpt_meta = {
-                "epoch"         : int(ckpt.get("epoch", -1)),
-                "best_val_loss" : float(ckpt.get("best_val_loss", float("nan"))),
-                "best_epoch"    : int(ckpt.get("best_epoch", -1)),
-                "best_metrics"  : dict(ckpt.get("best_metrics", {}) or {}),
-            }
+        ckpt_meta = {
+            "epoch"         : int(ckpt.get("epoch", -1)),
+            "best_val_loss" : float(ckpt.get("best_val_loss", float("nan"))),
+            "best_epoch"    : int(ckpt.get("best_epoch", -1)),
+            "best_metrics"  : dict(ckpt.get("best_metrics", {}) or {}),
+        }
 
         dataset, grid, region, global_crop = self._build_split_dataset(
             dataset_config,
@@ -289,16 +249,13 @@ class RunDirectoryLoader:
             n_gaussians   = n_gaussians,
         )
 
-        from pipelines.dataset_creation_pipeline.load import _numpy_collate
         loader = DataLoader(
             dataset,
             batch_size  = dataset_config.batch_size,
             shuffle     = False,
             num_workers = dataset_config.num_workers,
-            pin_memory  = False,
-            multiprocessing_context = "spawn" if dataset_config.num_workers > 0 else None,
+            pin_memory  = True,
             drop_last   = False,
-            collate_fn  = _numpy_collate,
         )
 
         self.logger.subsection(f"Model : '{model_name}' in_ch={in_channels} out_ch={out_channels} K_gauss={n_gaussians} noise_head={has_noise_head}")

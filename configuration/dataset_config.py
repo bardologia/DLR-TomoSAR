@@ -76,29 +76,8 @@ class InputConfig:
         n = self.master_channels_per_pass
         if n_slaves > 0:
             n += n_slaves * (self.slaves_channels_per_pass + self.interferograms_channels_per_pass)
+      
         return n
-
-    def build_tensor(self, complex_data: np.ndarray) -> np.ndarray:
-
-        n_samples, n_passes, h, w = complex_data.shape
-       
-        master_data = complex_data[:, :1]
-        slave_data  = complex_data[:, 1:] if n_passes > 1 else None
-
-        parts: list[np.ndarray] = []
-        if self.use_master:
-            parts.append(self.master_representation.convert(master_data))
-
-        if slave_data is not None and slave_data.shape[1] > 0:
-            if self.use_slaves:
-                parts.append(self.slaves_representation.convert(slave_data))
-            if self.use_interferograms:
-                interferograms = slave_data * np.conj(master_data)
-                parts.append(self.interferograms_representation.convert(interferograms))
-
-        if not parts:
-            raise ValueError("InputConfig produced no channels (no slaves and master disabled).")
-        return parts[0] if len(parts) == 1 else np.concatenate(parts, axis=1)
 
     def as_dict(self) -> dict:
         return {
@@ -112,25 +91,68 @@ class InputConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "InputConfig":
-        if "master" in payload:
-            return cls(
-                use_master                    = bool(payload["master"]["use"]),
-                master_representation         = Representation(payload["master"]["representation"]),
-                use_slaves                    = bool(payload["slaves"]["use"]),
-                slaves_representation         = Representation(payload["slaves"]["representation"]),
-                use_interferograms            = bool(payload["interferograms"]["use"]),
-                interferograms_representation = Representation(payload["interferograms"]["representation"]),
-            )
         return cls(
-            use_master                    = bool(payload["use_master"]),
-            master_representation         = Representation(payload["master_representation"]),
-            use_slaves                    = bool(payload["use_slaves"]),
-            slaves_representation         = Representation(payload["slaves_representation"]),
-            use_interferograms            = bool(payload["use_interferograms"]),
-            interferograms_representation = Representation(payload["interferograms_representation"]),
+            use_master                    = bool(payload["master"]["use"]),
+            master_representation         = Representation(payload["master"]["representation"]),
+            use_slaves                    = bool(payload["slaves"]["use"]),
+            slaves_representation         = Representation(payload["slaves"]["representation"]),
+            use_interferograms            = bool(payload["interferograms"]["use"]),
+            interferograms_representation = Representation(payload["interferograms"]["representation"]),
         )
 
+      
+@dataclass
+class OutputConfig:
+    use_amplitude : bool = True
+    use_mu        : bool = True
+    use_sigma     : bool = True
 
+    @property
+    def role_names(self) -> list[str]:
+        names: list[str] = []
+        if self.use_amplitude:
+            names.append("a")
+        if self.use_mu:
+            names.append("mu")
+        if self.use_sigma:
+            names.append("sig")
+        return names
+
+    @property
+    def params_per_gaussian(self) -> int:
+        return len(self.role_names)
+
+    def selected_indices(self, n_gaussians: int) -> list[int]:
+        role_to_idx = {"a": 0, "mu": 1, "sig": 2}
+        local        = [role_to_idx[name] for name in self.role_names]
+
+        indices: list[int] = []
+        for g in range(n_gaussians):
+            base = g * 3
+            for i in local:
+                indices.append(base + i)
+     
+        return indices
+
+    def total_channels(self, n_gaussians: int) -> int:
+        return n_gaussians * self.params_per_gaussian
+
+    def as_dict(self) -> dict:
+        return {
+            "use_amplitude" : self.use_amplitude,
+            "use_mu"        : self.use_mu,
+            "use_sigma"     : self.use_sigma,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "OutputConfig":
+        return cls(
+            use_amplitude = bool(payload["amplitude"]["use"]),
+            use_mu        = bool(payload["mu"]["use"]),
+            use_sigma     = bool(payload["sigma"]["use"]),
+        )
+
+   
 @dataclass
 class PatchConfiguration:
     size                   : Tuple[int, int] = (64, 64)
@@ -139,12 +161,13 @@ class PatchConfiguration:
 
 
 @dataclass
-class DatasetCreationConfiguration:
+class DatasetConfiguration:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
     parameters_path             : Optional[Path]          = None
     patch                       : PatchConfiguration      = field(default_factory=PatchConfiguration)
-    input_config                : InputConfig             = field(default_factory=InputConfig)      
+    input_config                : InputConfig             = field(default_factory=InputConfig)
+    output_config               : OutputConfig            = field(default_factory=OutputConfig)
     batch_size                  : int                     = 8
     num_workers                 : int                     = 16
     shuffle_train               : bool                    = True
@@ -153,3 +176,4 @@ class DatasetCreationConfiguration:
     output_normalization_mode   : OutputNormalizationMode = OutputNormalizationMode.DISABLED
     x_axis                      : Optional[np.ndarray]    = field(default=None, repr=False)
     n_gaussians                 : int                     = 1
+

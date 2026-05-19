@@ -5,16 +5,17 @@ from typing import Optional, Tuple
 
 from torch.utils.data import DataLoader
 
-from configuration.dataset_config                    import DatasetCreationConfiguration
+from configuration.dataset_config                    import DatasetConfiguration
 from pipelines.dataset_creation_pipeline.crop        import Cropper
 from pipelines.dataset_creation_pipeline.load        import Loader, PatchDataset
-from pipelines.dataset_creation_pipeline.metadata    import DatasetLayout, DatasetMetadataWriter
-from pipelines.dataset_creation_pipeline.normalize   import Stats
+from pipelines.dataset_creation_pipeline.metadata    import Layout, MetadataWriter
+from pipelines.dataset_creation_pipeline.normalize   import Stats, StatsComputer
 from pipelines.dataset_creation_pipeline.patch       import Patcher
 from tools.logger                                    import Logger
 
-class DatasetCreationPipeline:
-    def __init__(self, config : DatasetCreationConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
+
+class DatasetPipeline:
+    def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
 
@@ -23,12 +24,14 @@ class DatasetCreationPipeline:
 
         self.logger = logger or Logger(log_dir = str(log_dir), name = "dataset_creation", level = "INFO")
 
-        self.layout          = DatasetLayout(config.preprocessing_run_directory, logger=self.logger, parameters_path=config.parameters_path)
+        self.layout          = Layout(config.preprocessing_run_directory, logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions, logger=self.logger)
-        self.metadata_writer = DatasetMetadataWriter(self.training_run_directory, logger=self.logger)
+        self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
 
         ic = config.input_config
-        self.logger.section("[DatasetCreationPipeline Initialized]")
+        oc = config.output_config
+        
+        self.logger.section("[DatasetPipeline Initialized]")
         self.logger.kv_table(
             {
                 "Pre-processing Run"  : str(config.preprocessing_run_directory),
@@ -36,6 +39,7 @@ class DatasetCreationPipeline:
                 "Master"              : f"use={ic.use_master} rep={ic.master_representation.value}",
                 "Slaves"              : f"use={ic.use_slaves} rep={ic.slaves_representation.value}",
                 "Interferograms"      : f"use={ic.use_interferograms} rep={ic.interferograms_representation.value}",
+                "Output Parameters"   : ",".join(oc.role_names),
                 "Patch Size"          : config.patch.size,
                 "Patch Stride"        : config.patch.stride,
             },
@@ -56,11 +60,12 @@ class DatasetCreationPipeline:
 
         gt_parameters = arrays["parameters"]
         
-        dataset       = PatchDataset(
+        dataset = PatchDataset(
             inputs           = arrays["inputs"],
             gt_parameters    = gt_parameters,
             grid             = patcher,
             input_config     = self.config.input_config,
+            output_config    = self.config.output_config,
             split_name       = split_name,
             logger           = self.logger,
             norm_stats       = norm_stats,
@@ -75,12 +80,13 @@ class DatasetCreationPipeline:
 
         train_ds, train_patcher = self._build_dataset("train")
 
-        norm_stats = Stats.compute_from_dataset(
+        norm_stats = StatsComputer.compute_from_dataset(
             dataset             = train_ds,
             logger              = self.logger,
             input_config        = self.config.input_config,
+            output_config       = self.config.output_config,
             n_slaves            = train_ds.n_slaves,
-            params_per_gaussian = 3,
+            params_per_gaussian = self.config.output_config.params_per_gaussian,
             input_mode          = self.config.input_normalization_mode,
             output_mode         = self.config.output_normalization_mode,
             num_workers         = self.config.num_workers,
