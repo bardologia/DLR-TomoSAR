@@ -138,6 +138,7 @@ def make_walk_gif(
     vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample, raw_sample)
     emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample),  99.0))
     emax_raw    = float(np.percentile(np.abs(pred_sample - raw_sample), 99.0))
+   
     if emax_gt  <= 0.0: emax_gt  = 1.0
     if emax_raw <= 0.0: emax_raw = 1.0
 

@@ -5,26 +5,6 @@ from typing import Optional, Tuple
 import numpy as np
 from pipelines.dataset_creation_pipeline.patch import GridInfo
 
-def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.ndarray:
-    ph, pw = patch_size
-    if kind == "uniform":
-        return np.ones((ph, pw), dtype=np.float32)
-
-    if kind == "hann":
-        wv = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(ph) + 0.5) / ph)
-        wh = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(pw) + 0.5) / pw)
-    elif kind == "triangular":
-        wv = 1.0 - np.abs((np.arange(ph) + 0.5) / ph * 2.0 - 1.0)
-        wh = 1.0 - np.abs((np.arange(pw) + 0.5) / pw * 2.0 - 1.0)
-    else:
-        raise ValueError(f"Unknown window kind: {kind!r}")
-
-    wv = np.clip(wv, 1e-3, None).astype(np.float32)
-    wh = np.clip(wh, 1e-3, None).astype(np.float32)
-    
-    return np.outer(wv, wh)
-
-
 class CubeStitcher:
     def __init__(
         self,
@@ -37,7 +17,7 @@ class CubeStitcher:
         self.grid       = grid
         self.n_channels = int(n_channels)
         self.dtype      = np.dtype(dtype)
-        self.window     = make_patch_window(grid.patch_size, kind=window_kind)
+        self.window     = CubeStitcher.make_patch_window(grid.patch_size, kind=window_kind)
 
         H_pad, W_pad = grid.padded_size
         shape_pad    = (self.n_channels, H_pad, W_pad)
@@ -49,6 +29,28 @@ class CubeStitcher:
             self._accum = np.zeros(shape_pad, dtype=self.dtype)
 
         self._weight = np.zeros((H_pad, W_pad), dtype=np.float32)
+
+    @staticmethod
+    def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.ndarray:
+        ph, pw = patch_size
+        if kind == "uniform":
+            return np.ones((ph, pw), dtype=np.float32)
+
+        if kind == "hann":
+            wv = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(ph) + 0.5) / ph)
+            wh = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(pw) + 0.5) / pw)
+
+        elif kind == "triangular":
+            wv = 1.0 - np.abs((np.arange(ph) + 0.5) / ph * 2.0 - 1.0)
+            wh = 1.0 - np.abs((np.arange(pw) + 0.5) / pw * 2.0 - 1.0)
+
+        else:
+            raise ValueError(f"Unknown window kind: {kind!r}")
+
+        wv = np.clip(wv, 1e-3, None).astype(np.float32)
+        wh = np.clip(wh, 1e-3, None).astype(np.float32)
+
+        return np.outer(wv, wh)
 
     @property
     def number_of_patches(self) -> int:

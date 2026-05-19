@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing             import Dict, Optional, Tuple
 
-import numpy                as np
-from skimage.metrics import structural_similarity as ssim
-from tqdm                   import tqdm
+import numpy                                as np
+from skimage.metrics                        import structural_similarity as ssim
+from tqdm                                   import tqdm
 from pipelines.inference_pipeline.predictor import Result
 
 

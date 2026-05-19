@@ -437,14 +437,9 @@ class Ploter:
         fig, axes = plt.subplots(2, 2, figsize=(13, 7))
 
         for ax, (key, ylabel, desc) in zip(axes.ravel(), metric_specs):
-            vals_gt  = np.array(
-                [global_metrics.get(f"{key}_gt_{i}",  float("nan")) for i in range(n_elev)],
-                dtype=np.float64,
-            )
-            vals_raw = np.array(
-                [global_metrics.get(f"{key}_raw_{i}", float("nan")) for i in range(n_elev)],
-                dtype=np.float64,
-            )
+            vals_gt  = np.array([global_metrics.get(f"{key}_gt_{i}",  float("nan")) for i in range(n_elev)], dtype=np.float64)
+            vals_raw = np.array([global_metrics.get(f"{key}_raw_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
+            
             mean_gt  = float(np.nanmean(vals_gt))
             mean_raw = float(np.nanmean(vals_raw))
 

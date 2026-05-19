@@ -8,9 +8,7 @@ os.environ["OMP_NUM_THREADS"] = "4"
 import gc
 from pathlib import Path
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -99,48 +97,48 @@ class Trainer:
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
-    @staticmethod
-    def _unpack_batch(batch, device):
-        if isinstance(batch, (tuple, list)):
-            images = batch[0].to(device)
-            gt_params = batch[1].to(device) if len(batch) > 1 and batch[1] is not None else None
-            return images, gt_params
-        raise TypeError(f"Unsupported batch type: {type(batch)}")
+    def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None) -> torch.Tensor:
+        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
+            pred_params = self.model(images)
+            loss_dict   = self.criterion(pred_params, gt_params)
+            loss        = loss_dict["total_loss"]
+            loss        = loss / self.accumulation_steps
+
+        return loss
+
+    def _backward(self, loss: torch.Tensor, batch_idx: int, n_batches: int) -> None:
+        self.scaler.scale(loss).backward()
+
+        if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
+            self.scaler.unscale_(self.optimizer)
+            grad_norm = self.grad_clipper.maybe_clip(self.model, self.global_step)
+            self.grad_clipper.record(grad_norm, self.global_step)
+
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            self.optimizer.zero_grad(set_to_none=True)
+
+            if self.ema.enabled:
+                ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
+                if self.global_step % ema_every == 0:
+                    self.ema.update(self.model, step=self.global_step)
 
     def train_epoch(self, train_loader: DataLoader, epoch: int):
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
         num_batches = 0
-        loss_sum = 0.0
+        loss_sum    = 0.0
 
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch+1}/{self.epochs}[/section] - train", total=len(train_loader))
             
             for batch_idx, batch in enumerate(train_loader):
-                images, gt_params = self._unpack_batch(batch, self.device)
-                
-                with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=self.use_amp):
-                    pred_params = self.model(images)
-                    loss_dict = self.criterion(pred_params, gt_params)
-                    loss = loss_dict["total_loss"]
-                    loss = loss / self.accumulation_steps
+                images = batch[0].to(self.device)
+                gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
 
-                self.scaler.scale(loss).backward()
-                
-                if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
-                    self.scaler.unscale_(self.optimizer)
-                    if getattr(self.config.training, "max_grad_norm", None) is not None:
-                        nn.utils.clip_grad_norm_(self.model.parameters(), self.config.training.max_grad_norm)
-                        
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.optimizer.zero_grad(set_to_none=True)
-
-                    if self.ema.enabled:
-                        ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
-                        if self.global_step % ema_every == 0:
-                            self.ema.update(self.model, step=self.global_step)
+                loss = self._forward(images, gt_params)
+                self._backward(loss, batch_idx, len(train_loader))
                 
                 loss_val = loss.item() * self.accumulation_steps
                 loss_sum += loss_val
@@ -157,16 +155,13 @@ class Trainer:
                 _prog.update(_task, advance=1)
 
         avg_loss = loss_sum / num_batches if num_batches else float("nan")
-        self.tracker.log_scalar("loss/train_epoch", avg_loss, epoch)
+        self.tracker.log_scalar("loss/train", avg_loss, epoch)
         self.tracker.log_memory(epoch)
 
         return avg_loss
 
     @torch.no_grad()
-    def evaluate(self, loader: DataLoader, epoch: int, stage="validation", deep: bool | None = None):
-        if deep is None:
-            deep = getattr(self.config.training, "deep_validation", False)
-            
+    def evaluate(self, loader: DataLoader, epoch: int, stage="validation"):
         mem_cfg = self.config.memory
 
         self.ema.apply_to(self.model)
@@ -179,13 +174,13 @@ class Trainer:
             with self.logger.track(transient=True) as _prog:
                 _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch+1}/{self.epochs}", total=len(loader))
                 for batch_idx, batch in enumerate(loader):
-                    images, gt_params = self._unpack_batch(batch, self.device)
+                    images = batch[0].to(self.device)
+                    gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
                     
-                    with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=self.use_amp):
+                    with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
                         pred_params = self.model(images)
-                        
-                        loss_dict = self.criterion(pred_params, gt_params)
-                        loss = loss_dict["total_loss"]
+                        loss_dict   = self.criterion(pred_params, gt_params)
+                        loss        = loss_dict["total_loss"]
 
                     total_loss += loss.item()
                     num_batches += 1
@@ -202,7 +197,6 @@ class Trainer:
         return {
             "avg_loss"    : avg_loss,
             "num_batches" : num_batches,
-            "deep"        : deep,
         }
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, test_loader: DataLoader):
@@ -210,7 +204,7 @@ class Trainer:
         self.logger.subsection(f"Train loader size      = {len(train_loader)}")
         self.logger.subsection(f"Validation loader size = {len(val_loader)}")
         self.logger.subsection(f"Test loader size       = {len(test_loader)}")
-        self.logger.subsection(f"Device                 = {self.device}")
+        self.logger.subsection(f"Device                 = {self.device} \n")
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -219,7 +213,7 @@ class Trainer:
             self.resource_monitor.start()
 
         try:
-            data_loader, eval_train_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
+            data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
 
             epochs = self.epochs
             with self.logger.live_monitor("Training Progress") as live_mon:
@@ -236,43 +230,29 @@ class Trainer:
 
                         if do_eval:
                             val_results = self.evaluate(val_loader, epoch, stage="validation")
+                            val_loss    = val_results["avg_loss"]
+                            self.logger.subsection(f"Validation : loss={val_loss:.4f}  (batches={val_results['num_batches']})")
+
+                            self.tracker.log_scalar("loss/val",     val_loss,                 epoch)
+                
+                            self.checkpoint.step(val_loss, epoch_num, self)
+                            new_lrs = self.lr_scheduler.step(epoch, metric=val_loss)
+                            stop    = self.early_stopping(val_loss, self.model, epoch)
                         else:
-                            val_results = {"avg_loss": float("nan"), "num_batches": 0}
-                        val_loss = val_results["avg_loss"]
+                            val_results  = {"avg_loss": float("nan"), "num_batches": 0}
+                            val_loss     = val_results["avg_loss"]
+
+                            new_lrs = self.lr_scheduler.step(epoch, metric=None)
+                            stop    = False
 
                         self.train_losses.append(train_loss)
                         self.val_losses.append(val_loss)
 
-                        if do_eval:
-                            self.logger.subsection(f"Validation : loss={val_loss:.4f}  (batches={val_results['num_batches']})")
-
-                        if do_eval and getattr(self.config.training, "eval_train_split", False):
-                            train_results = self.evaluate(eval_train_loader, epoch, stage="train")
-                            self.logger.subsection(f"Train eval : loss={train_results['avg_loss']:.4f}")
-                        else:
-                            train_results = {"avg_loss": float("nan")}
-
                         if self.config.memory.clear_cache_after_epoch:
                             gc.collect()
                             torch.cuda.empty_cache()
-
-                        self.tracker.log_scalar("loss/train", train_loss, epoch)
-                        if do_eval:
-                            self.tracker.log_scalar("loss/val",        val_loss,                  epoch)
-                            self.tracker.log_scalar("loss/train_eval", train_results["avg_loss"], epoch)
-
-                        if do_eval:
-                            self.checkpoint.step(val_loss, epoch_num, self)
-                            new_lrs = self.lr_scheduler.step(epoch, metric=val_loss)
-                        else:
-                            new_lrs = self.lr_scheduler.step(epoch, metric=None)
                             
                         self._update_optimizer(self.lr_scheduler.lrs_with_warmup(new_lrs))
-
-                        if do_eval:
-                            stop = self.early_stopping(val_loss, self.model, epoch)
-                        else:
-                            stop = False
 
                         monitor_data = {
                             "epoch"         : f"{epoch_num}/{epochs}",
@@ -293,7 +273,7 @@ class Trainer:
                             break
 
             self.early_stopping.restore(self.model)
-            if self.early_stopping.best_params is not None:
+            if self.early_stopping.triggered and self.early_stopping.best_params is not None:
                 self.logger.subsection(f"Restored best parameters from epoch {self.early_stopping.best_epoch + 1}")
 
             return None, None, None

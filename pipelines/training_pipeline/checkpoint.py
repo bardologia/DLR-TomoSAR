@@ -57,7 +57,7 @@ class Checkpoint:
 
     def load(self, trainer, path: str) -> int:
         self.logger.info(f"Loading checkpoint from {path}")
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, weights_only=False)
 
         trainer.model.load_state_dict(checkpoint["params"])
         trainer.optimizer.load_state_dict(checkpoint["opt_state"])

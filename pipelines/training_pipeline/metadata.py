@@ -23,7 +23,7 @@ class TrainingRunMetadata:
         self.base_logdir    = Path(base_logdir)
 
         timestamp           = datetime.now().strftime("%Y%m%d_%H%M%S")
-        resolved_name       = run_name or f"run_jax_{model_name}_{timestamp}"
+        resolved_name       = run_name or f"run_{model_name}_{timestamp}"
        
         self.run_directory       = self.base_logdir / resolved_name
         self.tensorboard_dir     = self.run_directory / "tensorboard"
@@ -50,7 +50,7 @@ class TrainingRunMetadata:
         if hasattr(trainer_config, "resources"):
             trainer_config.resources.logs_dir = str(self.logs_directory)
 
-        self.logger = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_jax_metadata", level = "INFO",)
+        self.logger = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
 
         self.logger.section("[Training RunMetadata Initialized]")
         self.logger.subsection(f"Run Directory : {self.run_directory}")

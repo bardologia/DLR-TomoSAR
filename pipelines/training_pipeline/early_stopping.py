@@ -22,6 +22,7 @@ class EarlyStopping:
         self.counter          = 0
         self.best_epoch       = -1
         self.best_params      = None
+        self.triggered        = False
 
     def __call__(self, val_loss: float, model: torch.nn.Module, epoch: int) -> bool:
         if self.best_loss is None:
@@ -46,6 +47,7 @@ class EarlyStopping:
         self.tracker.log_scalar("early_stop/counter", self.counter, epoch)
 
         if stop:
+            self.triggered = True
             self.logger.warning(f"Early stopping triggered at epoch {epoch + 1}. Best epoch was {self.best_epoch + 1}.")
 
         return stop
