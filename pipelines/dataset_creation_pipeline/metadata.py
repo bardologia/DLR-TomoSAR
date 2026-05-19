@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict
 from pathlib     import Path
 
-from configuration.dataset_config               import DatasetCreationConfiguration
+from configuration.dataset_config               import DatasetConfiguration
 from configuration.preprocessing_config         import CropRegion
 from pipelines.dataset_creation_pipeline.patch  import GridInfo
 from tools.logger                               import Logger
@@ -57,7 +57,7 @@ class MetadataWriter:
         self.logger.section("[MetadataWriter Initialized]")
         self.logger.subsection(f"Metadata Directory : {self.metadata_directory} \n")
         
-    def save_dataset_configuration(self, config: DatasetCreationConfiguration) -> Path:
+    def save_dataset_configuration(self, config: DatasetConfiguration) -> Path:
         out_path = self.outpaths["dataset_configuration"]
         payload  = asdict(config)
         

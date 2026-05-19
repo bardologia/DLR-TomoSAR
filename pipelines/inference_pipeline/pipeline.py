@@ -8,7 +8,7 @@ import numpy as np
 
 from pipelines.inference_pipeline.animation import make_walk_gif
 from configuration.inference_config         import InferenceConfig
-from pipelines.inference_pipeline.loader    import RunDirectoryLoader
+from pipelines.inference_pipeline.loader    import DirectoryLoader
 from pipelines.inference_pipeline.metrics   import Metrics
 from pipelines.inference_pipeline.plots     import Ploter
 from pipelines.inference_pipeline.predictor import Predictor
@@ -24,6 +24,7 @@ class InferencePipeline:
         base = self.config.run_directory / "inference"
         if self.config.output_subdir:
             return base / self.config.output_subdir
+       
         return base / datetime.now().strftime("%Y%m%d_%H%M%S")
 
     def _plot_figures(
@@ -254,28 +255,26 @@ class InferencePipeline:
     ) -> Dict[str, Path]:
 
         gif_paths: Dict[str, Path] = {}
-        logger.section("[Inference: Animation]")
-        for axis in cfg.gif_axes:
-            try:
-                gif_paths[f"walk_{axis}"] = make_walk_gif(
-                    pred_cube   = result.pred_curves,
-                    gt_cube     = result.gt_curves,
-                    raw_cube    = result.raw_curves,
-                    axis        = axis,
-                    out_path    = gif_dir / f"walk_{axis}.gif",
-                    x_axis      = x_axis_np,
-                    az_offset   = result.azimuth_offset,
-                    rg_offset   = result.range_offset,
-                    fps         = cfg.gif_fps,
-                    max_frames  = cfg.gif_max_frames,
-                    dpi         = cfg.gif_dpi,
-                    cmap        = cfg.cmap_intensity,
-                    err_cmap    = cfg.cmap_error,
-                    num_workers = cfg.gif_workers,
-                )
-                logger.subsection(f"GIF ({axis:<9}) : {gif_paths[f'walk_{axis}']}")
-            except Exception as exc:
-                logger.warning(f"GIF generation failed for axis '{axis}': {exc}")
+        for axis in cfg.gif_axes: 
+            logger.subsection(f"Generating walk GIF along {axis} axis")
+            gif_paths[f"walk_{axis}"] = make_walk_gif(
+                pred_cube   = result.pred_curves,
+                gt_cube     = result.gt_curves,
+                raw_cube    = result.raw_curves,
+                axis        = axis,
+                out_path    = gif_dir / f"walk_{axis}.gif",
+                x_axis      = x_axis_np,
+                az_offset   = result.azimuth_offset,
+                rg_offset   = result.range_offset,
+                fps         = cfg.gif_fps,
+                max_frames  = cfg.gif_max_frames,
+                dpi         = cfg.gif_dpi,
+                cmap        = cfg.cmap_intensity,
+                err_cmap    = cfg.cmap_error,
+                num_workers = cfg.gif_workers,
+            )
+            logger.subsection(f"GIF ({axis:<9}) : {gif_paths[f'walk_{axis}']} \n")
+        
         logger.subsection("")
 
         return gif_paths
@@ -351,11 +350,13 @@ class InferencePipeline:
             save_dpi  = cfg.save_dpi,
         )
 
-        output_dir = self._resolve_output_dir()
+        output_dir  = self._resolve_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
+        
         figures_dir = output_dir / "figures"
         figures_dir.mkdir(parents=True, exist_ok=True)
-        gif_dir = output_dir / "animations"
+        
+        gif_dir     = output_dir / "animations"
         gif_dir.mkdir(parents=True, exist_ok=True)
 
         logger = Logger(log_dir=str(output_dir / "logs"), name="inference", level=cfg.log_level)
@@ -367,7 +368,7 @@ class InferencePipeline:
         logger.subsection(f"Device        : {cfg.device}")
         logger.subsection(f"Use EMA       : {cfg.use_ema}\n")
 
-        loader = RunDirectoryLoader(cfg.run_directory, logger=logger)
+        loader = DirectoryLoader(cfg.run_directory, logger=logger)
         run    = loader.load(
             split           = cfg.split,
             batch_size      = cfg.batch_size,
@@ -387,8 +388,7 @@ class InferencePipeline:
         )
         result = predictor.run_inference()
 
-        x_axis_np = run.x_axis.detach().cpu().numpy().astype(np.float64)
-
+        x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
         _N_elev, _az, _rg = result.pred_curves.shape
 
         def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
@@ -428,6 +428,7 @@ class InferencePipeline:
             all_elev_idx    = all_elev_idx,
         )
 
+        self.logger.section("[Inference: Animations]")
         gif_paths = self._run_animations(
             result    = result,
             gif_dir   = gif_dir,
@@ -436,6 +437,7 @@ class InferencePipeline:
             logger    = logger,
         )
 
+        self.logger.section("[Inference: Report]")
         report_path = self._build_report(
             output_dir     = output_dir,
             run            = run,

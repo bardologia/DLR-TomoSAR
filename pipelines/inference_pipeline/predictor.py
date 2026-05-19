@@ -40,6 +40,7 @@ class Predictor:
         save_cubes  : bool,
         output_dir  : Path,
     ) -> None:
+        
         self.run         = run
         self.logger      = logger
         self.window_kind = window_kind

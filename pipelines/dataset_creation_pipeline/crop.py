@@ -7,12 +7,12 @@ import numpy as np
 
 from tools.split_regions                          import SplitRegions
 from configuration.preprocessing_config           import CropRegion
-from pipelines.dataset_creation_pipeline.metadata import DatasetLayout
+from pipelines.dataset_creation_pipeline.metadata import Layout
 from tools.logger                                 import Logger
 
 
 class Cropper:
-    def __init__(self, layout: DatasetLayout, split_regions: SplitRegions, logger: Logger) -> None:
+    def __init__(self, layout: Layout, split_regions: SplitRegions, logger: Logger) -> None:
         self.layout        = layout
         self.split_regions = split_regions
         self.logger        = logger

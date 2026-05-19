@@ -50,28 +50,24 @@ class Metrics:
 
     @staticmethod
     def _psnr(pred: np.ndarray, ref: np.ndarray) -> float:
-
         diff       = (pred - ref).astype(np.float64)
         mse        = float((diff * diff).mean())
+        
         if mse <= 0.0:
             return float("inf")
+        
         data_range = float(ref.max() - ref.min())
         if data_range <= 0.0:
             return float("nan")
+       
         return 10.0 * np.log10(data_range * data_range / mse)
 
     @staticmethod
     def _ssim_2d(pred_slice: np.ndarray, ref_slice: np.ndarray) -> float:
-
-        if pred_slice.ndim != 2 or ref_slice.ndim != 2:
-            return float("nan")
-        data_range = float(ref_slice.max() - ref_slice.min())
-        if data_range <= 0.0 or not np.isfinite(pred_slice).all() or not np.isfinite(ref_slice).all():
-            return float("nan")
-        min_side = min(pred_slice.shape)
-        win_size = min(7, min_side if min_side % 2 == 1 else min_side - 1)
-        if win_size < 3:
-            return float("nan")
+        data_range = float(ref_slice.max() - ref_slice.min())   
+        min_side   = min(pred_slice.shape)
+        win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
+       
         return float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
 
     def _slice_ssim(
@@ -96,14 +92,12 @@ class Metrics:
                     p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
                 else:
                     p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
+                
                 tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
 
-        if elev_indices  is not None and len(elev_indices):
-            _enqueue(elev_indices,  axis=0, label="elev")
-        if range_indices is not None and len(range_indices):
-            _enqueue(range_indices, axis=2, label="range")
-        if az_indices    is not None and len(az_indices):
-            _enqueue(az_indices,    axis=1, label="azimuth")
+        _enqueue(elev_indices,  axis=0, label="elev")
+        _enqueue(range_indices, axis=2, label="range")
+        _enqueue(az_indices,    axis=1, label="azimuth")
 
         if not tasks:
             return out
@@ -248,6 +242,7 @@ class Metrics:
         for metric_name, arr in self._elev_metrics(pred, gt, raw).items():
             for i, v in enumerate(arr):
                 metrics[f"{metric_name}_{i}"] = float(v)
+            
             metrics[f"{metric_name}_mean"] = float(np.nanmean(arr))
 
         return metrics
