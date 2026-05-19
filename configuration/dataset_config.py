@@ -53,38 +53,38 @@ class OutputNormalizationMode(Enum):
 
 @dataclass
 class InputConfig:
-    use_master                    : bool           = True
-    master_representation         : Representation = Representation.MAG_ONLY
-    use_slaves                    : bool           = False
-    slaves_representation         : Representation = Representation.MAG_ONLY
+    use_primary                   : bool           = True
+    primary_representation        : Representation = Representation.MAG_ONLY
+    use_secondaries               : bool           = False
+    secondaries_representation    : Representation = Representation.MAG_ONLY
     use_interferograms            : bool           = True
     interferograms_representation : Representation = Representation.ANGLE_ONLY
 
     @property
-    def master_channels_per_pass(self) -> int:
-        return self.master_representation.channels_per_pass if self.use_master else 0
+    def primary_channels_per_pass(self) -> int:
+        return self.primary_representation.channels_per_pass if self.use_primary else 0
 
     @property
-    def slaves_channels_per_pass(self) -> int:
-        return self.slaves_representation.channels_per_pass if self.use_slaves else 0
+    def secondaries_channels_per_pass(self) -> int:
+        return self.secondaries_representation.channels_per_pass if self.use_secondaries else 0
 
     @property
     def interferograms_channels_per_pass(self) -> int:
         return self.interferograms_representation.channels_per_pass if self.use_interferograms else 0
 
-    def total_channels(self, n_slaves: int) -> int:
-        n = self.master_channels_per_pass
-        if n_slaves > 0:
-            n += n_slaves * (self.slaves_channels_per_pass + self.interferograms_channels_per_pass)
+    def total_channels(self, n_secondaries: int) -> int:
+        n = self.primary_channels_per_pass
+        if n_secondaries > 0:
+            n += n_secondaries * (self.secondaries_channels_per_pass + self.interferograms_channels_per_pass)
       
         return n
 
     def as_dict(self) -> dict:
         return {
-            "use_master"                    : self.use_master,
-            "master_representation"         : self.master_representation.value,
-            "use_slaves"                    : self.use_slaves,
-            "slaves_representation"         : self.slaves_representation.value,
+            "use_primary"                   : self.use_primary,
+            "primary_representation"        : self.primary_representation.value,
+            "use_secondaries"               : self.use_secondaries,
+            "secondaries_representation"    : self.secondaries_representation.value,
             "use_interferograms"            : self.use_interferograms,
             "interferograms_representation" : self.interferograms_representation.value,
         }
@@ -92,10 +92,10 @@ class InputConfig:
     @classmethod
     def from_dict(cls, payload: dict) -> "InputConfig":
         return cls(
-            use_master                    = bool(payload["master"]["use"]),
-            master_representation         = Representation(payload["master"]["representation"]),
-            use_slaves                    = bool(payload["slaves"]["use"]),
-            slaves_representation         = Representation(payload["slaves"]["representation"]),
+            use_primary                   = bool(payload["primary"]["use"]),
+            primary_representation        = Representation(payload["primary"]["representation"]),
+            use_secondaries               = bool(payload["secondaries"]["use"]),
+            secondaries_representation    = Representation(payload["secondaries"]["representation"]),
             use_interferograms            = bool(payload["interferograms"]["use"]),
             interferograms_representation = Representation(payload["interferograms"]["representation"]),
         )

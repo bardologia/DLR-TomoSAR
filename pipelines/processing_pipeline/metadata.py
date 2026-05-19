@@ -4,13 +4,13 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from configuration.preprocessing_config                  import PreProcessingConfiguration
+from configuration.processing_config                  import ProcessingConfiguration
 from pipelines.pre_processing_pipeline.artifacts         import ArtifactRegistry, ArtifactType
 from tools.logger                                        import Logger
 
 
 class MetadataManager:
-    def __init__(self, config: PreProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config   = config
         self.logger   = logger
         self.registry = ArtifactRegistry(config, logger)

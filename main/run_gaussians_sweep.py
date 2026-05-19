@@ -72,8 +72,8 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
         split_regions               = split_regions,
         patch                       = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
         input_config = InputConfig(
-            use_master         = True,  master_representation          = Representation.MAG_ONLY,
-            use_slaves         = True,  slaves_representation          = Representation.MAG_ONLY,
+            use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
+            use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
             use_interferograms = True,  interferograms_representation  = Representation.ANGLE_ONLY,
         ),
         batch_size               = 256,

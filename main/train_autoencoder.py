@@ -50,8 +50,8 @@ class RunConfig:
     patch_stride : int             = 32
 
     input_config : InputConfig = field(default_factory=lambda: InputConfig(
-        use_master=True,  master_representation=Representation.MAG_ONLY,
-        use_slaves=False, slaves_representation=Representation.MAG_ONLY,
+        use_primary=True,  primary_representation=Representation.MAG_ONLY,
+        use_secondaries=False, secondaries_representation=Representation.MAG_ONLY,
         use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,
     ))
 

@@ -88,11 +88,11 @@ class StatsComputer:
                 slot = i % cpp
                 keys.append(f"{source_kind}/{slot_kinds[slot]}")
 
-        if input_config.use_master:
-            _append_block(input_config.master_representation, n_passes=1, source_kind="pass")
+        if input_config.use_primary:
+            _append_block(input_config.primary_representation, n_passes=1, source_kind="pass")
 
-        if input_config.use_slaves:
-            _append_block(input_config.slaves_representation, n_passes=n_slaves, source_kind="pass")
+        if input_config.use_secondaries:
+            _append_block(input_config.secondaries_representation, n_passes=n_slaves, source_kind="pass")
 
         if input_config.use_interferograms:
             _append_block(input_config.interferograms_representation, n_passes=n_slaves, source_kind="ifg")

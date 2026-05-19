@@ -12,8 +12,8 @@ from typing import Tuple
 import h5py
 import numpy as np
 
-from configuration.preprocessing_config import PreProcessingConfiguration, TomogramConfiguration
-from tools.logger                                          import Logger
+from configuration.processing_config import ProcessingConfiguration, TomogramConfiguration
+from tools.logger                    import Logger
 
 
 def _run_pyrat(
@@ -65,7 +65,7 @@ def _run_pyrat(
 
 
 class TomogramProcessor:
-    def __init__(self, config: PreProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -73,7 +73,7 @@ class TomogramProcessor:
         self.logger.subsection(f"Max Azimuth Width : {self.config.input_configs.max_crop_azimuth_width}")
         self.logger.subsection(f"Parallel Workers  : {self.config.parallel.tomogram_workers}")
 
-    def _create_temp_dir(self) -> Path:
+    def _create_temp(self) -> Path:
         parent = self.config.paths.temporary_directory
         parent.mkdir(parents=True, exist_ok=True)
         temporary_directory = Path(tempfile.mkdtemp(prefix="tomo_", dir=str(parent)))
@@ -141,7 +141,7 @@ class TomogramProcessor:
             for future in as_completed(futures):
                 future.result()
 
-    def _concatenate_tomos(self, temporary_directory: Path) -> Tuple[np.ndarray, np.ndarray]:
+    def _concatenate(self, temporary_directory: Path) -> Tuple[np.ndarray, np.ndarray]:
         partial_files_directory = temporary_directory / "TOMO" / "TOMO-SR"
         partial_file_paths      = sorted(partial_files_directory.iterdir())
    
@@ -167,6 +167,7 @@ class TomogramProcessor:
 
         dem_offset      = 0
         tomogram_offset = 0
+        
         for partial_file_path, dem_shape, tomogram_shape in zip(partial_file_paths, dem_shapes, tomogram_shapes):
             with h5py.File(str(partial_file_path), "r") as hdf5_file:
                 hdf5_file["DEM"]     .read_direct(combined_dem,      dest_sel=np.s_[dem_offset:dem_offset + dem_shape[0]])
@@ -180,27 +181,32 @@ class TomogramProcessor:
       
         return combined_dem, combined_tomogram
 
-    def _save_tomo(self, output_path: Path, dem_array: np.ndarray, tomogram_array: np.ndarray) -> None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(str(output_path), tomogram_array)
+    def _save(self, tomogram_path: Path, dem_path: Path, tomogram_array: np.ndarray, dem_array: np.ndarray) -> None:
+        tomogram_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(str(tomogram_path), tomogram_array)
+        np.save(str(dem_path),      dem_array)
 
-    def _cleanup_temp_dir(self, temporary_directory: Path) -> None:
+    def _cleanup_temp(self, temporary_directory: Path) -> None:
         if temporary_directory.exists():
             shutil.rmtree(temporary_directory, ignore_errors=True)
 
-    def run(self, output_path: Path, stack_identifier: str, tomogram_config: TomogramConfiguration) -> Path:
-        self.logger.section(f"[Generating Full Tomogram] Target: {output_path.name}")
-        temporary_directory = self._create_temp_dir()
+    def run(self, tomogram_path: Path, dem_path: Path, stack_identifier: str, tomogram_config: TomogramConfiguration) -> Tuple[Path, Path]:
+        self.logger.section(f"[Generating Tomogram]")
+        self.logger.subsection(f"Target: {tomogram_path.name}")
+        
+        temporary_directory = self._create_temp()
 
         try:
             subsections = self._divide_crop(tomogram_config)
             self._dispatch_workers(subsections, stack_identifier, tomogram_config, temporary_directory)
-            combined_dem, combined_tomogram = self._concatenate_tomos(temporary_directory)
-            self._save_tomo(output_path, combined_dem, combined_tomogram)
-            self.logger.subsection(f"-> Full tomogram saved: {output_path}")
-        
+            combined_dem, combined_tomogram = self._concatenate(temporary_directory)
+            self._save(tomogram_path, dem_path, combined_tomogram, combined_dem)
+            
+            self.logger.subsection(f"Tomogram saved : {tomogram_path}")
+            self.logger.subsection(f"DEM saved      : {dem_path}")
+            self.logger.subsection(f"Temporary directory cleaned up. \n")
         finally:
-            self._cleanup_temp_dir(temporary_directory)
+            self._cleanup_temp(temporary_directory)
             gc.collect()
 
-        return output_path
+        return tomogram_path, dem_path

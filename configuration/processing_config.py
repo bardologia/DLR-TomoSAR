@@ -27,7 +27,7 @@ class TomogramConfiguration:
 
 
 @dataclass
-class PreProcessingParallelConfiguration:
+class ParallelConfiguration:
     tomogram_workers : int = 10
     pyrat_threads    : int = 15
 
@@ -61,11 +61,11 @@ class PathConfiguration:
 
 
 @dataclass
-class PreProcessingConfiguration:
+class ProcessingConfiguration:
     crop           : CropRegion
     input_configs  : TomogramConfiguration              = field(default_factory=TomogramConfiguration)
     output_configs : Optional[TomogramConfiguration]    = None
-    parallel       : PreProcessingParallelConfiguration = field(default_factory=PreProcessingParallelConfiguration)
+    parallel       : ParallelConfiguration              = field(default_factory=ParallelConfiguration)
     paths          : PathConfiguration                  = field(default_factory=PathConfiguration)
 
     dataset_type             : str = "FSAR"

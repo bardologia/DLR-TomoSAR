@@ -32,21 +32,33 @@ class Cropper:
     def load_split(self, region: CropRegion) -> dict[str, np.ndarray]:
         az_slice, rg_slice = self.to_local_slices(region)
 
-        inputs_full      = np.load(str(self.layout.artifact_path("inputs")),        mmap_mode="r", allow_pickle=False)
-        parameters_full  = np.load(str(self.layout.artifact_path("parameters")),    mmap_mode="r", allow_pickle=False)
-        tomogram_full    = np.load(str(self.layout.artifact_path("full_tomogram")), mmap_mode="r", allow_pickle=False)
+        primary_reduced        = np.load(str(self.layout.artifact_path("primary_reduced")),        mmap_mode="r", allow_pickle=False)
+        secondaries_reduced    = np.load(str(self.layout.artifact_path("secondaries_reduced")),    mmap_mode="r", allow_pickle=False)
+        interferograms_reduced = np.load(str(self.layout.artifact_path("interferograms_reduced")), mmap_mode="r", allow_pickle=False)
+        parameters_reduced     = np.load(str(self.layout.artifact_path("parameters")),             mmap_mode="r", allow_pickle=False)
+        tomogram_full          = np.load(str(self.layout.artifact_path("tomogram_full")),          mmap_mode="r", allow_pickle=False)
 
-        inputs_split     = np.ascontiguousarray(inputs_full    [..., az_slice, rg_slice])
-        parameters_split = np.ascontiguousarray(parameters_full[..., az_slice, rg_slice])
-        tomogram_split   = tomogram_full[..., az_slice, rg_slice]  
+        primary_split        = np.ascontiguousarray(primary_reduced        [..., az_slice, rg_slice])
+        secondaries_split    = np.ascontiguousarray(secondaries_reduced    [..., az_slice, rg_slice])
+        interferograms_split = np.ascontiguousarray(interferograms_reduced [..., az_slice, rg_slice])
+        parameters_split     = np.ascontiguousarray(parameters_reduced     [..., az_slice, rg_slice])
+        tomogram_split       = tomogram_full[..., az_slice, rg_slice]
+
+        inputs_split = np.concatenate([primary_split[np.newaxis], secondaries_split, interferograms_split], axis=0)
 
         self.logger.section(f"[Crop Loaded]")
-        self.logger.subsection(f" Inputs     = {inputs_split.shape}  (resident, {inputs_split.nbytes/1e9:.2f} GB)")
-        self.logger.subsection(f" Parameters = {parameters_split.shape}  (resident, {parameters_split.nbytes/1e9:.2f} GB)")
-        self.logger.subsection(f" Tomogram   = {tomogram_split.shape}  (mmap) \n")
+        self.logger.subsection(f" Primary         = {primary_split.shape}")
+        self.logger.subsection(f" Secondaries     = {secondaries_split.shape}")
+        self.logger.subsection(f" Interferograms  = {interferograms_split.shape}")
+        self.logger.subsection(f" Inputs (stacked)= {inputs_split.shape}  (resident, {inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {secondaries_split.shape[0]} secondaries + {interferograms_split.shape[0]} interferograms]")
+        self.logger.subsection(f" Parameters      = {parameters_split.shape}  (resident, {parameters_split.nbytes/1e9:.2f} GB)")
+        self.logger.subsection(f" Tomogram        = {tomogram_split.shape}  (mmap) \n")
 
         return {
-            "inputs"     : inputs_split,
-            "parameters" : parameters_split,
-            "tomogram"   : tomogram_split,
+            "primary"        : primary_split,
+            "secondaries"    : secondaries_split,
+            "interferograms" : interferograms_split,
+            "inputs"         : inputs_split,
+            "parameters"     : parameters_split,
+            "tomogram"       : tomogram_split,
         }

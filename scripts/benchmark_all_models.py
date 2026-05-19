@@ -82,8 +82,8 @@ class BenchmarkConfig:
     patch_stride          : int             = 32
 
     input_config          : InputConfig = field(default_factory=lambda: InputConfig(
-        use_master=False, master_representation=Representation.MAG_ONLY,
-        use_slaves=True,  slaves_representation=Representation.MAG_ONLY,
+        use_primary=False, primary_representation=Representation.MAG_ONLY,
+        use_secondaries=True,  secondaries_representation=Representation.MAG_ONLY,
         use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,
     ))
 

@@ -7,12 +7,12 @@ from typing import Tuple
 
 import numpy as np
 
-from configuration.preprocessing_config import PreProcessingConfiguration
+from configuration.processing_config import ProcessingConfiguration
 from tools.logger                       import Logger
 
 
 class InterferogramBuilder:
-    def __init__(self, config: PreProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -66,11 +66,12 @@ class InterferogramBuilder:
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 
-        data_array = self._compute_interferograms(tomography_object)
-        self.logger.subsection(f"FSAR stack built. Final shape: {data_array.shape}")
-        return data_array
+        primary, secondaries, interferograms = self._compute_interferograms(tomography_object)
+        self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
+        return primary, secondaries, interferograms
 
-    def _compute_interferograms(self, tomography_object) -> np.ndarray:
+    def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    
         import pyrat as pyrat_module
         from pyrat import getdata
 
@@ -80,7 +81,7 @@ class InterferogramBuilder:
         suffix       = options.get("suffix", "")
 
         self.logger.subsection("[FSAR] Loading primary SLC...")
-        primary_slc = getdata(
+        primary_slc  = getdata(
             pyrat_module.load.fsar(
                 tomography_object.master,
                 product       = "RGI-SLC",
@@ -90,14 +91,15 @@ class InterferogramBuilder:
                 sym           = True,
             )
         )
+        primary = primary_slc.astype(np.complex64)
 
-        master_layer = primary_slc.astype(np.complex64)
-
-        stack_layers : list[np.ndarray] = [master_layer]
-        num_slaves                       = len(tomography_object.slaves)
+        secondary_layers     : list[np.ndarray] = []
+        interferogram_layers : list[np.ndarray] = []
+        
+        n_secondaries = len(tomography_object.slaves)
 
         for secondary_index, secondary in enumerate(tomography_object.slaves):
-            self.logger.subsection(f"[FSAR] Loading secondary SLC {secondary_index + 1}/{num_slaves}: {secondary}")
+            self.logger.subsection(f"[FSAR] Loading secondary SLC {secondary_index + 1}/{n_secondaries}: {secondary}")
 
             secondary_slc = getdata(
                 pyrat_module.load.fsar(
@@ -120,37 +122,54 @@ class InterferogramBuilder:
                 )
             )
 
+            secondary_layers.append(secondary_slc.astype(np.complex64))
+
             secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, 1.25)
             deramped_secondary    = secondary_slc * np.exp(1.0j * dem_phase)
             phasor                = primary_slc * np.conj(deramped_secondary)
             phasor               /= (np.abs(phasor) + 1e-30)
             complex_interferogram = (secondary_amplitude * phasor).astype(np.complex64)
 
-            stack_layers.append(complex_interferogram)
+            interferogram_layers.append(complex_interferogram)
             del secondary_slc, dem_phase, deramped_secondary, phasor, secondary_amplitude, complex_interferogram
 
-        return np.stack(stack_layers, axis=0)
+        secondaries    = np.stack(secondary_layers,     axis=0)
+        interferograms = np.stack(interferogram_layers, axis=0)
+        return primary, secondaries, interferograms
 
-    def build(self, crop_tuple: Tuple[int, int, int, int]) -> np.ndarray:
+    def build(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.logger.section(f"[Building Stack] Crop parameters: {crop_tuple}")
 
-        if self.config.dataset_type == "UAVSAR":
-            stack = self._build_from_uavsar(crop_tuple)
-        else:
-            stack = self._build_from_fsar(crop_tuple)
+        primary, secondaries, interferograms = self._build_from_fsar(crop_tuple)
+        primary        = np.ascontiguousarray(primary)
+        secondaries    = np.ascontiguousarray(secondaries)
+        interferograms = np.ascontiguousarray(interferograms)
 
         gc.collect()
-        return stack
+        return primary, secondaries, interferograms
 
-    def run(self, crop_tuple: Tuple[int, int, int, int], output_path: Path) -> Tuple[int, ...]:
-        stack = self.build(crop_tuple)
-        stack = np.ascontiguousarray(stack)
+    def run(
+        self,
+        crop_tuple           : Tuple[int, int, int, int],
+        primary_path         : Path,
+        secondaries_path     : Path,
+        interferograms_path  : Path,
+    ) -> Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]:
+        
+        primary, secondaries, interferograms = self.build(crop_tuple)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(str(output_path), stack, allow_pickle=False)
-        self.logger.subsection(f"Inputs saved: {output_path} (shape: {stack.shape})")
+        for path in (primary_path, secondaries_path, interferograms_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-        shape = tuple(stack.shape)
-        del stack
+        np.save(str(primary_path),        primary,        allow_pickle=False)
+        np.save(str(secondaries_path),    secondaries,    allow_pickle=False)
+        np.save(str(interferograms_path), interferograms, allow_pickle=False)
+
+        self.logger.subsection(f"Primary saved        : {primary_path} (shape: {primary.shape})")
+        self.logger.subsection(f"Secondaries saved    : {secondaries_path} (shape: {secondaries.shape})")
+        self.logger.subsection(f"Interferograms saved : {interferograms_path} (shape: {interferograms.shape})")
+
+        shapes = tuple(primary.shape), tuple(secondaries.shape), tuple(interferograms.shape)
+        del primary, secondaries, interferograms
         gc.collect()
-        return shape
+        return shapes

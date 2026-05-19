@@ -75,7 +75,7 @@ class TrainingPipeline:
         self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
 
         if self.dataset_config.x_axis is None:
-            tomo_path     = self.dataset_pipeline.layout.artifact_path("full_tomogram")
+            tomo_path     = self.dataset_pipeline.layout.artifact_path("tomogram_full")
             tomo_mmap     = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
             x_axis_length = int(tomo_mmap.shape[0])
             self.dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length, dtype=np.float32)

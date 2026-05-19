@@ -3,15 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from configuration.preprocessing_config import PreProcessingConfiguration
-from tools.logger import Logger
+from configuration.processing_config import ProcessingConfiguration
+from tools.logger                    import Logger
 
 
-ArtifactType = Literal["full_tomogram", "input_tomogram", "inputs"]
+ArtifactType = Literal["tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced", "primary_reduced", "secondaries_reduced", "interferograms_reduced"]
 
 
 class ArtifactRegistry:
-    def __init__(self, config: PreProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -28,9 +28,13 @@ class ArtifactRegistry:
         param_tag = self.config.parameter_tag
         
         return {
-            "full_tomogram"  : f"tomofull_{param_tag}.npy",
-            "input_tomogram" : f"tomofull_{tomo_tag}.npy",
-            "inputs"         : f"inputs_{tomo_tag}.npy",
+            "tomogram_full"          : f"tomogram_full_{param_tag}.npy",
+            "tomogram_reduced"       : f"tomogram_reduced_{tomo_tag}.npy",
+            "dem_full"               : f"dem_full_{param_tag}.npy",
+            "dem_reduced"            : f"dem_reduced_{tomo_tag}.npy",
+            "primary_reduced"        : f"primary_reduced_{tomo_tag}.npy",
+            "secondaries_reduced"    : f"secondaries_reduced_{tomo_tag}.npy",
+            "interferograms_reduced" : f"interferograms_reduced_{tomo_tag}.npy",
         }
 
     def artifact_path(self, artifact_type: ArtifactType) -> Path:

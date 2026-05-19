@@ -36,8 +36,8 @@ class DatasetPipeline:
             {
                 "Pre-processing Run"  : str(config.preprocessing_run_directory),
                 "Training Run"        : str(self.training_run_directory),
-                "Master"              : f"use={ic.use_master} rep={ic.master_representation.value}",
-                "Slaves"              : f"use={ic.use_slaves} rep={ic.slaves_representation.value}",
+                "Primary"             : f"use={ic.use_primary} rep={ic.primary_representation.value}",
+                "Secondaries"         : f"use={ic.use_secondaries} rep={ic.secondaries_representation.value}",
                 "Interferograms"      : f"use={ic.use_interferograms} rep={ic.interferograms_representation.value}",
                 "Output Parameters"   : ",".join(oc.role_names),
                 "Patch Size"          : config.patch.size,

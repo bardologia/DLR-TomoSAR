@@ -36,8 +36,9 @@ class PatchDataset(Dataset):
         self.x_axis         = x_axis
         self.n_gaussians    = n_gaussians
         self.passes         = int(inputs.shape[0])
-        self.n_slaves       = self.passes - 1
-        self.input_channels = input_config.total_channels(self.n_slaves)
+        self.n_secondaries  = (self.passes - 1) // 2  # [primary, secondaries..., interferograms...]
+        self.n_slaves       = self.n_secondaries       # alias for normalize.py compatibility
+        self.input_channels = input_config.total_channels(self.n_secondaries)
 
         self.output_channel_indices = output_config.selected_indices(n_gaussians = int(gt_parameters.shape[0]) // 3)
         self.gt_channels            = len(self.output_channel_indices)
@@ -57,20 +58,20 @@ class PatchDataset(Dataset):
     def _build_input_tensor(self, complex_patch: np.ndarray) -> np.ndarray:
         complex_data = complex_patch[None, ...]
       
-        master_data = complex_data[:, :1]
-        slave_data  = complex_data[:, 1:] 
+        primary_data        = complex_data[:, :1]
+        secondaries_data    = complex_data[:, 1:1 + self.n_secondaries]
+        interferograms_data = complex_data[:, 1 + self.n_secondaries:]
 
         parts: list[np.ndarray] = []
         
-        if self.input_config.use_master:
-            parts.append(self.input_config.master_representation.convert(master_data))
+        if self.input_config.use_primary:
+            parts.append(self.input_config.primary_representation.convert(primary_data))
        
-        if self.input_config.use_slaves:
-            parts.append(self.input_config.slaves_representation.convert(slave_data))
+        if self.input_config.use_secondaries:
+            parts.append(self.input_config.secondaries_representation.convert(secondaries_data))
 
         if self.input_config.use_interferograms:
-            interferograms = slave_data * np.conj(master_data)
-            parts.append(self.input_config.interferograms_representation.convert(interferograms))
+            parts.append(self.input_config.interferograms_representation.convert(interferograms_data))
 
         input_tensor = parts[0] if len(parts) == 1 else np.concatenate(parts, axis=1)
         
