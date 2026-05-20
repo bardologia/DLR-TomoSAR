@@ -65,8 +65,23 @@ class GradientClipper:
         else:  
             return float(window_data.mean() + self.mean_std_k * window_data.std())
 
+    def check_gradients(self, model: torch.nn.Module, global_step: int) -> bool:
+        has_invalid = False
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                    self.logger.warning(f"NaN/Inf gradient detected in {name} at step {global_step}! GradScaler will handle this.")
+                    has_invalid = True
+                    break
+        return has_invalid
+
     def maybe_clip(self, model: torch.nn.Module, global_step: int):
+        self.check_gradients(model, global_step)
+        
         norm = GradientClipper.global_norm(model)
+        
+        if norm > 100.0:
+            self.logger.warning(f"Exploding gradient norm detected: {norm:.2f} at step {global_step}!")
 
         if self.mode == "disabled":
             return norm

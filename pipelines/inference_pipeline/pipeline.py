@@ -42,13 +42,10 @@ class InferencePipeline:
         figure_paths: Dict[str, Path] = {}
 
         pixel_metrics_for_plot = {
-            "mse"     : result.pixel_mse,
-            "mae"     : result.pixel_mae,
-            "r2"      : result.pixel_r2,
-            "cos"     : result.pixel_cosine,
-            "mse_raw" : result.pixel_mse_raw,
-            "r2_raw"  : result.pixel_r2_raw,
-            "cos_raw" : result.pixel_cosine_raw,
+            "mse (denorm)" : result.pixel_mse,
+            "mae (denorm)" : result.pixel_mae,
+            "r2  (denorm)" : result.pixel_r2,
+            "cos (denorm)" : result.pixel_cosine,
         }
 
         selected = Metrics.select_pixels(
@@ -69,7 +66,6 @@ class InferencePipeline:
             figure_paths[f"profiles_{tag}"] = plotter.plot_profile_panel(
                 pred_curves   = result.pred_curves,
                 gt_curves     = result.gt_curves,
-                raw_curves    = result.raw_curves,
                 params_pred   = result.params_pred,
                 x_axis        = x_axis_np,
                 pixels        = pixels,
@@ -84,9 +80,9 @@ class InferencePipeline:
             logger.subsection(f"Profiles ({tag:<6}) : {figure_paths[f'profiles_{tag}']}")
 
         for key, data, title, label, extra in (
-            ("pixel_mse_map",  result.pixel_mse,                             "Per-pixel curve MSE",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
-            ("pixel_r2_map",   result.pixel_r2,                              "Per-pixel R²",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
-            ("pixel_peak_map", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
+            ("pixel_mse_map",  result.pixel_mse,                             "Per-pixel curve MSE (denorm)",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
+            ("pixel_r2_map",   result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
+            ("pixel_peak_map", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
         ):
             figure_paths[key] = plotter.plot_pixel_metric_map(
                 data      = data, 
@@ -102,12 +98,9 @@ class InferencePipeline:
 
         figure_paths["metric_histograms"] = plotter.plot_metric_histogram(
             {
-                "pixel_mse (gt)"    : result.pixel_mse,
-                "pixel_r2 (gt)"     : result.pixel_r2,
-                "pixel_cosine (gt)" : result.pixel_cosine,
-                "pixel_mse (raw)"   : result.pixel_mse_raw,
-                "pixel_r2 (raw)"    : result.pixel_r2_raw,
-                "pixel_cosine (raw)": result.pixel_cosine_raw,
+                "pixel_mse (denorm)"    : result.pixel_mse,
+                "pixel_r2 (denorm)"     : result.pixel_r2,
+                "pixel_cosine (denorm)" : result.pixel_cosine,
             },
             meta.figure_path("metric_histograms"),
         )
@@ -153,9 +146,8 @@ class InferencePipeline:
             for s_idx, i in enumerate(indices):
                 tag = tag_fn(i)
                 figure_paths[tag] = plotter.plot_tomogram_slice(
-                    pred_cube  = result.pred_curves, 
-                    gt_cube    = result.gt_curves, 
-                    raw_cube   = result.raw_curves,
+                    pred_cube  = result.pred_curves,
+                    gt_cube    = result.gt_curves,
                     axis       = axis,
                     index      = int(i),
                     x_axis     = x_axis_np,
@@ -168,9 +160,8 @@ class InferencePipeline:
         for s_idx, i in enumerate(slice_elev_idx):
             tag = f"slice_elev_idx_{int(i)}"
             figure_paths[tag] = plotter.plot_elevation_intensity_slice(
-                pred_cube  = result.pred_curves, 
-                gt_cube    = result.gt_curves, 
-                raw_cube   = result.raw_curves,
+                pred_cube  = result.pred_curves,
+                gt_cube    = result.gt_curves,
                 elev_idx   = int(i),
                 x_axis     = x_axis_np,
                 out_path   = meta.figure_path(tag),
@@ -223,7 +214,6 @@ class InferencePipeline:
             gif_paths[f"walk_{axis}"] = make_walk_gif(
                 pred_cube   = result.pred_curves,
                 gt_cube     = result.gt_curves,
-                raw_cube    = result.raw_curves,
                 axis        = axis,
                 out_path    = meta.gif_path(axis),
                 x_axis      = x_axis_np,
@@ -301,12 +291,19 @@ class InferencePipeline:
             gif_paths        = gif_paths,
         ).assemble()
 
-    def run(self) -> Path:
-        cfg  = self.config
+    def _setup(self, cfg: InferenceConfig) -> tuple[InferenceMetadata, Logger, Ploter]:
         meta = InferenceMetadata(cfg)
         meta.create_dirs()
         np.random.seed(cfg.seed)
-        
+
+        logger = Logger(log_dir=str(meta.logs_dir), name="inference", level=cfg.log_level)
+        logger.section("[Inference Pipeline]")
+        logger.subsection(f"Run Directory : {cfg.run_directory}")
+        logger.subsection(f"Output Dir    : {meta.output_dir}")
+        logger.subsection(f"Split         : {cfg.split}")
+        logger.subsection(f"Device        : {cfg.device}")
+        logger.subsection(f"Use EMA       : {cfg.use_ema}\n")
+
         plotter = Ploter(
             cmap      = cfg.cmap_intensity,
             err_cmap  = cfg.cmap_error,
@@ -315,19 +312,11 @@ class InferencePipeline:
             save_dpi  = cfg.save_dpi,
         )
 
-        output_dir  = meta.output_dir
+        return meta, logger, plotter
 
-        logger = Logger(log_dir=str(meta.logs_dir), name="inference", level=cfg.log_level)
-
-        logger.section("[Inference Pipeline]")
-        logger.subsection(f"Run Directory : {cfg.run_directory}")
-        logger.subsection(f"Output Dir    : {output_dir}")
-        logger.subsection(f"Split         : {cfg.split}")
-        logger.subsection(f"Device        : {cfg.device}")
-        logger.subsection(f"Use EMA       : {cfg.use_ema}\n")
-
+    def _load_run(self, cfg: InferenceConfig, meta: InferenceMetadata, logger: Logger):
         loader = DirectoryLoader(cfg.run_directory, logger=logger)
-        run    = loader.load(
+        return loader.load(
             split           = cfg.split,
             batch_size      = cfg.batch_size,
             num_workers     = cfg.num_workers,
@@ -336,6 +325,7 @@ class InferencePipeline:
             checkpoint_name = cfg.checkpoint_name,
         )
 
+    def _predict(self, cfg: InferenceConfig, meta: InferenceMetadata, run, logger: Logger):
         predictor = Predictor(
             run         = run,
             logger      = logger,
@@ -343,30 +333,44 @@ class InferencePipeline:
             cube_dtype  = cfg.cube_dtype,
             save_cubes  = cfg.save_cubes,
             meta        = meta,
+            cpu_workers = cfg.cpu_workers,
         )
-        result = predictor.run_inference()
+        return predictor.run_inference()
 
-        x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
-        _N_elev, _az, _rg = result.pred_curves.shape
-
+    def _compute_slice_indices(self, cfg: InferenceConfig, n_elev: int, n_az: int, n_rg: int) -> dict:
         def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
             n_slices = max(1, min(n_slices, n_total))
             return np.linspace(n_total * 0.1, n_total * 0.9, n_slices).round().astype(int)
 
-        slice_elev_idx  = _equal_indices(_N_elev, cfg.n_elevation_slices)
-        slice_range_idx = _equal_indices(_rg,     cfg.n_range_slices)
-        slice_az_idx    = _equal_indices(_az,     cfg.n_azimuth_slices)
+        return {
+            "slice_elev_idx"  : _equal_indices(n_elev, cfg.n_elevation_slices),
+            "slice_range_idx" : _equal_indices(n_rg,   cfg.n_range_slices),
+            "slice_az_idx"    : _equal_indices(n_az,   cfg.n_azimuth_slices),
+            "all_elev_idx"    : np.arange(n_elev),
+            "all_range_idx"   : np.arange(n_rg),
+            "all_az_idx"      : np.arange(n_az),
+        }
 
-        all_elev_idx  = np.arange(_N_elev)
-        all_range_idx = np.arange(_rg)
-        all_az_idx    = np.arange(_az)
-
+    def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta: InferenceMetadata, indices: dict) -> dict:
         global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
-            elev_indices  = all_elev_idx,
-            range_indices = all_range_idx,
-            az_indices    = all_az_idx,
+            elev_indices  = indices["all_elev_idx"],
+            range_indices = indices["all_range_idx"],
+            az_indices    = indices["all_az_idx"],
         )
         write_metrics_json(global_metrics, meta.metrics_path)
+        return global_metrics
+
+    def run(self) -> Path:
+        cfg                    = self.config
+        meta, logger, plotter  = self._setup(cfg)
+        run                    = self._load_run(cfg, meta, logger)
+        result                 = self._predict(cfg, meta, run, logger)
+
+        x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
+        _N_elev, _az, _rg = result.pred_curves.shape
+
+        indices        = self._compute_slice_indices(cfg, _N_elev, _az, _rg)
+        global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
 
         logger.section("[Inference: Plots]")
         figure_paths = self._plot_figures(
@@ -378,15 +382,15 @@ class InferencePipeline:
             x_axis_np       = x_axis_np,
             cfg             = cfg,
             logger          = logger,
-            slice_range_idx = slice_range_idx,
-            slice_az_idx    = slice_az_idx,
-            slice_elev_idx  = slice_elev_idx,
-            all_range_idx   = all_range_idx,
-            all_az_idx      = all_az_idx,
-            all_elev_idx    = all_elev_idx,
+            slice_range_idx = indices["slice_range_idx"],
+            slice_az_idx    = indices["slice_az_idx"],
+            slice_elev_idx  = indices["slice_elev_idx"],
+            all_range_idx   = indices["all_range_idx"],
+            all_az_idx      = indices["all_az_idx"],
+            all_elev_idx    = indices["all_elev_idx"],
         )
 
-        self.logger.section("[Inference: Animations]")
+        logger.section("[Inference: Animations]")
         gif_paths = self._run_animations(
             result    = result,
             meta      = meta,
@@ -395,7 +399,7 @@ class InferencePipeline:
             logger    = logger,
         )
 
-        self.logger.section("[Inference: Report]")
+        logger.section("[Inference: Report]")
         report_path = self._build_report(
             meta           = meta,
             run            = run,
@@ -411,5 +415,5 @@ class InferencePipeline:
         logger.subsection(f"Metrics : {meta.metrics_path}")
         logger.subsection(f"Cubes   : {result.cube_directory}\n")
         logger.close()
-        
+
         return report_path

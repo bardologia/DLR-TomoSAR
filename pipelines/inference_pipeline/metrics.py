@@ -1,12 +1,22 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing             import Dict, Optional, Tuple
 
 import numpy                                as np
 from skimage.metrics                        import structural_similarity as ssim
 from tqdm                                   import tqdm
 from pipelines.inference_pipeline.predictor import Result
+
+
+def _ssim_worker(args: tuple) -> tuple[str, float]:
+    key, pred_slice, ref_slice = args
+    data_range = float(ref_slice.max() - ref_slice.min())
+    min_side   = min(pred_slice.shape)
+    win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
+    value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
+    return key, value
 
 
 class Metrics:
@@ -21,7 +31,7 @@ class Metrics:
         self.x_axis      = x_axis
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
-        self.num_workers = 40
+        self.num_workers = min(os.cpu_count() or 1, 16)
 
     @staticmethod
     def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
@@ -59,27 +69,9 @@ class Metrics:
        
         return 10.0 * np.log10(data_range * data_range / mse)
 
-    @staticmethod
-    def _ssim_2d(pred_slice: np.ndarray, ref_slice: np.ndarray) -> float:
-        data_range = float(ref_slice.max() - ref_slice.min())   
-        min_side   = min(pred_slice.shape)
-        win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
-       
-        return float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
-
-    def _slice_ssim(
-        self,
-        pred          : np.ndarray,
-        ref           : np.ndarray,
-        elev_indices  : Optional[np.ndarray],
-        range_indices : Optional[np.ndarray],
-        az_indices    : Optional[np.ndarray],
-        prefix        : str,
-    ) -> Dict[str, float]:
-
-        out: Dict[str, float] = {}
-
-        tasks: list[tuple[str, np.ndarray, np.ndarray]] = []
+    def _slice_ssim(self, pred : np.ndarray, ref : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray], prefix : str) -> Dict[str, float]:
+        out   : Dict[str, float]                         = {}
+        tasks : list[tuple[str, np.ndarray, np.ndarray]] = []
 
         def _enqueue(indices: np.ndarray, axis: int, label: str) -> None:
             for i, idx in enumerate(indices):
@@ -99,12 +91,15 @@ class Metrics:
         if not tasks:
             return out
 
-        with ThreadPoolExecutor(max_workers=self.num_workers) as pool:
-            futures = {pool.submit(self._ssim_2d, p, r): key for key, _label, p, r in tasks}
+        worker_args = [(key, p, r) for key, _label, p, r in tasks]
+        n_workers   = min(self.num_workers, len(worker_args))
+
+        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+            futures = {pool.submit(_ssim_worker, arg): arg[0] for arg in worker_args}
             with tqdm(total=len(futures), desc=f"SSIM ({prefix})", unit="slice", leave=False) as pbar:
                 for fut in as_completed(futures):
-                    key = futures[fut]
-                    out[key] = fut.result()
+                    key, value = fut.result()
+                    out[key]   = value
                     pbar.update(1)
 
         labels_seen = {t[1] for t in tasks}
@@ -114,67 +109,41 @@ class Metrics:
 
         return out
 
-    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray, raw: np.ndarray) -> Dict[str, np.ndarray]:
+    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:
        
         P = pred.reshape(pred.shape[0], -1).astype(np.float64)
         G = gt  .reshape(gt  .shape[0], -1).astype(np.float64)
-        R = raw .reshape(raw .shape[0], -1).astype(np.float64)
 
         diff_g = P - G
-        diff_r = P - R
 
         mae_gt  = np.abs(diff_g).mean(axis=1)
         rmse_gt = np.sqrt((diff_g ** 2).mean(axis=1))
         g_var   = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
         r2_gt   = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
 
-        mae_raw  = np.abs(diff_r).mean(axis=1)
-        rmse_raw = np.sqrt((diff_r ** 2).mean(axis=1))
-        r_var    = ((R - R.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
-        r2_raw   = 1.0 - (diff_r ** 2).sum(axis=1) / r_var
-
         gt_prob   = G / G.sum(axis=0, keepdims=True).clip(1e-12, None)
         pred_prob = P / P.sum(axis=0, keepdims=True).clip(1e-12, None)
-        raw_prob  = R / R.sum(axis=0, keepdims=True).clip(1e-12, None)
 
         log_pp = np.log(pred_prob.clip(1e-12, None))
-        ce_gt  = -(gt_prob  * log_pp).mean(axis=1)
-        ce_raw = -(raw_prob * log_pp).mean(axis=1)
+        ce_gt  = -(gt_prob * log_pp).mean(axis=1)
 
         return {
-            "elev_mae_gt"   : mae_gt,
-            "elev_rmse_gt"  : rmse_gt,
-            "elev_r2_gt"    : r2_gt,
-            "elev_ce_gt"    : ce_gt,
-            "elev_mae_raw"  : mae_raw,
-            "elev_rmse_raw" : rmse_raw,
-            "elev_r2_raw"   : r2_raw,
-            "elev_ce_raw"   : ce_raw,
+            "elev_mae_gt"  : mae_gt,
+            "elev_rmse_gt" : rmse_gt,
+            "elev_r2_gt"   : r2_gt,
+            "elev_ce_gt"   : ce_gt,
         }
 
-    def compute(
-        self,
-        *,
-        elev_indices  : Optional[np.ndarray] = None,
-        range_indices : Optional[np.ndarray] = None,
-        az_indices    : Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+    def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None) -> Dict[str, float]:
 
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
-        raw  = self.result.raw_curves
-
+    
         diff_gt        = pred - gt
         mse_gt         = float((diff_gt * diff_gt).mean())
         mae_gt         = float(np.abs(diff_gt).mean())
         gt_mean        = float(gt.mean())
         overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum()) / (float(((gt  - gt_mean)  ** 2).sum()) + 1e-12)
-
-        diff_raw       = pred - raw
-        mse_raw        = float((diff_raw * diff_raw).mean())
-        mae_raw        = float(np.abs(diff_raw).mean())
-        raw_mean       = float(raw.mean())
-        overall_r2_raw = 1.0 - float((diff_raw * diff_raw).sum()) / (float(((raw - raw_mean) ** 2).sum()) + 1e-12)
 
         metrics: Dict[str, float] = {
             "n_pixels"       : int(self.result.pixel_mse.size),
@@ -189,53 +158,34 @@ class Metrics:
             "overall_r2_gt"  : float(overall_r2_gt),
             "psnr_db_gt"     : self._psnr(pred, gt),
 
-            "curve_mse_raw"  : mse_raw,
-            "curve_mae_raw"  : mae_raw,
-            "curve_rmse_raw" : float(np.sqrt(mse_raw)),
-            "overall_r2_raw" : float(overall_r2_raw),
-            "psnr_db_raw"    : self._psnr(pred, raw),
-
             "gt_mean"        : gt_mean,
             "gt_std"         : float(gt.std()),
             "gt_max"         : float(gt.max()),
-            "raw_mean"       : raw_mean,
-            "raw_std"        : float(raw.std()),
-            "raw_max"        : float(raw.max()),
             "pred_mean"      : float(pred.mean()),
             "pred_std"       : float(pred.std()),
             "pred_max"       : float(pred.max()),
         }
 
         for tag, arr in (
-            ("pixel_mse_gt",         self.result.pixel_mse),
-            ("pixel_mae_gt",         self.result.pixel_mae),
-            ("pixel_r2_gt",          self.result.pixel_r2),
-            ("pixel_cosine_gt",      self.result.pixel_cosine),
-            ("pixel_peak_idx_d_gt",  self.result.pixel_peak_err_idx.astype(np.float32)),
-            ("pixel_mse_raw",        self.result.pixel_mse_raw),
-            ("pixel_mae_raw",        self.result.pixel_mae_raw),
-            ("pixel_r2_raw",         self.result.pixel_r2_raw),
-            ("pixel_cosine_raw",     self.result.pixel_cosine_raw),
-            ("pixel_peak_idx_d_raw", self.result.pixel_peak_err_idx_raw.astype(np.float32)),
+            ("pixel_mse_gt",        self.result.pixel_mse),
+            ("pixel_mae_gt",        self.result.pixel_mae),
+            ("pixel_r2_gt",         self.result.pixel_r2),
+            ("pixel_cosine_gt",     self.result.pixel_cosine),
+            ("pixel_peak_idx_d_gt", self.result.pixel_peak_err_idx.astype(np.float32)),
         ):
             for k, v in self._basic_stats(arr).items():
                 metrics[f"{tag}_{k}"] = v
             for k, v in self._percentiles(arr).items():
                 metrics[f"{tag}_{k}"] = v
 
-        metrics["pixel_peak_err_units_mean_gt"]    = float(self.result.pixel_peak_err_idx.mean())                  * self.x_step
-        metrics["pixel_peak_err_units_median_gt"]  = float(np.median(self.result.pixel_peak_err_idx))              * self.x_step
-        metrics["pixel_peak_err_units_p95_gt"]     = float(np.percentile(self.result.pixel_peak_err_idx, 95))      * self.x_step
-        metrics["pixel_peak_err_units_mean_raw"]   = float(self.result.pixel_peak_err_idx_raw.mean())              * self.x_step
-        metrics["pixel_peak_err_units_median_raw"] = float(np.median(self.result.pixel_peak_err_idx_raw))          * self.x_step
-        metrics["pixel_peak_err_units_p95_raw"]    = float(np.percentile(self.result.pixel_peak_err_idx_raw, 95))  * self.x_step
+        metrics["pixel_peak_err_units_mean_gt"]   = float(self.result.pixel_peak_err_idx.mean())              * self.x_step
+        metrics["pixel_peak_err_units_median_gt"] = float(np.median(self.result.pixel_peak_err_idx))          * self.x_step
+        metrics["pixel_peak_err_units_p95_gt"]    = float(np.percentile(self.result.pixel_peak_err_idx, 95))  * self.x_step
 
-        for k, v in self._slice_ssim(pred, gt,  elev_indices, range_indices, az_indices, prefix="gt" ).items():
-            metrics[k] = v
-        for k, v in self._slice_ssim(pred, raw, elev_indices, range_indices, az_indices, prefix="raw").items():
+        for k, v in self._slice_ssim(pred, gt, elev_indices, range_indices, az_indices, prefix="gt").items():
             metrics[k] = v
 
-        for metric_name, arr in self._elev_metrics(pred, gt, raw).items():
+        for metric_name, arr in self._elev_metrics(pred, gt).items():
             for i, v in enumerate(arr):
                 metrics[f"{metric_name}_{i}"] = float(v)
             

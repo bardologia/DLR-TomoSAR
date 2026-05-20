@@ -11,11 +11,11 @@ from torch.utils.data                                import DataLoader
 from pipelines.inference_pipeline.wrapper            import ModelWrapper
 from tools.logger                                    import Logger
 from configuration.dataset_config                    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
-from configuration.preprocessing_config              import CropRegion
-from pipelines.dataset_creation_pipeline.crop        import Cropper, Layout
-from pipelines.dataset_creation_pipeline.load        import PatchDataset
-from pipelines.dataset_creation_pipeline.normalize   import Stats, Normalizer
-from pipelines.dataset_creation_pipeline.patch       import Patcher, GridInfo
+from configuration.processing_config                 import CropRegion
+from pipelines.dataset_pipeline.crop                 import Cropper, Layout
+from pipelines.dataset_pipeline.load                 import PatchDataset
+from pipelines.dataset_pipeline.normalize            import Stats, Normalizer
+from pipelines.dataset_pipeline.patch                import Patcher, GridInfo
 from models                                          import get_model
 
 
@@ -98,7 +98,7 @@ class DirectoryLoader:
 
         inputs        = arrays["inputs"]
         gt_parameters = arrays["parameters"]
-        norm_stats    = Stats.compute(inputs, gt_parameters, dataset_config.input_config, dataset_config.output_config)
+        norm_stats    = Stats.load(self.run_directory / "meta", self.logger)
 
         dataset = PatchDataset(
             inputs        = inputs,
@@ -107,7 +107,6 @@ class DirectoryLoader:
             input_config  = dataset_config.input_config,
             output_config = dataset_config.output_config,
             split_name    = split_name,
-            logger        = self.logger,
             norm_stats    = norm_stats,
             x_axis        = x_axis,
             n_gaussians   = n_gaussians,
@@ -121,9 +120,12 @@ class DirectoryLoader:
         if model_name in _IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
         
-        return get_model(model_name, **overrides)
+        model, _ = get_model(model_name, **overrides)
+        return model
 
-    def _apply_ema(self, model, ema_state: dict) -> int:
+    def _apply_ema(self, model, ema_state: dict | None) -> int:
+        if not ema_state or not ema_state.get("shadow"):
+            return 0
         shadow  = ema_state["shadow"]
         applied = 0
       
@@ -147,7 +149,7 @@ class DirectoryLoader:
             "epoch"         : int(ckpt["epoch"]),
             "best_val_loss" : float(ckpt["best_val_loss"]),
             "best_epoch"    : int(ckpt["best_epoch"]),
-            "best_metrics"  : dict(ckpt["best_metrics"]),
+            "best_metrics"  : dict(ckpt.get("best_metrics", {})),
         }
 
     def _wrap_model(self, model, device: str) -> ModelWrapper:
@@ -191,11 +193,11 @@ class DirectoryLoader:
         model     = model.to(device)
 
         ckpt = self._load_checkpoint(ckpt_path, device)
-        model.load_state_dict(ckpt["model_state_dict"])
+        model.load_state_dict(ckpt["params"])
 
         used_ema = False
         if use_ema:
-            n_applied = self._apply_ema(model, ckpt["ema_state_dict"])
+            n_applied = self._apply_ema(model, ckpt.get("ema_shadow", {}))
             used_ema  = n_applied > 0
             self.logger.subsection(f"EMA           : applied to {n_applied} parameters")
 

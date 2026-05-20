@@ -100,7 +100,6 @@ class Ploter:
         self,
         pred_curves   : np.ndarray,
         gt_curves     : np.ndarray,
-        raw_curves    : np.ndarray,
         params_pred   : np.ndarray,
         x_axis        : np.ndarray,
         pixels        : np.ndarray,
@@ -134,12 +133,10 @@ class Ploter:
             ax   = axes[r, c]
             ax.set_visible(True)
 
-            raw   = raw_curves [:, y, x]
             gt    = gt_curves  [:, y, x]
             pred  = pred_curves[:, y, x]
             comps = self._gaussian_components(params_pred[:, y, x], x_axis, n_gaussians)
 
-            ax.plot(x_axis, raw,  color="C0",    linewidth=1.0, label="Raw",  linestyle=":",  zorder=2)
             ax.plot(x_axis, gt,   color="black", linewidth=1.4, label="GT",   zorder=3)
             ax.plot(x_axis, pred, color="C3",    linewidth=1.2, label="Pred", linestyle="--", zorder=4)
             
@@ -148,17 +145,13 @@ class Ploter:
             
             ax.fill_between(x_axis, pred - gt, 0.0, color="C0", alpha=0.10, linewidth=0)
 
-            mse     = float(pixel_metrics["mse"]    [y, x])
-            r2      = float(pixel_metrics["r2"]     [y, x])
-            cos     = float(pixel_metrics["cos"]    [y, x])
-            mse_raw = float(pixel_metrics["mse_raw"][y, x])
-            r2_raw  = float(pixel_metrics["r2_raw"] [y, x])
-            cos_raw = float(pixel_metrics["cos_raw"][y, x])
+            mse = float(pixel_metrics["mse"][y, x])
+            r2  = float(pixel_metrics["r2"] [y, x])
+            cos = float(pixel_metrics["cos"][y, x])
 
             ax.set_title(
                 f"az={y + az_offset}, rg={x + rg_offset}\n"
-                f"pred/gt  MSE={mse:.3g}  R2={r2:.3f}  cos={cos:.3f}\n"
-                f"pred/raw MSE={mse_raw:.3g}  R2={r2_raw:.3f}  cos={cos_raw:.3f}",
+                f"MSE={mse:.3g}  R²={r2:.3f}  cos={cos:.3f}",
                 fontsize=8,
             )
 
@@ -209,7 +202,6 @@ class Ploter:
         self,
         pred_cube  : np.ndarray,
         gt_cube    : np.ndarray,
-        raw_cube   : np.ndarray,
         axis       : str,
         index      : int,
         x_axis     : np.ndarray,
@@ -222,7 +214,6 @@ class Ploter:
         if axis == "range":
             pred_slice               = pred_cube[:, :, index]
             gt_slice                 = gt_cube  [:, :, index]
-            raw_slice                = raw_cube [:, :, index]
             x_label                  = "azimuth index"
             x_extent_lo, x_extent_hi = az_offset, az_offset + pred_slice.shape[1]
             title_pos                = f"range = {index + rg_offset}"
@@ -230,7 +221,6 @@ class Ploter:
         elif axis == "azimuth":
             pred_slice               = pred_cube[:, index, :]
             gt_slice                 = gt_cube  [:, index, :]
-            raw_slice                = raw_cube [:, index, :]
             x_label                  = "range index"
             x_extent_lo, x_extent_hi = rg_offset, rg_offset + pred_slice.shape[1]
             title_pos                = f"azimuth = {index + az_offset}"
@@ -238,53 +228,37 @@ class Ploter:
         else:
             raise ValueError(f"axis must be 'range' or 'azimuth', got {axis!r}")
 
-        err_gt_slice  = np.abs(pred_slice - gt_slice)
-        err_raw_slice = np.abs(pred_slice - raw_slice)
+        err_gt_slice = np.abs(pred_slice - gt_slice)
 
         sort_idx      = np.argsort(x_axis)
         x_axis_sorted = x_axis[sort_idx]
-        pred_slice    = pred_slice   [sort_idx]
-        gt_slice      = gt_slice     [sort_idx]
-        raw_slice     = raw_slice    [sort_idx]
-        err_gt_slice  = err_gt_slice [sort_idx]
-        err_raw_slice = err_raw_slice[sort_idx]
+        pred_slice    = pred_slice  [sort_idx]
+        gt_slice      = gt_slice    [sort_idx]
+        err_gt_slice  = err_gt_slice[sort_idx]
 
         extent_int = [x_extent_lo, x_extent_hi, float(x_axis_sorted[0]), float(x_axis_sorted[-1])]
 
-        pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice = self._maybe_normalize(pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice)
+        pred_slice, gt_slice, err_gt_slice = self._maybe_normalize(pred_slice, gt_slice, err_gt_slice)
 
-        vmin, vmax = self._shared_clim(raw_slice, gt_slice, pred_slice)
-        emax_gt    = float(np.percentile(err_gt_slice,  99.0))
-        emax_raw   = float(np.percentile(err_raw_slice, 99.0))
+        vmin, vmax = self._shared_clim(gt_slice, pred_slice)
+        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
 
-        fig, axes = plt.subplots(2, 3, figsize=(15, 9.0), sharey=True)
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True)
 
-        top_panels = [
-            (raw_slice,     "Raw Tomogram",  self.cmap,     vmin, vmax),
-            (gt_slice,      "GT (Gaussian)", self.cmap,     vmin, vmax),
-            (pred_slice,    "Prediction",    self.cmap,     vmin, vmax),
+        panels = [
+            (gt_slice,    "GT (Gaussian)", self.cmap,     vmin,  vmax),
+            (pred_slice,  "Prediction",    self.cmap,     vmin,  vmax),
+            (err_gt_slice, "|Pred - GT|",  self.err_cmap, 0.0,   emax_gt),
         ]
 
-        bot_panels = [
-            (err_gt_slice,  "|Pred - GT|",   self.err_cmap, 0.0,  emax_gt),
-            (err_raw_slice, "|Pred - Raw|",  self.err_cmap, 0.0,  emax_raw),
-        ]
-
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[0], top_panels):
+        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
             im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi, origin="lower")
             ax_i.set_title(label)
             ax_i.set_xlabel(x_label)
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(self._int_label)
+            lbl_cb = self._int_label if cm_used == self.cmap else "|error|"
+            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
 
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[1], bot_panels):
-            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi, origin="lower")
-            ax_i.set_title(label)
-            ax_i.set_xlabel(x_label)
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label("|error|")
-
-        axes[1, 2].set_visible(False)
-        axes[0, 0].set_ylabel("elevation [m]")
-        axes[1, 0].set_ylabel("elevation [m]")
+        axes[0].set_ylabel("elevation [m]")
 
         ssim_str = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
         fig.suptitle(f"Tomogram slice ({axis}-cut) - {title_pos}{ssim_str}", fontsize=13)
@@ -296,7 +270,6 @@ class Ploter:
         self,
         pred_cube  : np.ndarray,
         gt_cube    : np.ndarray,
-        raw_cube   : np.ndarray,
         elev_idx   : int,
         x_axis     : np.ndarray,
         out_path   : Path,
@@ -305,48 +278,33 @@ class Ploter:
         ssim_value : Optional[float] = None,
     ) -> Path:
 
-        pred_slice    = pred_cube[elev_idx]
-        gt_slice      = gt_cube  [elev_idx]
-        raw_slice     = raw_cube [elev_idx]
-        err_gt_slice  = np.abs(pred_slice - gt_slice)
-        err_raw_slice = np.abs(pred_slice - raw_slice)
+        pred_slice   = pred_cube[elev_idx]
+        gt_slice     = gt_cube  [elev_idx]
+        err_gt_slice = np.abs(pred_slice - gt_slice)
 
-        pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice = self._maybe_normalize(pred_slice, gt_slice, raw_slice, err_gt_slice, err_raw_slice)
+        pred_slice, gt_slice, err_gt_slice = self._maybe_normalize(pred_slice, gt_slice, err_gt_slice)
 
         H, W       = pred_slice.shape
         extent     = [rg_offset, rg_offset + W, az_offset + H, az_offset]
-        vmin, vmax = self._shared_clim(raw_slice, gt_slice, pred_slice)
-        emax_gt    = float(np.percentile(err_gt_slice,  99.0))
-        emax_raw   = float(np.percentile(err_raw_slice, 99.0))
+        vmin, vmax = self._shared_clim(gt_slice, pred_slice)
+        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
 
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
 
-        top_panels = [
-            (raw_slice,     "Raw Tomogram",  self.cmap,     vmin, vmax),
-            (gt_slice,      "GT (Gaussian)", self.cmap,     vmin, vmax),
-            (pred_slice,    "Prediction",    self.cmap,     vmin, vmax),
+        panels = [
+            (gt_slice,     "GT (Gaussian)", self.cmap,     vmin, vmax),
+            (pred_slice,   "Prediction",    self.cmap,     vmin, vmax),
+            (err_gt_slice, "|Pred - GT|",   self.err_cmap, 0.0,  emax_gt),
         ]
 
-        bot_panels = [
-            (err_gt_slice,  "|Pred - GT|",   self.err_cmap, 0.0,  emax_gt),
-            (err_raw_slice, "|Pred - Raw|",  self.err_cmap, 0.0,  emax_raw),
-        ]
-
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[0], top_panels):
+        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
             im = ax_i.imshow(data, cmap=cm_used, vmin=vlo, vmax=vhi, extent=extent, aspect="auto")
             ax_i.set_title(label)
             ax_i.set_xlabel("range index")
             ax_i.set_ylabel("azimuth index")
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(self._int_label)
+            lbl_cb = self._int_label if cm_used == self.cmap else "|error|"
+            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
 
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes[1], bot_panels):
-            im = ax_i.imshow(data, cmap=cm_used, vmin=vlo, vmax=vhi, extent=extent, aspect="auto")
-            ax_i.set_title(label)
-            ax_i.set_xlabel("range index")
-            ax_i.set_ylabel("azimuth index")
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label("|error|")
-
-        axes[1, 2].set_visible(False)
         ssim_str = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
         fig.suptitle(f"Elevation slice (elev = {x_axis[elev_idx]:.2f} m, idx={elev_idx}){ssim_str}", fontsize=13)
         fig.tight_layout(rect=(0, 0, 1, 0.95))
@@ -390,18 +348,14 @@ class Ploter:
         ax_offset      : int = 0,
     ) -> Path:
 
-        vals_gt  = np.array([global_metrics.get(f"ssim_gt_{axis}_{i}",  float("nan")) for i in range(n_slices)], dtype=np.float64)
-        vals_raw = np.array([global_metrics.get(f"ssim_raw_{axis}_{i}", float("nan")) for i in range(n_slices)], dtype=np.float64)
-        x_phys   = slice_indices.astype(np.float64) + ax_offset
+        vals_gt = np.array([global_metrics.get(f"ssim_gt_{axis}_{i}", float("nan")) for i in range(n_slices)], dtype=np.float64)
+        x_phys  = slice_indices.astype(np.float64) + ax_offset
 
-        mean_gt  = float(np.nanmean(vals_gt))
-        mean_raw = float(np.nanmean(vals_raw))
+        mean_gt = float(np.nanmean(vals_gt))
 
         fig, ax = plt.subplots(figsize=(12, 4.2))
-        ax.plot(x_phys, vals_gt,  color="C0", linewidth=0.9, label="pred x GT (Gaussian)", alpha=0.9)
-        ax.plot(x_phys, vals_raw, color="C3", linewidth=0.9, label="pred x Raw",           alpha=0.9)
-        ax.axhline(mean_gt,  color="C0", linestyle="--", linewidth=1.0, label=f"mean GT  = {mean_gt:.4f}")
-        ax.axhline(mean_raw, color="C3", linestyle="--", linewidth=1.0, label=f"mean Raw = {mean_raw:.4f}")
+        ax.plot(x_phys, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
+        ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4f}")
 
         tick_locs = np.linspace(x_phys[0], x_phys[-1], min(40, n_slices)).round().astype(int)
         ax.set_xticks(tick_locs)
@@ -434,16 +388,11 @@ class Ploter:
         fig, axes = plt.subplots(2, 2, figsize=(13, 7))
 
         for ax, (key, ylabel, desc) in zip(axes.ravel(), metric_specs):
-            vals_gt  = np.array([global_metrics.get(f"{key}_gt_{i}",  float("nan")) for i in range(n_elev)], dtype=np.float64)
-            vals_raw = np.array([global_metrics.get(f"{key}_raw_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
+            vals_gt = np.array([global_metrics.get(f"{key}_gt_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
+            mean_gt = float(np.nanmean(vals_gt))
 
-            mean_gt  = float(np.nanmean(vals_gt))
-            mean_raw = float(np.nanmean(vals_raw))
-
-            ax.plot(x_axis, vals_gt,  color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
-            ax.plot(x_axis, vals_raw, color="C3", linewidth=0.9, label="pred × Raw",           alpha=0.9)
-            ax.axhline(mean_gt,  color="C0", linestyle="--", linewidth=1.0, label=f"mean GT  = {mean_gt:.4g}")
-            ax.axhline(mean_raw, color="C3", linestyle="--", linewidth=1.0, label=f"mean Raw = {mean_raw:.4g}")
+            ax.plot(x_axis, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
+            ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4g}")
 
             ax.set_xlabel("elevation [m]")
             ax.set_ylabel(ylabel)
@@ -515,24 +464,31 @@ class Ploter:
                 ax   = axes[k, j]
                 pred = params_pred[ch].reshape(-1)
                 pred = pred[np.isfinite(pred)]
-                lo   = float(np.percentile(pred, 0.5))
-                hi   = float(np.percentile(pred, 99.5))
+                
+                has_pred = pred.size > 0
+                lo = float(np.percentile(pred, 0.5)) if has_pred else 0.0
+                hi = float(np.percentile(pred, 99.5)) if has_pred else 1.0
 
+                has_gt = False
                 if params_gt is not None and ch < params_gt.shape[0]:
                     gt  = params_gt[ch].reshape(-1)
                     gt  = gt[np.isfinite(gt)]
-                    lo  = min(lo, float(np.percentile(gt,   0.5)))
-                    hi  = max(hi, float(np.percentile(gt,  99.5)))
-                    ax.hist(gt,   bins=bins, range=(lo, hi), density=True, color="C0", alpha=0.55, label="GT",   edgecolor="none")
-                    ax.axvline(float(np.median(gt)),   color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
+                    has_gt = gt.size > 0
+                    if has_gt:
+                        lo = min(lo, float(np.percentile(gt, 0.5))) if has_pred else float(np.percentile(gt, 0.5))
+                        hi = max(hi, float(np.percentile(gt, 99.5))) if has_pred else float(np.percentile(gt, 99.5))
+                        ax.hist(gt, bins=bins, range=(lo, hi), density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
+                        ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
 
-                ax.hist(pred, bins=bins, range=(lo, hi), density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
-                ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med Pred={np.median(pred):.3g}")
+                if has_pred:
+                    ax.hist(pred, bins=bins, range=(lo, hi), density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
+                    ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med Pred={np.median(pred):.3g}")
 
                 ax.set_title(f"g{k+1} — {lbl}")
                 ax.set_xlabel(short)
                 ax.set_ylabel("density")
-                ax.legend(fontsize=7, framealpha=0.9)
+                if has_pred or has_gt:
+                    ax.legend(fontsize=7, framealpha=0.9)
                 ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
 
         fig.suptitle("Gaussian parameter distributions (GT vs Pred)", fontsize=13)
@@ -566,6 +522,11 @@ class Ploter:
                 pred = params_pred[ch].reshape(-1)
                 mask = np.isfinite(gt) & np.isfinite(pred)
                 gt, pred = gt[mask], pred[mask]
+
+                if gt.size == 0:
+                    ax.set_title(f"g{k+1} — {lbl}  (No Data)")
+                    ax.set_axis_off()
+                    continue
 
                 if gt.size > max_points:
                     idx  = rng.choice(gt.size, max_points, replace=False)
@@ -614,7 +575,14 @@ class Ploter:
                     continue
 
                 err  = np.abs(params_pred[ch] - params_gt[ch])
-                vmax = float(np.percentile(err[np.isfinite(err)], 99.0))
+                valid_err = err[np.isfinite(err)]
+                
+                if valid_err.size == 0:
+                    ax.set_title(f"|Δ{short}| — g{k+1}  (No Data)")
+                    ax.set_axis_off()
+                    continue
+                    
+                vmax = float(np.percentile(valid_err, 99.0))
                 im   = ax.imshow(err, cmap=self.err_cmap, vmin=0.0, vmax=vmax, extent=extent, aspect="auto", interpolation="nearest")
                 ax.set_title(f"|Δ{short}| — g{k+1}  (p99={vmax:.3g})")
                 ax.set_xlabel("range index")

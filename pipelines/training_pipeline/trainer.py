@@ -105,11 +105,23 @@ class Trainer:
             self.tracker.log_scalar(f"lr/{name}", lr, self.global_step)
 
     def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None) -> torch.Tensor:
+        if torch.isnan(images).any() or torch.isinf(images).any():
+            self.logger.warning(f"NaN or Inf detected in input images at step {self.global_step}!")
+        
+        if gt_params is not None and (torch.isnan(gt_params).any() or torch.isinf(gt_params).any()):
+            self.logger.warning(f"NaN or Inf detected in ground truth parameters at step {self.global_step}!")
+
         with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
             pred_params = self.model(images)
+            if torch.isnan(pred_params).any() or torch.isinf(pred_params).any():
+                self.logger.warning(f"NaN or Inf detected in model predictions at step {self.global_step}!")
+                
             loss_dict   = self.criterion(pred_params, gt_params)
             loss        = loss_dict["total_loss"]
             loss        = loss / self.accumulation_steps
+            
+        if torch.isnan(loss) or torch.isinf(loss):
+            self.logger.warning(f"Total loss evaluated to NaN or Inf at step {self.global_step}!")
 
         return loss
 
@@ -118,9 +130,10 @@ class Trainer:
 
         if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
             self.scaler.unscale_(self.optimizer)
+            
             grad_norm = self.grad_clipper.maybe_clip(self.model, self.global_step)
             self.grad_clipper.record(grad_norm, self.global_step)
-
+            
             self.scaler.step(self.optimizer)
             self.scaler.update()
             self.optimizer.zero_grad(set_to_none=True)

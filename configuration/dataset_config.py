@@ -92,14 +92,24 @@ class InputConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "InputConfig":
-        return cls(
-            use_primary                   = bool(payload["primary"]["use"]),
-            primary_representation        = Representation(payload["primary"]["representation"]),
-            use_secondaries               = bool(payload["secondaries"]["use"]),
-            secondaries_representation    = Representation(payload["secondaries"]["representation"]),
-            use_interferograms            = bool(payload["interferograms"]["use"]),
-            interferograms_representation = Representation(payload["interferograms"]["representation"]),
-        )
+        if "primary" in payload:
+            return cls(
+                use_primary                   = bool(payload["primary"]["use"]),
+                primary_representation        = Representation(payload["primary"]["representation"]),
+                use_secondaries               = bool(payload["secondaries"]["use"]),
+                secondaries_representation    = Representation(payload["secondaries"]["representation"]),
+                use_interferograms            = bool(payload["interferograms"]["use"]),
+                interferograms_representation = Representation(payload["interferograms"]["representation"]),
+            )
+        else:
+            return cls(
+                use_primary                   = bool(payload.get("use_primary", True)),
+                primary_representation        = Representation(payload.get("primary_representation", Representation.MAG_ONLY.value)),
+                use_secondaries               = bool(payload.get("use_secondaries", False)),
+                secondaries_representation    = Representation(payload.get("secondaries_representation", Representation.MAG_ONLY.value)),
+                use_interferograms            = bool(payload.get("use_interferograms", True)),
+                interferograms_representation = Representation(payload.get("interferograms_representation", Representation.ANGLE_ONLY.value)),
+            )
 
       
 @dataclass
@@ -147,11 +157,18 @@ class OutputConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "OutputConfig":
-        return cls(
-            use_amplitude = bool(payload["amplitude"]["use"]),
-            use_mu        = bool(payload["mu"]["use"]),
-            use_sigma     = bool(payload["sigma"]["use"]),
-        )
+        if "amplitude" in payload:
+            return cls(
+                use_amplitude = bool(payload["amplitude"]["use"]),
+                use_mu        = bool(payload["mu"]["use"]),
+                use_sigma     = bool(payload["sigma"]["use"]),
+            )
+        else:
+            return cls(
+                use_amplitude = bool(payload.get("use_amplitude", True)),
+                use_mu        = bool(payload.get("use_mu", True)),
+                use_sigma     = bool(payload.get("use_sigma", True)),
+            )
 
    
 @dataclass
@@ -162,6 +179,17 @@ class PatchConfiguration:
 
 
 @dataclass
+class AugmentationConfig:
+    p_flip_h        : float               = 0.5
+    p_flip_v        : float               = 0.5
+    p_rot90         : float               = 0.0
+    amp_scale_range : Tuple[float, float] = (0.8, 1.2)
+    p_amp_scale     : float               = 0.5
+    noise_std       : float               = 0.05
+    p_noise         : float               = 0.5
+
+
+@dataclass
 class DatasetConfiguration:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
@@ -169,6 +197,7 @@ class DatasetConfiguration:
     patch                       : PatchConfiguration      = field(default_factory=PatchConfiguration)
     input_config                : InputConfig             = field(default_factory=InputConfig)
     output_config               : OutputConfig            = field(default_factory=OutputConfig)
+    augmentation                : AugmentationConfig      = field(default_factory=AugmentationConfig)
     batch_size                  : int                     = 8
     num_workers                 : int                     = 16
     shuffle_train               : bool                    = True

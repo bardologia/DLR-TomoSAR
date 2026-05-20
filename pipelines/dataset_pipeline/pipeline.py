@@ -14,6 +14,9 @@ from pipelines.dataset_pipeline.patch       import Patcher
 from tools.logger                           import Logger
 
 
+from pipelines.dataset_pipeline.augmentation  import SpatialAugmenter
+
+
 class DatasetPipeline:
     def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
         self.config                 = config
@@ -23,6 +26,8 @@ class DatasetPipeline:
         self.layout          = Layout(config.preprocessing_run_directory, logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions, logger=self.logger)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
+        
+        self.augmenter       = SpatialAugmenter(config.augmentation)
 
         ic = config.input_config
         oc = config.output_config
@@ -38,6 +43,7 @@ class DatasetPipeline:
                 "Output Parameters"   : ",".join(oc.role_names),
                 "Patch Size"          : config.patch.size,
                 "Patch Stride"        : config.patch.stride,
+                "Augmentations"       : f"flip_h={config.augmentation.p_flip_h} flip_v={config.augmentation.p_flip_v} rot90={config.augmentation.p_rot90}, amp_scale={config.augmentation.amp_scale_range} noise_std={config.augmentation.noise_std}",
             },
             title="Dataset Creation",
         )
@@ -64,6 +70,7 @@ class DatasetPipeline:
             norm_stats       = norm_stats,
             x_axis           = self.config.x_axis,
             n_gaussians      = self.config.n_gaussians,
+            augmenter        = self.augmenter,
         )
         
         return dataset, patcher

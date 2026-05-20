@@ -49,9 +49,12 @@ class Loss:
         result      = torch.zeros((params.shape[0], self.x_axis.shape[0], params.shape[2], params.shape[3]), dtype=params.dtype, device=params.device)
 
         for i in range(n_gaussians):
-            a      = params[:, 3 * i    : 3 * i + 1, :, :]
-            mu     = params[:, 3 * i + 1: 3 * i + 2, :, :]
-            sig    = params[:, 3 * i + 2: 3 * i + 3, :, :]
+            a      = params[:, ppg * i    : ppg * i + 1, :, :]
+            mu     = params[:, ppg * i + 1: ppg * i + 2, :, :]
+            sig    = params[:, ppg * i + 2: ppg * i + 3, :, :]
+            
+            a = F.relu(a)
+            
             result = result + a * torch.exp(-((x - mu) ** 2) / (2.0 * sig ** 2 + 1e-8))
 
         return result
@@ -129,11 +132,11 @@ class Loss:
     @staticmethod
     def _cosine_similarity(a: torch.Tensor, b: torch.Tensor, axis: int) -> torch.Tensor:
         num = (a * b).sum(dim=axis)
-        den = torch.sqrt((a * a).sum(dim=axis)) * torch.sqrt((b * b).sum(dim=axis))
+        den = torch.sqrt((a * a).sum(dim=axis) + 1e-8) * torch.sqrt((b * b).sum(dim=axis) + 1e-8)
         
-        return num / torch.clamp(den, min=1e-12)
+        return num / torch.clamp(den, min=1e-8)
 
-    def _match_params(self, pred_gauss, gt_gauss):
+    def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss):
         ppg           = self.gaussian_cfg.params_per_gaussian
         batch_size, num_channels, height, width = pred_gauss.shape
         num_gaussians = num_channels // ppg
@@ -142,27 +145,23 @@ class Loss:
         gt_channels  = gt_gauss.shape[1]
         gt_gaussians = gt_channels // ppg
         gt           = gt_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
-
-        effective_gaussians = min(num_gaussians, gt_gaussians)
-        pred                = pred[:, :effective_gaussians]
-        gt                  = gt[:, :effective_gaussians]
+        gt_phys      = gt_phys_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
 
         strategy = self.loss_cfg.param_match
-        if strategy == "index" or effective_gaussians <= 1:
-            return pred, gt
 
         if strategy == "sorted_mu":
-            pred_mu    = pred[:, :, 1]
-            gt_mu      = gt[:,   :, 1]
-            pred_index = torch.argsort(pred_mu, dim=1)
-            gt_index   = torch.argsort(gt_mu,   dim=1)
-            pred_idx_b = pred_index[:, :, None, :, :].expand_as(pred)
-            gt_idx_b   = gt_index[:,   :, None, :, :].expand_as(gt)
-            pred       = torch.gather(pred, dim=1, index=pred_idx_b)
-            gt         = torch.gather(gt,   dim=1, index=gt_idx_b)
-            return pred, gt
+            gt_phys_amp  = gt_phys[:, :, 0]
+            is_active    = gt_phys_amp > 1e-7
+            gt_mu_masked = torch.where(is_active, gt[:, :, 1], torch.full_like(gt[:, :, 1], float('inf')))
+            pred_index   = torch.argsort(pred[:, :, 1], dim=1)
+            gt_index     = torch.argsort(gt_mu_masked, dim=1)
+            pred_idx_b   = pred_index[:, :, None, :, :].expand_as(pred)
+            gt_idx_b     = gt_index[:, :, None, :, :].expand_as(gt)
+            pred         = torch.gather(pred, dim=1, index=pred_idx_b)
+            gt           = torch.gather(gt, dim=1, index=gt_idx_b)
+            gt_phys      = torch.gather(gt_phys, dim=1, index=gt_idx_b)
 
-        if strategy == "sorted_a":
+        elif strategy == "sorted_a":
             pred_a     = pred[:, :, 0]
             gt_a       = gt[:,   :, 0]
             pred_index = torch.argsort(pred_a, dim=1, descending=True)
@@ -171,26 +170,31 @@ class Loss:
             gt_idx_b   = gt_index[:,   :, None, :, :].expand_as(gt)
             pred       = torch.gather(pred, dim=1, index=pred_idx_b)
             gt         = torch.gather(gt,   dim=1, index=gt_idx_b)
-            return pred, gt
+            gt_phys    = torch.gather(gt_phys, dim=1, index=gt_idx_b)
 
-        if strategy == "sort_gt_by_mu":
-            gt_amp    = gt[:, :, 0]
-            gt_mu     = gt[:, :, 1]
-            is_active = gt_amp > 1e-7
-            sort_key  = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float('inf')))
-            gt_index  = torch.argsort(sort_key, dim=1)
-            gt_idx_b  = gt_index[:, :, None, :, :].expand_as(gt)
-            gt        = torch.gather(gt, dim=1, index=gt_idx_b)
-            return pred, gt
+        elif strategy == "sort_gt_by_mu":
+            gt_phys_amp = gt_phys[:, :, 0]
+            gt_mu       = gt[:, :, 1]
+            is_active   = gt_phys_amp > 1e-7
+            sort_key    = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float('inf')))
+            gt_index    = torch.argsort(sort_key, dim=1)
+            gt_idx_b    = gt_index[:, :, None, :, :].expand_as(gt)
+            gt          = torch.gather(gt, dim=1, index=gt_idx_b)
+            gt_phys     = torch.gather(gt_phys, dim=1, index=gt_idx_b)
 
-        return pred, gt
+        effective_gaussians = min(num_gaussians, gt_gaussians)
+        pred                = pred[:, :effective_gaussians]
+        gt                  = gt[:, :effective_gaussians]
+        gt_phys             = gt_phys[:, :effective_gaussians]
 
-    def _param_term(self, pred_gauss, gt_gauss, kind):
-        pred, gt = self._match_params(pred_gauss, gt_gauss)
+        return pred, gt, gt_phys
+
+    def _param_term(self, pred_gauss, gt_gauss, gt_phys_gauss, kind):
+        pred, gt, gt_phys = self._match_params(pred_gauss, gt_gauss, gt_phys_gauss)
         diff     = pred - gt
 
-        gt_amp = gt[:, :, 0:1, :, :]
-        is_active = (gt_amp > 1e-7).to(diff.dtype)
+        gt_phys_amp = gt_phys[:, :, 0:1, :, :]
+        is_active = (gt_phys_amp > 1e-7).to(diff.dtype)
         
         mask_list = [torch.ones_like(is_active)] + [is_active] * (pred.shape[2] - 1)
         active_mask = torch.cat(mask_list, dim=2)
@@ -204,7 +208,8 @@ class Loss:
         weights = weights[: pred.shape[2]].reshape(1, 1, -1, 1, 1)
 
         if kind == "l1":
-            return (weights * torch.abs(diff)).mean()
+            weighted_diff = weights * torch.abs(diff)
+            return weighted_diff.sum() / torch.clamp(active_mask.sum(), min=1.0)
         
         if kind == "huber":
             delta    = self.loss_cfg.param_huber_delta
@@ -212,7 +217,8 @@ class Loss:
             quad     = 0.5 * diff * diff
             linear   = delta * (abs_diff - 0.5 * delta)
             val      = torch.where(abs_diff <= delta, quad, linear)
-            return (weights * val).mean()
+            weighted_val = weights * val
+            return weighted_val.sum() / torch.clamp(active_mask.sum(), min=1.0)
 
         raise ValueError(f"Unknown param term kind: {kind}")
 
@@ -222,17 +228,16 @@ class Loss:
         C   = pred_params.shape[1]
 
         with torch.no_grad():
-            gt_phys    = self.norm_stats.denormalize_output(gt_params) 
+            if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
+                gt_phys = self.norm_stats.denormalize_output(gt_params)
+            else:
+                gt_phys = gt_params
             exp_curves = self.reconstruct(gt_phys)
 
         if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
             pred_params_phys = self.norm_stats.denormalize_output(pred_params)
         else:
             pred_params_phys = pred_params
-
-        amplitude_mask   = torch.zeros(C, dtype=torch.bool, device=pred_params.device)
-        amplitude_mask[torch.arange(0, C, ppg, device=pred_params.device)] = True
-        pred_params_phys = torch.where(amplitude_mask[None, :, None, None], F.relu(pred_params_phys), pred_params_phys)
 
         pred_curves  = self.reconstruct(pred_params_phys)
         diff         = pred_curves - exp_curves
@@ -288,13 +293,13 @@ class Loss:
             total_loss               = total_loss + weighted["ssim_curve"]
 
         if cfg.use_param_l1:
-            val                    = self._param_term(pred_params, gt_params, "l1")
+            val                    = self._param_term(pred_params, gt_params, gt_phys, "l1")
             components["param_l1"] = val
             weighted["param_l1"]   = cfg.weight_param_l1 * val
             total_loss             = total_loss + weighted["param_l1"]
 
         if cfg.use_param_huber:
-            val                       = self._param_term(pred_params, gt_params, "huber")
+            val                       = self._param_term(pred_params, gt_params, gt_phys, "huber")
             components["param_huber"] = val
             weighted["param_huber"]   = cfg.weight_param_huber * val
             total_loss                = total_loss + weighted["param_huber"]

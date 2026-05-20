@@ -121,7 +121,7 @@ class Decoder(nn.Module):
             )
             self.conv_blocks.append(
                 ConvBlock(
-                    input_channels  = feature_sizes[index],
+                    input_channels  = feature_sizes[index + 1] * 2,
                     output_channels = feature_sizes[index + 1],
                     dropout         = dropout,
                     activation      = activation,

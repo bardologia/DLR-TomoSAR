@@ -39,7 +39,7 @@ class ModelWrapper:
     def apply_constrains(self, out: torch.Tensor) -> torch.Tensor:
         ppg = self._params_per_gaussian
         for i in range(0, out.shape[1], ppg):
-            out[:, i]     = F.softplus(out[:, i])
+            out[:, i]     = F.relu(out[:, i])
             if i + 2 < out.shape[1]:
                 out[:, i + 2] = torch.abs(out[:, i + 2])
        

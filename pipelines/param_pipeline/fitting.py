@@ -71,28 +71,24 @@ class ParameterExtractor:
         self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
 
     @staticmethod
-    def _sort_gaussians_by_mu(parameters_array: np.ndarray, n_gaussians: int) -> np.ndarray:
+    def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int) -> np.ndarray:
         n_params, Az, R = parameters_array.shape
-        out             = parameters_array.copy()
-        mu_rows         = np.array([1 + 3 * g for g in range(n_gaussians)])
+        reshaped = parameters_array.reshape(n_gaussians, 3, Az, R)
         
-        for ai in range(Az):
-            for ri in range(R):
-                mus   = parameters_array[mu_rows, ai, ri]
-                order = np.argsort(mus)
-                
-                for new_pos, old_pos in enumerate(order):
-                    out[new_pos * 3 + 0, ai, ri] = parameters_array[old_pos * 3 + 0, ai, ri]
-                    out[new_pos * 3 + 1, ai, ri] = parameters_array[old_pos * 3 + 1, ai, ri]
-                    out[new_pos * 3 + 2, ai, ri] = parameters_array[old_pos * 3 + 2, ai, ri]
+        amps = reshaped[:, 0, :, :]
+        mus  = reshaped[:, 1, :, :]
+    
+        sort_keys    = np.where(amps > 1e-7, mus, np.inf)
+        order        = np.argsort(sort_keys, axis=0)
+        out_reshaped = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
         
-        return out
+        return out_reshaped.reshape(n_params, Az, R)
 
     def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> np.ndarray:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
 
         parameters_array = self._gpu_extractor.run(tomogram_path, height_range)
-        parameters_array = self._sort_gaussians_by_mu(parameters_array, self.parameter_extraction.fit_config.k_max)
+        parameters_array = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max)
         
         self.logger.subsection("[Extraction Complete]")
         return parameters_array

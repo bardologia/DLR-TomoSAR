@@ -174,22 +174,22 @@ class Report:
             ("MSE",     gm.get("curve_mse_gt"),   gm.get("curve_mse_raw"),   "Mean squared error over all (elev, az, rg)"),
             ("MAE",     gm.get("curve_mae_gt"),   gm.get("curve_mae_raw"),   "Mean absolute error"),
             ("RMSE",    gm.get("curve_rmse_gt"),  gm.get("curve_rmse_raw"),  "Root mean squared error"),
-            ("R\u00b2",      gm.get("overall_r2_gt"),  gm.get("overall_r2_raw"),  "Global coefficient of determination"),
+            ("R\u00b2", gm.get("overall_r2_gt"),  gm.get("overall_r2_raw"),  "Global coefficient of determination"),
             ("PSNR dB", gm.get("psnr_db_gt"),     gm.get("psnr_db_raw"),     "Peak signal-to-noise ratio"),
         ]))
         out.append("")
 
         out.append("**Per-pixel** (computed per (az, rg) pixel over the elevation axis)\n")
         out.append(self._four_col_table([
-            ("MSE mean",        gm.get("pixel_mse_gt_mean"),      gm.get("pixel_mse_raw_mean"),      "Mean of per-pixel MSE"),
-            ("MSE median",      gm.get("pixel_mse_gt_median"),    gm.get("pixel_mse_raw_median"),    "Median of per-pixel MSE"),
-            ("MSE p95",         gm.get("pixel_mse_gt_p95"),       gm.get("pixel_mse_raw_p95"),       "95th percentile"),
-            ("MAE mean",        gm.get("pixel_mae_gt_mean"),      gm.get("pixel_mae_raw_mean"),      "Mean of per-pixel MAE"),
-            ("R\u00b2 mean",         gm.get("pixel_r2_gt_mean"),       gm.get("pixel_r2_raw_mean"),       "Mean of per-pixel R\u00b2"),
-            ("R\u00b2 median",       gm.get("pixel_r2_gt_median"),     gm.get("pixel_r2_raw_median"),     "Median of per-pixel R\u00b2"),
-            ("R\u00b2 p5",           gm.get("pixel_r2_gt_p5"),         gm.get("pixel_r2_raw_p5"),         "5th percentile (worst tail)"),
-            ("Cosine mean",     gm.get("pixel_cosine_gt_mean"),   gm.get("pixel_cosine_raw_mean"),   "Mean cosine similarity"),
-            ("Cosine median",   gm.get("pixel_cosine_gt_median"), gm.get("pixel_cosine_raw_median"), "Median cosine similarity"),
+            ("MSE mean",        gm.get("pixel_mse_gt_mean"),              gm.get("pixel_mse_raw_mean"),              "Mean of per-pixel MSE"),
+            ("MSE median",      gm.get("pixel_mse_gt_median"),            gm.get("pixel_mse_raw_median"),            "Median of per-pixel MSE"),
+            ("MSE p95",         gm.get("pixel_mse_gt_p95"),               gm.get("pixel_mse_raw_p95"),               "95th percentile"),
+            ("MAE mean",        gm.get("pixel_mae_gt_mean"),              gm.get("pixel_mae_raw_mean"),              "Mean of per-pixel MAE"),
+            ("R\u00b2 mean",    gm.get("pixel_r2_gt_mean"),               gm.get("pixel_r2_raw_mean"),               "Mean of per-pixel R\u00b2"),
+            ("R\u00b2 median",  gm.get("pixel_r2_gt_median"),             gm.get("pixel_r2_raw_median"),             "Median of per-pixel R\u00b2"),
+            ("R\u00b2 p5",      gm.get("pixel_r2_gt_p5"),                 gm.get("pixel_r2_raw_p5"),                 "5th percentile (worst tail)"),
+            ("Cosine mean",     gm.get("pixel_cosine_gt_mean"),           gm.get("pixel_cosine_raw_mean"),           "Mean cosine similarity"),
+            ("Cosine median",   gm.get("pixel_cosine_gt_median"),         gm.get("pixel_cosine_raw_median"),         "Median cosine similarity"),
             ("Peak err mean",   gm.get("pixel_peak_err_units_mean_gt"),   gm.get("pixel_peak_err_units_mean_raw"),   "|\u0394 peak| in elevation units"),
             ("Peak err median", gm.get("pixel_peak_err_units_median_gt"), gm.get("pixel_peak_err_units_median_raw"), "Median"),
             ("Peak err p95",    gm.get("pixel_peak_err_units_p95_gt"),    gm.get("pixel_peak_err_units_p95_raw"),    "95th percentile"),
@@ -208,7 +208,7 @@ class Report:
         out.append(self._four_col_table([
             ("MAE mean",           gm.get("elev_mae_gt_mean"),   gm.get("elev_mae_raw_mean"),   "Mean absolute error averaged over elevation"),
             ("RMSE mean",          gm.get("elev_rmse_gt_mean"),  gm.get("elev_rmse_raw_mean"),  "Root mean squared error averaged over elevation"),
-            ("R\u00b2 mean",            gm.get("elev_r2_gt_mean"),    gm.get("elev_r2_raw_mean"),    "Coefficient of determination averaged over elevation"),
+            ("R\u00b2 mean",       gm.get("elev_r2_gt_mean"),    gm.get("elev_r2_raw_mean"),    "Coefficient of determination averaged over elevation"),
             ("Cross-entropy mean", gm.get("elev_ce_gt_mean"),    gm.get("elev_ce_raw_mean"),    "Cross-entropy (normalised profiles) averaged over elevation"),
         ]))
         out.append("")

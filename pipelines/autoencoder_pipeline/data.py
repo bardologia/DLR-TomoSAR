@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from pipelines.dataset_creation_pipeline.load import TomoPatchDataset
+from pipelines.dataset_pipeline.load      import TomoPatchDataset
 from tools.logger                             import Logger
 
 from .config        import AugmentationConfig, ContrastiveView, DataConfig
@@ -14,7 +14,6 @@ from .normalization import ProfileNormalizer
 
 
 class Augmenter:
-
     def __init__(self, config: AugmentationConfig) -> None:
         self.config = config
         self._rng   = np.random.default_rng(config.seed)
@@ -46,7 +45,6 @@ class Augmenter:
 
 
 class ProfileDataset(Dataset):
-
     def __init__(
         self,
         tomo_dataset : TomoPatchDataset,
@@ -112,17 +110,20 @@ class ProfileDataset(Dataset):
         return divmod(pixel_idx, self.patch_w)
 
     def _neighbor_coords(self, row: int, col: int) -> Tuple[int, int]:
+       
         deltas = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
         np.random.shuffle(deltas)
         for dr, dc in deltas:
             r, c = row + dr, col + dc
             if 0 <= r < self.patch_h and 0 <= c < self.patch_w:
                 return r, c
+        
         return row, col
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float]:
         if self._indices is not None:
             idx = int(self._indices[idx])
+        
         patch_idx, pixel_idx = divmod(idx, self.pixels_per_patch)
         target_patch         = self._load_patch(patch_idx)
         row, col             = self._pixel_coords(pixel_idx)
@@ -132,13 +133,16 @@ class ProfileDataset(Dataset):
 
         if view == ContrastiveView.augmentation:
             profile_b = self.augmenter(profile_a)
+        
         elif view == ContrastiveView.neighbor:
             r2, c2       = self._neighbor_coords(row, col)
             profile_b, _ = self.normalizer.apply(target_patch[:, r2, c2])
+        
         elif view == ContrastiveView.both:
             r2, c2       = self._neighbor_coords(row, col)
             profile_b, _ = self.normalizer.apply(target_patch[:, r2, c2])
             profile_b    = self.augmenter(profile_b)
+        
         else:
             raise ValueError(f"Unknown contrastive view: {view}")
 
@@ -146,7 +150,6 @@ class ProfileDataset(Dataset):
 
 
 class LoaderBuilder:
-
     def __init__(
         self,
         batch_size         : int,
@@ -171,6 +174,7 @@ class LoaderBuilder:
         val_dataset   : ProfileDataset,
         test_dataset  : ProfileDataset,
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
+       
         common = {
             "batch_size"         : self.batch_size,
             "num_workers"        : self.num_workers,
@@ -179,6 +183,7 @@ class LoaderBuilder:
             "persistent_workers" : self.persistent_workers,
             "prefetch_factor"    : self.prefetch_factor,
         }
+       
         train_loader = DataLoader(train_dataset, shuffle=self.shuffle_train, drop_last=True,  **common)
         val_loader   = DataLoader(val_dataset,   shuffle=False,              drop_last=False, **common)
         test_loader  = DataLoader(test_dataset,  shuffle=False,              drop_last=False, **common)
@@ -187,4 +192,5 @@ class LoaderBuilder:
         self.logger.subsection(f"Train batches : {len(train_loader)}")
         self.logger.subsection(f"Val   batches : {len(val_loader)}")
         self.logger.subsection(f"Test  batches : {len(test_loader)}")
+        
         return train_loader, val_loader, test_loader

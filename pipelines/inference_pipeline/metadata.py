@@ -4,13 +4,13 @@ from datetime import datetime
 from pathlib  import Path
 from typing   import Dict
 
-from configuration.inference_config import InferenceConfig, InferencePaths
+from configuration.inference_config import InferenceConfig
 
 
 class InferenceMetadata:
     def __init__(self, config: InferenceConfig) -> None:
         self.config     = config
-        self._p         = config.paths          # shorthand
+        self._p         = config.paths        
         self.output_dir = self._resolve_output_dir()
 
     def _resolve_output_dir(self) -> Path:
@@ -94,7 +94,6 @@ class InferenceMetadata:
 
         return paths
 
- 
     def create_dirs(self) -> None:
         for d in (
             self.output_dir,
@@ -105,13 +104,3 @@ class InferenceMetadata:
         ):
             d.mkdir(parents=True, exist_ok=True)
 
-    def __repr__(self) -> str:
-        return (
-            f"InferenceMetadata(\n"
-            f"  output_dir    = {self.output_dir}\n"
-            f"  figures_dir   = {self.figures_dir}\n"
-            f"  animations_dir= {self.animations_dir}\n"
-            f"  logs_dir      = {self.logs_dir}\n"
-            f"  metrics_path  = {self.metrics_path}\n"
-            f")"
-        )

@@ -11,6 +11,9 @@ from pipelines.dataset_pipeline.patch        import Patcher
 from tools.logger                            import Logger
 
 
+from pipelines.dataset_pipeline.augmentation  import SpatialAugmenter
+
+
 class PatchDataset(Dataset):
     def __init__(
         self,
@@ -23,6 +26,7 @@ class PatchDataset(Dataset):
         norm_stats    : Optional[Stats]      = None,
         x_axis        : Optional[np.ndarray] = None,
         n_gaussians   : int                  = 1,
+        augmenter     : Optional[SpatialAugmenter] = None,
     ) -> None:
 
         self.inputs         = inputs
@@ -34,6 +38,7 @@ class PatchDataset(Dataset):
         self.norm_stats     = Normalizer(norm_stats) if norm_stats is not None else None
         self.x_axis         = x_axis
         self.n_gaussians    = n_gaussians
+        self.augmenter      = augmenter
         self.input_layers   = int(inputs.shape[0])
         self.n_secondaries  = (self.input_layers - 1) // 2 
         self.n_slaves       = self.n_secondaries      
@@ -91,6 +96,9 @@ class PatchDataset(Dataset):
 
         gt_patch  = self.grid.extract(self.gt_parameters, idx)
         gt_params = self._build_output_tensor(gt_patch)
+
+        if self.augmenter is not None and self.split_name == "train":
+            input_tensor, gt_params = self.augmenter(input_tensor, gt_params)
 
         input_tensor = self._normalize_input_tensor(input_tensor)
         gt_params    = self._normalize_gt_params(gt_params)

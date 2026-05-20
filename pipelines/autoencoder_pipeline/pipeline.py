@@ -8,7 +8,7 @@ from pathlib     import Path
 from torch.utils.tensorboard import SummaryWriter
 
 from configuration.dataset_config import DatasetCreationConfiguration
-from pipelines.dataset_creation_pipeline.pipeline    import DatasetCreationPipeline
+from pipelines.dataset_pipeline.pipeline    import DatasetCreationPipeline
 from tools.logger                                    import Logger
 
 from .config    import AutoencoderConfig

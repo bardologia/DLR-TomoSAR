@@ -103,7 +103,7 @@ class ExtractionConfig:
         if layout_path.is_file():
             with open(layout_path, "r", encoding="utf-8") as f:
                 layout = json.load(f)
-            fname = layout.get("artifacts", {}).get("full_tomogram")
+            fname = layout.get("artifacts", {}).get("tomogram_full")
             if fname:
                 candidate = data_dir / fname
                 if candidate.is_file():

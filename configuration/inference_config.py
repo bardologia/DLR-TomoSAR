@@ -29,6 +29,7 @@ class InferenceConfig:
     num_workers        : int           = 4
 
     gif_workers        : int           = 40
+    cpu_workers        : int           = 80
 
     stitch_window      : str           = "hann"
     cube_dtype         : str           = "float32"

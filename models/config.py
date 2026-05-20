@@ -107,12 +107,22 @@ class UNetConfig:
     params_per_gaussian : int             = 3
     features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor   : int             = 2
-    dropout             : float           = 0.0
+    dropout             : float           = 0.15
     activation          : str             = "relu"
     normalization       : str             = "batch"
     upsample_mode       : str             = "convtranspose"
     conv_bias           : bool            = False
     init_mode           : str             = "default"
+
+    encoder_lr          : float           = 3e-4
+    bottleneck_lr       : float           = 3e-4
+    decoder_lr          : float           = 3e-4
+    output_head_lr      : float           = 1e-3
+
+    encoder_wd          : float           = 5e-3
+    bottleneck_wd       : float           = 5e-3
+    decoder_wd          : float           = 5e-3
+    output_head_wd      : float           = 5e-3
     
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -122,10 +132,10 @@ class UNetConfig:
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         return [g for g in [
-            {'params': list(model.encoder.parameters()),     'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.bottleneck.parameters()),  'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': list(model.decoder.parameters()),     'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()), 'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': list(model.encoder.parameters()),     'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),  'lr': self.bottleneck_lr,  'weight_decay': self.bottleneck_wd,  'name': 'bottleneck'},
+            {'params': list(model.decoder.parameters()),     'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()), 'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -134,9 +144,9 @@ class ResUNetConfig:
     in_channels         : int             = 1
     out_channels        : int             = 6
     params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
+    features            : list[int]       = field(default_factory=lambda: [32, 64, 128, 256])
     bottleneck_factor   : int             = 2
-    dropout             : float           = 0.0
+    dropout             : float           = 0.2
     activation          : str             = "relu"
     normalization       : str             = "batch"
     upsample_mode       : str             = "convtranspose"
@@ -153,10 +163,10 @@ class ResUNetConfig:
         encoder_params = list(model.encoder_blocks.parameters()) + list(model.downsample_layers.parameters())
         decoder_params = list(model.upsample_layers.parameters()) + list(model.decoder_blocks.parameters())
         return [g for g in [
-            {'params': encoder_params,                       'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.bottleneck.parameters()),  'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': decoder_params,                       'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()), 'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': encoder_params,                       'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),  'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'bottleneck'},
+            {'params': decoder_params,                       'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'decoder'},
+            {'params': list(model.output_head.parameters()), 'lr': 1e-3, 'weight_decay': 1e-2, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 

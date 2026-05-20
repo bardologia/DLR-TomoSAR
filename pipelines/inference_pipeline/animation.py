@@ -9,7 +9,6 @@ from typing             import Any
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy             as np
 from PIL                 import Image
 from tqdm                import tqdm
@@ -24,39 +23,28 @@ def _render_frame(args: tuple) -> tuple[int, bytes]:
     import numpy as np
     from io import BytesIO
 
-    frame_order, r, g, p, vmin, vmax, emax_gt, emax_raw, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
+    frame_order, g, p, vmin, vmax, emax_gt, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
 
     eg = np.abs(p - g)
-    er = np.abs(p - r)
 
-    fig, axes = plt.subplots(2, 3, figsize=(18, 8.0))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5.0))
 
     ims = [
-        axes[0, 0].imshow(r,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
-        axes[0, 1].imshow(g,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
-        axes[0, 2].imshow(p,  cmap=cmap,     vmin=vmin,     vmax=vmax,     extent=extent, aspect="auto", origin=_origin),
-        axes[1, 0].imshow(eg, cmap=err_cmap, vmin=0.0,      vmax=emax_gt,  extent=extent, aspect="auto", origin=_origin),
-        axes[1, 1].imshow(er, cmap=err_cmap, vmin=0.0,      vmax=emax_raw, extent=extent, aspect="auto", origin=_origin),
+        axes[0].imshow(g,  cmap=cmap,     vmin=vmin,    vmax=vmax,    extent=extent, aspect="auto", origin=_origin),
+        axes[1].imshow(p,  cmap=cmap,     vmin=vmin,    vmax=vmax,    extent=extent, aspect="auto", origin=_origin),
+        axes[2].imshow(eg, cmap=err_cmap, vmin=0.0,     vmax=emax_gt, extent=extent, aspect="auto", origin=_origin),
     ]
-    axes[1, 2].set_visible(False)
 
-    for ax, label in zip(axes[0], ("Raw Tomogram", "GT (Gaussian)", "Prediction")):
+    for ax, label in zip(axes, ("GT (Gaussian)", "Prediction", "|Pred - GT|")):
         ax.set_title(label)
         ax.set_xlabel(x_label)
-    
-    for ax, label in zip(axes[1, :2], ("|Pred - GT|", "|Pred - Raw|")):
-        ax.set_title(label)
-        ax.set_xlabel(x_label)
-    
-    axes[0, 0].set_ylabel(y_label)
-    axes[1, 0].set_ylabel(y_label)
+
+    axes[0].set_ylabel(y_label)
 
     int_label = "intensity"
-    fig.colorbar(ims[0], ax=axes[0, 0], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(ims[1], ax=axes[0, 1], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(ims[2], ax=axes[0, 2], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(ims[3], ax=axes[1, 0], fraction=0.045, pad=0.02).set_label("|error|")
-    fig.colorbar(ims[4], ax=axes[1, 1], fraction=0.045, pad=0.02).set_label("|error|")
+    fig.colorbar(ims[0], ax=axes[0], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(ims[1], ax=axes[1], fraction=0.045, pad=0.02).set_label(int_label)
+    fig.colorbar(ims[2], ax=axes[2], fraction=0.045, pad=0.02).set_label("|error|")
 
     fig.suptitle(title, fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
@@ -72,7 +60,6 @@ def _render_frame(args: tuple) -> tuple[int, bytes]:
 def make_walk_gif(
     pred_cube  : np.ndarray,
     gt_cube    : np.ndarray,
-    raw_cube   : np.ndarray,
     axis       : str,
     out_path   : Path,
     *,
@@ -98,7 +85,7 @@ def make_walk_gif(
     if axis == "elevation":
         n_total = N_elev
         def get_slice(i):
-            return pred_cube[i], gt_cube[i], raw_cube[i]
+            return pred_cube[i], gt_cube[i]
         
         extent           = [rg_offset, rg_offset + rg, az_offset + az, az_offset]
         x_label, y_label = "range index", "azimuth index"
@@ -107,11 +94,11 @@ def make_walk_gif(
     elif axis == "range":
         n_total = rg
         def get_slice(i):
-            p, g, r = pred_cube[:, :, i], gt_cube[:, :, i], raw_cube[:, :, i]
+            p, g = pred_cube[:, :, i], gt_cube[:, :, i]
             if _sort_idx is not None:
-                p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+                p, g = p[_sort_idx], g[_sort_idx]
         
-            return p, g, r
+            return p, g
         
         extent           = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "azimuth index", "elevation [m]"
@@ -120,11 +107,11 @@ def make_walk_gif(
     elif axis == "azimuth":
         n_total = az
         def get_slice(i):
-            p, g, r = pred_cube[:, i, :], gt_cube[:, i, :], raw_cube[:, i, :]
+            p, g = pred_cube[:, i, :], gt_cube[:, i, :]
             if _sort_idx is not None:
-                p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+                p, g = p[_sort_idx], g[_sort_idx]
             
-            return p, g, r
+            return p, g
         
         extent           = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "range index", "elevation [m]"
@@ -141,25 +128,22 @@ def make_walk_gif(
     sample_idx  = frame_indices[:: max(1, len(frame_indices) // 16)]
     pred_sample = np.stack([get_slice(int(i))[0] for i in sample_idx])
     gt_sample   = np.stack([get_slice(int(i))[1] for i in sample_idx])
-    raw_sample  = np.stack([get_slice(int(i))[2] for i in sample_idx])
-    vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample, raw_sample)
-    emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample),  99.0))
-    emax_raw    = float(np.percentile(np.abs(pred_sample - raw_sample), 99.0))
+    vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample)
+    emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample), 99.0))
    
-    if emax_gt  <= 0.0: emax_gt  = 1.0
-    if emax_raw <= 0.0: emax_raw = 1.0
+    if emax_gt <= 0.0: emax_gt = 1.0
 
     _origin = "lower" if axis in ("range", "azimuth") else "upper"
 
     tasks: list[tuple[Any, ...]] = []
     for frame_order, fi in enumerate(frame_indices):
-        i       = int(fi)
-        p, g, r = get_slice(i)
+        i    = int(fi)
+        p, g = get_slice(i)
         tasks.append((
             frame_order,
-            r.copy(), g.copy(), p.copy(),
+            g.copy(), p.copy(),
             vmin, vmax,
-            emax_gt, emax_raw,
+            emax_gt,
             extent,
             x_label, y_label,
             cmap, err_cmap,
