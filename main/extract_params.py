@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import warnings
+warnings.filterwarnings("ignore", message=".*pynvml.*", category=FutureWarning)
+
 import sys
 from pathlib import Path
 
@@ -17,23 +20,17 @@ from pipelines.param_pipeline.pipeline import ParamExtractionPipeline
 
 def main() -> None:
     config = ExtractionConfig(
-        processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/new_toy"),
+        processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset"),
         pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat"),
 
         output_prefix     = "params",
         output_suffix     = None,
         
-        tomogram_filename = "tomogram_full_1000a1050a500a550_1_Xparams_id2X.npy",
+        tomogram_filename = "tomogram_full_1000a16000a500a4000_1_Xparams_id2X.npy",
         height_range      = None,
 
         fit_settings = FitSettings(
-            number_of_gaussians = 2,
-            max_fit_iterations  = 5000,
-            fit_config          = FitMode.Adaptive(
-                initial_guess = None,
-                lower_bounds  = None,
-                upper_bounds  = None,
-            ),
+            fit_config = FitMode.SigmaOnly(k_max=5, lambda_k=3e-3),
         ),
 
         parameter_workers = 50,

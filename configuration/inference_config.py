@@ -6,6 +6,16 @@ from typing      import List, Optional
 
 
 @dataclass
+class InferencePaths:
+    figures_subdir    : str = "figures"
+    animations_subdir : str = "animations"
+    logs_subdir       : str = "logs"
+    cubes_subdir      : str = "cubes"
+    metrics_filename  : str = "metrics.json"
+    report_filename   : str = "report.html"
+
+
+@dataclass
 class InferenceConfig:
     run_directory      : Path
     output_subdir      : Optional[str]  = None
@@ -46,3 +56,5 @@ class InferenceConfig:
 
     seed               : int           = 0
     log_level          : str           = "INFO"
+
+    paths              : InferencePaths = field(default_factory=InferencePaths)

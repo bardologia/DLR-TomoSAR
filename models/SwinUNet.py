@@ -504,6 +504,4 @@ class SwinUNet(nn.Module):
         feature_map = self.final_upsample(feature_map)
         feature_map = match_spatial_size(source=feature_map, reference=original_input)
         out = self.output_head(feature_map)
-        out = out.clone()
-        out[:, 0::self.config.params_per_gaussian] = functional.softplus(out[:, 0::self.config.params_per_gaussian])
         return out

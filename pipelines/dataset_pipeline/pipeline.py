@@ -5,24 +5,20 @@ from typing import Optional, Tuple
 
 from torch.utils.data import DataLoader
 
-from configuration.dataset_config                    import DatasetConfiguration
-from pipelines.dataset_creation_pipeline.crop        import Cropper
-from pipelines.dataset_creation_pipeline.load        import Loader, PatchDataset
-from pipelines.dataset_creation_pipeline.metadata    import Layout, MetadataWriter
-from pipelines.dataset_creation_pipeline.normalize   import Stats, StatsComputer
-from pipelines.dataset_creation_pipeline.patch       import Patcher
-from tools.logger                                    import Logger
+from configuration.dataset_config           import DatasetConfiguration
+from pipelines.dataset_pipeline.crop        import Cropper
+from pipelines.dataset_pipeline.load        import Loader, PatchDataset
+from pipelines.dataset_pipeline.metadata    import Layout, MetadataWriter
+from pipelines.dataset_pipeline.normalize   import Stats, StatsComputer
+from pipelines.dataset_pipeline.patch       import Patcher
+from tools.logger                           import Logger
 
 
 class DatasetPipeline:
     def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
-
-        log_dir = self.training_run_directory / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-        self.logger = logger or Logger(log_dir = str(log_dir), name = "dataset_creation", level = "INFO")
+        self.logger                 = logger 
 
         self.layout          = Layout(config.preprocessing_run_directory, logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions, logger=self.logger)
@@ -58,16 +54,13 @@ class DatasetPipeline:
             use_reflective_padding = self.config.patch.use_reflective_padding,
         )
 
-        gt_parameters = arrays["parameters"]
-        
         dataset = PatchDataset(
             inputs           = arrays["inputs"],
-            gt_parameters    = gt_parameters,
+            gt_parameters    = arrays["parameters"],
             grid             = patcher,
             input_config     = self.config.input_config,
             output_config    = self.config.output_config,
             split_name       = split_name,
-            logger           = self.logger,
             norm_stats       = norm_stats,
             x_axis           = self.config.x_axis,
             n_gaussians      = self.config.n_gaussians,
@@ -76,8 +69,6 @@ class DatasetPipeline:
         return dataset, patcher
 
     def run(self) -> Tuple[DataLoader, DataLoader, DataLoader, dict[str, PatchDataset]]:
-        self.logger.section("[Dataset Creation Pipeline Execution]")
-
         train_ds, train_patcher = self._build_dataset("train")
 
         norm_stats = StatsComputer.compute_from_dataset(
@@ -86,13 +77,12 @@ class DatasetPipeline:
             input_config        = self.config.input_config,
             output_config       = self.config.output_config,
             n_slaves            = train_ds.n_slaves,
-            params_per_gaussian = self.config.output_config.params_per_gaussian,
             input_mode          = self.config.input_normalization_mode,
             output_mode         = self.config.output_normalization_mode,
             num_workers         = self.config.num_workers,
         )
         
-        norm_stats.save(self.training_run_directory / "meta", self.logger)
+        norm_stats.save(self.training_run_directory / "meta")
 
         train_ds, train_patcher = self._build_dataset("train", norm_stats=norm_stats)
         val_ds,   val_patcher   = self._build_dataset("val",   norm_stats=norm_stats)

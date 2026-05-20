@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib  import Path
 from typing   import Dict
 
@@ -9,6 +8,7 @@ import numpy as np
 from pipelines.inference_pipeline.animation import make_walk_gif
 from configuration.inference_config         import InferenceConfig
 from pipelines.inference_pipeline.loader    import DirectoryLoader
+from pipelines.inference_pipeline.metadata  import InferenceMetadata
 from pipelines.inference_pipeline.metrics   import Metrics
 from pipelines.inference_pipeline.plots     import Ploter
 from pipelines.inference_pipeline.predictor import Predictor
@@ -20,19 +20,12 @@ class InferencePipeline:
     def __init__(self, config: InferenceConfig) -> None:
         self.config = config
 
-    def _resolve_output_dir(self) -> Path:
-        base = self.config.run_directory / "inference"
-        if self.config.output_subdir:
-            return base / self.config.output_subdir
-       
-        return base / datetime.now().strftime("%Y%m%d_%H%M%S")
-
     def _plot_figures(
         self,
         plotter         : Ploter,
         result,
         run,
-        figures_dir     : Path,
+        meta            : InferenceMetadata,
         global_metrics  : dict,
         x_axis_np       : np.ndarray,
         cfg             : InferenceConfig,
@@ -81,42 +74,31 @@ class InferencePipeline:
                 x_axis        = x_axis_np,
                 pixels        = pixels,
                 title         = profile_titles[tag],
-                out_path      = figures_dir / f"profiles_{tag}.png",
+                out_path      = meta.figure_path(f"profiles_{tag}"),
                 n_gaussians   = run.n_gaussians,
                 pixel_metrics = pixel_metrics_for_plot,
                 az_offset     = result.azimuth_offset,
                 rg_offset     = result.range_offset,
             )
+           
             logger.subsection(f"Profiles ({tag:<6}) : {figure_paths[f'profiles_{tag}']}")
 
-        figure_paths["pixel_mse_map"] = plotter.plot_pixel_metric_map(
-            result.pixel_mse, "Per-pixel curve MSE", "MSE",
-            figures_dir / "pixel_mse_map.png",
-            az_offset = result.azimuth_offset,
-            rg_offset = result.range_offset,
-            cmap      = cfg.cmap_error,
-            log       = True,
-        )
+        for key, data, title, label, extra in (
+            ("pixel_mse_map",  result.pixel_mse,                             "Per-pixel curve MSE",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
+            ("pixel_r2_map",   result.pixel_r2,                              "Per-pixel R²",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
+            ("pixel_peak_map", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
+        ):
+            figure_paths[key] = plotter.plot_pixel_metric_map(
+                data      = data, 
+                title     = title, 
+                label     = label,
+                out_path  = meta.figure_path(key),
+                az_offset = result.azimuth_offset,
+                rg_offset = result.range_offset,
+                **extra,
+            )
         
-        figure_paths["pixel_r2_map"] = plotter.plot_pixel_metric_map(
-            result.pixel_r2, "Per-pixel R²", "R²",
-            figures_dir / "pixel_r2_map.png",
-            az_offset = result.azimuth_offset,
-            rg_offset = result.range_offset,
-            cmap      = "RdYlGn",
-            q_low     = 2.0,
-            q_high    = 98.0,
-        )
-        
-        figure_paths["pixel_peak_map"] = plotter.plot_pixel_metric_map(
-            result.pixel_peak_err_idx.astype(np.float32),
-            "Peak-location absolute error", "|Δ peak idx|",
-            figures_dir / "pixel_peak_map.png",
-            az_offset = result.azimuth_offset,
-            rg_offset = result.range_offset,
-            cmap      = cfg.cmap_error,
-        )
-        logger.subsection(f"Pixel maps      : mse, r2, peak written to {figures_dir}")
+        logger.subsection(f"Pixel maps : mse, r2, peak written to {meta.figures_dir}")
 
         figure_paths["metric_histograms"] = plotter.plot_metric_histogram(
             {
@@ -127,14 +109,14 @@ class InferencePipeline:
                 "pixel_r2 (raw)"    : result.pixel_r2_raw,
                 "pixel_cosine (raw)": result.pixel_cosine_raw,
             },
-            figures_dir / "metric_histograms.png",
+            meta.figure_path("metric_histograms"),
         )
 
         figure_paths["param_maps"] = plotter.plot_param_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
-            out_path    = figures_dir / "param_maps.png",
+            out_path    = meta.figure_path("param_maps"),
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
         )
@@ -143,112 +125,93 @@ class InferencePipeline:
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
-            out_path    = figures_dir / "param_distributions.png",
+            out_path    = meta.figure_path("param_distributions"),
         )
-        
         
         figure_paths["param_scatter"] = plotter.plot_param_scatter(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
-            out_path    = figures_dir / "param_scatter.png",
+            out_path    = meta.figure_path("param_scatter"),
         )
         
         figure_paths["param_error_maps"] = plotter.plot_param_error_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
-            out_path    = figures_dir / "param_error_maps.png",
+            out_path    = meta.figure_path("param_error_maps"),
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
         )
         
-        logger.subsection(f"Param plots     : distributions, scatter, error maps written to {figures_dir}")
+        logger.subsection(f"Param plots : distributions, scatter, error maps written to {meta.figures_dir}")
 
-        for s_idx, i in enumerate(slice_range_idx):
-            tag = f"slice_range_{int(i) + result.range_offset}"
-            figure_paths[tag] = plotter.plot_tomogram_slice(
-                result.pred_curves, result.gt_curves, result.raw_curves,
-                axis       = "range",
-                index      = int(i),
-                x_axis     = x_axis_np,
-                out_path   = figures_dir / f"{tag}.png",
-                az_offset  = result.azimuth_offset,
-                rg_offset  = result.range_offset,
-                ssim_value = global_metrics.get(f"ssim_gt_range_{s_idx}"),
-            )
-        
-        for s_idx, i in enumerate(slice_az_idx):
-            tag = f"slice_azimuth_{int(i) + result.azimuth_offset}"
-            figure_paths[tag] = plotter.plot_tomogram_slice(
-                result.pred_curves, result.gt_curves, result.raw_curves,
-                axis       = "azimuth",
-                index      = int(i),
-                x_axis     = x_axis_np,
-                out_path   = figures_dir / f"{tag}.png",
-                az_offset  = result.azimuth_offset,
-                rg_offset  = result.range_offset,
-                ssim_value = global_metrics.get(f"ssim_gt_azimuth_{s_idx}"),
-            )
-        
+        for axis, indices, tag_fn, metric_key in (
+            ("range",   slice_range_idx, lambda i: f"slice_range_{int(i) + result.range_offset}",    "ssim_gt_range"),
+            ("azimuth", slice_az_idx,    lambda i: f"slice_azimuth_{int(i) + result.azimuth_offset}", "ssim_gt_azimuth"),
+        ):
+            for s_idx, i in enumerate(indices):
+                tag = tag_fn(i)
+                figure_paths[tag] = plotter.plot_tomogram_slice(
+                    pred_cube  = result.pred_curves, 
+                    gt_cube    = result.gt_curves, 
+                    raw_cube   = result.raw_curves,
+                    axis       = axis,
+                    index      = int(i),
+                    x_axis     = x_axis_np,
+                    out_path   = meta.figure_path(tag),
+                    az_offset  = result.azimuth_offset,
+                    rg_offset  = result.range_offset,
+                    ssim_value = global_metrics.get(f"{metric_key}_{s_idx}"),
+                )
+
         for s_idx, i in enumerate(slice_elev_idx):
             tag = f"slice_elev_idx_{int(i)}"
             figure_paths[tag] = plotter.plot_elevation_intensity_slice(
-                result.pred_curves, result.gt_curves, result.raw_curves,
+                pred_cube  = result.pred_curves, 
+                gt_cube    = result.gt_curves, 
+                raw_cube   = result.raw_curves,
                 elev_idx   = int(i),
                 x_axis     = x_axis_np,
-                out_path   = figures_dir / f"{tag}.png",
+                out_path   = meta.figure_path(tag),
                 az_offset  = result.azimuth_offset,
                 rg_offset  = result.range_offset,
                 ssim_value = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
             )
         
-        logger.subsection(f"Slices written  : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices}")
+        logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices}")
 
-        figure_paths["ssim_range"] = plotter.plot_ssim_curves(
-            global_metrics = global_metrics,
-            axis           = "range",
-            out_path       = figures_dir / "ssim_range.png",
-            n_slices       = _rg,
-            slice_indices  = all_range_idx,
-            ax_offset      = result.range_offset,
-        )
+        for axis, n_slices, indices, offset in (
+            ("range",   _rg,     all_range_idx, result.range_offset),
+            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
+            ("elev",    _N_elev, all_elev_idx,  0),
+        ):
+            figure_paths[f"ssim_{axis}"] = plotter.plot_ssim_curves(
+                global_metrics = global_metrics,
+                axis           = axis,
+                out_path       = meta.figure_path(f"ssim_{axis}"),
+                n_slices       = n_slices,
+                slice_indices  = indices,
+                ax_offset      = offset,
+            )
        
-        figure_paths["ssim_azimuth"] = plotter.plot_ssim_curves(
-            global_metrics = global_metrics,
-            axis           = "azimuth",
-            out_path       = figures_dir / "ssim_azimuth.png",
-            n_slices       = _az,
-            slice_indices  = all_az_idx,
-            ax_offset      = result.azimuth_offset,
-        )
-        
-        figure_paths["ssim_elev"] = plotter.plot_ssim_curves(
-            global_metrics = global_metrics,
-            axis           = "elev",
-            out_path       = figures_dir / "ssim_elev.png",
-            n_slices       = _N_elev,
-            slice_indices  = all_elev_idx,
-            ax_offset      = 0,
-        )
-       
-        logger.subsection(f"SSIM plots      : range, azimuth, elev written to {figures_dir}\n")
+        logger.subsection(f"SSIM plots : range, azimuth, elev written to {meta.figures_dir}\n")
 
         figure_paths["elev_metric_curves"] = plotter.plot_elev_metric_curves(
             global_metrics = global_metrics,
-            out_path       = figures_dir / "elev_metric_curves.png",
+            out_path       = meta.figure_path("elev_metric_curves"),
             n_elev         = _N_elev,
             x_axis         = x_axis_np,
         )
         
-        logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {figures_dir}\n")
+        logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir}\n")
 
         return figure_paths
 
     def _run_animations(
         self,
         result    ,
-        gif_dir   : Path,
+        meta      : InferenceMetadata,
         x_axis_np : np.ndarray,
         cfg       : InferenceConfig,
         logger    : Logger,
@@ -262,7 +225,7 @@ class InferencePipeline:
                 gt_cube     = result.gt_curves,
                 raw_cube    = result.raw_curves,
                 axis        = axis,
-                out_path    = gif_dir / f"walk_{axis}.gif",
+                out_path    = meta.gif_path(axis),
                 x_axis      = x_axis_np,
                 az_offset   = result.azimuth_offset,
                 rg_offset   = result.range_offset,
@@ -281,7 +244,7 @@ class InferencePipeline:
 
     def _build_report(
         self,
-        output_dir     : Path,
+        meta           : InferenceMetadata,
         run,
         cfg            : InferenceConfig,
         x_axis_np      : np.ndarray,
@@ -329,7 +292,7 @@ class InferencePipeline:
         }
 
         return Report(
-            output_dir       = output_dir,
+            output_dir       = meta.output_dir,
             run_summary      = run_summary_payload,
             inference_config = inference_cfg_payload,
             checkpoint_meta  = run.checkpoint_meta,
@@ -339,7 +302,9 @@ class InferencePipeline:
         ).assemble()
 
     def run(self) -> Path:
-        cfg = self.config
+        cfg  = self.config
+        meta = InferenceMetadata(cfg)
+        meta.create_dirs()
         np.random.seed(cfg.seed)
         
         plotter = Ploter(
@@ -350,16 +315,9 @@ class InferencePipeline:
             save_dpi  = cfg.save_dpi,
         )
 
-        output_dir  = self._resolve_output_dir()
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        figures_dir = output_dir / "figures"
-        figures_dir.mkdir(parents=True, exist_ok=True)
-        
-        gif_dir     = output_dir / "animations"
-        gif_dir.mkdir(parents=True, exist_ok=True)
+        output_dir  = meta.output_dir
 
-        logger = Logger(log_dir=str(output_dir / "logs"), name="inference", level=cfg.log_level)
+        logger = Logger(log_dir=str(meta.logs_dir), name="inference", level=cfg.log_level)
 
         logger.section("[Inference Pipeline]")
         logger.subsection(f"Run Directory : {cfg.run_directory}")
@@ -384,7 +342,7 @@ class InferencePipeline:
             window_kind = cfg.stitch_window,
             cube_dtype  = cfg.cube_dtype,
             save_cubes  = cfg.save_cubes,
-            output_dir  = output_dir,
+            meta        = meta,
         )
         result = predictor.run_inference()
 
@@ -408,14 +366,14 @@ class InferencePipeline:
             range_indices = all_range_idx,
             az_indices    = all_az_idx,
         )
-        write_metrics_json(global_metrics, output_dir / "metrics.json")
+        write_metrics_json(global_metrics, meta.metrics_path)
 
         logger.section("[Inference: Plots]")
         figure_paths = self._plot_figures(
             plotter         = plotter,
             result          = result,
             run             = run,
-            figures_dir     = figures_dir,
+            meta            = meta,
             global_metrics  = global_metrics,
             x_axis_np       = x_axis_np,
             cfg             = cfg,
@@ -431,7 +389,7 @@ class InferencePipeline:
         self.logger.section("[Inference: Animations]")
         gif_paths = self._run_animations(
             result    = result,
-            gif_dir   = gif_dir,
+            meta      = meta,
             x_axis_np = x_axis_np,
             cfg       = cfg,
             logger    = logger,
@@ -439,7 +397,7 @@ class InferencePipeline:
 
         self.logger.section("[Inference: Report]")
         report_path = self._build_report(
-            output_dir     = output_dir,
+            meta           = meta,
             run            = run,
             cfg            = cfg,
             x_axis_np      = x_axis_np,
@@ -450,7 +408,7 @@ class InferencePipeline:
 
         logger.section("[Inference Pipeline Done]")
         logger.subsection(f"Report  : {report_path}")
-        logger.subsection(f"Metrics : {output_dir / 'metrics.json'}")
+        logger.subsection(f"Metrics : {meta.metrics_path}")
         logger.subsection(f"Cubes   : {result.cube_directory}\n")
         logger.close()
         

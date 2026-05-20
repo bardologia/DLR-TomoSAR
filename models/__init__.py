@@ -55,7 +55,11 @@ def get_model(name: str, config=None, **overrides):
         raise ValueError(f"Unknown model '{name}'. Available: {list(MODEL_REGISTRY.keys())}")
     if config is None:
         config = CONFIG_REGISTRY[key](**overrides)
-    return MODEL_REGISTRY[key](config)
+    elif overrides:
+        for k, v in overrides.items():
+            if hasattr(config, k):
+                setattr(config, k, v)
+    return MODEL_REGISTRY[key](config), config
 
 
 __all__ = [

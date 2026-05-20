@@ -8,7 +8,7 @@ from typing import Tuple
 import numpy as np
 
 from configuration.processing_config import ProcessingConfiguration
-from tools.logger                       import Logger
+from tools.logger                    import Logger
 
 
 class InterferogramBuilder:
@@ -23,26 +23,6 @@ class InterferogramBuilder:
         pyrat_root = str(self.config.paths.pyrat_directory)
         if pyrat_root not in sys.path:
             sys.path.insert(0, pyrat_root)
-
-    def _build_from_uavsar(self, crop_tuple: Tuple[int, int, int, int]) -> np.ndarray:
-        from pyrat import getdata, load
-
-        loading_parameters = {
-            "dir"     : self.config.input_configs.fusar_project_path,
-            "band"    : "L",
-            "polar"   : self.config.input_configs.polarisation,
-            "tracks"  : self.config.input_configs.track_selection,
-            "crop"    : list(crop_tuple),
-            "product" : "SLC",
-            "sym"     : False,
-        }
-
-        self.logger.subsection("Loading UAVSAR layer...")
-        loaded_layer = load.uavsar(**loading_parameters)
-        data_array   = np.stack(getdata(loaded_layer), axis=0)
-
-        self.logger.subsection(f"UAVSAR stack built. Final shape: {data_array.shape}")
-        return data_array
 
     def _build_from_fsar(self, crop_tuple: Tuple[int, int, int, int]) -> np.ndarray:
         from pyrat import pyrat_init, tomo
@@ -135,6 +115,7 @@ class InterferogramBuilder:
 
         secondaries    = np.stack(secondary_layers,     axis=0)
         interferograms = np.stack(interferogram_layers, axis=0)
+        
         return primary, secondaries, interferograms
 
     def build(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

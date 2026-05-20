@@ -8,31 +8,22 @@ from typing import List, Optional, Tuple, Union
 
 class FitMode:
     @dataclass
-    class Adaptive:
-        threshold_factor : float                 = 0.25
-        truncation_index : int                   = 170
-        initial_guess    : Optional[List[float]] = None
-        lower_bounds     : Optional[List[float]] = None
-        upper_bounds     : Optional[List[float]] = None
-
-    @dataclass
-    class MLE:
-        initial_guess : Optional[List[float]] = None
-        lower_bounds  : Optional[List[float]] = None
-        upper_bounds  : Optional[List[float]] = None
-        epsilon       : float                 = 1e-10
-        ftol          : float                 = 1e-9
-        gtol          : float                 = 1e-6
+    class SigmaOnly:
+        threshold_factor : float = 0.25
+        truncation_index : int   = 170
+        k_max            : int   = 5
+        lambda_k         : float = 3e-3
+        prominence_frac  : float = 0.05
 
 
-FitConfig = Union[FitMode.Adaptive, FitMode.MLE]
+FitConfig = FitMode.SigmaOnly
 
 
 @dataclass
 class FitSettings:
     number_of_gaussians : int       = 3
     max_fit_iterations  : int       = 5000
-    fit_config          : FitConfig = field(default_factory=FitMode.Adaptive)
+    fit_config          : FitConfig = field(default_factory=FitMode.SigmaOnly)
 
     @property
     def parameters_per_profile(self) -> int:
@@ -40,10 +31,7 @@ class FitSettings:
 
     @property
     def fitting_method(self) -> str:
-        if isinstance(self.fit_config, FitMode.Adaptive):
-            return "adaptive_curve_fit"
-        if isinstance(self.fit_config, FitMode.MLE):
-            return "mle_poisson"
+        return "sigma_only_adam"
 
 
 @dataclass
@@ -60,10 +48,11 @@ class ExtractionConfig:
     use_gpu              : bool                          = True
     gpu_batch_size       : int                           = 256
     gpu_pixel_batch_size : int                           = 24576
-    adam_steps           : int                           = 1000
+    adam_steps           : int                           = 3000
     adam_lr              : float                         = 2e-1
     adam_b1              : float                         = 0.95
     adam_b2              : float                         = 0.999
+    adam_warmup_steps    : int                           = 100
     gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 2, 3])
     r2_sample_cap        : int                           = 4096
 
@@ -82,10 +71,10 @@ class ExtractionConfig:
             return self.output_suffix
         fs = self.fit_settings
         method = fs.fitting_method
-        if method.startswith("adaptive"):
-            method_short = "adapt"
-        elif method.startswith("mle"):
-            method_short = "mle"
+        if method.startswith("sigma_only"):
+            cfg = self.fit_settings.fit_config
+            k_max = getattr(cfg, "k_max", self.fit_settings.number_of_gaussians)
+            method_short = f"sigonly_k{k_max}"
         else:
             method_short = "filt"
         return f"Ng{fs.number_of_gaussians}_{method_short}"
@@ -120,11 +109,11 @@ class ExtractionConfig:
                 if candidate.is_file():
                     return candidate
 
-        params_matches = sorted(data_dir.glob("tomofull_*params*.npy"))
+        params_matches = sorted(data_dir.glob("tomogram_full_*params*.npy"))
         if params_matches:
             return params_matches[0]
 
-        any_matches = sorted(data_dir.glob("tomofull_*.npy"))
+        any_matches = sorted(data_dir.glob("tomogram_full_*.npy"))
         if any_matches:
             return any_matches[0]
 

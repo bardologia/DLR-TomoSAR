@@ -65,6 +65,7 @@ def _render_frame(args: tuple) -> tuple[int, bytes]:
     fig.savefig(buf, format="png", dpi=dpi)
     plt.close(fig)
     buf.seek(0)
+    
     return frame_order, buf.read()
 
 
@@ -98,6 +99,7 @@ def make_walk_gif(
         n_total = N_elev
         def get_slice(i):
             return pred_cube[i], gt_cube[i], raw_cube[i]
+        
         extent           = [rg_offset, rg_offset + rg, az_offset + az, az_offset]
         x_label, y_label = "range index", "azimuth index"
         title_fn         = lambda i: f"elevation = {x_axis[i]:.2f} m  (idx {i}/{N_elev - 1})"
@@ -108,7 +110,9 @@ def make_walk_gif(
             p, g, r = pred_cube[:, :, i], gt_cube[:, :, i], raw_cube[:, :, i]
             if _sort_idx is not None:
                 p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+        
             return p, g, r
+        
         extent           = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "azimuth index", "elevation [m]"
         title_fn         = lambda i: f"range = {i + rg_offset}"
@@ -119,10 +123,13 @@ def make_walk_gif(
             p, g, r = pred_cube[:, i, :], gt_cube[:, i, :], raw_cube[:, i, :]
             if _sort_idx is not None:
                 p, g, r = p[_sort_idx], g[_sort_idx], r[_sort_idx]
+            
             return p, g, r
+        
         extent           = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])]
         x_label, y_label = "range index", "elevation [m]"
         title_fn         = lambda i: f"azimuth = {i + az_offset}"
+    
     else:
         raise ValueError(f"axis must be elevation|range|azimuth, got {axis!r}")
 
@@ -172,20 +179,19 @@ def make_walk_gif(
                 png_bytes[order] = data
                 pbar.update(1)
 
-    frames: list[Image.Image] = [
-        Image.open(BytesIO(png_bytes[k])).convert("P", dither=Image.Dither.NONE)
-        for k in sorted(png_bytes)
-    ]
+    frames: list[Image.Image] = [Image.open(BytesIO(png_bytes[k])).convert("P", dither=Image.Dither.NONE) for k in sorted(png_bytes)]
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     duration_ms = int(round(1000.0 / max(1, fps)))
+    
     frames[0].save(
-        str(out_path),
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        loop=0,
-        duration=duration_ms,
-        optimize=False,
+        fp            = str(out_path),
+        format        = "GIF",
+        save_all      = True,
+        append_images = frames[1:],
+        loop          = 0,
+        duration      = duration_ms,
+        optimize      = False,
     )
+   
     return out_path

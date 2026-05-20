@@ -64,19 +64,12 @@ class GaussianConfig:
     params_per_gaussian : int   = 3
 
     @classmethod
-    def from_dataset(cls, dataset_dir: str | Path, params_subdir: str | None = None) -> "GaussianConfig":
+    def from_dataset(cls, dataset_dir: str | Path, n_gaussians: int) -> "GaussianConfig":
         meta_dir   = Path(dataset_dir) / "meta"
         candidates = sorted(meta_dir.glob("config_state_*.json"))
         cfg = json.loads(candidates[0].read_text())
         height_range = cfg["output_configs"]["height_range"]
-        params_dir   = Path(dataset_dir) / "params"
-        if params_subdir is not None:
-            meta_path = params_dir / params_subdir / "param_extraction_meta.json"
-        else:
-            meta_path = sorted(params_dir.glob("*/param_extraction_meta.json"))[0]
-        param_meta   = json.loads(Path(meta_path).read_text())
-        n_gaussians  = param_meta["number_of_gaussians"]
-
+        
         return cls(
             n_default_gaussians = n_gaussians,
             x_min               = float(height_range[0]),
@@ -149,6 +142,14 @@ class OptimizerConfig:
 
 
 @dataclass
+class OverfitConfig:
+    enabled        : bool  = False
+    max_steps      : int   = 50
+    stop_threshold : float = 1e-6
+    batch_size     : int   = 1
+
+
+@dataclass
 class TrainingConfigInner:
     device                      : str   = "cuda" if torch.cuda.is_available() else "cpu"
     epochs                      : int   = 3
@@ -157,15 +158,6 @@ class TrainingConfigInner:
     gradient_accumulation_steps : int   = 1
     max_grad_norm               : float = None
     verbose                     : bool  = True
-    
-    overfit_enabled             : bool  = False
-    overfit_max_steps           : int   = 50
-    overfit_stop_threshold      : float = 1e-6
-    overfit_batch_size          : int   = 1
-    
-    deep_validation             : bool  = True
-    eval_train_split            : bool  = False
-    log_debug                   : bool  = False   
 
 
 @dataclass
@@ -206,14 +198,15 @@ class GradientClipperConfig:
 
 @dataclass
 class TrainerConfig:
-    gaussian       : GaussianConfig
-    early_stopping   : EarlyStoppingConfig    = field(default_factory=EarlyStoppingConfig)
+    gaussian         : GaussianConfig
+    early_stopping   : EarlyStoppingConfig     = field(default_factory=EarlyStoppingConfig)
     warmup           : WarmupConfig            = field(default_factory=WarmupConfig)
     scheduler        : SchedulerConfig         = field(default_factory=SchedulerConfig)
     ema              : EMAConfig               = field(default_factory=EMAConfig)
     io               : IOConfig                = field(default_factory=IOConfig)
     optimizer        : OptimizerConfig         = field(default_factory=OptimizerConfig)
     training         : TrainingConfigInner     = field(default_factory=TrainingConfigInner)
+    overfit          : OverfitConfig           = field(default_factory=OverfitConfig)
     loss             : LossConfig              = field(default_factory=LossConfig)
     resources        : ResourceConfig          = field(default_factory=ResourceConfig)
     memory           : MemoryConfig            = field(default_factory=MemoryConfig)

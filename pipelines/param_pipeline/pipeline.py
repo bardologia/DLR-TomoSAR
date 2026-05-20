@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 
 from configuration.param_extraction_config import ExtractionConfig
-from pipelines.param_extraction_pipeline.fitting   import ParameterExtractor
-from pipelines.param_extraction_pipeline.metadata  import ExtractionMetadataManager
+from pipelines.param_pipeline.fitting      import ParameterExtractor
+from pipelines.param_pipeline.metadata     import ExtractionMetadataManager
 from tools.logger import Logger
 
 
@@ -47,24 +47,27 @@ class ParamExtractionPipeline:
         self.logger.subsection(f"N gaussians       : {config.fit_settings.number_of_gaussians}")
         self.logger.subsection(f"Fit method        : {config.fit_settings.fitting_method}")
 
-    def _stage_extract_and_save(self) -> Path:
+    def _stage_extract(self) -> np.ndarray:
+        self.logger.subsection("Extracting multi-Gaussian parameters")
+        return self.parameter_extractor.run(tomogram_path = self.tomogram_path, height_range = self.height_range)
+
+    def _stage_save(self, parameters_array: np.ndarray) -> Path:
         npy_path = self.config.parameters_npy_path
         npy_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.logger.subsection("[Active] Extracting multi-Gaussian parameters")
-       
-        parameters_array = self.parameter_extractor.run(tomogram_path = self.tomogram_path, height_range  = self.height_range)
-
-        self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk...")
+        self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk")
         np.save(str(npy_path), np.ascontiguousarray(parameters_array), allow_pickle=False)
+        
         del parameters_array
         gc.collect()
+        
         return npy_path
 
     def run(self) -> dict[str, Path]:
         self.logger.section("[Param Extraction Pipeline Execution]")
 
-        npy_path  = self._stage_extract_and_save()
+        parameters_array = self._stage_extract()
+        npy_path         = self._stage_save(parameters_array)
         meta_path = self.metadata_manager.save_run_metadata(npy_path)
 
         self.logger.section("[Param Extraction Completed]")

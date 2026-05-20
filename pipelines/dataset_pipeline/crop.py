@@ -5,10 +5,10 @@ from typing import Tuple
 
 import numpy as np
 
-from tools.split_regions                          import SplitRegions
-from configuration.preprocessing_config           import CropRegion
-from pipelines.dataset_creation_pipeline.metadata import Layout
-from tools.logger                                 import Logger
+from tools.split_regions                      import SplitRegions
+from configuration.processing_config          import CropRegion
+from pipelines.dataset_pipeline.metadata      import Layout
+from tools.logger                             import Logger
 
 
 class Cropper:
@@ -20,7 +20,6 @@ class Cropper:
         self.logger.section("[Cropper Initialized]")
         for name, region in split_regions.items():
             self.logger.subsection(f"{name:<5} : {region.as_tuple()}  ({region.azimuth_size} x {region.range_size})")
-        self.logger("")
 
     def to_local_slices(self, region: CropRegion) -> Tuple[slice, slice]:
         global_crop = self.layout.global_crop

@@ -51,50 +51,39 @@ class DirectoryLoader:
 
     def _read_json(self, name: str) -> dict:
         path = self.meta_directory / name
+        
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def _build_dataset_config(self, payload: dict, batch_size: Optional[int], num_workers: int) -> DatasetConfiguration:
-        splits        = payload["split_regions"]
+        splits = payload["split_regions"]
         
         split_regions = SplitRegions(
             train = CropRegion(**splits["train"]),
             val   = CropRegion(**splits["val"]),
             test  = CropRegion(**splits["test"]),
         )
-
-        patch_payload = payload["patch"]
-        
-        patch         = PatchConfiguration(
-            size                   = tuple(patch_payload["size"]),
-            stride                 = int(patch_payload["stride"]),
-            use_reflective_padding = bool(patch_payload["use_reflective_padding"]),
+       
+        patch = PatchConfiguration(
+            size                   = tuple(payload["patch"]["size"]),
+            stride                 = int(payload["patch"]["stride"]),
+            use_reflective_padding = bool(payload["patch"]["use_reflective_padding"]),
         )
-
-        raw_params_path = payload["parameters_path"]
-        parameters_path = Path(raw_params_path) if raw_params_path != "None" else None
 
         return DatasetConfiguration(
-            preprocessing_run_directory  = Path(payload["preprocessing_run_directory"]),
-            parameters_path              = parameters_path,
-            split_regions                = split_regions,
-            patch                        = patch,
-            input_config                 = InputConfig.from_dict(payload["input_config"]),
-            output_config                = OutputConfig.from_dict(payload["output_config"]),
-            batch_size                   = batch_size if batch_size is not None else int(payload["batch_size"]),
-            num_workers                  = int(num_workers),
-            shuffle_train                = False,
-            pin_memory                   = bool(payload["pin_memory"]),
+            preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
+            parameters_path             = Path(payload["parameters_path"]),
+            split_regions               = split_regions,
+            patch                       = patch,
+            input_config                = InputConfig.from_dict(payload["input_config"]),
+            output_config               = OutputConfig.from_dict(payload["output_config"]),
+            batch_size                  = batch_size if batch_size is not None else int(payload["batch_size"]),
+            num_workers                 = int(num_workers),
+            shuffle_train               = False,
+            pin_memory                  = bool(payload["pin_memory"]),
         )
 
-    def _build_split_dataset(
-        self,
-        dataset_config : DatasetConfiguration,
-        split_name     : str,
-        x_axis         : np.ndarray,
-        n_gaussians    : int,
-    ) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
-        
+    def _build_split_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger)
         region  = dict(dataset_config.split_regions.items())[split_name]
@@ -107,11 +96,13 @@ class DirectoryLoader:
             use_reflective_padding = dataset_config.patch.use_reflective_padding,
         )
 
-        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
+        inputs        = arrays["inputs"]
+        gt_parameters = arrays["parameters"]
+        norm_stats    = Stats.compute(inputs, gt_parameters, dataset_config.input_config, dataset_config.output_config)
 
         dataset = PatchDataset(
-            inputs        = arrays["inputs"],
-            gt_parameters = arrays["parameters"],
+            inputs        = inputs,
+            gt_parameters = gt_parameters,
             grid          = grid,
             input_config  = dataset_config.input_config,
             output_config = dataset_config.output_config,
@@ -126,8 +117,10 @@ class DirectoryLoader:
 
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
+        
         if model_name in _IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
+        
         return get_model(model_name, **overrides)
 
     def _apply_ema(self, model, ema_state: dict) -> int:
@@ -176,6 +169,7 @@ class DirectoryLoader:
         use_ema         : bool,
         checkpoint_name : str,
     ) -> LoadedRun:
+       
         self.logger.section("[Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
 
@@ -238,7 +232,6 @@ class DirectoryLoader:
         self.logger.subsection(f"Azimuth size  : {region.azimuth_size}")
         self.logger.subsection(f"Range size    : {region.range_size}\n")
         self.logger.subsection(f"X-axis length : {x_axis.size}")
-
 
         return LoadedRun(
             run_directory   = self.run_directory,

@@ -292,13 +292,13 @@ class StatsComputer:
             input_stats.names = in_groups
 
         if input_mode is not InputNormalizationMode.PER_CHANNEL:
+            logger.section("[Input grouping]")
             StatsComputer._log_grouping(logger, "Input", in_groups)
 
         logger.section("[Input stats per channel]")
         for c in range(in_channels):
             logger.subsection(f" Channel {c:>3d}  mean={input_stats.mean[c]:+.6f},  std={input_stats.std[c]:.6f}")
-        logger.write("\n")
-
+     
         return input_stats
 
     @staticmethod
@@ -321,13 +321,13 @@ class StatsComputer:
             output_stats.names = out_groups
 
         if output_mode is not OutputNormalizationMode.PER_CHANNEL:
+            logger.section("[Output grouping]")
             StatsComputer._log_grouping(logger, "Output", out_groups)
 
         logger.section("[Output stats per channel]")
         for c in range(gt_channels):
             logger.subsection(f" Channel {c:>3d}  mean={output_stats.mean[c]:+.6f},  std={output_stats.std[c]:.6f}")
-        logger.write("\n")
-
+        
         return output_stats
 
     @staticmethod

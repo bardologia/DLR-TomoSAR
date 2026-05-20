@@ -7,6 +7,7 @@ from typing      import Dict
 import numpy as np
 
 from pipelines.inference_pipeline.loader    import LoadedRun
+from pipelines.inference_pipeline.metadata  import InferenceMetadata
 from pipelines.inference_pipeline.stitching import CubeStitcher, make_patch_window
 from tools.logger                           import Logger
 
@@ -38,7 +39,7 @@ class Predictor:
         window_kind : str,
         cube_dtype  : str,
         save_cubes  : bool,
-        output_dir  : Path,
+        meta        : InferenceMetadata,
     ) -> None:
         
         self.run         = run
@@ -46,9 +47,7 @@ class Predictor:
         self.window_kind = window_kind
         self.cube_dtype  = cube_dtype
         self.save_cubes  = save_cubes
-        self.output_dir  = Path(output_dir)
-        self.cube_dir    = self.output_dir / "cubes"
-        self.cube_dir.mkdir(parents=True, exist_ok=True)
+        self.cube_dir    = meta.cube_dir()
 
     def _new_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
         memmap_path = str(self.cube_dir / f"_tmp_{name}.npy") if self.save_cubes else None
@@ -173,6 +172,7 @@ class Predictor:
         pixel_peak : np.ndarray,
         pixel_w    : np.ndarray,
     ) -> Result:
+     
         pred_curves_cube = pred_curve_stitcher.finalize()
         gt_curves_cube   = gt_curve_stitcher.finalize()
         params_pred_cube = param_pred_stitcher.finalize()

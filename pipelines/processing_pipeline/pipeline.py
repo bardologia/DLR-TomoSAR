@@ -5,9 +5,9 @@ from pathlib import Path
 from typing  import Literal, Tuple
 
 from configuration.processing_config                 import ProcessingConfiguration
-from pipelines.pre_processing_pipeline.interferogram import InterferogramBuilder
-from pipelines.pre_processing_pipeline.metadata      import MetadataManager
-from pipelines.pre_processing_pipeline.tomogram      import TomogramProcessor
+from pipelines.processing_pipeline.interferogram     import InterferogramBuilder
+from pipelines.processing_pipeline.metadata          import MetadataManager
+from pipelines.processing_pipeline.tomogram          import TomogramProcessor
 from tools.logger                                    import Logger
 
 

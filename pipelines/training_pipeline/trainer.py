@@ -13,6 +13,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from tools                                          import Tracker, ResourceMonitor
+from tools.model_summary                            import ModelSummary
+from tools.shape_logger                             import ShapeLogger
 from pipelines.training_pipeline.early_stopping     import EarlyStopping
 from pipelines.training_pipeline.warmup             import Warmup
 from pipelines.training_pipeline.scheduler          import Scheduler
@@ -24,7 +26,7 @@ from pipelines.training_pipeline.loss               import Loss
 
 
 class Trainer:
-    def __init__(self, model, x_axis, config, run_dir, logger, norm_stats=None):
+    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger, norm_stats=None):
         self.logger       = logger
         self.config       = config
         self.gaussian_cfg = config.gaussian
@@ -39,10 +41,17 @@ class Trainer:
         self.logger.subsection(f"Log Directory : {self.config.io.logdir} \n")
 
         self.checkpoint_path = Path(run_dir) / "best_model.pt"
+        self.run_dir         = Path(run_dir)
         self.tracker         = Tracker(writer=self.config.io.writer, debug=getattr(self.config.training, "log_debug", False))
 
-        self.model  = model.to(self.device)
-        self.x_axis = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
+        self.model     = model.to(self.device)
+        self.model_cfg = model_cfg
+        self.x_axis    = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
+
+        summary = ModelSummary(self.logger, self.model)
+        summary.run()
+        summary_path = Path(run_dir) / "docs" / "model_summary.md"
+        summary.save_markdown(str(summary_path))
 
         self.epochs               = self.config.training.epochs
         self.validation_frequency = self.config.training.validation_frequency
@@ -51,8 +60,9 @@ class Trainer:
         
         self.scaler = torch.amp.GradScaler("cuda", enabled=self.use_amp)
 
-        self.base_lrs   = [float(getattr(self.config.optimizer, "lr", 1e-3))]
-        self.optimizer  = self._build_optimizer(self.base_lrs)
+        param_groups    = self.model_cfg.get_param_groups(self.model)
+        self.base_lrs   = [float(pg["lr"]) for pg in param_groups]
+        self.optimizer  = self._build_optimizer(param_groups)
 
         self.warmup           = Warmup(self.config, self.logger, self.tracker)
         self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
@@ -70,32 +80,29 @@ class Trainer:
         self.train_losses = []
         self.val_losses   = []
 
-    def _build_optimizer(self, base_lrs):
-        lr           = base_lrs[0]
+    def _build_optimizer(self, param_groups: list[dict]):
         betas        = tuple(self.config.optimizer.betas)
         eps          = self.config.optimizer.eps
         weight_decay = float(getattr(self.config.optimizer, "weight_decay", 0.0))
 
-        optimizer = optim.AdamW(
-            self.model.parameters(),
-            lr=lr,
-            betas=betas,
-            eps=eps,
-            weight_decay=weight_decay
-        )
+        for pg in param_groups:
+            pg.setdefault("betas",        betas)
+            pg.setdefault("eps",          eps)
+            pg.setdefault("weight_decay", weight_decay)
+
+        optimizer = optim.AdamW(param_groups)
         return optimizer
 
     def _update_optimizer(self, lrs: list[float]):
-        lr = lrs[0]
-        current_lr = getattr(self, "_current_lr", None)
-        if current_lr is not None and abs(lr - current_lr) < 1e-12:
+        prev_lrs = getattr(self, "_current_lrs", None)
+        if prev_lrs is not None and all(abs(a - b) < 1e-12 for a, b in zip(lrs, prev_lrs)):
             return
 
-        self._current_lr = lr
-        self.tracker.log_scalar("lr/learning_rate", lr, self.global_step)
-
-        for param_group in self.optimizer.param_groups:
+        self._current_lrs = lrs
+        for i, (param_group, lr) in enumerate(zip(self.optimizer.param_groups, lrs)):
             param_group['lr'] = lr
+            name = param_group.get('name', str(i))
+            self.tracker.log_scalar(f"lr/{name}", lr, self.global_step)
 
     def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None) -> torch.Tensor:
         with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
@@ -122,6 +129,32 @@ class Trainer:
                 ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
                 if self.global_step % ema_every == 0:
                     self.ema.update(self.model, step=self.global_step)
+
+    @torch.no_grad()
+    def _run_shape_logger(self, data_loader: DataLoader):
+        include_types = getattr(self.model_cfg, "shape_logger_types", None)
+        if include_types is None:
+            return
+
+        self.logger.section("[Shape Logger]")
+        shape_logger = ShapeLogger(
+            model         = self.model,
+            logger        = self.logger,
+            include_types = include_types,
+            docs_dir      = self.run_dir / "docs",
+        )
+        shape_logger.attach()
+
+        try:
+            batch  = next(iter(data_loader))
+            images = batch[0].to(self.device)
+            self.model.eval()
+            self.model(images)
+        finally:
+            shape_logger.detach()
+            self.model.train()
+
+        shape_logger.save_markdown(filename="shape_log.md", title="Tensor Shape Log")
 
     def train_epoch(self, train_loader: DataLoader, epoch: int):
         self.model.train()
@@ -214,6 +247,8 @@ class Trainer:
 
         try:
             data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
+
+            self._run_shape_logger(data_loader)
 
             epochs = self.epochs
             with self.logger.live_monitor("Training Progress") as live_mon:

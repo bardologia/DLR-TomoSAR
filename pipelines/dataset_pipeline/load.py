@@ -5,10 +5,10 @@ from typing import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
-from configuration.dataset_config                     import InputConfig, OutputConfig
-from pipelines.dataset_creation_pipeline.normalize    import Stats, Normalizer
-from pipelines.dataset_creation_pipeline.patch        import Patcher
-from tools.logger                                     import Logger
+from configuration.dataset_config            import InputConfig, OutputConfig
+from pipelines.dataset_pipeline.normalize    import Stats, Normalizer
+from pipelines.dataset_pipeline.patch        import Patcher
+from tools.logger                            import Logger
 
 
 class PatchDataset(Dataset):
@@ -20,7 +20,6 @@ class PatchDataset(Dataset):
         input_config  : InputConfig,
         output_config : OutputConfig,
         split_name    : str,
-        logger        : Logger,
         norm_stats    : Optional[Stats]      = None,
         x_axis        : Optional[np.ndarray] = None,
         n_gaussians   : int                  = 1,
@@ -35,22 +34,13 @@ class PatchDataset(Dataset):
         self.norm_stats     = Normalizer(norm_stats) if norm_stats is not None else None
         self.x_axis         = x_axis
         self.n_gaussians    = n_gaussians
-        self.passes         = int(inputs.shape[0])
-        self.n_secondaries  = (self.passes - 1) // 2  # [primary, secondaries..., interferograms...]
-        self.n_slaves       = self.n_secondaries       # alias for normalize.py compatibility
+        self.input_layers   = int(inputs.shape[0])
+        self.n_secondaries  = (self.input_layers - 1) // 2 
+        self.n_slaves       = self.n_secondaries      
         self.input_channels = input_config.total_channels(self.n_secondaries)
 
-        self.output_channel_indices = output_config.selected_indices(n_gaussians = int(gt_parameters.shape[0]) // 3)
+        self.output_channel_indices = output_config.selected_indices(n_gaussians = n_gaussians)
         self.gt_channels            = len(self.output_channel_indices)
-
-        logger.section(f"[Dataset:{split_name}]")
-        logger.subsection(f"Patches  : {len(self):>6}")
-        logger.subsection(f"Passes   : {self.passes}")
-        logger.subsection(f"Input ch : {self.input_channels}")
-        logger.subsection(f"GT ch    : {self.gt_channels}")
-
-        logger.section("Pipeline Flux")
-        logger.subsection("input patch -> input tensor + gt params -> (norm) input tensor + (norm) gt params \n")
 
     def __len__(self) -> int:
         return self.grid.grid.number_of_patches
@@ -74,7 +64,8 @@ class PatchDataset(Dataset):
             parts.append(self.input_config.interferograms_representation.convert(interferograms_data))
 
         input_tensor = parts[0] if len(parts) == 1 else np.concatenate(parts, axis=1)
-        
+        input_tensor = input_tensor[0]  
+
         return np.ascontiguousarray(input_tensor, dtype=np.float32)
 
     def _build_output_tensor(self, gt_patch: np.ndarray) -> np.ndarray:

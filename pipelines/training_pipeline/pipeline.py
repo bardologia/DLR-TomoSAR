@@ -6,9 +6,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from configuration.dataset_config                 import DatasetCreationConfiguration
+from configuration.dataset_config                 import DatasetConfiguration
 from configuration.training_config                import TrainerConfig
-from pipelines.dataset_creation_pipeline.pipeline import DatasetCreationPipeline
+from pipelines.dataset_pipeline.pipeline          import DatasetPipeline
 from pipelines.training_pipeline.metadata         import TrainingRunMetadata
 from pipelines.training_pipeline.trainer          import Trainer
 
@@ -19,8 +19,9 @@ class TrainingPipeline:
     def __init__(
         self,
         trainer_config : TrainerConfig,
-        dataset_config : DatasetCreationConfiguration,
+        dataset_config : DatasetConfiguration,
         model_name     : str,
+        model_config   = None,
         seed           : int = 0,
     ) -> None:
 
@@ -29,6 +30,7 @@ class TrainingPipeline:
         self.trainer_config = trainer_config
         self.dataset_config = dataset_config
         self.model_name     = model_name
+        self.model_config   = model_config
         self.image_size     = patch_height
         self.seed           = seed
         
@@ -44,7 +46,7 @@ class TrainingPipeline:
         )
         self.logger = self.run_metadata.logger
 
-        self.dataset_pipeline = DatasetCreationPipeline(
+        self.dataset_pipeline = DatasetPipeline(
             config                 = dataset_config,
             training_run_directory = self.run_metadata.run_directory,
             logger                 = self.logger,
@@ -57,7 +59,7 @@ class TrainingPipeline:
         if self.model_name in _IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
-        model = get_model(self.model_name, **overrides)
+        model, model_cfg = get_model(self.model_name, config=self.model_config, **overrides)
         
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -66,7 +68,7 @@ class TrainingPipeline:
         self.logger.subsection(f"In Channels  : {in_channels}")
         self.logger.subsection(f"Out Channels : {out_channels}")
         self.logger.subsection(f"Parameters   : {n_params:,}")
-        return model
+        return model, model_cfg
 
     def run(self):
         self.logger.section("[PyTorch Training Pipeline Execution]")
@@ -90,7 +92,7 @@ class TrainingPipeline:
         x_axis_length = len(self.dataset_config.x_axis)
         x_axis = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
         
-        model = self._build_model(in_channels=in_channels, out_channels=out_channels)
+        model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
         self.run_metadata.save_run_summary(
@@ -102,6 +104,7 @@ class TrainingPipeline:
 
         trainer = Trainer(
             model                 = model,
+            model_cfg             = model_cfg,
             x_axis                = x_axis,
             config                = self.trainer_config,
             run_dir               = self.run_metadata.run_directory,

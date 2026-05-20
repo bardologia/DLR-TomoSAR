@@ -12,7 +12,6 @@ import numpy                as np
 
 
 class Ploter:
-
     SCIENTIFIC_RC: dict = {
         "font.family"         : "serif",
         "font.serif"          : ["Times New Roman", "DejaVu Serif"],
@@ -33,8 +32,6 @@ class Ploter:
         "image.interpolation" : "nearest",
         "savefig.bbox"        : "tight",
     }
-
-    _SSIM_MAX_XTICKS: int = 40
 
     def __init__(
         self,
@@ -406,7 +403,7 @@ class Ploter:
         ax.axhline(mean_gt,  color="C0", linestyle="--", linewidth=1.0, label=f"mean GT  = {mean_gt:.4f}")
         ax.axhline(mean_raw, color="C3", linestyle="--", linewidth=1.0, label=f"mean Raw = {mean_raw:.4f}")
 
-        tick_locs = np.linspace(x_phys[0], x_phys[-1], min(self._SSIM_MAX_XTICKS, n_slices)).round().astype(int)
+        tick_locs = np.linspace(x_phys[0], x_phys[-1], min(40, n_slices)).round().astype(int)
         ax.set_xticks(tick_locs)
         ax.set_xticklabels(tick_locs, rotation=45, ha="right", fontsize=8)
         ax.set_xlabel(f"{axis} index")
@@ -439,7 +436,7 @@ class Ploter:
         for ax, (key, ylabel, desc) in zip(axes.ravel(), metric_specs):
             vals_gt  = np.array([global_metrics.get(f"{key}_gt_{i}",  float("nan")) for i in range(n_elev)], dtype=np.float64)
             vals_raw = np.array([global_metrics.get(f"{key}_raw_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
-            
+
             mean_gt  = float(np.nanmean(vals_gt))
             mean_raw = float(np.nanmean(vals_raw))
 

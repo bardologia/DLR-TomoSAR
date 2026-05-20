@@ -5,10 +5,10 @@ import numpy as np
 
 class OverfitManager:
     def __init__(self, config, logger):
-        self.enabled         = config.training.overfit_enabled
-        self.max_steps       = config.training.overfit_max_steps
-        self.stop_threshold  = config.training.overfit_stop_threshold
-        self.batch_size      = config.training.overfit_batch_size
+        self.enabled         = config.overfit.enabled
+        self.max_steps       = config.overfit.max_steps
+        self.stop_threshold  = config.overfit.stop_threshold
+        self.batch_size      = config.overfit.batch_size
         self.logger          = logger
 
         self.logger.section("[Overfit Manager]")

@@ -10,9 +10,6 @@ from pipelines.inference_pipeline.predictor import Result
 
 
 class Metrics:
-
-    _EPS : float = 1e-12
-
     def __init__(
         self,
         result      : Result,
@@ -118,8 +115,7 @@ class Metrics:
         return out
 
     def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray, raw: np.ndarray) -> Dict[str, np.ndarray]:
-        eps = self._EPS
-
+       
         P = pred.reshape(pred.shape[0], -1).astype(np.float64)
         G = gt  .reshape(gt  .shape[0], -1).astype(np.float64)
         R = raw .reshape(raw .shape[0], -1).astype(np.float64)
@@ -129,19 +125,19 @@ class Metrics:
 
         mae_gt  = np.abs(diff_g).mean(axis=1)
         rmse_gt = np.sqrt((diff_g ** 2).mean(axis=1))
-        g_var   = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + eps
+        g_var   = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
         r2_gt   = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
 
         mae_raw  = np.abs(diff_r).mean(axis=1)
         rmse_raw = np.sqrt((diff_r ** 2).mean(axis=1))
-        r_var    = ((R - R.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + eps
+        r_var    = ((R - R.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
         r2_raw   = 1.0 - (diff_r ** 2).sum(axis=1) / r_var
 
-        gt_prob   = G / G.sum(axis=0, keepdims=True).clip(eps, None)
-        pred_prob = P / P.sum(axis=0, keepdims=True).clip(eps, None)
-        raw_prob  = R / R.sum(axis=0, keepdims=True).clip(eps, None)
+        gt_prob   = G / G.sum(axis=0, keepdims=True).clip(1e-12, None)
+        pred_prob = P / P.sum(axis=0, keepdims=True).clip(1e-12, None)
+        raw_prob  = R / R.sum(axis=0, keepdims=True).clip(1e-12, None)
 
-        log_pp = np.log(pred_prob.clip(eps, None))
+        log_pp = np.log(pred_prob.clip(1e-12, None))
         ce_gt  = -(gt_prob  * log_pp).mean(axis=1)
         ce_raw = -(raw_prob * log_pp).mean(axis=1)
 
@@ -172,13 +168,13 @@ class Metrics:
         mse_gt         = float((diff_gt * diff_gt).mean())
         mae_gt         = float(np.abs(diff_gt).mean())
         gt_mean        = float(gt.mean())
-        overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum()) / (float(((gt  - gt_mean)  ** 2).sum()) + self._EPS)
+        overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum()) / (float(((gt  - gt_mean)  ** 2).sum()) + 1e-12)
 
         diff_raw       = pred - raw
         mse_raw        = float((diff_raw * diff_raw).mean())
         mae_raw        = float(np.abs(diff_raw).mean())
         raw_mean       = float(raw.mean())
-        overall_r2_raw = 1.0 - float((diff_raw * diff_raw).sum()) / (float(((raw - raw_mean) ** 2).sum()) + self._EPS)
+        overall_r2_raw = 1.0 - float((diff_raw * diff_raw).sum()) / (float(((raw - raw_mean) ** 2).sum()) + 1e-12)
 
         metrics: Dict[str, float] = {
             "n_pixels"       : int(self.result.pixel_mse.size),
@@ -257,18 +253,18 @@ class Metrics:
         seed       : int = 0,
     ) -> Dict[str, np.ndarray]:
 
-        flat      = metric_map.reshape(-1)
-        H, W      = metric_map.shape
-        rng       = np.random.default_rng(seed)
-        valid_idx = np.where(np.isfinite(flat))[0]
-        order     = valid_idx[np.argsort(flat[valid_idx])]
+        flat       = metric_map.reshape(-1)
+        H, W       = metric_map.shape
+        rng        = np.random.default_rng(seed)
+        valid_idx  = np.where(np.isfinite(flat))[0]
+        order      = valid_idx[np.argsort(flat[valid_idx])]
 
         best_flat  = order[:n_best]
         worst_flat = order[-n_worst:][::-1]
 
-        pool      = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
-        n_random  = min(n_random, pool.size)
-        rand_flat = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
+        pool       = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
+        n_random   = min(n_random, pool.size)
+        rand_flat  = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
 
         def _to_yx(flat_idx: np.ndarray) -> np.ndarray:
             return np.stack([(flat_idx // W).astype(np.int32), (flat_idx % W).astype(np.int32)], axis=1)

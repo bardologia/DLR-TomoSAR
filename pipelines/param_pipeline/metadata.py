@@ -26,12 +26,8 @@ class ExtractionMetadataManager:
             "output_directory"    : str(self.config.output_directory),
             "output_prefix"       : self.config.output_prefix,
             "output_suffix"       : self.config._output_suffix_value,
-            "number_of_gaussians" : ext.number_of_gaussians,
-            "fitting_method"      : ext.fitting_method,
-            "max_fit_iterations"  : ext.max_fit_iterations,
-            "fit_config"          : asdict(ext.fit_config),
-            "parameter_workers"   : self.config.parameter_workers,
             "parameters_npy"      : npy_path.name,
+            "number_of_gaussians" : ext.k_max,
         }
 
         with open(meta_path, "w", encoding="utf-8") as f:

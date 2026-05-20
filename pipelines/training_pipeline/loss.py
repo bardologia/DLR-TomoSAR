@@ -160,7 +160,27 @@ class Loss:
             gt_idx_b   = gt_index[:,   :, None, :, :].expand_as(gt)
             pred       = torch.gather(pred, dim=1, index=pred_idx_b)
             gt         = torch.gather(gt,   dim=1, index=gt_idx_b)
-           
+            return pred, gt
+
+        if strategy == "sorted_a":
+            pred_a     = pred[:, :, 0]
+            gt_a       = gt[:,   :, 0]
+            pred_index = torch.argsort(pred_a, dim=1, descending=True)
+            gt_index   = torch.argsort(gt_a,   dim=1, descending=True)
+            pred_idx_b = pred_index[:, :, None, :, :].expand_as(pred)
+            gt_idx_b   = gt_index[:,   :, None, :, :].expand_as(gt)
+            pred       = torch.gather(pred, dim=1, index=pred_idx_b)
+            gt         = torch.gather(gt,   dim=1, index=gt_idx_b)
+            return pred, gt
+
+        if strategy == "sort_gt_by_mu":
+            gt_amp    = gt[:, :, 0]
+            gt_mu     = gt[:, :, 1]
+            is_active = gt_amp > 1e-7
+            sort_key  = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float('inf')))
+            gt_index  = torch.argsort(sort_key, dim=1)
+            gt_idx_b  = gt_index[:, :, None, :, :].expand_as(gt)
+            gt        = torch.gather(gt, dim=1, index=gt_idx_b)
             return pred, gt
 
         return pred, gt
@@ -168,6 +188,13 @@ class Loss:
     def _param_term(self, pred_gauss, gt_gauss, kind):
         pred, gt = self._match_params(pred_gauss, gt_gauss)
         diff     = pred - gt
+
+        gt_amp = gt[:, :, 0:1, :, :]
+        is_active = (gt_amp > 1e-7).to(diff.dtype)
+        
+        mask_list = [torch.ones_like(is_active)] + [is_active] * (pred.shape[2] - 1)
+        active_mask = torch.cat(mask_list, dim=2)
+        diff = diff * active_mask
 
         weights = torch.tensor(self.loss_cfg.param_weights, dtype=diff.dtype, device=diff.device)
         if weights.numel() < pred.shape[2]:
@@ -205,7 +232,7 @@ class Loss:
 
         amplitude_mask   = torch.zeros(C, dtype=torch.bool, device=pred_params.device)
         amplitude_mask[torch.arange(0, C, ppg, device=pred_params.device)] = True
-        pred_params_phys = torch.where(amplitude_mask[None, :, None, None], F.softplus(pred_params_phys), pred_params_phys)
+        pred_params_phys = torch.where(amplitude_mask[None, :, None, None], F.relu(pred_params_phys), pred_params_phys)
 
         pred_curves  = self.reconstruct(pred_params_phys)
         diff         = pred_curves - exp_curves

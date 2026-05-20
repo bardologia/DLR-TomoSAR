@@ -161,8 +161,4 @@ class ResUNet(nn.Module):
             x = decoder_block(x)
 
         out = self.output_head(x)
-        out = out.clone()
-        ppg = self.config.params_per_gaussian
-        out[:, 0::ppg]       = functional.softplus(out[:, 0::ppg])
-        out[:, ppg - 1::ppg] = functional.softplus(out[:, ppg - 1::ppg])
         return out

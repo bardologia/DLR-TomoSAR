@@ -12,7 +12,7 @@ from configuration.param_extraction_config import (
     ExtractionConfig,
     FitSettings,
 )
-from pipelines.param_extraction_pipeline.pipeline import ParamExtractionPipeline
+from pipelines.param_pipeline.pipeline import ParamExtractionPipeline
 
 
 def main() -> None:
@@ -22,12 +22,12 @@ def main() -> None:
         print(f"{'='*50}")
 
         config = ExtractionConfig(
-            processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/run_1000a16000a500a4000_dtmf_Xtomo_id2X_20260513_155626"),
+            processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset"),
             pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat"),
 
             output_prefix     = f"params_g{n_gaussians}",
             output_suffix     = None,
-            tomogram_filename = "tomofull_1000a16000a500a4000_1_Xparams_id2X.npy",
+            tomogram_filename = "tomogram_full_1000a16000a500a4000_1_Xparams_id2X.npy",
             height_range      = None,
 
             fit_settings = FitSettings(

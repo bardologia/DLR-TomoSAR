@@ -27,9 +27,6 @@ class Representation(Enum):
         return _CHANNELS_PER_PASS[self.value]
 
     def convert(self, data: np.ndarray) -> np.ndarray:
-        # Hot path: this is called per-patch in DataLoader workers. Only compute
-        # the intermediates the active representation actually needs and avoid
-        # the unconditional final ``np.nan_to_num`` scan.
         n_samples, n_passes, h, w = data.shape
         cpp                       = _CHANNELS_PER_PASS[self.value]
 

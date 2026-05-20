@@ -4,10 +4,10 @@ import json
 from dataclasses import asdict
 from pathlib     import Path
 
-from configuration.dataset_config               import DatasetConfiguration
-from configuration.preprocessing_config         import CropRegion
-from pipelines.dataset_creation_pipeline.patch  import GridInfo
-from tools.logger                               import Logger
+from configuration.dataset_config            import DatasetConfiguration
+from configuration.processing_config         import CropRegion
+from pipelines.dataset_pipeline.patch        import GridInfo
+from tools.logger                            import Logger
 
 
 class Layout:
@@ -21,22 +21,22 @@ class Layout:
         with open(layout_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
 
-        self.global_crop   : CropRegion = CropRegion(*payload["global_crop"])
-        self.dataset_type  : str        = payload["dataset_type"]
-        self.tomogram_tag  : str        = payload["tomogram_tag"]
-        self.parameter_tag : str        = payload["parameter_tag"]
-        self.artifacts     : dict       = payload["artifacts"]
+        self.global_crop    : CropRegion = CropRegion(*payload["global_crop"])
+        self.dataset_type   : str        = payload["dataset_type"]
+        self.tomogram_tag   : str        = payload["tomogram_tag"]
+        self.parameter_tag  : str        = payload["parameter_tag"]
+        self.artifacts      : dict       = payload["artifacts"]
 
         self.logger.section("[Layout Loaded]")
-        self.logger.subsection(f"Run Directory : {self.run_directory}")
-        self.logger.subsection(f"Global Crop   : {self.global_crop.as_tuple()}")
-        self.logger.subsection(f"Tomogram Tag  : {self.tomogram_tag}")
-        self.logger.subsection(f"Parameters    : {self.parameters_path} \n")
+        self.logger.subsection(f"Run Directory  : {self.run_directory}")
+        self.logger.subsection(f"Global Crop    : {self.global_crop.as_tuple()}")
+        self.logger.subsection(f"Tomogram Tag   : {self.tomogram_tag}")
+        self.logger.subsection(f"Parameters     : {self.parameters_path} \n")
 
     def artifact_path(self, artifact_key: str) -> Path:
         if artifact_key == "parameters":
             return self.parameters_path
-        
+
         return self.data_directory / self.artifacts[artifact_key]
 
 

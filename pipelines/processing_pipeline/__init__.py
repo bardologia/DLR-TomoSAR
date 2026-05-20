@@ -1,9 +1,9 @@
-from pipelines.pre_processing_pipeline.artifacts    import ArtifactRegistry, ArtifactType
-from pipelines.pre_processing_pipeline.interferogram import InterferogramBuilder
-from pipelines.pre_processing_pipeline.metadata     import MetadataManager
-from pipelines.param_extraction_pipeline.fitting    import ParameterExtractor
-from pipelines.pre_processing_pipeline.pipeline     import PreProcessingPipeline
-from pipelines.pre_processing_pipeline.tomogram     import TomogramProcessor
+from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, ArtifactType
+from pipelines.processing_pipeline.interferogram import InterferogramBuilder
+from pipelines.processing_pipeline.metadata      import MetadataManager
+from pipelines.param_pipeline.fitting            import ParameterExtractor
+from pipelines.processing_pipeline.pipeline      import ProcessingPipeline
+from pipelines.processing_pipeline.tomogram      import TomogramProcessor
 
 __all__ = [
     "ArtifactRegistry",
@@ -11,6 +11,6 @@ __all__ = [
     "InterferogramBuilder",
     "MetadataManager",
     "ParameterExtractor",
-    "PreProcessingPipeline",
+    "ProcessingPipeline",
     "TomogramProcessor",
 ]

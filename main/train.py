@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-GPU_ID = 0  
+GPU_ID = 3 
 os.environ["CUDA_VISIBLE_DEVICES"]    = str(GPU_ID)
 os.environ["MKL_NUM_THREADS"]     = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
@@ -46,13 +46,13 @@ def main() -> None:
 
     # ── Experiment ────────────────────────────────────────────────────────────
     model_name   = "unet"
-    n_gaussians  = 2
+    n_gaussians  = 5
     seed         = 0
 
     # ── Paths ─────────────────────────────────────────────────────────────────
-    dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset")
+    dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
     logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
-    params_subdir = f"params_Ng{n_gaussians}_adapt"
+    params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
 
     # ── Dataset splits ────────────────────────────────────────────────────────
     train_az  = (1000,  9120)
@@ -68,12 +68,12 @@ def main() -> None:
     num_workers = 8
 
     # ── Optimizer ─────────────────────────────────────────────────────────────
-    lr    = 1e-3
+    lr    = 1e-4
     betas = (0.9, 0.999)
     eps   = 1e-8
 
     # ── Scheduler ─────────────────────────────────────────────────────────────
-    scheduler_epochs = 150
+    scheduler_epochs = 200
     eta_min          = 1e-6
 
     # ── Warmup ────────────────────────────────────────────────────────────────
@@ -91,76 +91,42 @@ def main() -> None:
     es_restore   = True
 
     # ── Training ──────────────────────────────────────────────────────────────
-    epochs               = 15
+    epochs               = 200
     validation_frequency = 5
     use_amp              = False
     grad_accum_steps     = 1
 
     # ── Loss ──────────────────────────────────────────────────────────────────
-    use_mse_curve     = True
-    weight_mse_curve  = 1.0
-
-    use_ssim_curve    = False
-    weight_ssim_curve = 1.0
-    ssim_window_size  = 11
-    ssim_sigma        = 1.5
-    ssim_data_range   = 1.0
-    ssim_k1           = 0.01
-    ssim_k2           = 0.03
-    ssim_axis         = "elevation"
-
+    
+    use_charbonnier_curve    = True  # Upgraded from MSE (sharper profiles)
+    weight_charbonnier_curve = 0.5
+    
+    use_ssim_curve           = True
+    weight_ssim_curve        = 0.5
+    
+    use_cosine_curve         = True  # Aligns peaks correctly regardless of amplitude
+    weight_cosine_curve      = 0.1
+    
+    use_param_l1             = True
+    weight_param_l1          = 1.0
+    param_match              = "sort_gt_by_mu"
+    
+    use_smoothness_tv        = True
+    weight_smoothness_tv     = 1e-4  # Smooths out speckle across neighboring pixels
+    
     # ── Overfit sanity check ──────────────────────────────────────────────────
     overfit_enabled        = False
-    overfit_max_steps      = 50
+    overfit_max_steps      = 5
     overfit_stop_threshold = 1e-6
     overfit_batch_size     = 1
 
-    # ── Model architecture ────────────────────────────────────────────────────
-    features           = [64, 128, 256, 512]
-    bottleneck_factor  = 2
-    dropout            = 0.0
-    activation         = "relu"
-    normalization      = "batch"
-    upsample_mode      = "convtranspose"
-    init_mode          = "default"
-
-    # ── Per-layer LR / weight decay ───────────────────────────────────────────
-    lr_encoder      = 1e-4;  wd_encoder      = 1e-4
-    lr_bottleneck   = 1e-4;  wd_bottleneck   = 1e-4
-    lr_decoder      = 1e-4;  wd_decoder      = 1e-4
-    lr_output_head  = 1e-3;  wd_output_head  = 1e-4
-
     # ─────────────────────────────────────────────────────────────────────────
 
-    model_config = UNetConfig(
-        features          = features,
-        bottleneck_factor = bottleneck_factor,
-        dropout           = dropout,
-        activation        = activation,
-        normalization     = normalization,
-        upsample_mode     = upsample_mode,
-        init_mode         = init_mode,
-    )
-
-    _pg_overrides = {
-        "encoder"     : {"lr": lr_encoder,     "weight_decay": wd_encoder},
-        "bottleneck"  : {"lr": lr_bottleneck,  "weight_decay": wd_bottleneck},
-        "decoder"     : {"lr": lr_decoder,     "weight_decay": wd_decoder},
-        "output_head" : {"lr": lr_output_head, "weight_decay": wd_output_head},
-    }
-    _orig_get_param_groups = model_config.get_param_groups
-    def _patched_get_param_groups(model):
-        groups = _orig_get_param_groups(model)
-        for g in groups:
-            overrides = _pg_overrides.get(g.get("name", ""), {})
-            g.update(overrides)
-        return groups
-    model_config.get_param_groups = _patched_get_param_groups
-
-    params_path   = dataset_path / "params" / params_subdir / f"parameters_Ng{n_gaussians}_adapt.npy"
+    model_config = UNetConfig()
 
     with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
         layout = json.load(f)
+    
     global_crop = CropRegion(*layout["global_crop"])
 
     split_regions = SplitRegions(
@@ -192,7 +158,7 @@ def main() -> None:
     )
 
     trainer_config = TrainerConfig(
-        gaussian       = GaussianConfig.from_dataset(dataset_path, params_subdir=params_subdir),
+        gaussian       = GaussianConfig.from_dataset(dataset_path, n_gaussians=n_gaussians),
         early_stopping = EarlyStoppingConfig(patience=es_patience, min_delta=es_min_delta, restore_best=es_restore),
         warmup         = WarmupConfig(warmup_steps=warmup_steps, warmup_start_factor=warmup_start_factor, warmup_enabled=warmup_enabled),
         scheduler      = SchedulerConfig(epochs=scheduler_epochs, eta_min=eta_min),
@@ -218,17 +184,24 @@ def main() -> None:
         ),
 
         loss = LossConfig(
-            use_mse_curve     = use_mse_curve,
-            weight_mse_curve  = weight_mse_curve,
+            use_mse_curve            = False, 
+            weight_mse_curve         = 0.0,
+            
+            use_ssim_curve           = use_ssim_curve,
+            weight_ssim_curve        = weight_ssim_curve,
 
-            use_ssim_curve    = use_ssim_curve,
-            weight_ssim_curve = weight_ssim_curve,
-            ssim_window_size  = ssim_window_size,
-            ssim_sigma        = ssim_sigma,
-            ssim_data_range   = ssim_data_range,
-            ssim_k1           = ssim_k1,
-            ssim_k2           = ssim_k2,
-            ssim_axis         = ssim_axis,
+            use_charbonnier_curve    = use_charbonnier_curve,
+            weight_charbonnier_curve = weight_charbonnier_curve,
+
+            use_cosine_curve         = use_cosine_curve,
+            weight_cosine_curve      = weight_cosine_curve,
+
+            use_param_l1             = use_param_l1,
+            weight_param_l1          = weight_param_l1,
+            param_match              = param_match,
+
+            use_smoothness_tv        = use_smoothness_tv,
+            weight_smoothness_tv     = weight_smoothness_tv,
         ),
     )
 

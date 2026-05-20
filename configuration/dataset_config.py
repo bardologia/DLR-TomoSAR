@@ -43,6 +43,7 @@ class ChannelStats:
 class InputNormalizationMode(Enum):
     PER_CHANNEL = "per_channel"
     GROUPED     = "grouped"
+    DISABLED    = "disabled"
 
 
 class OutputNormalizationMode(Enum):
