@@ -23,6 +23,7 @@ class TrainingPipeline:
         model_name     : str,
         model_config   = None,
         seed           : int = 0,
+        run_name       : str | None = None,
     ) -> None:
 
         patch_height, patch_width = dataset_config.patch.size
@@ -43,6 +44,7 @@ class TrainingPipeline:
             trainer_config = trainer_config,
             model_name     = model_name,
             base_logdir    = Path(trainer_config.io.logdir),
+            run_name       = run_name,
         )
         self.logger = self.run_metadata.logger
 
@@ -76,11 +78,11 @@ class TrainingPipeline:
         gaussian_cfg                    = self.trainer_config.gaussian
         self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
 
-        if self.dataset_config.x_axis is None:
-            tomo_path     = self.dataset_pipeline.layout.artifact_path("tomogram_full")
-            tomo_mmap     = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
-            x_axis_length = int(tomo_mmap.shape[0])
-            self.dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length, dtype=np.float32)
+        tomo_path     = self.dataset_pipeline.layout.artifact_path("tomogram_full")
+        tomo_mmap     = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
+        x_axis_length = int(tomo_mmap.shape[0])
+
+        self.dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length, dtype=np.float32)
 
         train_loader, val_loader, test_loader, datasets = self.dataset_pipeline.run()
 
@@ -95,12 +97,7 @@ class TrainingPipeline:
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
-        self.run_metadata.save_run_summary(
-            model_name    = self.model_name,
-            in_channels   = in_channels,
-            out_channels  = out_channels,
-            x_axis_length = x_axis_length,
-        )
+        self.run_metadata.save_run_summary(model_name = self.model_name, in_channels = in_channels, out_channels = out_channels, x_axis_length = x_axis_length)
 
         trainer = Trainer(
             model                 = model,

@@ -300,7 +300,7 @@ class Trainer:
                             gc.collect()
                             torch.cuda.empty_cache()
                             
-                        self._update_optimizer(self.lr_scheduler.lrs_with_warmup(new_lrs))
+                        self._update_optimizer(new_lrs)
 
                         monitor_data = {
                             "epoch"         : f"{epoch_num}/{epochs}",

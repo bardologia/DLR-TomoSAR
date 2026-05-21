@@ -48,6 +48,7 @@ from pipelines.training_pipeline.pipeline import TrainingPipeline
 model_name   = "unet"
 n_gaussians  = 5
 seed         = 0
+run_name     = None          # set to a string for a custom run directory name
 
 dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
 logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
@@ -66,11 +67,14 @@ num_workers = 8
 betas = (0.9, 0.999)
 eps   = 1e-8
 
-scheduler_epochs = 200
-eta_min          = 1e-6
+scheduler_type = "cosine_annealing_warm_restarts"
+T_zero         = 10
+T_mult         = 2.0
+eta_min        = 1e-6
 
 warmup_enabled      = True
-warmup_steps        = 50
+warmup_mode         = "linear"
+warmup_steps        = 200
 warmup_start_factor = 0.1
 
 use_ema    = False
@@ -173,8 +177,8 @@ def main() -> None:
     trainer_config = TrainerConfig(
         gaussian       = GaussianConfig.from_dataset(dataset_path, n_gaussians=n_gaussians),
         early_stopping = EarlyStoppingConfig(patience=es_patience, min_delta=es_min_delta, restore_best=es_restore),
-        warmup         = WarmupConfig(warmup_steps=warmup_steps, warmup_start_factor=warmup_start_factor, warmup_enabled=warmup_enabled),
-        scheduler      = SchedulerConfig(epochs=scheduler_epochs, eta_min=eta_min),
+        warmup         = WarmupConfig(warmup_steps=warmup_steps, warmup_start_factor=warmup_start_factor, warmup_enabled=warmup_enabled, warmup_mode=warmup_mode),
+        scheduler      = SchedulerConfig(type=scheduler_type, T_0=T_zero, T_mult=T_mult, eta_min=eta_min),
         ema            = EMAConfig(use_ema=use_ema, ema_decay=ema_decay),
         optimizer      = OptimizerConfig(betas=betas, eps=eps),
         io             = IOConfig(logdir=logdir),
@@ -222,6 +226,7 @@ def main() -> None:
         model_name     = model_name,
         model_config   = model_config,
         seed           = seed,
+        run_name       = run_name,
     )
 
     pipeline.run()

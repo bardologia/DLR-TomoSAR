@@ -21,12 +21,7 @@ from configuration.param_extraction_config import FitMode, FitSettings
 from tools.logger import Logger
 
 
-def _evaluate_gaussian(
-    height_axis : np.ndarray,   
-    amps        : np.ndarray,   
-    mus         : np.ndarray,   
-    sigs        : np.ndarray,   
-) -> np.ndarray:                
+def _evaluate_gaussian(height_axis : np.ndarray, amps : np.ndarray, mus : np.ndarray, sigs : np.ndarray) -> np.ndarray:                
     pred = np.zeros((len(amps), len(height_axis)), dtype=np.float32)
     h    = height_axis[None, :]
     
@@ -37,14 +32,7 @@ def _evaluate_gaussian(
     return pred
 
 
-def _prominence_worker(
-    smoothed_chunk  : np.ndarray,  
-    height_axis     : np.ndarray,   
-    K               : int,
-    sigma_guess     : float,
-    min_dist        : int,
-    prominence_frac : float,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _prominence_worker(smoothed_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     chunk_N, H = smoothed_chunk.shape
     amps = np.zeros((chunk_N, K), dtype=np.float32)
@@ -85,14 +73,7 @@ def _prominence_worker(
     return amps, mus, sigs
 
 
-def _prominence_batch(
-    prof_raw        : np.ndarray,  
-    height_axis     : np.ndarray,   
-    K               : int,
-    prominence_frac : float = 0.05,
-    n_workers       : int   = 1,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-
+def _prominence_batch(prof_raw : np.ndarray, height_axis : np.ndarray, K : int, prominence_frac : float = 0.05, n_workers : int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     N, H        = prof_raw.shape
     h_span      = float(height_axis[-1] - height_axis[0])
     dh          = float(height_axis[1] - height_axis[0])
@@ -134,6 +115,7 @@ class SigmaAdamKernel:
         expon   = jnp.clip(-(diff ** 2) / safe_s2[:, None], -100.0, 0.0)
         pred    = (amps[:, None] * jnp.exp(expon)).sum(axis=0)
         mse     = jnp.mean((pred - profile) ** 2)
+     
         return mse
     
     @staticmethod
@@ -630,6 +612,82 @@ class SigmaFittingExtractor:
 
         return total_attempted
 
+    def _estimate_r2(
+        self,
+        output           : np.ndarray,
+        tomogram_mmap    : np.ndarray,
+        height_axis      : np.ndarray,
+        threshold_factor : float,
+        truncation_index : int,
+    ) -> dict:
+        
+        H, Az, R = tomogram_mmap.shape
+        rng      = np.random.default_rng(0)
+        idx_flat = rng.choice(Az * R, size=min(self.r2_sample_cap, Az * R), replace=False)
+        az_idx   = idx_flat // R
+        r_idx    = idx_flat %  R
+
+        profiles = np.abs(tomogram_mmap[:, az_idx, r_idx]).T.astype(np.float64)
+
+        if threshold_factor > 0.0:
+            col_max  = profiles.max(axis=1, keepdims=True)
+            profiles = np.where(profiles > col_max * threshold_factor, profiles, 0.0)
+       
+        if truncation_index < H:
+            profiles[:, truncation_index:] = 0.0
+
+        active = profiles.max(axis=1) > 1e-7
+        nan_stats = dict(mse_norm=float("nan"), mse_denorm=float("nan"), r2_valid=False)
+        if not active.any():
+            return nan_stats
+
+        y    = profiles[active]
+        h64  = height_axis.astype(np.float64)
+        f    = output[:, az_idx, r_idx].T[active].astype(np.float64)
+        amps = f[:, 0::3]
+        mus  = f[:, 1::3]
+        sigs = np.maximum(f[:, 2::3], 1e-6)
+
+        diff = h64[None, None, :] - mus[:, :, None]
+        pred = (amps[:, :, None] * np.exp(np.clip(-(diff ** 2) / (2.0 * sigs[:, :, None] ** 2 + 1e-10), -100.0, 0.0))).sum(axis=1)
+
+        pmax_y       = y.max(axis=1, keepdims=True)
+        safe_pmax    = np.where(pmax_y > 1e-10, pmax_y, 1.0)
+        y_norm       = y    / safe_pmax
+        pred_norm    = pred / safe_pmax
+        active_bins  = y > 0.0
+        n_active     = np.maximum(active_bins.sum(axis=1), 1)
+        mse_norm     = float(((active_bins * (y_norm  - pred_norm) ** 2).sum(axis=1) / n_active).mean())
+
+        mse_denorm   = float(((active_bins * (y - pred) ** 2).sum(axis=1) / n_active).mean())
+
+        pred_m  = np.where(active_bins, pred, 0.0)
+        mean_y  = (y * active_bins).sum(axis=1, keepdims=True) / np.maximum(active_bins.sum(axis=1, keepdims=True), 1)
+        ss_res  = (active_bins * (y - pred_m) ** 2).sum(axis=1)
+        ss_tot  = (active_bins * (y - mean_y) ** 2).sum(axis=1)
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            r2 = np.where(ss_tot > 1e-20, 1.0 - ss_res / ss_tot, np.nan)
+
+        finite = np.isfinite(r2)
+        if not finite.any():
+            return dict(mse_norm=mse_norm, mse_denorm=mse_denorm, r2_valid=False)
+
+        r2f = r2[finite]
+        return dict(
+            mse_norm    = mse_norm,
+            mse_denorm  = mse_denorm,
+            r2_valid    = True,
+            r2_mean     = float(r2f.mean()),
+            r2_median   = float(np.median(r2f)),
+            r2_std      = float(r2f.std()),
+            r2_p10      = float(np.percentile(r2f, 10)),
+            r2_p25      = float(np.percentile(r2f, 25)),
+            r2_p75      = float(np.percentile(r2f, 75)),
+            r2_p90      = float(np.percentile(r2f, 90)),
+            r2_neg_frac = float((r2f < 0).mean()),
+        )
+
     def run(
         self,
         tomogram_path : Path,
@@ -672,82 +730,3 @@ class SigmaFittingExtractor:
             self.logger.subsection("R²                   : N/A")
 
         return output
-
-    def _estimate_r2(
-        self,
-        output           : np.ndarray,
-        tomogram_mmap    : np.ndarray,
-        height_axis      : np.ndarray,
-        threshold_factor : float,
-        truncation_index : int,
-    ) -> dict:
-        
-        H, Az, R = tomogram_mmap.shape
-        rng      = np.random.default_rng(0)
-        idx_flat = rng.choice(Az * R, size=min(self.r2_sample_cap, Az * R), replace=False)
-        az_idx   = idx_flat // R
-        r_idx    = idx_flat %  R
-
-        profiles = np.abs(tomogram_mmap[:, az_idx, r_idx]).T.astype(np.float64)
-
-        if threshold_factor > 0.0:
-            col_max  = profiles.max(axis=1, keepdims=True)
-            profiles = np.where(profiles > col_max * threshold_factor, profiles, 0.0)
-       
-        if truncation_index < H:
-            profiles[:, truncation_index:] = 0.0
-
-        active = profiles.max(axis=1) > 1e-7
-        nan_stats = dict(mse_norm=float("nan"), mse_denorm=float("nan"), r2_valid=False)
-        if not active.any():
-            return nan_stats
-
-        y    = profiles[active]
-        h64  = height_axis.astype(np.float64)
-        f    = output[:, az_idx, r_idx].T[active].astype(np.float64)
-        amps = f[:, 0::3]
-        mus  = f[:, 1::3]
-        sigs = np.maximum(f[:, 2::3], 1e-6)
-
-        diff = h64[None, None, :] - mus[:, :, None]
-        pred = (amps[:, :, None] * np.exp(np.clip(-(diff ** 2) / (2.0 * sigs[:, :, None] ** 2 + 1e-10), -100.0, 0.0))).sum(axis=1)
-
-        # --- normalised MSE (0-1 scale per pixel) ---
-        pmax_y       = y.max(axis=1, keepdims=True)
-        safe_pmax    = np.where(pmax_y > 1e-10, pmax_y, 1.0)
-        y_norm       = y    / safe_pmax
-        pred_norm    = pred / safe_pmax
-        active_bins  = y > 0.0
-        n_active     = np.maximum(active_bins.sum(axis=1), 1)
-        mse_norm     = float(((active_bins * (y_norm  - pred_norm) ** 2).sum(axis=1) / n_active).mean())
-
-        # --- denormalised MSE (original amplitude scale) ---
-        mse_denorm   = float(((active_bins * (y - pred) ** 2).sum(axis=1) / n_active).mean())
-
-        # --- R² (on original scale, active bins only) ---
-        pred_m  = np.where(active_bins, pred, 0.0)
-        mean_y  = (y * active_bins).sum(axis=1, keepdims=True) / np.maximum(active_bins.sum(axis=1, keepdims=True), 1)
-        ss_res  = (active_bins * (y - pred_m) ** 2).sum(axis=1)
-        ss_tot  = (active_bins * (y - mean_y) ** 2).sum(axis=1)
-
-        with np.errstate(invalid="ignore", divide="ignore"):
-            r2 = np.where(ss_tot > 1e-20, 1.0 - ss_res / ss_tot, np.nan)
-
-        finite = np.isfinite(r2)
-        if not finite.any():
-            return dict(mse_norm=mse_norm, mse_denorm=mse_denorm, r2_valid=False)
-
-        r2f = r2[finite]
-        return dict(
-            mse_norm    = mse_norm,
-            mse_denorm  = mse_denorm,
-            r2_valid    = True,
-            r2_mean     = float(r2f.mean()),
-            r2_median   = float(np.median(r2f)),
-            r2_std      = float(r2f.std()),
-            r2_p10      = float(np.percentile(r2f, 10)),
-            r2_p25      = float(np.percentile(r2f, 25)),
-            r2_p75      = float(np.percentile(r2f, 75)),
-            r2_p90      = float(np.percentile(r2f, 90)),
-            r2_neg_frac = float((r2f < 0).mean()),
-        )

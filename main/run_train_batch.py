@@ -61,36 +61,36 @@ EXPERIMENTS = [
         "use_l1_curve":             False, "weight_l1_curve":          0.0,
         "use_huber_curve":          False, "weight_huber_curve":       0.0,
         "use_charbonnier_curve":    False, "weight_charbonnier_curve": 0.0,
-        "use_cosine_curve":         True,  "weight_cosine_curve":      0.1,
+        "use_cosine_curve":         False, "weight_cosine_curve":      0.1,
         "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
         "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
         "use_param_l1":             True,  "weight_param_l1":          1.0,
         "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        True , "weight_smoothness_tv":     5e-5,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
     },
     {
         "use_mse_curve":            False, "weight_mse_curve":         0.0,
         "use_l1_curve":             False, "weight_l1_curve":          0.0,
         "use_huber_curve":          False, "weight_huber_curve":       0.0,
         "use_charbonnier_curve":    False, "weight_charbonnier_curve": 0.0,
-        "use_cosine_curve":         True,  "weight_cosine_curve":      0.1,
-        "use_spectral_coherence":   True , "weight_spectral_coh":      0.1,
-        "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
-        "use_param_l1":             True,  "weight_param_l1":          1.0,
+        "use_cosine_curve":         False,  "weight_cosine_curve":      0.1,
+        "use_spectral_coherence":   False , "weight_spectral_coh":      0.1,
+        "use_ssim_curve":           True, "weight_ssim_curve":          1.0, 
+        "use_param_l1":             False,  "weight_param_l1":          1.0,
         "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        True , "weight_smoothness_tv":     5e-5,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
     },
     {
         "use_mse_curve":            False, "weight_mse_curve":         0.0,
         "use_l1_curve":             False, "weight_l1_curve":          0.0,
         "use_huber_curve":          False, "weight_huber_curve":       0.0,
-        "use_charbonnier_curve":    True,  "weight_charbonnier_curve": 0.5,
-        "use_cosine_curve":         True,  "weight_cosine_curve":      0.1,
-        "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
-        "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
-        "use_param_l1":             True,  "weight_param_l1":          2.0,
+        "use_charbonnier_curve":    True, "weight_charbonnier_curve":  1.0,
+        "use_cosine_curve":         False,  "weight_cosine_curve":      0.1,
+        "use_spectral_coherence":   False , "weight_spectral_coh":      0.1,
+        "use_ssim_curve":           False, "weight_ssim_curve":          1.0, 
+        "use_param_l1":             False,  "weight_param_l1":          1.0,
         "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        True , "weight_smoothness_tv":     5e-5,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
     },
 ]
 
@@ -121,7 +121,7 @@ FLOAT_VARS = {
     "weight_smoothness_tv",
 }
 
-STR_VARS = {"ssim_axis", "param_match"}
+STR_VARS = {"ssim_axis", "param_match", "run_name"}
 
 
 def _patch_script(src: str, overrides: dict, gpu_id: int, exp_name: str) -> str:
@@ -133,13 +133,6 @@ def _patch_script(src: str, overrides: dict, gpu_id: int, exp_name: str) -> str:
         if stripped.startswith("GPU_ID"):
             out.append(f"GPU_ID = {gpu_id}")
             continue
-
-        if stripped.startswith('logdir'):
-            import re
-            m = re.match(r'(\s*logdir\s*=\s*)"([^"]+)"', line)
-            if m:
-                out.append(f'{m.group(1)}"{m.group(2)}/unet_trials/{exp_name}"')
-                continue
 
         matched = False
         # Only patch bare module-level assignments; skip lines inside function
@@ -161,7 +154,7 @@ def _patch_script(src: str, overrides: dict, gpu_id: int, exp_name: str) -> str:
     return "\n".join(out)
 
 
-GPU_IDS = [0, 1, 3]
+GPU_IDS = [0, 1, 2]
 
 
 def main() -> None:
@@ -177,7 +170,7 @@ def main() -> None:
         print(f"[LAUNCH] GPU {gpu_id}  →  {name}")
 
         src     = TRAIN_SCRIPT.read_text(encoding="utf-8")
-        patched = _patch_script(src, exp, gpu_id, name)
+        patched = _patch_script(src, {**exp, "run_name": name}, gpu_id, name)
 
         # Write to a real temp file so __file__ is defined inside the script
         tmp = tempfile.NamedTemporaryFile(

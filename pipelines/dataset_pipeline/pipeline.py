@@ -23,11 +23,10 @@ class DatasetPipeline:
         self.training_run_directory = Path(training_run_directory)
         self.logger                 = logger 
 
-        self.layout          = Layout(config.preprocessing_run_directory, logger=self.logger, parameters_path=config.parameters_path)
-        self.cropper         = Cropper(self.layout, config.split_regions, logger=self.logger)
+        self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
+        self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
-        
-        self.augmenter       = SpatialAugmenter(config.augmentation)
+        self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger)
 
         ic = config.input_config
         oc = config.output_config
@@ -43,7 +42,6 @@ class DatasetPipeline:
                 "Output Parameters"   : ",".join(oc.role_names),
                 "Patch Size"          : config.patch.size,
                 "Patch Stride"        : config.patch.stride,
-                "Augmentations"       : f"flip_h={config.augmentation.p_flip_h} flip_v={config.augmentation.p_flip_v} rot90={config.augmentation.p_rot90}, amp_scale={config.augmentation.amp_scale_range} noise_std={config.augmentation.noise_std}",
             },
             title="Dataset Creation",
         )

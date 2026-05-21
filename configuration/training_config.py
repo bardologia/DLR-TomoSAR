@@ -115,6 +115,8 @@ class SchedulerConfig:
     factor       : float = 0.1
     patience     : int   = 10
     threshold    : float = 1e-4
+    T_0          : int   = 10
+    T_mult       : float = 1.0
 
 
 @dataclass

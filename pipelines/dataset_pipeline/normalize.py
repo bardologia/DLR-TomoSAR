@@ -16,10 +16,10 @@ from torch.utils.data             import Subset
 
 @dataclass
 class Stats:
-    input_stats  : Optional[ChannelStats]    = None
-    output_stats : Optional[ChannelStats]    = None
-    input_mode   : InputNormalizationMode    = InputNormalizationMode.PER_CHANNEL
-    output_mode  : OutputNormalizationMode   = OutputNormalizationMode.DISABLED
+    input_stats  : Optional[ChannelStats]   = None
+    output_stats : Optional[ChannelStats]   = None
+    input_mode   : InputNormalizationMode   = InputNormalizationMode.PER_CHANNEL
+    output_mode  : OutputNormalizationMode  = OutputNormalizationMode.DISABLED
 
     def save(self, directory: Path) -> Path:
         directory = Path(directory)
@@ -69,7 +69,7 @@ class Stats:
 
 class StatsComputer:
     @staticmethod
-    def _build_input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
+    def _input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
         map: dict[Representation, list[str]] = {
             Representation.REAL_IMAG     : ["raw_re_im",  "raw_re_im"],
             Representation.MAG_REAL_IMAG : ["log_mag",    "norm_re_im", "norm_re_im"],
@@ -100,7 +100,7 @@ class StatsComputer:
         return keys
 
     @staticmethod
-    def _build_output_to_group(n_channels : int, role_names : list[str]) -> list[str]:
+    def _output_to_group(n_channels : int, role_names : list[str]) -> list[str]:
         ppg = len(role_names)
         return [role_names[i % ppg] for i in range(n_channels)]
 
@@ -193,7 +193,7 @@ class StatsComputer:
             logger.subsection(f"  {k:<24s} -> {len(idxs):>3d} ch  [{preview}]")
 
     @staticmethod
-    def _get_dataset_subset(dataset, max_samples : int) -> tuple:
+    def _get_subset(dataset, max_samples : int) -> tuple:
         n_total = len(dataset)
         n_use   = min(n_total, max_samples) if max_samples > 0 else n_total
 
@@ -272,7 +272,7 @@ class StatsComputer:
                 StatsComputer._accumulate_batch(gt, out_count, out_mean, out_m2)
 
     @staticmethod
-    def _compute_input_stats(
+    def _input_stats(
         logger       : Logger,
         input_config : InputConfig,
         n_slaves     : int,
@@ -282,7 +282,7 @@ class StatsComputer:
         in_mean,
         in_m2,
     ) -> ChannelStats:
-        in_groups = StatsComputer._build_input_to_group(input_config, n_slaves)
+        in_groups = StatsComputer._input_to_group(input_config, n_slaves)
 
         if input_mode is InputNormalizationMode.PER_CHANNEL:
             input_stats       = StatsComputer._per_channel_stats(in_count, in_mean, in_m2)
@@ -302,7 +302,7 @@ class StatsComputer:
         return input_stats
 
     @staticmethod
-    def _compute_output_stats(
+    def _output_stats(
         logger        : Logger,
         output_config : OutputConfig,
         output_mode   : OutputNormalizationMode,
@@ -311,7 +311,7 @@ class StatsComputer:
         out_mean,
         out_m2,
     ) -> ChannelStats:
-        out_groups = StatsComputer._build_output_to_group(gt_channels, output_config.role_names)
+        out_groups = StatsComputer._output_to_group(gt_channels, output_config.role_names)
 
         if output_mode is OutputNormalizationMode.PER_CHANNEL:
             output_stats       = StatsComputer._per_channel_stats(out_count, out_mean, out_m2)
@@ -348,7 +348,7 @@ class StatsComputer:
         logger.subsection(f"Input  mode : {input_mode.value}")
         logger.subsection(f"Output mode : {output_mode.value}")
 
-        subset, n_use, n_total = StatsComputer._get_dataset_subset(
+        subset, n_use, n_total = StatsComputer._get_subset(
             dataset     = dataset,
             max_samples = max_samples,
         )
@@ -388,7 +388,7 @@ class StatsComputer:
 
         input_stats: Optional[ChannelStats] = None
         if do_input:
-            input_stats = StatsComputer._compute_input_stats(
+            input_stats = StatsComputer._input_stats(
                 logger       = logger,
                 input_config = input_config,
                 n_slaves     = n_slaves,
@@ -401,7 +401,7 @@ class StatsComputer:
 
         output_stats: Optional[ChannelStats] = None
         if do_output:
-            output_stats = StatsComputer._compute_output_stats(
+            output_stats = StatsComputer._output_stats(
                 logger        = logger,
                 output_config = output_config,
                 output_mode   = output_mode,

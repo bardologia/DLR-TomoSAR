@@ -28,6 +28,24 @@ class Scheduler:
         progress      = min(1.0, epoch / max(1, T_max))
         return eta_min_ratio + 0.5 * (1.0 - eta_min_ratio) * (1.0 + math.cos(math.pi * progress))
 
+    def _cosine_annealing_warm_restarts(self, epoch: int) -> float:
+        T_0       = int(self.config.scheduler.T_0)
+        T_mult    = float(self.config.scheduler.T_mult)
+        eta_min   = float(self.config.scheduler.eta_min)
+        base_lr   = self.base_lrs[0]
+        eta_min_ratio = eta_min / max(base_lr, 1e-12)
+
+        if T_mult == 1.0:
+            T_cur = epoch % T_0
+            T_i   = T_0
+        else:
+            n = math.floor(math.log(1 - epoch / T_0 * (1 - T_mult), T_mult)) if epoch >= T_0 else 0
+            T_i   = T_0 * (T_mult ** n)
+            T_cur = epoch - T_0 * (T_mult ** n - 1) / (T_mult - 1)
+
+        progress = T_cur / max(1, T_i)
+        return eta_min_ratio + 0.5 * (1.0 - eta_min_ratio) * (1.0 + math.cos(math.pi * progress))
+
     def _step_decay(self, epoch: int) -> float:
         step_size = int(self.config.scheduler.step_size)
         gamma     = float(self.config.scheduler.gamma)
@@ -81,6 +99,9 @@ class Scheduler:
         if self.scheduler_type == "cosine_annealing":
             return self._cosine_annealing(epoch)
         
+        if self.scheduler_type == "cosine_annealing_warm_restarts":
+            return self._cosine_annealing_warm_restarts(epoch)
+        
         if self.scheduler_type == "step":
             return self._step_decay(epoch)
         
@@ -104,29 +125,23 @@ class Scheduler:
         raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
     def step(self, epoch: int, metric: float | None = None) -> list[float]:
-        if self.warmup is not None and not self.warmup.is_finished():
-            return [lr * self.warmup.factor() for lr in self.base_lrs]
-
         if self.scheduler_type == "reduce_on_plateau":
-            self._factor_for(epoch, metric)   # updates self.current_lrs via _reduce_on_plateau
+            self._factor_for(epoch, metric)   
             lrs = list(self.current_lrs)
         
         else:
             factor = self._factor_for(epoch, metric)
             lrs    = [lr * factor for lr in self.base_lrs]
             self.current_lrs = list(lrs)
-
+      
+        if self.warmup is not None and not self.warmup.is_finished():
+            f   = self.warmup.factor()
+            lrs = [lr * f for lr in lrs]
+      
         for i, lr in enumerate(lrs):
             self.tracker.log_scalar(f"lr/group_{i}", lr, epoch)
         
         return lrs
-
-    def lrs_with_warmup(self, lrs: list[float]) -> list[float]:
-        if self.warmup is None or self.warmup.is_finished():
-            return lrs
-        f = self.warmup.factor()
-        
-        return [lr * f for lr in lrs]
 
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")
@@ -135,6 +150,11 @@ class Scheduler:
         
         if self.scheduler_type == "cosine_annealing":
             self.logger.subsection(f"T_max             : {self.config.scheduler.epochs}")
+            self.logger.subsection(f"Eta Min           : {self.config.scheduler.eta_min}")
+        
+        if self.scheduler_type == "cosine_annealing_warm_restarts":
+            self.logger.subsection(f"T_0               : {self.config.scheduler.T_0}")
+            self.logger.subsection(f"T_mult            : {self.config.scheduler.T_mult}")
             self.logger.subsection(f"Eta Min           : {self.config.scheduler.eta_min}")
         
         self.logger.subsection(f"Warmup Enabled    : {self.warmup.enabled if self.warmup else False} \n")

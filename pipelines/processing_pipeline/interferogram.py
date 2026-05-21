@@ -51,7 +51,6 @@ class InterferogramBuilder:
         return primary, secondaries, interferograms
 
     def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    
         import pyrat as pyrat_module
         from pyrat import getdata
 
@@ -60,7 +59,7 @@ class InterferogramBuilder:
         options      = {opt[0].lower().strip(): True if len(opt) == 1 else opt[1].strip() for opt in options_list}
         suffix       = options.get("suffix", "")
 
-        self.logger.subsection("[FSAR] Loading primary SLC...")
+        self.logger.subsection("[FSAR] Loading primary SLC")
         primary_slc  = getdata(
             pyrat_module.load.fsar(
                 tomography_object.master,

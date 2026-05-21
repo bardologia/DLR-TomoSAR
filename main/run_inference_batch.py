@@ -22,11 +22,18 @@ from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 LOGS_DIR = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_trials")
 
-RUN_DIRS = [
-    LOGS_DIR / "unet_l1_params",
-    LOGS_DIR / "unet_mix",
-    LOGS_DIR / "unet_ssmi",
+# Leave empty to run ALL subdirectories found in LOGS_DIR,
+# or list specific names to restrict which runs are processed.
+RUN_FILTER: list[str] = [
+    # "unet_l1_params",
+    # "unet_mix",
 ]
+
+RUN_DIRS = sorted(
+    [d for d in LOGS_DIR.iterdir() if d.is_dir()]
+    if not RUN_FILTER
+    else [LOGS_DIR / name for name in RUN_FILTER]
+)
 
 device             = "cuda" 
 use_ema            = True
@@ -34,17 +41,21 @@ checkpoint_name    = "best_model.pt"
 split              = "test"
 batch_size         = None
 num_workers        = 4
+
 stitch_window      = "hann"
 save_cubes         = True
+
 n_best_profiles    = 12
 n_worst_profiles   = 12
 n_random_profiles  = 12
 n_range_slices     = 5
 n_azimuth_slices   = 5
 n_elevation_slices = 5
+
 gif_axes           = ["elevation", "range", "azimuth"]
 gif_fps            = 12
 gif_max_frames     = 150
+
 cpu_workers        = 16
 
 def main() -> None:

@@ -73,7 +73,7 @@ class MetadataWriter:
 
     def save_crop_metadata(self, global_crop: CropRegion, splits: dict[str, CropRegion]) -> Path:
         out_path = self.outpaths["crop"]
-        payload  = {"global_crop" : list(global_crop.as_tuple()), "splits"      : {name: list(region.as_tuple()) for name, region in splits.items()}}
+        payload  = {"global_crop" : list(global_crop.as_tuple()), "splits" : {name: list(region.as_tuple()) for name, region in splits.items()}}
         
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4)

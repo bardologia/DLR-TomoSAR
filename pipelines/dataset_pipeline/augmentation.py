@@ -4,8 +4,20 @@ from configuration.dataset_config import AugmentationConfig
 
 
 class SpatialAugmenter:
-    def __init__(self, config: AugmentationConfig):
+    def __init__(self, config: AugmentationConfig, logger):
         self.config = config
+        self.logger = logger
+
+        self.logger.section("[Data Augmentation]")
+        self.logger.kv_table(
+            {
+                "Flip Horizontal" : self.config.p_flip_h,
+                "Flip Vertical"   : self.config.p_flip_v,
+                "Rotate 90°"      : self.config.p_rot90,
+                "Noise"           : f"std={self.config.noise_std} p={self.config.p_noise}",
+            },
+            title="Augmentation Config",
+        )
 
     def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
      

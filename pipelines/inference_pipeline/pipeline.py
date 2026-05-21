@@ -42,10 +42,10 @@ class InferencePipeline:
         figure_paths: Dict[str, Path] = {}
 
         pixel_metrics_for_plot = {
-            "mse" : result.pixel_mse,    # (denorm)
-            "mae" : result.pixel_mae,    # (denorm)
-            "r2"  : result.pixel_r2,     # (denorm)
-            "cos" : result.pixel_cosine, # (denorm)
+            "mse" : result.pixel_mse,    
+            "mae" : result.pixel_mae,    
+            "r2"  : result.pixel_r2,     
+            "cos" : result.pixel_cosine, 
         }
 
         selected = Metrics.select_pixels(
@@ -315,7 +315,7 @@ class InferencePipeline:
 
         return meta, logger, plotter
 
-    def _load_run(self, cfg: InferenceConfig, meta: InferenceMetadata, logger: Logger):
+    def _load_run(self, cfg: InferenceConfig, logger: Logger):
         loader = RunLoader(cfg.run_directory, logger=logger)
         return loader.load(
             split           = cfg.split,
@@ -364,7 +364,7 @@ class InferencePipeline:
     def run(self) -> Path:
         cfg                    = self.config
         meta, logger, plotter  = self._setup(cfg)
-        run                    = self._load_run(cfg, meta, logger)
+        run                    = self._load_run(cfg, logger)
         result                 = self._predict(cfg, meta, run, logger)
 
         x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
