@@ -5,9 +5,9 @@ from typing   import Dict
 
 import numpy as np
 
-from pipelines.inference_pipeline.animation import make_walk_gif
+from pipelines.inference_pipeline.animation import Animator
 from configuration.inference_config         import InferenceConfig
-from pipelines.inference_pipeline.loader    import DirectoryLoader
+from pipelines.inference_pipeline.loader    import RunLoader
 from pipelines.inference_pipeline.metadata  import InferenceMetadata
 from pipelines.inference_pipeline.metrics   import Metrics
 from pipelines.inference_pipeline.plots     import Ploter
@@ -42,10 +42,10 @@ class InferencePipeline:
         figure_paths: Dict[str, Path] = {}
 
         pixel_metrics_for_plot = {
-            "mse (denorm)" : result.pixel_mse,
-            "mae (denorm)" : result.pixel_mae,
-            "r2  (denorm)" : result.pixel_r2,
-            "cos (denorm)" : result.pixel_cosine,
+            "mse" : result.pixel_mse,    # (denorm)
+            "mae" : result.pixel_mae,    # (denorm)
+            "r2"  : result.pixel_r2,     # (denorm)
+            "cos" : result.pixel_cosine, # (denorm)
         }
 
         selected = Metrics.select_pixels(
@@ -85,9 +85,9 @@ class InferencePipeline:
             ("pixel_peak_map", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
         ):
             figure_paths[key] = plotter.plot_pixel_metric_map(
-                data      = data, 
-                title     = title, 
-                label     = label,
+                metric_map = data,
+                title      = title,
+                label      = label,
                 out_path  = meta.figure_path(key),
                 az_offset = result.azimuth_offset,
                 rg_offset = result.range_offset,
@@ -208,28 +208,30 @@ class InferencePipeline:
         logger    : Logger,
     ) -> Dict[str, Path]:
 
-        gif_paths: Dict[str, Path] = {}
-        for axis in cfg.gif_axes: 
-            logger.subsection(f"Generating walk GIF along {axis} axis")
-            gif_paths[f"walk_{axis}"] = make_walk_gif(
-                pred_cube   = result.pred_curves,
-                gt_cube     = result.gt_curves,
-                axis        = axis,
-                out_path    = meta.gif_path(axis),
-                x_axis      = x_axis_np,
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-                fps         = cfg.gif_fps,
-                max_frames  = cfg.gif_max_frames,
-                dpi         = cfg.gif_dpi,
-                cmap        = cfg.cmap_intensity,
-                err_cmap    = cfg.cmap_error,
-                num_workers = cfg.gif_workers,
-            )
-            logger.subsection(f"GIF ({axis:<9}) : {gif_paths[f'walk_{axis}']} \n")
-        
-        logger.subsection("")
+        animator = Animator(
+            logger      = logger,
+            cmap        = cfg.cmap_intensity,
+            err_cmap    = cfg.cmap_error,
+            dpi         = cfg.gif_dpi,
+            fps         = cfg.gif_fps,
+            max_frames  = cfg.gif_max_frames,
+            num_workers = cfg.gif_workers,
+        )
 
+        gif_paths: Dict[str, Path] = {}
+        for axis in cfg.gif_axes:
+            logger.subsection(f"Generating walk GIF along {axis} axis")
+            gif_paths[f"walk_{axis}"] = animator.walk_gif(
+                pred_cube = result.pred_curves,
+                gt_cube   = result.gt_curves,
+                axis      = axis,
+                out_path  = meta.animations_dir / f"walk_{axis}.gif",
+                x_axis    = x_axis_np,
+                az_offset = result.azimuth_offset,
+                rg_offset = result.range_offset,
+            )
+
+        logger.subsection("")
         return gif_paths
 
     def _build_report(
@@ -248,7 +250,6 @@ class InferencePipeline:
             "in_channels"       : run.in_channels,
             "out_channels"      : run.out_channels,
             "n_gaussians"       : run.n_gaussians,
-            "has_noise_head"    : run.has_noise_head,
             "x_axis_length"     : run.x_axis_length,
             "x_axis_min"        : float(x_axis_np.min()),
             "x_axis_max"        : float(x_axis_np.max()),
@@ -315,7 +316,7 @@ class InferencePipeline:
         return meta, logger, plotter
 
     def _load_run(self, cfg: InferenceConfig, meta: InferenceMetadata, logger: Logger):
-        loader = DirectoryLoader(cfg.run_directory, logger=logger)
+        loader = RunLoader(cfg.run_directory, logger=logger)
         return loader.load(
             split           = cfg.split,
             batch_size      = cfg.batch_size,

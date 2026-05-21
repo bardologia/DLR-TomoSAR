@@ -23,8 +23,7 @@ _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 @dataclass
-class LoadedRun:
-    run_directory   : Path
+class Run:
     model           : object
     model_name      : str
     in_channels     : int
@@ -43,7 +42,7 @@ class LoadedRun:
     used_ema        : bool
 
 
-class DirectoryLoader:
+class RunLoader:
     def __init__(self, run_directory: Path, logger: Logger) -> None:
         self.run_directory  = Path(run_directory)
         self.logger         = logger
@@ -83,7 +82,7 @@ class DirectoryLoader:
             pin_memory                  = bool(payload["pin_memory"]),
         )
 
-    def _build_split_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
+    def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger)
         region  = dict(dataset_config.split_regions.items())[split_name]
@@ -98,7 +97,6 @@ class DirectoryLoader:
 
         inputs        = arrays["inputs"]
         gt_parameters = arrays["parameters"]
-        norm_stats    = Stats.load(self.run_directory / "meta", self.logger)
 
         dataset = PatchDataset(
             inputs        = inputs,
@@ -121,39 +119,40 @@ class DirectoryLoader:
             overrides["image_size"] = image_size
         
         model, _ = get_model(model_name, **overrides)
+        
         return model
 
-    def _apply_ema(self, model, ema_state: dict | None) -> int:
+    def _apply_ema(self, model, ckpt: dict, use_ema: bool) -> bool:
+        if not use_ema:
+            return False
+        ema_state = ckpt.get("ema_shadow", {})
         if not ema_state or not ema_state.get("shadow"):
-            return 0
+            return False
         shadow  = ema_state["shadow"]
         applied = 0
-      
         with torch.no_grad():
             for name, param in model.named_parameters():
                 if name in shadow:
                     param.data.copy_(shadow[name].to(param.device, dtype=param.dtype))
                     applied += 1
-      
-        return applied
+        
+        self.logger.subsection(f"EMA : applied to {applied} parameters")
+        return True
 
-    def _load_checkpoint(self, ckpt_path: Path, device: str) -> dict:
-        return torch.load(str(ckpt_path), map_location=device, weights_only=False)
-
-    def _extract_axis(self, ckpt: dict) -> np.ndarray:
-        raw = ckpt["x_axis"]
-        return raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
-
-    def _extract_ckpt_meta(self, ckpt: dict) -> dict:
-        return {
+    def _load_checkpoint(self, ckpt_path: Path, device: str) -> tuple[dict, np.ndarray, dict]:
+        ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
+        raw    = ckpt["x_axis"]
+        x_axis = raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
+        
+        meta = {
             "epoch"         : int(ckpt["epoch"]),
             "best_val_loss" : float(ckpt["best_val_loss"]),
             "best_epoch"    : int(ckpt["best_epoch"]),
-            "best_metrics"  : dict(ckpt.get("best_metrics", {})),
         }
+        
+        return ckpt, x_axis, meta
 
-    def _wrap_model(self, model, device: str) -> ModelWrapper:
-        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
+    def _wrap_model(self, model, device: str, norm_stats: Stats) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
@@ -170,7 +169,7 @@ class DirectoryLoader:
         device          : str,
         use_ema         : bool,
         checkpoint_name : str,
-    ) -> LoadedRun:
+    ) -> Run:
        
         self.logger.section("[Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
@@ -192,26 +191,20 @@ class DirectoryLoader:
         model     = self._build_model(model_name, in_channels, out_channels, dataset_config.patch.size[0])
         model     = model.to(device)
 
-        ckpt = self._load_checkpoint(ckpt_path, device)
+        ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
         model.load_state_dict(ckpt["params"])
-
-        used_ema = False
-        if use_ema:
-            n_applied = self._apply_ema(model, ckpt.get("ema_shadow", {}))
-            used_ema  = n_applied > 0
-            self.logger.subsection(f"EMA           : applied to {n_applied} parameters")
+        used_ema = self._apply_ema(model, ckpt, use_ema)
 
         model.eval()
-        model = self._wrap_model(model, device)
+        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
+        model      = self._wrap_model(model, device, norm_stats)
 
-        x_axis    = self._extract_axis(ckpt)
-        ckpt_meta = self._extract_ckpt_meta(ckpt)
-
-        dataset, grid, region, global_crop = self._build_split_dataset(
+        dataset, grid, region, global_crop = self._build_dataset(
             dataset_config = dataset_config,
             split_name     = split,
             x_axis         = x_axis,
             n_gaussians    = n_gaussians,
+            norm_stats     = norm_stats,
         )
 
         loader = DataLoader(
@@ -235,8 +228,7 @@ class DirectoryLoader:
         self.logger.subsection(f"Range size    : {region.range_size}\n")
         self.logger.subsection(f"X-axis length : {x_axis.size}")
 
-        return LoadedRun(
-            run_directory   = self.run_directory,
+        return Run(
             model           = model,
             model_name      = model_name,
             in_channels     = in_channels,

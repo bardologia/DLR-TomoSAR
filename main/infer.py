@@ -48,7 +48,7 @@ gif_axes           = ["elevation", "range", "azimuth"]
 gif_fps            = 12
 gif_max_frames     = 150
 
-cpu_workers        = 80
+cpu_workers        = 16
 
 def main() -> None:
     cfg = InferenceConfig(

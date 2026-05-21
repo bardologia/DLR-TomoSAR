@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-GPU_ID = 0
+GPU_ID = 1
 os.environ["CUDA_VISIBLE_DEVICES"]    = str(GPU_ID)
 os.environ["MKL_NUM_THREADS"]     = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
@@ -50,7 +50,7 @@ n_gaussians  = 5
 seed         = 0
 
 dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
+logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_trials/unet_cos0.1_spec0.1_pL11_tv5e-05"
 params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
 
 train_az  = (1000,  9120)
@@ -85,22 +85,22 @@ validation_frequency = 1
 use_amp              = False
 grad_accum_steps     = 1
 
-use_charbonnier_curve    = True  
-weight_charbonnier_curve = 0.5
+use_charbonnier_curve        = False
+weight_charbonnier_curve     = 0.0
 
-use_ssim_curve           = True
-weight_ssim_curve        = 1.0
+use_ssim_curve               = False
+weight_ssim_curve            = 0.0
 ssim_axis                = "elevation" 
 
-use_cosine_curve         = True  
-weight_cosine_curve      = 0.1
+use_cosine_curve             = True
+weight_cosine_curve          = 0.1
 
-use_param_l1             = True 
-weight_param_l1          = 1.0
+use_param_l1                 = True
+weight_param_l1              = 1.0
 param_match              = "sort_gt_by_mu"
 
-use_smoothness_tv        = True 
-weight_smoothness_tv     = 5e-5 
+use_smoothness_tv            = True
+weight_smoothness_tv         = 5e-05
 
 overfit_enabled        = False
 overfit_max_steps      = 5

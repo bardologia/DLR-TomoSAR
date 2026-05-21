@@ -11,7 +11,7 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 
-class Ploter:
+class PlotTools:
     SCIENTIFIC_RC: dict = {
         "font.family"         : "serif",
         "font.serif"          : ["Times New Roman", "DejaVu Serif"],
@@ -32,27 +32,6 @@ class Ploter:
         "image.interpolation" : "nearest",
         "savefig.bbox"        : "tight",
     }
-
-    def __init__(
-        self,
-        cmap      : str  = "jet",
-        err_cmap  : str  = "magma",
-        normalize : bool = False,
-        fig_dpi   : int  = 150,
-        save_dpi  : int  = 300,
-    ) -> None:
-        
-        self.cmap      = cmap
-        self.err_cmap  = err_cmap
-        self.normalize = normalize
-        self.fig_dpi   = fig_dpi
-        self.save_dpi  = save_dpi
-        self._apply_style()
-
-    def _apply_style(self) -> None:
-        plt.rcParams.update(self.SCIENTIFIC_RC)
-        plt.rcParams["figure.dpi"]  = self.fig_dpi
-        plt.rcParams["savefig.dpi"] = self.save_dpi
 
     @staticmethod
     def _gaussian_components(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> List[np.ndarray]:
@@ -86,6 +65,29 @@ class Ploter:
         if hi - lo < 1e-12:
             return np.zeros_like(arr, dtype=np.float32)
         return ((arr - lo) / (hi - lo)).astype(np.float32)
+
+
+class Ploter(PlotTools):
+    def __init__(
+        self,
+        cmap      : str  = "jet",
+        err_cmap  : str  = "magma",
+        normalize : bool = False,
+        fig_dpi   : int  = 150,
+        save_dpi  : int  = 300,
+    ) -> None:
+        
+        self.cmap      = cmap
+        self.err_cmap  = err_cmap
+        self.normalize = normalize
+        self.fig_dpi   = fig_dpi
+        self.save_dpi  = save_dpi
+        self._apply_style()
+
+    def _apply_style(self) -> None:
+        plt.rcParams.update(self.SCIENTIFIC_RC)
+        plt.rcParams["figure.dpi"]  = self.fig_dpi
+        plt.rcParams["savefig.dpi"] = self.save_dpi
 
     def _maybe_normalize(self, *arrays: np.ndarray) -> Tuple[np.ndarray, ...]:
         if self.normalize:

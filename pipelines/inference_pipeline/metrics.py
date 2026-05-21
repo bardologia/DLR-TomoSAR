@@ -16,6 +16,7 @@ def _ssim_worker(args: tuple) -> tuple[str, float]:
     min_side   = min(pred_slice.shape)
     win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
     value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
+   
     return key, value
 
 
@@ -35,18 +36,19 @@ class Metrics:
 
     @staticmethod
     def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
-
         flat = x.reshape(-1)
         out  = {}
         p    = np.percentile(flat, qs)
+       
         for q, v in zip(qs, p):
             out[f"p{q}"] = float(v)
+       
         return out
 
     @staticmethod
     def _basic_stats(x: np.ndarray) -> Dict[str, float]:
-
         flat = x.reshape(-1).astype(np.float64, copy=False)
+        
         return {
             "mean"   : float(flat.mean()),
             "std"    : float(flat.std()),
@@ -69,24 +71,66 @@ class Metrics:
        
         return 10.0 * np.log10(data_range * data_range / mse)
 
+    @staticmethod
+    def select_pixels(
+        metric_map : np.ndarray,
+        *,
+        n_best     : int,
+        n_worst    : int,
+        n_random   : int,
+        seed       : int = 0,
+    ) -> Dict[str, np.ndarray]:
+
+        flat       = metric_map.reshape(-1)
+        H, W       = metric_map.shape
+        rng        = np.random.default_rng(seed)
+        valid_idx  = np.where(np.isfinite(flat))[0]
+        order      = valid_idx[np.argsort(flat[valid_idx])]
+
+        best_flat  = order[:n_best]
+        worst_flat = order[-n_worst:][::-1]
+
+        pool       = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
+        n_random   = min(n_random, pool.size)
+        rand_flat  = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
+
+        def _to_yx(flat_idx: np.ndarray) -> np.ndarray:
+            return np.stack([(flat_idx // W).astype(np.int32), (flat_idx % W).astype(np.int32)], axis=1)
+
+        return {
+            "best"   : _to_yx(best_flat),
+            "worst"  : _to_yx(worst_flat),
+            "random" : _to_yx(rand_flat),
+        }
+
+    @staticmethod
+    def _enqueue_tasks(
+        tasks  : list,
+        pred   : np.ndarray,
+        ref    : np.ndarray,
+        prefix : str,
+        indices: np.ndarray,
+        axis   : int,
+        label  : str,
+    ) -> None:
+       
+        for i, idx in enumerate(indices):
+            if axis == 0:
+                p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
+            elif axis == 1:
+                p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
+            else:
+                p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
+       
+            tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
+
     def _slice_ssim(self, pred : np.ndarray, ref : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray], prefix : str) -> Dict[str, float]:
         out   : Dict[str, float]                         = {}
         tasks : list[tuple[str, np.ndarray, np.ndarray]] = []
 
-        def _enqueue(indices: np.ndarray, axis: int, label: str) -> None:
-            for i, idx in enumerate(indices):
-                if axis == 0:
-                    p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
-                elif axis == 1:
-                    p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
-                else:
-                    p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
-                
-                tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
-
-        _enqueue(elev_indices,  axis=0, label="elev")
-        _enqueue(range_indices, axis=2, label="range")
-        _enqueue(az_indices,    axis=1, label="azimuth")
+        self._enqueue_tasks(tasks, pred, ref, prefix, elev_indices,  axis=0, label="elev")
+        self._enqueue_tasks(tasks, pred, ref, prefix, range_indices, axis=2, label="range")
+        self._enqueue_tasks(tasks, pred, ref, prefix, az_indices,    axis=1, label="azimuth")
 
         if not tasks:
             return out
@@ -109,23 +153,21 @@ class Metrics:
 
         return out
 
-    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:
-       
+    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:  
         P = pred.reshape(pred.shape[0], -1).astype(np.float64)
         G = gt  .reshape(gt  .shape[0], -1).astype(np.float64)
 
-        diff_g = P - G
-
-        mae_gt  = np.abs(diff_g).mean(axis=1)
-        rmse_gt = np.sqrt((diff_g ** 2).mean(axis=1))
-        g_var   = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
-        r2_gt   = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
+        diff_g    = P - G
+        mae_gt    = np.abs(diff_g).mean(axis=1)
+        rmse_gt   = np.sqrt((diff_g ** 2).mean(axis=1))
+        g_var     = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
+        r2_gt     = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
 
         gt_prob   = G / G.sum(axis=0, keepdims=True).clip(1e-12, None)
         pred_prob = P / P.sum(axis=0, keepdims=True).clip(1e-12, None)
 
-        log_pp = np.log(pred_prob.clip(1e-12, None))
-        ce_gt  = -(gt_prob * log_pp).mean(axis=1)
+        log_pp    = np.log(pred_prob.clip(1e-12, None))
+        ce_gt     = -(gt_prob * log_pp).mean(axis=1)
 
         return {
             "elev_mae_gt"  : mae_gt,
@@ -135,7 +177,6 @@ class Metrics:
         }
 
     def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None) -> Dict[str, float]:
-
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
     
@@ -193,36 +234,5 @@ class Metrics:
 
         return metrics
 
-    @staticmethod
-    def select_pixels(
-        metric_map : np.ndarray,
-        *,
-        n_best     : int,
-        n_worst    : int,
-        n_random   : int,
-        seed       : int = 0,
-    ) -> Dict[str, np.ndarray]:
-
-        flat       = metric_map.reshape(-1)
-        H, W       = metric_map.shape
-        rng        = np.random.default_rng(seed)
-        valid_idx  = np.where(np.isfinite(flat))[0]
-        order      = valid_idx[np.argsort(flat[valid_idx])]
-
-        best_flat  = order[:n_best]
-        worst_flat = order[-n_worst:][::-1]
-
-        pool       = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
-        n_random   = min(n_random, pool.size)
-        rand_flat  = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
-
-        def _to_yx(flat_idx: np.ndarray) -> np.ndarray:
-            return np.stack([(flat_idx // W).astype(np.int32), (flat_idx % W).astype(np.int32)], axis=1)
-
-        return {
-            "best"   : _to_yx(best_flat),
-            "worst"  : _to_yx(worst_flat),
-            "random" : _to_yx(rand_flat),
-        }
-
+ 
 

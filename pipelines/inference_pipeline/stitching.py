@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 import numpy as np
 from pipelines.dataset_pipeline.patch import GridInfo
 
+
 class CubeStitcher:
     def __init__(
         self,

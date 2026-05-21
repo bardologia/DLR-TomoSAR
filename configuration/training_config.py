@@ -26,7 +26,6 @@ class LossConfig:
     use_cosine_curve         : bool  = False
     weight_cosine_curve      : float = 0.0
 
-
     use_spectral_coherence   : bool  = False
     weight_spectral_coh      : float = 0.0
     spectral_coh_window      : int   = 7

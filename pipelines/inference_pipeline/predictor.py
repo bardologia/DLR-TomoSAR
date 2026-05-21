@@ -8,7 +8,7 @@ from typing             import List, Tuple
 
 import numpy as np
 
-from pipelines.inference_pipeline.loader    import LoadedRun
+from pipelines.inference_pipeline.loader    import Run
 from pipelines.inference_pipeline.metadata  import InferenceMetadata
 from pipelines.inference_pipeline.stitching import CubeStitcher
 from tools.logger                           import Logger
@@ -78,7 +78,7 @@ def _cpu_worker(args: tuple) -> tuple:
 class Predictor:
     def __init__(
         self,
-        run         : LoadedRun,
+        run         : Run,
         logger      : Logger,
         *,
         window_kind : str,
@@ -93,7 +93,7 @@ class Predictor:
         self.window_kind = window_kind
         self.cube_dtype  = cube_dtype
         self.save_cubes  = save_cubes
-        self.cube_dir    = meta.cube_dir()
+        self.cube_dir    = meta.cube_dir
         self.cpu_workers = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
 
     def _create_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
