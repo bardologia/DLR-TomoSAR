@@ -60,37 +60,49 @@ EXPERIMENTS = [
         "use_mse_curve":            False, "weight_mse_curve":         0.0,
         "use_l1_curve":             False, "weight_l1_curve":          0.0,
         "use_huber_curve":          False, "weight_huber_curve":       0.0,
-        "use_charbonnier_curve":    False, "weight_charbonnier_curve": 0.0,
-        "use_cosine_curve":         False, "weight_cosine_curve":      0.1,
+        "use_charbonnier_curve":    False,  "weight_charbonnier_curve": 0.0,
+        "use_cosine_curve":         False, "weight_cosine_curve":      0.0,
         "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
         "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
         "use_param_l1":             True,  "weight_param_l1":          1.0,
         "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":    0.0,
+    },
+    {
+        "use_mse_curve":            False, "weight_mse_curve":         0.0,
+        "use_l1_curve":             False, "weight_l1_curve":          0.0,
+        "use_huber_curve":          False, "weight_huber_curve":       0.0,
+        "use_charbonnier_curve":    True,  "weight_charbonnier_curve": 1.0,
+        "use_cosine_curve":         False, "weight_cosine_curve":      0.0,
+        "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
+        "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
+        "use_param_l1":             True,  "weight_param_l1":          1.0,
+        "use_param_huber":          False, "weight_param_huber":       0.0,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":    0.0,
+    },
+     {
+        "use_mse_curve":            False, "weight_mse_curve":         0.0,
+        "use_l1_curve":             False, "weight_l1_curve":          0.0,
+        "use_huber_curve":          False, "weight_huber_curve":       0.0,
+        "use_charbonnier_curve":    True,  "weight_charbonnier_curve": 0.5,
+        "use_cosine_curve":         False, "weight_cosine_curve":      0.0,
+        "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
+        "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
+        "use_param_l1":             True,  "weight_param_l1":          1.0,
+        "use_param_huber":          False, "weight_param_huber":       0.0,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":    0.0,
     },
     {
         "use_mse_curve":            False, "weight_mse_curve":         0.0,
         "use_l1_curve":             False, "weight_l1_curve":          0.0,
         "use_huber_curve":          False, "weight_huber_curve":       0.0,
         "use_charbonnier_curve":    False, "weight_charbonnier_curve": 0.0,
-        "use_cosine_curve":         False,  "weight_cosine_curve":      0.1,
-        "use_spectral_coherence":   False , "weight_spectral_coh":      0.1,
-        "use_ssim_curve":           True, "weight_ssim_curve":          1.0, 
-        "use_param_l1":             False,  "weight_param_l1":          1.0,
+        "use_cosine_curve":         True,  "weight_cosine_curve":      0.2,
+        "use_spectral_coherence":   False, "weight_spectral_coh":      0.0,
+        "use_ssim_curve":           False, "weight_ssim_curve":        0.0,
+        "use_param_l1":             True,  "weight_param_l1":          1.0,
         "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
-    },
-    {
-        "use_mse_curve":            False, "weight_mse_curve":         0.0,
-        "use_l1_curve":             False, "weight_l1_curve":          0.0,
-        "use_huber_curve":          False, "weight_huber_curve":       0.0,
-        "use_charbonnier_curve":    True, "weight_charbonnier_curve":  1.0,
-        "use_cosine_curve":         False,  "weight_cosine_curve":      0.1,
-        "use_spectral_coherence":   False , "weight_spectral_coh":      0.1,
-        "use_ssim_curve":           False, "weight_ssim_curve":          1.0, 
-        "use_param_l1":             False,  "weight_param_l1":          1.0,
-        "use_param_huber":          False, "weight_param_huber":       0.0,
-        "use_smoothness_tv":        False , "weight_smoothness_tv":     5e-5,
+        "use_smoothness_tv":        False , "weight_smoothness_tv":    0.0,
     },
 ]
 
@@ -135,8 +147,6 @@ def _patch_script(src: str, overrides: dict, gpu_id: int, exp_name: str) -> str:
             continue
 
         matched = False
-        # Only patch bare module-level assignments; skip lines inside function
-        # calls (those end with a comma after the value).
         if not stripped.rstrip().endswith(","):
             for key in BOOL_VARS | FLOAT_VARS | STR_VARS:
                 if stripped.startswith(key) and key in overrides:
@@ -154,7 +164,7 @@ def _patch_script(src: str, overrides: dict, gpu_id: int, exp_name: str) -> str:
     return "\n".join(out)
 
 
-GPU_IDS = [0, 1, 2]
+GPU_IDS = [0, 1, 2, 3]
 
 
 def main() -> None:

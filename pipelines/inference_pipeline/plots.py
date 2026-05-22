@@ -11,6 +11,7 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 
+
 class PlotTools:
     SCIENTIFIC_RC: dict = {
         "font.family"         : "serif",
@@ -70,18 +71,18 @@ class PlotTools:
 class Ploter(PlotTools):
     def __init__(
         self,
-        cmap      : str  = "jet",
-        err_cmap  : str  = "magma",
-        normalize : bool = False,
-        fig_dpi   : int  = 150,
-        save_dpi  : int  = 300,
+        cmap     : str  = "jet",
+        err_cmap : str  = "magma",
+        normalize: bool = False,
+        fig_dpi  : int  = 150,
+        save_dpi : int  = 300,
     ) -> None:
-        
-        self.cmap      = cmap
-        self.err_cmap  = err_cmap
-        self.normalize = normalize
-        self.fig_dpi   = fig_dpi
-        self.save_dpi  = save_dpi
+
+        self.cmap       = cmap
+        self.err_cmap   = err_cmap
+        self.normalize  = normalize
+        self.fig_dpi    = fig_dpi
+        self.save_dpi   = save_dpi
         self._apply_style()
 
     def _apply_style(self) -> None:
@@ -466,15 +467,15 @@ class Ploter(PlotTools):
                 ax   = axes[k, j]
                 pred = params_pred[ch].reshape(-1)
                 pred = pred[np.isfinite(pred)]
-                
+
                 has_pred = pred.size > 0
                 lo = float(np.percentile(pred, 0.5)) if has_pred else 0.0
                 hi = float(np.percentile(pred, 99.5)) if has_pred else 1.0
 
                 has_gt = False
                 if params_gt is not None and ch < params_gt.shape[0]:
-                    gt  = params_gt[ch].reshape(-1)
-                    gt  = gt[np.isfinite(gt)]
+                    gt = params_gt[ch].reshape(-1)
+                    gt = gt[np.isfinite(gt)]
                     has_gt = gt.size > 0
                     if has_gt:
                         lo = min(lo, float(np.percentile(gt, 0.5))) if has_pred else float(np.percentile(gt, 0.5))
@@ -507,7 +508,6 @@ class Ploter(PlotTools):
         max_points  : int = 8_000,
         seed        : int = 0,
     ) -> Path:
-
         fig, axes = plt.subplots(n_gaussians, 3, figsize=(13.5, 3.5 * n_gaussians), squeeze=False)
         rng       = np.random.default_rng(seed)
 
@@ -520,10 +520,12 @@ class Ploter(PlotTools):
                     ax.set_axis_off()
                     continue
 
-                gt   = params_gt  [ch].reshape(-1)
-                pred = params_pred[ch].reshape(-1)
+                gt   = params_gt  [ch].reshape(-1).copy()
+                pred = params_pred[ch].reshape(-1).copy()
                 mask = np.isfinite(gt) & np.isfinite(pred)
                 gt, pred = gt[mask], pred[mask]
+
+                n_snapped = 0
 
                 if gt.size == 0:
                     ax.set_title(f"g{k+1} — {lbl}  (No Data)")
@@ -576,7 +578,8 @@ class Ploter(PlotTools):
                     ax.set_axis_off()
                     continue
 
-                err  = np.abs(params_pred[ch] - params_gt[ch])
+                err = np.abs(params_pred[ch] - params_gt[ch]).astype(np.float32)
+
                 valid_err = err[np.isfinite(err)]
                 
                 if valid_err.size == 0:

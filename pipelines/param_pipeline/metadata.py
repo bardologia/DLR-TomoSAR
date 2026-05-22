@@ -14,18 +14,18 @@ class ExtractionMetadataManager:
         self.config = config
         self.logger = logger
 
-    def save_run_metadata(self, npy_path: Path) -> Path:
+    def save_run_metadata(self, npy_path: Path, tomogram_path: Path, height_range: tuple) -> Path:
         meta_path = self.config.output_directory / "param_extraction_meta.json"
         ext       = self.config.fit_settings
 
         payload = {
             "timestamp"           : datetime.now().isoformat(timespec="seconds"),
             "processed_data_path" : str(self.config.processed_data_path),
-            "source_tomogram"     : str(self.config.discover_tomogram_path()),
-            "height_range"        : list(self.config.discover_height_range()),
+            "source_tomogram"     : str(tomogram_path),
+            "height_range"        : list(height_range),
             "output_directory"    : str(self.config.output_directory),
             "output_prefix"       : self.config.output_prefix,
-            "output_suffix"       : self.config._output_suffix_value,
+            "output_suffix"       : self.config.output_suffix_value,
             "parameters_npy"      : npy_path.name,
             "number_of_gaussians" : getattr(ext.fit_config, "k_max", ext.number_of_gaussians),
         }

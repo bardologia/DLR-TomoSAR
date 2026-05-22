@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import gc
-import os
 from pathlib import Path
 from typing import Tuple
 import numpy as np
 
-from configuration.param_extraction_config  import FitSettings, FitMode
+from configuration.param_extraction_config  import FitSettings
 from tools.logger                           import Logger
 from pipelines.param_pipeline.sigma_fitting import SigmaFittingExtractor
 
@@ -23,7 +21,6 @@ class ParameterExtractor:
         adam_lr              : float               = 1e-2,
         adam_b1              : float               = 0.9,
         adam_b2              : float               = 0.999,
-        adam_warmup_steps    : int                 = 100,
         gpu_device_ids       : list | None         = None,
         r2_sample_cap        : int                 = 4096,
         gpu_pixel_batch_size : int                 = 8192,
@@ -40,7 +37,6 @@ class ParameterExtractor:
         self.adam_lr              = adam_lr
         self.adam_b1              = adam_b1
         self.adam_b2              = adam_b2
-        self.adam_warmup_steps    = adam_warmup_steps
         self.gpu_device_ids       = gpu_device_ids
         self.init_workers         = init_workers
 

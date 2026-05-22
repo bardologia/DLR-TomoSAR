@@ -31,7 +31,7 @@ class Representation(Enum):
         cpp                       = _CHANNELS_PER_PASS[self.value]
 
         if self is Representation.MAG_ONLY:
-            channels = [np.log1p(np.abs(data))]
+            channels = [np.abs(data)]
 
         elif self is Representation.ANGLE_ONLY:
             channels = [np.angle(data)]
@@ -40,18 +40,18 @@ class Representation(Enum):
             channels = [data.real, data.imag]
 
         elif self is Representation.MAG_ANGLE:
-            channels = [np.log1p(np.abs(data)), np.angle(data)]
+            channels = [np.abs(data), np.angle(data)]
 
         elif self is Representation.MAG_REAL_IMAG:
             magnitude = np.abs(data)
             safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
-            channels  = [np.log1p(magnitude), data.real / safe_mag, data.imag / safe_mag]
+            channels  = [magnitude, data.real / safe_mag, data.imag / safe_mag]
 
         elif self is Representation.MAG_RI_ANGLE:
             magnitude = np.abs(data)
             safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
             channels  = [
-                np.log1p(magnitude),
+                magnitude,
                 data.real / safe_mag,
                 data.imag / safe_mag,
                 np.angle(data),

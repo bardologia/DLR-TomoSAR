@@ -40,6 +40,13 @@ class InferenceConfig:
     n_random_profiles  : int           = 12
     profile_seed       : int           = 0
 
+    scatter_amp_zero_thr : float       = 1e-3
+    scatter_bg_sigma_thr : float       = 4.0   # set >0 to snap mu/sigma of bg Gaussians in scatter plot
+
+    amp_zero_thr         : float       = 1e-3
+    bg_sigma_threshold   : float       = 4.0
+    bg_sigma_diff_cap    : float       = 0.0
+
     n_range_slices     : int           = 5
     n_azimuth_slices   : int           = 5
     n_elevation_slices : int           = 5

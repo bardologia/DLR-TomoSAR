@@ -14,9 +14,11 @@ class EarlyStopping:
         self.restore_best = self.config.early_stopping.restore_best
 
         self.logger.section("[Early Stopping]")
-        self.logger.subsection(f"Patience       : {self.patience}")
-        self.logger.subsection(f"Min Delta      : {self.min_delta}")
-        self.logger.subsection(f"Restore Best   : {self.restore_best} \n")
+        self.logger.kv_table({
+            "Patience":     self.patience,
+            "Min Delta":    self.min_delta,
+            "Restore Best": self.restore_best,
+        })
 
         self.best_loss        = None
         self.counter          = 0

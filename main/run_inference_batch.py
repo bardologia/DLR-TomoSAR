@@ -20,10 +20,8 @@ from configuration.inference_config        import InferenceConfig
 from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 
-LOGS_DIR = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_trials")
+LOGS_DIR = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/new")
 
-# Leave empty to run ALL subdirectories found in LOGS_DIR,
-# or list specific names to restrict which runs are processed.
 RUN_FILTER: list[str] = [
     # "unet_l1_params",
     # "unet_mix",

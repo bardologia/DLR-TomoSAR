@@ -23,7 +23,7 @@ class ArtifactRegistry:
             target_dir.mkdir(parents=True, exist_ok=True)
             self.logger.subsection(f"Ensured path : {target_dir}")
 
-    def _artifact_filenames(self) -> dict[str, str]:
+    def artifact_filenames(self) -> dict[str, str]:
         tomo_tag  = self.config.tomogram_tag
         param_tag = self.config.parameter_tag
         
@@ -38,17 +38,5 @@ class ArtifactRegistry:
         }
 
     def artifact_path(self, artifact_type: ArtifactType) -> Path:
-        filenames = self._artifact_filenames()
+        filenames = self.artifact_filenames()
         return self.config.paths.data_directory / filenames[artifact_type]
-
-    def existence_map(self) -> dict[str, bool]:
-        self.ensure_directory_structure()
-        filenames = self._artifact_filenames()
-        existence = {key: self.artifact_path(key).exists() for key in filenames}
-
-        self.logger.section("[Pipeline State Check]")
-        for key, exists in existence.items():
-            path = self.artifact_path(key)
-            self.logger.subsection(f"{key:<16} ({path.name}) : {'FOUND' if exists else 'MISSING'}")
-        
-        return existence

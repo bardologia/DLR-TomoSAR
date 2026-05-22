@@ -53,11 +53,13 @@ class TrainingRunMetadata:
         self.logger = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
 
         self.logger.section("[Training RunMetadata Initialized]")
-        self.logger.subsection(f"Run Directory : {self.run_directory}")
-        self.logger.subsection(f"Model         : {self.model_name}")
-        self.logger.subsection(f"Backend       : PyTorch")
         devices = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        self.logger.subsection(f"Devices       : {devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}")
+        self.logger.kv_table({
+            "Run Directory": self.run_directory,
+            "Model":         self.model_name,
+            "Backend":       "PyTorch",
+            "Devices":       f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
+        })
 
     def save_trainer_config(self) -> Path:
         out_path                     = self.docs_directory / "trainer_config.json"
@@ -67,7 +69,7 @@ class TrainingRunMetadata:
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(serializable, f, indent=4, default=str)
         
-        self.logger.subsection(f"-> Trainer config saved: {out_path}")
+        self.logger.info(f"Trainer config saved: {out_path}")
         
         return out_path
 
@@ -87,7 +89,7 @@ class TrainingRunMetadata:
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4)
         
-        self.logger.subsection(f"-> Run summary saved: {out_path}")
+        self.logger.info(f"Run summary saved: {out_path}")
         
         return out_path
 

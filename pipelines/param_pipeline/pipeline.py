@@ -68,7 +68,7 @@ class ParamExtractionPipeline:
 
         parameters_array = self._stage_extract()
         npy_path         = self._stage_save(parameters_array)
-        meta_path = self.metadata_manager.save_run_metadata(npy_path)
+        meta_path = self.metadata_manager.save_run_metadata(npy_path, self.tomogram_path, self.height_range)
 
         self.logger.section("[Param Extraction Completed]")
         

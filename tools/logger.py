@@ -38,7 +38,7 @@ _THEME = Theme({
     "section":    "bold cyan",
     "subsection": "white",
     "key":        "bold magenta",
-    "value":      "white",
+    "value":      "bright_white",
     "ok":         "bold green",
     "warn":       "bold yellow",
     "err":        "bold red",

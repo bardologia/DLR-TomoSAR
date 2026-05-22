@@ -19,10 +19,12 @@ class Warmup:
         self._logged_completion  = False
 
         self.logger.section("[Warmup Scheduler]")
-        self.logger.subsection(f"Warmup Enabled      : {self.enabled}")
-        self.logger.subsection(f"Warmup Steps        : {self.warmup_steps}")
-        self.logger.subsection(f"Warmup Mode         : {self.mode}")
-        self.logger.subsection(f"Warmup Start Factor : {self.warmup_start_factor} \n")
+        self.logger.kv_table({
+            "Enabled":      self.enabled,
+            "Steps":        self.warmup_steps,
+            "Mode":         self.mode,
+            "Start Factor": self.warmup_start_factor,
+        })
 
     def factor(self) -> float:
         if not self.enabled or self.warmup_steps <= 0:

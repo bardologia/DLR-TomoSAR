@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import os
-os.environ["MKL_NUM_THREADS"] = "4"
-os.environ["NUMEXPR_NUM_THREADS"] = "4"
-os.environ["OMP_NUM_THREADS"] = "4" 
- 
 import gc
+import os
 from pathlib import Path
 
 import torch
@@ -36,13 +32,15 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         self.logger.section("[Training Start]")
-        self.logger.subsection(f"Backend       : PyTorch")
-        self.logger.subsection(f"Device        : {self.device}")
-        self.logger.subsection(f"Log Directory : {self.config.io.logdir} \n")
+        self.logger.kv_table({
+            "Backend":       "PyTorch",
+            "Device":        self.device,
+            "Log Directory": self.config.io.logdir,
+        })
 
         self.checkpoint_path = Path(run_dir) / "best_model.pt"
         self.run_dir         = Path(run_dir)
-        self.tracker         = Tracker(writer=self.config.io.writer, debug=getattr(self.config.training, "log_debug", False))
+        self.tracker         = Tracker(writer=self.config.io.writer, debug=config.training.log_debug)
 
         self.model     = model.to(self.device)
         self.model_cfg = model_cfg
@@ -75,15 +73,32 @@ class Trainer:
         self.resource_monitor = ResourceMonitor(config = self.config.resources, logger = self.logger, tracker = self.tracker, step_getter = lambda: self.global_step)
         
         self.ema.init(self.model)
+        self._ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
 
         self.global_step  = 0
         self.train_losses = []
         self.val_losses   = []
 
+    def maybe_run_loss_probe(self, train_loader, probe_config=None) -> None:
+        """Run the loss-scale probe when ``probe_config.enabled`` is True."""
+        if probe_config is None or not probe_config.enabled:
+            return
+
+        from tools.loss_scale_probe import LossScaleProbe
+
+        probe = LossScaleProbe(
+            probe_cfg    = probe_config,
+            loss_cfg     = self.loss_cfg,
+            gaussian_cfg = self.gaussian_cfg,
+            norm_stats   = self.norm_stats,
+            logger       = self.logger,
+        )
+        probe.run(train_loader, self.model, self.device, self.x_axis)
+
     def _build_optimizer(self, param_groups: list[dict]):
         betas        = tuple(self.config.optimizer.betas)
         eps          = self.config.optimizer.eps
-        weight_decay = float(getattr(self.config.optimizer, "weight_decay", 0.0))
+        weight_decay = self.config.optimizer.weight_decay
 
         for pg in param_groups:
             pg.setdefault("betas",        betas)
@@ -94,26 +109,22 @@ class Trainer:
         return optimizer
 
     def _update_optimizer(self, lrs: list[float]):
-        prev_lrs = getattr(self, "_current_lrs", None)
-        if prev_lrs is not None and all(abs(a - b) < 1e-12 for a, b in zip(lrs, prev_lrs)):
-            return
-
         self._current_lrs = lrs
         for i, (param_group, lr) in enumerate(zip(self.optimizer.param_groups, lrs)):
             param_group['lr'] = lr
-            name = param_group.get('name', str(i))
+            name              = param_group.get('name', str(i))
             self.tracker.log_scalar(f"lr/{name}", lr, self.global_step)
 
     def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None) -> torch.Tensor:
-        if torch.isnan(images).any() or torch.isinf(images).any():
-            self.logger.warning(f"NaN or Inf detected in input images at step {self.global_step}!")
-        
-        if gt_params is not None and (torch.isnan(gt_params).any() or torch.isinf(gt_params).any()):
-            self.logger.warning(f"NaN or Inf detected in ground truth parameters at step {self.global_step}!")
+        if self.tracker.debug:
+            if torch.isnan(images).any() or torch.isinf(images).any():
+                self.logger.warning(f"NaN or Inf detected in input images at step {self.global_step}!")
+            if gt_params is not None and (torch.isnan(gt_params).any() or torch.isinf(gt_params).any()):
+                self.logger.warning(f"NaN or Inf detected in ground truth parameters at step {self.global_step}!")
 
         with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
             pred_params = self.model(images)
-            if torch.isnan(pred_params).any() or torch.isinf(pred_params).any():
+            if self.tracker.debug and (torch.isnan(pred_params).any() or torch.isinf(pred_params).any()):
                 self.logger.warning(f"NaN or Inf detected in model predictions at step {self.global_step}!")
                 
             loss_dict   = self.criterion(pred_params, gt_params)
@@ -123,7 +134,7 @@ class Trainer:
         if torch.isnan(loss) or torch.isinf(loss):
             self.logger.warning(f"Total loss evaluated to NaN or Inf at step {self.global_step}!")
 
-        return loss
+        return loss, loss_dict
 
     def _backward(self, loss: torch.Tensor, batch_idx: int, n_batches: int) -> None:
         self.scaler.scale(loss).backward()
@@ -139,8 +150,7 @@ class Trainer:
             self.optimizer.zero_grad(set_to_none=True)
 
             if self.ema.enabled:
-                ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
-                if self.global_step % ema_every == 0:
+                if self.global_step % self._ema_every == 0:
                     self.ema.update(self.model, step=self.global_step)
 
     @torch.no_grad()
@@ -173,8 +183,10 @@ class Trainer:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        num_batches = 0
-        loss_sum    = 0.0
+        num_batches        = 0
+        loss_sum           = 0.0
+        components_sum: dict = {}
+        weighted_sum:   dict = {}
 
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch+1}/{self.epochs}[/section] - train", total=len(train_loader))
@@ -183,12 +195,17 @@ class Trainer:
                 images = batch[0].to(self.device)
                 gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
 
-                loss = self._forward(images, gt_params)
+                loss, loss_dict = self._forward(images, gt_params)
                 self._backward(loss, batch_idx, len(train_loader))
                 
                 loss_val = loss.item() * self.accumulation_steps
                 loss_sum += loss_val
                 num_batches += 1
+
+                for k, v in loss_dict["components"].items():
+                    components_sum[k] = components_sum.get(k, 0.0) + float(v)
+                for k, v in loss_dict["weighted"].items():
+                    weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
 
                 self.warmup.step()
                 self.global_step += 1
@@ -202,6 +219,11 @@ class Trainer:
 
         avg_loss = loss_sum / num_batches if num_batches else float("nan")
         self.tracker.log_scalar("loss/train", avg_loss, epoch)
+
+        n = max(1, num_batches)
+        self.tracker.log_metrics("loss_components/train",  {k: v / n for k, v in components_sum.items()}, epoch)
+        self.tracker.log_metrics("loss_weighted/train",    {k: v / n for k, v in weighted_sum.items()},   epoch)
+
         self.tracker.log_memory(epoch)
 
         return avg_loss
@@ -214,8 +236,10 @@ class Trainer:
         self.model.eval()
 
         try:
-            total_loss = 0.0
-            num_batches = 0
+            total_loss           = 0.0
+            num_batches          = 0
+            components_sum: dict = {}
+            weighted_sum:   dict = {}
 
             with self.logger.track(transient=True) as _prog:
                 _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch+1}/{self.epochs}", total=len(loader))
@@ -230,9 +254,19 @@ class Trainer:
 
                     total_loss += loss.item()
                     num_batches += 1
+
+                    for k, v in loss_dict["components"].items():
+                        components_sum[k] = components_sum.get(k, 0.0) + float(v)
+                    for k, v in loss_dict["weighted"].items():
+                        weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
+
                     _prog.advance(_task)
 
             avg_loss = total_loss / max(1, num_batches)
+
+            n = max(1, num_batches)
+            self.tracker.log_metrics(f"loss_components/{stage}", {k: v / n for k, v in components_sum.items()}, epoch)
+            self.tracker.log_metrics(f"loss_weighted/{stage}",   {k: v / n for k, v in weighted_sum.items()},   epoch)
 
         finally:
             self.ema.restore(self.model)
@@ -324,7 +358,7 @@ class Trainer:
             if self.early_stopping.triggered and self.early_stopping.best_params is not None:
                 self.logger.subsection(f"Restored best parameters from epoch {self.early_stopping.best_epoch + 1}")
 
-            return None, None, None
+            return self.train_losses, self.val_losses, self.checkpoint.best_val_loss
 
         finally:
             if self.resource_monitor is not None:

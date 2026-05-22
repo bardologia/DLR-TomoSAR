@@ -24,6 +24,7 @@ class TomogramConfiguration:
     max_crop_azimuth_width : int                 = 1000
     apply_resampling       : bool                = False
     apply_presumming       : bool                = False
+    max_amplitude_clip     : float               = 1.25
 
 
 @dataclass

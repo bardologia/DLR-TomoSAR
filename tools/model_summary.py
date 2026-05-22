@@ -42,7 +42,7 @@ class ModelSummary:
 
     def run(self):
         self.logger.section("[Model Summary]")
-        self.logger.subsection("Generating model architecture summary")
+        self.logger.info("Generating model architecture summary")
         self.total_params = 0
 
         for name, module in self.model.named_modules():
@@ -57,4 +57,4 @@ class ModelSummary:
     def save_markdown(self, path: str, title: str = "Model Summary"):
         md = self.to_markdown(title=title)
         Path(path).write_text(md, encoding="utf-8")
-        self.logger.subsection(f"Model summary saved to {path} \n")
+        self.logger.info(f"Model summary saved to {path}")

@@ -299,11 +299,13 @@ class InferencePipeline:
 
         logger = Logger(log_dir=str(meta.logs_dir), name="inference", level=cfg.log_level)
         logger.section("[Inference Pipeline]")
-        logger.subsection(f"Run Directory : {cfg.run_directory}")
-        logger.subsection(f"Output Dir    : {meta.output_dir}")
-        logger.subsection(f"Split         : {cfg.split}")
-        logger.subsection(f"Device        : {cfg.device}")
-        logger.subsection(f"Use EMA       : {cfg.use_ema}\n")
+        logger.kv_table({
+            "Run Directory": cfg.run_directory,
+            "Output Dir":    meta.output_dir,
+            "Split":         cfg.split,
+            "Device":        cfg.device,
+            "Use EMA":       cfg.use_ema,
+        })
 
         plotter = Ploter(
             cmap      = cfg.cmap_intensity,

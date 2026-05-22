@@ -15,11 +15,14 @@ Usage
     python scripts/compare_trials.py
     python scripts/compare_trials.py --trials-dir logs/unet_trials
     python scripts/compare_trials.py --out-dir logs/comparisons
+    python scripts/compare_trials.py --embed   # base64-embed all images → portable files
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -101,11 +104,19 @@ def _fmt(v) -> str:
 
 def _rel(target: Path, base: Path) -> str:
     """Relative POSIX path from *base directory* to *target*."""
-    try:
-        return target.relative_to(base).as_posix()
-    except ValueError:
-        # cross-drive or non-subpath → use absolute
-        return target.as_posix()
+    return Path(os.path.relpath(target.resolve(), base.resolve())).as_posix()
+
+
+_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif"}
+
+
+def _img_src(path: Path, embed: bool, out_dir: Path) -> str:
+    """Return either a base64 data URI (embed=True) or a relative path."""
+    if embed and path.exists():
+        mime = _MIME.get(path.suffix.lower(), "image/png")
+        data = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:{mime};base64,{data}"
+    return _rel(path, out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +317,7 @@ FIGURE_SECTIONS: list[tuple[str, list[str]]] = [
 ]
 
 
-def write_test_results_comparison(trials: list[dict], out_dir: Path) -> Path:
+def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> Path:
     inf_trials = [t for t in trials if t["has_inf"]]
     names = [t["name"] for t in inf_trials]
 
@@ -338,8 +349,8 @@ def write_test_results_comparison(trials: list[dict], out_dir: Path) -> Path:
             for t in inf_trials:
                 fig_path = t["inf_dir"] / "figures" / fig
                 if fig_path.exists():
-                    rel = _rel(fig_path, out_dir)
-                    lines.append(f"*{t['name']}*  \n![]({rel})\n")
+                    src = _img_src(fig_path, embed, out_dir)
+                    lines.append(f"*{t['name']}*  \n![]({src})\n")
                 else:
                     lines.append(f"*{t['name']}* — _(not found)_\n")
             lines.append("")
@@ -371,7 +382,7 @@ _HTML_STYLE = """
 """
 
 
-def write_gif_comparison(trials: list[dict], out_dir: Path) -> Path:
+def write_gif_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> Path:
     inf_trials = [t for t in trials if t["has_inf"]]
     n = len(inf_trials)
     if n == 0:
@@ -389,10 +400,10 @@ def write_gif_comparison(trials: list[dict], out_dir: Path) -> Path:
         for t in inf_trials:
             gif_path = t["inf_dir"] / "animations" / fname
             if gif_path.exists():
-                rel  = _rel(gif_path, out_dir)
+                src = _img_src(gif_path, embed, out_dir)
                 cells += (
                     f'<div class="cell">'
-                    f'<img src="{rel}" alt="{axis}" loading="lazy">'
+                    f'<img src="{src}" alt="{axis}" loading="lazy">'
                     f'<span>{t["name"]}</span>'
                     f'</div>\n'
                 )
@@ -436,6 +447,10 @@ def main() -> None:
         "--out-dir", type=Path, default=None,
         help="Where to write comparison reports (default: <trials-dir>/comparison_<ts>)."
     )
+    parser.add_argument(
+        "--embed", action="store_true",
+        help="Base64-embed all images/GIFs into the output files (portable, no external deps)."
+    )
     args = parser.parse_args()
 
     ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -443,7 +458,11 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[compare_trials] Scanning  → {args.trials_dir}")
-    print(f"[compare_trials] Output    → {out_dir}\n")
+    print(f"[compare_trials] Output    → {out_dir}")
+    if args.embed:
+        print("[compare_trials] Mode      → embedded (portable, base64 images)\n")
+    else:
+        print("[compare_trials] Mode      → linked (relative paths)\n")
 
     trials = collect_trials(args.trials_dir)
 
@@ -455,8 +474,8 @@ def main() -> None:
     print()
 
     r1 = write_training_comparison(trials, out_dir)
-    r2 = write_test_results_comparison(trials, out_dir)
-    r3 = write_gif_comparison(trials, out_dir)
+    r2 = write_test_results_comparison(trials, out_dir, embed=args.embed)
+    r3 = write_gif_comparison(trials, out_dir, embed=args.embed)
 
     print(f"\n[compare_trials] Reports written:")
     for r in (r1, r2, r3):

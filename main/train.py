@@ -21,11 +21,10 @@ from configuration.dataset_config       import (
     PatchConfiguration,
     Representation,
     SplitRegions,
-    InputNormalizationMode,
-    OutputNormalizationMode,
 )
 
-from tools.crop_region import CropRegion
+from tools.crop_region     import CropRegion
+from tools.loss_scale_probe import LossScaleProbe, LossScaleProbeConfig
 
 from configuration.training_config      import (
     EarlyStoppingConfig,
@@ -48,10 +47,16 @@ from pipelines.training_pipeline.pipeline import TrainingPipeline
 model_name   = "unet"
 n_gaussians  = 5
 seed         = 0
-run_name     = None          # set to a string for a custom run directory name
+run_name     = None        
+
+probe_enabled    = False
+probe_n_batches  = 100
+probe_reference  = "param_l1"
+probe_exit_after = True
+
 
 dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
+logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/new"
 params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
 
 train_az  = (1000,  9120)
@@ -67,10 +72,8 @@ num_workers = 8
 betas = (0.9, 0.999)
 eps   = 1e-8
 
-scheduler_type = "cosine_annealing_warm_restarts"
-T_zero         = 10
-T_mult         = 2.0
-eta_min        = 1e-6
+scheduler_type = "cosine_annealing"
+eta_min = 1e-6
 
 warmup_enabled      = True
 warmup_mode         = "linear"
@@ -89,21 +92,21 @@ validation_frequency = 1
 use_amp              = False
 grad_accum_steps     = 1
 
-use_charbonnier_curve    = True  
+use_charbonnier_curve    = False  
 weight_charbonnier_curve = 0.5
 
-use_ssim_curve           = True
+use_ssim_curve           = False
 weight_ssim_curve        = 1.0
 ssim_axis                = "elevation" 
 
-use_cosine_curve         = True  
+use_cosine_curve         = False  
 weight_cosine_curve      = 0.1
 
-use_param_l1             = True 
+use_param_l1             = True
 weight_param_l1          = 1.0
 param_match              = "sort_gt_by_mu"
 
-use_smoothness_tv        = True 
+use_smoothness_tv        = False 
 weight_smoothness_tv     = 5e-5 
 
 overfit_enabled        = False
@@ -114,9 +117,6 @@ overfit_batch_size     = 1
 primary_representation        = Representation.MAG_ONLY
 secondaries_representation    = Representation.MAG_ONLY
 interferograms_representation = Representation.ANGLE_ONLY
-
-input_normalization_mode  = InputNormalizationMode.GROUPED
-output_normalization_mode = OutputNormalizationMode.GROUPED
 
 encoder_lr     = 3e-4
 bottleneck_lr  = 3e-4
@@ -169,16 +169,13 @@ def main() -> None:
 
         shuffle_train               = True,
         pin_memory                  = True,
-
-        input_normalization_mode    = input_normalization_mode,
-        output_normalization_mode   = output_normalization_mode,
     )
 
     trainer_config = TrainerConfig(
         gaussian       = GaussianConfig.from_dataset(dataset_path, n_gaussians=n_gaussians),
         early_stopping = EarlyStoppingConfig(patience=es_patience, min_delta=es_min_delta, restore_best=es_restore),
         warmup         = WarmupConfig(warmup_steps=warmup_steps, warmup_start_factor=warmup_start_factor, warmup_enabled=warmup_enabled, warmup_mode=warmup_mode),
-        scheduler      = SchedulerConfig(type=scheduler_type, T_0=T_zero, T_mult=T_mult, eta_min=eta_min),
+        scheduler      = SchedulerConfig(type=scheduler_type, epochs=epochs, eta_min=eta_min),
         ema            = EMAConfig(use_ema=use_ema, ema_decay=ema_decay),
         optimizer      = OptimizerConfig(betas=betas, eps=eps),
         io             = IOConfig(logdir=logdir),
@@ -229,7 +226,15 @@ def main() -> None:
         run_name       = run_name,
     )
 
-    pipeline.run()
+    probe_config = LossScaleProbeConfig(
+        enabled        = probe_enabled,
+        n_batches      = probe_n_batches,
+        reference      = probe_reference,
+        exit_after     = probe_exit_after,
+        enabled_losses = {},
+    )
+
+    pipeline.run(probe_config=probe_config)
 
 
 if __name__ == "__main__":

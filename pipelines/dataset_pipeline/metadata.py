@@ -28,10 +28,14 @@ class Layout:
         self.artifacts      : dict       = payload["artifacts"]
 
         self.logger.section("[Layout Loaded]")
-        self.logger.subsection(f"Run Directory  : {self.run_directory}")
-        self.logger.subsection(f"Global Crop    : {self.global_crop.as_tuple()}")
-        self.logger.subsection(f"Tomogram Tag   : {self.tomogram_tag}")
-        self.logger.subsection(f"Parameters     : {self.parameters_path} \n")
+        self.logger.kv_table({
+            "Run Directory":   self.run_directory,
+            "Global Crop":     self.global_crop.as_tuple(),
+            "Azimuth (lines)": self.global_crop.azimuth_size,
+            "Range (samples)": self.global_crop.range_size,
+            "Tomogram Tag":    self.tomogram_tag,
+            "Parameters":      self.parameters_path,
+        })
 
     def artifact_path(self, artifact_key: str) -> Path:
         if artifact_key == "parameters":

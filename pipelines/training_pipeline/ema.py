@@ -12,8 +12,10 @@ class EMA:
         self.decay   = self.config.ema.ema_decay
 
         self.logger.section("[Exponential Moving Average (EMA)]")
-        self.logger.subsection(f"EMA Enabled: {self.enabled}")
-        self.logger.subsection(f"EMA Decay  : {self.decay} \n")
+        self.logger.kv_table({
+            "Enabled": self.enabled,
+            "Decay":   self.decay,
+        })
 
         self.shadow = None
         self.backup = None

@@ -217,16 +217,20 @@ class RunLoader:
         )
 
         self.logger.section(f"[Model]         : '{model_name}'")
-        self.logger.subsection(f"Checkpoint    : {ckpt_path}")
-        self.logger.subsection(f"In channels   : {in_channels}")
-        self.logger.subsection(f"Out channels  : {out_channels}")
-        self.logger.subsection(f"K gaussians   : {n_gaussians} \n")
-        
+        self.logger.kv_table({
+            "Checkpoint":  ckpt_path,
+            "In channels":  in_channels,
+            "Out channels": out_channels,
+            "K gaussians":  n_gaussians,
+        })
+
         self.logger.section(f"[Split]         : '{split}'")
-        self.logger.subsection(f"Patches       : {grid.grid.number_of_patches}")
-        self.logger.subsection(f"Azimuth size  : {region.azimuth_size}")
-        self.logger.subsection(f"Range size    : {region.range_size}\n")
-        self.logger.subsection(f"X-axis length : {x_axis.size}")
+        self.logger.kv_table({
+            "Patches":      grid.grid.number_of_patches,
+            "Azimuth size": region.azimuth_size,
+            "Range size":   region.range_size,
+            "X-axis length": x_axis.size,
+        })
 
         return Run(
             model           = model,

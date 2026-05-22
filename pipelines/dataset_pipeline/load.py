@@ -3,15 +3,12 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
-
+from torch.utils.data                        import DataLoader, Dataset
 from configuration.dataset_config            import InputConfig, OutputConfig
 from pipelines.dataset_pipeline.normalize    import Stats, Normalizer
 from pipelines.dataset_pipeline.patch        import Patcher
 from tools.logger                            import Logger
-
-
-from pipelines.dataset_pipeline.augmentation  import SpatialAugmenter
+from pipelines.dataset_pipeline.augmentation import SpatialAugmenter
 
 
 class PatchDataset(Dataset):
@@ -40,8 +37,10 @@ class PatchDataset(Dataset):
         self.n_gaussians    = n_gaussians
         self.augmenter      = augmenter
         self.input_layers   = int(inputs.shape[0])
-        self.n_secondaries  = (self.input_layers - 1) // 2 
-        self.n_slaves       = self.n_secondaries      
+
+        n_rest              = self.input_layers - 1  # subtract primary
+        self.n_secondaries  = n_rest // 2 if (input_config.use_secondaries and input_config.use_interferograms) else (n_rest if (input_config.use_secondaries or input_config.use_interferograms) else 0)
+        self.n_slaves       = self.n_secondaries
         self.input_channels = input_config.total_channels(self.n_secondaries)
 
         self.output_channel_indices = output_config.selected_indices(n_gaussians = n_gaussians)
@@ -120,10 +119,12 @@ class Loader:
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
         logger.section("[Loaders]")
-        logger.subsection(f"Batch size   : {batch_size}")
-        logger.subsection(f"Num workers  : {num_workers}")
-        logger.subsection(f"Pin memory   : {pin_memory}")
-        logger.subsection(f"Shuffle train : {shuffle_train}")
+        logger.kv_table({
+            "Batch size":    batch_size,
+            "Num workers":   num_workers,
+            "Pin memory":    pin_memory,
+            "Shuffle train": shuffle_train,
+        })
 
         _base = dict(
             batch_size         = batch_size,
@@ -137,8 +138,10 @@ class Loader:
         val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last  = False, **_base,)
         test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last  = False, **_base,)
          
-        logger.subsection(f"Train batches : {len(train_loader)}")
-        logger.subsection(f"Val   batches : {len(val_loader)}")
-        logger.subsection(f"Test  batches : {len(test_loader)} \n")
+        logger.kv_table({
+            "Train batches": len(train_loader),
+            "Val batches":   len(val_loader),
+            "Test batches":  len(test_loader),
+        })
 
         return train_loader, val_loader, test_loader

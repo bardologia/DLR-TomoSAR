@@ -72,7 +72,7 @@ class TrainingPipeline:
         self.logger.subsection(f"Parameters   : {n_params:,}")
         return model, model_cfg
 
-    def run(self):
+    def run(self, probe_config=None):
         self.logger.section("[PyTorch Training Pipeline Execution]")
 
         gaussian_cfg                    = self.trainer_config.gaussian
@@ -90,9 +90,8 @@ class TrainingPipeline:
         in_channels   = train_dataset.input_channels
         n_gaussians   = gaussian_cfg.n_default_gaussians
         out_channels  = gaussian_cfg.params_per_gaussian * n_gaussians
-
-        x_axis_length = len(self.dataset_config.x_axis)
-        x_axis = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
+        x_axis_length = int(tomo_mmap.shape[0])
+        x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
         
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
@@ -110,6 +109,7 @@ class TrainingPipeline:
         )
 
         try:
+            trainer.maybe_run_loss_probe(train_loader, probe_config)
             results = trainer.train(train_loader, val_loader, test_loader)
         finally:
             self.run_metadata.close()

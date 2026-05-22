@@ -36,8 +36,6 @@ import jax
 from configuration.dataset_config import (
     DatasetCreationConfiguration,
     InputConfig,
-    InputNormalizationMode,
-    OutputNormalizationMode,
     PassDropConfig,
     PatchConfiguration,
     Representation,
@@ -87,9 +85,6 @@ class BenchmarkConfig:
         use_secondaries=True,  secondaries_representation=Representation.MAG_ONLY,
         use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,
     ))
-
-    input_normalization_mode  : InputNormalizationMode  = InputNormalizationMode.GROUPED
-    output_normalization_mode : OutputNormalizationMode = OutputNormalizationMode.GROUPED
 
     # ── Train / val / test split ───────────────────────────────────────
     split_mode    : str             = "manual"
@@ -172,8 +167,6 @@ def _build_dataset_config(bench: BenchmarkConfig) -> DatasetCreationConfiguratio
         num_workers               = bench.num_workers,
         shuffle_train             = True,
         pin_memory                = True,
-        input_normalization_mode  = bench.input_normalization_mode,
-        output_normalization_mode = bench.output_normalization_mode,
     )
 
 

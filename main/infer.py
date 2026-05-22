@@ -22,7 +22,7 @@ from configuration.inference_config        import InferenceConfig
 from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 
-run_directory      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/unet_new_v1")
+run_directory      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/new/run_unet_20260522_181909")
 output_subdir      = ""
 split              = "test"
 device             = "cuda" if torch.cuda.is_available() else "cpu"

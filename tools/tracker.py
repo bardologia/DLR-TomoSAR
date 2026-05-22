@@ -4,23 +4,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-v0_8-darkgrid')
 
 
-class Tracker:
-    """
-    Thin TensorBoard writer wrapper.
-
-    Logging conventions (grouped for easy comparison):
-        loss/train_step, loss/train_epoch, loss/train_eval, loss/val
-        curve_{mse,mae,rmse}/<stage>    — train/val on same graph
-        r2/<stage>, r2_{overall,median,min}/<stage>
-        pixel_{mse,mae}_max/<stage>
-        cos_sim/<stage>, spectral_coh/<stage>, gt_param_{mse,mae}/<stage>
-        
-        train/grad_norm, train/grad_clip_thr, train/components/<name>, train/loss_total
-        lr/<group>, lr/warmup_factor
-        early_stop/*, system/*, params/<stage>/<name>
-        debug/* — only if log_debug=True
-    """
-    
+class Tracker:    
     def __init__(self, writer=None, debug: bool = False):
         self.writer = writer
         self.debug  = debug
@@ -30,7 +14,6 @@ class Tracker:
             self.writer.add_scalar(tag, value, step)
 
     def log_metrics(self, prefix, dict_values, step):
-        """Flat-log a dict of scalars under `prefix/<key>`. Preferred over add_scalars."""
         if self.writer is None:
             return
         for k, v in dict_values.items():
@@ -98,13 +81,11 @@ class Tracker:
             pass
 
     def log_optimizer(self, lr: float, step, name: str = "lr"):
-        """Log a scalar learning rate value."""
         if self.writer is None or not self.debug:
             return
         self.writer.add_scalar(f"debug/optimizer/{name}", lr, step)
 
     def log_activations(self, model, step_box):
-        """No-op: activation hooks are PyTorch-specific and not applicable to Flax."""
         return []
 
     def log_param_stats(self, name, tensor, step):

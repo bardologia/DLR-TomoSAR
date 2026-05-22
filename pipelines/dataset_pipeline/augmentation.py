@@ -7,6 +7,7 @@ class SpatialAugmenter:
     def __init__(self, config: AugmentationConfig, logger):
         self.config = config
         self.logger = logger
+        self._rng   = np.random.default_rng()
 
         self.logger.section("[Data Augmentation]")
         self.logger.kv_table(
@@ -21,21 +22,21 @@ class SpatialAugmenter:
 
     def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
      
-        if np.random.rand() < self.config.p_flip_h:
+        if self._rng.random() < self.config.p_flip_h:
             input_tensor = np.flip(input_tensor, axis=-1).copy()
             gt_params    = np.flip(gt_params, axis=-1).copy()
             
-        if np.random.rand() < self.config.p_flip_v:
+        if self._rng.random() < self.config.p_flip_v:
             input_tensor = np.flip(input_tensor, axis=-2).copy()
             gt_params    = np.flip(gt_params, axis=-2).copy()
 
-        if self.config.p_rot90 > 0.0 and np.random.rand() < self.config.p_rot90:
-            k = np.random.randint(1, 4) 
+        if self.config.p_rot90 > 0.0 and self._rng.random() < self.config.p_rot90:
+            k = int(self._rng.integers(1, 4))
             input_tensor = np.rot90(input_tensor, k=k, axes=(-2, -1)).copy()
             gt_params    = np.rot90(gt_params, k=k, axes=(-2, -1)).copy()
 
-        if np.random.rand() < self.config.p_noise:
-            noise = np.random.normal(0.0, self.config.noise_std, input_tensor.shape).astype(input_tensor.dtype)
+        if self._rng.random() < self.config.p_noise:
+            noise = self._rng.normal(0.0, self.config.noise_std, input_tensor.shape).astype(input_tensor.dtype)
             input_tensor = input_tensor + noise
 
         return input_tensor, gt_params

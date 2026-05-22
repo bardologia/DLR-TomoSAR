@@ -258,11 +258,14 @@ class Predictor:
                 except OSError:
                     pass
 
-        self.logger.subsection(f"Curves cube    (denorm) : {pred_curves_cube.shape}")
-        self.logger.subsection(f"Params cube    (denorm) : {params_pred_cube.shape}")
-        self.logger.subsection(f"GT params cube (denorm) : {params_gt_cube.shape}")
-        self.logger.subsection(f"Mean pixel MSE (denorm) : {pixel_mse.mean():.4g}  (pred vs gt)")
-        self.logger.subsection(f"Mean pixel R²  (denorm) : {pixel_r2.mean():.4g}  (pred vs gt)\n")
+        self.logger.section("[Inference: Results]")
+        self.logger.kv_table({
+            "Curves cube    (denorm)": pred_curves_cube.shape,
+            "Params cube    (denorm)": params_pred_cube.shape,
+            "GT params cube (denorm)": params_gt_cube.shape,
+            "Mean pixel MSE (denorm)": f"{pixel_mse.mean():.4g}  (pred vs gt)",
+            "Mean pixel R²  (denorm)": f"{pixel_r2.mean():.4g}  (pred vs gt)",
+        })
 
         return Result(
             pred_curves        = pred_curves_cube,
@@ -283,11 +286,13 @@ class Predictor:
         import torch
         backend = "cuda" if torch.cuda.is_available() else "cpu"
         self.logger.section("[Inference: Predict]")
-        self.logger.subsection(f"Backend      : PyTorch / {backend}")
-        self.logger.subsection(f"Cube dir     : {self.cube_dir}")
-        self.logger.subsection(f"Window       : {self.window_kind}")
-        self.logger.subsection(f"Cube dtype   : {self.cube_dtype}")
-        self.logger.subsection(f"CPU workers  : {self.cpu_workers}\n")
+        self.logger.kv_table({
+            "Backend":     f"PyTorch / {backend}",
+            "Cube dir":    self.cube_dir,
+            "Window":      self.window_kind,
+            "Cube dtype":  self.cube_dtype,
+            "CPU workers": self.cpu_workers,
+        })
 
         all_indices, all_pred_params, all_gt_params = self._forward_pass()
         cpu_results = self._compute_metrics(all_pred_params, all_gt_params)

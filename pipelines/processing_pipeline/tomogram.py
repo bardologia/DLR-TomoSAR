@@ -138,43 +138,30 @@ class TomogramProcessor:
 
         with ProcessPoolExecutor(max_workers=parallel_config.tomogram_workers, mp_context=mp.get_context("spawn")) as executor:
             futures = [executor.submit(_run_pyrat, *task) for task in tasks]
-            for future in as_completed(futures):
-                future.result()
+            try:
+                for future in as_completed(futures):
+                    future.result()
+            except Exception:
+                for f in futures:
+                    f.cancel()
+                raise
 
     def _concatenate(self, temporary_directory: Path) -> Tuple[np.ndarray, np.ndarray]:
         partial_files_directory = temporary_directory / "TOMO" / "TOMO-SR"
         partial_file_paths      = sorted(partial_files_directory.iterdir())
    
-        self.logger.subsection(f"[Concatenation] Merging {len(partial_file_paths)} subsection artifacts...")
+        self.logger.subsection(f"[Concatenation] Merging {len(partial_file_paths)} subsection artifacts")
 
-        dem_shapes      = []
-        tomogram_shapes = []
-        dem_dtype       = None
-        tomogram_dtype  = None
+        dem_chunks      : list[np.ndarray] = []
+        tomogram_chunks : list[np.ndarray] = []
 
         for partial_file_path in partial_file_paths:
             with h5py.File(str(partial_file_path), "r") as hdf5_file:
-                dem_shapes.append(hdf5_file["DEM"].shape)
-                tomogram_shapes.append(hdf5_file["tomogram"].shape)
-                dem_dtype      = hdf5_file["DEM"].dtype
-                tomogram_dtype = hdf5_file["tomogram"].dtype
+                dem_chunks.append(hdf5_file["DEM"][:])
+                tomogram_chunks.append(hdf5_file["tomogram"][:])
 
-        total_dem_az      = sum(s[0] for s in dem_shapes)
-        total_tomogram_az = sum(s[1] for s in tomogram_shapes)
-
-        combined_dem      = np.empty((total_dem_az,) + dem_shapes[0][1:],                                 dtype=dem_dtype)
-        combined_tomogram = np.empty((tomogram_shapes[0][0], total_tomogram_az, tomogram_shapes[0][2]),   dtype=tomogram_dtype)
-
-        dem_offset      = 0
-        tomogram_offset = 0
-        
-        for partial_file_path, dem_shape, tomogram_shape in zip(partial_file_paths, dem_shapes, tomogram_shapes):
-            with h5py.File(str(partial_file_path), "r") as hdf5_file:
-                hdf5_file["DEM"]     .read_direct(combined_dem,      dest_sel=np.s_[dem_offset:dem_offset + dem_shape[0]])
-                hdf5_file["tomogram"].read_direct(combined_tomogram, dest_sel=np.s_[:, tomogram_offset:tomogram_offset + tomogram_shape[1], :])
-            
-            dem_offset      += dem_shape[0]
-            tomogram_offset += tomogram_shape[1]
+        combined_dem      = np.concatenate(dem_chunks,      axis=0)
+        combined_tomogram = np.concatenate(tomogram_chunks, axis=1)
 
         self.logger.subsection(f"-> Combined DEM shape      : {combined_dem.shape}")
         self.logger.subsection(f"-> Combined Tomogram shape : {combined_tomogram.shape}")
@@ -183,8 +170,8 @@ class TomogramProcessor:
 
     def _save(self, tomogram_path: Path, dem_path: Path, tomogram_array: np.ndarray, dem_array: np.ndarray) -> None:
         tomogram_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(str(tomogram_path), tomogram_array)
-        np.save(str(dem_path),      dem_array)
+        np.save(str(tomogram_path), tomogram_array, allow_pickle=False)
+        np.save(str(dem_path),      dem_array,      allow_pickle=False)
 
     def _cleanup_temp(self, temporary_directory: Path) -> None:
         if temporary_directory.exists():
@@ -204,9 +191,9 @@ class TomogramProcessor:
             
             self.logger.subsection(f"Tomogram saved : {tomogram_path}")
             self.logger.subsection(f"DEM saved      : {dem_path}")
-            self.logger.subsection(f"Temporary directory cleaned up. \n")
         finally:
             self._cleanup_temp(temporary_directory)
+            self.logger.subsection("Temporary directory cleaned up. \n")
             gc.collect()
 
         return tomogram_path, dem_path

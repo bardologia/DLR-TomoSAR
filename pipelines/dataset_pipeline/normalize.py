@@ -8,7 +8,8 @@ from typing      import Optional
 import numpy as np
 import torch
 
-from configuration.dataset_config import ChannelStats, InputConfig, InputNormalizationMode, OutputConfig, OutputNormalizationMode, Representation
+from configuration.norm_config    import ChannelStats, ChannelTransformStrategy, NormStrategy
+from configuration.dataset_config import InputConfig, OutputConfig, Representation
 from tools.logger                 import Logger
 from torch.utils.data             import DataLoader
 from torch.utils.data             import Subset
@@ -16,10 +17,8 @@ from torch.utils.data             import Subset
 
 @dataclass
 class Stats:
-    input_stats  : Optional[ChannelStats]   = None
-    output_stats : Optional[ChannelStats]   = None
-    input_mode   : InputNormalizationMode   = InputNormalizationMode.PER_CHANNEL
-    output_mode  : OutputNormalizationMode  = OutputNormalizationMode.DISABLED
+    input_stats  : Optional[ChannelStats]  = None
+    output_stats : Optional[ChannelStats]  = None
 
     def save(self, directory: Path) -> Path:
         directory = Path(directory)
@@ -27,8 +26,6 @@ class Stats:
         out_path  = directory / "normalization_stats.json"
 
         payload = {
-            "input_mode"   : self.input_mode.value,
-            "output_mode"  : self.output_mode.value,
             "input_stats"  : self.input_stats.as_dict()  if self.input_stats  else None,
             "output_stats" : self.output_stats.as_dict() if self.output_stats else None,
         }
@@ -42,29 +39,22 @@ class Stats:
     def load(cls, directory: Path, logger: Logger) -> "Stats":
         path = Path(directory) / "normalization_stats.json"
         if not path.exists():
-            logger.warning(f"No normalization stats found at {path}. Running without normalization.")
+            raise FileNotFoundError(f"Normalization stats not found at '{path}'.")
             
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
 
-        input_stats  = ChannelStats.from_dict(payload["input_stats"])  
-        output_stats = ChannelStats.from_dict(payload["output_stats"]) 
-        input_mode   = InputNormalizationMode(payload["input_mode"])
-        output_mode  = OutputNormalizationMode(payload["output_mode"])
+        input_stats  = ChannelStats.from_dict(payload["input_stats"])
+        output_stats = ChannelStats.from_dict(payload["output_stats"])
 
         logger.section(f"[Normalization stats loaded]")
-        logger.subsection(f"Stats path      : {path}")
-        logger.subsection(f"Input  mode     : {input_mode.value}")
-        logger.subsection(f"Output mode     : {output_mode.value}")
-        logger.subsection(f"Input  channels : {input_stats.n_channels}  (mode={input_mode.value})")
-        logger.subsection(f"Output channels : {output_stats.n_channels}  (mode={output_mode.value})")
+        logger.kv_table({
+            "Stats path":      path,
+            "Input channels":  input_stats.n_channels,
+            "Output channels": output_stats.n_channels,
+        })
 
-        return cls(
-            input_stats  = input_stats,
-            output_stats = output_stats,
-            input_mode   = input_mode,
-            output_mode  = output_mode,
-        )
+        return cls(input_stats = input_stats, output_stats = output_stats)
 
 
 class StatsComputer:
@@ -72,11 +62,11 @@ class StatsComputer:
     def _input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
         map: dict[Representation, list[str]] = {
             Representation.REAL_IMAG     : ["raw_re_im",  "raw_re_im"],
-            Representation.MAG_REAL_IMAG : ["log_mag",    "norm_re_im", "norm_re_im"],
-            Representation.MAG_ANGLE     : ["log_mag",    "phase"],
-            Representation.MAG_RI_ANGLE  : ["log_mag",    "norm_re_im", "norm_re_im", "phase"],
+            Representation.MAG_REAL_IMAG : ["mag",    "norm_re_im", "norm_re_im"],
+            Representation.MAG_ANGLE     : ["mag",    "phase"],
+            Representation.MAG_RI_ANGLE  : ["mag",    "norm_re_im", "norm_re_im", "phase"],
             Representation.ANGLE_ONLY    : ["phase"],
-            Representation.MAG_ONLY      : ["log_mag"],
+            Representation.MAG_ONLY      : ["mag"],
         }
 
         keys: list[str] = []
@@ -98,62 +88,6 @@ class StatsComputer:
             _append_block(input_config.interferograms_representation, n_passes=n_slaves, source_kind="ifg")
 
         return keys
-
-    @staticmethod
-    def _output_to_group(n_channels : int, role_names : list[str]) -> list[str]:
-        ppg = len(role_names)
-        return [role_names[i % ppg] for i in range(n_channels)]
-
-    @staticmethod
-    def _per_channel_stats(
-        per_ch_count : np.ndarray,
-        per_ch_mean  : np.ndarray,
-        per_ch_m2    : np.ndarray,
-    ) -> ChannelStats:
-
-        std = np.sqrt(per_ch_m2 / np.maximum(per_ch_count - 1, 1))
-        std = np.where(std < 1e-8, 1.0, std)
-        return ChannelStats(mean=per_ch_mean.tolist(), std=std.tolist())
-
-    @staticmethod
-    def _collapse_to_groups(per_ch_count : np.ndarray, per_ch_mean : np.ndarray, per_ch_m2 : np.ndarray, group_keys : list[str]) -> ChannelStats:
-        n         = len(group_keys)
-        grp_count : dict[str, float] = {}
-        grp_mean  : dict[str, float] = {}
-        grp_m2    : dict[str, float] = {}
-
-        for i in range(n):
-            key           = group_keys[i]
-            c_i, m_i, s_i = float(per_ch_count[i]), float(per_ch_mean[i]), float(per_ch_m2[i])
-            if key not in grp_count:
-                grp_count[key] = c_i
-                grp_mean[key]  = m_i
-                grp_m2[key]    = s_i
-                continue
-
-            c_a, m_a, s_a = grp_count[key], grp_mean[key], grp_m2[key]
-            c_b, m_b, s_b = c_i,            m_i,            s_i
-            total = c_a + c_b
-
-            if total <= 0:
-                continue
-
-            delta          = m_b - m_a
-            grp_mean[key]  = m_a + delta * c_b / total
-            grp_m2[key]    = s_a + s_b + delta * delta * c_a * c_b / total
-            grp_count[key] = total
-
-        means = np.empty(n, dtype=np.float64)
-        stds  = np.empty(n, dtype=np.float64)
-        for i, key in enumerate(group_keys):
-            c        = grp_count[key]
-            means[i] = grp_mean[key]
-            var      = grp_m2[key] / max(c - 1.0, 1.0)
-            stds[i]  = float(np.sqrt(var))
-
-        stds = np.where(stds < 1e-8, 1.0, stds)
-
-        return ChannelStats(mean=means.tolist(), std=stds.tolist())
 
     @staticmethod
     def _log_grouping(logger : Logger, label : str, group_keys : list[str]) -> None:
@@ -208,214 +142,198 @@ class StatsComputer:
         return subset, n_use, n_total
 
     @staticmethod
-    def _initialize_accumulators(in_channels : int, gt_channels : int, do_output : bool) -> tuple:
-        in_count = np.zeros(in_channels, dtype=np.int64)
-        in_mean  = np.zeros(in_channels, dtype=np.float64)
-        in_m2    = np.zeros(in_channels, dtype=np.float64)
-
-        out_count = np.zeros(gt_channels, dtype=np.int64)   if do_output else None
-        out_mean  = np.zeros(gt_channels, dtype=np.float64) if do_output else None
-        out_m2    = np.zeros(gt_channels, dtype=np.float64) if do_output else None
-
-        return in_count, in_mean, in_m2, out_count, out_mean, out_m2
-
-    @staticmethod
-    def _accumulate_batch(arr: np.ndarray, count, mean, m2) -> None:
-        arr = np.asarray(arr, dtype=np.float64)
-
-        if arr.ndim == 1:
-            arr = arr[np.newaxis, :, np.newaxis]
-        elif arr.ndim == 2:
-            arr = arr[:, :, np.newaxis]
-
-        n_ch  = arr.shape[1]
-        flat  = arr.reshape(arr.shape[0], n_ch, -1)
-        flat  = flat.transpose(1, 0, 2).reshape(n_ch, -1)
-
-        batch_n    = flat.shape[1]
-        batch_mean = flat.mean(axis=1)
-        batch_m2   = ((flat - batch_mean[:, None]) ** 2).sum(axis=1)
-
-        total    = count + batch_n
-        delta    = batch_mean - mean
-        mean[:]  = mean + delta * batch_n / total
-        m2[:]    = m2 + batch_m2 + delta ** 2 * count * batch_n / total
-        count[:] = total
-
-    @staticmethod
-    def _process_batches(
+    def _collect_grouped_raw(
         subset,
-        in_count, in_mean, in_m2,
-        out_count, out_mean, out_m2,
-        do_input    : bool,
-        do_output   : bool,
-        num_workers : int,
-        batch_size  : int,
-    ) -> None:
+        group_keys         : list[str],
+        num_workers        : int,
+        batch_size         : int,
+        max_vals_per_group : int = 1_000_000,
+    ) -> dict[str, np.ndarray]:
+ 
+        unique_groups  = list(dict.fromkeys(group_keys))
+        group_channels = {g: [i for i, k in enumerate(group_keys) if k == g] for g in unique_groups}
+        needs_data     = {g for g in unique_groups if ChannelTransformStrategy.from_slot(g).strategy is not NormStrategy.FIXED_DIV_PI}
 
-        loader = DataLoader(
-            subset,
-            batch_size  = batch_size,
-            shuffle     = False,
-            num_workers = num_workers,
-            pin_memory  = False,
-            drop_last   = False,
-        )
+        collected: dict[str, list[np.ndarray]] = {g: [] for g in needs_data}
+        if not collected:
+            return {}
+
+        n_batches_est     = max(len(subset) // max(batch_size, 1), 1)
+        first_group_chs   = len(next(iter(group_channels.values())))
+        vals_per_ch_batch = max(64, max_vals_per_group // (n_batches_est * max(first_group_chs, 1)))
+
+        loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+        rng    = np.random.default_rng(42)
 
         for batch in loader:
-            if do_input:
-                inp = batch[0] if isinstance(batch, (tuple, list)) else batch
-                StatsComputer._accumulate_batch(np.asarray(inp), in_count, in_mean, in_m2)
+            inp = batch[0] if isinstance(batch, (tuple, list)) else batch
+            arr = np.asarray(inp, dtype=np.float32)
+           
+            if arr.ndim == 3:
+                arr = arr[np.newaxis]  
 
-            if do_output:
-                gt = np.asarray(batch[1])
-                StatsComputer._accumulate_batch(gt, out_count, out_mean, out_m2)
+            for g, channels in group_channels.items():
+                if g not in needs_data:
+                    continue
+                for ch in channels:
+                    flat = arr[:, ch].ravel()
+                    
+                    if len(flat) > vals_per_ch_batch:
+                        idx  = rng.choice(len(flat), vals_per_ch_batch, replace=False)
+                        flat = flat[idx]
+                    
+                    collected[g].append(flat)
+
+        return {g: np.concatenate(v) for g, v in collected.items() if v}
 
     @staticmethod
-    def _input_stats(
+    def _fit_input_stats(logger : Logger, group_keys : list[str], collected : dict[str, np.ndarray]) -> ChannelStats:
+        unique_groups    = list(dict.fromkeys(group_keys))
+        group_strategies = {g: ChannelTransformStrategy.from_slot(g) for g in unique_groups}
+
+        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected.get(g, np.array([]))) for g in unique_groups}
+
+        n          = len(group_keys)
+        locs       = [group_mean_std[group_keys[i]][0] for i in range(n)]
+        scales     = [group_mean_std[group_keys[i]][1] for i in range(n)]
+        strategies = [group_strategies[group_keys[i]]  for i in range(n)]
+
+        logger.section("[Input stats per channel]")
+        rows = []
+        for c in range(n):
+            strat = strategies[c]
+            rows.append({
+                "Ch":       str(c),
+                "Slot":     group_keys[c],
+                "Strategy": strat.strategy.value,
+                "log1p":    str(strat.apply_log1p),
+                "loc":      f"{locs[c]:+.6f}",
+                "scale":    f"{scales[c]:.6f}",
+            })
+        logger.metrics_table(rows, ["Ch", "Slot", "Strategy", "log1p", "loc", "scale"])
+
+        return ChannelStats(
+            loc        = locs,
+            scale      = scales,
+            names      = group_keys,
+            strategies = strategies,
+        )
+
+    @staticmethod
+    def compute_input_stats(
+        dataset,
         logger       : Logger,
         input_config : InputConfig,
         n_slaves     : int,
-        input_mode   : InputNormalizationMode,
-        in_channels  : int,
-        in_count,
-        in_mean,
-        in_m2,
-    ) -> ChannelStats:
-        in_groups = StatsComputer._input_to_group(input_config, n_slaves)
-
-        if input_mode is InputNormalizationMode.PER_CHANNEL:
-            input_stats       = StatsComputer._per_channel_stats(in_count, in_mean, in_m2)
-            input_stats.names = in_groups
-        else:
-            input_stats       = StatsComputer._collapse_to_groups(in_count, in_mean, in_m2, in_groups)
-            input_stats.names = in_groups
-
-        if input_mode is not InputNormalizationMode.PER_CHANNEL:
-            logger.section("[Input grouping]")
-            StatsComputer._log_grouping(logger, "Input", in_groups)
-
-        logger.section("[Input stats per channel]")
-        for c in range(in_channels):
-            logger.subsection(f" Channel {c:>3d}  mean={input_stats.mean[c]:+.6f},  std={input_stats.std[c]:.6f}")
-     
-        return input_stats
-
-    @staticmethod
-    def _output_stats(
-        logger        : Logger,
-        output_config : OutputConfig,
-        output_mode   : OutputNormalizationMode,
-        gt_channels   : int,
-        out_count,
-        out_mean,
-        out_m2,
-    ) -> ChannelStats:
-        out_groups = StatsComputer._output_to_group(gt_channels, output_config.role_names)
-
-        if output_mode is OutputNormalizationMode.PER_CHANNEL:
-            output_stats       = StatsComputer._per_channel_stats(out_count, out_mean, out_m2)
-            output_stats.names = out_groups
-        else:
-            output_stats       = StatsComputer._collapse_to_groups(out_count, out_mean, out_m2, out_groups)
-            output_stats.names = out_groups
-
-        if output_mode is not OutputNormalizationMode.PER_CHANNEL:
-            logger.section("[Output grouping]")
-            StatsComputer._log_grouping(logger, "Output", out_groups)
-
-        logger.section("[Output stats per channel]")
-        for c in range(gt_channels):
-            logger.subsection(f" Channel {c:>3d}  mean={output_stats.mean[c]:+.6f},  std={output_stats.std[c]:.6f}")
-        
-        return output_stats
-
-    @staticmethod
-    def compute_from_dataset(
-        dataset,
-        logger              : Logger,
-        input_config        : InputConfig,
-        output_config       : OutputConfig,
-        n_slaves            : int,
-        input_mode          : InputNormalizationMode  = InputNormalizationMode.PER_CHANNEL,
-        output_mode         : OutputNormalizationMode = OutputNormalizationMode.DISABLED,
-        max_samples         : int                     = 0,
-        num_workers         : int                     = 4,
-        batch_size          : int                     = 512,
+        max_samples  : int = 0,
+        num_workers  : int = 4,
+        batch_size   : int = 512,
     ) -> Stats:
-
-        logger.section("[Normalization Statistics Computation]")
-        logger.subsection(f"Input  mode : {input_mode.value}")
-        logger.subsection(f"Output mode : {output_mode.value}")
-
-        subset, n_use, n_total = StatsComputer._get_subset(
-            dataset     = dataset,
-            max_samples = max_samples,
-        )
-
-        logger.subsection(f"Samples used : {n_use:,} / {n_total:,}")
-
+        logger.section("[Input Normalization Statistics]")
+        subset, n_use, n_total = StatsComputer._get_subset(dataset, max_samples)
         sample      = dataset[0]
         in_first    = sample[0] if isinstance(sample, (tuple, list)) else sample
         in_channels = int(in_first.shape[0])
-        gt_channels = int(sample[1].shape[0])
+        logger.kv_table({
+            "Strategy":       "auto-selected per slot-kind (grouped across passes/ifgs)",
+            "Samples":        f"{n_use:,} / {n_total:,}",
+            "Input channels": in_channels,
+        })
 
-        logger.subsection(f"Input channels : {in_channels}")
-        logger.subsection(f"Output channels: {gt_channels} \n")
+        group_keys = StatsComputer._input_to_group(input_config, n_slaves)
+        assert len(group_keys) == in_channels, (f"Group key count ({len(group_keys)}) != tensor channels ({in_channels})")
 
-        do_input  = input_mode is not InputNormalizationMode.DISABLED
-        do_output = output_mode is not OutputNormalizationMode.DISABLED
+        logger.section("[Input grouping by slot-kind]")
+        StatsComputer._log_grouping(logger, "Input", group_keys)
 
-        in_count, in_mean, in_m2, out_count, out_mean, out_m2 = StatsComputer._initialize_accumulators(
-            in_channels = in_channels if do_input else 0,
-            gt_channels = gt_channels,
-            do_output   = do_output,
-        )
-
-        StatsComputer._process_batches(
+        collected = StatsComputer._collect_grouped_raw(
             subset      = subset,
-            in_count    = in_count if do_input else None,
-            in_mean     = in_mean  if do_input else None,
-            in_m2       = in_m2    if do_input else None,
-            out_count   = out_count,
-            out_mean    = out_mean,
-            out_m2      = out_m2,
-            do_input    = do_input,
-            do_output   = do_output,
+            group_keys  = group_keys,
             num_workers = num_workers,
             batch_size  = batch_size,
         )
 
-        input_stats: Optional[ChannelStats] = None
-        if do_input:
-            input_stats = StatsComputer._input_stats(
-                logger       = logger,
-                input_config = input_config,
-                n_slaves     = n_slaves,
-                input_mode   = input_mode,
-                in_channels  = in_channels,
-                in_count     = in_count,
-                in_mean      = in_mean,
-                in_m2        = in_m2,
-            )
-
-        output_stats: Optional[ChannelStats] = None
-        if do_output:
-            output_stats = StatsComputer._output_stats(
-                logger        = logger,
-                output_config = output_config,
-                output_mode   = output_mode,
-                gt_channels   = gt_channels,
-                out_count     = out_count,
-                out_mean      = out_mean,
-                out_m2        = out_m2,
-            )
+        input_stats = StatsComputer._fit_input_stats(
+            logger     = logger,
+            group_keys = group_keys,
+            collected  = collected,
+        )
 
         return Stats(
             input_stats  = input_stats,
-            output_stats = output_stats,
-            input_mode   = input_mode,
-            output_mode  = output_mode,
+            output_stats = None,
+        )
+
+    @staticmethod
+    def compute_output_stats(
+        params_path   : Path,
+        n_gaussians   : int,
+        output_config : "OutputConfig",
+        amp_threshold : float = 1e-2,
+        logger        : Optional[Logger] = None,
+    ) -> ChannelStats:
+        params = np.load(params_path, mmap_mode="r")
+
+        amp_pool_vals:  list[np.ndarray] = []
+        mu_pool_vals:   list[np.ndarray] = []
+        sig_pool_vals:  list[np.ndarray] = []
+
+        for g in range(n_gaussians):
+            a_flat   = params[g * 3 + 0].ravel().astype(np.float64)
+            mu_flat  = params[g * 3 + 1].ravel().astype(np.float64)
+            sig_flat = params[g * 3 + 2].ravel().astype(np.float64)
+            active   = a_flat > amp_threshold
+
+            amp_pool_vals.append(a_flat)           
+            mu_pool_vals.append(mu_flat[active])   
+            sig_pool_vals.append(sig_flat[active])
+
+        role_pools = {
+            "out/amp"   : np.concatenate(amp_pool_vals),
+            "out/mu"    : np.concatenate(mu_pool_vals),
+            "out/sigma" : np.concatenate(sig_pool_vals),
+        }
+
+        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
+        role_strat : dict[str, ChannelTransformStrategy] = {key: output_config.strategy_for(key)           for key in role_pools}
+
+        selected       = output_config.selected_indices(n_gaussians)
+        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
+
+        locs:       list[float]                      = []
+        scales:     list[float]                      = []
+        names:      list[str]                        = []
+        strategies: list[ChannelTransformStrategy]   = []
+
+        for out_ch, full_ch in enumerate(selected):
+            g        = full_ch // 3
+            role_key = _local_to_role[full_ch % 3]
+            m, s     = role_fit[role_key]
+            locs.append(m)
+            scales.append(s)
+            names.append(f"G{g+1}_{role_key.split('/')[1]}")
+            strategies.append(role_strat[role_key])
+
+        if logger is not None:
+            logger.section("[Output stats from params]")
+            rows = [
+                {
+                    "Channel":   key,
+                    "loc":       f"{m:.5f}",
+                    "scale":     f"{s:.5f}",
+                    "Strategy":  strat.strategy.value,
+                    "log1p":     str(strat.apply_log1p),
+                }
+                for key, (m, s) in role_fit.items()
+                for strat in [role_strat[key]]
+            ]
+            logger.metrics_table(rows, ["Channel", "loc", "scale", "Strategy", "log1p"])
+
+        return ChannelStats(
+            loc        = locs,
+            scale      = scales,
+            names      = names,
+            strategies = strategies,
         )
 
 
@@ -423,58 +341,39 @@ class Normalizer:
     def __init__(self, stats: Stats) -> None:
         self.stats = stats
 
-    @staticmethod
-    def _broadcast_shape(ndim: int) -> tuple:
-        if ndim == 4:
-            return (1, -1, 1, 1)
-        elif ndim == 3:
-            return (-1, 1, 1)
-        
-        return (-1,)
+    def _apply_strategy_normalization(self, tensor, stats: ChannelStats, inverse: bool):
+        is_torch = isinstance(tensor, torch.Tensor)
+        out      = tensor.clone() if is_torch else tensor.copy()
 
-    def _mean_std_numpy(self, channel_stats, ndim: int):
-        shape = self._broadcast_shape(ndim)
-        mean  = np.asarray(channel_stats.mean, dtype=np.float32).reshape(shape)
-        std   = np.asarray(channel_stats.std,  dtype=np.float32).reshape(shape)
-        
-        return mean, std
+        for ch, strat in enumerate(stats.strategies):
+            sl = (slice(None), ch) if tensor.ndim == 4 else (ch,)
+            m  = stats.loc[ch]
+            s  = stats.scale[ch]
+
+            if not inverse:
+                x = tensor[sl]
+                if strat.apply_log1p:
+                    x = (torch.log1p(torch.clamp(x, min=0.0))
+                         if is_torch else np.log1p(np.maximum(np.asarray(x), 0.0)))
+                out[sl] = (x - m) / s
+            
+            else:
+                x = tensor[sl] * s + m
+                if strat.apply_log1p:
+                    x = torch.expm1(x) if is_torch else np.expm1(x)
+               
+                out[sl] = x
+
+        return out
 
     def normalize_input(self, tensor: np.ndarray) -> np.ndarray:
-        if isinstance(tensor, torch.Tensor):
-            shape = self._broadcast_shape(tensor.ndim)
-            mean  = torch.tensor(self.stats.input_stats.mean, dtype=torch.float32, device=tensor.device).reshape(shape)
-            std   = torch.tensor(self.stats.input_stats.std,  dtype=torch.float32, device=tensor.device).reshape(shape)
-        else:
-            mean, std = self._mean_std_numpy(self.stats.input_stats, tensor.ndim)
-        
-        return (tensor - mean) / std
+        return self._apply_strategy_normalization(tensor, self.stats.input_stats, inverse=False)
 
-    def normalize_output(self, tensor: np.ndarray) -> np.ndarray:
-        if isinstance(tensor, torch.Tensor):
-            shape = self._broadcast_shape(tensor.ndim)
-            mean  = torch.tensor(self.stats.output_stats.mean, dtype=torch.float32, device=tensor.device).reshape(shape)
-            std   = torch.tensor(self.stats.output_stats.std,  dtype=torch.float32, device=tensor.device).reshape(shape)
-        else:
-            mean, std = self._mean_std_numpy(self.stats.output_stats, tensor.ndim)
-        
-        return (tensor - mean) / std
+    def normalize_output(self, tensor) -> np.ndarray:
+        return self._apply_strategy_normalization(tensor, self.stats.output_stats, inverse=False)
 
     def denormalize_input(self, tensor):
-        if isinstance(tensor, torch.Tensor):
-            shape = self._broadcast_shape(tensor.ndim)
-            mean  = torch.tensor(self.stats.input_stats.mean, dtype=torch.float32, device=tensor.device).reshape(shape)
-            std   = torch.tensor(self.stats.input_stats.std,  dtype=torch.float32, device=tensor.device).reshape(shape)
-        else:
-            mean, std = self._mean_std_numpy(self.stats.input_stats, tensor.ndim)
-        
-        return tensor * std + mean
+        return self._apply_strategy_normalization(tensor, self.stats.input_stats, inverse=True)
 
     def denormalize_output(self, tensor):
-        if isinstance(tensor, torch.Tensor):
-            shape = self._broadcast_shape(tensor.ndim)
-            mean  = torch.tensor(self.stats.output_stats.mean, dtype=torch.float32, device=tensor.device).reshape(shape)
-            std   = torch.tensor(self.stats.output_stats.std,  dtype=torch.float32, device=tensor.device).reshape(shape)
-        else:
-            mean, std = self._mean_std_numpy(self.stats.output_stats, tensor.ndim)
-            
-        return tensor * std + mean
+        return self._apply_strategy_normalization(tensor, self.stats.output_stats, inverse=True)

@@ -39,7 +39,7 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
 
     from configuration.dataset_config import (
         DatasetCreationConfiguration, InputConfig, PatchConfiguration,
-        Representation, SplitRegions, InputNormalizationMode, OutputNormalizationMode,
+        Representation, SplitRegions,
     )
     from tools.crop_region import CropRegion
     from configuration.training_config import (
@@ -80,8 +80,6 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
         num_workers              = 8,
         shuffle_train            = True,
         pin_memory               = False,
-        input_normalization_mode  = InputNormalizationMode.GROUPED,
-        output_normalization_mode = OutputNormalizationMode.GROUPED,
     )
 
     trainer_config = TrainerConfig(

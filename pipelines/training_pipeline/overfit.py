@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import numpy as np
+import torch
 
 
 class OverfitManager:
@@ -12,17 +12,19 @@ class OverfitManager:
         self.logger          = logger
 
         self.logger.section("[Overfit Manager]")
-        self.logger.subsection(f"Overfit Enabled     : {self.enabled}")
-        self.logger.subsection(f"Overfit Max Steps   : {self.max_steps}")
-        self.logger.subsection(f"Overfit Stop Thresh : {self.stop_threshold}")
-        self.logger.subsection(f"Overfit Batch Size  : {self.batch_size} \n")
+        self.logger.kv_table({
+            "Enabled":     self.enabled,
+            "Max Steps":   self.max_steps,
+            "Stop Thresh": self.stop_threshold,
+            "Batch Size":  self.batch_size,
+        })
 
     def setup_loaders(self, train_loader, val_loader, test_loader):
         if not self.enabled:
             return train_loader, val_loader, test_loader
 
         raw_batch     = next(iter(train_loader))
-        single_batch  = tuple(t[:self.batch_size] if isinstance(t, np.ndarray) else t for t in raw_batch)
+        single_batch  = tuple(t[:self.batch_size] if isinstance(t, torch.Tensor) else t for t in raw_batch)
         overfit_steps = min(len(train_loader), self.max_steps)
 
         data_loader       = [single_batch] * overfit_steps

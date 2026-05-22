@@ -118,46 +118,36 @@ class Scheduler:
             return self._polynomial(epoch)
         
         if self.scheduler_type == "reduce_on_plateau":
-            f = self._reduce_on_plateau(metric)
-            self.current_lrs = [lr * f for lr in self.current_lrs]
-            return 1.0
+            return self._reduce_on_plateau(metric)
         
         raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
     def step(self, epoch: int, metric: float | None = None) -> list[float]:
-        if self.scheduler_type == "reduce_on_plateau":
-            self._factor_for(epoch, metric)   
-            lrs = list(self.current_lrs)
-        
-        else:
-            factor = self._factor_for(epoch, metric)
-            lrs    = [lr * factor for lr in self.base_lrs]
-            self.current_lrs = list(lrs)
+        factor           = self._factor_for(epoch, metric)
+        self.current_lrs = [lr * factor for lr in self.current_lrs] if self.scheduler_type == "reduce_on_plateau" else [lr * factor for lr in self.base_lrs]
+        lrs              = list(self.current_lrs)
       
         if self.warmup is not None and not self.warmup.is_finished():
             f   = self.warmup.factor()
             lrs = [lr * f for lr in lrs]
-      
-        for i, lr in enumerate(lrs):
-            self.tracker.log_scalar(f"lr/group_{i}", lr, epoch)
         
         return lrs
 
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")
-        self.logger.subsection(f"Scheduler Type    : {self.scheduler_type}")
-        self.logger.subsection(f"Base LRs          : {self.base_lrs}")
-        
+        info = {
+            "Scheduler Type": self.scheduler_type,
+            "Base LRs":       self.base_lrs,
+        }
         if self.scheduler_type == "cosine_annealing":
-            self.logger.subsection(f"T_max             : {self.config.scheduler.epochs}")
-            self.logger.subsection(f"Eta Min           : {self.config.scheduler.eta_min}")
-        
+            info["T_max"]   = self.config.scheduler.epochs
+            info["Eta Min"] = self.config.scheduler.eta_min
         if self.scheduler_type == "cosine_annealing_warm_restarts":
-            self.logger.subsection(f"T_0               : {self.config.scheduler.T_0}")
-            self.logger.subsection(f"T_mult            : {self.config.scheduler.T_mult}")
-            self.logger.subsection(f"Eta Min           : {self.config.scheduler.eta_min}")
-        
-        self.logger.subsection(f"Warmup Enabled    : {self.warmup.enabled if self.warmup else False} \n")
+            info["T_0"]     = self.config.scheduler.T_0
+            info["T_mult"]  = self.config.scheduler.T_mult
+            info["Eta Min"] = self.config.scheduler.eta_min
+        info["Warmup Enabled"] = self.warmup.enabled if self.warmup else False
+        self.logger.kv_table(info)
 
     def state_dict(self) -> dict:
         return {

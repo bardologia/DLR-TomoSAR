@@ -53,8 +53,9 @@ class GridInfo:
 
 
 class Patcher:
-    def __init__(self, grid: GridInfo) -> None:
-        self.grid = grid
+    def __init__(self, grid: GridInfo, patch_coords: list) -> None:
+        self.grid          = grid
+        self._patch_coords = patch_coords  
 
     @classmethod
     def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : int, use_reflective_padding : bool = True) -> "Patcher":
@@ -82,33 +83,38 @@ class Patcher:
             spatial_size           = (H, W),
             use_reflective_padding = use_reflective_padding,
         )
+
+        mode         = "symmetric" if use_reflective_padding else "constant"
+        patch_coords = []
         
-        return cls(grid)
+        for iv in range(n_v):
+            for ih in range(n_h):
+                v0 = iv * stride - pad_top
+                h0 = ih * stride - pad_left
+                v1 = v0 + ph
+                h1 = h0 + pw
+
+                pt = max(0, -v0);  pb = max(0, v1 - H)
+                pl = max(0, -h0);  pr = max(0, h1 - W)
+
+                v0c, v1c = max(0, v0), min(H, v1)
+                h0c, h1c = max(0, h0), min(W, h1)
+
+                pw_spec = None
+                if pt or pb or pl or pr:
+                    pw_spec = (pt, pb, pl, pr, mode)
+
+                patch_coords.append((v0c, v1c, h0c, h1c, pw_spec))
+
+        return cls(grid, patch_coords)
 
     def extract(self, array: np.ndarray, idx: int) -> np.ndarray:
-        grid   = self.grid
-        iv, ih = divmod(idx, grid.n_h)
-        ph, pw = grid.patch_size
-        H, W   = grid.spatial_size
+        v0c, v1c, h0c, h1c, pw_spec = self._patch_coords[idx]
+        sub                         = np.ascontiguousarray(array[..., v0c:v1c, h0c:h1c])
 
-        v0 = iv * grid.stride - grid.pad_top
-        h0 = ih * grid.stride - grid.pad_left
-        v1 = v0 + ph
-        h1 = h0 + pw
-
-        pad_top   = max(0, -v0)
-        pad_bot   = max(0, v1 - H)
-        pad_left  = max(0, -h0)
-        pad_right = max(0, h1 - W)
-
-        v0c, v1c  = max(0, v0), min(H, v1)
-        h0c, h1c  = max(0, h0), min(W, h1)
-
-        sub = np.ascontiguousarray(array[..., v0c:v1c, h0c:h1c])
-
-        if pad_top or pad_bot or pad_left or pad_right:
-            pad_width = [(0, 0)] * (sub.ndim - 2) + [(pad_top, pad_bot), (pad_left, pad_right)]
-            mode      = "symmetric" if grid.use_reflective_padding else "constant"
-            sub       = np.pad(sub, pad_width, mode=mode)
+        if pw_spec is not None:
+            pt, pb, pl, pr, mode = pw_spec
+            pad_width            = [(0, 0)] * (sub.ndim - 2) + [(pt, pb), (pl, pr)]
+            sub                  = np.pad(sub, pad_width, mode=mode)
 
         return sub

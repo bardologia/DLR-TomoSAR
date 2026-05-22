@@ -66,7 +66,7 @@ class ExtractionConfig:
         return Path(self.processed_data_path) / "meta"
 
     @property
-    def _output_suffix_value(self) -> str:
+    def output_suffix_value(self) -> str:
         if self.output_suffix:
             return self.output_suffix
         fs = self.fit_settings
@@ -81,7 +81,7 @@ class ExtractionConfig:
 
     @property
     def output_subdir_name(self) -> str:
-        return f"{self.output_prefix}_{self._output_suffix_value}"
+        return f"{self.output_prefix}_{self.output_suffix_value}"
 
     @property
     def output_directory(self) -> Path:
@@ -89,7 +89,7 @@ class ExtractionConfig:
 
     @property
     def parameters_npy_path(self) -> Path:
-        return self.output_directory / f"parameters_{self._output_suffix_value}.npy"
+        return self.output_directory / f"parameters_{self.output_suffix_value}.npy"
 
     def discover_tomogram_path(self) -> Path:
         data_dir = self.data_directory

@@ -8,6 +8,20 @@ import torch
 
 
 @dataclass
+class LossNormalizationConfig:
+    mse_curve         : float = 0.970732
+    l1_curve          : float = 3.758574
+    huber_curve       : float = 6.316330
+    charbonnier_curve : float = 3.741222
+    cosine_curve      : float = 0.661617
+    spectral_coh      : float = 1.0        
+    ssim_curve        : float = 2.240200
+    param_l1          : float = 1.000000
+    param_huber       : float = 2.893419
+    smoothness_tv     : float = 56.654920
+
+
+@dataclass
 class LossConfig:
     use_mse_curve            : bool  = False
     weight_mse_curve         : float = 1.0
@@ -49,10 +63,20 @@ class LossConfig:
     param_weights            : tuple = (1.0, 1.0, 1.0)
     param_match              : str   = "sorted_mu"
 
+    amp_zero_thr             : float = 1e-3
+    amp_zero_thr_torch       : float = 1e-7
+
     use_smoothness_tv        : bool  = False
     weight_smoothness_tv     : float = 1e-4
 
     log_components_every     : int   = 50
+
+    norm : LossNormalizationConfig = field(default_factory=LossNormalizationConfig)
+
+    def eff(self, weight_key: str) -> float:
+        alpha       = getattr(self, weight_key)
+        norm_factor = getattr(self.norm, weight_key.removeprefix("weight_"), 1.0)
+        return alpha * norm_factor
 
 
 @dataclass
@@ -64,9 +88,9 @@ class GaussianConfig:
 
     @classmethod
     def from_dataset(cls, dataset_dir: str | Path, n_gaussians: int) -> "GaussianConfig":
-        meta_dir   = Path(dataset_dir) / "meta"
-        candidates = sorted(meta_dir.glob("config_state_*.json"))
-        cfg = json.loads(candidates[0].read_text())
+        meta_dir     = Path(dataset_dir) / "meta"
+        candidates   = sorted(meta_dir.glob("config_state_*.json"))
+        cfg          = json.loads(candidates[0].read_text())
         height_range = cfg["output_configs"]["height_range"]
         
         return cls(
@@ -137,9 +161,10 @@ class IOConfig:
 
 @dataclass
 class OptimizerConfig:
-    lr    : float = 1e-3
-    betas : tuple = (0.9, 0.999)
-    eps   : float = 1e-8
+    lr           : float = 1e-3
+    betas        : tuple = (0.9, 0.999)
+    eps          : float = 1e-8
+    weight_decay : float = 0.1
 
 
 @dataclass
@@ -159,6 +184,7 @@ class TrainingConfigInner:
     gradient_accumulation_steps : int   = 1
     max_grad_norm               : float = None
     verbose                     : bool  = True
+    log_debug                   : bool  = True
 
 
 @dataclass

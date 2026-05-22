@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Tuple
-
-from torch.utils.data import DataLoader
-
-from configuration.dataset_config           import DatasetConfiguration
-from pipelines.dataset_pipeline.crop        import Cropper
-from pipelines.dataset_pipeline.load        import Loader, PatchDataset
-from pipelines.dataset_pipeline.metadata    import Layout, MetadataWriter
-from pipelines.dataset_pipeline.normalize   import Stats, StatsComputer
-from pipelines.dataset_pipeline.patch       import Patcher
-from tools.logger                           import Logger
-
-
-from pipelines.dataset_pipeline.augmentation  import SpatialAugmenter
+from pathlib                                 import Path
+from typing                                  import Optional, Tuple
+from torch.utils.data                        import DataLoader
+from configuration.dataset_config            import DatasetConfiguration
+from pipelines.dataset_pipeline.crop         import Cropper
+from pipelines.dataset_pipeline.load         import Loader, PatchDataset
+from pipelines.dataset_pipeline.metadata     import Layout, MetadataWriter
+from pipelines.dataset_pipeline.normalize    import Stats, StatsComputer
+from pipelines.dataset_pipeline.patch        import Patcher
+from tools.logger                            import Logger
+from pipelines.dataset_pipeline.normalize    import Normalizer
+from pipelines.dataset_pipeline.augmentation import SpatialAugmenter
 
 
 class DatasetPipeline:
     def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
-        self.logger                 = logger 
+
+        log_dir = self.training_run_directory / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = logger or Logger(log_dir=str(log_dir), name="dataset_pipeline", level="INFO")
 
         self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger)
@@ -74,24 +74,30 @@ class DatasetPipeline:
         return dataset, patcher
 
     def run(self) -> Tuple[DataLoader, DataLoader, DataLoader, dict[str, PatchDataset]]:
+      
         train_ds, train_patcher = self._build_dataset("train")
 
-        norm_stats = StatsComputer.compute_from_dataset(
-            dataset             = train_ds,
-            logger              = self.logger,
-            input_config        = self.config.input_config,
-            output_config       = self.config.output_config,
-            n_slaves            = train_ds.n_slaves,
-            input_mode          = self.config.input_normalization_mode,
-            output_mode         = self.config.output_normalization_mode,
-            num_workers         = self.config.num_workers,
+        norm_stats = StatsComputer.compute_input_stats(
+            dataset      = train_ds,
+            logger       = self.logger,
+            input_config = self.config.input_config,
+            n_slaves     = train_ds.n_slaves,
+            num_workers  = self.config.num_workers,
+        )
+
+        norm_stats.output_stats = StatsComputer.compute_output_stats(
+            params_path   = self.config.parameters_path,
+            n_gaussians   = self.config.n_gaussians,
+            output_config = self.config.output_config,
+            logger        = self.logger,
         )
         
         norm_stats.save(self.training_run_directory / "meta")
 
-        train_ds, train_patcher = self._build_dataset("train", norm_stats=norm_stats)
-        val_ds,   val_patcher   = self._build_dataset("val",   norm_stats=norm_stats)
-        test_ds,  test_patcher  = self._build_dataset("test",  norm_stats=norm_stats)
+        train_ds.norm_stats = Normalizer(norm_stats)
+
+        val_ds,   val_patcher   = self._build_dataset("val",  norm_stats=norm_stats)
+        test_ds,  test_patcher  = self._build_dataset("test", norm_stats=norm_stats)
 
         train_loader, val_loader, test_loader = Loader.build(
             train_dataset = train_ds,

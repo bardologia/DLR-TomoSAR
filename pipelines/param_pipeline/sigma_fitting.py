@@ -363,22 +363,19 @@ class SigmaFittingExtractor:
     ) -> None:
         
         self.logger.section("[Kernel Compilation]")
-        self.logger.subsection("Compiling sigma-only JAX kernels")
+        self.logger.subsection(f"Compiling sigma-only JAX kernel for K={self.k_max}")
 
-        N_warm = self._n_devices * max(1, 4 // self._n_devices)
-        for K in range(1, self.k_max + 1):
-            dummy_s = jnp.ones((N_warm, K), dtype=jnp.float32) * 5.0
-            dummy_p = jnp.ones((N_warm, H), dtype=jnp.float32)
-            dummy_a = jnp.ones((N_warm, K), dtype=jnp.float32) * 0.5
-            dummy_m = jnp.zeros((N_warm, K), dtype=jnp.float32)
-            
-            self._kernel(
-                dummy_s, height_ax_j, dummy_p, dummy_a, dummy_m,
-                sigma_lower_j, sigma_upper_j,
-                2, self.adam_lr, self.adam_b1, self.adam_b2,
-            )
+        N_warm  = self._n_devices * max(1, 4 // self._n_devices)
+        K       = self.k_max
+       
+        dummy_s = jnp.ones((N_warm, K),  dtype=jnp.float32) * 5.0
+        dummy_p = jnp.ones((N_warm, H),  dtype=jnp.float32)
+        dummy_a = jnp.ones((N_warm, K),  dtype=jnp.float32) * 0.5
+        dummy_m = jnp.zeros((N_warm, K), dtype=jnp.float32)
         
-        self.logger.subsection(f"Shapes compiled : K=1 … {self.k_max}")
+        self._kernel(dummy_s, height_ax_j, dummy_p, dummy_a, dummy_m, sigma_lower_j, sigma_upper_j, 2, self.adam_lr, self.adam_b1, self.adam_b2)
+        
+        self.logger.subsection(f"Kernel compiled (K={K})")
 
     def _load_batch(
         self,
@@ -558,7 +555,7 @@ class SigmaFittingExtractor:
         bar_task     = progress.add_task("  [section]Loading range bins[/section]", total=R,)
 
         try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
+            with ThreadPoolExecutor(max_workers=2) as pool:
                 r               = 0
                 prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H, threshold_factor, truncation_index,)
 
@@ -674,17 +671,18 @@ class SigmaFittingExtractor:
             return dict(mse_norm=mse_norm, mse_denorm=mse_denorm, r2_valid=False)
 
         r2f = r2[finite]
+        p10, p25, p50, p75, p90 = np.percentile(r2f, [10, 25, 50, 75, 90])
         return dict(
             mse_norm    = mse_norm,
             mse_denorm  = mse_denorm,
             r2_valid    = True,
             r2_mean     = float(r2f.mean()),
-            r2_median   = float(np.median(r2f)),
+            r2_median   = float(p50),
             r2_std      = float(r2f.std()),
-            r2_p10      = float(np.percentile(r2f, 10)),
-            r2_p25      = float(np.percentile(r2f, 25)),
-            r2_p75      = float(np.percentile(r2f, 75)),
-            r2_p90      = float(np.percentile(r2f, 90)),
+            r2_p10      = float(p10),
+            r2_p25      = float(p25),
+            r2_p75      = float(p75),
+            r2_p90      = float(p90),
             r2_neg_frac = float((r2f < 0).mean()),
         )
 

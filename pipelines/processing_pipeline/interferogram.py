@@ -24,7 +24,7 @@ class InterferogramBuilder:
         if pyrat_root not in sys.path:
             sys.path.insert(0, pyrat_root)
 
-    def _build_from_fsar(self, crop_tuple: Tuple[int, int, int, int]) -> np.ndarray:
+    def _build_from_fsar(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         from pyrat import pyrat_init, tomo
 
         self.logger.subsection("Initializing PyRat for FSAR...")
@@ -103,7 +103,7 @@ class InterferogramBuilder:
 
             secondary_layers.append(secondary_slc.astype(np.complex64))
 
-            secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, 1.25)
+            secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, self.config.input_configs.max_amplitude_clip)
             deramped_secondary    = secondary_slc * np.exp(1.0j * dem_phase)
             phasor                = primary_slc * np.conj(deramped_secondary)
             phasor               /= (np.abs(phasor) + 1e-30)
@@ -120,12 +120,16 @@ class InterferogramBuilder:
     def build(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.logger.section(f"[Building Stack] Crop parameters: {crop_tuple}")
 
+        if self.config.dataset_type != "FSAR":
+            raise NotImplementedError(f"Dataset type '{self.config.dataset_type}' is not supported. Only 'FSAR' is implemented.")
+
         primary, secondaries, interferograms = self._build_from_fsar(crop_tuple)
         primary        = np.ascontiguousarray(primary)
         secondaries    = np.ascontiguousarray(secondaries)
         interferograms = np.ascontiguousarray(interferograms)
 
         gc.collect()
+        
         return primary, secondaries, interferograms
 
     def run(
@@ -145,11 +149,12 @@ class InterferogramBuilder:
         np.save(str(secondaries_path),    secondaries,    allow_pickle=False)
         np.save(str(interferograms_path), interferograms, allow_pickle=False)
 
-        self.logger.subsection(f"Primary saved        : {primary_path} (shape: {primary.shape})")
-        self.logger.subsection(f"Secondaries saved    : {secondaries_path} (shape: {secondaries.shape})")
+        self.logger.subsection(f"Primary saved        : {primary_path}        (shape: {primary.shape})")
+        self.logger.subsection(f"Secondaries saved    : {secondaries_path}    (shape: {secondaries.shape})")
         self.logger.subsection(f"Interferograms saved : {interferograms_path} (shape: {interferograms.shape})")
 
         shapes = tuple(primary.shape), tuple(secondaries.shape), tuple(interferograms.shape)
         del primary, secondaries, interferograms
         gc.collect()
+       
         return shapes

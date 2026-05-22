@@ -21,21 +21,19 @@ class GradientClipper:
         self.history     : list[float] = []
 
         self.logger.section("[Gradient Clipper]")
-        self.logger.subsection(f"Mode               : {self.mode}")
+        self.logger.subsection(f"Mode : {self.mode}")
         
         if self.mode == "fixed":
-            self.logger.subsection(f"Threshold          : {self.threshold}")
+            self.logger.subsection(f"Threshold     : {self.threshold}")
         
         elif self.mode == "adaptive_percentile":
-            self.logger.subsection(f"Window             : {self.window}")
-            self.logger.subsection(f"Percentile         : {self.percentile}")
+            self.logger.subsection(f"Window        : {self.window}")
+            self.logger.subsection(f"Percentile    : {self.percentile}")
         
         elif self.mode == "adaptive_mean_std":
-            self.logger.subsection(f"Window             : {self.window}")
-            self.logger.subsection(f"Mean+k*Std  k      : {self.mean_std_k}")
+            self.logger.subsection(f"Window        : {self.window}")
+            self.logger.subsection(f"Mean+k*Std  k : {self.mean_std_k}")
         
-        self.logger.subsection("")
-
     @staticmethod
     def global_norm(model: torch.nn.Module) -> float:
         total_norm = 0.0
@@ -45,13 +43,13 @@ class GradientClipper:
                 total_norm += param_norm.item() ** 2
         return total_norm ** 0.5
 
-    def _clip(self, model: torch.nn.Module, max_norm: float):
-        norm = GradientClipper.global_norm(model)
+    def _clip(self, model: torch.nn.Module, norm: float, max_norm: float) -> tuple[float, float]:
         scale = min(1.0, max_norm / (norm + self.epsilon))
         for p in model.parameters():
             if p.grad is not None:
                 p.grad.detach().mul_(scale)
-        return norm
+        norm_after = norm * scale
+        return norm, norm_after
 
     def _compute_adaptive_threshold(self) -> float | None:
         if len(self.history) < self.window:
@@ -73,6 +71,7 @@ class GradientClipper:
                     self.logger.warning(f"NaN/Inf gradient detected in {name} at step {global_step}! GradScaler will handle this.")
                     has_invalid = True
                     break
+       
         return has_invalid
 
     def maybe_clip(self, model: torch.nn.Module, global_step: int):
@@ -82,6 +81,8 @@ class GradientClipper:
         
         if norm > 100.0:
             self.logger.warning(f"Exploding gradient norm detected: {norm:.2f} at step {global_step}!")
+
+        self.tracker.log_scalar("train/grad_norm_before_clip", norm, global_step)
 
         if self.mode == "disabled":
             return norm
@@ -94,10 +95,14 @@ class GradientClipper:
         if threshold is None:
             return norm
 
-        norm = self._clip(model, threshold)
-        self.tracker.log_scalar("train/grad_clip_threshold", threshold, global_step)
-        
-        return norm
+        norm_before, norm_after = self._clip(model, norm, threshold)
+        clip_ratio = norm_after / (norm_before + self.epsilon)
+
+        self.tracker.log_scalar("train/grad_norm_after_clip",  norm_after,  global_step)
+        self.tracker.log_scalar("train/grad_clip_ratio",       clip_ratio,  global_step)
+        self.tracker.log_scalar("train/grad_clip_threshold",   threshold,   global_step)
+
+        return norm_after
 
     def record(self, grad_norm_value: float, global_step: int):
         self.history.append(float(grad_norm_value))

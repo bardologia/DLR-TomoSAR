@@ -1,55 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum        import Enum
 from pathlib     import Path
 from typing      import Literal, Optional, Sequence, Tuple
 
 import numpy as np
 
-from tools.representation  import Representation
-from tools.split_regions   import SplitRegions 
-
-
-@dataclass
-class ChannelStats:
-    mean  : list[float]
-    std   : list[float]
-    names : Optional[list[str]] = None
-
-    @property
-    def n_channels(self) -> int:
-        return len(self.mean)
-
-    def as_dict(self) -> dict:
-        entries = []
-        for i, (m, s) in enumerate(zip(self.mean, self.std)):
-            entry: dict = {"name": self.names[i] if self.names else f"ch{i}", "mean": m, "std": s}
-            entries.append(entry)
-        return {"channels": entries}
-
-    @classmethod
-    def from_dict(cls, payload: dict) -> "ChannelStats":
-        if "channels" in payload:
-            entries = payload["channels"]
-            return cls(
-                mean  = [e["mean"]  for e in entries],
-                std   = [e["std"]   for e in entries],
-                names = [e["name"]  for e in entries],
-            )
-        return cls(mean=list(payload["mean"]), std=list(payload["std"]))
-
-
-class InputNormalizationMode(Enum):
-    PER_CHANNEL = "per_channel"
-    GROUPED     = "grouped"
-    DISABLED    = "disabled"
-
-
-class OutputNormalizationMode(Enum):
-    DISABLED    = "disabled"
-    PER_CHANNEL = "per_channel"
-    GROUPED     = "grouped"
+from configuration.norm_config    import ChannelStats, ChannelTransformStrategy, NormStrategy, Strat, _SLOT_STRATEGIES
+from tools.representation         import Representation
+from tools.split_regions          import SplitRegions
 
 
 @dataclass
@@ -114,9 +73,18 @@ class InputConfig:
       
 @dataclass
 class OutputConfig:
-    use_amplitude : bool = True
-    use_mu        : bool = True
-    use_sigma     : bool = True
+    use_amplitude      : bool                              = True
+    use_mu             : bool                              = True
+    use_sigma          : bool                              = True
+    
+    output_strategies  : dict[str, ChannelTransformStrategy] = field(default_factory=lambda: {
+        "out/amp"   : ChannelTransformStrategy.from_slot("out/amp"),
+        "out/mu"    : ChannelTransformStrategy.from_slot("out/mu"),
+        "out/sigma" : ChannelTransformStrategy.from_slot("out/sigma"),
+    })
+
+    def strategy_for(self, role_key: str) -> ChannelTransformStrategy:
+        return self.output_strategies.get(role_key, ChannelTransformStrategy.from_slot(role_key))
 
     @property
     def role_names(self) -> list[str]:
@@ -150,25 +118,39 @@ class OutputConfig:
 
     def as_dict(self) -> dict:
         return {
-            "use_amplitude" : self.use_amplitude,
-            "use_mu"        : self.use_mu,
-            "use_sigma"     : self.use_sigma,
+            "use_amplitude"     : self.use_amplitude,
+            "use_mu"            : self.use_mu,
+            "use_sigma"         : self.use_sigma,
+            "output_strategies" : {
+                k: v.as_dict() for k, v in self.output_strategies.items()
+            },
         }
 
     @classmethod
     def from_dict(cls, payload: dict) -> "OutputConfig":
+        raw_strats = payload.get("output_strategies", {})
+        strategies = {
+            k: ChannelTransformStrategy.from_dict(v)
+            for k, v in raw_strats.items()
+        } if raw_strats else {
+            "out/amp"   : ChannelTransformStrategy.from_slot("out/amp"),
+            "out/mu"    : ChannelTransformStrategy.from_slot("out/mu"),
+            "out/sigma" : ChannelTransformStrategy.from_slot("out/sigma"),
+        }
+
         if "amplitude" in payload:
             return cls(
-                use_amplitude = bool(payload["amplitude"]["use"]),
-                use_mu        = bool(payload["mu"]["use"]),
-                use_sigma     = bool(payload["sigma"]["use"]),
+                use_amplitude     = bool(payload["amplitude"]["use"]),
+                use_mu            = bool(payload["mu"]["use"]),
+                use_sigma         = bool(payload["sigma"]["use"]),
+                output_strategies = strategies,
             )
-        else:
-            return cls(
-                use_amplitude = bool(payload.get("use_amplitude", True)),
-                use_mu        = bool(payload.get("use_mu", True)),
-                use_sigma     = bool(payload.get("use_sigma", True)),
-            )
+        return cls(
+            use_amplitude     = bool(payload.get("use_amplitude", True)),
+            use_mu            = bool(payload.get("use_mu", True)),
+            use_sigma         = bool(payload.get("use_sigma", True)),
+            output_strategies = strategies,
+        )
 
    
 @dataclass
@@ -202,8 +184,6 @@ class DatasetConfiguration:
     num_workers                 : int                     = 16
     shuffle_train               : bool                    = True
     pin_memory                  : bool                    = True
-    input_normalization_mode    : InputNormalizationMode  = InputNormalizationMode.PER_CHANNEL
-    output_normalization_mode   : OutputNormalizationMode = OutputNormalizationMode.DISABLED
     x_axis                      : Optional[np.ndarray]    = field(default=None, repr=False)
     n_gaussians                 : int                     = 1
 

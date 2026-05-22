@@ -26,10 +26,8 @@ class MetadataManager:
     def artifact_path(self, artifact_type: ArtifactType) -> Path:
         return self.registry.artifact_path(artifact_type)
 
-    def existence_map(self) -> dict[str, bool]:
-        return self.registry.existence_map()
-
     def save_stage_metadata(self, stage_name: str, identifier_tag: str, metadata_entries: dict[str, str]) -> Path:
+        self.ensure_directory_structure()
         meta_filename = f"meta_{stage_name}_{identifier_tag}.txt"
         meta_path     = self.config.paths.metadata_directory / meta_filename
 
@@ -65,7 +63,7 @@ class MetadataManager:
             "dataset_type"  : self.config.dataset_type,
             "tomogram_tag"  : self.config.tomogram_tag,
             "parameter_tag" : self.config.parameter_tag,
-            "artifacts"     : self.registry._artifact_filenames(),
+            "artifacts"     : self.registry.artifact_filenames(),
         }
         
         out_path = self.config.paths.data_directory / "dataset.json"
