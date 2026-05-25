@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import ResUNetConfig, build_activation, build_norm2d, build_upsample, initialize_weights
+from configuration.models_config import ResUNetConfig, build_activation, build_norm2d, build_upsample, initialize_weights
 
 
 # Pre-activation residual block: Norm -> Act -> Conv -> Norm -> Act -> Conv + shortcut

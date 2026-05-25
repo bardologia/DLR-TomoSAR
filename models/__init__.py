@@ -1,4 +1,4 @@
-from .config import (
+from configuration.models_config import (
     AttentionUNetConfig,
     DropPath,
     FCNConfig,

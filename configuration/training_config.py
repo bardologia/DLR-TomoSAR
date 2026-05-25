@@ -51,7 +51,7 @@ class LossConfig:
     ssim_data_range          : float = 1.0
     ssim_k1                  : float = 0.01
     ssim_k2                  : float = 0.03
-    ssim_axis                : str   = "elevation"   # "elevation" | "azimuth" | "range"
+    ssim_axis                : str   = "elevation"   
 
     use_param_l1             : bool  = False
     weight_param_l1          : float = 0.1
@@ -61,7 +61,7 @@ class LossConfig:
     param_huber_delta        : float = 0.5
 
     param_weights            : tuple = (1.0, 1.0, 1.0)
-    param_match              : str   = "sorted_mu"
+    param_match              : str   = "sort_gt_by_mu"   
 
     amp_zero_thr             : float = 1e-3
     amp_zero_thr_torch       : float = 1e-7
@@ -78,34 +78,16 @@ class LossConfig:
 
 
 @dataclass
-class MatchingCurriculumConfig:
-    enabled             : bool = False
-    warmup_strategy     : str  = "push_mu_sort"
-    graduation_strategy : str  = "push_hungarian"
-    swap_epoch          : int  = 0
-
-    reset_early_stopping : bool = True
-    reset_lr             : bool = True
-    reset_warmup         : bool = True
-
-
-@dataclass
 class LossCurriculumConfig:
-    enabled    : bool          = False
-    swap_epoch : int           = 0
+    enabled              : bool       = False
+    swap_epoch           : int        = 0
 
-    warmup   : LossConfig      = field(default_factory=LossConfig)
-    complete : LossConfig      = field(default_factory=LossConfig)
+    warmup               : LossConfig = field(default_factory=LossConfig)
+    complete             : LossConfig = field(default_factory=LossConfig)
 
-    reset_early_stopping : bool = False
-    reset_lr             : bool = False
-    reset_warmup         : bool = False
-
-
-@dataclass
-class CurriculumConfig:
-    matching : MatchingCurriculumConfig = field(default_factory=MatchingCurriculumConfig)
-    loss     : LossCurriculumConfig     = field(default_factory=LossCurriculumConfig)
+    reset_early_stopping : bool       = False
+    reset_lr             : bool       = False
+    reset_warmup         : bool       = False
 
 
 @dataclass
@@ -184,7 +166,6 @@ class IOConfig:
     tb_dir     : str = ""
     docs_dir   : str = ""
     logs_dir   : str = ""
-    images_dir : str = ""
     writer = None
 
 
@@ -218,12 +199,12 @@ class TrainingConfigInner:
 
 @dataclass
 class MemoryConfig:
-    streaming_eval               : bool = True   
-    eval_keep_pixel_arrays       : bool = True   
-    eval_pixel_subsample         : int  = 0      
-    clear_cache_every_n_steps    : int  = 0      
-    clear_cache_after_eval       : bool = False  
-    clear_cache_after_epoch      : bool = False 
+    streaming_eval            : bool = True   
+    eval_keep_pixel_arrays    : bool = True   
+    eval_pixel_subsample      : int  = 0      
+    clear_cache_every_n_steps : int  = 0      
+    clear_cache_after_eval    : bool = False  
+    clear_cache_after_epoch   : bool = False 
 
 
 @dataclass
@@ -261,18 +242,17 @@ class PermutationMetricsConfig:
 
 @dataclass
 class TrainerConfig:
-    gaussian         : GaussianConfig
-    early_stopping   : EarlyStoppingConfig     = field(default_factory=EarlyStoppingConfig)
-    warmup           : WarmupConfig            = field(default_factory=WarmupConfig)
-    scheduler        : SchedulerConfig         = field(default_factory=SchedulerConfig)
-    ema              : EMAConfig               = field(default_factory=EMAConfig)
-    io               : IOConfig                = field(default_factory=IOConfig)
-    optimizer        : OptimizerConfig         = field(default_factory=OptimizerConfig)
-    training         : TrainingConfigInner     = field(default_factory=TrainingConfigInner)
-    overfit          : OverfitConfig           = field(default_factory=OverfitConfig)
-    loss             : LossConfig              = field(default_factory=LossConfig)  # kept for backward compat
-    curriculum       : CurriculumConfig        = field(default_factory=CurriculumConfig)
-    resources        : ResourceConfig          = field(default_factory=ResourceConfig)
-    memory           : MemoryConfig            = field(default_factory=MemoryConfig)
-    gradient_clipper : GradientClipperConfig   = field(default_factory=GradientClipperConfig)
+    gaussian            : GaussianConfig
+    early_stopping      : EarlyStoppingConfig      = field(default_factory=EarlyStoppingConfig)
+    warmup              : WarmupConfig             = field(default_factory=WarmupConfig)
+    scheduler           : SchedulerConfig          = field(default_factory=SchedulerConfig)
+    ema                 : EMAConfig                = field(default_factory=EMAConfig)
+    io                  : IOConfig                 = field(default_factory=IOConfig)
+    optimizer           : OptimizerConfig          = field(default_factory=OptimizerConfig)
+    training            : TrainingConfigInner      = field(default_factory=TrainingConfigInner)
+    overfit             : OverfitConfig            = field(default_factory=OverfitConfig)
+    curriculum          : LossCurriculumConfig     = field(default_factory=LossCurriculumConfig)
+    resources           : ResourceConfig           = field(default_factory=ResourceConfig)
+    memory              : MemoryConfig             = field(default_factory=MemoryConfig)
+    gradient_clipper    : GradientClipperConfig    = field(default_factory=GradientClipperConfig)
     permutation_metrics : PermutationMetricsConfig = field(default_factory=PermutationMetricsConfig)

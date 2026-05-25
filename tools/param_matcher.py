@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import numpy as np
 import torch
 
 from tools.logger import Logger
@@ -10,36 +9,17 @@ from tools.logger import Logger
 class ParamMatcher:
     def __init__(
         self,
-        strategy                   : str,
-        logger                     : Logger | None = None,
-        curriculum_hungarian_epochs: int           = 0,
-        graduation_strategy        : str           = "push_hungarian",
+        strategy : str,
+        logger   : Logger | None = None,
     ) -> None:
-       
-        self.base_strategy                = strategy
-        self.strategy                     = strategy
-        self.curriculum_hungarian_epochs  = curriculum_hungarian_epochs
-        self.graduation_strategy          = graduation_strategy
-        self._current_epoch               = 0
+        self.strategy = strategy
 
         if logger is not None:
-            info = {"Param match strategy": strategy}
-            if curriculum_hungarian_epochs > 0:
-                info["Curriculum warmup epochs"] = curriculum_hungarian_epochs
-                info["Graduation strategy"]      = graduation_strategy
-            logger.kv_table(info)
+            logger.kv_table({"Param match strategy": strategy})
 
     @classmethod
     def silent(cls, strategy: str) -> ParamMatcher:
         return cls(strategy, logger=None)
-
-    def set_epoch(self, epoch: int) -> None:
-        self._current_epoch = epoch
-        if (self.curriculum_hungarian_epochs > 0):
-            if epoch < self.curriculum_hungarian_epochs:
-                self.strategy = self.base_strategy
-            else:
-                self.strategy = self.graduation_strategy
 
     def match_torch(
         self,

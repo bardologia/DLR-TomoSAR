@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import SwinUNetConfig, build_activation, DropPath, initialize_weights
+from configuration.models_config import SwinUNetConfig, build_activation, DropPath, initialize_weights
 
 
 # Multi-head self-attention within local windows, with learned relative position bias

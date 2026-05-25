@@ -75,6 +75,9 @@ class Scheduler:
         progress    = min(1.0, epoch / max(1, total_iters))
         return (1.0 - progress) ** power
 
+    def _constant(self) -> float:
+        return 1.0
+
     def _reduce_on_plateau(self, metric: float | None) -> float:
         if metric is None:
             return 1.0
@@ -121,14 +124,12 @@ class Scheduler:
         if self.scheduler_type == "reduce_on_plateau":
             return self._reduce_on_plateau(metric)
         
+        if self.scheduler_type == "constant":
+            return self._constant()
+        
         raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
     def reset(self, epoch_offset: int = 0) -> None:
-        """Restart the schedule from scratch at `epoch_offset` (e.g. after a curriculum swap).
-
-        After calling this, the schedule treats the next epoch as relative epoch 0,
-        so cosine annealing restarts, plateau counters clear, etc.
-        """
         self._epoch_offset = epoch_offset
         self.current_lrs   = list(self.base_lrs)
         self.plateau_best  = float("inf")

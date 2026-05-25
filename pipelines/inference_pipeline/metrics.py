@@ -177,14 +177,9 @@ class Metrics:
         }
 
     def _mu_ordering_rate(self) -> float:
-        """Fraction of pixels where predicted µ values are strictly ascending across
-        all predicted-active slots (pred amp >= 1e-3).
-
-        Pixels with fewer than 2 predicted-active slots are excluded (ordering
-        is trivially satisfied there).
-        """
         pp  = self.result.params_pred
         n_K = self.n_gaussians
+        
         if n_K < 2:
             return float("nan")
 
@@ -192,21 +187,18 @@ class Metrics:
         amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)  # (G, H, W)
         active = amps >= 1e-3                                             # (G, H, W)
 
-        ordered      = mus[:-1] < mus[1:]                                # (G-1, H, W)
-        both_active  = active[:-1] & active[1:]
+        ordered       = mus[:-1] < mus[1:]                               # (G-1, H, W)
+        both_active   = active[:-1] & active[1:]
         has_violation = ((~ordered) & both_active).any(axis=0)           # (H, W)
 
-        # single-active pixels: only valid if the active slot is slot 0
-        n_active         = active.sum(axis=0)                             # (H, W)
-        single_active    = n_active == 1
-        active_not_first = single_active & ~active[0]                    # active but not in slot 0
-        has_violation    = has_violation | active_not_first
-
-        any_active = n_active >= 1
-        denom      = int(any_active.sum())
+        n_active     = active.sum(axis=0)                                 # (H, W)
+        multi_active = n_active >= 2
+        denom        = int(multi_active.sum())
+        
         if denom == 0:
             return float("nan")
-        return float((~has_violation & any_active).sum() / denom)
+      
+        return float((~has_violation & multi_active).sum() / denom)
 
     def _slot_mu_stats(self) -> Dict[str, float]:
         """Mean and std of µ (pred and GT) per Gaussian slot, restricted to active pixels."""

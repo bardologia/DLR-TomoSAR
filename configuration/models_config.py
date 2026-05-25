@@ -183,14 +183,24 @@ class ResUNetConfig:
     in_channels         : int             = 1
     out_channels        : int             = 6
     params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [32, 64, 128, 256])
+    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor   : int             = 2
-    dropout             : float           = 0.2
+    dropout             : float           = 0.15
     activation          : str             = "relu"
     normalization       : str             = "batch"
     upsample_mode       : str             = "convtranspose"
     conv_bias           : bool            = False
     init_mode           : str             = "default"
+
+    encoder_lr          : float           = 3e-4
+    bottleneck_lr       : float           = 3e-4
+    decoder_lr          : float           = 3e-4
+    output_head_lr      : float           = 1e-3
+
+    encoder_wd          : float           = 5e-3
+    bottleneck_wd       : float           = 5e-3
+    decoder_wd          : float           = 5e-3
+    output_head_wd      : float           = 5e-3
     
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -202,10 +212,10 @@ class ResUNetConfig:
         encoder_params = list(model.encoder_blocks.parameters()) + list(model.downsample_layers.parameters())
         decoder_params = list(model.upsample_layers.parameters()) + list(model.decoder_blocks.parameters())
         return [g for g in [
-            {'params': encoder_params,                       'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'encoder'},
-            {'params': list(model.bottleneck.parameters()),  'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'bottleneck'},
-            {'params': decoder_params,                       'lr': 1e-4, 'weight_decay': 1e-2, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()), 'lr': 1e-3, 'weight_decay': 1e-2, 'name': 'output_head'},
+            {'params': encoder_params,                       'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),  'lr': self.bottleneck_lr,  'weight_decay': self.bottleneck_wd,  'name': 'bottleneck'},
+            {'params': decoder_params,                       'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()), 'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -216,13 +226,23 @@ class AttentionUNetConfig:
     params_per_gaussian          : int       = 3
     features                     : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor            : int       = 2
-    dropout                      : float     = 0.0
+    dropout                      : float     = 0.15
     attention_intermediate_ratio : float     = 0.5
     activation                   : str       = "relu"
     normalization                : str       = "batch"
     upsample_mode                : str       = "convtranspose"
     conv_bias                    : bool      = False
     init_mode                    : str       = "default"
+
+    encoder_lr                   : float     = 3e-4
+    bottleneck_lr                : float     = 3e-4
+    decoder_lr                   : float     = 3e-4
+    output_head_lr               : float     = 1e-3
+
+    encoder_wd                   : float     = 5e-3
+    bottleneck_wd                : float     = 5e-3
+    decoder_wd                   : float     = 5e-3
+    output_head_wd               : float     = 5e-3
     
     shape_logger_types           : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -231,20 +251,23 @@ class AttentionUNetConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
+     
         encoder_params = (
             list(model.encoder_blocks.parameters()) +
             list(model.downsample_layers.parameters())
         )
+     
         decoder_params = (
             list(model.upsample_layers.parameters()) +
             list(model.attention_gates.parameters()) +
             list(model.decoder_blocks.parameters())
         )
+     
         return [g for g in [
-            {'params': encoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.bottleneck.parameters()),   'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': decoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),  'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': encoder_params,                        'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),   'lr': self.bottleneck_lr,  'weight_decay': self.bottleneck_wd,  'name': 'bottleneck'},
+            {'params': decoder_params,                        'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),  'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -255,13 +278,21 @@ class UNetPlusPlusConfig:
     params_per_gaussian   : int       = 3
     features              : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor     : int       = 2
-    dropout               : float     = 0.0
+    dropout               : float     = 0.15
     deep_supervision      : bool      = False
     activation            : str       = "relu"
     normalization         : str       = "batch"
     upsample_mode         : str       = "convtranspose"
     conv_bias             : bool      = False
     init_mode             : str       = "default"
+
+    encoder_lr            : float     = 3e-4
+    decoder_lr            : float     = 3e-4
+    output_head_lr        : float     = 1e-3
+
+    encoder_wd            : float     = 5e-3
+    decoder_wd            : float     = 5e-3
+    output_head_wd        : float     = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Upsample, nn.Dropout2d,
@@ -282,10 +313,10 @@ class UNetPlusPlusConfig:
                 head_params.append(param)
         
         return [g for g in [
-            {'params': encoder_params,    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': dense_params,      'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'dense_blocks'},
-            {'params': upsample_params,   'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'upsample'},
-            {'params': head_params,       'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'}
+            {'params': encoder_params,    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': dense_params,      'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'dense_blocks'},
+            {'params': upsample_params,   'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'upsample'},
+            {'params': head_params,       'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'}
         ] if len(g['params']) > 0]
 
 
@@ -297,11 +328,19 @@ class FCNConfig:
     features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
     bottleneck_factor   : int       = 2
     variant             : str       = "8s"
-    dropout             : float     = 0.0
+    dropout             : float     = 0.15
     activation          : str       = "relu"
     normalization       : str       = "batch"
     conv_bias           : bool      = False
     init_mode           : str       = "default"
+
+    encoder_lr          : float     = 3e-4
+    classifier_lr       : float     = 3e-4
+    output_head_lr      : float     = 1e-3
+
+    encoder_wd          : float     = 5e-3
+    classifier_wd       : float     = 5e-3
+    output_head_wd      : float     = 5e-3
     
     shape_logger_types  : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -311,13 +350,16 @@ class FCNConfig:
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         encoder_params = list(model.encoder_blocks.parameters()) + list(model.downsample_layers.parameters())
-        head_params = list(model.score_final.parameters())
+        head_params    = list(model.score_final.parameters())
+       
         if hasattr(model, 'score_pool4'): head_params += list(model.score_pool4.parameters())
+       
         if hasattr(model, 'score_pool3'): head_params += list(model.score_pool3.parameters())
+       
         return [g for g in [
-            {'params': encoder_params,                      'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.classifier.parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'classifier'},
-            {'params': head_params,                         'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': encoder_params,                      'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.classifier.parameters()), 'lr': self.classifier_lr,  'weight_decay': self.classifier_wd,  'name': 'classifier'},
+            {'params': head_params,                         'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -327,13 +369,21 @@ class LinkNetConfig:
     out_channels             : int       = 6
     params_per_gaussian      : int       = 3
     features                 : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
-    dropout                  : float     = 0.0
+    dropout                  : float     = 0.15
     initial_kernel_size      : int       = 7
     decoder_bottleneck_ratio : int       = 4
     activation               : str       = "relu"
     normalization            : str       = "batch"
     conv_bias                : bool      = False
     init_mode                : str       = "default"
+
+    encoder_lr               : float     = 3e-4
+    decoder_lr               : float     = 3e-4
+    output_head_lr           : float     = 1e-3
+
+    encoder_wd               : float     = 5e-3
+    decoder_wd               : float     = 5e-3
+    output_head_wd           : float     = 5e-3
     
     shape_logger_types       : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Dropout2d,
@@ -343,10 +393,10 @@ class LinkNetConfig:
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         return [g for g in [
-            {'params': list(model.initial_conv.parameters()),   'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'initial_conv'},
-            {'params': list(model.encoder_stages.parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.decoder_stages.parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),    'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': list(model.initial_conv.parameters()),   'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'initial_conv'},
+            {'params': list(model.encoder_stages.parameters()), 'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.decoder_stages.parameters()), 'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),    'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -362,37 +412,49 @@ class SwinUNetConfig:
     num_heads             : list[int] = field(default_factory=lambda: [3, 6, 12, 24])
     window_size           : int       = 7
     mlp_ratio             : float     = 4.0
-    dropout               : float     = 0.0
+    dropout               : float     = 0.15
     attention_dropout     : float     = 0.0
     ffn_activation        : str       = "gelu"
     stochastic_depth_rate : float     = 0.0
     init_mode             : str       = "default"
+
+    encoder_lr            : float     = 3e-4
+    decoder_lr            : float     = 3e-4
+    output_head_lr        : float     = 1e-3
+
+    encoder_wd            : float     = 5e-3
+    decoder_wd            : float     = 5e-3
+    output_head_wd        : float     = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm, nn.GELU, nn.Dropout,
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
+     
         patch_embed_params = (
             list(model.patch_embed.parameters()) +
             list(model.patch_norm.parameters())
         )
+     
         encoder_params = (
             list(model.encoder_stages.parameters()) +
             list(model.downsample_layers.parameters())
         )
+     
         decoder_params = (
             list(model.upsample_layers.parameters()) +
             list(model.skip_projections.parameters()) +
             list(model.decoder_stages.parameters())
         )
+     
         return [g for g in [
-            {'params': patch_embed_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': encoder_params,                            'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(model.bottleneck_norm.parameters()),  'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': decoder_params,                            'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.final_upsample.parameters()),   'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'final_upsample'},
-            {'params': list(model.output_head.parameters()),      'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': patch_embed_params,                        'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'patch_embed'},
+            {'params': encoder_params,                            'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.bottleneck_norm.parameters()),  'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'bottleneck'},
+            {'params': decoder_params,                            'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.final_upsample.parameters()),   'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'final_upsample'},
+            {'params': list(model.output_head.parameters()),      'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -408,7 +470,7 @@ class TransUNetConfig:
     transformer_heads     : int       = 8
     transformer_mlp_ratio : float     = 4.0
     patch_size            : int       = 1
-    dropout               : float     = 0.0
+    dropout               : float     = 0.15
     activation            : str       = "relu"
     normalization         : str       = "batch"
     upsample_mode         : str       = "convtranspose"
@@ -417,6 +479,14 @@ class TransUNetConfig:
     ffn_activation        : str       = "gelu"
     stochastic_depth_rate : float     = 0.0
     init_mode             : str       = "default"
+
+    encoder_lr            : float     = 3e-4
+    decoder_lr            : float     = 3e-4
+    output_head_lr        : float     = 1e-3
+
+    encoder_wd            : float     = 5e-3
+    decoder_wd            : float     = 5e-3
+    output_head_wd        : float     = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Linear, nn.LayerNorm,
@@ -426,29 +496,34 @@ class TransUNetConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
+        
         cnn_encoder_params = (
             list(model.encoder_blocks.parameters()) +
             list(model.downsample_layers.parameters()) +
             list(model.pre_transformer_conv.parameters())
         )
+        
         patch_embed_params = (
             list(model.patch_embedding.parameters()) +
             [model.positional_embedding]
         )
+        
         transformer_params = (
             list(model.transformer_blocks.parameters()) +
             list(model.transformer_norm.parameters())
         )
+        
         decoder_params = (
             list(model.upsample_layers.parameters()) +
             list(model.decoder_blocks.parameters())
         )
+        
         return [g for g in [
-            {'params': cnn_encoder_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'cnn_encoder'},
-            {'params': patch_embed_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': transformer_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer'},
-            {'params': decoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),  'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': cnn_encoder_params,                    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'cnn_encoder'},
+            {'params': patch_embed_params,                    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'patch_embed'},
+            {'params': transformer_params,                    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'transformer'},
+            {'params': decoder_params,                        'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),  'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -464,7 +539,7 @@ class UNETRConfig:
     transformer_heads     : int       = 12
     transformer_mlp_ratio : float     = 4.0
     decoder_features      : list[int] = field(default_factory=lambda: [512, 256, 128, 64])
-    dropout               : float     = 0.0
+    dropout               : float     = 0.15
     activation            : str       = "relu"
     normalization         : str       = "batch"
     conv_bias             : bool      = False
@@ -472,6 +547,14 @@ class UNETRConfig:
     ffn_activation        : str       = "gelu"
     stochastic_depth_rate : float     = 0.0
     init_mode             : str       = "default"
+
+    encoder_lr            : float     = 3e-4
+    decoder_lr            : float     = 3e-4
+    output_head_lr        : float     = 1e-3
+
+    encoder_wd            : float     = 5e-3
+    decoder_wd            : float     = 5e-3
+    output_head_wd        : float     = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm,
@@ -481,14 +564,17 @@ class UNETRConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
+       
         patch_embed_params = (
             list(model.patch_embedding.parameters()) +
             [model.positional_embedding]
         )
+       
         transformer_params = (
             list(model.transformer_blocks.parameters()) +
             list(model.transformer_norm.parameters())
         )
+       
         decoder_params = (
             list(model.transformer_skip_heads.parameters()) +
             list(model.bottleneck_projection.parameters()) +
@@ -497,11 +583,12 @@ class UNETRConfig:
             list(model.decoder_blocks.parameters()) +
             list(model.final_upsample.parameters())
         )
+       
         return [g for g in [
-            {'params': patch_embed_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': transformer_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer'},
-            {'params': decoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),  'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': patch_embed_params,                    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'patch_embed'},
+            {'params': transformer_params,                    'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'transformer'},
+            {'params': decoder_params,                        'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),  'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 

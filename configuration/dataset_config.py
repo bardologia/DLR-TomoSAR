@@ -6,7 +6,7 @@ from typing      import Literal, Optional, Sequence, Tuple
 
 import numpy as np
 
-from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod, Presets, _SLOT_STRATEGIES
+from configuration.norm_config    import ChannelStrategy
 from tools.representation         import Representation
 from tools.split_regions          import SplitRegions
 
@@ -15,8 +15,10 @@ from tools.split_regions          import SplitRegions
 class InputConfig:
     use_primary                   : bool           = True
     primary_representation        : Representation = Representation.MAG_ONLY
+ 
     use_secondaries               : bool           = False
     secondaries_representation    : Representation = Representation.MAG_ONLY
+ 
     use_interferograms            : bool           = True
     interferograms_representation : Representation = Representation.ANGLE_ONLY
 
@@ -180,6 +182,7 @@ class DatasetConfiguration:
     input_config                : InputConfig             = field(default_factory=InputConfig)
     output_config               : OutputConfig            = field(default_factory=OutputConfig)
     augmentation                : AugmentationConfig      = field(default_factory=AugmentationConfig)
+    
     batch_size                  : int                     = 8
     num_workers                 : int                     = 16
     shuffle_train               : bool                    = True

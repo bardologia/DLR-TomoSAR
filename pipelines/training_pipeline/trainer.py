@@ -27,7 +27,7 @@ class Trainer:
         self.config       = config
         self.gaussian_cfg = config.gaussian
         self.curriculum      = config.curriculum
-        self.warmup_loss_cfg = config.curriculum.loss.warmup
+        self.warmup_loss_cfg = config.curriculum.warmup
         self.norm_stats   = norm_stats
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,7 +67,7 @@ class Trainer:
         self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
         self.ema              = EMA(self.config, self.logger, self.tracker)
         self.early_stopping   = EarlyStopping(self.config, self.logger, self.tracker)
-        self.criterion        = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, curriculum_cfg=self.curriculum)
+        self.criterion        = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats)
         self.checkpoint       = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.grad_clipper     = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
         self.overfitter       = OverfitManager(self.config, self.logger)
@@ -182,25 +182,7 @@ class Trainer:
         shape_logger.save_markdown(filename="shape_log.md", title="Tensor Shape Log")
 
     def _apply_curriculum_swap(self, epoch: int) -> None:
-        cur = self.curriculum
-
-        m = cur.matching
-        if m.enabled and epoch == m.swap_epoch:
-            self.logger.section(f"[Curriculum Matching Swap @ epoch {epoch + 1}]")
-
-            if m.reset_early_stopping:
-                self.early_stopping.reset()
-                self.logger.subsection("Early stopping reset.")
-
-            if m.reset_lr:
-                self.lr_scheduler.reset(epoch_offset=epoch)
-                self.logger.subsection(f"LR scheduler reset (epoch offset = {epoch}).")
-
-            if m.reset_warmup:
-                self.warmup.reset()
-                self.logger.subsection(f"Warmup reset ({self.warmup.warmup_steps} steps).")
-
-        lc = cur.loss
+        lc = self.curriculum
         if lc.enabled and epoch == lc.swap_epoch:
             self.logger.section(f"[Curriculum Loss Swap @ epoch {epoch + 1}]")
             self.criterion.loss_cfg = lc.complete
@@ -359,7 +341,6 @@ class Trainer:
                         epoch_num = epoch + 1
 
                         self.logger.section(f"[Epoch {epoch_num}/{epochs}]")
-                        self.criterion.matcher.set_epoch(epoch)
                         self._apply_curriculum_swap(epoch)
                         train_loss = self.train_epoch(data_loader, epoch)
                         self.logger.subsection(f"Train  : loss={train_loss:.4f}")

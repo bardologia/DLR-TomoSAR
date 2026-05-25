@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-GPU_ID = "0"
+GPU_ID = "1"
 os.environ["CUDA_VISIBLE_DEVICES"]    = str(GPU_ID)
 os.environ["MKL_NUM_THREADS"]     = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
@@ -27,9 +27,7 @@ from tools.crop_region      import CropRegion
 from tools.loss_scale_probe import LossScaleProbeConfig
 
 from configuration.training_config      import (
-    CurriculumConfig,
     LossCurriculumConfig,
-    MatchingCurriculumConfig,
     EarlyStoppingConfig,
     EMAConfig,
     GaussianConfig,
@@ -44,7 +42,7 @@ from configuration.training_config      import (
     WarmupConfig,
 )
 
-from models import UNetConfig
+from models import UNetConfig, UNetMultiHeadConfig
 from pipelines.training_pipeline.pipeline import TrainingPipeline
 
 
@@ -81,11 +79,11 @@ def main() -> None:
         pin_memory    = True,
     )
 
-    model_config = UNetConfig(
+    model_config = UNetMultiHeadConfig(
         encoder_lr    = 3e-4,  encoder_wd    = 5e-3,
         bottleneck_lr = 3e-4,  bottleneck_wd = 5e-3,
         decoder_lr    = 3e-4,  decoder_wd    = 5e-3,
-        output_head_lr      = 1e-3,        output_head_wd = 5e-3,
+        heads_lr      = 1e-3,  heads_wd      = 5e-3,
     )
 
     trainer_config = TrainerConfig(
@@ -115,39 +113,25 @@ def main() -> None:
             batch_size     = 1,
         ),
 
-        curriculum = CurriculumConfig(
+        curriculum = LossCurriculumConfig(
+            enabled              = False,
+            swap_epoch           = 100,
             
-            matching = MatchingCurriculumConfig(
-                enabled              = False,
-                warmup_strategy      = "sort_gt_by_mu",
-                graduation_strategy  = "sort_gt_by_mu",
-                swap_epoch           = 1000,
-                
-                reset_early_stopping = True,
-                reset_lr             = False,
-                reset_warmup         = True,
+            reset_early_stopping = False,
+            reset_lr             = False,
+            reset_warmup         = False,
+            
+            warmup = LossConfig(
+                use_param_l1             = True,
+                weight_param_l1          = 1.0,
+                param_weights            = (1.0, 1.0, 1.0)
             ),
             
-            loss = LossCurriculumConfig(
-                enabled              = False,
-                swap_epoch           = 100,
-                
-                reset_early_stopping = False,
-                reset_lr             = False,
-                reset_warmup         = False,
-                
-                warmup = LossConfig(
-                    use_param_l1             = True,
-                    weight_param_l1          = 1.0,
-                    param_weights            = (1.0, 1.0, 1.0)
-                ),
-                
-                complete = LossConfig(
-                    use_param_l1             = True,
-                    weight_param_l1          = 1.0,
-                    use_charbonnier_curve    = True,
-                    weight_charbonnier_curve = 0.3,
-                ),
+            complete = LossConfig(
+                use_param_l1             = True,
+                weight_param_l1          = 1.0,
+                use_charbonnier_curve    = True,
+                weight_charbonnier_curve = 0.3,
             ),
         ),
     )
@@ -155,10 +139,10 @@ def main() -> None:
     pipeline = TrainingPipeline(
         trainer_config = trainer_config,
         dataset_config = dataset_config,
-        model_name     = "unet",
+        model_name     = "unet_multihead",
         model_config   = model_config,
         seed           = 0,
-        run_name       = "unet_baseline_hard_new",
+        run_name       = "unet_baseline_multihead",
     )
 
     probe_config = LossScaleProbeConfig(

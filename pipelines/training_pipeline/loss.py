@@ -133,15 +133,14 @@ class LossComponents:
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None, curriculum_cfg=None):
-        self.x_axis         = x_axis
-        self.logger         = logger
-        self.tracker        = tracker
-        self.gaussian_cfg   = gaussian_cfg
-        self.reconstruct    = self.reconstruct_gaussians
-        self.loss_cfg       = loss_cfg if loss_cfg is not None else LossConfig()
-        self.curriculum_cfg = curriculum_cfg
-        self.norm_stats     = norm_stats
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None):
+        self.x_axis       = x_axis
+        self.logger       = logger
+        self.tracker      = tracker
+        self.gaussian_cfg = gaussian_cfg
+        self.reconstruct  = self.reconstruct_gaussians
+        self.loss_cfg     = loss_cfg if loss_cfg is not None else LossConfig()
+        self.norm_stats   = norm_stats
 
         cfg = self.loss_cfg
         
@@ -174,15 +173,9 @@ class Loss:
        
         self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title="Active Terms")
 
-        cur = self.curriculum_cfg
-        m   = cur.matching if cur is not None else None
-        base_strategy = m.warmup_strategy 
-     
         self.matcher = ParamMatcher(
-            strategy                    = base_strategy,
-            logger                      = self.logger,
-            curriculum_hungarian_epochs = m.swap_epoch ,
-            graduation_strategy         = m.graduation_strategy ,
+            strategy = cfg.param_match,
+            logger   = self.logger,
         )
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:

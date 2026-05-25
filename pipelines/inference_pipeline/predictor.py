@@ -256,10 +256,8 @@ class Predictor:
         for k in range(n_K):
             a_gt    = params_gt_cube[3 * k]
             mask_gt = a_gt < 1e-7
-            params_gt_cube  [3 * k + 1][mask_gt] = np.nan
-            params_gt_cube  [3 * k + 2][mask_gt] = np.nan
-            params_pred_cube[3 * k + 1][mask_gt] = np.nan
-            params_pred_cube[3 * k + 2][mask_gt] = np.nan
+            params_gt_cube[3 * k + 1][mask_gt] = np.nan
+            params_gt_cube[3 * k + 2][mask_gt] = np.nan
 
         w_safe         = np.where(pixel_w > 0, pixel_w, 1.0)
         pixel_mse      = (pixel_mse         / w_safe).astype(np.float32)

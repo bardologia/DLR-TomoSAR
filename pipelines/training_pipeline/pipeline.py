@@ -102,7 +102,7 @@ class TrainingPipeline:
             in_channels   = in_channels,
             out_channels  = out_channels,
             x_axis_length = x_axis_length,
-            param_match   = self.trainer_config.curriculum.loss.warmup.param_match,
+            param_match   = self.trainer_config.curriculum.warmup.param_match,
         )
 
         trainer = Trainer(

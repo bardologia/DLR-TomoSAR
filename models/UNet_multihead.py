@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from .config import UNetMultiHeadConfig, build_activation, initialize_weights
+from configuration.models_config import UNetMultiHeadConfig, build_activation, initialize_weights
 from .UNet import ConvBlock, Encoder, Decoder, match_spatial_size
 
 
