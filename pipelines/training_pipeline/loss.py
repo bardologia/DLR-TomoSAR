@@ -4,17 +4,144 @@ import torch
 import torch.nn.functional as F
 
 from configuration.training_config import LossConfig
+from tools.param_matcher           import ParamMatcher
+
+
+class LossComponents:
+    @staticmethod
+    def mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return ((pred - target) ** 2).mean()
+
+    @staticmethod
+    def l1(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return torch.abs(pred - target).mean()
+
+    @staticmethod
+    def huber(pred: torch.Tensor, target: torch.Tensor, delta: float) -> torch.Tensor:
+        return F.huber_loss(pred, target, reduction="mean", delta=delta)
+
+    @staticmethod
+    def charbonnier(pred: torch.Tensor, target: torch.Tensor, eps: float) -> torch.Tensor:
+        diff = pred - target
+        return torch.sqrt((diff * diff + eps * eps).clamp(min=eps * eps)).mean()
+
+    @staticmethod
+    def cosine(pred: torch.Tensor, target: torch.Tensor, axis: int) -> torch.Tensor:
+        p = pred   / torch.norm(pred,   dim=axis, keepdim=True).clamp(min=1e-8)
+        t = target / torch.norm(target, dim=axis, keepdim=True).clamp(min=1e-8)
+        return (1.0 - (p * t).sum(dim=axis).clamp(-1.0, 1.0)).mean()
+
+    @staticmethod
+    def spectral_coherence(pred: torch.Tensor, target: torch.Tensor, window: int) -> torch.Tensor:
+        p_u  = pred.unfold(1, window, 1)
+        t_u  = target.unfold(1, window, 1)
+        p_un = p_u / torch.norm(p_u, dim=-1, keepdim=True).clamp(min=1e-8)
+        t_un = t_u / torch.norm(t_u, dim=-1, keepdim=True).clamp(min=1e-8)
+        coh  = (p_un * t_un).sum(-1).abs().clamp(0.0, 1.0)
+        return (1.0 - coh).mean()
+
+    @staticmethod
+    def tv(params: torch.Tensor) -> torch.Tensor:
+        dx = torch.abs(params[..., 1:, :] - params[..., :-1, :]).mean()
+        dy = torch.abs(params[..., :, 1:] - params[..., :, :-1]).mean()
+        return dx + dy
+
+    @staticmethod
+    def _gaussian_window(size: int, sigma: float, dtype, device) -> torch.Tensor:
+        coords = torch.arange(size, dtype=dtype, device=device) - (size - 1) / 2.0
+        g      = torch.exp(-(coords ** 2) / (2.0 * sigma ** 2))
+        g      = g / g.sum()
+        kernel = g[:, None] * g[None, :]
+        return kernel[None, None, :, :]
+
+    @staticmethod
+    def ssim(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        window_size: int,
+        sigma: float,
+        data_range: float,
+        k1: float,
+        k2: float,
+        axis: str = "elevation",
+    ) -> torch.Tensor:
+        B, N, H, W = pred.shape
+        dtype      = pred.dtype
+        device     = pred.device
+
+        kernel  = LossComponents._gaussian_window(window_size, sigma, dtype, device)
+        padding = window_size // 2
+        c1 = (k1 * data_range) ** 2
+        c2 = (k2 * data_range) ** 2
+
+        def conv(z: torch.Tensor) -> torch.Tensor:
+            return F.conv2d(z, kernel, padding=padding)
+
+        def ssim_slice(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            mu_x  = conv(x);  mu_y = conv(y)
+            mu_x2 = mu_x * mu_x;  mu_y2 = mu_y * mu_y;  mu_xy = mu_x * mu_y
+            sx2   = torch.clamp(conv(x * x) - mu_x2, min=0.0)
+            sy2   = torch.clamp(conv(y * y) - mu_y2, min=0.0)
+            sxy   = conv(x * y) - mu_xy
+            num   = (2.0 * mu_xy + c1) * (2.0 * sxy + c2)
+            den   = (mu_x2 + mu_y2 + c1) * (sx2 + sy2 + c2)
+            return (1.0 - num / den.clamp(min=1e-12)).mean()
+
+        if axis == "elevation":
+            xs = pred.permute(1, 0, 2, 3).reshape(-1, 1, H, W)
+            ys = target.permute(1, 0, 2, 3).reshape(-1, 1, H, W)
+        elif axis == "azimuth":
+            xs = pred.permute(2, 0, 1, 3).reshape(-1, 1, N, W)
+            ys = target.permute(2, 0, 1, 3).reshape(-1, 1, N, W)
+        elif axis == "range":
+            xs = pred.permute(3, 0, 1, 2).reshape(-1, 1, N, H)
+            ys = target.permute(3, 0, 1, 2).reshape(-1, 1, N, H)
+        else:
+            raise ValueError(f"ssim_axis must be 'elevation', 'azimuth', or 'range', got '{axis}'")
+
+        return ssim_slice(xs, ys)
+
+    @staticmethod
+    def param_l1(
+        pred: torch.Tensor,
+        gt: torch.Tensor,
+        weights: torch.Tensor,
+        param_names: list[str],
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+        diff          = pred - gt
+        weighted_diff = weights * torch.abs(diff)
+        total         = weighted_diff.mean()
+   
+        per_param     = {
+            name: (weights[:, :, i:i+1] * torch.abs(diff[:, :, i:i+1])).mean()
+            for i, name in enumerate(param_names)
+            if i < pred.shape[2]
+        }
+        return total, per_param
+
+    @staticmethod
+    def param_huber(
+        pred: torch.Tensor,
+        gt: torch.Tensor,
+        weights: torch.Tensor,
+        delta: float,
+    ) -> torch.Tensor:
+        diff     = pred - gt
+        abs_diff = torch.abs(diff)
+        val      = torch.where(abs_diff <= delta, 0.5 * diff * diff, delta * (abs_diff - 0.5 * delta))
+        return (weights * val).mean()
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None):
-        self.x_axis       = x_axis
-        self.logger       = logger
-        self.tracker      = tracker
-        self.gaussian_cfg = gaussian_cfg
-        self.reconstruct  = self.reconstruct_gaussians
-        self.loss_cfg     = loss_cfg if loss_cfg is not None else LossConfig()
-        self.norm_stats   = norm_stats
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None, curriculum_cfg=None):
+        self.x_axis         = x_axis
+        self.logger         = logger
+        self.tracker        = tracker
+        self.gaussian_cfg   = gaussian_cfg
+        self.reconstruct    = self.reconstruct_gaussians
+        self.loss_cfg       = loss_cfg if loss_cfg is not None else LossConfig()
+        self.curriculum_cfg = curriculum_cfg
+        self.norm_stats     = norm_stats
 
         cfg = self.loss_cfg
         
@@ -24,6 +151,7 @@ class Loss:
             ("huber_curve",       cfg.use_huber_curve,        cfg.weight_huber_curve,        "weight_huber_curve"),
             ("charbonnier_curve", cfg.use_charbonnier_curve,  cfg.weight_charbonnier_curve,  "weight_charbonnier_curve"),
             ("cosine_curve",      cfg.use_cosine_curve,       cfg.weight_cosine_curve,       "weight_cosine_curve"),
+            ("spectral_coh",      cfg.use_spectral_coherence, cfg.weight_spectral_coh,       "weight_spectral_coh"),
             ("ssim_curve",        cfg.use_ssim_curve,         cfg.weight_ssim_curve,         "weight_ssim_curve"),
             ("param_l1",          cfg.use_param_l1,           cfg.weight_param_l1,           "weight_param_l1"),
             ("param_huber",       cfg.use_param_huber,        cfg.weight_param_huber,        "weight_param_huber"),
@@ -43,7 +171,19 @@ class Loss:
                 factor = getattr(cfg.norm, w_key.removeprefix("weight_"), 1.0)
                 extra  = f"  [axis={cfg.ssim_axis}]" if name == "ssim_curve" else ""
                 active_rows.append({"Term": name, "Alpha": f"{alpha:g}", "Norm": f"{factor:g}", "Eff": f"{eff:g}{extra}"})
+       
         self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title="Active Terms")
+
+        cur = self.curriculum_cfg
+        m   = cur.matching if cur is not None else None
+        base_strategy = m.warmup_strategy 
+     
+        self.matcher = ParamMatcher(
+            strategy                    = base_strategy,
+            logger                      = self.logger,
+            curriculum_hungarian_epochs = m.swap_epoch ,
+            graduation_strategy         = m.graduation_strategy ,
+        )
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         B, C, H, W = params.shape
@@ -58,87 +198,12 @@ class Loss:
         sig = p[:, :, 2:3, :, :]                                
         x   = self.x_axis.reshape(1, 1, -1, 1, 1)              
 
-        curves = (a * torch.exp(-((x - mu) ** 2) / (2.0 * sig ** 2 + 1e-8))).sum(dim=1)  
+        sig_safe = F.softplus(sig, beta=100, threshold=20)
+        sig2     = sig_safe ** 2
+        curves   = (a * torch.exp(-((x - mu) ** 2) / (2.0 * sig2))).sum(dim=1)
      
         return curves
     
-    @staticmethod
-    def _charbonnier(diff: torch.Tensor, eps: float) -> torch.Tensor:
-        return torch.sqrt(diff * diff + eps * eps).mean()
-
-    @staticmethod
-    def _huber(pred: torch.Tensor, target: torch.Tensor, delta: float) -> torch.Tensor:
-        return F.huber_loss(pred, target, reduction='mean', delta=delta)
-
-    @staticmethod
-    def _gaussian_window(window_size: int, sigma: float, dtype, device) -> torch.Tensor:
-        coords    = torch.arange(window_size, dtype=dtype, device=device) - (window_size - 1) / 2.0
-        gaussian  = torch.exp(-(coords ** 2) / (2.0 * sigma ** 2))
-        gaussian  = gaussian / gaussian.sum()
-        kernel_2d = gaussian[:, None] * gaussian[None, :]
-      
-        return kernel_2d[None, None, :, :]
-
-    @staticmethod
-    def _ssim_loss(pred_curves, exp_curves, window_size, sigma, data_range, k1, k2, axis="elevation"):
-        batch_size, num_points, height, width = pred_curves.shape
-        dtype  = pred_curves.dtype
-        device = pred_curves.device
-
-        kernel  = Loss._gaussian_window(window_size, sigma, dtype, device)
-        
-        padding = window_size // 2
-        c1 = (k1 * data_range) ** 2
-        c2 = (k2 * data_range) ** 2
-
-        def conv(z):
-            return F.conv2d(z, kernel, padding=padding)
-
-        def ssim_one(x, y):
-            mu_x       = conv(x);  mu_y = conv(y)
-            mu_x_sq    = mu_x * mu_x;  mu_y_sq = mu_y * mu_y;  mu_x_y = mu_x * mu_y
-            sigma_x_sq = torch.clamp(conv(x * x) - mu_x_sq, min=0.0)
-            sigma_y_sq = torch.clamp(conv(y * y) - mu_y_sq, min=0.0)
-            sigma_xy   = conv(x * y) - mu_x_y
-            num        = (2.0 * mu_x_y + c1) * (2.0 * sigma_xy + c2)
-            den        = (mu_x_sq + mu_y_sq + c1) * (sigma_x_sq + sigma_y_sq + c2)
-            
-            return (1.0 - num / torch.clamp(den, min=1e-12)).mean()
-
-        if axis == "elevation":
-            x_slices  = pred_curves.permute(1, 0, 2, 3).reshape(-1, 1, height, width)
-            y_slices  = exp_curves.permute(1, 0, 2, 3).reshape(-1, 1, height, width)
-            ssim_vals = ssim_one(x_slices, y_slices)               
-        
-        elif axis == "azimuth":
-            x_slices  = pred_curves.permute(2, 0, 1, 3).reshape(-1, 1, num_points, width)
-            y_slices  = exp_curves.permute(2, 0, 1, 3).reshape(-1, 1, num_points, width)
-            ssim_vals = ssim_one(x_slices, y_slices)
-        
-        elif axis == "range":
-            x_slices  = pred_curves.permute(3, 0, 1, 2).reshape(-1, 1, num_points, height)
-            y_slices  = exp_curves.permute(3, 0, 1, 2).reshape(-1, 1, num_points, height)
-            ssim_vals = ssim_one(x_slices, y_slices)
-        
-        else:
-            raise ValueError(f"ssim_axis must be 'elevation', 'azimuth', or 'range', got '{axis}'")
-
-        return ssim_vals
-
-    @staticmethod
-    def _tv_loss(params: torch.Tensor) -> torch.Tensor:
-        dx = torch.abs(params[..., 1:, :] - params[..., :-1, :]).mean()
-        dy = torch.abs(params[..., :, 1:] - params[..., :, :-1]).mean()
-       
-        return dx + dy
-
-    @staticmethod
-    def _cosine_similarity(a: torch.Tensor, b: torch.Tensor, axis: int) -> torch.Tensor:
-        num = (a * b).sum(dim=axis)
-        den = torch.sqrt((a * a).sum(dim=axis) + 1e-8) * torch.sqrt((b * b).sum(dim=axis) + 1e-8)
-        
-        return num / torch.clamp(den, min=1e-8)
-
     def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss):
         ppg           = self.gaussian_cfg.params_per_gaussian
         batch_size, num_channels, height, width = pred_gauss.shape
@@ -151,82 +216,37 @@ class Loss:
         gt           = gt_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
         gt_phys      = gt_phys_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
 
-        strategy = self.loss_cfg.param_match
-
-        if strategy == "sorted_mu":
-            gt_phys_amp  = gt_phys[:, :, 0]
-            is_active    = gt_phys_amp > 1e-7
-            gt_mu_masked = torch.where(is_active, gt[:, :, 1], torch.full_like(gt[:, :, 1], float('inf')))
-            pred_index   = torch.argsort(pred_phys[:, :, 1], dim=1)
-            gt_index     = torch.argsort(gt_mu_masked, dim=1)
-            pred_idx_b   = pred_index[:, :, None, :, :].expand_as(pred)
-            gt_idx_b     = gt_index[:, :, None, :, :].expand_as(gt)
-            pred         = torch.gather(pred, dim=1, index=pred_idx_b)
-            pred_phys    = torch.gather(pred_phys, dim=1, index=pred_idx_b)
-            gt           = torch.gather(gt, dim=1, index=gt_idx_b)
-            gt_phys      = torch.gather(gt_phys, dim=1, index=gt_idx_b)
-
-        elif strategy == "sorted_a":
-            pred_a     = pred[:, :, 0]
-            gt_a       = gt[:,   :, 0]
-            pred_index = torch.argsort(pred_a, dim=1, descending=True)
-            gt_index   = torch.argsort(gt_a,   dim=1, descending=True)
-            pred_idx_b = pred_index[:, :, None, :, :].expand_as(pred)
-            gt_idx_b   = gt_index[:,   :, None, :, :].expand_as(gt)
-            pred       = torch.gather(pred, dim=1, index=pred_idx_b)
-            pred_phys  = torch.gather(pred_phys, dim=1, index=pred_idx_b)
-            gt         = torch.gather(gt,   dim=1, index=gt_idx_b)
-            gt_phys    = torch.gather(gt_phys, dim=1, index=gt_idx_b)
-
-        elif strategy == "sort_gt_by_mu":
-            gt_phys_amp = gt_phys[:, :, 0]
-            gt_mu       = gt[:, :, 1]
-            is_active   = gt_phys_amp > 1e-7
-            sort_key    = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float('inf')))
-            gt_index    = torch.argsort(sort_key, dim=1)
-            gt_idx_b    = gt_index[:, :, None, :, :].expand_as(gt)
-            gt          = torch.gather(gt, dim=1, index=gt_idx_b)
-            gt_phys     = torch.gather(gt_phys, dim=1, index=gt_idx_b)
+        pred, pred_phys, gt, gt_phys = self.matcher.match_torch(pred, pred_phys, gt, gt_phys)
 
         effective_gaussians = min(num_gaussians, gt_gaussians)
-        pred                = pred[:, :effective_gaussians]
+        pred                = pred[:,      :effective_gaussians]
         pred_phys           = pred_phys[:, :effective_gaussians]
-        gt                  = gt[:, :effective_gaussians]
-        gt_phys             = gt_phys[:, :effective_gaussians]
+        gt                  = gt[:,        :effective_gaussians]
+        gt_phys             = gt_phys[:,   :effective_gaussians]
 
         return pred, pred_phys, gt, gt_phys
 
     def _param_term(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss, kind):
         pred, pred_phys, gt, gt_phys = self._match_params(pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss)
+        cfg     = self.loss_cfg
+        w       = torch.tensor(cfg.param_weights, dtype=pred.dtype, device=pred.device)
 
-        diff = pred - gt
-        cfg  = self.loss_cfg
+        if w.numel() < pred.shape[2]:
+            w = torch.cat([w, torch.ones(pred.shape[2] - w.numel(), dtype=w.dtype, device=w.device)])
 
-        weights = torch.tensor(self.loss_cfg.param_weights, dtype=diff.dtype, device=diff.device)
-        if weights.numel() < pred.shape[2]:
-            pad     = torch.ones(pred.shape[2] - weights.numel(), dtype=weights.dtype, device=weights.device)
-            weights = torch.cat([weights, pad])
+        w       = w[:pred.shape[2]]
+        weights = w.reshape(1, 1, -1, 1, 1)
 
-        weights = weights[: pred.shape[2]].reshape(1, 1, -1, 1, 1)
+        hard_active          = (gt_phys[:, :, 0:1] > cfg.amp_zero_thr).to(pred.dtype)
+        param_mask           = torch.ones_like(pred)
+        param_mask[:, :, 1:] = hard_active.expand_as(pred[:, :, 1:])
 
         if kind == "l1":
-            weighted_diff = weights * torch.abs(diff)
-            total         = weighted_diff.mean()
-            param_names   = ["amp", "mu", "sigma"]
-            per_param     = {pname: (weights[:, :, i:i+1] * torch.abs(diff[:, :, i:i+1])).mean() for i, pname in enumerate(param_names) if i < pred.shape[2]}
-            return total, per_param
+            return LossComponents.param_l1(pred, gt, weights * param_mask, ["amp", "mu", "sigma"])
 
         if kind == "huber":
-            delta        = self.loss_cfg.param_huber_delta
-            abs_diff     = torch.abs(diff)
-            quad         = 0.5 * diff * diff
-            linear       = delta * (abs_diff - 0.5 * delta)
-            val          = torch.where(abs_diff <= delta, quad, linear)
-            weighted_val = weights * val
-            return weighted_val.mean(), {}
-
-        raise ValueError(f"Unknown param term kind: {kind}")
-
+            return LossComponents.param_huber(pred, gt, weights * param_mask, cfg.param_huber_delta), {}
+      
     def __call__(self, pred_params, gt_params):
         cfg = self.loss_cfg
         ppg = self.gaussian_cfg.params_per_gaussian
@@ -251,39 +271,46 @@ class Loss:
         weighted:   dict = {}
         total_loss       = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
 
+        lc = LossComponents
+
         if cfg.use_mse_curve:
-            val                     = (diff ** 2).mean()
+            val                     = lc.mse(pred_curves, exp_curves)
             components["mse_curve"] = val
             weighted["mse_curve"]   = cfg.eff("weight_mse_curve") * val
             total_loss              = total_loss + weighted["mse_curve"]
 
         if cfg.use_l1_curve:
-            val                    = torch.abs(diff).mean()
+            val                    = lc.l1(pred_curves, exp_curves)
             components["l1_curve"] = val
             weighted["l1_curve"]   = cfg.eff("weight_l1_curve") * val
             total_loss             = total_loss + weighted["l1_curve"]
 
         if cfg.use_huber_curve:
-            val                       = self._huber(pred_curves, exp_curves, cfg.huber_delta)
+            val                       = lc.huber(pred_curves, exp_curves, cfg.huber_delta)
             components["huber_curve"] = val
             weighted["huber_curve"]   = cfg.eff("weight_huber_curve") * val
             total_loss                = total_loss + weighted["huber_curve"]
 
         if cfg.use_charbonnier_curve:
-            val                             = self._charbonnier(diff, cfg.charbonnier_eps)
+            val                             = lc.charbonnier(pred_curves, exp_curves, cfg.charbonnier_eps)
             components["charbonnier_curve"] = val
             weighted["charbonnier_curve"]   = cfg.eff("weight_charbonnier_curve") * val
             total_loss                      = total_loss + weighted["charbonnier_curve"]
 
         if cfg.use_cosine_curve:
-            cos_sim                    = self._cosine_similarity(pred_curves, exp_curves, axis=1)
-            val                        = (1.0 - cos_sim).mean()
+            val                        = lc.cosine(pred_curves, exp_curves, axis=1)
             components["cosine_curve"] = val
             weighted["cosine_curve"]   = cfg.eff("weight_cosine_curve") * val
             total_loss                 = total_loss + weighted["cosine_curve"]
 
+        if cfg.use_spectral_coherence:
+            val                        = lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window)
+            components["spectral_coh"] = val
+            weighted["spectral_coh"]   = cfg.eff("weight_spectral_coh") * val
+            total_loss                 = total_loss + weighted["spectral_coh"]
+
         if cfg.use_ssim_curve:
-            val = self._ssim_loss(
+            val = lc.ssim(
                 pred_curves, exp_curves,
                 window_size = cfg.ssim_window_size,
                 sigma       = cfg.ssim_sigma,
@@ -313,7 +340,7 @@ class Loss:
             total_loss                = total_loss + weighted["param_huber"]
 
         if cfg.use_smoothness_tv:
-            val                         = self._tv_loss(pred_params)
+            val                         = lc.tv(pred_params)
             components["smoothness_tv"] = val
             weighted["smoothness_tv"]   = cfg.eff("weight_smoothness_tv") * val
             total_loss                  = total_loss + weighted["smoothness_tv"]

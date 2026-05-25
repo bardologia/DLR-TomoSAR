@@ -77,7 +77,7 @@ class DatasetPipeline:
       
         train_ds, train_patcher = self._build_dataset("train")
 
-        norm_stats = StatsComputer.compute_input_stats(
+        input_stats = StatsComputer.compute_input_stats(
             dataset      = train_ds,
             logger       = self.logger,
             input_config = self.config.input_config,
@@ -85,11 +85,16 @@ class DatasetPipeline:
             num_workers  = self.config.num_workers,
         )
 
-        norm_stats.output_stats = StatsComputer.compute_output_stats(
+        output_stats = StatsComputer.compute_output_stats(
             params_path   = self.config.parameters_path,
             n_gaussians   = self.config.n_gaussians,
             output_config = self.config.output_config,
             logger        = self.logger,
+        )
+
+        norm_stats = Stats(
+            input_stats  = input_stats.input_stats,
+            output_stats = output_stats.output_stats,
         )
         
         norm_stats.save(self.training_run_directory / "meta")

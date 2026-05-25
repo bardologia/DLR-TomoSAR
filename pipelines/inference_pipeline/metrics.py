@@ -176,6 +176,206 @@ class Metrics:
             "elev_ce_gt"   : ce_gt,
         }
 
+    def _mu_ordering_rate(self) -> float:
+        """Fraction of pixels where predicted µ values are strictly ascending across
+        all predicted-active slots (pred amp >= 1e-3).
+
+        Pixels with fewer than 2 predicted-active slots are excluded (ordering
+        is trivially satisfied there).
+        """
+        pp  = self.result.params_pred
+        n_K = self.n_gaussians
+        if n_K < 2:
+            return float("nan")
+
+        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)  # (G, H, W)
+        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)  # (G, H, W)
+        active = amps >= 1e-3                                             # (G, H, W)
+
+        ordered      = mus[:-1] < mus[1:]                                # (G-1, H, W)
+        both_active  = active[:-1] & active[1:]
+        has_violation = ((~ordered) & both_active).any(axis=0)           # (H, W)
+
+        # single-active pixels: only valid if the active slot is slot 0
+        n_active         = active.sum(axis=0)                             # (H, W)
+        single_active    = n_active == 1
+        active_not_first = single_active & ~active[0]                    # active but not in slot 0
+        has_violation    = has_violation | active_not_first
+
+        any_active = n_active >= 1
+        denom      = int(any_active.sum())
+        if denom == 0:
+            return float("nan")
+        return float((~has_violation & any_active).sum() / denom)
+
+    def _slot_mu_stats(self) -> Dict[str, float]:
+        """Mean and std of µ (pred and GT) per Gaussian slot, restricted to active pixels."""
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+        out: Dict[str, float] = {}
+
+        for k in range(n_K):
+            gt_amp  = pg[3 * k].reshape(-1)
+            active  = (gt_amp >= 1e-3) & np.isfinite(gt_amp)
+
+            mu_pred = pp[3 * k + 1].reshape(-1)[active]
+            mu_gt   = pg[3 * k + 1].reshape(-1)[active]
+            mu_pred = mu_pred[np.isfinite(mu_pred)]
+            mu_gt   = mu_gt  [np.isfinite(mu_gt)]
+
+            out[f"slot_{k}_mu_pred_mean"] = float(np.mean(mu_pred)) if mu_pred.size > 0 else float("nan")
+            out[f"slot_{k}_mu_pred_std"]  = float(np.std( mu_pred)) if mu_pred.size > 0 else float("nan")
+            out[f"slot_{k}_mu_gt_mean"]   = float(np.mean(mu_gt))   if mu_gt.size   > 0 else float("nan")
+            out[f"slot_{k}_mu_gt_std"]    = float(np.std( mu_gt))   if mu_gt.size   > 0 else float("nan")
+
+        return out
+
+    def _placeholder_detection(self) -> Dict[str, float]:
+        """Precision / recall / F1 for inactive-slot detection, per slot and overall."""
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+        out: Dict[str, float] = {}
+
+        all_gt_ph: list[np.ndarray]   = []
+        all_pred_ph: list[np.ndarray] = []
+
+        for k in range(n_K):
+            gt_amp   = pg[3 * k].reshape(-1)
+            pred_amp = pp[3 * k].reshape(-1)
+            valid    = np.isfinite(gt_amp) & np.isfinite(pred_amp)
+
+            gt_ph   = (gt_amp  [valid] < 1e-3).astype(np.float32)
+            pred_ph = (pred_amp[valid] < 1e-3).astype(np.float32)
+
+            tp = (pred_ph * gt_ph).sum()
+            fp = (pred_ph * (1.0 - gt_ph)).sum()
+            fn = ((1.0 - pred_ph) * gt_ph).sum()
+
+            precision = float(tp / (tp + fp + 1e-8))
+            recall    = float(tp / (tp + fn + 1e-8))
+            f1        = 2.0 * precision * recall / (precision + recall + 1e-8)
+
+            out[f"slot_{k}_placeholder_precision"] = precision
+            out[f"slot_{k}_placeholder_recall"]    = recall
+            out[f"slot_{k}_placeholder_f1"]        = f1
+            out[f"slot_{k}_placeholder_gt_rate"]   = float(gt_ph.mean())   if gt_ph.size   > 0 else float("nan")
+            out[f"slot_{k}_placeholder_pred_rate"] = float(pred_ph.mean()) if pred_ph.size > 0 else float("nan")
+
+            all_gt_ph.append(gt_ph)
+            all_pred_ph.append(pred_ph)
+
+        gt_all   = np.concatenate(all_gt_ph)
+        pred_all = np.concatenate(all_pred_ph)
+        tp  = (pred_all * gt_all).sum()
+        fp  = (pred_all * (1.0 - gt_all)).sum()
+        fn  = ((1.0 - pred_all) * gt_all).sum()
+        p   = float(tp / (tp + fp + 1e-8))
+        r   = float(tp / (tp + fn + 1e-8))
+        out["placeholder_precision"] = p
+        out["placeholder_recall"]    = r
+        out["placeholder_f1"]        = 2.0 * p * r / (p + r + 1e-8)
+
+        return out
+
+    def _permutation_consensus(self) -> Dict[str, float]:
+        """Fraction of pixels that prefer the same pred→GT permutation (by µ distance).
+
+        A high dominant-fraction means the model has learnt stable slot roles.
+        identity_frac specifically measures how often the identity permutation
+        (slot k matched to GT slot k) is optimal, which is expected when both
+        pred and GT are µ-sorted.
+        """
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+
+        if n_K == 1:
+            return {"permutation_consensus_dominant_frac": 1.0,
+                    "permutation_consensus_identity_frac":  1.0}
+
+        from itertools import permutations as _perms
+
+        pred_mu = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)  # (G, HW)
+        gt_mu   = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)  # (G, HW)
+
+        # Replace NaN (inactive) with large value so those pixels don't bias the match
+        pred_mu = np.nan_to_num(pred_mu, nan=1e9)
+        gt_mu   = np.nan_to_num(gt_mu,   nan=1e9)
+
+        # cost_mat[hw, i, j] = |pred_mu[i,hw] - gt_mu[j,hw]|
+        cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])  # (HW, G, G)
+
+        all_perms  = list(_perms(range(n_K)))
+        perm_costs = np.stack(
+            [cost_mat[:, np.arange(n_K), list(p)].sum(axis=1) for p in all_perms],
+            axis=1,
+        )  # (HW, n_perms)
+
+        best_idx = perm_costs.argmin(axis=1)  # (HW,)
+        counts   = np.bincount(best_idx, minlength=len(all_perms)).astype(np.float64)
+        total    = counts.sum()
+
+        identity_idx  = all_perms.index(tuple(range(n_K)))
+        dominant_frac = float(counts.max()     / total)
+        identity_frac = float(counts[identity_idx] / total)
+
+        return {
+            "permutation_consensus_dominant_frac": dominant_frac,
+            "permutation_consensus_identity_frac": identity_frac,
+        }
+
+    def _gaussian_param_metrics(self) -> Dict[str, float]:
+        out    : Dict[str, float] = {}
+        pp     = self.result.params_pred.astype(np.float64)
+        pg     = self.result.params_gt  .astype(np.float64)
+        n_K    = self.n_gaussians
+
+        all_mu_ae  : list[np.ndarray] = []
+        all_sig_ae : list[np.ndarray] = []
+
+        for k in range(n_K):
+            gt_amp  = pg[3 * k]                      # (H, W)
+            valid   = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
+
+            mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
+            mu_gt   = np.where(valid, pg[3 * k + 1], np.nan)
+            sg_pred = np.where(valid, pp[3 * k + 2], np.nan)
+            sg_gt   = np.where(valid, pg[3 * k + 2], np.nan)
+
+            mu_ae  = np.abs(mu_pred  - mu_gt)
+            sig_ae = np.abs(sg_pred  - sg_gt)
+            mu_se  = (mu_pred  - mu_gt)  ** 2
+            sig_se = (sg_pred  - sg_gt)  ** 2
+
+            n_valid = int(np.sum(valid))
+
+            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se)))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae)) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se))) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_n_valid"]  = n_valid
+
+            if n_valid > 0:
+                all_mu_ae .append(mu_ae [valid])
+                all_sig_ae.append(sig_ae[valid])
+
+        if all_mu_ae:
+            cat_mu  = np.concatenate(all_mu_ae)
+            cat_sig = np.concatenate(all_sig_ae)
+            out["gauss_all_mu_mae"]   = float(cat_mu .mean())
+            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean()))
+            out["gauss_all_sig_mae"]  = float(cat_sig.mean())
+            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean()))
+        else:
+            out["gauss_all_mu_mae"]   = float("nan")
+            out["gauss_all_mu_rmse"]  = float("nan")
+            out["gauss_all_sig_mae"]  = float("nan")
+            out["gauss_all_sig_rmse"] = float("nan")
+
+        return out
+
     def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None) -> Dict[str, float]:
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
@@ -231,6 +431,23 @@ class Metrics:
                 metrics[f"{metric_name}_{i}"] = float(v)
             
             metrics[f"{metric_name}_mean"] = float(np.nanmean(arr))
+
+        # ── Per-Gaussian µ / σ errors (placeholder-masked, µ-sorted order) ──────────
+        for k, v in self._gaussian_param_metrics().items():
+            metrics[k] = v
+
+        # ── Slot µ statistics (mean & std per slot, active pixels only) ─────────────
+        for k, v in self._slot_mu_stats().items():
+            metrics[k] = v
+
+        # ── Inactive-Gaussian detection (precision / recall / F1) ───────────────────
+        for k, v in self._placeholder_detection().items():
+            metrics[k] = v
+
+        # ── µ ordering rate & permutation consensus ──────────────────────────────────
+        metrics["mu_ordering_rate"] = self._mu_ordering_rate()
+        for k, v in self._permutation_consensus().items():
+            metrics[k] = v
 
         return metrics
 

@@ -8,6 +8,7 @@ from .config import (
     TransUNetConfig,
     UNETRConfig,
     UNetConfig,
+    UNetMultiHeadConfig,
     UNetPlusPlusConfig,
     build_activation,
     build_norm2d,
@@ -15,6 +16,7 @@ from .config import (
     initialize_weights,
 )
 from .UNet import UNet
+from .UNet_multihead import UNetMultiHead
 from .ResUNet import ResUNet
 from .AttentionUNet import AttentionUNet
 from .UNetPlusPlus import UNetPlusPlus
@@ -26,6 +28,7 @@ from .UNETR import UNETR
 
 MODEL_REGISTRY: dict[str, type] = {
     "unet"           : UNet,
+    "unet_multihead" : UNetMultiHead,
     "resunet"        : ResUNet,
     "attention_unet" : AttentionUNet,
     "unetplusplus"   : UNetPlusPlus,
@@ -38,6 +41,7 @@ MODEL_REGISTRY: dict[str, type] = {
 
 CONFIG_REGISTRY: dict[str, type] = {
     "unet"           : UNetConfig,
+    "unet_multihead" : UNetMultiHeadConfig,
     "resunet"        : ResUNetConfig,
     "attention_unet" : AttentionUNetConfig,
     "unetplusplus"   : UNetPlusPlusConfig,
@@ -64,6 +68,7 @@ def get_model(name: str, config=None, **overrides):
 
 __all__ = [
     "UNet",
+    "UNetMultiHead",
     "ResUNet",
     "AttentionUNet",
     "UNetPlusPlus",
@@ -73,6 +78,7 @@ __all__ = [
     "TransUNet",
     "UNETR",
     "UNetConfig",
+    "UNetMultiHeadConfig",
     "ResUNetConfig",
     "AttentionUNetConfig",
     "UNetPlusPlusConfig",

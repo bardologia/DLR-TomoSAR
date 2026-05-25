@@ -140,6 +140,45 @@ class UNetConfig:
 
 
 @dataclass
+class UNetMultiHeadConfig:
+    in_channels         : int             = 1
+    out_channels        : int             = 6
+    params_per_gaussian : int             = 3
+    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int             = 2
+    dropout             : float           = 0.15
+    activation          : str             = "relu"
+    normalization       : str             = "batch"
+    upsample_mode       : str             = "convtranspose"
+    conv_bias           : bool            = False
+    init_mode           : str             = "default"
+
+    encoder_lr          : float           = 3e-4
+    bottleneck_lr       : float           = 3e-4
+    decoder_lr          : float           = 3e-4
+    heads_lr            : float           = 1e-3
+
+    encoder_wd          : float           = 5e-3
+    bottleneck_wd       : float           = 5e-3
+    decoder_wd          : float           = 5e-3
+    heads_wd            : float           = 5e-3
+
+    shape_logger_types  : tuple           = field(default_factory=lambda: (
+        nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
+        nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
+        nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
+    ))
+
+    def get_param_groups(self, model: nn.Module) -> list[dict]:
+        return [g for g in [
+            {'params': list(model.encoder.parameters()),                                                                      'lr': self.encoder_lr,    'weight_decay': self.encoder_wd,    'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),                                                                   'lr': self.bottleneck_lr, 'weight_decay': self.bottleneck_wd, 'name': 'bottleneck'},
+            {'params': list(model.decoder.parameters()),                                                                      'lr': self.decoder_lr,    'weight_decay': self.decoder_wd,    'name': 'decoder'},
+            {'params': list(model.head_amp.parameters()) + list(model.head_mu.parameters()) + list(model.head_sigma.parameters()), 'lr': self.heads_lr,      'weight_decay': self.heads_wd,      'name': 'heads'},
+        ] if len(g['params']) > 0]
+
+
+@dataclass
 class ResUNetConfig:
     in_channels         : int             = 1
     out_channels        : int             = 6
@@ -237,7 +276,7 @@ class UNetPlusPlusConfig:
                 encoder_params.append(param)
             elif name.startswith("dense_"):
                 dense_params.append(param)
-            elif name.startswith("upsample."):
+            elif name.startswith("upsample.") or name.startswith("upsample_modules."):
                 upsample_params.append(param)
             elif name.startswith("output_head"):
                 head_params.append(param)
@@ -334,16 +373,26 @@ class SwinUNetConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
-        patch_embed_params = list(getattr(model, 'patch_embed', nn.Identity()).parameters()) + list(getattr(model, 'pos_drop', nn.Identity()).parameters())
-        upsample_params    = list(getattr(model, 'upsample_final', nn.Identity()).parameters())
-        
+        patch_embed_params = (
+            list(model.patch_embed.parameters()) +
+            list(model.patch_norm.parameters())
+        )
+        encoder_params = (
+            list(model.encoder_stages.parameters()) +
+            list(model.downsample_layers.parameters())
+        )
+        decoder_params = (
+            list(model.upsample_layers.parameters()) +
+            list(model.skip_projections.parameters()) +
+            list(model.decoder_stages.parameters())
+        )
         return [g for g in [
-            {'params': patch_embed_params,                                                 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': list(getattr(model, 'encoder_layers', nn.Identity()).parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
-            {'params': list(getattr(model, 'bottleneck', nn.Identity()).parameters()),     'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': list(getattr(model, 'decoder_layers', nn.Identity()).parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': upsample_params,                                                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'upsample_final'},
-            {'params': list(model.output_head.parameters()),                               'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': patch_embed_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
+            {'params': encoder_params,                            'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'encoder'},
+            {'params': list(model.bottleneck_norm.parameters()),  'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
+            {'params': decoder_params,                            'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
+            {'params': list(model.final_upsample.parameters()),   'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'final_upsample'},
+            {'params': list(model.output_head.parameters()),      'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -377,15 +426,29 @@ class TransUNetConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
-        patch_embed_params = list(getattr(model, 'patch_embedding', nn.Identity()).parameters()) + list(getattr(model, 'pos_drop', nn.Identity()).parameters())
-        
+        cnn_encoder_params = (
+            list(model.encoder_blocks.parameters()) +
+            list(model.downsample_layers.parameters()) +
+            list(model.pre_transformer_conv.parameters())
+        )
+        patch_embed_params = (
+            list(model.patch_embedding.parameters()) +
+            [model.positional_embedding]
+        )
+        transformer_params = (
+            list(model.transformer_blocks.parameters()) +
+            list(model.transformer_norm.parameters())
+        )
+        decoder_params = (
+            list(model.upsample_layers.parameters()) +
+            list(model.decoder_blocks.parameters())
+        )
         return [g for g in [
-            {'params': list(getattr(model, 'cnn_encoder', nn.Identity()).parameters()),         'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'cnn_encoder'},
-            {'params': patch_embed_params,                                                      'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': list(getattr(model, 'transformer_encoder', nn.Identity()).parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer_encoder'},
-            {'params': list(getattr(model, 'bottleneck', nn.Identity()).parameters()),          'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'bottleneck'},
-            {'params': list(getattr(model, 'decoder', nn.Identity()).parameters()),             'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),                                    'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': cnn_encoder_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'cnn_encoder'},
+            {'params': patch_embed_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
+            {'params': transformer_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer'},
+            {'params': decoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),  'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 
@@ -418,12 +481,27 @@ class UNETRConfig:
     ))
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
-        patch_embed_params = list(getattr(model, 'patch_embedding', nn.Identity()).parameters()) + list(getattr(model, 'pos_drop', nn.Identity()).parameters())
+        patch_embed_params = (
+            list(model.patch_embedding.parameters()) +
+            [model.positional_embedding]
+        )
+        transformer_params = (
+            list(model.transformer_blocks.parameters()) +
+            list(model.transformer_norm.parameters())
+        )
+        decoder_params = (
+            list(model.transformer_skip_heads.parameters()) +
+            list(model.bottleneck_projection.parameters()) +
+            list(model.input_skip_conv.parameters()) +
+            list(model.upsample_layers.parameters()) +
+            list(model.decoder_blocks.parameters()) +
+            list(model.final_upsample.parameters())
+        )
         return [g for g in [
-            {'params': patch_embed_params,                                                      'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
-            {'params': list(getattr(model, 'transformer_encoder', nn.Identity()).parameters()), 'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer_encoder'},
-            {'params': list(getattr(model, 'decoder_stages', nn.Identity()).parameters()),      'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
-            {'params': list(model.output_head.parameters()),                                    'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
+            {'params': patch_embed_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'patch_embed'},
+            {'params': transformer_params,                    'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'transformer'},
+            {'params': decoder_params,                        'lr': 1e-4, 'weight_decay': 1e-4, 'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),  'lr': 1e-3, 'weight_decay': 1e-4, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
 

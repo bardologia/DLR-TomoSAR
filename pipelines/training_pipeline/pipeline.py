@@ -96,7 +96,14 @@ class TrainingPipeline:
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
-        self.run_metadata.save_run_summary(model_name = self.model_name, in_channels = in_channels, out_channels = out_channels, x_axis_length = x_axis_length)
+        
+        self.run_metadata.save_run_summary(
+            model_name    = self.model_name,
+            in_channels   = in_channels,
+            out_channels  = out_channels,
+            x_axis_length = x_axis_length,
+            param_match   = self.trainer_config.curriculum.loss.warmup.param_match,
+        )
 
         trainer = Trainer(
             model                 = model,

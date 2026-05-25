@@ -136,7 +136,34 @@ class InferencePipeline:
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
         )
-        
+
+        figure_paths["slot_mu_distributions"] = plotter.plot_slot_mu_distributions(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_path       = meta.figure_path("slot_mu_distributions"),
+        )
+
+        figure_paths["placeholder_detection"] = plotter.plot_placeholder_detection(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_path       = meta.figure_path("placeholder_detection"),
+        )
+
+        figure_paths["slot_ordering_summary"] = plotter.plot_slot_ordering_summary(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_path       = meta.figure_path("slot_ordering_summary"),
+        )
+
+        figure_paths["active_count_map"] = plotter.plot_active_count_map(
+            params_pred  = result.params_pred[: run.n_gaussians * 3],
+            params_gt    = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians  = run.n_gaussians,
+            out_path     = meta.figure_path("active_count_map"),
+            az_offset    = result.azimuth_offset,
+            rg_offset    = result.range_offset,
+        )
+
         logger.subsection(f"Param plots : distributions, scatter, error maps written to {meta.figures_dir}")
 
         for axis, indices, tag_fn, metric_key in (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from io                 import BytesIO
 from pathlib            import Path
@@ -27,8 +28,8 @@ def _render_frame(args: tuple) -> tuple[int, bytes]:
 
     eg = np.abs(p - g)
 
-    fig = plt.figure(figsize=(18, 5.4))
-    gs  = fig.add_gridspec(2, 3, height_ratios=[1, 0.04], hspace=0.08)
+    fig = plt.figure(figsize=(20, 6), constrained_layout=False)
+    gs  = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
     axes = [fig.add_subplot(gs[0, k]) for k in range(3)]
     pbar_ax = fig.add_subplot(gs[1, :])
 
@@ -55,8 +56,8 @@ def _render_frame(args: tuple) -> tuple[int, bytes]:
     pbar_ax.set_xlim(0, 1)
     pbar_ax.set_axis_off()
 
-    fig.suptitle(title, fontsize=13)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.suptitle(title, fontsize=13, y=0.98)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08)
 
     buf = BytesIO()
     fig.savefig(buf, format="png", dpi=dpi)

@@ -34,6 +34,7 @@ class InferenceConfig:
     stitch_window      : str           = "hann"
     cube_dtype         : str           = "float32"
     save_cubes         : bool          = True
+    match_strategy     : str           = "auto"  # auto = hungarian_mu (default for inference); or override: none | sorted_mu | push_mu_sort | hungarian_mu | etc.
 
     n_best_profiles    : int           = 12
     n_worst_profiles   : int           = 12

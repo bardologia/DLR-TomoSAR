@@ -26,6 +26,17 @@ class Representation(Enum):
     def channels_per_pass(self) -> int:
         return _CHANNELS_PER_PASS[self.value]
 
+    @property
+    def slot_kinds(self) -> list[str]:
+        return {
+            Representation.REAL_IMAG     : ["raw_re_im",  "raw_re_im"],
+            Representation.MAG_REAL_IMAG : ["mag",    "norm_re_im", "norm_re_im"],
+            Representation.MAG_ANGLE     : ["mag",    "phase"],
+            Representation.MAG_RI_ANGLE  : ["mag",    "norm_re_im", "norm_re_im", "phase"],
+            Representation.ANGLE_ONLY    : ["phase"],
+            Representation.MAG_ONLY      : ["mag"],
+        }[self]
+
     def convert(self, data: np.ndarray) -> np.ndarray:
         n_samples, n_passes, h, w = data.shape
         cpp                       = _CHANNELS_PER_PASS[self.value]

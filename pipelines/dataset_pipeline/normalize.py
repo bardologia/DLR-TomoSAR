@@ -8,8 +8,8 @@ from typing      import Optional
 import numpy as np
 import torch
 
-from configuration.norm_config    import ChannelStats, ChannelTransformStrategy, NormStrategy
-from configuration.dataset_config import InputConfig, OutputConfig, Representation
+from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod
+from configuration.dataset_config import InputConfig, OutputConfig
 from tools.logger                 import Logger
 from torch.utils.data             import DataLoader
 from torch.utils.data             import Subset
@@ -57,37 +57,50 @@ class Stats:
         return cls(input_stats = input_stats, output_stats = output_stats)
 
 
+
 class StatsComputer:
     @staticmethod
     def _input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
-        map: dict[Representation, list[str]] = {
-            Representation.REAL_IMAG     : ["raw_re_im",  "raw_re_im"],
-            Representation.MAG_REAL_IMAG : ["mag",    "norm_re_im", "norm_re_im"],
-            Representation.MAG_ANGLE     : ["mag",    "phase"],
-            Representation.MAG_RI_ANGLE  : ["mag",    "norm_re_im", "norm_re_im", "phase"],
-            Representation.ANGLE_ONLY    : ["phase"],
-            Representation.MAG_ONLY      : ["mag"],
-        }
-
         keys: list[str] = []
 
-        def _append_block(rep: Representation, n_passes: int, source_kind: str) -> None:
-            slot_kinds = map[rep]
-            cpp        = len(slot_kinds)
-            for i in range(n_passes * cpp):
-                slot = i % cpp
-                keys.append(f"{source_kind}/{slot_kinds[slot]}")
-
         if input_config.use_primary:
-            _append_block(input_config.primary_representation, n_passes=1, source_kind="pass")
+            slot_kinds = input_config.primary_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(1 * cpp))
 
         if input_config.use_secondaries:
-            _append_block(input_config.secondaries_representation, n_passes=n_slaves, source_kind="pass")
+            slot_kinds = input_config.secondaries_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(n_slaves * cpp))
 
         if input_config.use_interferograms:
-            _append_block(input_config.interferograms_representation, n_passes=n_slaves, source_kind="ifg")
+            slot_kinds = input_config.interferograms_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_slaves * cpp))
 
         return keys
+
+    @staticmethod
+    def _compact_ranges(indices: list[int], max_items: int = 6) -> str:
+        ranges: list[tuple[int, int]] = []
+        start = indices[0]
+        prev  = indices[0]
+
+        for idx in indices[1:]:
+            if idx == prev + 1:
+                prev = idx
+                continue
+            ranges.append((start, prev))
+            start = idx
+            prev  = idx
+
+        ranges.append((start, prev))
+
+        parts = [f"{a}" if a == b else f"{a}-{b}" for a, b in ranges[:max_items]]
+        if len(ranges) > max_items:
+            parts.append("...")
+
+        return ", ".join(parts)
 
     @staticmethod
     def _log_grouping(logger : Logger, label : str, group_keys : list[str]) -> None:
@@ -101,30 +114,11 @@ class StatsComputer:
 
         logger.subsection(f"{label} grouping ({len(seen)} groups, {len(group_keys)} channels):")
 
-        def _compact_ranges(indices: list[int], max_items: int = 6) -> str:
-            ranges: list[tuple[int, int]] = []
-            start = indices[0]
-            prev  = indices[0]
-
-            for idx in indices[1:]:
-                if idx == prev + 1:
-                    prev = idx
-                    continue
-                ranges.append((start, prev))
-                start = idx
-                prev  = idx
-
-            ranges.append((start, prev))
-
-            parts = [f"{a}" if a == b else f"{a}-{b}" for a, b in ranges[:max_items]]
-            if len(ranges) > max_items:
-                parts.append("...")
-
-            return ", ".join(parts)
-
-        for k, idxs in sorted(seen.items(), key=lambda kv: (kv[1][0], kv[0])):
-            preview = _compact_ranges(sorted(idxs))
-            logger.subsection(f"  {k:<24s} -> {len(idxs):>3d} ch  [{preview}]")
+        rows = {
+            k: f"{len(idxs):d} ch  [{StatsComputer._compact_ranges(sorted(idxs))}]"
+            for k, idxs in sorted(seen.items(), key=lambda kv: (kv[1][0], kv[0]))
+        }
+        logger.kv_table(rows)
 
     @staticmethod
     def _get_subset(dataset, max_samples : int) -> tuple:
@@ -142,7 +136,7 @@ class StatsComputer:
         return subset, n_use, n_total
 
     @staticmethod
-    def _collect_grouped_raw(
+    def _collect(
         subset,
         group_keys         : list[str],
         num_workers        : int,
@@ -152,7 +146,7 @@ class StatsComputer:
  
         unique_groups  = list(dict.fromkeys(group_keys))
         group_channels = {g: [i for i, k in enumerate(group_keys) if k == g] for g in unique_groups}
-        needs_data     = {g for g in unique_groups if ChannelTransformStrategy.from_slot(g).strategy is not NormStrategy.FIXED_DIV_PI}
+        needs_data     = {g for g in unique_groups if ChannelStrategy.from_slot(g).norm_method is not NormMethod.FIXED_DIV_PI}
 
         collected: dict[str, list[np.ndarray]] = {g: [] for g in needs_data}
         if not collected:
@@ -187,9 +181,9 @@ class StatsComputer:
         return {g: np.concatenate(v) for g, v in collected.items() if v}
 
     @staticmethod
-    def _fit_input_stats(logger : Logger, group_keys : list[str], collected : dict[str, np.ndarray]) -> ChannelStats:
+    def _fit_input(logger : Logger, group_keys : list[str], collected : dict[str, np.ndarray]) -> ChannelStats:
         unique_groups    = list(dict.fromkeys(group_keys))
-        group_strategies = {g: ChannelTransformStrategy.from_slot(g) for g in unique_groups}
+        group_strategies = {g: ChannelStrategy.from_slot(g) for g in unique_groups}
 
         group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected.get(g, np.array([]))) for g in unique_groups}
 
@@ -205,17 +199,67 @@ class StatsComputer:
             rows.append({
                 "Ch":       str(c),
                 "Slot":     group_keys[c],
-                "Strategy": strat.strategy.value,
+                "Method":   strat.norm_method.value,
                 "log1p":    str(strat.apply_log1p),
                 "loc":      f"{locs[c]:+.6f}",
                 "scale":    f"{scales[c]:.6f}",
             })
-        logger.metrics_table(rows, ["Ch", "Slot", "Strategy", "log1p", "loc", "scale"])
+        logger.metrics_table(rows, ["Ch", "Slot", "Method", "log1p", "loc", "scale"])
 
         return ChannelStats(
             loc        = locs,
             scale      = scales,
             names      = group_keys,
+            strategies = strategies,
+        )
+
+    @staticmethod
+    def _fit_output(
+        logger        : Optional[Logger],
+        role_pools    : dict[str, np.ndarray],
+        output_config : "OutputConfig",
+        n_gaussians   : int,
+    ) -> ChannelStats:
+     
+        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
+        role_strat : dict[str, ChannelStrategy] = {key: output_config.strategy_for(key) for key in role_pools}
+
+        selected       = output_config.selected_indices(n_gaussians)
+        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
+
+        locs:       list[float]                    = []
+        scales:     list[float]                    = []
+        names:      list[str]                      = []
+        strategies: list[ChannelStrategy] = []
+
+        for out_ch, full_ch in enumerate(selected):
+            g        = full_ch // 3
+            role_key = _local_to_role[full_ch % 3]
+            m, s     = role_fit[role_key]
+            locs.append(m)
+            scales.append(s)
+            names.append(f"G{g+1}_{role_key.split('/')[1]}")
+            strategies.append(role_strat[role_key])
+
+        if logger is not None:
+            logger.section("[Output stats from params]")
+            rows = [
+                {
+                    "Channel":  key,
+                    "loc":      f"{m:.5f}",
+                    "scale":    f"{s:.5f}",
+                    "Method":    strat.norm_method.value,
+                    "log1p":    str(strat.apply_log1p),
+                }
+                for key, (m, s) in role_fit.items()
+                for strat in [role_strat[key]]
+            ]
+            logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
+
+        return ChannelStats(
+            loc        = locs,
+            scale      = scales,
+            names      = names,
             strategies = strategies,
         )
 
@@ -229,11 +273,13 @@ class StatsComputer:
         num_workers  : int = 4,
         batch_size   : int = 512,
     ) -> Stats:
+       
         logger.section("[Input Normalization Statistics]")
         subset, n_use, n_total = StatsComputer._get_subset(dataset, max_samples)
         sample      = dataset[0]
         in_first    = sample[0] if isinstance(sample, (tuple, list)) else sample
         in_channels = int(in_first.shape[0])
+       
         logger.kv_table({
             "Strategy":       "auto-selected per slot-kind (grouped across passes/ifgs)",
             "Samples":        f"{n_use:,} / {n_total:,}",
@@ -246,14 +292,14 @@ class StatsComputer:
         logger.section("[Input grouping by slot-kind]")
         StatsComputer._log_grouping(logger, "Input", group_keys)
 
-        collected = StatsComputer._collect_grouped_raw(
+        collected = StatsComputer._collect(
             subset      = subset,
             group_keys  = group_keys,
             num_workers = num_workers,
             batch_size  = batch_size,
         )
 
-        input_stats = StatsComputer._fit_input_stats(
+        input_stats = StatsComputer._fit_input(
             logger     = logger,
             group_keys = group_keys,
             collected  = collected,
@@ -271,7 +317,7 @@ class StatsComputer:
         output_config : "OutputConfig",
         amp_threshold : float = 1e-2,
         logger        : Optional[Logger] = None,
-    ) -> ChannelStats:
+    ) -> Stats:
         params = np.load(params_path, mmap_mode="r")
 
         amp_pool_vals:  list[np.ndarray] = []
@@ -284,8 +330,8 @@ class StatsComputer:
             sig_flat = params[g * 3 + 2].ravel().astype(np.float64)
             active   = a_flat > amp_threshold
 
-            amp_pool_vals.append(a_flat)           
-            mu_pool_vals.append(mu_flat[active])   
+            amp_pool_vals.append(a_flat)
+            mu_pool_vals.append(mu_flat[active])
             sig_pool_vals.append(sig_flat[active])
 
         role_pools = {
@@ -294,54 +340,25 @@ class StatsComputer:
             "out/sigma" : np.concatenate(sig_pool_vals),
         }
 
-        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
-        role_strat : dict[str, ChannelTransformStrategy] = {key: output_config.strategy_for(key)           for key in role_pools}
-
-        selected       = output_config.selected_indices(n_gaussians)
-        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
-
-        locs:       list[float]                      = []
-        scales:     list[float]                      = []
-        names:      list[str]                        = []
-        strategies: list[ChannelTransformStrategy]   = []
-
-        for out_ch, full_ch in enumerate(selected):
-            g        = full_ch // 3
-            role_key = _local_to_role[full_ch % 3]
-            m, s     = role_fit[role_key]
-            locs.append(m)
-            scales.append(s)
-            names.append(f"G{g+1}_{role_key.split('/')[1]}")
-            strategies.append(role_strat[role_key])
-
-        if logger is not None:
-            logger.section("[Output stats from params]")
-            rows = [
-                {
-                    "Channel":   key,
-                    "loc":       f"{m:.5f}",
-                    "scale":     f"{s:.5f}",
-                    "Strategy":  strat.strategy.value,
-                    "log1p":     str(strat.apply_log1p),
-                }
-                for key, (m, s) in role_fit.items()
-                for strat in [role_strat[key]]
-            ]
-            logger.metrics_table(rows, ["Channel", "loc", "scale", "Strategy", "log1p"])
-
-        return ChannelStats(
-            loc        = locs,
-            scale      = scales,
-            names      = names,
-            strategies = strategies,
+        output_stats = StatsComputer._fit_output(
+            logger        = logger,
+            role_pools    = role_pools,
+            output_config = output_config,
+            n_gaussians   = n_gaussians,
         )
+
+        return Stats(
+            input_stats  = None,
+            output_stats = output_stats,
+        )
+
 
 
 class Normalizer:
     def __init__(self, stats: Stats) -> None:
         self.stats = stats
 
-    def _apply_strategy_normalization(self, tensor, stats: ChannelStats, inverse: bool):
+    def _apply_normalization(self, tensor, stats: ChannelStats, inverse: bool):
         is_torch = isinstance(tensor, torch.Tensor)
         out      = tensor.clone() if is_torch else tensor.copy()
 
@@ -367,13 +384,13 @@ class Normalizer:
         return out
 
     def normalize_input(self, tensor: np.ndarray) -> np.ndarray:
-        return self._apply_strategy_normalization(tensor, self.stats.input_stats, inverse=False)
+        return self._apply_normalization(tensor, self.stats.input_stats, inverse=False)
 
     def normalize_output(self, tensor) -> np.ndarray:
-        return self._apply_strategy_normalization(tensor, self.stats.output_stats, inverse=False)
+        return self._apply_normalization(tensor, self.stats.output_stats, inverse=False)
 
     def denormalize_input(self, tensor):
-        return self._apply_strategy_normalization(tensor, self.stats.input_stats, inverse=True)
+        return self._apply_normalization(tensor, self.stats.input_stats, inverse=True)
 
     def denormalize_output(self, tensor):
-        return self._apply_strategy_normalization(tensor, self.stats.output_stats, inverse=True)
+        return self._apply_normalization(tensor, self.stats.output_stats, inverse=True)

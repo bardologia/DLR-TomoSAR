@@ -20,7 +20,7 @@ from configuration.inference_config        import InferenceConfig
 from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 
-LOGS_DIR = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/new")
+LOGS_DIR = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/new_sort")
 
 RUN_FILTER: list[str] = [
     # "unet_l1_params",

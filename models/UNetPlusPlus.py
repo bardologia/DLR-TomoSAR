@@ -80,7 +80,14 @@ class UNetPlusPlus(nn.Module):
         bias = config.conv_bias
 
         self.pool = nn.MaxPool2d(2)
-        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
+        self._upsample_mode = config.upsample_mode
+        if config.upsample_mode == "convtranspose":
+            unique_channels = sorted(set([level_1, level_2, level_3, bottleneck_width]))
+            self.upsample_modules = nn.ModuleDict({
+                str(c): nn.ConvTranspose2d(c, c, kernel_size=2, stride=2) for c in unique_channels
+            })
+        else:
+            self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
 
         # Backbone encoder nodes (column 0): progressively deeper features
         self.encoder_0_0 = ConvBlock(config.in_channels, level_0, dropout, act, norm, bias)
@@ -118,7 +125,10 @@ class UNetPlusPlus(nn.Module):
         initialize_weights(module=self, mode=config.init_mode)
 
     def _upsample_and_match(self, source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-        upsampled = self.upsample(source)
+        if self._upsample_mode == "convtranspose":
+            upsampled = self.upsample_modules[str(source.shape[1])](source)
+        else:
+            upsampled = self.upsample(source)
         return match_spatial_size(source=upsampled, reference=reference)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor | list[torch.Tensor]:
@@ -158,7 +168,6 @@ class UNetPlusPlus(nn.Module):
         node_0_4 = self.dense_0_4(torch.cat([node_0_0, node_0_1, node_0_2, node_0_3, up_1_3], dim=1))
 
         # Output: deep supervision returns predictions from multiple columns, otherwise final node only
-        ppg = self.config.params_per_gaussian
         if self.deep_supervision:
             outs = [self.output_heads[i](n) for i, n in enumerate([node_0_1, node_0_2, node_0_3, node_0_4])]
             return outs

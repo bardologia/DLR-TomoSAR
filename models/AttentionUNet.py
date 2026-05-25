@@ -81,9 +81,8 @@ class AttentionGate(nn.Module):
                 in_channels  = intermediate_channels,
                 out_channels = 1,
                 kernel_size  = 1,
-                bias         = bias,
+                bias         = True,
             ),
-            build_norm2d(normalization, 1),
             nn.Sigmoid(),
         )
         self.relu = nn.ReLU(inplace=True)

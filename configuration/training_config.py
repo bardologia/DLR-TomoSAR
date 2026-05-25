@@ -9,16 +9,16 @@ import torch
 
 @dataclass
 class LossNormalizationConfig:
-    mse_curve         : float = 0.970732
-    l1_curve          : float = 3.758574
-    huber_curve       : float = 6.316330
-    charbonnier_curve : float = 3.741222
-    cosine_curve      : float = 0.661617
-    spectral_coh      : float = 1.0        
-    ssim_curve        : float = 2.240200
+    mse_curve         : float = 0.301741
+    l1_curve          : float = 1.316913
+    huber_curve       : float = 2.104144
+    charbonnier_curve : float = 1.309981
+    cosine_curve      : float = 0.189017
+    spectral_coh      : float = 0.185308
+    ssim_curve        : float = 0.710225
     param_l1          : float = 1.000000
-    param_huber       : float = 2.893419
-    smoothness_tv     : float = 56.654920
+    param_huber       : float = 6.940039
+    smoothness_tv     : float = 41.464860
 
 
 @dataclass
@@ -69,14 +69,43 @@ class LossConfig:
     use_smoothness_tv        : bool  = False
     weight_smoothness_tv     : float = 1e-4
 
-    log_components_every     : int   = 50
-
     norm : LossNormalizationConfig = field(default_factory=LossNormalizationConfig)
 
     def eff(self, weight_key: str) -> float:
         alpha       = getattr(self, weight_key)
         norm_factor = getattr(self.norm, weight_key.removeprefix("weight_"), 1.0)
         return alpha * norm_factor
+
+
+@dataclass
+class MatchingCurriculumConfig:
+    enabled             : bool = False
+    warmup_strategy     : str  = "push_mu_sort"
+    graduation_strategy : str  = "push_hungarian"
+    swap_epoch          : int  = 0
+
+    reset_early_stopping : bool = True
+    reset_lr             : bool = True
+    reset_warmup         : bool = True
+
+
+@dataclass
+class LossCurriculumConfig:
+    enabled    : bool          = False
+    swap_epoch : int           = 0
+
+    warmup   : LossConfig      = field(default_factory=LossConfig)
+    complete : LossConfig      = field(default_factory=LossConfig)
+
+    reset_early_stopping : bool = False
+    reset_lr             : bool = False
+    reset_warmup         : bool = False
+
+
+@dataclass
+class CurriculumConfig:
+    matching : MatchingCurriculumConfig = field(default_factory=MatchingCurriculumConfig)
+    loss     : LossCurriculumConfig     = field(default_factory=LossCurriculumConfig)
 
 
 @dataclass
@@ -224,6 +253,13 @@ class GradientClipperConfig:
 
 
 @dataclass
+class PermutationMetricsConfig:
+    enabled          : bool  = True
+    amp_threshold    : float = 1e-3
+    max_G_for_margin : int   = 8
+
+
+@dataclass
 class TrainerConfig:
     gaussian         : GaussianConfig
     early_stopping   : EarlyStoppingConfig     = field(default_factory=EarlyStoppingConfig)
@@ -234,7 +270,9 @@ class TrainerConfig:
     optimizer        : OptimizerConfig         = field(default_factory=OptimizerConfig)
     training         : TrainingConfigInner     = field(default_factory=TrainingConfigInner)
     overfit          : OverfitConfig           = field(default_factory=OverfitConfig)
-    loss             : LossConfig              = field(default_factory=LossConfig)
+    loss             : LossConfig              = field(default_factory=LossConfig)  # kept for backward compat
+    curriculum       : CurriculumConfig        = field(default_factory=CurriculumConfig)
     resources        : ResourceConfig          = field(default_factory=ResourceConfig)
     memory           : MemoryConfig            = field(default_factory=MemoryConfig)
     gradient_clipper : GradientClipperConfig   = field(default_factory=GradientClipperConfig)
+    permutation_metrics : PermutationMetricsConfig = field(default_factory=PermutationMetricsConfig)

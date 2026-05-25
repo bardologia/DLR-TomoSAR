@@ -6,7 +6,7 @@ from typing      import Literal, Optional, Sequence, Tuple
 
 import numpy as np
 
-from configuration.norm_config    import ChannelStats, ChannelTransformStrategy, NormStrategy, Strat, _SLOT_STRATEGIES
+from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod, Presets, _SLOT_STRATEGIES
 from tools.representation         import Representation
 from tools.split_regions          import SplitRegions
 
@@ -77,14 +77,14 @@ class OutputConfig:
     use_mu             : bool                              = True
     use_sigma          : bool                              = True
     
-    output_strategies  : dict[str, ChannelTransformStrategy] = field(default_factory=lambda: {
-        "out/amp"   : ChannelTransformStrategy.from_slot("out/amp"),
-        "out/mu"    : ChannelTransformStrategy.from_slot("out/mu"),
-        "out/sigma" : ChannelTransformStrategy.from_slot("out/sigma"),
+    output_strategies  : dict[str, ChannelStrategy] = field(default_factory=lambda: {
+        "out/amp"   : ChannelStrategy.from_slot("out/amp"),
+        "out/mu"    : ChannelStrategy.from_slot("out/mu"),
+        "out/sigma" : ChannelStrategy.from_slot("out/sigma"),
     })
 
-    def strategy_for(self, role_key: str) -> ChannelTransformStrategy:
-        return self.output_strategies.get(role_key, ChannelTransformStrategy.from_slot(role_key))
+    def strategy_for(self, role_key: str) -> ChannelStrategy:
+        return self.output_strategies.get(role_key, ChannelStrategy.from_slot(role_key))
 
     @property
     def role_names(self) -> list[str]:
@@ -130,12 +130,12 @@ class OutputConfig:
     def from_dict(cls, payload: dict) -> "OutputConfig":
         raw_strats = payload.get("output_strategies", {})
         strategies = {
-            k: ChannelTransformStrategy.from_dict(v)
+            k: ChannelStrategy.from_dict(v)
             for k, v in raw_strats.items()
         } if raw_strats else {
-            "out/amp"   : ChannelTransformStrategy.from_slot("out/amp"),
-            "out/mu"    : ChannelTransformStrategy.from_slot("out/mu"),
-            "out/sigma" : ChannelTransformStrategy.from_slot("out/sigma"),
+            "out/amp"   : ChannelStrategy.from_slot("out/amp"),
+            "out/mu"    : ChannelStrategy.from_slot("out/mu"),
+            "out/sigma" : ChannelStrategy.from_slot("out/sigma"),
         }
 
         if "amplitude" in payload:
@@ -167,8 +167,8 @@ class AugmentationConfig:
     p_rot90         : float               = 0.0
     amp_scale_range : Tuple[float, float] = (0.8, 1.2)
     p_amp_scale     : float               = 0.5
-    noise_std       : float               = 0.05
-    p_noise         : float               = 0.5
+    noise_std       : float               = 0.01
+    p_noise         : float               = 0.25
 
 
 @dataclass

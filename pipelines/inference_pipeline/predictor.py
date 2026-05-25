@@ -14,12 +14,13 @@ from pipelines.inference_pipeline.stitching import CubeStitcher
 from tools.logger                           import Logger
 
 
+
 @dataclass
 class Result:
-    pred_curves        : np.ndarray   # (denorm) reconstructed Gaussian curves from predicted params
-    gt_curves          : np.ndarray   # (denorm) reconstructed Gaussian curves from GT params
-    params_pred        : np.ndarray   # (denorm) predicted Gaussian parameters
-    params_gt          : np.ndarray   # (denorm) ground-truth Gaussian parameters
+    pred_curves        : np.ndarray   
+    gt_curves          : np.ndarray   
+    params_pred        : np.ndarray   
+    params_gt          : np.ndarray  
 
     pixel_mse          : np.ndarray
     pixel_mae          : np.ndarray
@@ -33,7 +34,7 @@ class Result:
 
 
 def _cpu_worker(args: tuple) -> tuple:
-    pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, out_ch = args
+    pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, out_ch, norm_loc, norm_scale = args
 
     x    = x_axis.reshape(1, -1, 1, 1).astype(np.float32)
     B, _, H, W = pred_params_chunk.shape
@@ -48,9 +49,31 @@ def _cpu_worker(args: tuple) -> tuple:
             out = out + a * np.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
         return out
 
-    pred_gauss  = pred_params_chunk[:, :(out_ch // 3) * 3]
-    pred_curves = reconstruct(pred_gauss,         n_gaussians)
-    gt_curves   = reconstruct(gt_params_chunk,    n_gaussians)
+    n_K        = n_gaussians
+    pred_gauss = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+    gt_gauss   = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+  
+    loc        = norm_loc[:n_K * 3].reshape(1, n_K, 3, 1, 1)
+    scale      = np.where(norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1) > 1e-8, norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1), 1e-8)
+    pred_norm  = (pred_gauss - loc) / scale
+    gt_norm    = (gt_gauss   - loc) / scale
+
+    gt_phys     = gt_norm * scale + loc                                         
+    sort_key    = np.where(gt_phys[:, :, 0] < 1e-3, np.inf, gt_phys[:, :, 1]) 
+    sort_idx    = np.argsort(sort_key, axis=1)                                  
+    sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)                 
+   
+    gt_norm_matched   = np.take_along_axis(gt_norm,   sort_idx_e, axis=1)
+    pred_norm_matched = pred_norm                                                
+
+    pred_gauss_matched = pred_norm_matched * scale + loc
+    gt_gauss_matched   = gt_norm_matched   * scale + loc
+
+    pred_gauss_flat = pred_gauss_matched.reshape(B, n_K * 3, H, W)
+    gt_gauss_flat   = gt_gauss_matched.reshape(  B, n_K * 3, H, W)
+
+    pred_curves = reconstruct(pred_gauss_flat, n_gaussians)
+    gt_curves   = reconstruct(gt_gauss_flat,   n_gaussians)
 
     diff   = pred_curves - gt_curves
     mse    = (diff * diff).mean(axis=1)
@@ -68,8 +91,8 @@ def _cpu_worker(args: tuple) -> tuple:
     return (
         pred_curves.astype(np.float32),
         gt_curves.astype(np.float32),
-        pred_params_chunk.astype(np.float32),
-        gt_params_chunk.astype(np.float32),
+        pred_gauss_flat.astype(np.float32),
+        gt_gauss_flat.astype(np.float32),
         {"mse": mse, "mae": mae, "r2": r2, "cos": cos},
         peak,
     )
@@ -78,23 +101,23 @@ def _cpu_worker(args: tuple) -> tuple:
 class Predictor:
     def __init__(
         self,
-        run         : Run,
-        logger      : Logger,
+        run            : Run,
+        logger         : Logger,
         *,
-        window_kind : str,
-        cube_dtype  : str,
-        save_cubes  : bool,
-        meta        : InferenceMetadata,
-        cpu_workers : int | None = None,
+        window_kind    : str,
+        cube_dtype     : str,
+        save_cubes     : bool,
+        meta           : InferenceMetadata,
+        cpu_workers    : int | None = None,
     ) -> None:
         
-        self.run         = run
-        self.logger      = logger
-        self.window_kind = window_kind
-        self.cube_dtype  = cube_dtype
-        self.save_cubes  = save_cubes
-        self.cube_dir    = meta.cube_dir
-        self.cpu_workers = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
+        self.run            = run
+        self.logger         = logger
+        self.window_kind    = window_kind
+        self.cube_dtype     = cube_dtype
+        self.save_cubes     = save_cubes
+        self.cube_dir       = meta.cube_dir
+        self.cpu_workers    = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
 
     def _create_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
         memmap_path = str(self.cube_dir / f"_tmp_{name}.npy") if self.save_cubes else None
@@ -141,8 +164,11 @@ class Predictor:
         n_K    = run.n_gaussians
         out_ch = run.out_channels
 
-        tasks = [(pred, gt, run.x_axis, n_K, out_ch) for pred, gt in zip(all_pred_params, all_gt_params)]
-
+        ns = run.dataset.norm_stats
+        norm_loc   = np.array(ns.stats.output_stats.loc,   dtype=np.float32)
+        norm_scale = np.array(ns.stats.output_stats.scale, dtype=np.float32)
+    
+        tasks = [(pred, gt, run.x_axis, n_K, out_ch, norm_loc, norm_scale) for pred, gt in zip(all_pred_params, all_gt_params)]
         results: List[tuple | None] = [None] * len(tasks)
 
         with self.logger.track(transient=True) as prog:

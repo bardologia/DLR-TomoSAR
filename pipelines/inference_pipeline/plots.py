@@ -458,27 +458,38 @@ class Ploter(PlotTools):
         out_path    : Path,
         bins        : int = 80,
     ) -> Path:
-
         fig, axes = plt.subplots(n_gaussians, 3, figsize=(13.5, 3.0 * n_gaussians), squeeze=False)
 
         for k in range(n_gaussians):
+            amp_ch   = 3 * k         
+            if params_gt is not None and amp_ch < params_gt.shape[0]:
+                gt_amp_flat = params_gt[amp_ch].reshape(-1)
+                active_mask = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
+            else:
+                active_mask = None
+
             for j, (lbl, short) in enumerate(zip(("amplitude (a)", "mean (μ)", "std-dev (σ)"), ("a", "μ", "σ"))):
                 ch   = 3 * k + j
                 ax   = axes[k, j]
-                pred = params_pred[ch].reshape(-1)
-                pred = pred[np.isfinite(pred)]
+
+                pred_flat = params_pred[ch].reshape(-1)
+                if active_mask is not None:
+                    pred_flat = pred_flat[active_mask]
+                pred = pred_flat[np.isfinite(pred_flat)]
 
                 has_pred = pred.size > 0
-                lo = float(np.percentile(pred, 0.5)) if has_pred else 0.0
+                lo = float(np.percentile(pred, 0.5))  if has_pred else 0.0
                 hi = float(np.percentile(pred, 99.5)) if has_pred else 1.0
 
                 has_gt = False
                 if params_gt is not None and ch < params_gt.shape[0]:
-                    gt = params_gt[ch].reshape(-1)
-                    gt = gt[np.isfinite(gt)]
+                    gt_flat = params_gt[ch].reshape(-1)
+                    if active_mask is not None:
+                        gt_flat = gt_flat[active_mask]
+                    gt     = gt_flat[np.isfinite(gt_flat)]
                     has_gt = gt.size > 0
                     if has_gt:
-                        lo = min(lo, float(np.percentile(gt, 0.5))) if has_pred else float(np.percentile(gt, 0.5))
+                        lo = min(lo, float(np.percentile(gt, 0.5)))  if has_pred else float(np.percentile(gt, 0.5))
                         hi = max(hi, float(np.percentile(gt, 99.5))) if has_pred else float(np.percentile(gt, 99.5))
                         ax.hist(gt, bins=bins, range=(lo, hi), density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
                         ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
@@ -487,14 +498,14 @@ class Ploter(PlotTools):
                     ax.hist(pred, bins=bins, range=(lo, hi), density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
                     ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med Pred={np.median(pred):.3g}")
 
-                ax.set_title(f"g{k+1} — {lbl}")
+                ax.set_title(f"g{k+1} — {lbl}  (active pixels only)")
                 ax.set_xlabel(short)
                 ax.set_ylabel("density")
                 if has_pred or has_gt:
                     ax.legend(fontsize=7, framealpha=0.9)
                 ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
 
-        fig.suptitle("Gaussian parameter distributions (GT vs Pred)", fontsize=13)
+        fig.suptitle("Gaussian parameter distributions (GT vs Pred, placeholder slots excluded)", fontsize=13)
         fig.tight_layout(rect=(0, 0, 1, 0.97))
 
         return self._save(fig, out_path)
@@ -512,6 +523,11 @@ class Ploter(PlotTools):
         rng       = np.random.default_rng(seed)
 
         for k in range(n_gaussians):
+            amp_ch          = 3 * k
+            gt_amp_flat     = params_gt[amp_ch].reshape(-1)
+            is_active       = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
+            is_placeholder  = np.isfinite(gt_amp_flat) & (gt_amp_flat <  1e-3)
+
             for j, (lbl, short) in enumerate(zip(("amplitude (a)", "mean (μ)", "std-dev (σ)"), ("a", "μ", "σ"))):
                 ch  = 3 * k + j
                 ax  = axes[k, j]
@@ -520,31 +536,69 @@ class Ploter(PlotTools):
                     ax.set_axis_off()
                     continue
 
-                gt   = params_gt  [ch].reshape(-1).copy()
-                pred = params_pred[ch].reshape(-1).copy()
-                mask = np.isfinite(gt) & np.isfinite(pred)
-                gt, pred = gt[mask], pred[mask]
+                gt_all   = params_gt  [ch].reshape(-1)
+                pred_all = params_pred[ch].reshape(-1)
 
-                n_snapped = 0
+                if j == 0:
+                    def _subsample(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+                        m = mask & np.isfinite(gt_all) & np.isfinite(pred_all)
+                        g, p = gt_all[m], pred_all[m]
+                        if g.size > max_points:
+                            idx = rng.choice(g.size, max_points, replace=False)
+                            g, p = g[idx], p[idx]
+                        return g, p
 
-                if gt.size == 0:
-                    ax.set_title(f"g{k+1} — {lbl}  (No Data)")
-                    ax.set_axis_off()
-                    continue
+                    g_act,  p_act  = _subsample(is_active)
+                    g_phld, p_phld = _subsample(is_placeholder)
 
-                if gt.size > max_points:
-                    idx  = rng.choice(gt.size, max_points, replace=False)
-                    gt, pred = gt[idx], pred[idx]
+                    has_data = g_act.size > 0 or g_phld.size > 0
+                    if not has_data:
+                        ax.set_title(f"g{k+1} — {lbl}  (No Data)")
+                        ax.set_axis_off()
+                        continue
 
-                ss_res = float(np.sum((gt - pred) ** 2))
-                ss_tot = float(np.sum((gt - np.mean(gt)) ** 2))
-                r2     = 1.0 - ss_res / (ss_tot + 1e-12)
-                lo     = min(float(gt.min()), float(pred.min()))
-                hi     = max(float(gt.max()), float(pred.max()))
+                    all_g    = np.concatenate([g_act, g_phld]) if g_phld.size else g_act
+                    all_p    = np.concatenate([p_act, p_phld]) if p_phld.size else p_act
+                    lo       = min(float(all_g.min()), float(all_p.min()))
+                    hi       = max(float(all_g.max()), float(all_p.max()))
 
-                ax.scatter(gt, pred, s=2, alpha=0.25, color="C0", rasterized=True)
-                ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
-                ax.set_title(f"g{k+1} — {lbl}  (R²={r2:.3f})")
+                    if g_act.size > 0:
+                        ss_res = float(np.sum((g_act - p_act) ** 2))
+                        ss_tot = float(np.sum((g_act - np.mean(g_act)) ** 2))
+                        r2_act = 1.0 - ss_res / (ss_tot + 1e-12)
+                        ax.scatter(g_act, p_act, s=2, alpha=0.25, color="C0", rasterized=True, label=f"active (R²={r2_act:.3f})")
+
+                    if g_phld.size > 0:
+                        ax.scatter(g_phld, p_phld, s=2, alpha=0.35, color="C1", rasterized=True, label=f"placeholder (n={g_phld.size})")
+
+                    ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
+                    ax.set_title(f"g{k+1} — {lbl}")
+
+                else:
+                    # ── mu / sigma: active pixels only (placeholders are NaN'd) ─
+                    mask = is_active & np.isfinite(gt_all) & np.isfinite(pred_all)
+                    gt, pred = gt_all[mask], pred_all[mask]
+
+                    if gt.size == 0:
+                        ax.set_title(f"g{k+1} — {lbl}  (No active data)")
+                        ax.set_axis_off()
+                        continue
+
+                    if gt.size > max_points:
+                        idx  = rng.choice(gt.size, max_points, replace=False)
+                        gt, pred = gt[idx], pred[idx]
+
+                    ss_res = float(np.sum((gt - pred) ** 2))
+                    ss_tot = float(np.sum((gt - np.mean(gt)) ** 2))
+                    r2     = 1.0 - ss_res / (ss_tot + 1e-12)
+                    lo     = min(float(gt.min()), float(pred.min()))
+                    hi     = max(float(gt.max()), float(pred.max()))
+
+                    ax.scatter(gt, pred, s=2, alpha=0.25, color="C0", rasterized=True,
+                               label=f"active  R²={r2:.3f}")
+                    ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
+                    ax.set_title(f"g{k+1} — {lbl}  (R²={r2:.3f}, active only)")
+
                 ax.set_xlabel(f"GT {short}")
                 ax.set_ylabel(f"Pred {short}")
                 ax.legend(fontsize=7, framealpha=0.9)
@@ -596,5 +650,242 @@ class Ploter(PlotTools):
 
         fig.suptitle("Gaussian parameter absolute-error maps  |Pred − GT|", fontsize=13)
         fig.tight_layout(rect=(0, 0, 1, 0.97))
+
+        return self._save(fig, out_path)
+
+    def plot_slot_mu_distributions(
+        self,
+        global_metrics : dict,
+        n_gaussians    : int,
+        out_path       : Path,
+    ) -> Path:
+        slots      = list(range(n_gaussians))
+        x          = np.arange(n_gaussians)
+        width      = 0.35
+
+        pred_means = np.array([global_metrics.get(f"slot_{k}_mu_pred_mean", np.nan) for k in slots])
+        pred_stds  = np.array([global_metrics.get(f"slot_{k}_mu_pred_std",  np.nan) for k in slots])
+        gt_means   = np.array([global_metrics.get(f"slot_{k}_mu_gt_mean",   np.nan) for k in slots])
+        gt_stds    = np.array([global_metrics.get(f"slot_{k}_mu_gt_std",    np.nan) for k in slots])
+
+        fig, axes = plt.subplots(1, 2, figsize=(5.5 * n_gaussians, 4.5))
+
+        ax = axes[0]
+        ax.bar(x - width / 2, gt_means,   width, yerr=gt_stds,   color="C0", alpha=0.75, capsize=4, label="GT")
+        ax.bar(x + width / 2, pred_means, width, yerr=pred_stds, color="C3", alpha=0.75, capsize=4, label="Pred")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"g{k+1}" for k in slots])
+        ax.set_xlabel("Gaussian slot")
+        ax.set_ylabel("µ  [m]")
+        ax.set_title("Mean µ per slot  (active pixels, mean ± std)")
+        ax.legend(framealpha=0.9)
+        ax.grid(True, axis="y", which="major", linewidth=0.3, alpha=0.5)
+
+        ax = axes[1]
+        ax.bar(x - width / 2, gt_stds,   width, color="C0", alpha=0.75, label="GT")
+        ax.bar(x + width / 2, pred_stds, width, color="C3", alpha=0.75, label="Pred")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"g{k+1}" for k in slots])
+        ax.set_xlabel("Gaussian slot")
+        ax.set_ylabel("std(µ)  [m]")
+        ax.set_title("Std of µ per slot  (spread across pixels)")
+        ax.legend(framealpha=0.9)
+        ax.grid(True, axis="y", which="major", linewidth=0.3, alpha=0.5)
+
+        fig.suptitle("Per-slot µ statistics  (active pixels only)", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.95))
+
+        return self._save(fig, out_path)
+
+    def plot_placeholder_detection(
+        self,
+        global_metrics : dict,
+        n_gaussians    : int,
+        out_path       : Path,
+    ) -> Path:
+        slots      = list(range(n_gaussians))
+        labels     = [f"g{k+1}" for k in slots] + ["all"]
+        x          = np.arange(len(labels))
+        width      = 0.25
+
+        def _get(key: str) -> float:
+            return float(global_metrics.get(key, np.nan))
+
+        precisions = [_get(f"slot_{k}_placeholder_precision") for k in slots] + [_get("placeholder_precision")]
+        recalls    = [_get(f"slot_{k}_placeholder_recall")    for k in slots] + [_get("placeholder_recall")]
+        f1s        = [_get(f"slot_{k}_placeholder_f1")        for k in slots] + [_get("placeholder_f1")]
+        gt_rates   = [_get(f"slot_{k}_placeholder_gt_rate")   for k in slots] + [_get("placeholder_gt_rate") if "placeholder_gt_rate" in global_metrics else np.nan]
+
+        fig, axes = plt.subplots(1, 2, figsize=(max(8, 3.0 * len(labels)), 4.5))
+
+        ax = axes[0]
+        ax.bar(x - width,     precisions, width, color="C0", alpha=0.80, label="Precision")
+        ax.bar(x,             recalls,    width, color="C2", alpha=0.80, label="Recall")
+        ax.bar(x + width,     f1s,        width, color="C3", alpha=0.80, label="F1")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels)
+        ax.set_ylim(0, 1.08)
+        ax.set_xlabel("Gaussian slot")
+        ax.set_ylabel("score")
+        ax.set_title("Inactive-Gaussian detection  (Precision / Recall / F1)")
+        ax.legend(framealpha=0.9)
+        ax.grid(True, axis="y", which="major", linewidth=0.3, alpha=0.5)
+        for xi, (p, r, f) in enumerate(zip(precisions, recalls, f1s)):
+            for val, offset in ((p, -width), (r, 0.0), (f, width)):
+                if np.isfinite(val):
+                    ax.text(xi + offset, val + 0.01, f"{val:.2f}", ha="center", va="bottom", fontsize=7)
+
+        # ── right: GT placeholder rate per slot ──────────────────────────────────
+        ax = axes[1]
+        colors = [f"C{k % 10}" for k in range(len(labels))]
+        bars   = ax.bar(x, gt_rates, color=colors, alpha=0.75)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels)
+        ax.set_ylim(0, 1.08)
+        ax.set_xlabel("Gaussian slot")
+        ax.set_ylabel("fraction of pixels")
+        ax.set_title("GT placeholder rate per slot")
+        ax.grid(True, axis="y", which="major", linewidth=0.3, alpha=0.5)
+        for bar, val in zip(bars, gt_rates):
+            if np.isfinite(val):
+                ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01, f"{val:.2f}", ha="center", va="bottom", fontsize=8)
+
+        fig.suptitle("Inactive-Gaussian detection metrics", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.95))
+
+        return self._save(fig, out_path)
+
+    def plot_slot_ordering_summary(
+        self,
+        global_metrics : dict,
+        n_gaussians    : int,
+        out_path       : Path,
+    ) -> Path:
+        ordering_rate   = float(global_metrics.get("mu_ordering_rate",                            np.nan))
+        dominant_frac   = float(global_metrics.get("permutation_consensus_dominant_frac",         np.nan))
+        identity_frac   = float(global_metrics.get("permutation_consensus_identity_frac",         np.nan))
+
+        slots        = list(range(n_gaussians))
+        active_rates = [1.0 - float(global_metrics.get(f"slot_{k}_placeholder_gt_rate", np.nan)) for k in slots]
+
+        fig = plt.figure(figsize=(13, 4.5))
+        gs  = fig.add_gridspec(1, 3, wspace=0.38)
+
+        ax1     = fig.add_subplot(gs[0])
+        labels  = ["µ ordering\nrate", "consensus\ndominant", "consensus\nidentity"]
+        values  = [ordering_rate, dominant_frac, identity_frac]
+        colors  = ["C0", "C2", "C3"]
+
+        bars = ax1.barh(labels, values, color=colors, alpha=0.80)
+        ax1.set_xlim(0, 1.08)
+        ax1.set_xlabel("fraction")
+        ax1.set_title("Slot organisation scalars")
+        ax1.axvline(1.0, color="black", linewidth=0.7, linestyle="--")
+        ax1.grid(True, axis="x", which="major", linewidth=0.3, alpha=0.5)
+        for bar, val in zip(bars, values):
+            if np.isfinite(val):
+                ax1.text(val + 0.01, bar.get_y() + bar.get_height() / 2,
+                         f"{val:.3f}", va="center", fontsize=9)
+
+        ax2 = fig.add_subplot(gs[1])
+        x   = np.arange(n_gaussians)
+        ax2.bar(x, active_rates, color=[f"C{k % 10}" for k in slots], alpha=0.78)
+        ax2.set_xticks(x)
+        ax2.set_xticklabels([f"g{k+1}" for k in slots])
+        ax2.set_ylim(0, 1.08)
+        ax2.set_xlabel("Gaussian slot")
+        ax2.set_ylabel("active-pixel fraction")
+        ax2.set_title("GT activation rate per slot\n(1 − placeholder rate)")
+        ax2.grid(True, axis="y", which="major", linewidth=0.3, alpha=0.5)
+        for xi, val in enumerate(active_rates):
+            if np.isfinite(val):
+                ax2.text(xi, val + 0.01, f"{val:.2f}", ha="center", va="bottom", fontsize=8)
+
+        ax3 = fig.add_subplot(gs[2])
+        pred_means = np.array([global_metrics.get(f"slot_{k}_mu_pred_mean", np.nan) for k in slots])
+        gt_means   = np.array([global_metrics.get(f"slot_{k}_mu_gt_mean",   np.nan) for k in slots])
+        pred_stds  = np.array([global_metrics.get(f"slot_{k}_mu_pred_std",  np.nan) for k in slots])
+        gt_stds    = np.array([global_metrics.get(f"slot_{k}_mu_gt_std",    np.nan) for k in slots])
+
+        ax3.errorbar(slots, gt_means,   yerr=gt_stds,   fmt="o-", color="C0", capsize=5, linewidth=1.2, label="GT",   markersize=6)
+        ax3.errorbar(slots, pred_means, yerr=pred_stds, fmt="s--", color="C3", capsize=5, linewidth=1.2, label="Pred", markersize=6)
+        ax3.set_xticks(slots)
+        ax3.set_xticklabels([f"g{k+1}" for k in slots])
+        ax3.set_xlabel("Gaussian slot")
+        ax3.set_ylabel("µ  [m]")
+        ax3.set_title("µ centre per slot  (mean ± std)")
+        ax3.legend(framealpha=0.9)
+        ax3.grid(True, which="major", linewidth=0.3, alpha=0.5)
+
+        fig.suptitle("Slot organisation summary", fontsize=13)
+
+        return self._save(fig, out_path)
+
+    def plot_active_count_map(
+        self,
+        params_pred : np.ndarray,
+        params_gt   : np.ndarray,
+        n_gaussians : int,
+        out_path    : Path,
+        az_offset   : int,
+        rg_offset   : int,
+        amp_threshold: float = 1e-3,
+    ) -> Path:
+
+        gt_count   = np.zeros(params_gt  .shape[-2:], dtype=np.int32)
+        pred_count = np.zeros(params_pred.shape[-2:], dtype=np.int32)
+        
+        for k in range(n_gaussians):
+            gt_count   += (params_gt  [3 * k] >= amp_threshold).astype(np.int32)
+            pred_count += (params_pred[3 * k] >= amp_threshold).astype(np.int32)
+
+        diff = pred_count - gt_count   
+
+        H, W  = diff.shape
+        rgb   = np.zeros((H, W, 3), dtype=np.float32)
+        rgb[diff == 0]  = [0.20, 0.75, 0.20]   
+        rgb[diff <  0]  = [0.20, 0.45, 0.90]   
+        rgb[diff >  0]  = [0.90, 0.25, 0.25]   
+
+        extent = [az_offset, az_offset + W, az_offset + H, az_offset]
+
+        n_total   = H * W
+        n_correct = int((diff == 0).sum())
+        n_under   = int((diff <  0).sum())
+        n_over    = int((diff >  0).sum())
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+        ax = axes[0]
+        ax.imshow(rgb, aspect="auto", interpolation="nearest", extent=[az_offset, az_offset + W, az_offset + H, az_offset])
+        ax.set_xlabel("range index")
+        ax.set_ylabel("azimuth index")
+        ax.set_title("Active-count agreement per pixel")
+
+        from matplotlib.patches import Patch
+        legend_els = [
+            Patch(facecolor=[0.20, 0.75, 0.20], label=f"correct  ({n_correct/n_total*100:.1f}%)"),
+            Patch(facecolor=[0.20, 0.45, 0.90], label=f"under    ({n_under  /n_total*100:.1f}%)"),
+            Patch(facecolor=[0.90, 0.25, 0.25], label=f"over     ({n_over   /n_total*100:.1f}%)"),
+        ]
+        ax.legend(handles=legend_els, loc="lower right", framealpha=0.9, fontsize=9)
+
+        ax2  = axes[1]
+        vabs = max(1, int(np.abs(diff).max()))
+        im   = ax2.imshow(diff, cmap="RdBu_r", vmin=-vabs, vmax=vabs, aspect="auto", interpolation="nearest", extent=[az_offset, az_offset + W, az_offset + H, az_offset])
+        ax2.set_xlabel("range index")
+        ax2.set_ylabel("azimuth index")
+        ax2.set_title("Signed count difference  (pred − GT)")
+        cb = fig.colorbar(im, ax=ax2, fraction=0.045, pad=0.02)
+        cb.set_label("pred − GT  [#Gaussians]")
+        cb.set_ticks(range(-vabs, vabs + 1))
+
+        fig.suptitle(
+            f"Active-Gaussian count  |  correct {n_correct/n_total*100:.1f}%  "
+            f"under {n_under/n_total*100:.1f}%  over {n_over/n_total*100:.1f}%",
+            fontsize=13,
+        )
+        
+        fig.tight_layout(rect=(0, 0, 1, 0.95))
 
         return self._save(fig, out_path)

@@ -70,6 +70,12 @@ class Warmup:
 
         return factor
 
+    def reset(self) -> None:
+        """Restart the warmup from step 0 (e.g. after a curriculum phase swap)."""
+        self.current_step       = 0
+        self.warmup_finished    = False
+        self._logged_completion = False
+
     def is_finished(self) -> bool:
         return self.warmup_finished or not self.enabled or self.warmup_steps <= 0
 

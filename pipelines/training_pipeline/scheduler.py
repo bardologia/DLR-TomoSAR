@@ -17,6 +17,7 @@ class Scheduler:
         self.last_metric    = None
         self.plateau_best   = float("inf")
         self.plateau_count  = 0
+        self._epoch_offset  = 0
 
         self._log_scheduler_info()
 
@@ -122,8 +123,19 @@ class Scheduler:
         
         raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
+    def reset(self, epoch_offset: int = 0) -> None:
+        """Restart the schedule from scratch at `epoch_offset` (e.g. after a curriculum swap).
+
+        After calling this, the schedule treats the next epoch as relative epoch 0,
+        so cosine annealing restarts, plateau counters clear, etc.
+        """
+        self._epoch_offset = epoch_offset
+        self.current_lrs   = list(self.base_lrs)
+        self.plateau_best  = float("inf")
+        self.plateau_count = 0
+
     def step(self, epoch: int, metric: float | None = None) -> list[float]:
-        factor           = self._factor_for(epoch, metric)
+        factor           = self._factor_for(epoch - self._epoch_offset, metric)
         self.current_lrs = [lr * factor for lr in self.current_lrs] if self.scheduler_type == "reduce_on_plateau" else [lr * factor for lr in self.base_lrs]
         lrs              = list(self.current_lrs)
       
@@ -154,9 +166,11 @@ class Scheduler:
             "current_lrs"   : self.current_lrs,
             "plateau_best"  : self.plateau_best,
             "plateau_count" : self.plateau_count,
+            "epoch_offset"  : self._epoch_offset,
         }
 
     def load_state_dict(self, state: dict) -> None:
         self.current_lrs   = state["current_lrs"]
         self.plateau_best  = state["plateau_best"]
         self.plateau_count = state["plateau_count"]
+        self._epoch_offset = state.get("epoch_offset", 0)

@@ -58,6 +58,14 @@ class EarlyStopping:
         if self.restore_best:
             self.best_params = {name: param.clone().detach() for name, param in model.state_dict().items()}
 
+    def reset(self) -> None:
+        """Clear all state so early stopping starts fresh (e.g. after a curriculum phase swap)."""
+        self.best_loss   = None
+        self.counter     = 0
+        self.best_epoch  = -1
+        self.best_params = None
+        self.triggered   = False
+
     def restore(self, model: torch.nn.Module):
         if self.restore_best and self.best_params is not None:
             model.load_state_dict(self.best_params)

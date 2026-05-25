@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from tools                                          import Tracker, ResourceMonitor
+from tools                                          import Tracker, ResourceMonitor, PermutationMetrics
 from tools.model_summary                            import ModelSummary
 from tools.shape_logger                             import ShapeLogger
 from pipelines.training_pipeline.early_stopping     import EarlyStopping
@@ -26,7 +26,8 @@ class Trainer:
         self.logger       = logger
         self.config       = config
         self.gaussian_cfg = config.gaussian
-        self.loss_cfg     = config.loss
+        self.curriculum      = config.curriculum
+        self.warmup_loss_cfg = config.curriculum.loss.warmup
         self.norm_stats   = norm_stats
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,11 +67,12 @@ class Trainer:
         self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
         self.ema              = EMA(self.config, self.logger, self.tracker)
         self.early_stopping   = EarlyStopping(self.config, self.logger, self.tracker)
-        self.criterion        = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.loss_cfg, norm_stats=self.norm_stats)
+        self.criterion        = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, curriculum_cfg=self.curriculum)
         self.checkpoint       = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.grad_clipper     = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
         self.overfitter       = OverfitManager(self.config, self.logger)
-        self.resource_monitor = ResourceMonitor(config = self.config.resources, logger = self.logger, tracker = self.tracker, step_getter = lambda: self.global_step)
+        self.resource_monitor    = ResourceMonitor(config = self.config.resources, logger = self.logger, tracker = self.tracker, step_getter = lambda: self.global_step)
+        self.permutation_metrics = PermutationMetrics(self.config.permutation_metrics, logger=self.logger)
         
         self.ema.init(self.model)
         self._ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
@@ -88,7 +90,7 @@ class Trainer:
 
         probe = LossScaleProbe(
             probe_cfg    = probe_config,
-            loss_cfg     = self.loss_cfg,
+            loss_cfg     = self.warmup_loss_cfg,
             gaussian_cfg = self.gaussian_cfg,
             norm_stats   = self.norm_stats,
             logger       = self.logger,
@@ -179,6 +181,43 @@ class Trainer:
 
         shape_logger.save_markdown(filename="shape_log.md", title="Tensor Shape Log")
 
+    def _apply_curriculum_swap(self, epoch: int) -> None:
+        cur = self.curriculum
+
+        m = cur.matching
+        if m.enabled and epoch == m.swap_epoch:
+            self.logger.section(f"[Curriculum Matching Swap @ epoch {epoch + 1}]")
+
+            if m.reset_early_stopping:
+                self.early_stopping.reset()
+                self.logger.subsection("Early stopping reset.")
+
+            if m.reset_lr:
+                self.lr_scheduler.reset(epoch_offset=epoch)
+                self.logger.subsection(f"LR scheduler reset (epoch offset = {epoch}).")
+
+            if m.reset_warmup:
+                self.warmup.reset()
+                self.logger.subsection(f"Warmup reset ({self.warmup.warmup_steps} steps).")
+
+        lc = cur.loss
+        if lc.enabled and epoch == lc.swap_epoch:
+            self.logger.section(f"[Curriculum Loss Swap @ epoch {epoch + 1}]")
+            self.criterion.loss_cfg = lc.complete
+            self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
+
+            if lc.reset_early_stopping:
+                self.early_stopping.reset()
+                self.logger.subsection("Early stopping reset.")
+
+            if lc.reset_lr:
+                self.lr_scheduler.reset(epoch_offset=epoch)
+                self.logger.subsection(f"LR scheduler reset (epoch offset = {epoch}).")
+
+            if lc.reset_warmup:
+                self.warmup.reset()
+                self.logger.subsection(f"Warmup reset ({self.warmup.warmup_steps} steps).")
+
     def train_epoch(self, train_loader: DataLoader, epoch: int):
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
@@ -240,6 +279,7 @@ class Trainer:
             num_batches          = 0
             components_sum: dict = {}
             weighted_sum:   dict = {}
+            perm_sum:        dict = {}
 
             with self.logger.track(transient=True) as _prog:
                 _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch+1}/{self.epochs}", total=len(loader))
@@ -260,6 +300,18 @@ class Trainer:
                     for k, v in loss_dict["weighted"].items():
                         weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
 
+                    if gt_params is not None:
+                        ppg = self.gaussian_cfg.params_per_gaussian
+                        if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
+                            pred_phys = self.norm_stats.denormalize_output(pred_params)
+                            gt_phys   = self.norm_stats.denormalize_output(gt_params)
+                        else:
+                            pred_phys = pred_params
+                            gt_phys   = gt_params
+                        perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), ppg)
+                        for k, v in perm_m.items():
+                            perm_sum[k] = perm_sum.get(k, 0.0) + (v if v == v else 0.0)  # skip NaN
+
                     _prog.advance(_task)
 
             avg_loss = total_loss / max(1, num_batches)
@@ -267,6 +319,8 @@ class Trainer:
             n = max(1, num_batches)
             self.tracker.log_metrics(f"loss_components/{stage}", {k: v / n for k, v in components_sum.items()}, epoch)
             self.tracker.log_metrics(f"loss_weighted/{stage}",   {k: v / n for k, v in weighted_sum.items()},   epoch)
+            if perm_sum:
+                self.tracker.log_metrics(f"permutation/{stage}", {k: v / n for k, v in perm_sum.items()}, epoch)
 
         finally:
             self.ema.restore(self.model)
@@ -305,6 +359,8 @@ class Trainer:
                         epoch_num = epoch + 1
 
                         self.logger.section(f"[Epoch {epoch_num}/{epochs}]")
+                        self.criterion.matcher.set_epoch(epoch)
+                        self._apply_curriculum_swap(epoch)
                         train_loss = self.train_epoch(data_loader, epoch)
                         self.logger.subsection(f"Train  : loss={train_loss:.4f}")
 
@@ -315,7 +371,7 @@ class Trainer:
                             val_loss    = val_results["avg_loss"]
                             self.logger.subsection(f"Validation : loss={val_loss:.4f}  (batches={val_results['num_batches']})")
 
-                            self.tracker.log_scalar("loss/val",     val_loss,                 epoch)
+                            self.tracker.log_scalar("loss/val", val_loss, epoch)
                 
                             self.checkpoint.step(val_loss, epoch_num, self)
                             new_lrs = self.lr_scheduler.step(epoch, metric=val_loss)

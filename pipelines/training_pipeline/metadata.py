@@ -7,11 +7,10 @@ from pathlib     import Path
 
 import torch
 
-try:
-    from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
-    from torch.utils.tensorboard import SummaryWriter
-except ImportError:
-    from tensorboardX import SummaryWriter
+
+from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
+from torch.utils.tensorboard import SummaryWriter
+
 from configuration.training_config import TrainerConfig
 from tools.logger                  import Logger
 
@@ -73,7 +72,7 @@ class TrainingRunMetadata:
         
         return out_path
 
-    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int) -> Path:
+    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int, param_match: str = "none") -> Path:
         out_path = self.metadata_directory / "run_summary.json"
         
         payload  = {
@@ -84,6 +83,7 @@ class TrainingRunMetadata:
             "run_directory" : str(self.run_directory),
             "framework"     : "pytorch",
             "n_devices"     : torch.cuda.device_count() if torch.cuda.is_available() else 0,
+            "param_match"   : param_match,
         }
         
         with open(out_path, "w", encoding="utf-8") as f:
