@@ -17,17 +17,10 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from configuration.dataset_config import (
-    AugmentationConfig,
-    DatasetConfiguration,
-    InputConfig,
-    PatchConfiguration,
-    Representation,
-    SplitRegions,
-)
-from tools.crop_region      import CropRegion
-from tools.loss_scale_probe import LossScaleProbeConfig
-from tools.logger           import Logger
+from configuration.dataset_config import AugmentationConfig, DatasetConfiguration, SplitRegions
+from tools.crop_region            import CropRegion
+from tools.loss_scale_probe       import LossScaleProbeConfig
+from tools.logger                 import Logger
 
 from configuration.training_config import (
     LossCurriculumConfig,
@@ -48,87 +41,52 @@ from configuration.training_config import (
 from models import CONFIG_REGISTRY
 from pipelines.training_pipeline.pipeline import TrainingPipeline
 
-dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-log_base_dir  = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/overfit_test")
+dataset_path        = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
+params_path         = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
+log_base_dir        = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/overfit_test")
 
 overfit_steps       = 5000
 stop_threshold      = 1e-3
 overfit_batchsize   = 9
 overfit_az_lines    = 128
 overfit_range_lines = 128
+az_start            = 1000
+
+n_gaussians         = 5
+seed                = 42
+
 
 skip_models: set[str] = set()
 
 
-def build_dataset_config() -> DatasetConfiguration:
-    with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
-        layout = json.load(f)
+def run_overfit(model_name: str, dataset_config: DatasetConfiguration, logger: Logger, run_tag: str) -> dict:
+    logger.subsection(model_name)
 
-    global_crop = CropRegion(*layout["global_crop"])
+    model_config = CONFIG_REGISTRY[model_name]()
 
-    az_start    = 1000
-    az_end      = az_start + overfit_az_lines
-    range_start = global_crop.range_start
-    range_end   = range_start + overfit_range_lines
+    for attr in ("dropout", "attention_dropout", "stochastic_depth_rate"):
+        if hasattr(model_config, attr):
+            setattr(model_config, attr, 0.0)
 
-    split_regions = SplitRegions(
-        train = CropRegion(az_start, az_end, range_start, range_end),
-        val   = CropRegion(az_start, az_end, range_start, range_end),
-        test  = CropRegion(az_start, az_end, range_start, range_end),
-    )
+    for attr in vars(model_config):
+        if attr.endswith("_wd"):
+            setattr(model_config, attr, 0.0)
 
-    return DatasetConfiguration(
-        preprocessing_run_directory = dataset_path,
-        parameters_path             = params_path,
-        split_regions               = split_regions,
-        patch = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
-
-        input_config = InputConfig(
-            use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
-            use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
-            use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
-        ),
-
-        batch_size    = overfit_batchsize,
-        num_workers   = 4,
-        shuffle_train = True,
-        pin_memory    = True,
-
-        augmentation  = AugmentationConfig(
-            p_flip_h    = 0.0,
-            p_flip_v    = 0.0,
-            p_rot90     = 0.0,
-            p_amp_scale = 0.0,
-            p_noise     = 0.0,
-        ),
-    )
-
-
-def build_trainer_config(model_name: str) -> TrainerConfig:
-    return TrainerConfig(
-        gaussian = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
-
-        early_stopping = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
-
-        warmup = WarmupConfig(warmup_enabled=False),
-
-        scheduler = SchedulerConfig(type="constant"),
-
+    trainer_config = TrainerConfig(
+        gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=n_gaussians),
+        early_stopping   = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
+        warmup           = WarmupConfig(warmup_enabled=False),
+        scheduler        = SchedulerConfig(type="constant"),
         ema              = EMAConfig(use_ema=False, ema_decay=0.999),
         optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
         gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
 
-        io = IOConfig(logdir=str(log_base_dir / model_name)),
+        io = IOConfig(logdir=str(log_base_dir / f"{run_tag}_{model_name}")),
 
         training = TrainingConfigInner(
-            device                      = "gpu",
-            epochs                      = 10000,
-            validation_frequency        = 9999,
-            use_amp                     = False,
-            gradient_accumulation_steps = 1,
-            max_grad_norm               = None,
-            verbose                     = False,
+            device               = "gpu",
+            epochs               = 10000,
+            validation_frequency = 9999,
         ),
 
         overfit = OverfitConfig(
@@ -145,28 +103,12 @@ def build_trainer_config(model_name: str) -> TrainerConfig:
         ),
     )
 
-
-def run_overfit(model_name: str, dataset_config: DatasetConfiguration, logger: Logger) -> dict:
-    logger.subsection(model_name)
-
-    model_config = CONFIG_REGISTRY[model_name]()
-
-    for attr in ("dropout", "attention_dropout", "stochastic_depth_rate"):
-        if hasattr(model_config, attr):
-            setattr(model_config, attr, 0.0)
-
-    for attr in vars(model_config):
-        if attr.endswith("_wd"):
-            setattr(model_config, attr, 0.0)
-
-    trainer_config = build_trainer_config(model_name)
-
     pipeline = TrainingPipeline(
         trainer_config = trainer_config,
         dataset_config = dataset_config,
         model_name     = model_name,
         model_config   = model_config,
-        seed           = 42,
+        seed           = seed,
         run_name       = f"overfit_{model_name}",
     )
 
@@ -196,7 +138,7 @@ def run_overfit(model_name: str, dataset_config: DatasetConfiguration, logger: L
 
 def main() -> None:
     log_base_dir.mkdir(parents=True, exist_ok=True)
-
+    run_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger = Logger(log_dir=str(log_base_dir), name="overfit_test")
 
     all_models     = list(CONFIG_REGISTRY.keys())
@@ -210,12 +152,38 @@ def main() -> None:
         "Batch size":      overfit_batchsize,
     }, title="Configuration")
 
-    dataset_config = build_dataset_config()
+    with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
+        layout = json.load(f)
+    
+    global_crop = CropRegion(*layout["global_crop"])
+    az_end      = az_start + overfit_az_lines
+    range_end   = global_crop.range_start + overfit_range_lines
+    
+    overfit_crop = CropRegion(az_start, az_end, global_crop.range_start, range_end)
+
+    dataset_config = DatasetConfiguration(
+        preprocessing_run_directory = dataset_path,
+        parameters_path             = params_path,
+       
+        split_regions = SplitRegions(
+            train = overfit_crop,
+            val   = overfit_crop,
+            test  = overfit_crop,
+        ),
+    
+        augmentation  = AugmentationConfig(
+            p_flip_h    = 0.0,
+            p_flip_v    = 0.0,
+            p_rot90     = 0.0,
+            p_amp_scale = 0.0,
+            p_noise     = 0.0,
+        ),
+    )
 
     logger.section("Running tests")
     results = []
     for model_name in models_to_test:
-        result = run_overfit(model_name, dataset_config, logger)
+        result = run_overfit(model_name, dataset_config, logger, run_tag)
         results.append(result)
 
     passed = [r for r in results if r["status"] == "PASS"]

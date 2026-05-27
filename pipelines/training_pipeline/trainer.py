@@ -97,6 +97,9 @@ class Trainer:
         )
         probe.run(train_loader, self.model, self.device, self.x_axis)
 
+    def _trial_callback(self, val_loss: float, epoch: int) -> None:
+        pass
+
     def _build_optimizer(self, param_groups: list[dict]):
         betas        = tuple(self.config.optimizer.betas)
         eps          = self.config.optimizer.eps
@@ -357,6 +360,7 @@ class Trainer:
                             self.checkpoint.step(val_loss, epoch_num, self)
                             new_lrs = self.lr_scheduler.step(epoch, metric=val_loss)
                             stop    = self.early_stopping(val_loss, self.model, epoch)
+                            self._trial_callback(val_loss, epoch)
                         else:
                             val_results  = {"avg_loss": float("nan"), "num_batches": 0}
                             val_loss     = val_results["avg_loss"]

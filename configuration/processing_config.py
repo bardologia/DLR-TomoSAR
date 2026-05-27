@@ -35,7 +35,7 @@ class ParallelConfiguration:
 
 @dataclass
 class PathConfiguration:
-    main_directory         : Path          = field(default_factory=lambda: Path("."))
+    main_directory         : Path          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/Dataset"))
     pyrat_directory        : Path          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/pyrat"))
     data_subdirectory      : str           = "data"
     metadata_subdirectory  : str           = "meta"

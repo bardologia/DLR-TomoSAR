@@ -10,26 +10,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from configuration.param_extraction_config import (
-    FitMode,
-    ExtractionConfig,
-    FitSettings,
-)
-from pipelines.param_pipeline.pipeline import ParamExtractionPipeline
+from configuration.param_extraction_config import FitMode, ExtractionConfig, FitSettings
+from pipelines.param_pipeline.pipeline     import ParamExtractionPipeline
 
 
 processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
 pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat")
+tomogram_filename   = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
 
-output_prefix     = "params"
-output_suffix     = None
+output_prefix       = "params"
+output_suffix       = None
+height_range        = None
 
-tomogram_filename = "tomogram_full_1000a16000a500a4000_1_Xparams_id2X.npy"
-height_range      = None
-
-fit_config        = FitMode.SigmaOnly(k_max=5, lambda_k=3e-3)
-
-parameter_workers = 50
+fit_k_max           = 5
+fit_lambda_k        = 3e-3
+parameter_workers   = 50
 
 
 def main() -> None:
@@ -43,7 +38,7 @@ def main() -> None:
         tomogram_filename = tomogram_filename,
         height_range      = height_range,
 
-        fit_settings = FitSettings(fit_config = fit_config),
+        fit_settings      = FitSettings(fit_config=FitMode.SigmaOnly(k_max=fit_k_max, lambda_k=fit_lambda_k)),
 
         parameter_workers = parameter_workers,
     )

@@ -13,6 +13,9 @@ class ModelSummary:
     def count_params(self, module: nn.Module):
         return sum(p.numel() for p in module.parameters())
 
+    def count_own_params(self, module: nn.Module):
+        return sum(p.numel() for p in module.parameters(recurse=False))
+
     def to_markdown(self, title="Model Summary") -> str:
         if not self.rows:
             return f"# {title}\n\nNo layers found."
@@ -43,16 +46,14 @@ class ModelSummary:
     def run(self):
         self.logger.section("[Model Summary]")
         self.logger.info("Generating model architecture summary")
-        self.total_params = 0
+
+        self.total_params = sum(p.numel() for p in self.model.parameters())
 
         for name, module in self.model.named_modules():
             if name == "":
                 continue
-
-            n_params = self.count_params(module)
-            self.total_params += n_params
-            
-            self.rows.append((name, module.__class__.__name__, n_params))
+            own_params = self.count_own_params(module)
+            self.rows.append((name, module.__class__.__name__, own_params))
     
     def save_markdown(self, path: str, title: str = "Model Summary"):
         md = self.to_markdown(title=title)

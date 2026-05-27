@@ -74,7 +74,7 @@ def _scheduler(tag: str) -> None:
                     "model"   : model_name,
                     "status"  : status,
                     "gpu"     : gpu_id,
-                    "logdir"  : str(run_dir / model_name),
+                    "logdir"  : str(log_base_dir / model_name),
                     "log_file": str(log_path),
                     "error"   : None if ret == 0 else f"exit code {ret} — see {log_path}",
                 })
@@ -88,9 +88,10 @@ def _scheduler(tag: str) -> None:
     while queue or running:
         _reap_finished()
         while queue and gpu_pool:
-            model_name = queue.pop(0)
-            gpu_id     = gpu_pool.pop(0)
-            log_path   = run_dir / model_name / "worker.log"
+            model_name    = queue.pop(0)
+            gpu_id        = gpu_pool.pop(0)
+            model_run_dir = log_base_dir / model_name
+            log_path      = model_run_dir / "worker.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             cmd = [
                 sys.executable, __file__,
@@ -153,8 +154,7 @@ def _worker(model_name: str, gpu_id: int, tag: str) -> None:
     from models import CONFIG_REGISTRY
     from pipelines.training_pipeline.pipeline import TrainingPipeline
 
-    run_dir      = log_base_dir / tag
-    model_logdir = str(run_dir / model_name)
+    model_logdir = str(log_base_dir / model_name)
 
     logger = Logger(log_dir=model_logdir, name=f"worker_{model_name}")
     logger.section(f"GPU {gpu_id}  —  {model_name}")
@@ -193,7 +193,7 @@ def _worker(model_name: str, gpu_id: int, tag: str) -> None:
         ema              = EMAConfig(use_ema=False, ema_decay=0.999),
         optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
         gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
-        io               = IOConfig(logdir=model_logdir),
+        io               = IOConfig(logdir=str(log_base_dir)),
         training = TrainingConfigInner(
             device="gpu", epochs=epochs, validation_frequency=1,
             use_amp=False, gradient_accumulation_steps=1,
@@ -215,7 +215,7 @@ def _worker(model_name: str, gpu_id: int, tag: str) -> None:
         model_name     = model_name,
         model_config   = model_config,
         seed           = 0,
-        run_name       = f"benchmark_{model_name}",
+        run_name       = model_name,
     )
 
     pipeline.run(probe_config=LossScaleProbeConfig(

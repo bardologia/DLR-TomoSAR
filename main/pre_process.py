@@ -9,32 +9,25 @@ if str(REPO_ROOT) not in sys.path:
 
 from configuration.processing_config import (
     CropRegion,
-    ParallelConfiguration,
-    PathConfiguration,
     ProcessingConfiguration,
     TomogramConfiguration,
 )
 from pipelines.processing_pipeline.pipeline import ProcessingPipeline
 
 
-azimuth_start = 1000
-azimuth_end   = 16000
-range_start   = 500
-range_end     = 4000
+azimuth_start            = 1000
+azimuth_end              = 16000
+range_start              = 500
+range_end                = 4000
 
-tomogram_workers = 16
-pyrat_threads    = 8
-
-fusar_project_path = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
-base_directory     = "/ste/rnd/"
-track_selection    = "*"
-polarisation       = "hv"
-beamforming_method = "Capon"
-filter_method      = "Boxcar"
-filter_arguments   = {"win": [20, 10]}
-height_range       = (-20.0, 80.0)
-
-main_directory = Path("/ste/rnd/User/vice_vi/Dataset")
+fusar_project_path       = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
+base_directory           = "/ste/rnd/"
+track_selection          = "*"
+polarisation             = "hv"
+beamforming_method       = "Capon"
+filter_method            = "Boxcar"
+filter_arguments         = {"win": [20, 10]}
+height_range             = (-20.0, 80.0)
 
 dataset_type             = "FSAR"
 full_stack_identifier    = "1"
@@ -45,43 +38,24 @@ parameter_output_tag     = "Xparams_id2X"
 
 def main() -> None:
     global_crop            = CropRegion(azimuth_start=azimuth_start, azimuth_end=azimuth_end, range_start=range_start, range_end=range_end)
-    total_azimuth_width    = global_crop.azimuth_end - global_crop.azimuth_start
-    max_crop_azimuth_width = total_azimuth_width // tomogram_workers
+    max_crop_azimuth_width = (global_crop.azimuth_end - global_crop.azimuth_start) // 16
+
+    shared_tomo = dict(
+        fusar_project_path     = fusar_project_path,
+        base_directory         = base_directory,
+        track_selection        = track_selection,
+        polarisation           = polarisation,
+        beamforming_method     = beamforming_method,
+        filter_method          = filter_method,
+        filter_arguments       = filter_arguments,
+        max_crop_azimuth_width = max_crop_azimuth_width,
+    )
 
     config = ProcessingConfiguration(
         crop = global_crop,
 
-        input_configs = TomogramConfiguration(
-            fusar_project_path     = fusar_project_path,
-            base_directory         = base_directory,
-            track_selection        = track_selection,
-            polarisation           = polarisation,
-            beamforming_method     = beamforming_method,
-            filter_method          = filter_method,
-            filter_arguments       = filter_arguments,
-            max_crop_azimuth_width = max_crop_azimuth_width,
-        ),
-
-        output_configs = TomogramConfiguration(
-            fusar_project_path     = fusar_project_path,
-            base_directory         = base_directory,
-            track_selection        = track_selection,
-            polarisation           = polarisation,
-            beamforming_method     = beamforming_method,
-            filter_method          = filter_method,
-            filter_arguments       = filter_arguments,
-            height_range           = height_range,
-            max_crop_azimuth_width = max_crop_azimuth_width,
-        ),
-
-        parallel = ParallelConfiguration(
-            tomogram_workers = tomogram_workers,
-            pyrat_threads    = pyrat_threads,
-        ),
-
-        paths = PathConfiguration(
-            main_directory = main_directory,
-        ),
+        input_configs  = TomogramConfiguration(**shared_tomo),
+        output_configs = TomogramConfiguration(**shared_tomo, height_range=height_range),
 
         dataset_type             = dataset_type,
         full_stack_identifier    = full_stack_identifier,

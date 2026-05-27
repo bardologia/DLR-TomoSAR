@@ -1,7 +1,6 @@
 from configuration.models_config import (
     AttentionUNetConfig,
     DropPath,
-    FCNConfig,
     LinkNetConfig,
     ResUNetConfig,
     SwinUNetConfig,
@@ -9,6 +8,7 @@ from configuration.models_config import (
     UNETRConfig,
     UNetConfig,
     UNetMultiHeadConfig,
+    UNetPerGaussianConfig,
     UNetPlusPlusConfig,
     build_activation,
     build_norm2d,
@@ -17,10 +17,10 @@ from configuration.models_config import (
 )
 from .UNet import UNet
 from .UNet_multihead import UNetMultiHead
+from .UNet_pergaussian import UNetPerGaussian
 from .ResUNet import ResUNet
 from .AttentionUNet import AttentionUNet
 from .UNetPlusPlus import UNetPlusPlus
-from .FCN import FCN
 from .LinkNet import LinkNet
 from .SwinUNet import SwinUNet
 from .TransUNet import TransUNet
@@ -28,11 +28,11 @@ from .UNETR import UNETR
 
 MODEL_REGISTRY: dict[str, type] = {
     "unet"           : UNet,
-    "unet_multihead" : UNetMultiHead,
-    "resunet"        : ResUNet,
+    "unet_multihead"   : UNetMultiHead,
+    "unet_pergaussian" : UNetPerGaussian,
+    "resunet"          : ResUNet,
     "attention_unet" : AttentionUNet,
     "unetplusplus"   : UNetPlusPlus,
-    "fcn"            : FCN,
     "linknet"        : LinkNet,
     "swin_unet"      : SwinUNet,
     "transunet"      : TransUNet,
@@ -40,16 +40,16 @@ MODEL_REGISTRY: dict[str, type] = {
 }
 
 CONFIG_REGISTRY: dict[str, type] = {
-    "unet"           : UNetConfig,
-    "unet_multihead" : UNetMultiHeadConfig,
-    "resunet"        : ResUNetConfig,
-    "attention_unet" : AttentionUNetConfig,
-    "unetplusplus"   : UNetPlusPlusConfig,
-    "fcn"            : FCNConfig,
-    "linknet"        : LinkNetConfig,
-    "swin_unet"      : SwinUNetConfig,
-    "transunet"      : TransUNetConfig,
-    "unetr"          : UNETRConfig,
+    "unet"             : UNetConfig,
+    "unet_multihead"   : UNetMultiHeadConfig,
+    "unet_pergaussian" : UNetPerGaussianConfig,
+    "resunet"          : ResUNetConfig,
+    "attention_unet"   : AttentionUNetConfig,
+    "unetplusplus"     : UNetPlusPlusConfig,
+    "linknet"          : LinkNetConfig,
+    "swin_unet"        : SwinUNetConfig,
+    "transunet"        : TransUNetConfig,
+    "unetr"            : UNETRConfig,
 }
 
 
@@ -69,20 +69,20 @@ def get_model(name: str, config=None, **overrides):
 __all__ = [
     "UNet",
     "UNetMultiHead",
+    "UNetPerGaussian",
     "ResUNet",
     "AttentionUNet",
     "UNetPlusPlus",
-    "FCN",
     "LinkNet",
     "SwinUNet",
     "TransUNet",
     "UNETR",
     "UNetConfig",
     "UNetMultiHeadConfig",
+    "UNetPerGaussianConfig",
     "ResUNetConfig",
     "AttentionUNetConfig",
     "UNetPlusPlusConfig",
-    "FCNConfig",
     "LinkNetConfig",
     "SwinUNetConfig",
     "TransUNetConfig",

@@ -105,15 +105,7 @@ class TrainingPipeline:
             param_match   = self.trainer_config.curriculum.warmup.param_match,
         )
 
-        trainer = Trainer(
-            model                 = model,
-            model_cfg             = model_cfg,
-            x_axis                = x_axis,
-            config                = self.trainer_config,
-            run_dir               = self.run_metadata.run_directory,
-            logger                = self.logger,
-            norm_stats            = getattr(train_dataset, "norm_stats", None),
-        )
+        trainer = self._make_trainer(model, model_cfg, x_axis, getattr(train_dataset, "norm_stats", None))
 
         try:
             trainer.maybe_run_loss_probe(train_loader, probe_config)
@@ -123,3 +115,14 @@ class TrainingPipeline:
             self.logger.close()
 
         return results
+
+    def _make_trainer(self, model, model_cfg, x_axis, norm_stats):
+        return Trainer(
+            model      = model,
+            model_cfg  = model_cfg,
+            x_axis     = x_axis,
+            config     = self.trainer_config,
+            run_dir    = self.run_metadata.run_directory,
+            logger     = self.logger,
+            norm_stats = norm_stats,
+        )

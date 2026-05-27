@@ -174,6 +174,7 @@ class AttentionUNet(nn.Module):
                     out_channels = decoder_channels,
                 )
             )
+            
             self.attention_gates.append(
                 AttentionGate(
                     gate_channels         = decoder_channels,
@@ -183,6 +184,7 @@ class AttentionUNet(nn.Module):
                     bias                  = config.conv_bias,
                 )
             )
+            
             self.decoder_blocks.append(
                 ConvBlock(
                     input_channels  = decoder_channels * 2,
