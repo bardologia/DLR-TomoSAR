@@ -377,7 +377,10 @@ class Normalizer:
             else:
                 x = tensor[sl] * s + m
                 if strat.apply_log1p:
-                    x = torch.expm1(x) if is_torch else np.expm1(x)
+                    if is_torch:
+                        x = torch.expm1(x.clamp(max=15.0))
+                    else:
+                        x = np.expm1(np.clip(x, a_min=None, a_max=15.0))
                
                 out[sl] = x
 

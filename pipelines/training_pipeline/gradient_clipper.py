@@ -9,14 +9,13 @@ class GradientClipper:
         self.logger      = logger
         self.tracker     = tracker       
         
-        cfg              = config.gradient_clipper
-        self.mode        = cfg.clip_mode
-        self.threshold   = cfg.max_grad_norm if self.mode == "fixed" else None
-        self.window      = cfg.adaptive_window
-        self.percentile  = cfg.adaptive_percentile
-        self.mean_std_k  = cfg.adaptive_mean_std_k
-        self.epsilon     = cfg.clip_epsilon
-        self.hist_freq   = cfg.log_histogram_freq
+        self.mode        = config.gradient_clipper.clip_mode
+        self.threshold   = config.gradient_clipper.max_grad_norm if self.mode == "fixed" else None
+        self.window      = config.gradient_clipper.adaptive_window
+        self.percentile  = config.gradient_clipper.adaptive_percentile
+        self.mean_std_k  = config.gradient_clipper.adaptive_mean_std_k
+        self.epsilon     = config.gradient_clipper.clip_epsilon
+        self.hist_freq   = config.gradient_clipper.log_histogram_freq
        
         self.history     : list[float] = []
 
@@ -41,6 +40,7 @@ class GradientClipper:
             if p.grad is not None:
                 param_norm = p.grad.detach().data.norm(2)
                 total_norm += param_norm.item() ** 2
+        
         return total_norm ** 0.5
 
     def _clip(self, model: torch.nn.Module, norm: float, max_norm: float) -> tuple[float, float]:
@@ -48,6 +48,7 @@ class GradientClipper:
         for p in model.parameters():
             if p.grad is not None:
                 p.grad.detach().mul_(scale)
+        
         norm_after = norm * scale
         return norm, norm_after
 
@@ -75,7 +76,8 @@ class GradientClipper:
         return has_invalid
 
     def maybe_clip(self, model: torch.nn.Module, global_step: int):
-        self.check_gradients(model, global_step)
+        if self.tracker.debug:
+            self.check_gradients(model, global_step)
         
         norm = GradientClipper.global_norm(model)
         

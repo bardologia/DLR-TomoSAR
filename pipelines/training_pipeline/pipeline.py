@@ -90,7 +90,6 @@ class TrainingPipeline:
         in_channels   = train_dataset.input_channels
         n_gaussians   = gaussian_cfg.n_default_gaussians
         out_channels  = gaussian_cfg.params_per_gaussian * n_gaussians
-        x_axis_length = int(tomo_mmap.shape[0])
         x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
         
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)

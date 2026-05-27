@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import os
 import subprocess
@@ -48,13 +47,13 @@ def _storage_url(run_dir: Path) -> str:
 def _build_base_configs(dataset_path: Path, params_path: Path):
     import json
     from configuration.dataset_config import (
-        DatasetConfiguration, InputConfig, PatchConfiguration,
-        Representation, SplitRegions,
+        DatasetConfiguration, PatchConfiguration,
+        SplitRegions,
     )
     from configuration.training_config import (
         LossCurriculumConfig, EarlyStoppingConfig, EMAConfig, GaussianConfig,
         GradientClipperConfig, IOConfig, LossConfig, OptimizerConfig,
-        OverfitConfig, SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,
+        SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,
     )
     from tools.crop_region import CropRegion
 
@@ -154,7 +153,7 @@ def _scheduler(tag: str, target_model: str | None = None) -> None:
             ]
             log_fh = open(log_path, "w")
             proc   = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh)
-            procs.append((proc, gpu_id, log_path))
+            procs.append((proc, gpu_id, log_path, log_fh))
             logger.info(f"[GPU {gpu_id}] phase-{phase} worker — {model_name}  ({n_trials} trials)")
         return procs
 
@@ -163,11 +162,12 @@ def _scheduler(tag: str, target_model: str | None = None) -> None:
         while procs:
             time.sleep(5)
             still = []
-            for proc, gpu_id, log_path in procs:
+            for proc, gpu_id, log_path, log_fh in procs:
                 ret = proc.poll()
                 if ret is None:
-                    still.append((proc, gpu_id, log_path))
+                    still.append((proc, gpu_id, log_path, log_fh))
                 else:
+                    log_fh.close()
                     if ret == 0:
                         logger.info(f"✓  [GPU {gpu_id}] phase-{phase} worker — {model_name}  DONE")
                     else:
@@ -213,12 +213,40 @@ def _scheduler(tag: str, target_model: str | None = None) -> None:
         best_p1_trial = p1_study.best_trial
         best_p1_path  = run_dir / model_name / "phase1_best.json"
         best_p1_path.parent.mkdir(parents=True, exist_ok=True)
-       
+
+        # Decode indexed_categorical params: trial.params stores "foo__idx" (int index);
+        # reconstruct the actual choice value so Phase-2 workers can apply them correctly.
+        lr_space     = CONFIG_REGISTRY[model_name].tunable_lr_params()
+        raw_p1       = dict(best_p1_trial.params)
+        decoded_p1   = {}
+        for k, v in raw_p1.items():
+            if k.endswith("__idx"):
+                param_name = k[:-5]
+                spec       = lr_space.get(param_name, {})
+                if spec.get("type") == "indexed_categorical":
+                    decoded_p1[param_name] = spec["choices"][v]
+                # else: orphaned __idx key — skip
+            else:
+                decoded_p1[k] = v
+
         with open(best_p1_path, "w", encoding="utf-8") as f:
-            json.dump(best_p1_trial.params, f, indent=2)
+            json.dump(decoded_p1, f, indent=2)
 
         logger.subsection(f"Phase 1 best — trial {best_p1_trial.number}  val_loss={best_p1_trial.value:.6f}")
-        logger.kv_table(best_p1_trial.params, title="Best Phase-1 Params")
+        logger.kv_table(decoded_p1, title="Best Phase-1 Params")
+
+        if not p1_ok:
+            logger.error(f"Phase 1 had failures for {model_name} — skipping Phase 2")
+            results.append({
+                "model"          : model_name,
+                "status"         : "PARTIAL",
+                "phase1_val_loss": best_p1_trial.value,
+                "phase2_val_loss": None,
+                "best_config"    : None,
+            })
+            with open(summary_path, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2)
+            continue
 
         p2_counts = _distribute_trials(tune_cfg.phase2.n_trials, len(gpus))
         p2_name   = _study_name(model_name, 2, tag)
@@ -246,7 +274,7 @@ def _scheduler(tag: str, target_model: str | None = None) -> None:
         logger.subsection(f"Phase 2 — {sum(p2_counts)} trials across {len(gpus)} GPUs")
 
         p2_procs = _spawn_workers(model_name, 2, p2_counts)
-        _wait_workers(p2_procs, model_name, 2)
+        p2_ok    = _wait_workers(p2_procs, model_name, 2)
 
         p2_study      = optuna.load_study(study_name=p2_name, storage=storage_url)
         best_p2_trial = p2_study.best_trial
@@ -266,7 +294,7 @@ def _scheduler(tag: str, target_model: str | None = None) -> None:
 
         results.append({
             "model"          : model_name,
-            "status"         : "DONE" if p1_ok else "PARTIAL",
+            "status"         : "DONE" if (p1_ok and p2_ok) else "PARTIAL",
             "phase1_val_loss": best_p1_trial.value,
             "phase2_val_loss": best_p2_trial.value,
             "best_config"    : str(best_cfg_path),
@@ -383,7 +411,7 @@ def main() -> None:
         )
     
     else:
-        _scheduler(tag=run_tag or tag, target_model=args.model)
+        _scheduler(tag=tag, target_model=args.model)
 
 
 if __name__ == "__main__":

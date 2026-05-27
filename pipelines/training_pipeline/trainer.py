@@ -203,6 +203,22 @@ class Trainer:
                 self.warmup.reset()
                 self.logger.subsection(f"Warmup reset ({self.warmup.warmup_steps} steps).")
 
+            if lc.reset_optimizer:
+                for group in self.optimizer.param_groups:
+                    for p in group["params"]:
+                        state = self.optimizer.state.get(p)
+                        if state:
+                            state.clear()
+                self.logger.subsection("Optimizer state (Adam moments) cleared.")
+
+            # Immediately push a warmup-adjusted LR to the optimizer so the
+            # swap epoch trains from a low LR instead of the stale decayed one.
+            if lc.reset_lr or lc.reset_warmup:
+                warmup_factor = self.warmup.factor() if (self.warmup.enabled and not self.warmup.is_finished()) else 1.0
+                immediate_lrs = [lr * warmup_factor for lr in self.lr_scheduler.base_lrs]
+                self._update_optimizer(immediate_lrs)
+                self.logger.subsection(f"Optimizer LR set to warmup-adjusted value (factor={warmup_factor:.4f}) for swap epoch.")
+
     def train_epoch(self, train_loader: DataLoader, epoch: int):
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)

@@ -36,7 +36,7 @@ class Result:
 def _cpu_worker(args: tuple) -> tuple:
     pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, out_ch, norm_loc, norm_scale = args
 
-    x    = x_axis.reshape(1, -1, 1, 1).astype(np.float32)
+    x          = x_axis.reshape(1, -1, 1, 1).astype(np.float32)
     B, _, H, W = pred_params_chunk.shape
     n_elev     = x.shape[1]
 
@@ -49,28 +49,28 @@ def _cpu_worker(args: tuple) -> tuple:
             out = out + a * np.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
         return out
 
-    n_K        = n_gaussians
-    pred_gauss = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-    gt_gauss   = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+    n_K         = n_gaussians
+    pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+    gt_gauss    = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
   
-    loc        = norm_loc[:n_K * 3].reshape(1, n_K, 3, 1, 1)
-    scale      = np.where(norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1) > 1e-8, norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1), 1e-8)
-    pred_norm  = (pred_gauss - loc) / scale
-    gt_norm    = (gt_gauss   - loc) / scale
+    loc         = norm_loc[:n_K * 3].reshape(1, n_K, 3, 1, 1)
+    scale       = np.where(norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1) > 1e-8, norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1), 1e-8)
+    pred_norm   = (pred_gauss - loc) / scale
+    gt_norm     = (gt_gauss   - loc) / scale
 
     gt_phys     = gt_norm * scale + loc                                         
     sort_key    = np.where(gt_phys[:, :, 0] < 1e-3, np.inf, gt_phys[:, :, 1]) 
     sort_idx    = np.argsort(sort_key, axis=1)                                  
     sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)                 
    
-    gt_norm_matched   = np.take_along_axis(gt_norm,   sort_idx_e, axis=1)
-    pred_norm_matched = pred_norm                                                
+    gt_norm_matched    = np.take_along_axis(gt_norm,   sort_idx_e, axis=1)
+    pred_norm_matched  = pred_norm                                                
 
     pred_gauss_matched = pred_norm_matched * scale + loc
     gt_gauss_matched   = gt_norm_matched   * scale + loc
 
-    pred_gauss_flat = pred_gauss_matched.reshape(B, n_K * 3, H, W)
-    gt_gauss_flat   = gt_gauss_matched.reshape(  B, n_K * 3, H, W)
+    pred_gauss_flat    = pred_gauss_matched.reshape(B, n_K * 3, H, W)
+    gt_gauss_flat      = gt_gauss_matched.reshape(  B, n_K * 3, H, W)
 
     pred_curves = reconstruct(pred_gauss_flat, n_gaussians)
     gt_curves   = reconstruct(gt_gauss_flat,   n_gaussians)
@@ -141,19 +141,17 @@ class Predictor:
         with self.logger.track(transient=True) as prog:
             task = prog.add_task("[section]GPU Forward Pass[/section]", total=len(run.loader))
             for batch in run.loader:
-                images, gt_params_b = batch[0], batch[1]
-                images      = np.asarray(images,      dtype=np.float32)  # (norm)   model input
-                gt_params_b = np.asarray(gt_params_b, dtype=np.float32)  # (norm)   from dataset
+                images, gt_params_b = batch[0], batch[1]  # tensors from DataLoader
 
-                pred_params     = run.model(images)  # (denorm) wrapper applies denorm + constraints
+                pred_params = run.model(images) 
 
-                gt_params_ready = gt_params_b[:, :n_K * 3]                              # (norm)
-                gt_params_ready = run.dataset.norm_stats.denormalize_output(gt_params_ready)  # (denorm)
+                gt_params_ready = gt_params_b[:, :n_K * 3]                                    # (norm, tensor)
+                gt_params_ready = run.dataset.norm_stats.denormalize_output(gt_params_ready)  # (denorm, tensor)
 
                 B = images.shape[0]
                 all_indices.append(list(range(sample_count, sample_count + B)))
-                all_pred_params.append(pred_params)                                      # (denorm)
-                all_gt_params.append(np.asarray(gt_params_ready, dtype=np.float32))      # (denorm)
+                all_pred_params.append(pred_params)                                            # (denorm, ndarray)
+                all_gt_params.append(gt_params_ready.cpu().numpy().astype(np.float32))         # (denorm, ndarray)
                 sample_count += B
                 prog.advance(task)
 

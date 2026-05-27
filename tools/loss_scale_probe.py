@@ -61,6 +61,19 @@ class LossScaleProbe:
             if getattr(self.loss_cfg, flag, False):
                 setattr(self.loss_cfg, w_key, 1.0)
 
+    @staticmethod
+    def _iqr_filter(values: list[float], k: float = 3.0) -> list[float]:
+        if len(values) < 4:
+            return values
+        sorted_v = sorted(values)
+        n        = len(sorted_v)
+        q1       = sorted_v[n // 4]
+        q3       = sorted_v[(3 * n) // 4]
+        iqr      = q3 - q1
+        lo, hi   = q1 - k * iqr, q3 + k * iqr
+        filtered = [v for v in values if lo <= v <= hi]
+        return filtered if len(filtered) >= 3 else values
+
     def run(self, train_loader, model, device, x_axis: torch.Tensor) -> dict[str, float]:
         if not self.probe_cfg.enabled:
             return {}
@@ -97,7 +110,9 @@ class LossScaleProbe:
             self.logger.warning("No loss components recorded — check model outputs.")
             return {}
 
-        means = {k: sum(v) / len(v) for k, v in accum.items()}
+        filtered = {k: self._iqr_filter(v) for k, v in accum.items()}
+        means    = {k: sum(v) / len(v) for k, v in filtered.items()}
+        n_total  = self.probe_cfg.n_batches
 
         ref     = self.probe_cfg.reference
         ref_val = means.get(ref) if ref is not None else None
@@ -111,11 +126,12 @@ class LossScaleProbe:
             {
                 "Term"             : name,
                 "Raw value"        : f"{means[name]:.6f}",
+                "Kept"             : f"{len(filtered[name])}/{len(accum[name])}",
                 "Suggested weight" : f"{suggested[name]:.6f}" + ("  ← reference" if name == ref else ""),
             }
             for name in sorted(means)
         ]
-        self.logger.metrics_table(rows, columns=["Term", "Raw value", "Suggested weight"], title="Probe Results")
+        self.logger.metrics_table(rows, columns=["Term", "Raw value", "Kept", "Suggested weight"], title="Probe Results")
 
         formula = f"raw({ref}) / raw(i)" if ref_val is not None else "1 / raw(i)"
         self.logger.subsection(f"Formula : suggested_weight(i) = {formula}")

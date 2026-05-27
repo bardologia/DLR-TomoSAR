@@ -53,7 +53,7 @@ class ExtractionConfig:
     adam_b1              : float                         = 0.95
     adam_b2              : float                         = 0.999
     adam_warmup_steps    : int                           = 100
-    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 2, 3])
+    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 3])
     r2_sample_cap        : int                           = 4096
 
 

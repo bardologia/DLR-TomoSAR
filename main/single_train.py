@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 GPU_ID = "1"
-os.environ["CUDA_VISIBLE_DEVICES"]    = str(GPU_ID)
-os.environ["MKL_NUM_THREADS"]     = "4"
-os.environ["NUMEXPR_NUM_THREADS"] = "4"
-os.environ["OMP_NUM_THREADS"]     = "4" 
+os.environ["CUDA_VISIBLE_DEVICES"]          = str(GPU_ID)
+os.environ["MKL_NUM_THREADS"]               = "4"
+os.environ["NUMEXPR_NUM_THREADS"]           = "4"
+os.environ["OMP_NUM_THREADS"]               = "4"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"]       = "expandable_segments:True"
  
 import json
 import sys
@@ -40,55 +41,76 @@ from configuration.training_config      import (
 from pipelines.training_pipeline.pipeline import TrainingPipeline
 
 
-run_name      = "unet_baseline_multihead"
-model_name    = "unet_multihead"
+run_name      = "resunet_curriculum"
+model_name    = "resunet"
 seed          = 0
 
 dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
 params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/help"
+logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/curriculum/"
 
 batch_size    = 256
 num_workers   = 8
 
 n_gaussians              = 5
-epochs                   = 200
+epochs                   = 150
 validation_frequency     = 1
-early_stopping_patience  = 30
+early_stopping_patience  = 50
 early_stopping_min_delta = 0.0001
 
 probe_enabled    = False
-probe_n_batches  = 100
+probe_n_batches  = 1000
 probe_reference  = "param_l1"
 probe_exit_after = True
 
 curriculum_enabled              = False
-curriculum_swap_epoch           = 100
-curriculum_reset_early_stopping = False
-curriculum_reset_lr             = False
-curriculum_reset_warmup         = False
+curriculum_swap_epoch           = 50
+curriculum_reset_early_stopping = True
+curriculum_reset_lr             = True
+curriculum_reset_warmup         = True
+curriculum_reset_optimizer      = True
 
-warmup_use_mse_curve              = False;  warmup_weight_mse_curve           = 0.0
-warmup_use_l1_curve               = False;  warmup_weight_l1_curve            = 0.0
-warmup_use_huber_curve            = False;  warmup_weight_huber_curve         = 0.0
-warmup_use_charbonnier_curve      = False;  warmup_weight_charbonnier_curve   = 0.0
-warmup_use_cosine_curve           = False;  warmup_weight_cosine_curve        = 0.0
-warmup_use_spectral_coherence     = False;  warmup_weight_spectral_coh        = 0.0
-warmup_use_ssim_curve             = False;  warmup_weight_ssim_curve          = 0.0
-warmup_use_param_l1               = True;   warmup_weight_param_l1            = 1.0
-warmup_use_param_huber            = False;  warmup_weight_param_huber         = 0.0
-warmup_use_smoothness_tv          = False;  warmup_weight_smoothness_tv       = 0.0
+warmup_use_mse_curve              = False
+warmup_weight_mse_curve           = 0.0
+warmup_use_l1_curve               = False
+warmup_weight_l1_curve            = 0.0
+warmup_use_huber_curve            = False
+warmup_weight_huber_curve         = 0.0
+warmup_use_charbonnier_curve      = False
+warmup_weight_charbonnier_curve   = 0.0
+warmup_use_cosine_curve           = False
+warmup_weight_cosine_curve        = 0.0
+warmup_use_spectral_coherence     = False
+warmup_weight_spectral_coh        = 0.0
+warmup_use_ssim_curve             = False
+warmup_weight_ssim_curve          = 0.0
+warmup_use_param_l1               = False
+warmup_weight_param_l1            = 0.0
+warmup_use_param_huber            = False
+warmup_weight_param_huber         = 0.0
+warmup_use_smoothness_tv          = False
+warmup_weight_smoothness_tv       = 0.0
 
-complete_use_mse_curve            = False;  complete_weight_mse_curve         = 0.0
-complete_use_l1_curve             = False;  complete_weight_l1_curve          = 0.0
-complete_use_huber_curve          = False;  complete_weight_huber_curve       = 0.0
-complete_use_charbonnier_curve    = False;  complete_weight_charbonnier_curve = 0.0
-complete_use_cosine_curve         = False;  complete_weight_cosine_curve      = 0.0
-complete_use_spectral_coherence   = False;  complete_weight_spectral_coh      = 0.0
-complete_use_ssim_curve           = False;  complete_weight_ssim_curve        = 0.0
-complete_use_param_l1             = True;   complete_weight_param_l1          = 1.0
-complete_use_param_huber          = False;  complete_weight_param_huber       = 0.0
-complete_use_smoothness_tv        = False;  complete_weight_smoothness_tv     = 0.0
+complete_use_mse_curve            = False
+complete_weight_mse_curve         = 0.0
+complete_use_l1_curve             = False
+complete_weight_l1_curve          = 0.0
+complete_use_huber_curve          = False
+complete_weight_huber_curve       = 0.0
+complete_use_charbonnier_curve    = False
+complete_weight_charbonnier_curve = 0.0
+complete_use_cosine_curve         = False
+complete_weight_cosine_curve      = 0.0
+complete_use_spectral_coherence   = False
+complete_weight_spectral_coh      = 0.0
+complete_use_ssim_curve           = False
+complete_weight_ssim_curve        = 0.0
+complete_use_param_l1             = False
+complete_weight_param_l1          = 0.0
+complete_use_param_huber          = False
+complete_weight_param_huber       = 0.0
+complete_use_smoothness_tv        = False
+complete_weight_smoothness_tv     = 0.0
 
 
 def main() -> None:
@@ -159,6 +181,7 @@ def main() -> None:
             reset_early_stopping = curriculum_reset_early_stopping,
             reset_lr             = curriculum_reset_lr,
             reset_warmup         = curriculum_reset_warmup,
+            reset_optimizer      = curriculum_reset_optimizer,
             warmup               = warmup_loss_config,
             complete             = complete_loss_config,
         ),

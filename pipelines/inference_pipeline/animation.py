@@ -181,7 +181,10 @@ class Animator:
         az_offset  : int,
         rg_offset  : int,
     ) -> Path:
-        Ploter(fig_dpi=self.dpi, save_dpi=self.dpi)._apply_style()
+        import matplotlib.pyplot as _plt
+        _plt.rcParams.update(Ploter.SCIENTIFIC_RC)
+        _plt.rcParams["figure.dpi"]  = self.dpi
+        _plt.rcParams["savefig.dpi"] = self.dpi
 
         spec      = self._build_axis(axis, pred_cube, gt_cube, x_axis, az_offset, rg_offset)
         n_total   = spec["n_total"]

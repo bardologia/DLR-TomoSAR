@@ -94,6 +94,7 @@ class Scheduler:
         self.plateau_count += 1
         if self.plateau_count >= patience:
             self.plateau_count = 0
+            self.plateau_best  = metric
             return factor
        
         return 1.0

@@ -56,7 +56,7 @@ class EarlyStopping:
 
     def _save_state(self, model: torch.nn.Module):
         if self.restore_best:
-            self.best_params = {name: param.clone().detach() for name, param in model.state_dict().items()}
+            self.best_params = {name: param.clone().detach().cpu() for name, param in model.state_dict().items()}
 
     def reset(self) -> None:
         """Clear all state so early stopping starts fresh (e.g. after a curriculum phase swap)."""

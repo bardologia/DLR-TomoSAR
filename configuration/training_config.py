@@ -9,16 +9,16 @@ import torch
 
 @dataclass
 class LossNormalizationConfig:
-    mse_curve         : float = 0.301741
-    l1_curve          : float = 1.316913
-    huber_curve       : float = 2.104144
-    charbonnier_curve : float = 1.309981
-    cosine_curve      : float = 0.189017
-    spectral_coh      : float = 0.185308
-    ssim_curve        : float = 0.710225
+    mse_curve         : float = 0.256520
+    l1_curve          : float = 0.799401
+    huber_curve       : float = 1.304963
+    charbonnier_curve : float = 0.795284
+    cosine_curve      : float = 0.122937
+    spectral_coh      : float = 0.117614
+    ssim_curve        : float = 2.410647
     param_l1          : float = 1.000000
-    param_huber       : float = 6.940039
-    smoothness_tv     : float = 41.464860
+    param_huber       : float = 5.399934
+    smoothness_tv     : float = 1.532997
 
 
 @dataclass
@@ -88,6 +88,7 @@ class LossCurriculumConfig:
     reset_early_stopping : bool       = False
     reset_lr             : bool       = False
     reset_warmup         : bool       = False
+    reset_optimizer      : bool       = False
 
 
 @dataclass
@@ -224,7 +225,7 @@ class ResourceConfig:
 
 @dataclass
 class GradientClipperConfig:
-    clip_mode            : str   = "disabled"   # disabled | fixed | adaptive_percentile | adaptive_mean_std
+    clip_mode            : str   = "fixed"   # disabled | fixed | adaptive_percentile | adaptive_mean_std
     max_grad_norm        : float = 1.0        
     adaptive_window      : int   = 200        
     adaptive_percentile  : float = 95.0      

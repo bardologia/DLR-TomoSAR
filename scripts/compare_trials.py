@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-compare_trials.py
-=================
-Scans all experiment folders under logs/unet_trials/, picks the latest
-inference run per trial, and writes three comparison reports:
-
-    comparison_<timestamp>/
-        training_comparison.md   – loss config, optimiser, best checkpoint
-        test_results_comparison.md – metrics tables (means / medians only)
-        gif_comparison.html      – side-by-side animated GIFs
-
-Usage
------
-    python scripts/compare_trials.py
-    python scripts/compare_trials.py --trials-dir logs/unet_trials
-    python scripts/compare_trials.py --out-dir logs/comparisons
-    python scripts/compare_trials.py --embed   # base64-embed all images → portable files
-"""
 from __future__ import annotations
 
 import argparse
@@ -102,6 +83,27 @@ def _fmt(v) -> str:
     return str(v)
 
 
+def _parse_best_from_log(trial_dir: Path) -> dict:
+    """Extract best epoch and best val loss from the metadata log file."""
+    log_dir = trial_dir / "logs"
+    logs = list(log_dir.glob("*.log")) if log_dir.is_dir() else []
+    if not logs:
+        return {}
+    log_text = logs[0].read_text(encoding="utf-8", errors="ignore")
+    # "Early stopping triggered at epoch NNN. Best epoch was NNN."
+    es_match = re.search(r"Best epoch was (\d+)", log_text)
+    # "best=0.0364 @ epoch 100" — take the last occurrence
+    best_matches = re.findall(r"best=([\d.eE+\-]+)\s*@\s*epoch\s*(\d+)", log_text)
+    result = {}
+    if es_match:
+        result["best_epoch"] = int(es_match.group(1))
+    elif best_matches:
+        result["best_epoch"] = int(best_matches[-1][1])
+    if best_matches:
+        result["best_val_loss"] = float(best_matches[-1][0])
+    return result
+
+
 def _rel(target: Path, base: Path) -> str:
     """Relative POSIX path from *base directory* to *target*."""
     return Path(os.path.relpath(target.resolve(), base.resolve())).as_posix()
@@ -137,6 +139,7 @@ def collect_trials(trials_dir: Path) -> list[dict]:
             "has_inf":    inf_dir is not None,
             "trainer_cfg": _load_json(td / "docs" / "trainer_config.json"),
             "run_summary": _load_json(td / "meta"  / "run_summary.json"),
+            "log_best":   _parse_best_from_log(td),
             "metrics":    _slim_metrics(_load_json(inf_dir / "metrics.json")) if inf_dir else {},
         }
         trials.append(entry)
@@ -147,8 +150,20 @@ def collect_trials(trials_dir: Path) -> list[dict]:
 # Report 1 – training_comparison.md
 # ---------------------------------------------------------------------------
 
+def _loss_cfg(cfg: dict) -> dict:
+    """Return the active loss sub-dict, falling back through known locations."""
+    # Prefer curriculum.complete (the phase that runs for most of training)
+    cur = cfg.get("curriculum", {})
+    if cur.get("complete"):
+        return cur["complete"]
+    if cur.get("warmup"):
+        return cur["warmup"]
+    # Legacy: flat top-level "loss" key
+    return cfg.get("loss", {})
+
+
 def _loss_row(cfg: dict) -> dict[str, str]:
-    loss = cfg.get("loss", {})
+    loss = _loss_cfg(cfg)
     active = []
     for key, lbl in [
         ("use_mse_curve",          "MSE"),
@@ -163,11 +178,14 @@ def _loss_row(cfg: dict) -> dict[str, str]:
         ("use_smoothness_tv",      "TV"),
     ]:
         if loss.get(key, False):
-            w_key = key.replace("use_", "weight_").replace("_curve", "_curve").replace(
-                "use_spectral_coherence", "weight_spectral_coh"
-            ).replace("use_param_l1", "weight_param_l1").replace(
-                "use_param_huber", "weight_param_huber"
-            ).replace("use_smoothness_tv", "weight_smoothness_tv")
+            w_key = (
+                key
+                .replace("use_spectral_coherence", "weight_spectral_coh")
+                .replace("use_param_l1",            "weight_param_l1")
+                .replace("use_param_huber",          "weight_param_huber")
+                .replace("use_smoothness_tv",        "weight_smoothness_tv")
+                .replace("use_",                     "weight_")
+            )
             w = loss.get(w_key, "?")
             active.append(f"{lbl}({w:g})" if isinstance(w, float) else f"{lbl}({w})")
     return ", ".join(active) if active else "—"
@@ -206,8 +224,8 @@ def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
         "## Loss Configuration\n",
         header, divider,
         row("Active losses + weights", lambda t: _loss_row(t["trainer_cfg"])),
-        row("Param match strategy",    lambda t: cfg_val(t, "loss", "param_match")),
-        row("TV weight",               lambda t: cfg_val(t, "loss", "weight_smoothness_tv")),
+        row("Param match strategy",    lambda t: _loss_cfg(t["trainer_cfg"]).get("param_match", "—")),
+        row("TV weight",               lambda t: _loss_cfg(t["trainer_cfg"]).get("weight_smoothness_tv", "—")),
         "",
         "## Optimiser & Scheduler\n",
         header, divider,
@@ -221,8 +239,8 @@ def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
         "",
         "## Best Checkpoint\n",
         header, divider,
-        row("Best epoch",     lambda t: sum_val(t, "best_epoch")),
-        row("Best val loss",  lambda t: sum_val(t, "best_val_loss")),
+        row("Best epoch",     lambda t: t["log_best"].get("best_epoch",    sum_val(t, "best_epoch"))),
+        row("Best val loss",  lambda t: t["log_best"].get("best_val_loss", sum_val(t, "best_val_loss"))),
         row("Has inference",  lambda t: "✅" if t["has_inf"] else "⏳ pending"),
         row("Inference run",  lambda t: t["inf_dir"].name if t["inf_dir"] else "—"),
         "",
@@ -317,7 +335,7 @@ FIGURE_SECTIONS: list[tuple[str, list[str]]] = [
 ]
 
 
-def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> Path:
+def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> list[Path]:
     inf_trials = [t for t in trials if t["has_inf"]]
     names = [t["name"] for t in inf_trials]
 
@@ -328,24 +346,33 @@ def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool
         cells = [_fmt(t["metrics"].get(key, "—")) for t in inf_trials]
         return "| " + label + " | " + " | ".join(cells) + " |"
 
+    # ── File 1: numerical metrics only ───────────────────────────────────────
     lines = [
-        "# Test Results Comparison",
+        "# Test Results – Numerical Metrics",
         f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_\n",
         "> Only trials that have at least one completed inference run are shown.\n",
     ]
-
     for section_title, metrics in METRIC_SECTIONS:
         lines += [f"## {section_title}\n", header, divider]
         for key, label in metrics:
             lines.append(metric_row(label, key))
         lines.append("")
 
-    # ── Figure grids ─────────────────────────────────────────────────────────
-    lines += ["---", "## Side-by-side Figures\n"]
+    metrics_out = out_dir / "test_results_metrics.md"
+    metrics_out.write_text("\n".join(lines), encoding="utf-8")
+    written = [metrics_out]
+
+    # ── One file per figure section ───────────────────────────────────────────
+    ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for section_title, figs in FIGURE_SECTIONS:
-        lines.append(f"### {section_title}\n")
+        slug = re.sub(r"[^a-z0-9]+", "_", section_title.lower()).strip("_")
+        lines = [
+            f"# Figures – {section_title}",
+            f"\n_Generated {ts_str}_\n",
+            "> Only trials that have at least one completed inference run are shown.\n",
+        ]
         for fig in figs:
-            lines.append(f"**`{fig}`**\n")
+            lines.append(f"## `{fig}`\n")
             for t in inf_trials:
                 fig_path = t["inf_dir"] / "figures" / fig
                 if fig_path.exists():
@@ -355,9 +382,11 @@ def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool
                     lines.append(f"*{t['name']}* — _(not found)_\n")
             lines.append("")
 
-    out = out_dir / "test_results_comparison.md"
-    out.write_text("\n".join(lines), encoding="utf-8")
-    return out
+        fig_out = out_dir / f"figures_{slug}.md"
+        fig_out.write_text("\n".join(lines), encoding="utf-8")
+        written.append(fig_out)
+
+    return written
 
 
 # ---------------------------------------------------------------------------
@@ -366,70 +395,34 @@ def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool
 
 GIF_AXES = ["walk_elevation", "walk_range", "walk_azimuth"]
 
-_HTML_STYLE = """
-<style>
-  body  { font-family: sans-serif; background: #1a1a2e; color: #eee; margin: 0; padding: 16px; }
-  h1    { text-align: center; margin-bottom: 8px; }
-  p.ts  { text-align: center; color: #aaa; font-size: .85em; margin-top: 0; }
-  h2    { border-bottom: 1px solid #444; padding-bottom: 4px; margin-top: 32px; }
-  .grid { display: grid; gap: 12px; margin-top: 8px; }
-  .cell { background: #16213e; border: 1px solid #333; border-radius: 6px;
-          padding: 8px; text-align: center; }
-  .cell img  { width: 100%; border-radius: 4px; }
-  .cell span { display: block; font-size: .8em; color: #aaa; margin-top: 4px;
-               word-break: break-all; }
-</style>
-"""
-
 
 def write_gif_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> Path:
     inf_trials = [t for t in trials if t["has_inf"]]
-    n = len(inf_trials)
-    if n == 0:
-        html = "<html><body><p>No inference results available yet.</p></body></html>"
-        out  = out_dir / "gif_comparison.html"
-        out.write_text(html, encoding="utf-8")
-        return out
+    ts_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    cols_css = " ".join(["1fr"] * n)
+    lines = [
+        "# GIF Comparison",
+        f"\n_Generated {ts_str}_\n",
+        "> Only trials that have at least one completed inference run are shown.\n",
+    ]
 
-    rows_html = ""
-    for axis in GIF_AXES:
-        fname = f"{axis}.gif"
-        cells = ""
-        for t in inf_trials:
-            gif_path = t["inf_dir"] / "animations" / fname
-            if gif_path.exists():
-                src = _img_src(gif_path, embed, out_dir)
-                cells += (
-                    f'<div class="cell">'
-                    f'<img src="{src}" alt="{axis}" loading="lazy">'
-                    f'<span>{t["name"]}</span>'
-                    f'</div>\n'
-                )
-            else:
-                cells += (
-                    f'<div class="cell">'
-                    f'<em style="color:#888">not found</em>'
-                    f'<span>{t["name"]}</span>'
-                    f'</div>\n'
-                )
-        rows_html += (
-            f'<h2>{axis.replace("_", " ").title()}</h2>'
-            f'<div class="grid" style="grid-template-columns:{cols_css};">'
-            f'{cells}</div>\n'
-        )
+    if not inf_trials:
+        lines.append("_No inference results available yet._\n")
+    else:
+        for axis in GIF_AXES:
+            fname = f"{axis}.gif"
+            lines.append(f"## {axis.replace('_', ' ').title()}\n")
+            for t in inf_trials:
+                gif_path = t["inf_dir"] / "animations" / fname
+                if gif_path.exists():
+                    src = _img_src(gif_path, embed, out_dir)
+                    lines.append(f"*{t['name']}*  \n![]({src})\n")
+                else:
+                    lines.append(f"*{t['name']}* — _(not found)_\n")
+            lines.append("")
 
-    ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    html = (
-        "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
-        f"<title>GIF Comparison – {ts}</title>{_HTML_STYLE}</head>"
-        f"<body><h1>GIF Comparison</h1><p class='ts'>Generated {ts}</p>"
-        f"{rows_html}</body></html>"
-    )
-
-    out = out_dir / "gif_comparison.html"
-    out.write_text(html, encoding="utf-8")
+    out = out_dir / "gif_comparison.md"
+    out.write_text("\n".join(lines), encoding="utf-8")
     return out
 
 
@@ -478,7 +471,7 @@ def main() -> None:
     r3 = write_gif_comparison(trials, out_dir, embed=args.embed)
 
     print(f"\n[compare_trials] Reports written:")
-    for r in (r1, r2, r3):
+    for r in [r1, *r2, r3]:
         print(f"  {r}")
 
 

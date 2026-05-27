@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+from functools import lru_cache as _lru_cache
+
 import torch
 import torch.nn.functional as F
+import torch.utils.checkpoint as _ckpt
 
 from configuration.training_config import LossConfig
 from tools.param_matcher           import ParamMatcher
+
+
+@_lru_cache(maxsize=8)
+def _cached_gaussian_kernel(size: int, sigma: float, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+    coords = torch.arange(size, dtype=dtype, device=device) - (size - 1) / 2.0
+    g      = torch.exp(-(coords ** 2) / (2.0 * sigma ** 2))
+    g      = g / g.sum()
+    kernel = g[:, None] * g[None, :]
+    return kernel[None, None, :, :].contiguous()
 
 
 class LossComponents:
@@ -27,23 +39,37 @@ class LossComponents:
 
     @staticmethod
     def cosine(pred: torch.Tensor, target: torch.Tensor, axis: int) -> torch.Tensor:
-        p = pred   / torch.norm(pred,   dim=axis, keepdim=True).clamp(min=1e-8)
-        t = target / torch.norm(target, dim=axis, keepdim=True).clamp(min=1e-8)
-        return (1.0 - (p * t).sum(dim=axis).clamp(-1.0, 1.0)).mean()
+        pred_norm   = torch.norm(pred,   dim=axis, keepdim=True)
+        target_norm = torch.norm(target, dim=axis, keepdim=True)
+
+        valid = (target_norm > 1e-3).squeeze(axis).float()
+
+        p   = pred   / pred_norm.clamp(min=1e-3)
+        t   = target / target_norm.clamp(min=1e-3)
+        sim = (p * t).sum(dim=axis).clamp(-1.0, 1.0)
+        n   = valid.sum().clamp(min=1.0)
+
+        return ((1.0 - sim) * valid).sum() / n
 
     @staticmethod
     def spectral_coherence(pred: torch.Tensor, target: torch.Tensor, window: int) -> torch.Tensor:
-        p_u  = pred.unfold(1, window, 1)
-        t_u  = target.unfold(1, window, 1)
-        p_un = p_u / torch.norm(p_u, dim=-1, keepdim=True).clamp(min=1e-8)
-        t_un = t_u / torch.norm(t_u, dim=-1, keepdim=True).clamp(min=1e-8)
-        coh  = (p_un * t_un).sum(-1).abs().clamp(0.0, 1.0)
+        B, N, H, W = pred.shape
+        p = pred.permute(  0, 2, 3, 1).reshape(B * H * W, 1, N)
+        t = target.permute(0, 2, 3, 1).reshape(B * H * W, 1, N)
+
+        pt = F.avg_pool1d(p * t, window, stride=1) * window
+        p2 = F.avg_pool1d(p * p, window, stride=1) * window
+        t2 = F.avg_pool1d(t * t, window, stride=1) * window
+
+        coh = (pt.abs() / (p2 * t2).clamp(min=1e-16).sqrt()).clamp(0.0, 1.0)
+        
         return (1.0 - coh).mean()
 
     @staticmethod
     def tv(params: torch.Tensor) -> torch.Tensor:
         dx = torch.abs(params[..., 1:, :] - params[..., :-1, :]).mean()
         dy = torch.abs(params[..., :, 1:] - params[..., :, :-1]).mean()
+        
         return dx + dy
 
     @staticmethod
@@ -52,6 +78,7 @@ class LossComponents:
         g      = torch.exp(-(coords ** 2) / (2.0 * sigma ** 2))
         g      = g / g.sum()
         kernel = g[:, None] * g[None, :]
+       
         return kernel[None, None, :, :]
 
     @staticmethod
@@ -69,7 +96,7 @@ class LossComponents:
         dtype      = pred.dtype
         device     = pred.device
 
-        kernel  = LossComponents._gaussian_window(window_size, sigma, dtype, device)
+        kernel  = _cached_gaussian_kernel(window_size, sigma, dtype, device)
         padding = window_size // 2
         c1 = (k1 * data_range) ** 2
         c2 = (k2 * data_range) ** 2
@@ -78,6 +105,12 @@ class LossComponents:
             return F.conv2d(z, kernel, padding=padding)
 
         def ssim_slice(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            xy_min = torch.min(x.min(), y.min()).detach()
+            xy_max = torch.max(x.max(), y.max()).detach()
+            rng    = (xy_max - xy_min).clamp(min=1e-6)
+            x      = (x - xy_min) / rng
+            y      = (y - xy_min) / rng
+
             mu_x  = conv(x);  mu_y = conv(y)
             mu_x2 = mu_x * mu_x;  mu_y2 = mu_y * mu_y;  mu_xy = mu_x * mu_y
             sx2   = torch.clamp(conv(x * x) - mu_x2, min=0.0)
@@ -186,14 +219,17 @@ class Loss:
         n_gaussians = C // ppg
     
         p   = params.reshape(B, n_gaussians, ppg, H, W)
-        a   = F.relu(p[:, :, 0:1, :, :])                       
+        a   = F.softplus(p[:, :, 0:1, :, :], beta=10).clamp(max=1e6)
         mu  = p[:, :, 1:2, :, :]                                
         sig = p[:, :, 2:3, :, :]                                
-        x   = self.x_axis.reshape(1, 1, -1, 1, 1)              
+        x   = self.x_axis.reshape(1, 1, -1, 1, 1)
 
-        sig_safe = F.softplus(sig, beta=100, threshold=20)
-        sig2     = sig_safe ** 2
-        curves   = (a * torch.exp(-((x - mu) ** 2) / (2.0 * sig2))).sum(dim=1)
+        sig_safe = F.softplus(sig, beta=100, threshold=20).clamp(min=1e-3)
+        sig2     = (sig_safe ** 2).clamp(min=1e-6)
+
+        exponent = ((x - mu) ** 2) / (2.0 * sig2)
+        exponent = torch.nan_to_num(exponent, nan=500.0, posinf=500.0, neginf=0.0).clamp(max=500.0)
+        curves   = (a * torch.exp(-exponent)).sum(dim=1)
      
         return curves
     
@@ -239,7 +275,9 @@ class Loss:
 
         if kind == "huber":
             return LossComponents.param_huber(pred, gt, weights * param_mask, cfg.param_huber_delta), {}
-      
+
+        raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1' or 'huber'.")
+
     def __call__(self, pred_params, gt_params):
         cfg = self.loss_cfg
         ppg = self.gaussian_cfg.params_per_gaussian
@@ -247,18 +285,18 @@ class Loss:
 
         with torch.no_grad():
             if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
-                gt_phys = self.norm_stats.denormalize_output(gt_params)
+                gt_phys = self.norm_stats.denormalize_output(gt_params.float())
             else:
-                gt_phys = gt_params
-            exp_curves = self.reconstruct(gt_phys)
+                gt_phys = gt_params.float()
+            exp_curves = self.reconstruct(gt_phys.float())
 
         if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
-            pred_params_phys = self.norm_stats.denormalize_output(pred_params)
+            pred_params_phys = self.norm_stats.denormalize_output(pred_params.float())
         else:
-            pred_params_phys = pred_params
+            pred_params_phys = pred_params.float()
 
-        pred_curves  = self.reconstruct(pred_params_phys)
-        diff         = pred_curves - exp_curves
+        pred_curves  = self.reconstruct(pred_params_phys.float())
+        exp_curves   = exp_curves.float()
 
         components: dict = {}
         weighted:   dict = {}
