@@ -7,8 +7,9 @@ from pipelines.tuning_pipeline.trial_trainer import TrialTrainer
 
 
 class TrialPipeline(TrainingPipeline):
-    def __init__(self, *args, trial: optuna.Trial, **kwargs) -> None:
-        self._trial = trial
+    def __init__(self, *args, trial: optuna.Trial, emit_docs: bool = False, **kwargs) -> None:
+        self._trial     = trial
+        self._emit_docs = emit_docs
         super().__init__(*args, **kwargs)
 
     def _make_trainer(self, model, model_cfg, x_axis, norm_stats):
@@ -21,4 +22,5 @@ class TrialPipeline(TrainingPipeline):
             logger     = self.logger,
             norm_stats = norm_stats,
             trial      = self._trial,
+            emit_docs  = self._emit_docs,
         )

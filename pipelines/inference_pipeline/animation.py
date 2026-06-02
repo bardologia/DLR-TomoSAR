@@ -17,9 +17,15 @@ from pipelines.inference_pipeline.plots import Ploter
 from tools.logger                       import Logger
 
 
-def _render_frame(args: tuple) -> tuple[int, bytes]:
+def _init_worker() -> None:
     import matplotlib
     matplotlib.use("Agg")
+    import matplotlib.pyplot
+    import numpy
+    import io
+
+
+def _render_frame(args: tuple) -> tuple[int, bytes]:
     import matplotlib.pyplot as plt
     import numpy as np
     from io import BytesIO
@@ -160,7 +166,7 @@ class Animator:
         n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
         png_bytes: dict[int, bytes] = {}
 
-        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=_init_worker) as pool:
             futures = {pool.submit(_render_frame, t): t[0] for t in tasks}
             with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
                 for fut in as_completed(futures):

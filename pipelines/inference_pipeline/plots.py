@@ -75,7 +75,7 @@ class Ploter(PlotTools):
         err_cmap : str  = "magma",
         normalize: bool = False,
         fig_dpi  : int  = 150,
-        save_dpi : int  = 300,
+        save_dpi : int  = 150,
     ) -> None:
 
         self.cmap       = cmap

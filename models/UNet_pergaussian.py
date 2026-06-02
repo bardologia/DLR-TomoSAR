@@ -9,12 +9,6 @@ from .UNet_multihead import PixelMLP
 
 
 class UNetPerGaussian(nn.Module):
-    """UNet with one independent MLP head per Gaussian component.
-
-    Each head predicts all ``params_per_gaussian`` parameters (e.g. amplitude,
-    mean, sigma) for its assigned Gaussian, rather than having a shared head
-    per parameter type as in :class:`UNetMultiHead`.
-    """
 
     def __init__(self, config: UNetPerGaussianConfig | None = None):
         super().__init__()

@@ -85,6 +85,7 @@ class DatasetPipeline:
             input_config = self.config.input_config,
             n_slaves     = train_ds.n_slaves,
             num_workers  = self.config.num_workers,
+            max_samples  = 4000,
         )
 
         output_stats = StatsComputer.compute_output_stats(

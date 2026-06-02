@@ -37,41 +37,45 @@ class Representation(Enum):
             Representation.MAG_ONLY      : ["mag"],
         }[self]
 
+    def _channels(self, data: np.ndarray) -> list[np.ndarray]:
+        if self is Representation.MAG_ONLY:
+            return [np.abs(data)]
+
+        if self is Representation.ANGLE_ONLY:
+            return [np.angle(data)]
+
+        if self is Representation.REAL_IMAG:
+            return [data.real, data.imag]
+
+        if self is Representation.MAG_ANGLE:
+            return [np.abs(data), np.angle(data)]
+
+        if self is Representation.MAG_REAL_IMAG:
+            magnitude = np.abs(data)
+            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
+            return [magnitude, data.real / safe_mag, data.imag / safe_mag]
+
+        if self is Representation.MAG_RI_ANGLE:
+            magnitude = np.abs(data)
+            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
+            return [magnitude, data.real / safe_mag, data.imag / safe_mag, np.angle(data)]
+
+        raise ValueError(f"Unsupported representation: {self}")
+
     def convert(self, data: np.ndarray) -> np.ndarray:
         n_samples, n_passes, h, w = data.shape
         cpp                       = _CHANNELS_PER_PASS[self.value]
-
-        if self is Representation.MAG_ONLY:
-            channels = [np.abs(data)]
-
-        elif self is Representation.ANGLE_ONLY:
-            channels = [np.angle(data)]
-
-        elif self is Representation.REAL_IMAG:
-            channels = [data.real, data.imag]
-
-        elif self is Representation.MAG_ANGLE:
-            channels = [np.abs(data), np.angle(data)]
-
-        elif self is Representation.MAG_REAL_IMAG:
-            magnitude = np.abs(data)
-            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
-            channels  = [magnitude, data.real / safe_mag, data.imag / safe_mag]
-
-        elif self is Representation.MAG_RI_ANGLE:
-            magnitude = np.abs(data)
-            safe_mag  = np.where(magnitude > 0, magnitude, 1.0)
-            channels  = [
-                magnitude,
-                data.real / safe_mag,
-                data.imag / safe_mag,
-                np.angle(data),
-            ]
-        else:
-            raise ValueError(f"Unsupported representation: {self}")
+        channels                  = self._channels(data)
 
         out = np.empty((n_samples, n_passes * cpp, h, w), dtype=np.float32)
         for c, arr in enumerate(channels):
             out[:, c::cpp] = arr
 
         return out
+
+    def convert_into(self, out: np.ndarray, data: np.ndarray) -> None:
+        cpp      = _CHANNELS_PER_PASS[self.value]
+        channels = self._channels(data)
+
+        for c, arr in enumerate(channels):
+            out[c::cpp] = arr

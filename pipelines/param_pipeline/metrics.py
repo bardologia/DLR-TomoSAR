@@ -23,27 +23,36 @@ class FittingMetricsCalculator:
     def _build_height_axis(height_range: Tuple[float, float], n_elev: int) -> np.ndarray:
         return np.linspace(float(height_range[0]), float(height_range[1]), n_elev, dtype=np.float32)
 
-    def _reconstruct_profiles(self, parameters_array : np.ndarray, height_axis : np.ndarray) -> np.ndarray:
-        n_elev        = height_axis.size
-        _, Az, R      = parameters_array.shape
-        reconstructed = np.zeros((n_elev, Az, R), dtype=np.float32)
-        h             = height_axis[:, np.newaxis, np.newaxis].astype(np.float32)   
+    def _reconstruct_slice(self, parameters_array : np.ndarray, h_val : float) -> np.ndarray:
+        Az, R         = parameters_array.shape[1:]
+        reconstructed = np.zeros((Az, R), dtype=np.float32)
 
         for k in range(self.n_gaussians):
-            amp = parameters_array[3 * k    ][np.newaxis].astype(np.float32)        
-            mu  = parameters_array[3 * k + 1][np.newaxis].astype(np.float32)        
-            sig = parameters_array[3 * k + 2][np.newaxis].astype(np.float32)        
-            reconstructed += amp * np.exp(-((h - mu) ** 2) / (2.0 * sig ** 2 + 1e-12))
+            amp = parameters_array[3 * k    ]
+            mu  = parameters_array[3 * k + 1]
+            sig = parameters_array[3 * k + 2]
+            reconstructed += amp * np.exp(-((h_val - mu) ** 2) / (2.0 * sig ** 2 + 1e-12))
 
-        return reconstructed                                                         
+        return reconstructed
 
-    def _compute_r2_map(self, tomogram : np.ndarray, reconstructed : np.ndarray) -> np.ndarray:
-        tom_d  = tomogram    .astype(np.float64)
-        rec_d  = reconstructed.astype(np.float64)
-        ss_res = ((rec_d - tom_d) ** 2).sum(axis=0)                                
-        ss_tot = ((tom_d - tom_d.mean(axis=0, keepdims=True)) ** 2).sum(axis=0) + 1e-12
-        
-        return (1.0 - ss_res / ss_tot).astype(np.float32)                           
+    def _compute_r2_map(self, tomogram : np.ndarray, parameters_array : np.ndarray, height_axis : np.ndarray) -> np.ndarray:
+        n_elev = height_axis.size
+        Az, R  = tomogram.shape[1:]
+
+        tom_mean = tomogram.mean(axis=0, dtype=np.float64)
+
+        ss_res = np.zeros((Az, R), dtype=np.float64)
+        ss_tot = np.zeros((Az, R), dtype=np.float64)
+
+        for j in range(n_elev):
+            tom_h = tomogram[j].astype(np.float64)
+            rec_h = self._reconstruct_slice(parameters_array, float(height_axis[j])).astype(np.float64)
+            ss_res += (rec_h - tom_h) ** 2
+            ss_tot += (tom_h - tom_mean) ** 2
+
+        ss_tot += 1e-12
+
+        return (1.0 - ss_res / ss_tot).astype(np.float32)
 
     def _compute_activity_map(self, parameters_array: np.ndarray) -> np.ndarray:
         active = np.zeros(parameters_array.shape[1:], dtype=np.int32)              
@@ -118,14 +127,10 @@ class FittingMetricsCalculator:
 
         self.logger.subsection(f"Tomogram shape  : {tomogram.shape}")
         self.logger.subsection(f"Height range    : [{height_range[0]:.1f}, {height_range[1]:.1f}] m")
-        self.logger.subsection("Reconstructing Gaussian profiles from parameters")
+        self.logger.subsection("Computing per-pixel R\u00b2 map (single-pass, float32)")
+        r2_map = self._compute_r2_map(tomogram, parameters_array, height_axis)
 
-        reconstructed = self._reconstruct_profiles(parameters_array, height_axis) 
-
-        self.logger.subsection("Computing per-pixel R\u00b2 map")
-        r2_map = self._compute_r2_map(tomogram, reconstructed)                     
-
-        del tomogram, reconstructed
+        del tomogram
         gc.collect()
 
         self.logger.subsection("Computing activity and spatial parameter maps")

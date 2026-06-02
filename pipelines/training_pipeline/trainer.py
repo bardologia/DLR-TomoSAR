@@ -22,13 +22,14 @@ from pipelines.training_pipeline.loss               import Loss
 
 
 class Trainer:
-    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger, norm_stats=None):
+    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger, norm_stats=None, emit_docs=True):
         self.logger       = logger
         self.config       = config
         self.gaussian_cfg = config.gaussian
         self.curriculum      = config.curriculum
         self.warmup_loss_cfg = config.curriculum.warmup
         self.norm_stats   = norm_stats
+        self.emit_docs    = emit_docs
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
@@ -47,10 +48,11 @@ class Trainer:
         self.model_cfg = model_cfg
         self.x_axis    = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
 
-        summary = ModelSummary(self.logger, self.model)
-        summary.run()
-        summary_path = Path(run_dir) / "docs" / "model_summary.md"
-        summary.save_markdown(str(summary_path))
+        if self.emit_docs:
+            summary      = ModelSummary(self.logger, self.model)
+            summary.run()
+            summary_path = Path(run_dir) / "docs" / "model_summary.md"
+            summary.save_markdown(str(summary_path))
 
         self.epochs               = self.config.training.epochs
         self.validation_frequency = self.config.training.validation_frequency
@@ -159,6 +161,9 @@ class Trainer:
 
     @torch.no_grad()
     def _run_shape_logger(self, data_loader: DataLoader):
+        if not self.emit_docs:
+            return
+
         include_types = getattr(self.model_cfg, "shape_logger_types", None)
         if include_types is None:
             return

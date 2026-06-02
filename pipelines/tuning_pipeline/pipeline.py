@@ -39,6 +39,7 @@ class TuningPipeline:
             tune_cfg            = self.tune_cfg.phase1,
             log_dir             = str(Path(self.log_dir) / "phase1"),
             logger              = self.logger,
+            emit_trial_docs     = self.tune_cfg.emit_trial_docs,
         )
         tuner.run(study, n_trials)
 
@@ -52,6 +53,7 @@ class TuningPipeline:
             best_phase1_params  = best_phase1_params,
             log_dir             = str(Path(self.log_dir) / "phase2"),
             logger              = self.logger,
+            emit_trial_docs     = self.tune_cfg.emit_trial_docs,
         )
         tuner.run(study, n_trials)
 
@@ -64,5 +66,6 @@ class TuningPipeline:
             tune_cfg            = self.tune_cfg.single_phase,
             log_dir             = str(Path(self.log_dir) / "single_phase"),
             logger              = self.logger,
+            emit_trial_docs     = self.tune_cfg.emit_trial_docs,
         )
         tuner.run(study, n_trials)

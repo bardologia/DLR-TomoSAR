@@ -317,6 +317,7 @@ class InferencePipeline:
             global_metrics   = global_metrics,
             figure_paths     = figure_paths,
             gif_paths        = gif_paths,
+            report_path      = meta.report_path,
         ).assemble()
 
     def _setup(self, cfg: InferenceConfig) -> tuple[InferenceMetadata, Logger, Ploter]:

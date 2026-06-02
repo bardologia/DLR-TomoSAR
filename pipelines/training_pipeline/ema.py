@@ -31,9 +31,12 @@ class EMA:
             return None
 
         with torch.no_grad():
-            for name, param in model.named_parameters():
-                if param.requires_grad:
-                    self.shadow[name] = self.shadow[name] * self.decay + param * (1.0 - self.decay)
+            names   = [name for name, param in model.named_parameters() if param.requires_grad]
+            params  = [param for name, param in model.named_parameters() if param.requires_grad]
+            shadows = [self.shadow[name] for name in names]
+
+            torch._foreach_mul_(shadows, self.decay)
+            torch._foreach_add_(shadows, params, alpha=1.0 - self.decay)
 
         if step is not None and self.tracker.debug:
             divergence = sum(torch.norm(self.shadow[name] - param).item() for name, param in model.named_parameters() if param.requires_grad)

@@ -20,6 +20,7 @@ class Phase2Tuner:
         best_phase1_params  : dict,
         log_dir             : str,
         logger,
+        emit_trial_docs     : bool = False,
     ) -> None:
         self.model_name          = model_name
         self.model_config_cls    = model_config_cls
@@ -29,6 +30,7 @@ class Phase2Tuner:
         self.best_phase1_params  = best_phase1_params
         self.log_dir             = log_dir
         self.logger              = logger
+        self.emit_trial_docs     = emit_trial_docs
 
     def _objective(self, trial: optuna.Trial) -> float:
         from pipelines.tuning_pipeline.trial_pipeline import TrialPipeline
@@ -58,6 +60,7 @@ class Phase2Tuner:
             seed           = trial.number,
             run_name       = f"phase2_trial_{trial.number:04d}",
             trial          = trial,
+            emit_docs      = self.emit_trial_docs,
         )
 
         try:

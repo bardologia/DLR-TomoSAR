@@ -36,44 +36,32 @@ class Result:
 def _cpu_worker(args: tuple) -> tuple:
     pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, out_ch, norm_loc, norm_scale = args
 
-    x          = x_axis.reshape(1, -1, 1, 1).astype(np.float32)
+    x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
     B, _, H, W = pred_params_chunk.shape
-    n_elev     = x.shape[1]
+    n_elev     = x.shape[2]
 
     def reconstruct(params: np.ndarray, n_K: int) -> np.ndarray:
-        out = np.zeros((B, n_elev, H, W), dtype=np.float32)
-        for k in range(n_K):
-            a   = np.maximum(params[:, 3 * k     : 3 * k + 1], 0.0)
-            mu  =            params[:, 3 * k + 1 : 3 * k + 2]
-            sig =            params[:, 3 * k + 2 : 3 * k + 3]
-            out = out + a * np.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
-        return out
+        a   = np.maximum(params[:, :, 0:1], 0.0)
+        mu  =            params[:, :, 1:2]
+        sig =            params[:, :, 2:3]
+        out = (a * np.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))).sum(axis=1)
+        return out.astype(np.float32)
 
     n_K         = n_gaussians
     pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
     gt_gauss    = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-  
-    loc         = norm_loc[:n_K * 3].reshape(1, n_K, 3, 1, 1)
-    scale       = np.where(norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1) > 1e-8, norm_scale[:n_K * 3].reshape(1, n_K, 3, 1, 1), 1e-8)
-    pred_norm   = (pred_gauss - loc) / scale
-    gt_norm     = (gt_gauss   - loc) / scale
 
-    gt_phys     = gt_norm * scale + loc                                         
-    sort_key    = np.where(gt_phys[:, :, 0] < 1e-3, np.inf, gt_phys[:, :, 1]) 
-    sort_idx    = np.argsort(sort_key, axis=1)                                  
-    sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)                 
-   
-    gt_norm_matched    = np.take_along_axis(gt_norm,   sort_idx_e, axis=1)
-    pred_norm_matched  = pred_norm                                                
+    sort_key    = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
+    sort_idx    = np.argsort(sort_key, axis=1)
+    sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)
 
-    pred_gauss_matched = pred_norm_matched * scale + loc
-    gt_gauss_matched   = gt_norm_matched   * scale + loc
+    gt_gauss_matched   = np.take_along_axis(gt_gauss, sort_idx_e, axis=1)
 
-    pred_gauss_flat    = pred_gauss_matched.reshape(B, n_K * 3, H, W)
-    gt_gauss_flat      = gt_gauss_matched.reshape(  B, n_K * 3, H, W)
+    pred_gauss_flat    = pred_gauss.reshape(      B, n_K * 3, H, W)
+    gt_gauss_flat      = gt_gauss_matched.reshape(B, n_K * 3, H, W)
 
-    pred_curves = reconstruct(pred_gauss_flat, n_gaussians)
-    gt_curves   = reconstruct(gt_gauss_flat,   n_gaussians)
+    pred_curves = reconstruct(pred_gauss,        n_gaussians)
+    gt_curves   = reconstruct(gt_gauss_matched,  n_gaussians)
 
     diff   = pred_curves - gt_curves
     mse    = (diff * diff).mean(axis=1)
@@ -89,10 +77,10 @@ def _cpu_worker(args: tuple) -> tuple:
     peak   = np.abs(pred_curves.argmax(axis=1) - gt_curves.argmax(axis=1)).astype(np.float32)
 
     return (
-        pred_curves.astype(np.float32),
-        gt_curves.astype(np.float32),
-        pred_gauss_flat.astype(np.float32),
-        gt_gauss_flat.astype(np.float32),
+        pred_curves,
+        gt_curves,
+        pred_gauss_flat,
+        gt_gauss_flat,
         {"mse": mse, "mae": mae, "r2": r2, "cos": cos},
         peak,
     )
@@ -193,16 +181,14 @@ class Predictor:
         param_pred_stitcher = self._create_stitcher(out_ch,  "params_pred")
         gt_param_stitcher   = self._create_stitcher(n_K * 3, "params_gt")
 
-        pixel_mse  = np.zeros((H, W), dtype=np.float32)
-        pixel_mae  = np.zeros((H, W), dtype=np.float32)
-        pixel_r2   = np.zeros((H, W), dtype=np.float32)
-        pixel_cos  = np.zeros((H, W), dtype=np.float32)
-        pixel_peak = np.zeros((H, W), dtype=np.float32)
-        pixel_w    = np.zeros((H, W), dtype=np.float32)
+        pixel_maps = np.zeros((5, H, W), dtype=np.float32)
+        pixel_w    = np.zeros((H, W),    dtype=np.float32)
 
         win2d = CubeStitcher.make_patch_window(run.grid.patch_size, kind=self.window_kind)
 
         for batch_indices, (pred_curves, gt_curves, pred_params, gt_params, mets, peak_np) in zip(all_indices, cpu_results):
+            patch_maps = np.stack([mets["mse"], mets["mae"], mets["r2"], mets["cos"], peak_np], axis=1)
+
             for b, idx in enumerate(batch_indices):
                 pred_curve_stitcher.add_patch(idx, pred_curves[b].astype(self.cube_dtype))
                 gt_curve_stitcher.add_patch(  idx, gt_curves  [b].astype(self.cube_dtype))
@@ -218,17 +204,13 @@ class Predictor:
                 pv1, ph1 = pv0 + (v1c - v0c), ph0 + (h1c - h0c)
                 w_local  = win2d[pv0:pv1, ph0:ph1]
 
-                pixel_mse [v0c:v1c, h0c:h1c] += w_local * mets["mse"][b, pv0:pv1, ph0:ph1]
-                pixel_mae [v0c:v1c, h0c:h1c] += w_local * mets["mae"][b, pv0:pv1, ph0:ph1]
-                pixel_r2  [v0c:v1c, h0c:h1c] += w_local * mets["r2"] [b, pv0:pv1, ph0:ph1]
-                pixel_cos [v0c:v1c, h0c:h1c] += w_local * mets["cos"][b, pv0:pv1, ph0:ph1]
-                pixel_peak[v0c:v1c, h0c:h1c] += w_local * peak_np    [b, pv0:pv1, ph0:ph1]
-                pixel_w   [v0c:v1c, h0c:h1c] += w_local
+                pixel_maps[:, v0c:v1c, h0c:h1c] += w_local * patch_maps[b, :, pv0:pv1, ph0:ph1]
+                pixel_w   [   v0c:v1c, h0c:h1c] += w_local
 
         return self._finalize_results(
             pred_curve_stitcher, gt_curve_stitcher,
             param_pred_stitcher, gt_param_stitcher,
-            pixel_mse, pixel_mae, pixel_r2, pixel_cos, pixel_peak, pixel_w,
+            pixel_maps[0], pixel_maps[1], pixel_maps[2], pixel_maps[3], pixel_maps[4], pixel_w,
         )
 
     def _finalize_results(

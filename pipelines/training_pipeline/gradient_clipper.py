@@ -35,13 +35,15 @@ class GradientClipper:
         
     @staticmethod
     def global_norm(model: torch.nn.Module) -> float:
-        total_norm = 0.0
-        for p in model.parameters():
-            if p.grad is not None:
-                param_norm = p.grad.detach().data.norm(2)
-                total_norm += param_norm.item() ** 2
-        
-        return total_norm ** 0.5
+        grads = [p.grad.detach() for p in model.parameters() if p.grad is not None]
+
+        if not grads:
+            return 0.0
+
+        per_param_norms = torch._foreach_norm(grads, 2)
+        total_norm      = torch.norm(torch.stack(per_param_norms), 2)
+
+        return total_norm.item()
 
     def _clip(self, model: torch.nn.Module, norm: float, max_norm: float) -> tuple[float, float]:
         scale = min(1.0, max_norm / (norm + self.epsilon))

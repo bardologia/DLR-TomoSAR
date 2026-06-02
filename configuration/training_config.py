@@ -158,8 +158,9 @@ class SchedulerConfig:
 
 @dataclass
 class EMAConfig:
-    use_ema   : bool  = True
-    ema_decay : float = 0.999
+    use_ema               : bool  = True
+    ema_decay             : float = 0.999
+    update_every_n_steps  : int   = 10
 
 
 @dataclass

@@ -21,22 +21,28 @@ class SpatialAugmenter:
         )
 
     def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-     
-        if self._rng.random() < self.config.p_flip_h:
-            input_tensor = np.flip(input_tensor, axis=-1).copy()
-            gt_params    = np.flip(gt_params, axis=-1).copy()
-            
-        if self._rng.random() < self.config.p_flip_v:
-            input_tensor = np.flip(input_tensor, axis=-2).copy()
-            gt_params    = np.flip(gt_params, axis=-2).copy()
 
-        if self.config.p_rot90 > 0.0 and self._rng.random() < self.config.p_rot90:
-            k = int(self._rng.integers(1, 4))
-            input_tensor = np.rot90(input_tensor, k=k, axes=(-2, -1)).copy()
-            gt_params    = np.rot90(gt_params, k=k, axes=(-2, -1)).copy()
+        flip_h  = self._rng.random() < self.config.p_flip_h
+        flip_v  = self._rng.random() < self.config.p_flip_v
+        rotate  = self.config.p_rot90 > 0.0 and self._rng.random() < self.config.p_rot90
+        k       = int(self._rng.integers(1, 4)) if rotate else 0
+        noise   = self._rng.random() < self.config.p_noise
 
-        if self._rng.random() < self.config.p_noise:
-            noise = self._rng.normal(0.0, self.config.noise_std, input_tensor.shape).astype(input_tensor.dtype)
-            input_tensor = input_tensor + noise
+        sl_h    = slice(None, None, -1) if flip_h else slice(None)
+        sl_v    = slice(None, None, -1) if flip_v else slice(None)
+        sl      = (Ellipsis, sl_v, sl_h)
+
+        input_view = input_tensor[sl]
+        gt_view    = gt_params[sl]
+
+        if k:
+            input_view = np.rot90(input_view, k=k, axes=(-2, -1))
+            gt_view    = np.rot90(gt_view, k=k, axes=(-2, -1))
+
+        input_tensor = np.ascontiguousarray(input_view)
+        gt_params    = np.ascontiguousarray(gt_view)
+
+        if noise:
+            input_tensor += self._rng.normal(0.0, self.config.noise_std, input_tensor.shape).astype(input_tensor.dtype)
 
         return input_tensor, gt_params

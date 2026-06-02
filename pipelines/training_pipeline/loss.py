@@ -22,19 +22,37 @@ def _cached_gaussian_kernel(size: int, sigma: float, dtype: torch.dtype, device:
 class LossComponents:
     @staticmethod
     def mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        return ((pred - target) ** 2).mean()
+        return F.mse_loss(pred, target, reduction="mean")
+
+    @staticmethod
+    def mse_diff(diff: torch.Tensor) -> torch.Tensor:
+        return (diff * diff).mean()
 
     @staticmethod
     def l1(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        return torch.abs(pred - target).mean()
+        return F.l1_loss(pred, target, reduction="mean")
+
+    @staticmethod
+    def l1_diff(diff: torch.Tensor) -> torch.Tensor:
+        return diff.abs().mean()
 
     @staticmethod
     def huber(pred: torch.Tensor, target: torch.Tensor, delta: float) -> torch.Tensor:
         return F.huber_loss(pred, target, reduction="mean", delta=delta)
 
     @staticmethod
+    def huber_diff(diff: torch.Tensor, delta: float) -> torch.Tensor:
+        abs_diff = diff.abs()
+        val      = torch.where(abs_diff <= delta, 0.5 * diff * diff, delta * (abs_diff - 0.5 * delta))
+        return val.mean()
+
+    @staticmethod
     def charbonnier(pred: torch.Tensor, target: torch.Tensor, eps: float) -> torch.Tensor:
         diff = pred - target
+        return LossComponents.charbonnier_diff(diff, eps)
+
+    @staticmethod
+    def charbonnier_diff(diff: torch.Tensor, eps: float) -> torch.Tensor:
         return torch.sqrt((diff * diff + eps * eps).clamp(min=eps * eps)).mean()
 
     @staticmethod
@@ -222,14 +240,21 @@ class Loss:
         n_gaussians = C // ppg
         p           = params.reshape(B, n_gaussians, ppg, H, W)
 
-        a   = p[:, :, 0:1, :, :]
-        mu  = p[:, :, 1:2, :, :]
-        sig = p[:, :, 2:3, :, :]
-        x   = self.x_axis.reshape(1, 1, -1, 1, 1)
+        a   = p[:, :, 0, :, :]
+        mu  = p[:, :, 1, :, :]
+        sig = p[:, :, 2, :, :]
+        x   = self.x_axis.reshape(1, -1, 1, 1)
 
-        sig2     = sig ** 2
-        exponent = ((x - mu) ** 2) / (2.0 * sig2)
-        curves   = (a * torch.exp(-exponent)).sum(dim=1)
+        curves = torch.zeros((B, x.shape[1], H, W), dtype=params.dtype, device=params.device)
+
+        for g in range(n_gaussians):
+            a_g   = a[:, g:g+1, :, :]
+            mu_g  = mu[:, g:g+1, :, :]
+            sig_g = sig[:, g:g+1, :, :]
+
+            sig2_g     = sig_g ** 2
+            exponent_g = ((x - mu_g) ** 2) / (2.0 * sig2_g)
+            curves     = curves + a_g * torch.exp(-exponent_g)
 
         return curves
     
@@ -308,9 +333,12 @@ class Loss:
 
         lc = LossComponents
 
+        needs_diff = cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
+        diff       = (pred_curves - exp_curves) if needs_diff else None
+
         if cfg.use_mse_curve:
             eff_w                           = cfg.eff("weight_mse_curve")
-            val                             = lc.mse(pred_curves, exp_curves)
+            val                             = lc.mse_diff(diff)
             components["mse_curve"]         = val
             weighted["mse_curve"]           = eff_w * val
             total_loss                      = total_loss + weighted["mse_curve"]
@@ -318,7 +346,7 @@ class Loss:
 
         if cfg.use_l1_curve:
             eff_w                           = cfg.eff("weight_l1_curve")
-            val                             = lc.l1(pred_curves, exp_curves)
+            val                             = lc.l1_diff(diff)
             components["l1_curve"]          = val
             weighted["l1_curve"]            = eff_w * val
             total_loss                      = total_loss + weighted["l1_curve"]
@@ -326,7 +354,7 @@ class Loss:
 
         if cfg.use_huber_curve:
             eff_w                           = cfg.eff("weight_huber_curve")
-            val                             = lc.huber(pred_curves, exp_curves, cfg.huber_delta)
+            val                             = lc.huber_diff(diff, cfg.huber_delta)
             components["huber_curve"]       = val
             weighted["huber_curve"]         = eff_w * val
             total_loss                      = total_loss + weighted["huber_curve"]
@@ -334,7 +362,7 @@ class Loss:
 
         if cfg.use_charbonnier_curve:
             eff_w                           = cfg.eff("weight_charbonnier_curve")
-            val                             = lc.charbonnier(pred_curves, exp_curves, cfg.charbonnier_eps)
+            val                             = lc.charbonnier_diff(diff, cfg.charbonnier_eps)
             components["charbonnier_curve"] = val
             weighted["charbonnier_curve"]   = eff_w * val
             total_loss                      = total_loss + weighted["charbonnier_curve"]

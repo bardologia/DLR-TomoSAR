@@ -170,7 +170,6 @@ Root configuration object for a single pipeline run.
 | `adam_b1` | `float` | `0.95` | Adam first-moment decay coefficient |
 | `adam_b2` | `float` | `0.999` | Adam second-moment decay coefficient |
 | `gpu_device_ids` | `List[int] \| None` | `[0, 1, 3]` | GPU device indices to activate; `None` uses all available devices |
-| `r2_sample_cap` | `int` | `4096` | Maximum number of pixels sampled for the quick in-fitting $R^2$ diagnostic |
 
 **Derived properties:**
 
@@ -218,7 +217,6 @@ ParameterExtractor(
     adam_b1              : float = 0.9,
     adam_b2              : float = 0.999,
     gpu_device_ids       : list | None = None,
-    r2_sample_cap        : int   = 4096,
     gpu_pixel_batch_size : int   = 8192,
     init_workers         : int | None = None,
 )
@@ -768,7 +766,6 @@ class ParameterExtractor:
         adam_b1              : float = 0.9,
         adam_b2              : float = 0.999,
         gpu_device_ids       : list | None = None,
-        r2_sample_cap        : int   = 4096,
         gpu_pixel_batch_size : int   = 8192,
         init_workers         : int | None = None,
     ) -> None: ...
@@ -797,7 +794,6 @@ class SigmaFittingExtractor:
         lambda_k             : float = 3e-3,
         prominence_frac      : float = 0.05,
         gpu_pixel_batch_size : int   = 8192,
-        r2_sample_cap        : int   = 4096,
         gpu_device_ids       : list | None = None,
         init_workers         : int | None = None,
     ) -> None: ...

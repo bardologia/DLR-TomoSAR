@@ -81,7 +81,7 @@ def _prominence_batch(prof_raw : np.ndarray, height_axis : np.ndarray, K : int, 
     min_dist    = max(1, int(sigma_guess / dh))
     smoothed    = uniform_filter1d(prof_raw.astype(np.float32), size=5, mode="nearest", axis=1).copy()
 
-    chunk_size = max(1, N // (n_workers * 8))
+    chunk_size = max(1, -(-N // (n_workers * 2)))
     chunks     = [smoothed[i:i + chunk_size] for i in range(0, N, chunk_size)]
     
     worker_fn  = partial(
@@ -537,16 +537,13 @@ class SigmaFittingExtractor:
     ) -> int:
         
         self.logger.section("[Range Bin Loading]")
-        self.logger.subsection(f"Loading all range batches into memory")
+        self.logger.subsection(f"Streaming range batches (load fused with fitting)")
 
-        all_profiles_flat : list = []
-        all_profiles_norm : list = []
-        all_safe_scale    : list = []
-        all_active        : list = []
+        total_attempted = 0
 
         progress_bar = self.logger.track(transient=True)
         progress     = progress_bar.__enter__()
-        bar_task     = progress.add_task("  [section]Loading range bins[/section]", total=R,)
+        bar_task     = progress.add_task("  [section]Processing range bins[/section]", total=R,)
 
         try:
             with ThreadPoolExecutor(max_workers=2) as pool:
@@ -555,51 +552,40 @@ class SigmaFittingExtractor:
 
                 try:
                     while r < R:
-                        profiles_flat, profiles_norm, safe_scale, active, r_end = \
-                            prefetch_future.result()
-                        
+                        profiles_flat, profiles_norm, safe_scale, active, r_end = prefetch_future.result()
+
+                        r_start = r
                         r_count = r_end - r
 
                         if r_end < R:
                             prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H, threshold_factor, truncation_index)
 
-                        all_profiles_flat.append(profiles_flat)
-                        all_profiles_norm.append(profiles_norm)
-                        all_safe_scale   .append(safe_scale)
-                        all_active       .append(active)
+                        total_attempted += int(active.sum())
+
+                        fitted = self._fit_batch(
+                            profiles_flat, profiles_norm,
+                            active, safe_scale,
+                            height_axis, height_ax_j,
+                            sigma_lower_j, sigma_upper_j,
+                            n_params_out,
+                        )
+
+                        output[:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
+
+                        del profiles_flat, profiles_norm, safe_scale, active, fitted
+                        gc.collect()
 
                         progress.advance(bar_task, advance=r_count)
                         r = r_end
-                
+
                 except Exception:
                     prefetch_future.cancel()
                     raise
         finally:
             progress_bar.__exit__(None, None, None)
 
-        profiles_flat_all = np.concatenate(all_profiles_flat, axis=0)
-        profiles_norm_all = np.concatenate(all_profiles_norm, axis=0)
-        safe_scale_all    = np.concatenate(all_safe_scale,    axis=0)
-        active_all        = np.concatenate(all_active,        axis=0)
-        
-        del all_profiles_flat, all_profiles_norm, all_safe_scale, all_active
-
-        total_attempted = int(active_all.sum())
         self.logger.subsection(f"Total pixels   : {R * Az:,}")
         self.logger.subsection(f"Active pixels  : {total_attempted:,}")
-
-        fitted_all = self._fit_batch(
-            profiles_flat_all, profiles_norm_all,
-            active_all, safe_scale_all,
-            height_axis, height_ax_j,
-            sigma_lower_j, sigma_upper_j,
-            n_params_out,
-        )
-
-        del profiles_flat_all, profiles_norm_all, safe_scale_all, active_all
-        output[:, :, :] = fitted_all.reshape(R, Az, n_params_out).transpose(2, 1, 0)
-        del fitted_all
-        gc.collect()
 
         return total_attempted
 

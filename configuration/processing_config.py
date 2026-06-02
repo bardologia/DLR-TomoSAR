@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -29,8 +30,24 @@ class TomogramConfiguration:
 
 @dataclass
 class ParallelConfiguration:
-    tomogram_workers : int = 10
-    pyrat_threads    : int = 15
+    tomogram_workers : Optional[int] = None
+    pyrat_threads    : int           = 15
+
+    @staticmethod
+    def available_cores() -> int:
+        try:
+            return len(os.sched_getaffinity(0))
+        except AttributeError:
+            return os.cpu_count() or 1
+
+    def resolve_workers(self, subsection_count: int) -> int:
+        if self.tomogram_workers is not None:
+            return max(1, min(subsection_count, self.tomogram_workers))
+
+        cores  = self.available_cores()
+        budget = max(1, cores // max(1, self.pyrat_threads))
+
+        return max(1, min(subsection_count, budget))
 
 
 @dataclass

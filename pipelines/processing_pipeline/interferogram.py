@@ -72,10 +72,10 @@ class InterferogramBuilder:
         )
         primary = primary_slc.astype(np.complex64)
 
-        secondary_layers     : list[np.ndarray] = []
-        interferogram_layers : list[np.ndarray] = []
-        
         n_secondaries = len(tomography_object.slaves)
+
+        secondaries    = np.empty((n_secondaries,) + primary.shape, dtype=np.complex64)
+        interferograms = np.empty((n_secondaries,) + primary.shape, dtype=np.complex64)
 
         for secondary_index, secondary in enumerate(tomography_object.slaves):
             self.logger.subsection(f"[FSAR] Loading secondary SLC {secondary_index + 1}/{n_secondaries}: {secondary}")
@@ -101,20 +101,17 @@ class InterferogramBuilder:
                 )
             )
 
-            secondary_layers.append(secondary_slc.astype(np.complex64))
+            secondaries[secondary_index] = secondary_slc
 
             secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, self.config.input_configs.max_amplitude_clip)
             deramped_secondary    = secondary_slc * np.exp(1.0j * dem_phase)
             phasor                = primary_slc * np.conj(deramped_secondary)
             phasor               /= (np.abs(phasor) + 1e-30)
-            complex_interferogram = (secondary_amplitude * phasor).astype(np.complex64)
 
-            interferogram_layers.append(complex_interferogram)
-            del secondary_slc, dem_phase, deramped_secondary, phasor, secondary_amplitude, complex_interferogram
+            interferograms[secondary_index] = secondary_amplitude * phasor
 
-        secondaries    = np.stack(secondary_layers,     axis=0)
-        interferograms = np.stack(interferogram_layers, axis=0)
-        
+            del secondary_slc, dem_phase, deramped_secondary, phasor, secondary_amplitude
+
         return primary, secondaries, interferograms
 
     def build(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -124,9 +121,6 @@ class InterferogramBuilder:
             raise NotImplementedError(f"Dataset type '{self.config.dataset_type}' is not supported. Only 'FSAR' is implemented.")
 
         primary, secondaries, interferograms = self._build_from_fsar(crop_tuple)
-        primary        = np.ascontiguousarray(primary)
-        secondaries    = np.ascontiguousarray(secondaries)
-        interferograms = np.ascontiguousarray(interferograms)
 
         gc.collect()
         

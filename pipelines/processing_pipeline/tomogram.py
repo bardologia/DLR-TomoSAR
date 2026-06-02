@@ -87,7 +87,9 @@ class TomogramProcessor:
 
         self.logger.section("[TomogramProcessor Initialization]")
         self.logger.subsection(f"Max Azimuth Width : {self.config.input_configs.max_crop_azimuth_width}")
-        self.logger.subsection(f"Parallel Workers  : {self.config.parallel.tomogram_workers}")
+        self.logger.subsection(f"Parallel Workers  : {self.config.parallel.tomogram_workers if self.config.parallel.tomogram_workers is not None else 'auto'}")
+        self.logger.subsection(f"PyRat Threads     : {self.config.parallel.pyrat_threads}")
+        self.logger.subsection(f"Cores Available   : {self.config.parallel.available_cores()}")
 
     def _create_temp(self) -> Path:
         parent = self.config.paths.temporary_directory
@@ -160,9 +162,11 @@ class TomogramProcessor:
                 parent_sys_path,
             ))
 
-        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {parallel_config.tomogram_workers} workers")
+        resolved_workers = parallel_config.resolve_workers(len(tasks))
 
-        with ProcessPoolExecutor(max_workers=parallel_config.tomogram_workers, mp_context=mp.get_context("spawn")) as executor:
+        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({parallel_config.pyrat_threads} threads each, {parallel_config.available_cores()} cores available)")
+
+        with ProcessPoolExecutor(max_workers=resolved_workers, mp_context=mp.get_context("spawn")) as executor:
             futures = [executor.submit(_run_pyrat, *task) for task in tasks]
             try:
                 for future in as_completed(futures):
@@ -178,16 +182,42 @@ class TomogramProcessor:
    
         self.logger.subsection(f"[Concatenation] Merging {len(partial_file_paths)} subsection artifacts")
 
-        dem_chunks      : list[np.ndarray] = []
-        tomogram_chunks : list[np.ndarray] = []
+        dem_shapes      : list[Tuple[int, ...]] = []
+        tomogram_shapes : list[Tuple[int, ...]] = []
+        dem_dtype       = None
+        tomogram_dtype  = None
 
         for partial_file_path in partial_file_paths:
             with h5py.File(str(partial_file_path), "r") as hdf5_file:
-                dem_chunks.append(hdf5_file["DEM"][:])
-                tomogram_chunks.append(hdf5_file["tomogram"][:])
+                dem_shapes.append(hdf5_file["DEM"].shape)
+                tomogram_shapes.append(hdf5_file["tomogram"].shape)
+                dem_dtype      = hdf5_file["DEM"].dtype
+                tomogram_dtype = hdf5_file["tomogram"].dtype
 
-        combined_dem      = np.concatenate(dem_chunks,      axis=0)
-        combined_tomogram = np.concatenate(tomogram_chunks, axis=1)
+        combined_dem_shape      = (sum(shape[0] for shape in dem_shapes),) + dem_shapes[0][1:]
+        combined_tomogram_shape = tomogram_shapes[0][:1] + (sum(shape[1] for shape in tomogram_shapes),) + tomogram_shapes[0][2:]
+
+        combined_dem      = np.empty(combined_dem_shape,      dtype=dem_dtype)
+        combined_tomogram = np.empty(combined_tomogram_shape, dtype=tomogram_dtype)
+
+        dem_offset      = 0
+        tomogram_offset = 0
+
+        for partial_file_path in partial_file_paths:
+            with h5py.File(str(partial_file_path), "r") as hdf5_file:
+                dem_chunk      = hdf5_file["DEM"][:]
+                tomogram_chunk = hdf5_file["tomogram"][:]
+
+            dem_width      = dem_chunk.shape[0]
+            tomogram_width = tomogram_chunk.shape[1]
+
+            combined_dem[dem_offset:dem_offset + dem_width]                 = dem_chunk
+            combined_tomogram[:, tomogram_offset:tomogram_offset + tomogram_width] = tomogram_chunk
+
+            dem_offset      += dem_width
+            tomogram_offset += tomogram_width
+
+            del dem_chunk, tomogram_chunk
 
         self.logger.subsection(f"Combined DEM shape      : {combined_dem.shape}")
         self.logger.subsection(f"Combined Tomogram shape : {combined_tomogram.shape}")

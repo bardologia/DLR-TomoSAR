@@ -52,31 +52,35 @@ class PatchDataset(Dataset):
         return self.grid.grid.number_of_patches
 
     def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
-        complex_data = complex_patch[None, ...]
-      
-        primary_data        = complex_data[:, :1]
-        secondaries_data    = complex_data[:, 1:1 + self.n_secondaries]
-        interferograms_data = complex_data[:, 1 + self.n_secondaries:]
+        primary_data        = complex_patch[:1]
+        secondaries_data    = complex_patch[1:1 + self.n_secondaries]
+        interferograms_data = complex_patch[1 + self.n_secondaries:]
 
-        parts: list[np.ndarray] = []
-        
+        p_h, p_w     = complex_patch.shape[-2], complex_patch.shape[-1]
+        input_tensor = np.empty((self.input_channels, p_h, p_w), dtype=np.float32)
+
+        offset = 0
+
         if self.input_config.use_primary:
-            parts.append(self.input_config.primary_representation.convert(primary_data))
-       
+            n = self.input_config.primary_channels_per_pass
+            self.input_config.primary_representation.convert_into(input_tensor[offset:offset + n], primary_data)
+            offset += n
+
         if self.input_config.use_secondaries:
-            parts.append(self.input_config.secondaries_representation.convert(secondaries_data))
+            n = self.n_secondaries * self.input_config.secondaries_channels_per_pass
+            self.input_config.secondaries_representation.convert_into(input_tensor[offset:offset + n], secondaries_data)
+            offset += n
 
         if self.input_config.use_interferograms:
-            parts.append(self.input_config.interferograms_representation.convert(interferograms_data))
+            n = self.n_secondaries * self.input_config.interferograms_channels_per_pass
+            self.input_config.interferograms_representation.convert_into(input_tensor[offset:offset + n], interferograms_data)
+            offset += n
 
         if self.input_config.use_dem and dem_patch is not None:
-            # dem_patch shape: (pH, pW) → (1, 1, pH, pW) to match batch/channel dims before squeezing
-            parts.append(dem_patch[np.newaxis, np.newaxis].astype(np.float32))
+            input_tensor[offset] = dem_patch
+            offset += 1
 
-        input_tensor = parts[0] if len(parts) == 1 else np.concatenate(parts, axis=1)
-        input_tensor = input_tensor[0]  
-
-        return np.ascontiguousarray(input_tensor, dtype=np.float32)
+        return input_tensor
 
     def _build_output_tensor(self, gt_patch: np.ndarray) -> np.ndarray:
         output_tensor = gt_patch[self.output_channel_indices, ...]

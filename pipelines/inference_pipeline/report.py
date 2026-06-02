@@ -31,9 +31,11 @@ class Report:
         global_metrics   : Dict,
         figure_paths     : Dict[str, Path],
         gif_paths        : Dict[str, Path],
+        report_path      : Path,
         extra_sections   : Optional[List[str]] = None,
     ) -> None:
 
+        self.report_path      = Path(report_path)
         self.output_dir       = Path(output_dir)
         self.run_summary      = run_summary
         self.inference_config = inference_config
@@ -338,7 +340,7 @@ class Report:
 
     def assemble(self) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        report_path = self.output_dir / "report.md"
+        report_path = self.report_path
 
         lines: List[str] = []
         lines.append("# TomoSAR Inference Report")

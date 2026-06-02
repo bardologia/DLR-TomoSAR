@@ -49,3 +49,4 @@ class TuningConfig:
     single_phase      : SinglePhaseTuneConfig  = field(default_factory=SinglePhaseTuneConfig)
     study_storage_dir : str                    = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/tuning"
     n_gpus            : int                    = 4
+    emit_trial_docs   : bool                   = False

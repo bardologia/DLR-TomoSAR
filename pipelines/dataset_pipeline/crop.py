@@ -40,29 +40,36 @@ class Cropper:
         parameters_reduced     = np.load(str(self.layout.artifact_path("parameters")),             mmap_mode="r", allow_pickle=False)
         dem_reduced            = np.load(str(self.layout.artifact_path("dem_reduced")),            mmap_mode="r", allow_pickle=False)
 
-        primary_split        = np.ascontiguousarray(primary_reduced        [..., az_slice, rg_slice])
-        secondaries_split    = np.ascontiguousarray(secondaries_reduced    [..., az_slice, rg_slice])
-        interferograms_split = np.ascontiguousarray(interferograms_reduced [..., az_slice, rg_slice])
-        parameters_split     = np.ascontiguousarray(parameters_reduced     [..., az_slice, rg_slice])
-        dem_split            = np.ascontiguousarray(dem_reduced            [az_slice, rg_slice].astype(np.float32))
+        primary_view        = primary_reduced        [..., az_slice, rg_slice]
+        secondaries_view    = secondaries_reduced    [..., az_slice, rg_slice]
+        interferograms_view = interferograms_reduced [..., az_slice, rg_slice]
 
-        inputs_split = np.concatenate([primary_split[np.newaxis], secondaries_split, interferograms_split], axis=0)
+        n_secondaries    = secondaries_view.shape[0]
+        n_interferograms = interferograms_view.shape[0]
+        n_passes         = 1 + n_secondaries + n_interferograms
+        az_size          = primary_view.shape[-2]
+        rg_size          = primary_view.shape[-1]
+
+        inputs_split     = np.empty((n_passes, az_size, rg_size), dtype=primary_reduced.dtype)
+        inputs_split[0]                                  = primary_view
+        inputs_split[1:1 + n_secondaries]                = secondaries_view
+        inputs_split[1 + n_secondaries:]                 = interferograms_view
+
+        parameters_split = np.ascontiguousarray(parameters_reduced [..., az_slice, rg_slice])
+        dem_split        = np.ascontiguousarray(dem_reduced        [az_slice, rg_slice].astype(np.float32))
 
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
-            "Primary"          : primary_split.shape,
-            "Secondaries"      : secondaries_split.shape,
-            "Interferograms"   : interferograms_split.shape,
-            "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {secondaries_split.shape[0]} secondaries + {interferograms_split.shape[0]} interferograms]",
+            "Primary"          : primary_view.shape,
+            "Secondaries"      : secondaries_view.shape,
+            "Interferograms"   : interferograms_view.shape,
+            "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
             "DEM reduced"      : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
             "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
         })
 
         return {
-            "primary"        : primary_split,
-            "secondaries"    : secondaries_split,
-            "interferograms" : interferograms_split,
-            "inputs"         : inputs_split,
-            "dem"            : dem_split,
-            "parameters"     : parameters_split,
+            "inputs"     : inputs_split,
+            "dem"        : dem_split,
+            "parameters" : parameters_split,
         }

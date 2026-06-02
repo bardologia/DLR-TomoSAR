@@ -47,11 +47,11 @@ class Metrics:
 
     @staticmethod
     def _basic_stats(x: np.ndarray) -> Dict[str, float]:
-        flat = x.reshape(-1).astype(np.float64, copy=False)
-        
+        flat = x.reshape(-1)
+
         return {
-            "mean"   : float(flat.mean()),
-            "std"    : float(flat.std()),
+            "mean"   : float(flat.mean(dtype=np.float64)),
+            "std"    : float(flat.std(dtype=np.float64)),
             "median" : float(np.median(flat)),
             "min"    : float(flat.min()),
             "max"    : float(flat.max()),
@@ -59,8 +59,8 @@ class Metrics:
 
     @staticmethod
     def _psnr(pred: np.ndarray, ref: np.ndarray) -> float:
-        diff       = (pred - ref).astype(np.float64)
-        mse        = float((diff * diff).mean())
+        diff       = pred - ref
+        mse        = float((diff * diff).mean(dtype=np.float64))
         
         if mse <= 0.0:
             return float("inf")
@@ -153,21 +153,21 @@ class Metrics:
 
         return out
 
-    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:  
-        P = pred.reshape(pred.shape[0], -1).astype(np.float64)
-        G = gt  .reshape(gt  .shape[0], -1).astype(np.float64)
+    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:
+        P = pred.reshape(pred.shape[0], -1)
+        G = gt  .reshape(gt  .shape[0], -1)
 
         diff_g    = P - G
-        mae_gt    = np.abs(diff_g).mean(axis=1)
-        rmse_gt   = np.sqrt((diff_g ** 2).mean(axis=1))
-        g_var     = ((G - G.mean(axis=1, keepdims=True)) ** 2).sum(axis=1) + 1e-12
-        r2_gt     = 1.0 - (diff_g ** 2).sum(axis=1) / g_var
+        mae_gt    = np.abs(diff_g).mean(axis=1, dtype=np.float64)
+        rmse_gt   = np.sqrt((diff_g ** 2).mean(axis=1, dtype=np.float64))
+        g_var     = ((G - G.mean(axis=1, keepdims=True, dtype=np.float64)) ** 2).sum(axis=1, dtype=np.float64) + 1e-12
+        r2_gt     = 1.0 - (diff_g ** 2).sum(axis=1, dtype=np.float64) / g_var
 
-        gt_prob   = G / G.sum(axis=0, keepdims=True).clip(1e-12, None)
-        pred_prob = P / P.sum(axis=0, keepdims=True).clip(1e-12, None)
+        gt_prob   = G / G.sum(axis=0, keepdims=True, dtype=np.float64).clip(1e-12, None)
+        pred_prob = P / P.sum(axis=0, keepdims=True, dtype=np.float64).clip(1e-12, None)
 
         log_pp    = np.log(pred_prob.clip(1e-12, None))
-        ce_gt     = -(gt_prob * log_pp).mean(axis=1)
+        ce_gt     = -(gt_prob * log_pp).mean(axis=1, dtype=np.float64)
 
         return {
             "elev_mae_gt"  : mae_gt,
@@ -289,39 +289,59 @@ class Metrics:
 
         from itertools import permutations as _perms
 
-        pred_mu = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)  # (G, HW)
-        gt_mu   = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)  # (G, HW)
+        pred_mu = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
+        gt_mu   = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
 
-        # Replace NaN (inactive) with large value so those pixels don't bias the match
         pred_mu = np.nan_to_num(pred_mu, nan=1e9)
         gt_mu   = np.nan_to_num(gt_mu,   nan=1e9)
 
-        # cost_mat[hw, i, j] = |pred_mu[i,hw] - gt_mu[j,hw]|
-        cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])  # (HW, G, G)
+        cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])
 
-        all_perms  = list(_perms(range(n_K)))
-        perm_costs = np.stack(
-            [cost_mat[:, np.arange(n_K), list(p)].sum(axis=1) for p in all_perms],
-            axis=1,
-        )  # (HW, n_perms)
+        all_perms   = list(_perms(range(n_K)))
+        identity_idx = all_perms.index(tuple(range(n_K)))
 
-        best_idx = perm_costs.argmin(axis=1)  # (HW,)
-        counts   = np.bincount(best_idx, minlength=len(all_perms)).astype(np.float64)
-        total    = counts.sum()
+        if n_K <= 4:
+            best_idx = self._best_perm_bruteforce(cost_mat, all_perms, n_K)
+        else:
+            best_idx = self._best_perm_assignment(cost_mat, all_perms)
 
-        identity_idx  = all_perms.index(tuple(range(n_K)))
-        dominant_frac = float(counts.max()     / total)
-        identity_frac = float(counts[identity_idx] / total)
+        counts = np.bincount(best_idx, minlength=len(all_perms)).astype(np.float64)
+        total  = counts.sum()
+
+        dominant_frac = float(counts.max()           / total)
+        identity_frac = float(counts[identity_idx]   / total)
 
         return {
             "permutation_consensus_dominant_frac": dominant_frac,
             "permutation_consensus_identity_frac": identity_frac,
         }
 
+    @staticmethod
+    def _best_perm_bruteforce(cost_mat: np.ndarray, all_perms: list, n_K: int) -> np.ndarray:
+        perm_costs = np.stack(
+            [cost_mat[:, np.arange(n_K), list(p)].sum(axis=1) for p in all_perms],
+            axis=1,
+        )
+
+        return perm_costs.argmin(axis=1)
+
+    @staticmethod
+    def _best_perm_assignment(cost_mat: np.ndarray, all_perms: list) -> np.ndarray:
+        from scipy.optimize import linear_sum_assignment
+
+        perm_to_idx = {p: i for i, p in enumerate(all_perms)}
+        best_idx    = np.empty(cost_mat.shape[0], dtype=np.int64)
+
+        for hw in range(cost_mat.shape[0]):
+            _, col       = linear_sum_assignment(cost_mat[hw])
+            best_idx[hw] = perm_to_idx[tuple(col)]
+
+        return best_idx
+
     def _gaussian_param_metrics(self) -> Dict[str, float]:
         out    : Dict[str, float] = {}
-        pp     = self.result.params_pred.astype(np.float64)
-        pg     = self.result.params_gt  .astype(np.float64)
+        pp     = self.result.params_pred
+        pg     = self.result.params_gt
         n_K    = self.n_gaussians
 
         all_mu_ae  : list[np.ndarray] = []
@@ -343,10 +363,10 @@ class Metrics:
 
             n_valid = int(np.sum(valid))
 
-            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se)))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae)) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se))) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae,  dtype=np.float64))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae, dtype=np.float64)) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64))) if n_valid > 0 else float("nan")
             out[f"gauss_{k}_n_valid"]  = n_valid
 
             if n_valid > 0:
@@ -356,10 +376,10 @@ class Metrics:
         if all_mu_ae:
             cat_mu  = np.concatenate(all_mu_ae)
             cat_sig = np.concatenate(all_sig_ae)
-            out["gauss_all_mu_mae"]   = float(cat_mu .mean())
-            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean()))
-            out["gauss_all_sig_mae"]  = float(cat_sig.mean())
-            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean()))
+            out["gauss_all_mu_mae"]   = float(cat_mu .mean(dtype=np.float64))
+            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean(dtype=np.float64)))
+            out["gauss_all_sig_mae"]  = float(cat_sig.mean(dtype=np.float64))
+            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean(dtype=np.float64)))
         else:
             out["gauss_all_mu_mae"]   = float("nan")
             out["gauss_all_mu_rmse"]  = float("nan")
@@ -373,10 +393,10 @@ class Metrics:
         gt   = self.result.gt_curves
     
         diff_gt        = pred - gt
-        mse_gt         = float((diff_gt * diff_gt).mean())
-        mae_gt         = float(np.abs(diff_gt).mean())
-        gt_mean        = float(gt.mean())
-        overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum()) / (float(((gt  - gt_mean)  ** 2).sum()) + 1e-12)
+        mse_gt         = float((diff_gt * diff_gt).mean(dtype=np.float64))
+        mae_gt         = float(np.abs(diff_gt).mean(dtype=np.float64))
+        gt_mean        = float(gt.mean(dtype=np.float64))
+        overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum(dtype=np.float64)) / (float(((gt  - gt_mean)  ** 2).sum(dtype=np.float64)) + 1e-12)
 
         metrics: Dict[str, float] = {
             "n_pixels"       : int(self.result.pixel_mse.size),
@@ -392,10 +412,10 @@ class Metrics:
             "psnr_db_gt"     : self._psnr(pred, gt),
 
             "gt_mean"        : gt_mean,
-            "gt_std"         : float(gt.std()),
+            "gt_std"         : float(gt.std(dtype=np.float64)),
             "gt_max"         : float(gt.max()),
-            "pred_mean"      : float(pred.mean()),
-            "pred_std"       : float(pred.std()),
+            "pred_mean"      : float(pred.mean(dtype=np.float64)),
+            "pred_std"       : float(pred.std(dtype=np.float64)),
             "pred_max"       : float(pred.max()),
         }
 
