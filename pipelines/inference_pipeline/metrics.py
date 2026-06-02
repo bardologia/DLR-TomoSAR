@@ -1,23 +1,15 @@
 from __future__ import annotations
 
+import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib            import Path
 from typing             import Dict, Optional, Tuple
 
-import numpy                                as np
-from skimage.metrics                        import structural_similarity as ssim
-from tqdm                                   import tqdm
-from pipelines.inference_pipeline.predictor import Result
-
-
-def _ssim_worker(args: tuple) -> tuple[str, float]:
-    key, pred_slice, ref_slice = args
-    data_range = float(ref_slice.max() - ref_slice.min())
-    min_side   = min(pred_slice.shape)
-    win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
-    value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
-   
-    return key, value
+import numpy                            as np
+from skimage.metrics                    import structural_similarity as ssim
+from tqdm                               import tqdm
+from pipelines.inference_pipeline.types import Result
 
 
 class Metrics:
@@ -33,6 +25,25 @@ class Metrics:
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
         self.num_workers = min(os.cpu_count() or 1, 16)
+
+    @staticmethod
+    def _ssim_worker(args: tuple) -> tuple[str, float]:
+        key, pred_slice, ref_slice = args
+        data_range = float(ref_slice.max() - ref_slice.min())
+        min_side   = min(pred_slice.shape)
+        win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
+        value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
+
+        return key, value
+
+    @staticmethod
+    def write_json(metrics: Dict[str, object], path: Path) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=4, default=str)
+
+        return path
 
     @staticmethod
     def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
@@ -139,7 +150,7 @@ class Metrics:
         n_workers   = min(self.num_workers, len(worker_args))
 
         with ProcessPoolExecutor(max_workers=n_workers) as pool:
-            futures = {pool.submit(_ssim_worker, arg): arg[0] for arg in worker_args}
+            futures = {pool.submit(Metrics._ssim_worker, arg): arg[0] for arg in worker_args}
             with tqdm(total=len(futures), desc=f"SSIM ({prefix})", unit="slice", leave=False) as pbar:
                 for fut in as_completed(futures):
                     key, value = fut.result()

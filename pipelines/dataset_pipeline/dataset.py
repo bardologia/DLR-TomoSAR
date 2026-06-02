@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
-from torch.utils.data                        import DataLoader, Dataset
+from torch.utils.data                        import Dataset
 from configuration.dataset_config            import InputConfig, OutputConfig
-from pipelines.dataset_pipeline.normalize    import Stats, Normalizer
+from pipelines.dataset_pipeline.normalizer   import Normalizer
 from pipelines.dataset_pipeline.patch        import Patcher
-from tools.logger                            import Logger
 from pipelines.dataset_pipeline.augmentation import SpatialAugmenter
 
 
@@ -20,11 +19,11 @@ class PatchDataset(Dataset):
         input_config  : InputConfig,
         output_config : OutputConfig,
         split_name    : str,
-        norm_stats    : Optional[Stats]      = None,
-        x_axis        : Optional[np.ndarray] = None,
-        n_gaussians   : int                  = 1,
+        normalizer    : Optional[Normalizer]      = None,
+        x_axis        : Optional[np.ndarray]       = None,
+        n_gaussians   : int                        = 1,
         augmenter     : Optional[SpatialAugmenter] = None,
-        dem           : Optional[np.ndarray] = None,
+        dem           : Optional[np.ndarray]       = None,
     ) -> None:
 
         self.inputs         = inputs
@@ -33,14 +32,14 @@ class PatchDataset(Dataset):
         self.input_config   = input_config
         self.output_config  = output_config
         self.split_name     = split_name
-        self.norm_stats     = Normalizer(norm_stats) if norm_stats is not None else None
+        self.normalizer     = normalizer
         self.x_axis         = x_axis
         self.n_gaussians    = n_gaussians
         self.augmenter      = augmenter
         self.dem            = dem
         self.input_layers   = int(inputs.shape[0])
 
-        n_rest              = self.input_layers - 1  # subtract primary
+        n_rest              = self.input_layers - 1
         self.n_secondaries  = n_rest // 2 if (input_config.use_secondaries and input_config.use_interferograms) else (n_rest if (input_config.use_secondaries or input_config.use_interferograms) else 0)
         self.n_slaves       = self.n_secondaries
         self.input_channels = input_config.total_channels(self.n_secondaries)
@@ -84,20 +83,20 @@ class PatchDataset(Dataset):
 
     def _build_output_tensor(self, gt_patch: np.ndarray) -> np.ndarray:
         output_tensor = gt_patch[self.output_channel_indices, ...]
-       
+
         return np.ascontiguousarray(output_tensor, dtype=np.float32)
-        
+
     def _normalize_input_tensor(self, input_tensor: np.ndarray) -> np.ndarray:
-        if self.norm_stats is None:
+        if self.normalizer is None:
             return input_tensor
-        
-        return self.norm_stats.normalize_input(input_tensor)
+
+        return self.normalizer.normalize_input(input_tensor)
 
     def _normalize_gt_params(self, gt_params: np.ndarray) -> np.ndarray:
-        if self.norm_stats is None or self.norm_stats.stats.output_stats is None:
+        if self.normalizer is None or self.normalizer.stats.output_stats is None:
             return gt_params
-        
-        return self.norm_stats.normalize_output(gt_params)
+
+        return self.normalizer.normalize_output(gt_params)
 
     def __getitem__(self, idx: int):
         complex_patch = self.grid.extract(self.inputs, idx)
@@ -114,45 +113,3 @@ class PatchDataset(Dataset):
         gt_params    = self._normalize_gt_params(gt_params)
 
         return input_tensor, gt_params
-
-
-class Loader:
-    @staticmethod
-    def build(
-        train_dataset : PatchDataset,
-        val_dataset   : PatchDataset,
-        test_dataset  : PatchDataset,
-        batch_size    : int,
-        num_workers   : int,
-        logger        : Logger,
-        pin_memory    : bool = True,
-        shuffle_train : bool = True,
-    ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-
-        logger.section("[Loaders]")
-        logger.kv_table({
-            "Batch size":    batch_size,
-            "Num workers":   num_workers,
-            "Pin memory":    pin_memory,
-            "Shuffle train": shuffle_train,
-        })
-
-        _base = dict(
-            batch_size         = batch_size,
-            num_workers        = num_workers,
-            pin_memory         = pin_memory,
-            persistent_workers = num_workers > 0,
-            prefetch_factor    = 8 if num_workers > 0 else None,
-        )
-
-        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last  = True, **_base,)
-        val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last  = False, **_base,)
-        test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last  = False, **_base,)
-         
-        logger.kv_table({
-            "Train batches": len(train_loader),
-            "Val batches":   len(val_loader),
-            "Test batches":  len(test_loader),
-        })
-
-        return train_loader, val_loader, test_loader

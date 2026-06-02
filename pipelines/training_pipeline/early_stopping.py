@@ -58,6 +58,18 @@ class EarlyStopping:
         if self.restore_best:
             self.best_params = {name: param.clone().detach().cpu() for name, param in model.state_dict().items()}
 
+    def state_dict(self) -> dict:
+        return {
+            "best_loss"   : self.best_loss,
+            "counter"     : self.counter,
+            "best_params" : self.best_params,
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        self.best_loss   = state["best_loss"]
+        self.counter     = state["counter"]
+        self.best_params = state["best_params"]
+
     def reset(self) -> None:
         self.best_loss   = None
         self.counter     = 0

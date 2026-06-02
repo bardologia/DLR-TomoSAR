@@ -4,14 +4,17 @@ from pathlib                                 import Path
 from typing                                  import Optional, Tuple
 from torch.utils.data                        import DataLoader
 from configuration.dataset_config            import DatasetConfiguration
-from pipelines.dataset_pipeline.crop         import Cropper
-from pipelines.dataset_pipeline.load         import Loader, PatchDataset
-from pipelines.dataset_pipeline.metadata     import Layout, MetadataWriter
-from pipelines.dataset_pipeline.normalize    import Stats, StatsComputer
-from pipelines.dataset_pipeline.patch        import Patcher
-from tools.logger                            import Logger
-from pipelines.dataset_pipeline.normalize    import Normalizer
-from pipelines.dataset_pipeline.augmentation import SpatialAugmenter
+from pipelines.dataset_pipeline.crop           import Cropper
+from pipelines.dataset_pipeline.dataset         import PatchDataset
+from pipelines.dataset_pipeline.loader          import Loader
+from pipelines.dataset_pipeline.layout          import Layout
+from pipelines.dataset_pipeline.metadata        import MetadataWriter
+from pipelines.dataset_pipeline.stats           import Stats
+from pipelines.dataset_pipeline.stats_computer  import StatsComputer
+from pipelines.dataset_pipeline.patch           import Patcher
+from tools.logger                               import Logger
+from pipelines.dataset_pipeline.normalizer      import Normalizer
+from pipelines.dataset_pipeline.augmentation    import SpatialAugmenter
 
 
 class DatasetPipeline:
@@ -47,7 +50,7 @@ class DatasetPipeline:
             title="Dataset Creation",
         )
 
-    def _build_dataset(self, split_name : str, norm_stats : Optional[Stats] = None) -> Tuple[PatchDataset, Patcher]:
+    def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None) -> Tuple[PatchDataset, Patcher]:
         region   = dict(self.config.split_regions.items())[split_name]
         arrays   = self.cropper.load_split(region)
         spatial  = (region.azimuth_size, region.range_size)
@@ -66,7 +69,7 @@ class DatasetPipeline:
             input_config     = self.config.input_config,
             output_config    = self.config.output_config,
             split_name       = split_name,
-            norm_stats       = norm_stats,
+            normalizer       = normalizer,
             x_axis           = self.config.x_axis,
             n_gaussians      = self.config.n_gaussians,
             augmenter        = self.augmenter,
@@ -79,33 +82,25 @@ class DatasetPipeline:
       
         train_ds, train_patcher = self._build_dataset("train")
 
-        input_stats = StatsComputer.compute_input_stats(
-            dataset      = train_ds,
-            logger       = self.logger,
-            input_config = self.config.input_config,
-            n_slaves     = train_ds.n_slaves,
-            num_workers  = self.config.num_workers,
-            max_samples  = 4000,
-        )
-
-        output_stats = StatsComputer.compute_output_stats(
+        norm_stats = StatsComputer.compute(
+            dataset       = train_ds,
             params_path   = self.config.parameters_path,
-            n_gaussians   = self.config.n_gaussians,
-            output_config = self.config.output_config,
             logger        = self.logger,
+            input_config  = self.config.input_config,
+            output_config = self.config.output_config,
+            n_slaves      = train_ds.n_slaves,
+            n_gaussians   = self.config.n_gaussians,
+            num_workers   = self.config.num_workers,
+            max_samples   = 4000,
         )
 
-        norm_stats = Stats(
-            input_stats  = input_stats.input_stats,
-            output_stats = output_stats.output_stats,
-        )
-        
         norm_stats.save(self.training_run_directory / "meta")
 
-        train_ds.norm_stats = Normalizer(norm_stats)
+        normalizer        = Normalizer(norm_stats)
+        train_ds.normalizer = normalizer
 
-        val_ds,   val_patcher   = self._build_dataset("val",  norm_stats=norm_stats)
-        test_ds,  test_patcher  = self._build_dataset("test", norm_stats=norm_stats)
+        val_ds,   val_patcher   = self._build_dataset("val",  normalizer=normalizer)
+        test_ds,  test_patcher  = self._build_dataset("test", normalizer=normalizer)
 
         train_loader, val_loader, test_loader = Loader.build(
             train_dataset = train_ds,

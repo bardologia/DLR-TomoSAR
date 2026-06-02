@@ -4,10 +4,9 @@ from pathlib import Path
 
 import optuna
 
-from configuration.tuning_config                    import TuningConfig
-from pipelines.tuning_pipeline.phase1_tuner         import Phase1Tuner
-from pipelines.tuning_pipeline.phase2_tuner         import Phase2Tuner
-from pipelines.tuning_pipeline.single_phase_tuner   import SinglePhaseTuner
+from configuration.tuning_config            import TuningConfig
+from pipelines.tuning_pipeline.phase1_tuner import Phase1Tuner
+from pipelines.tuning_pipeline.phase2_tuner import Phase2Tuner
 
 
 class TuningPipeline:
@@ -52,19 +51,6 @@ class TuningPipeline:
             tune_cfg            = self.tune_cfg.phase2,
             best_phase1_params  = best_phase1_params,
             log_dir             = str(Path(self.log_dir) / "phase2"),
-            logger              = self.logger,
-            emit_trial_docs     = self.tune_cfg.emit_trial_docs,
-        )
-        tuner.run(study, n_trials)
-
-    def run_single_phase(self, study: optuna.Study, n_trials: int) -> None:
-        tuner = SinglePhaseTuner(
-            model_name          = self.model_name,
-            model_config_cls    = self.model_config_cls,
-            base_trainer_config = self.base_trainer_config,
-            base_dataset_config = self.base_dataset_config,
-            tune_cfg            = self.tune_cfg.single_phase,
-            log_dir             = str(Path(self.log_dir) / "single_phase"),
             logger              = self.logger,
             emit_trial_docs     = self.tune_cfg.emit_trial_docs,
         )

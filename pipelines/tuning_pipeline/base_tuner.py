@@ -5,12 +5,14 @@ from pathlib import Path
 
 import optuna
 
-from configuration.tuning_config                import SinglePhaseTuneConfig
-from pipelines.tuning_pipeline.phase1_tuner     import _sample_params
+from pipelines.tuning_pipeline.param_sampler import ParamSampler
 
 
-class SinglePhaseTuner:
-    """Tunes all parameters (LR/WD + architecture) in a single Optuna study."""
+class BaseTuner:
+    run_name_prefix : str = ""
+    section_title   : str = ""
+    config_title    : str = ""
+    error_label     : str = ""
 
     def __init__(
         self,
@@ -18,7 +20,7 @@ class SinglePhaseTuner:
         model_config_cls,
         base_trainer_config,
         base_dataset_config,
-        tune_cfg            : SinglePhaseTuneConfig,
+        tune_cfg,
         log_dir             : str,
         logger,
         emit_trial_docs     : bool = False,
@@ -32,17 +34,19 @@ class SinglePhaseTuner:
         self.logger              = logger
         self.emit_trial_docs     = emit_trial_docs
 
+        self.sampler = ParamSampler()
+
+    def _apply_params(self, trial: optuna.Trial, model_config) -> None:
+        raise NotImplementedError
+
+    def _extra_config_rows(self) -> dict:
+        return {}
+
     def _objective(self, trial: optuna.Trial) -> float:
         from pipelines.tuning_pipeline.trial_pipeline import TrialPipeline
 
-        all_params = {
-            **_sample_params(trial, self.model_config_cls.tunable_lr_params()),
-            **_sample_params(trial, self.model_config_cls.tunable_arch_params()),
-        }
-
         model_config = self.model_config_cls()
-        for k, v in all_params.items():
-            setattr(model_config, k, v)
+        self._apply_params(trial, model_config)
 
         trainer_cfg = copy.deepcopy(self.base_trainer_config)
         dataset_cfg = copy.deepcopy(self.base_dataset_config)
@@ -58,7 +62,7 @@ class SinglePhaseTuner:
             model_name     = self.model_name,
             model_config   = model_config,
             seed           = trial.number,
-            run_name       = f"single_phase_trial_{trial.number:04d}",
+            run_name       = f"{self.run_name_prefix}{trial.number:04d}",
             trial          = trial,
             emit_docs      = self.emit_trial_docs,
         )
@@ -68,18 +72,22 @@ class SinglePhaseTuner:
         except optuna.exceptions.TrialPruned:
             raise
         except Exception as exc:
-            self.logger.error(f"Single-phase trial {trial.number} raised: {exc}")
+            self.logger.error(f"{self.error_label} trial {trial.number} raised: {exc}")
             raise optuna.exceptions.TrialPruned()
 
         return best_val_loss
 
     def run(self, study: optuna.Study, n_trials: int) -> None:
-        self.logger.section(f"[Single-Phase Tuner — {self.model_name}]")
-        self.logger.kv_table({
+        self.logger.section(f"[{self.section_title} — {self.model_name}]")
+
+        rows = {
             "Trials (this worker)" : n_trials,
             "Epochs / trial"       : self.tune_cfg.n_epochs,
             "Early-stop patience"  : self.tune_cfg.early_stop_patience,
-            "Log dir"              : self.log_dir,
-        }, title="Single-phase config")
+        }
+        rows.update(self._extra_config_rows())
+        rows["Log dir"] = self.log_dir
+
+        self.logger.kv_table(rows, title=self.config_title)
 
         study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True)

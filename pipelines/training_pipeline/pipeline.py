@@ -104,7 +104,7 @@ class TrainingPipeline:
             param_match   = self.trainer_config.curriculum.warmup.param_match,
         )
 
-        trainer = self._make_trainer(model, model_cfg, x_axis, getattr(train_dataset, "norm_stats", None))
+        trainer = self._make_trainer(model, model_cfg, x_axis, getattr(train_dataset, "normalizer", None))
 
         try:
             trainer.maybe_run_loss_probe(train_loader, probe_config)

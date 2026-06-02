@@ -1,16 +1,53 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib  import Path
 from typing   import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 
-def write_metrics_json(metrics: Dict[str, object], path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=4, default=str)
-    return path
+
+class ReportPayloadBuilder:
+    @staticmethod
+    def run_summary(run, x_axis_np: np.ndarray) -> Dict[str, Any]:
+        return {
+            "model_name"        : run.model_name,
+            "in_channels"       : run.in_channels,
+            "out_channels"      : run.out_channels,
+            "n_gaussians"       : run.n_gaussians,
+            "x_axis_length"     : run.x_axis_length,
+            "x_axis_min"        : float(x_axis_np.min()),
+            "x_axis_max"        : float(x_axis_np.max()),
+            "split"             : run.split_name,
+            "split_region"      : str(run.split_region.as_tuple()),
+            "global_crop"       : str(run.global_crop.as_tuple()),
+            "patches"           : run.grid.number_of_patches,
+            "patch_size"        : str(run.grid.patch_size),
+            "patch_stride"      : run.grid.stride,
+            "preprocessing_dir" : str(run.dataset_config.preprocessing_run_directory),
+            "input_config"      : run.dataset_config.input_config.as_dict(),
+            "used_ema"          : run.used_ema,
+        }
+
+    @staticmethod
+    def inference_config(cfg, run) -> Dict[str, Any]:
+        return {
+            "stitch_window"      : cfg.stitch_window,
+            "cube_dtype"         : cfg.cube_dtype,
+            "save_cubes"         : cfg.save_cubes,
+            "n_best_profiles"    : cfg.n_best_profiles,
+            "n_worst_profiles"   : cfg.n_worst_profiles,
+            "n_random_profiles"  : cfg.n_random_profiles,
+            "n_range_slices"     : cfg.n_range_slices,
+            "n_azimuth_slices"   : cfg.n_azimuth_slices,
+            "n_elevation_slices" : cfg.n_elevation_slices,
+            "gif_axes"           : cfg.gif_axes,
+            "gif_fps"            : cfg.gif_fps,
+            "gif_max_frames"     : cfg.gif_max_frames,
+            "device"             : cfg.device,
+            "batch_size"         : run.dataset_config.batch_size,
+            "num_workers"        : cfg.num_workers,
+        }
 
 
 class Report:

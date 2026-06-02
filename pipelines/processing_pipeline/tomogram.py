@@ -12,72 +12,9 @@ from typing import Tuple
 import h5py
 import numpy as np
 
-from configuration.processing_config import ProcessingConfiguration, TomogramConfiguration
-from tools.logger                    import Logger
-
-
-def _run_pyrat(
-    pyrat_root_path       : str,
-    crop_tuple            : Tuple[int, int, int, int],
-    suffix                : str,
-    fusar_project_path    : str,
-    stack_identifier      : str,
-    base_directory        : str,
-    polarisation          : str,
-    track_selection       : str,
-    height_range          : Tuple[float, float],
-    filter_method         : str,
-    filter_arguments      : dict,
-    beamforming_method    : str,
-    beamforming_arguments : list,
-    output_directory      : str,
-    apply_resampling      : bool,
-    apply_presumming      : bool,
-    pyrat_threads         : int,
-    parent_sys_path       : list | None = None,
-) -> int:
-    import os as _os
-
-    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-    # Ensure the conda env's own libgcc / libhwy are found before the system ones.
-    # This is needed when the conda-packaged GDAL was built against a newer GCC
-    # than what the system libgcc_s.so.1 provides.
-    _conda_lib = _os.path.join(sys.prefix, "lib")
-    _ldpath = _os.environ.get("LD_LIBRARY_PATH", "")
-    if _conda_lib not in _ldpath.split(":"):
-        _os.environ["LD_LIBRARY_PATH"] = _conda_lib + (":" + _ldpath if _ldpath else "")
-
-    # Restore the parent's sys.path so conda/venv site-packages are visible
-    if parent_sys_path is not None:
-        sys.path[:] = parent_sys_path
-
-    if pyrat_root_path not in sys.path:
-        sys.path.insert(0, pyrat_root_path)
-
-    from pyrat import pyrat_init, tomo
-    pyrat_init(debug=True, nthreads=pyrat_threads, silent=True)
-
-    tomo.fusartomo(
-        FuSARproject = fusar_project_path,
-        id           = stack_identifier,
-        basedir      = base_directory,
-        polarisation = polarisation,
-        select       = track_selection,
-        presum       = apply_presumming,
-        crop         = crop_tuple,
-        range        = list(height_range),
-        filter       = filter_method,
-        filargs      = filter_arguments,
-        method       = beamforming_method,
-        args         = beamforming_arguments,
-        suffix       = suffix,
-        dir          = output_directory,
-        resampling   = apply_resampling,
-    )
-
-    gc.collect()
-    return 0
+from configuration.processing_config                   import ProcessingConfiguration, TomogramConfiguration
+from pipelines.processing_pipeline.tomogram_worker      import PyRatJob, run_pyrat
+from tools.logger                                       import Logger
 
 
 class TomogramProcessor:
@@ -141,25 +78,25 @@ class TomogramProcessor:
         parent_sys_path = list(sys.path)
 
         for subsection_index, subsection_crop in enumerate(subsections):
-            tasks.append((
-                str(self.config.paths.pyrat_directory),
-                subsection_crop,
-                f"{subsection_index:04d}",
-                tomogram_config.fusar_project_path,
-                stack_identifier,
-                tomogram_config.base_directory,
-                tomogram_config.polarisation,
-                tomogram_config.track_selection,
-                tomogram_config.height_range,
-                tomogram_config.filter_method,
-                tomogram_config.filter_arguments,
-                tomogram_config.beamforming_method,
-                tomogram_config.beamforming_arguments,
-                str(temporary_directory),
-                tomogram_config.apply_resampling,
-                tomogram_config.apply_presumming,
-                parallel_config.pyrat_threads,
-                parent_sys_path,
+            tasks.append(PyRatJob(
+                pyrat_root_path       = str(self.config.paths.pyrat_directory),
+                crop_tuple            = subsection_crop,
+                suffix                = f"{subsection_index:04d}",
+                fusar_project_path    = tomogram_config.fusar_project_path,
+                stack_identifier      = stack_identifier,
+                base_directory        = tomogram_config.base_directory,
+                polarisation          = tomogram_config.polarisation,
+                track_selection       = tomogram_config.track_selection,
+                height_range          = tomogram_config.height_range,
+                filter_method         = tomogram_config.filter_method,
+                filter_arguments      = tomogram_config.filter_arguments,
+                beamforming_method    = tomogram_config.beamforming_method,
+                beamforming_arguments = tomogram_config.beamforming_arguments,
+                output_directory      = str(temporary_directory),
+                apply_resampling      = tomogram_config.apply_resampling,
+                apply_presumming      = tomogram_config.apply_presumming,
+                pyrat_threads         = parallel_config.pyrat_threads,
+                parent_sys_path       = parent_sys_path,
             ))
 
         resolved_workers = parallel_config.resolve_workers(len(tasks))
@@ -167,7 +104,7 @@ class TomogramProcessor:
         self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({parallel_config.pyrat_threads} threads each, {parallel_config.available_cores()} cores available)")
 
         with ProcessPoolExecutor(max_workers=resolved_workers, mp_context=mp.get_context("spawn")) as executor:
-            futures = [executor.submit(_run_pyrat, *task) for task in tasks]
+            futures = [executor.submit(run_pyrat, task) for task in tasks]
             try:
                 for future in as_completed(futures):
                     future.result()

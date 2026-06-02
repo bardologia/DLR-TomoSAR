@@ -7,7 +7,7 @@ import numpy as np
 
 from tools.split_regions                      import SplitRegions
 from configuration.processing_config          import CropRegion
-from pipelines.dataset_pipeline.metadata      import Layout
+from pipelines.dataset_pipeline.layout        import Layout
 from tools.logger                             import Logger
 
 

@@ -1,87 +1,22 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
-from pathlib     import Path
-from typing      import Optional
+from pathlib import Path
+from typing  import Optional
 
 import numpy as np
-import torch
 
-from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod
-from configuration.dataset_config import InputConfig, OutputConfig
-from tools.logger                 import Logger
-from torch.utils.data             import DataLoader
-from torch.utils.data             import Subset
-
-
-@dataclass
-class Stats:
-    input_stats  : Optional[ChannelStats]  = None
-    output_stats : Optional[ChannelStats]  = None
-
-    def save(self, directory: Path) -> Path:
-        directory = Path(directory)
-        directory.mkdir(parents=True, exist_ok=True)
-        out_path  = directory / "normalization_stats.json"
-
-        payload = {
-            "input_stats"  : self.input_stats.as_dict()  if self.input_stats  else None,
-            "output_stats" : self.output_stats.as_dict() if self.output_stats else None,
-        }
-        
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=4)
-
-        return out_path
-
-    @classmethod
-    def load(cls, directory: Path, logger: Logger) -> "Stats":
-        path = Path(directory) / "normalization_stats.json"
-        if not path.exists():
-            raise FileNotFoundError(f"Normalization stats not found at '{path}'.")
-            
-        with open(path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-
-        input_stats  = ChannelStats.from_dict(payload["input_stats"])
-        output_stats = ChannelStats.from_dict(payload["output_stats"])
-
-        logger.section(f"[Normalization stats loaded]")
-        logger.kv_table({
-            "Stats path":      path,
-            "Input channels":  input_stats.n_channels,
-            "Output channels": output_stats.n_channels,
-        })
-
-        return cls(input_stats = input_stats, output_stats = output_stats)
-
+from configuration.norm_config        import ChannelStats, ChannelStrategy, NormMethod
+from configuration.dataset_config     import InputConfig, OutputConfig
+from pipelines.dataset_pipeline.stats import Stats
+from tools.logger                     import Logger
+from torch.utils.data                 import DataLoader
+from torch.utils.data                 import Subset
 
 
 class StatsComputer:
     @staticmethod
     def _input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
-        keys: list[str] = []
-
-        if input_config.use_primary:
-            slot_kinds = input_config.primary_representation.slot_kinds
-            cpp        = len(slot_kinds)
-            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(1 * cpp))
-
-        if input_config.use_secondaries:
-            slot_kinds = input_config.secondaries_representation.slot_kinds
-            cpp        = len(slot_kinds)
-            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(n_slaves * cpp))
-
-        if input_config.use_interferograms:
-            slot_kinds = input_config.interferograms_representation.slot_kinds
-            cpp        = len(slot_kinds)
-            keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_slaves * cpp))
-
-        if input_config.use_dem:
-            keys.append("dem/elevation")
-
-        return keys
+        return input_config.channel_group_keys(n_slaves)
 
     @staticmethod
     def _compact_ranges(indices: list[int], max_items: int = 6) -> str:
@@ -146,7 +81,7 @@ class StatsComputer:
         batch_size         : int,
         max_vals_per_group : int = 1_000_000,
     ) -> dict[str, np.ndarray]:
- 
+
         unique_groups  = list(dict.fromkeys(group_keys))
         group_channels = {g: [i for i, k in enumerate(group_keys) if k == g] for g in unique_groups}
         needs_data     = {g for g in unique_groups if ChannelStrategy.from_slot(g).norm_method is not NormMethod.FIXED_DIV_PI}
@@ -165,20 +100,20 @@ class StatsComputer:
         for batch in loader:
             inp = batch[0] if isinstance(batch, (tuple, list)) else batch
             arr = np.asarray(inp, dtype=np.float32)
-           
+
             if arr.ndim == 3:
-                arr = arr[np.newaxis]  
+                arr = arr[np.newaxis]
 
             for g, channels in group_channels.items():
                 if g not in needs_data:
                     continue
                 for ch in channels:
                     flat = arr[:, ch].ravel()
-                    
+
                     if len(flat) > vals_per_ch_batch:
                         idx  = rng.choice(len(flat), vals_per_ch_batch, replace=False)
                         flat = flat[idx]
-                    
+
                     collected[g].append(flat)
 
         return {g: np.concatenate(v) for g, v in collected.items() if v}
@@ -223,7 +158,7 @@ class StatsComputer:
         output_config : "OutputConfig",
         n_gaussians   : int,
     ) -> ChannelStats:
-     
+
         role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
         role_strat : dict[str, ChannelStrategy] = {key: output_config.strategy_for(key) for key in role_pools}
 
@@ -276,13 +211,13 @@ class StatsComputer:
         num_workers  : int = 4,
         batch_size   : int = 512,
     ) -> Stats:
-       
+
         logger.section("[Input Normalization Statistics]")
         subset, n_use, n_total = StatsComputer._get_subset(dataset, max_samples)
         sample      = dataset[0]
         in_first    = sample[0] if isinstance(sample, (tuple, list)) else sample
         in_channels = int(in_first.shape[0])
-       
+
         logger.kv_table({
             "Strategy":       "auto-selected per slot-kind (grouped across passes/ifgs)",
             "Samples":        f"{n_use:,} / {n_total:,}",
@@ -355,78 +290,35 @@ class StatsComputer:
             output_stats = output_stats,
         )
 
+    @staticmethod
+    def compute(
+        dataset,
+        params_path   : Path,
+        logger        : Logger,
+        input_config  : InputConfig,
+        output_config : "OutputConfig",
+        n_slaves      : int,
+        n_gaussians   : int,
+        max_samples   : int = 0,
+        num_workers   : int = 4,
+        batch_size    : int = 512,
+    ) -> Stats:
 
+        input_only = StatsComputer.compute_input_stats(
+            dataset      = dataset,
+            logger       = logger,
+            input_config = input_config,
+            n_slaves     = n_slaves,
+            num_workers  = num_workers,
+            max_samples  = max_samples,
+            batch_size   = batch_size,
+        )
 
-class Normalizer:
-    def __init__(self, stats: Stats) -> None:
-        self.stats = stats
+        output_only = StatsComputer.compute_output_stats(
+            params_path   = params_path,
+            n_gaussians   = n_gaussians,
+            output_config = output_config,
+            logger        = logger,
+        )
 
-        self._vectors: dict[int, dict] = {}
-
-    def _channel_vectors(self, stats: ChannelStats) -> dict:
-        key = id(stats)
-        if key in self._vectors:
-            return self._vectors[key]
-
-        loc       = np.asarray(stats.loc,   dtype=np.float32)
-        scale     = np.asarray(stats.scale, dtype=np.float32)
-        log1p     = np.asarray([strat.apply_log1p for strat in stats.strategies], dtype=bool)
-        inv_scale = (1.0 / scale).astype(np.float32)
-
-        vectors = {
-            "loc"       : loc,
-            "scale"     : scale,
-            "inv_scale" : inv_scale,
-            "log1p"     : log1p,
-        }
-        self._vectors[key] = vectors
-
-        return vectors
-
-    def _apply_normalization(self, tensor, stats: ChannelStats, inverse: bool):
-        is_torch = isinstance(tensor, torch.Tensor)
-        vectors  = self._channel_vectors(stats)
-
-        shape    = (1, -1, 1, 1) if tensor.ndim == 4 else (-1, 1, 1)
-
-        if is_torch:
-            device    = tensor.device
-            loc       = torch.as_tensor(vectors["loc"],       device=device).reshape(shape)
-            scale     = torch.as_tensor(vectors["scale"],     device=device).reshape(shape)
-            inv_scale = torch.as_tensor(vectors["inv_scale"], device=device).reshape(shape)
-            log1p     = torch.as_tensor(vectors["log1p"],     device=device).reshape(shape)
-
-            if not inverse:
-                x   = torch.where(log1p, torch.log1p(torch.clamp(tensor, min=0.0)), tensor)
-                out = (x - loc) * inv_scale
-            else:
-                x   = tensor * scale + loc
-                out = torch.where(log1p, torch.expm1(x.clamp(max=15.0)), x)
-
-            return out
-
-        loc       = vectors["loc"].reshape(shape)
-        scale     = vectors["scale"].reshape(shape)
-        inv_scale = vectors["inv_scale"].reshape(shape)
-        log1p     = vectors["log1p"].reshape(shape)
-
-        if not inverse:
-            x   = np.where(log1p, np.log1p(np.maximum(tensor, 0.0)), tensor)
-            out = (x - loc) * inv_scale
-        else:
-            x   = tensor * scale + loc
-            out = np.where(log1p, np.expm1(np.clip(x, a_min=None, a_max=15.0)), x)
-
-        return np.ascontiguousarray(out, dtype=np.float32)
-
-    def normalize_input(self, tensor: np.ndarray) -> np.ndarray:
-        return self._apply_normalization(tensor, self.stats.input_stats, inverse=False)
-
-    def normalize_output(self, tensor) -> np.ndarray:
-        return self._apply_normalization(tensor, self.stats.output_stats, inverse=False)
-
-    def denormalize_input(self, tensor):
-        return self._apply_normalization(tensor, self.stats.input_stats, inverse=True)
-
-    def denormalize_output(self, tensor):
-        return self._apply_normalization(tensor, self.stats.output_stats, inverse=True)
+        return Stats.merge(input_only, output_only)

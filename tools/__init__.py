@@ -10,8 +10,10 @@ from .representation        import Representation
 from .split_regions         import SplitRegions
 from .loss_scale_probe      import LossScaleProbe, LossScaleProbeConfig
 from .permutation_metrics   import PermutationMetrics
+from .gaussian_mixture      import GaussianMixture
 
 __all__ = [
+    "GaussianMixture",
     "Logger",
     "LiveMonitor",
     "ShapeLogger",

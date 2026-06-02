@@ -6,7 +6,8 @@ from typing  import Dict, Tuple
 
 import numpy as np
 
-from tools.logger import Logger
+from tools.gaussian_mixture import GaussianMixture
+from tools.logger           import Logger
 
 
 class FittingMetricsCalculator:
@@ -24,16 +25,7 @@ class FittingMetricsCalculator:
         return np.linspace(float(height_range[0]), float(height_range[1]), n_elev, dtype=np.float32)
 
     def _reconstruct_slice(self, parameters_array : np.ndarray, h_val : float) -> np.ndarray:
-        Az, R         = parameters_array.shape[1:]
-        reconstructed = np.zeros((Az, R), dtype=np.float32)
-
-        for k in range(self.n_gaussians):
-            amp = parameters_array[3 * k    ]
-            mu  = parameters_array[3 * k + 1]
-            sig = parameters_array[3 * k + 2]
-            reconstructed += amp * np.exp(-((h_val - mu) ** 2) / (2.0 * sig ** 2 + 1e-12))
-
-        return reconstructed
+        return GaussianMixture.evaluate_slice(parameters_array, h_val, self.n_gaussians)
 
     def _compute_r2_map(self, tomogram : np.ndarray, parameters_array : np.ndarray, height_axis : np.ndarray) -> np.ndarray:
         n_elev = height_axis.size

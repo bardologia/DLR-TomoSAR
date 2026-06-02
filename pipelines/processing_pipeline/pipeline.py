@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import gc
 from pathlib import Path
-from typing  import Literal, Tuple
+from typing  import Literal, NamedTuple, Tuple
 
-from configuration.processing_config                 import ProcessingConfiguration
+from configuration.processing_config                 import ProcessingConfiguration, TomogramConfiguration
+from pipelines.processing_pipeline.artifacts         import ArtifactRegistry
 from pipelines.processing_pipeline.interferogram     import InterferogramBuilder
 from pipelines.processing_pipeline.metadata          import MetadataManager
 from pipelines.processing_pipeline.tomogram          import TomogramProcessor
 from tools.logger                                    import Logger
+
+
+class TomogramVariant(NamedTuple):
+    stack_identifier : str
+    tomogram_config  : TomogramConfiguration
+    identifier_tag   : str
 
 
 class ProcessingPipeline:
@@ -20,6 +27,7 @@ class ProcessingPipeline:
         log_dir.mkdir(parents=True, exist_ok=True)
 
         self.logger                = logger or Logger(log_dir = str(log_dir), name = "preprocessing", level = "INFO")
+        self.artifact_registry     = ArtifactRegistry (config,   logger=self.logger)
         self.metadata_manager      = MetadataManager  (config,    logger=self.logger)
         self.tomogram_processor    = TomogramProcessor (config,   logger=self.logger)
         self.interferogram_builder = InterferogramBuilder(config, logger=self.logger)
@@ -29,39 +37,43 @@ class ProcessingPipeline:
         self.logger.subsection(f"Reduced Stack ID : {config.reduced_stack_identifier}")
         self.logger.subsection(f"Separate X/Y     : {config.has_split_configs}")
 
-    def _stage_tomogram(self, variant : Literal["full", "reduced"]) -> Tuple[Path, Path]:
-        tomogram_key     = f"tomogram_{variant}"
-        dem_key          = f"dem_{variant}"
-        
-        stack_identifier = self.config.full_stack_identifier if variant == "full" else self.config.reduced_stack_identifier
-        tomogram_config  = self.config.output_config         if variant == "full" else self.config.input_configs
-        identifier_tag   = self.config.parameter_tag         if variant == "full" else self.config.tomogram_tag
+    def _resolve_variant(self, variant: Literal["full", "reduced"]) -> TomogramVariant:
+        if variant == "full":
+            return TomogramVariant(self.config.full_stack_identifier, self.config.output_config, self.config.parameter_tag)
 
-        tomogram_path    = self.metadata_manager.artifact_path(tomogram_key)
-        dem_path         = self.metadata_manager.artifact_path(dem_key)
+        return TomogramVariant(self.config.reduced_stack_identifier, self.config.input_configs, self.config.tomogram_tag)
+
+    def _stage_tomogram(self, variant : Literal["full", "reduced"]) -> Tuple[Path, Path]:
+        tomogram_key  = f"tomogram_{variant}"
+        dem_key       = f"dem_{variant}"
+
+        resolved      = self._resolve_variant(variant)
+
+        tomogram_path = self.artifact_registry.artifact_path(tomogram_key)
+        dem_path      = self.artifact_registry.artifact_path(dem_key)
 
         self.logger.subsection(f"[Active] Generating {variant} tomogram")
         self.tomogram_processor.run(
             tomogram_path    = tomogram_path,
             dem_path         = dem_path,
-            stack_identifier = stack_identifier,
-            tomogram_config  = tomogram_config,
+            stack_identifier = resolved.stack_identifier,
+            tomogram_config  = resolved.tomogram_config,
         )
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = tomogram_key,
-            identifier_tag   = identifier_tag,
-            metadata_entries = self._tomogram_metadata(variant, tomogram_path, stack_identifier, tomogram_config),
+            identifier_tag   = resolved.identifier_tag,
+            metadata_entries = self.metadata_manager.build_tomogram_metadata(variant, tomogram_path, resolved.stack_identifier, resolved.tomogram_config),
         )
 
         gc.collect()
-        
+
         return tomogram_path, dem_path
 
     def _stage_inputs(self) -> Tuple[Path, Path, Path]:
-        primary_path        = self.metadata_manager.artifact_path("primary_reduced")
-        secondaries_path    = self.metadata_manager.artifact_path("secondaries_reduced")
-        interferograms_path = self.metadata_manager.artifact_path("interferograms_reduced")
+        primary_path        = self.artifact_registry.artifact_path("primary_reduced")
+        secondaries_path    = self.artifact_registry.artifact_path("secondaries_reduced")
+        interferograms_path = self.artifact_registry.artifact_path("interferograms_reduced")
 
         self.logger.subsection("[Active] Building interferometric stack")
         primary_shape, secondaries_shape, interferograms_shape = self.interferogram_builder.run(
@@ -71,46 +83,16 @@ class ProcessingPipeline:
             interferograms_path = interferograms_path,
         )
 
-        cfg = self.config.input_configs
         self.metadata_manager.save_stage_metadata(
             stage_name       = "inputs",
             identifier_tag   = self.config.tomogram_tag,
-            metadata_entries = {
-                "primary_path"         : str(primary_path),
-                "secondaries_path"     : str(secondaries_path),
-                "interferograms_path"  : str(interferograms_path),
-                "primary_shape"        : f"[{', '.join(str(v) for v in primary_shape)}]",
-                "secondaries_shape"    : f"[{', '.join(str(v) for v in secondaries_shape)}]",
-                "interferograms_shape" : f"[{', '.join(str(v) for v in interferograms_shape)}]",
-                "crop"                 : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
-                "FuSARproject"         : cfg.fusar_project_path,
-                "id"                   : self.config.reduced_stack_identifier,
-                "basedir"              : cfg.base_directory,
-                "polarisation"         : cfg.polarisation,
-                "select"               : cfg.track_selection,
-                "data_type"            : self.config.dataset_type,
-            },
+            metadata_entries = self.metadata_manager.build_inputs_metadata(primary_path, secondaries_path, interferograms_path, primary_shape, secondaries_shape, interferograms_shape),
         )
-       
+
         gc.collect()
-        
+
         return primary_path, secondaries_path, interferograms_path
 
-    def _tomogram_metadata(self, variant: str, output_path: Path, stack_identifier: str, cfg) -> dict[str, str]:
-        return {
-            f"tomo_{variant}" : str(output_path),
-            "crop"         : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
-            "FuSARproject" : cfg.fusar_project_path,
-            "id"           : stack_identifier,
-            "basedir"      : cfg.base_directory,
-            "polarisation" : cfg.polarisation,
-            "select"       : cfg.track_selection,
-            "range"        : f"[{', '.join(str(v) for v in cfg.height_range)}]",
-            "filter"       : cfg.filter_method,
-            "method"       : cfg.beamforming_method,
-            "win"          : f"[{', '.join(str(v) for v in cfg.filter_arguments.get('win', []))}]",
-        }
-    
     def run(self) -> dict[str, Path]:
         self.logger.section("[Pre-Processing Pipeline Execution]")
 

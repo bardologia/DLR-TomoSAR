@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Tuple
 
-from configuration.processing_config           import ProcessingConfiguration
-from pipelines.processing_pipeline.artifacts   import ArtifactRegistry, ArtifactType
+from configuration.processing_config           import ProcessingConfiguration, TomogramConfiguration
+from pipelines.processing_pipeline.artifacts   import ArtifactRegistry
 from tools.logger                              import Logger
 
 
@@ -20,14 +21,41 @@ class MetadataManager:
         self.logger.subsection(f"Tomogram Tag  : {config.tomogram_tag}")
         self.logger.subsection(f"Parameter Tag : {config.parameter_tag}")
 
-    def ensure_directory_structure(self) -> None:
-        self.registry.ensure_directory_structure()
+    def build_tomogram_metadata(self, variant: str, output_path: Path, stack_identifier: str, cfg: TomogramConfiguration) -> dict[str, str]:
+        return {
+            f"tomo_{variant}" : str(output_path),
+            "crop"         : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
+            "FuSARproject" : cfg.fusar_project_path,
+            "id"           : stack_identifier,
+            "basedir"      : cfg.base_directory,
+            "polarisation" : cfg.polarisation,
+            "select"       : cfg.track_selection,
+            "range"        : f"[{', '.join(str(v) for v in cfg.height_range)}]",
+            "filter"       : cfg.filter_method,
+            "method"       : cfg.beamforming_method,
+            "win"          : f"[{', '.join(str(v) for v in cfg.filter_arguments.get('win', []))}]",
+        }
 
-    def artifact_path(self, artifact_type: ArtifactType) -> Path:
-        return self.registry.artifact_path(artifact_type)
+    def build_inputs_metadata(self, primary_path: Path, secondaries_path: Path, interferograms_path: Path, primary_shape: Tuple[int, ...], secondaries_shape: Tuple[int, ...], interferograms_shape: Tuple[int, ...]) -> dict[str, str]:
+        cfg = self.config.input_configs
+        return {
+            "primary_path"         : str(primary_path),
+            "secondaries_path"     : str(secondaries_path),
+            "interferograms_path"  : str(interferograms_path),
+            "primary_shape"        : f"[{', '.join(str(v) for v in primary_shape)}]",
+            "secondaries_shape"    : f"[{', '.join(str(v) for v in secondaries_shape)}]",
+            "interferograms_shape" : f"[{', '.join(str(v) for v in interferograms_shape)}]",
+            "crop"                 : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
+            "FuSARproject"         : cfg.fusar_project_path,
+            "id"                   : self.config.reduced_stack_identifier,
+            "basedir"              : cfg.base_directory,
+            "polarisation"         : cfg.polarisation,
+            "select"               : cfg.track_selection,
+            "data_type"            : self.config.dataset_type,
+        }
 
     def save_stage_metadata(self, stage_name: str, identifier_tag: str, metadata_entries: dict[str, str]) -> Path:
-        self.ensure_directory_structure()
+        self.registry.ensure_directory_structure()
         meta_filename = f"meta_{stage_name}_{identifier_tag}.txt"
         meta_path     = self.config.paths.metadata_directory / meta_filename
 
@@ -40,7 +68,7 @@ class MetadataManager:
         return meta_path
 
     def save_pipeline_configuration(self) -> Path:
-        self.ensure_directory_structure()
+        self.registry.ensure_directory_structure()
 
         run_tag       = self.config.tomogram_tag
         dump_filename = f"config_state_{run_tag}.json"
@@ -56,7 +84,7 @@ class MetadataManager:
         return dump_path
 
     def save_dataset_layout(self) -> Path:
-        self.ensure_directory_structure()
+        self.registry.ensure_directory_structure()
         
         layout = {
             "global_crop"   : list(self.config.crop.as_tuple()),

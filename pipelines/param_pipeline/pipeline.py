@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import gc
-import json
 from pathlib import Path
 
 import numpy as np
 
 from configuration.param_extraction_config import ExtractionConfig
+from pipelines.param_pipeline.artifact_io  import ParameterIO
 from pipelines.param_pipeline.fitting      import ParameterExtractor
 from pipelines.param_pipeline.metadata     import ExtractionMetadataManager
 from pipelines.param_pipeline.metrics      import FittingMetricsCalculator
@@ -39,6 +39,7 @@ class ParamExtractionPipeline:
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
         )
         self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
+        self.parameter_io       = ParameterIO(logger=self.logger)
 
         n_K = getattr(config.fit_settings.fit_config, "k_max", config.fit_settings.number_of_gaussians)
 
@@ -64,13 +65,7 @@ class ParamExtractionPipeline:
         return self.parameter_extractor.run(tomogram_path = self.tomogram_path, height_range = self.height_range)
 
     def _stage_save(self, parameters_array: np.ndarray) -> Path:
-        npy_path = self.config.parameters_npy_path
-        npy_path.parent.mkdir(parents=True, exist_ok=True)
-
-        self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk")
-        np.save(str(npy_path), np.ascontiguousarray(parameters_array), allow_pickle=False)
-        
-        return npy_path
+        return self.parameter_io.save_params(parameters_array, self.config.parameters_npy_path)
 
     def _stage_metrics(self, parameters_array: np.ndarray, metadata: dict) -> dict:
         return self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path)
@@ -88,10 +83,8 @@ class ParamExtractionPipeline:
 
         meta_path = self.metadata_manager.save_run_metadata(npy_path, self.tomogram_path, self.height_range)
 
-        self.logger.subsection("Loading saved parameters for metrics and plots")
-        parameters_array = np.load(str(npy_path)).astype(np.float32, copy=False)
-        with open(meta_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
+        parameters_array = self.parameter_io.load_params(npy_path)
+        metadata         = self.parameter_io.load_metadata(meta_path)
 
         metrics_dict = self._stage_metrics(parameters_array, metadata)
         plot_paths   = self._stage_plots(parameters_array, metadata, metrics_dict)

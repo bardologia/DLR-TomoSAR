@@ -12,9 +12,11 @@ from pipelines.inference_pipeline.wrapper            import ModelWrapper
 from tools.logger                                    import Logger
 from configuration.dataset_config                    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
 from configuration.processing_config                 import CropRegion
-from pipelines.dataset_pipeline.crop                 import Cropper, Layout
-from pipelines.dataset_pipeline.load                 import PatchDataset
-from pipelines.dataset_pipeline.normalize            import Stats, Normalizer
+from pipelines.dataset_pipeline.crop                 import Cropper
+from pipelines.dataset_pipeline.layout               import Layout
+from pipelines.dataset_pipeline.dataset              import PatchDataset
+from pipelines.dataset_pipeline.stats                import Stats
+from pipelines.dataset_pipeline.normalizer           import Normalizer
 from pipelines.dataset_pipeline.patch                import Patcher, GridInfo
 from models                                          import get_model
 from configuration.training_config                   import GaussianConfig
@@ -106,7 +108,7 @@ class RunLoader:
             input_config  = dataset_config.input_config,
             output_config = dataset_config.output_config,
             split_name    = split_name,
-            norm_stats    = norm_stats,
+            normalizer    = Normalizer(norm_stats),
             x_axis        = x_axis,
             n_gaussians   = n_gaussians,
         )

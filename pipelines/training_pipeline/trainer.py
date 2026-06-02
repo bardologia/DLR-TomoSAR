@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gc
-import os
 from pathlib import Path
 
 import torch
@@ -9,8 +8,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from tools                                          import Tracker, ResourceMonitor, PermutationMetrics
-from tools.model_summary                            import ModelSummary
-from tools.shape_logger                             import ShapeLogger
 from pipelines.training_pipeline.early_stopping     import EarlyStopping
 from pipelines.training_pipeline.warmup             import Warmup
 from pipelines.training_pipeline.scheduler          import Scheduler
@@ -19,6 +16,10 @@ from pipelines.training_pipeline.gradient_clipper   import GradientClipper
 from pipelines.training_pipeline.overfit            import OverfitManager
 from pipelines.training_pipeline.checkpoint         import Checkpoint
 from pipelines.training_pipeline.loss               import Loss
+from pipelines.training_pipeline.train_step         import TrainStep
+from pipelines.training_pipeline.metric_aggregator  import MetricAggregator
+from pipelines.training_pipeline.curriculum         import CurriculumController
+from pipelines.training_pipeline.training_docs      import TrainingDocs
 
 
 class Trainer:
@@ -32,7 +33,7 @@ class Trainer:
         self.emit_docs    = emit_docs
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         self.logger.section("[Training Start]")
         self.logger.kv_table({
             "Backend":       "PyTorch",
@@ -48,17 +49,14 @@ class Trainer:
         self.model_cfg = model_cfg
         self.x_axis    = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
 
-        if self.emit_docs:
-            summary      = ModelSummary(self.logger, self.model)
-            summary.run()
-            summary_path = Path(run_dir) / "docs" / "model_summary.md"
-            summary.save_markdown(str(summary_path))
+        self.docs = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
+        self.docs.emit_model_summary()
 
         self.epochs               = self.config.training.epochs
         self.validation_frequency = self.config.training.validation_frequency
         self.accumulation_steps   = self.config.training.gradient_accumulation_steps
         self.use_amp              = getattr(self.config.training, "use_amp", False)
-        
+
         self.scaler = torch.amp.GradScaler("cuda", enabled=self.use_amp)
 
         param_groups    = self.model_cfg.get_param_groups(self.model)
@@ -75,9 +73,35 @@ class Trainer:
         self.overfitter          = OverfitManager(self.config, self.logger)
         self.resource_monitor    = ResourceMonitor(config = self.config.resources, logger = self.logger, tracker = self.tracker, step_getter = lambda: self.global_step)
         self.permutation_metrics = PermutationMetrics(self.config.permutation_metrics, logger=self.logger)
-        
+
         self.ema.init(self.model)
         self._ema_every = max(1, int(getattr(self.config.ema, "update_every_n_steps", 10)))
+
+        self.train_step = TrainStep(
+            model              = self.model,
+            optimizer          = self.optimizer,
+            scaler             = self.scaler,
+            criterion          = self.criterion,
+            grad_clipper       = self.grad_clipper,
+            ema                = self.ema,
+            device             = self.device,
+            logger             = self.logger,
+            tracker            = self.tracker,
+            accumulation_steps = self.accumulation_steps,
+            use_amp            = self.use_amp,
+            ema_every          = self._ema_every,
+        )
+
+        self.curriculum_controller = CurriculumController(
+            curriculum       = self.curriculum,
+            criterion        = self.criterion,
+            early_stopping   = self.early_stopping,
+            lr_scheduler     = self.lr_scheduler,
+            warmup           = self.warmup,
+            optimizer        = self.optimizer,
+            update_optimizer = self._update_optimizer,
+            logger           = self.logger,
+        )
 
         self.global_step  = 0
         self.train_losses = []
@@ -121,138 +145,69 @@ class Trainer:
             name              = param_group.get('name', str(i))
             self.tracker.log_scalar(f"lr/{name}", lr, self.global_step)
 
-    def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None) -> torch.Tensor:
-        if self.tracker.debug:
-            if torch.isnan(images).any() or torch.isinf(images).any():
-                self.logger.warning(f"NaN or Inf detected in input images at step {self.global_step}!")
-            if gt_params is not None and (torch.isnan(gt_params).any() or torch.isinf(gt_params).any()):
-                self.logger.warning(f"NaN or Inf detected in ground truth parameters at step {self.global_step}!")
+    def capture_state(self, epoch: int) -> dict:
+        return {
+            "epoch"         : epoch,
+            "global_step"   : self.global_step,
+            "train_losses"  : self.train_losses,
+            "val_losses"    : self.val_losses,
 
-        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
-            pred_params = self.model(images)
-            if self.tracker.debug and (torch.isnan(pred_params).any() or torch.isinf(pred_params).any()):
-                self.logger.warning(f"NaN or Inf detected in model predictions at step {self.global_step}!")
-                
-            loss_dict   = self.criterion(pred_params, gt_params)
-            loss        = loss_dict["total_loss"]
-            loss        = loss / self.accumulation_steps
-            
-        if torch.isnan(loss) or torch.isinf(loss):
-            self.logger.warning(f"Total loss evaluated to NaN or Inf at step {self.global_step}!")
+            "params"        : self.model.state_dict(),
+            "opt_state"     : self.optimizer.state_dict(),
+            "batch_stats"   : getattr(self, "_batch_stats", None),
+            "ema_shadow"    : self.ema.state_dict() if self.ema is not None else None,
 
-        return loss, loss_dict
+            "config"        : getattr(self.config, "to_dict", lambda: None)() or str(self.config),
+            "x_axis"        : self.x_axis.cpu().numpy(),
 
-    def _backward(self, loss: torch.Tensor, batch_idx: int, n_batches: int) -> None:
-        self.scaler.scale(loss).backward()
+            "scheduler_state" : self.lr_scheduler.state_dict(),
+            "warmup_state"    : self.warmup.state_dict(),
 
-        if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
-            self.scaler.unscale_(self.optimizer)
-            
-            grad_norm = self.grad_clipper.maybe_clip(self.model, self.global_step)
-            self.grad_clipper.record(grad_norm, self.global_step)
-            
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.optimizer.zero_grad(set_to_none=True)
+            "early_stopping_state": self.early_stopping.state_dict(),
+        }
 
-            if self.ema.enabled:
-                if self.global_step % self._ema_every == 0:
-                    self.ema.update(self.model, step=self.global_step)
+    def restore_state(self, checkpoint: dict) -> int:
+        self.model.load_state_dict(checkpoint["params"])
+        self.optimizer.load_state_dict(checkpoint["opt_state"])
+        if hasattr(self, "_batch_stats"):
+            self._batch_stats = checkpoint.get("batch_stats")
 
-    @torch.no_grad()
-    def _run_shape_logger(self, data_loader: DataLoader):
-        if not self.emit_docs:
-            return
+        if checkpoint.get("ema_shadow") is not None and self.ema.enabled:
+            self.ema.load_state_dict(checkpoint["ema_shadow"])
 
-        include_types = getattr(self.model_cfg, "shape_logger_types", None)
-        if include_types is None:
-            return
+        self.global_step  = checkpoint["global_step"]
+        self.train_losses = checkpoint["train_losses"]
+        self.val_losses   = checkpoint["val_losses"]
 
-        self.logger.section("[Shape Logger]")
-        shape_logger = ShapeLogger(
-            model         = self.model,
-            logger        = self.logger,
-            include_types = include_types,
-            docs_dir      = self.run_dir / "docs",
-        )
-        shape_logger.attach()
+        self.lr_scheduler.load_state_dict(checkpoint["scheduler_state"])
+        self.warmup.load_state_dict(checkpoint["warmup_state"])
 
-        try:
-            batch  = next(iter(data_loader))
-            images = batch[0].to(self.device)
-            self.model.eval()
-            self.model(images)
-        finally:
-            shape_logger.detach()
-            self.model.train()
+        self.early_stopping.load_state_dict(checkpoint["early_stopping_state"])
 
-        shape_logger.save_markdown(filename="shape_log.md", title="Tensor Shape Log")
-
-    def _apply_curriculum_swap(self, epoch: int) -> None:
-        lc = self.curriculum
-        if lc.enabled and epoch == lc.swap_epoch:
-            self.logger.section(f"[Curriculum Loss Swap @ epoch {epoch + 1}]")
-            self.criterion.loss_cfg = lc.complete
-            self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
-
-            self.criterion.matcher.strategy = lc.complete.param_match
-            self.logger.subsection(f"ParamMatcher strategy updated to '{lc.complete.param_match}'.")
-
-            if lc.reset_early_stopping:
-                self.early_stopping.reset()
-                self.logger.subsection("Early stopping reset.")
-
-            if lc.reset_lr:
-                self.lr_scheduler.reset(epoch_offset=epoch)
-                self.logger.subsection(f"LR scheduler reset (epoch offset = {epoch}).")
-
-            if lc.reset_warmup:
-                self.warmup.reset()
-                self.logger.subsection(f"Warmup reset ({self.warmup.warmup_steps} steps).")
-
-            if lc.reset_optimizer:
-                for group in self.optimizer.param_groups:
-                    for p in group["params"]:
-                        state = self.optimizer.state.get(p)
-                        if state:
-                            state.clear()
-                
-                self.logger.subsection("Optimizer state (Adam moments) cleared.")
-
-            if lc.reset_lr or lc.reset_warmup:
-                warmup_factor = self.warmup.factor() if (self.warmup.enabled and not self.warmup.is_finished()) else 1.0
-                immediate_lrs = [lr * warmup_factor for lr in self.lr_scheduler.base_lrs]
-                self._update_optimizer(immediate_lrs)
-                self.logger.subsection(f"Optimizer LR set to warmup-adjusted value (factor={warmup_factor:.4f}) for swap epoch.")
+        return checkpoint["epoch"]
 
     def train_epoch(self, train_loader: DataLoader, epoch: int):
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        num_batches        = 0
-        loss_sum           = 0.0
-        components_sum: dict = {}
-        weighted_sum:   dict = {}
+        num_batches = 0
+        loss_sum    = 0.0
+        aggregator  = MetricAggregator()
 
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch+1}/{self.epochs}[/section] - train", total=len(train_loader))
-            
+
             for batch_idx, batch in enumerate(train_loader):
                 images = batch[0].to(self.device)
                 gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
 
-                loss, loss_dict = self._forward(images, gt_params)
-                self._backward(loss, batch_idx, len(train_loader))
-                
+                loss, loss_dict = self.train_step.step(images, gt_params, batch_idx, len(train_loader), self.global_step)
+
                 loss_val = loss.item() * self.accumulation_steps
                 loss_sum += loss_val
                 num_batches += 1
 
-                for k, v in loss_dict["components"].items():
-                    components_sum[k] = components_sum.get(k, 0.0) + float(v)
-                
-                for k, v in loss_dict["weighted"].items():
-                    weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
+                aggregator.add(loss_dict)
 
                 self.warmup.step()
                 self.global_step += 1
@@ -267,9 +222,8 @@ class Trainer:
         avg_loss = loss_sum / num_batches if num_batches else float("nan")
         self.tracker.log_scalar("loss/train", avg_loss, epoch)
 
-        n = max(1, num_batches)
-        self.tracker.log_metrics("loss_components/train",  {k: v / n for k, v in components_sum.items()}, epoch)
-        self.tracker.log_metrics("loss_weighted/train",    {k: v / n for k, v in weighted_sum.items()},   epoch)
+        self.tracker.log_metrics("loss_components/train", aggregator.reduce_components(), epoch)
+        self.tracker.log_metrics("loss_weighted/train",   aggregator.reduce_weighted(),   epoch)
 
         self.tracker.log_memory(epoch)
 
@@ -283,18 +237,16 @@ class Trainer:
         self.model.eval()
 
         try:
-            total_loss           = 0.0
-            num_batches          = 0
-            components_sum: dict = {}
-            weighted_sum:   dict = {}
-            perm_sum:        dict = {}
+            total_loss  = 0.0
+            num_batches = 0
+            aggregator  = MetricAggregator()
 
             with self.logger.track(transient=True) as _prog:
                 _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch+1}/{self.epochs}", total=len(loader))
                 for batch_idx, batch in enumerate(loader):
                     images = batch[0].to(self.device)
                     gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
-                    
+
                     with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
                         pred_params = self.model(images)
                         loss_dict   = self.criterion(pred_params, gt_params)
@@ -303,29 +255,23 @@ class Trainer:
                     total_loss += loss.item()
                     num_batches += 1
 
-                    for k, v in loss_dict["components"].items():
-                        components_sum[k] = components_sum.get(k, 0.0) + float(v)
-                   
-                    for k, v in loss_dict["weighted"].items():
-                        weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
+                    aggregator.add(loss_dict)
 
                     if gt_params is not None:
                         pred_phys = self.norm_stats.denormalize_output(pred_params)
                         gt_phys   = self.norm_stats.denormalize_output(gt_params)
-                    
+
                         perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), 3)
-                        for k, v in perm_m.items():
-                            perm_sum[k] = perm_sum.get(k, 0.0) + (v if v == v else 0.0)  # skip NaN
+                        aggregator.add_extra(perm_m)
 
                     _prog.advance(_task)
 
             avg_loss = total_loss / max(1, num_batches)
 
-            n = max(1, num_batches)
-            self.tracker.log_metrics(f"loss_components/{stage}", {k: v / n for k, v in components_sum.items()}, epoch)
-            self.tracker.log_metrics(f"loss_weighted/{stage}",   {k: v / n for k, v in weighted_sum.items()},   epoch)
-            if perm_sum:
-                self.tracker.log_metrics(f"permutation/{stage}", {k: v / n for k, v in perm_sum.items()}, epoch)
+            self.tracker.log_metrics(f"loss_components/{stage}", aggregator.reduce_components(), epoch)
+            self.tracker.log_metrics(f"loss_weighted/{stage}",   aggregator.reduce_weighted(),   epoch)
+            if aggregator.extra_sum:
+                self.tracker.log_metrics(f"permutation/{stage}", aggregator.reduce_extra(), epoch)
 
         finally:
             self.ema.restore(self.model)
@@ -354,7 +300,7 @@ class Trainer:
         try:
             data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
 
-            self._run_shape_logger(data_loader)
+            self.docs.emit_shape_log(data_loader, self.device)
 
             epochs = self.epochs
             with self.logger.live_monitor("Training Progress") as live_mon:
@@ -364,7 +310,7 @@ class Trainer:
                         epoch_num = epoch + 1
 
                         self.logger.section(f"[Epoch {epoch_num}/{epochs}]")
-                        self._apply_curriculum_swap(epoch)
+                        self.curriculum_controller.maybe_swap(epoch)
                         train_loss = self.train_epoch(data_loader, epoch)
                         self.logger.subsection(f"Train  : loss={train_loss:.4f}")
 
@@ -376,7 +322,7 @@ class Trainer:
                             self.logger.subsection(f"Validation : loss={val_loss:.4f}  (batches={val_results['num_batches']})")
 
                             self.tracker.log_scalar("loss/val", val_loss, epoch)
-                
+
                             self.checkpoint.step(val_loss, epoch_num, self)
                             new_lrs = self.lr_scheduler.step(epoch, metric=val_loss)
                             stop    = self.early_stopping(val_loss, self.model, epoch)
@@ -394,7 +340,7 @@ class Trainer:
                         if self.config.memory.clear_cache_after_epoch:
                             gc.collect()
                             torch.cuda.empty_cache()
-                            
+
                         self._update_optimizer(new_lrs)
 
                         monitor_data = {
@@ -408,7 +354,7 @@ class Trainer:
                         live_mon.update(**monitor_data)
 
                         _prog_epochs.update(_task_epochs, advance=1, description=f"[section]Training[/section]  best_val={self.checkpoint.best_val_loss:.4f} @ ep {self.checkpoint.best_epoch}")
-                        
+
                         if stop:
                             break
 
@@ -424,4 +370,3 @@ class Trainer:
         finally:
             if self.resource_monitor is not None:
                 self.resource_monitor.stop()
-

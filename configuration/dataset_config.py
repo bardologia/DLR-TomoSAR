@@ -44,6 +44,29 @@ class InputConfig:
             n += 1
         return n
 
+    def channel_group_keys(self, n_secondaries: int) -> list[str]:
+        keys: list[str] = []
+
+        if self.use_primary:
+            slot_kinds = self.primary_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(1 * cpp))
+
+        if self.use_secondaries:
+            slot_kinds = self.secondaries_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"pass/{slot_kinds[i % cpp]}" for i in range(n_secondaries * cpp))
+
+        if self.use_interferograms:
+            slot_kinds = self.interferograms_representation.slot_kinds
+            cpp        = len(slot_kinds)
+            keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_secondaries * cpp))
+
+        if self.use_dem:
+            keys.append("dem/elevation")
+
+        return keys
+
     def as_dict(self) -> dict:
         return {
             "use_primary"                   : self.use_primary,

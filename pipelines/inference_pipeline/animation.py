@@ -13,67 +13,61 @@ import numpy             as np
 from PIL                 import Image
 from tqdm                import tqdm
 
-from pipelines.inference_pipeline.plots import Ploter
+from pipelines.inference_pipeline.plots import PlotTools, Ploter
 from tools.logger                       import Logger
 
 
-def _init_worker() -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot
-    import numpy
-    import io
-
-
-def _render_frame(args: tuple) -> tuple[int, bytes]:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from io import BytesIO
-
-    frame_order, n_frames, g, p, vmin, vmax, emax_gt, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
-
-    eg = np.abs(p - g)
-
-    fig = plt.figure(figsize=(20, 6), constrained_layout=False)
-    gs  = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
-    axes = [fig.add_subplot(gs[0, k]) for k in range(3)]
-    pbar_ax = fig.add_subplot(gs[1, :])
-
-    ims = [
-        axes[0].imshow(g,  cmap=cmap,     vmin=vmin,    vmax=vmax,    extent=extent, aspect="auto", origin=_origin),
-        axes[1].imshow(p,  cmap=cmap,     vmin=vmin,    vmax=vmax,    extent=extent, aspect="auto", origin=_origin),
-        axes[2].imshow(eg, cmap=err_cmap, vmin=0.0,     vmax=emax_gt, extent=extent, aspect="auto", origin=_origin),
-    ]
-
-    for ax, label in zip(axes, ("GT (Gaussian)", "Prediction", "|Pred - GT|")):
-        ax.set_title(label)
-        ax.set_xlabel(x_label)
-
-    axes[0].set_ylabel(y_label)
-
-    int_label = "intensity"
-    fig.colorbar(ims[0], ax=axes[0], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(ims[1], ax=axes[1], fraction=0.045, pad=0.02).set_label(int_label)
-    fig.colorbar(ims[2], ax=axes[2], fraction=0.045, pad=0.02).set_label("|error|")
-
-    progress = (frame_order + 1) / max(1, n_frames)
-    pbar_ax.barh(0, progress,        height=1, color="steelblue", left=0.0)
-    pbar_ax.barh(0, 1.0 - progress,  height=1, color="#333333",   left=progress)
-    pbar_ax.set_xlim(0, 1)
-    pbar_ax.set_axis_off()
-
-    fig.suptitle(title, fontsize=13, y=0.98)
-    fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08)
-
-    buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi)
-    plt.close(fig)
-    buf.seek(0)
-
-    return frame_order, buf.read()
-
-
 class Animator:
+
+    @staticmethod
+    def _init_worker() -> None:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot
+        import numpy
+        import io
+
+    @staticmethod
+    def _render_frame(args: tuple) -> tuple[int, bytes]:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from io import BytesIO
+
+        frame_order, n_frames, g, p, vmin, vmax, emax_gt, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
+
+        eg = np.abs(p - g)
+
+        fig = plt.figure(figsize=(20, 6), constrained_layout=False)
+        gs  = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
+        axes = [fig.add_subplot(gs[0, k]) for k in range(3)]
+        pbar_ax = fig.add_subplot(gs[1, :])
+
+        panels = [
+            (g,  "GT (Gaussian)", cmap,     vmin, vmax),
+            (p,  "Prediction",    cmap,     vmin, vmax),
+            (eg, "|Pred - GT|",   err_cmap, 0.0,  emax_gt),
+        ]
+
+        PlotTools._triple_panel(fig, axes, panels, x_label, "intensity", extent, origin=_origin)
+
+        axes[0].set_ylabel(y_label)
+
+        progress = (frame_order + 1) / max(1, n_frames)
+        pbar_ax.barh(0, progress,        height=1, color="steelblue", left=0.0)
+        pbar_ax.barh(0, 1.0 - progress,  height=1, color="#333333",   left=progress)
+        pbar_ax.set_xlim(0, 1)
+        pbar_ax.set_axis_off()
+
+        fig.suptitle(title, fontsize=13, y=0.98)
+        fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08)
+
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=dpi)
+        plt.close(fig)
+        buf.seek(0)
+
+        return frame_order, buf.read()
+
     def __init__(
         self,
         logger      : Logger,
@@ -166,8 +160,8 @@ class Animator:
         n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
         png_bytes: dict[int, bytes] = {}
 
-        with ProcessPoolExecutor(max_workers=n_workers, initializer=_init_worker) as pool:
-            futures = {pool.submit(_render_frame, t): t[0] for t in tasks}
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=Animator._init_worker) as pool:
+            futures = {pool.submit(Animator._render_frame, t): t[0] for t in tasks}
             with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
                 for fut in as_completed(futures):
                     order, data = fut.result()

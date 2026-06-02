@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import numpy             as np
 from scipy.stats         import gaussian_kde
 
-from tools.logger import Logger
+from tools.gaussian_mixture import GaussianMixture
+from tools.logger           import Logger
 
 
 _SCIENTIFIC_RC: dict = {
@@ -122,17 +123,7 @@ class FittingResultPlotter:
         }
 
     def _reconstruct_pixel(self, params : np.ndarray, height_axis : np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
-        components : List[np.ndarray] = []
-        total      = np.zeros_like(height_axis, dtype=np.float64)
-        for k in range(self.n_gaussians):
-            a   = float(params[3 * k    ])
-            mu  = float(params[3 * k + 1])
-            sig = float(params[3 * k + 2])
-            c   = a * np.exp(-((height_axis - mu) ** 2) / (2.0 * sig ** 2 + 1e-12))
-            components.append(c)
-            total += c
-        
-        return total, components
+        return GaussianMixture.evaluate_pixel(params, height_axis, self.n_gaussians)
 
     def _plot_n_gaussians_map(self, activity_map : np.ndarray, out_path : Path) -> Path:
         Az, R    = activity_map.shape

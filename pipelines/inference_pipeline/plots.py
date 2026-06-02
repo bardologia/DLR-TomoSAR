@@ -10,6 +10,7 @@ import matplotlib.cm        as cm
 import matplotlib.pyplot    as plt
 import numpy                as np
 
+from pipelines.inference_pipeline.reconstruction import GaussianReconstructor
 
 
 class PlotTools:
@@ -36,14 +37,25 @@ class PlotTools:
 
     @staticmethod
     def _gaussian_components(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> List[np.ndarray]:
-        out = []
-        for k in range(n_gaussians):
-            a    = float(params[3 * k])
-            mu   = float(params[3 * k + 1])
-            sig  = float(params[3 * k + 2])
-            comp = a * np.exp(-((x_axis - mu) ** 2) / (2.0 * sig * sig + 1e-8))
-            out.append(comp)
-        return out
+        return GaussianReconstructor.components(params, x_axis, n_gaussians)
+
+    @staticmethod
+    def _triple_panel(
+        fig,
+        axes,
+        panels    : List[Tuple[np.ndarray, str, str, float, float]],
+        x_label   : str,
+        int_label : str,
+        extent    : list,
+        origin    : str,
+    ) -> None:
+
+        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
+            im = ax_i.imshow(data, cmap=cm_used, vmin=vlo, vmax=vhi, extent=extent, aspect="auto", origin=origin)
+            ax_i.set_title(label)
+            ax_i.set_xlabel(x_label)
+            lbl_cb = int_label if cm_used == panels[0][2] else "|error|"
+            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
 
     @staticmethod
     def _shared_clim(*arrays: np.ndarray, q_low: float = 1.0, q_high: float = 99.0) -> Tuple[float, float]:
@@ -254,12 +266,7 @@ class Ploter(PlotTools):
             (err_gt_slice, "|Pred - GT|",  self.err_cmap, 0.0,   emax_gt),
         ]
 
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
-            im = ax_i.imshow(data, aspect="auto", extent=extent_int, cmap=cm_used, vmin=vlo, vmax=vhi, origin="lower")
-            ax_i.set_title(label)
-            ax_i.set_xlabel(x_label)
-            lbl_cb = self._int_label if cm_used == self.cmap else "|error|"
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
+        self._triple_panel(fig, axes, panels, x_label, self._int_label, extent_int, origin="lower")
 
         axes[0].set_ylabel("elevation [m]")
 
@@ -300,13 +307,10 @@ class Ploter(PlotTools):
             (err_gt_slice, "|Pred - GT|",   self.err_cmap, 0.0,  emax_gt),
         ]
 
-        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
-            im = ax_i.imshow(data, cmap=cm_used, vmin=vlo, vmax=vhi, extent=extent, aspect="auto")
-            ax_i.set_title(label)
-            ax_i.set_xlabel("range index")
+        self._triple_panel(fig, axes, panels, "range index", self._int_label, extent, origin="upper")
+
+        for ax_i in axes:
             ax_i.set_ylabel("azimuth index")
-            lbl_cb = self._int_label if cm_used == self.cmap else "|error|"
-            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
 
         ssim_str = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
         fig.suptitle(f"Elevation slice (elev = {x_axis[elev_idx]:.2f} m, idx={elev_idx}){ssim_str}", fontsize=13)
