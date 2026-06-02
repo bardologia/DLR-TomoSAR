@@ -54,10 +54,10 @@ class TrainingRunMetadata:
         self.logger.section("[Training RunMetadata Initialized]")
         devices = torch.cuda.device_count() if torch.cuda.is_available() else 0
         self.logger.kv_table({
-            "Run Directory": self.run_directory,
-            "Model":         self.model_name,
-            "Backend":       "PyTorch",
-            "Devices":       f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
+            "Run Directory" : self.run_directory,
+            "Model"         : self.model_name,
+            "Backend"       : "PyTorch",
+            "Devices"       : f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
         })
 
     def save_trainer_config(self) -> Path:

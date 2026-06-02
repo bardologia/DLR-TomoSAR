@@ -38,21 +38,24 @@ class Cropper:
         secondaries_reduced    = np.load(str(self.layout.artifact_path("secondaries_reduced")),    mmap_mode="r", allow_pickle=False)
         interferograms_reduced = np.load(str(self.layout.artifact_path("interferograms_reduced")), mmap_mode="r", allow_pickle=False)
         parameters_reduced     = np.load(str(self.layout.artifact_path("parameters")),             mmap_mode="r", allow_pickle=False)
+        dem_reduced            = np.load(str(self.layout.artifact_path("dem_reduced")),            mmap_mode="r", allow_pickle=False)
 
         primary_split        = np.ascontiguousarray(primary_reduced        [..., az_slice, rg_slice])
         secondaries_split    = np.ascontiguousarray(secondaries_reduced    [..., az_slice, rg_slice])
         interferograms_split = np.ascontiguousarray(interferograms_reduced [..., az_slice, rg_slice])
         parameters_split     = np.ascontiguousarray(parameters_reduced     [..., az_slice, rg_slice])
+        dem_split            = np.ascontiguousarray(dem_reduced            [az_slice, rg_slice].astype(np.float32))
 
         inputs_split = np.concatenate([primary_split[np.newaxis], secondaries_split, interferograms_split], axis=0)
 
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
-            "Primary":          primary_split.shape,
-            "Secondaries":      secondaries_split.shape,
-            "Interferograms":   interferograms_split.shape,
-            "Inputs (stacked)": f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {secondaries_split.shape[0]} secondaries + {interferograms_split.shape[0]} interferograms]",
-            "Parameters":       f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
+            "Primary"          : primary_split.shape,
+            "Secondaries"      : secondaries_split.shape,
+            "Interferograms"   : interferograms_split.shape,
+            "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {secondaries_split.shape[0]} secondaries + {interferograms_split.shape[0]} interferograms]",
+            "DEM reduced"      : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
+            "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
         })
 
         return {
@@ -60,5 +63,6 @@ class Cropper:
             "secondaries"    : secondaries_split,
             "interferograms" : interferograms_split,
             "inputs"         : inputs_split,
+            "dem"            : dem_split,
             "parameters"     : parameters_split,
         }

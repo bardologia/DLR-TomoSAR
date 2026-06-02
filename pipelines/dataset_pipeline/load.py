@@ -24,6 +24,7 @@ class PatchDataset(Dataset):
         x_axis        : Optional[np.ndarray] = None,
         n_gaussians   : int                  = 1,
         augmenter     : Optional[SpatialAugmenter] = None,
+        dem           : Optional[np.ndarray] = None,
     ) -> None:
 
         self.inputs         = inputs
@@ -36,6 +37,7 @@ class PatchDataset(Dataset):
         self.x_axis         = x_axis
         self.n_gaussians    = n_gaussians
         self.augmenter      = augmenter
+        self.dem            = dem
         self.input_layers   = int(inputs.shape[0])
 
         n_rest              = self.input_layers - 1  # subtract primary
@@ -49,7 +51,7 @@ class PatchDataset(Dataset):
     def __len__(self) -> int:
         return self.grid.grid.number_of_patches
 
-    def _build_input_tensor(self, complex_patch: np.ndarray) -> np.ndarray:
+    def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
         complex_data = complex_patch[None, ...]
       
         primary_data        = complex_data[:, :1]
@@ -66,6 +68,10 @@ class PatchDataset(Dataset):
 
         if self.input_config.use_interferograms:
             parts.append(self.input_config.interferograms_representation.convert(interferograms_data))
+
+        if self.input_config.use_dem and dem_patch is not None:
+            # dem_patch shape: (pH, pW) → (1, 1, pH, pW) to match batch/channel dims before squeezing
+            parts.append(dem_patch[np.newaxis, np.newaxis].astype(np.float32))
 
         input_tensor = parts[0] if len(parts) == 1 else np.concatenate(parts, axis=1)
         input_tensor = input_tensor[0]  
@@ -91,7 +97,8 @@ class PatchDataset(Dataset):
 
     def __getitem__(self, idx: int):
         complex_patch = self.grid.extract(self.inputs, idx)
-        input_tensor  = self._build_input_tensor(complex_patch)
+        dem_patch     = self.grid.extract(self.dem, idx) if (self.input_config.use_dem and self.dem is not None) else None
+        input_tensor  = self._build_input_tensor(complex_patch, dem_patch)
 
         gt_patch  = self.grid.extract(self.gt_parameters, idx)
         gt_params = self._build_output_tensor(gt_patch)

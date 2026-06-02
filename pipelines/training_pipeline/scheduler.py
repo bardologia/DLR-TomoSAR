@@ -30,10 +30,10 @@ class Scheduler:
         return eta_min_ratio + 0.5 * (1.0 - eta_min_ratio) * (1.0 + math.cos(math.pi * progress))
 
     def _cosine_annealing_warm_restarts(self, epoch: int) -> float:
-        T_0       = int(self.config.scheduler.T_0)
-        T_mult    = float(self.config.scheduler.T_mult)
-        eta_min   = float(self.config.scheduler.eta_min)
-        base_lr   = self.base_lrs[0]
+        T_0           = int(self.config.scheduler.T_0)
+        T_mult        = float(self.config.scheduler.T_mult)
+        eta_min       = float(self.config.scheduler.eta_min)
+        base_lr       = self.base_lrs[0]
         eta_min_ratio = eta_min / max(base_lr, 1e-12)
 
         if T_mult == 1.0:
@@ -150,16 +150,19 @@ class Scheduler:
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")
         info = {
-            "Scheduler Type": self.scheduler_type,
-            "Base LRs":       self.base_lrs,
+            "Scheduler Type" : self.scheduler_type,
+            "Base LRs"       : self.base_lrs,
         }
+        
         if self.scheduler_type == "cosine_annealing":
             info["T_max"]   = self.config.scheduler.epochs
             info["Eta Min"] = self.config.scheduler.eta_min
+        
         if self.scheduler_type == "cosine_annealing_warm_restarts":
             info["T_0"]     = self.config.scheduler.T_0
             info["T_mult"]  = self.config.scheduler.T_mult
             info["Eta Min"] = self.config.scheduler.eta_min
+        
         info["Warmup Enabled"] = self.warmup.enabled if self.warmup else False
         self.logger.kv_table(info)
 

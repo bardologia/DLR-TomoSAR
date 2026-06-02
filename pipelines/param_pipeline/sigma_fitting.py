@@ -103,6 +103,43 @@ def _prominence_batch(prof_raw : np.ndarray, height_axis : np.ndarray, K : int, 
     return amps, mus, sigs
 
 
+def _adam_scan(
+    batched_vg  ,
+    sigmas_init  : jnp.ndarray,
+    height_axis  : jnp.ndarray,
+    profiles     : jnp.ndarray,
+    amps         : jnp.ndarray,
+    mus          : jnp.ndarray,
+    sigma_lower  : jnp.ndarray,
+    sigma_upper  : jnp.ndarray,
+    n_steps      : int,
+    lr           : float,
+    b1           : float,
+    b2           : float,
+) -> jnp.ndarray:
+    b1_ = jnp.float32(b1)
+    b2_ = jnp.float32(b2)
+    eps = jnp.float32(1e-8)
+    lr_ = jnp.float32(lr)
+    s   = jnp.clip(sigmas_init.astype(jnp.float32), sigma_lower, sigma_upper)
+    m   = jnp.zeros_like(s)
+    v   = jnp.zeros_like(s)
+
+    def _step(carry, t):
+        s_, m_, v_ = carry
+        _, g = batched_vg(s_, height_axis, profiles, amps, mus)
+        m_   = b1_ * m_ + (1.0 - b1_) * g
+        v_   = b2_ * v_ + (1.0 - b2_) * g * g
+        tf   = t.astype(jnp.float32) + 1.0
+        s_   = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
+        s_   = jnp.clip(s_, sigma_lower, sigma_upper)
+        return (s_, m_, v_), None
+
+    (s_final, _, _), _ = jax.lax.scan(_step, (s, m, v), jnp.arange(n_steps))
+   
+    return s_final
+
+
 class SigmaAdamKernel:
     def __init__(self) -> None:
         batched_vg = jax.vmap(jax.value_and_grad(self._per_pixel_loss), in_axes=(0, None, 0, 0, 0))
@@ -122,40 +159,19 @@ class SigmaAdamKernel:
     def _build(batched_vg):
         @partial(jax.jit, static_argnames=("n_steps", "lr", "b1", "b2"))
         def _run(
-            sigmas_init : jnp.ndarray,   
-            height_axis : jnp.ndarray,    
-            profiles    : jnp.ndarray,   
-            amps        : jnp.ndarray,   
-            mus         : jnp.ndarray,   
-            sigma_lower : jnp.ndarray,   
-            sigma_upper : jnp.ndarray,   
+            sigmas_init : jnp.ndarray,
+            height_axis : jnp.ndarray,
+            profiles    : jnp.ndarray,
+            amps        : jnp.ndarray,
+            mus         : jnp.ndarray,
+            sigma_lower : jnp.ndarray,
+            sigma_upper : jnp.ndarray,
             n_steps     : int   = 2000,
             lr          : float = 1e-2,
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> jnp.ndarray:
-           
-            b1_ = jnp.float32(b1)
-            b2_ = jnp.float32(b2)
-            eps = jnp.float32(1e-8)
-            lr_ = jnp.float32(lr)
-            s   = jnp.clip(sigmas_init.astype(jnp.float32), sigma_lower, sigma_upper)
-            m   = jnp.zeros_like(s)
-            v   = jnp.zeros_like(s)
-
-            def _step(carry, t):
-                s_, m_, v_ = carry
-                _, g = batched_vg(s_, height_axis, profiles, amps, mus)
-                m_   = b1_ * m_ + (1.0 - b1_) * g
-                v_   = b2_ * v_ + (1.0 - b2_) * g * g
-                tf   = t.astype(jnp.float32) + 1.0
-                s_   = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
-                s_   = jnp.clip(s_, sigma_lower, sigma_upper)
-                return (s_, m_, v_), None
-
-            (s_final, _, _), _ = jax.lax.scan(_step, (s, m, v), jnp.arange(n_steps))
-            return s_final
-
+            return _adam_scan(batched_vg, sigmas_init, height_axis, profiles, amps, mus, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
         return _run
 
     def __call__(
@@ -181,39 +197,19 @@ class PmapSigmaAdamKernel:
     @staticmethod
     def _build(batched_vg, devices):
         def _run_on_device(
-            sigmas_init : jnp.ndarray,  
-            height_axis : jnp.ndarray,   
-            profiles    : jnp.ndarray,   
-            amps        : jnp.ndarray,   
-            mus         : jnp.ndarray,   
-            sigma_lower : jnp.ndarray,   
-            sigma_upper : jnp.ndarray,   
+            sigmas_init : jnp.ndarray,
+            height_axis : jnp.ndarray,
+            profiles    : jnp.ndarray,
+            amps        : jnp.ndarray,
+            mus         : jnp.ndarray,
+            sigma_lower : jnp.ndarray,
+            sigma_upper : jnp.ndarray,
             n_steps     : int   = 2000,
             lr          : float = 1e-2,
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> jnp.ndarray:
-            
-            b1_ = jnp.float32(b1)
-            b2_ = jnp.float32(b2)
-            eps = jnp.float32(1e-8)
-            lr_ = jnp.float32(lr)
-            s   = jnp.clip(sigmas_init.astype(jnp.float32), sigma_lower, sigma_upper)
-            m   = jnp.zeros_like(s)
-            v   = jnp.zeros_like(s)
-
-            def _step(carry, t):
-                s_, m_, v_ = carry
-                _, g = batched_vg(s_, height_axis, profiles, amps, mus)
-                m_   = b1_ * m_ + (1.0 - b1_) * g
-                v_   = b2_ * v_ + (1.0 - b2_) * g * g
-                tf   = t.astype(jnp.float32) + 1.0
-                s_   = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
-                s_   = jnp.clip(s_, sigma_lower, sigma_upper)
-                return (s_, m_, v_), None
-
-            (s_final, _, _), _ = jax.lax.scan(_step, (s, m, v), jnp.arange(n_steps))
-            return s_final
+            return _adam_scan(batched_vg, sigmas_init, height_axis, profiles, amps, mus, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
 
         return jax.pmap(
             _run_on_device,
@@ -272,7 +268,6 @@ class SigmaFittingExtractor:
         lambda_k            : float               = 3e-3,
         prominence_frac     : float               = 0.05,
         gpu_pixel_batch_size: int                 = 8192,
-        r2_sample_cap       : int                 = 4096,
         gpu_device_ids      : Optional[List[int]] = None,
         init_workers        : Optional[int]       = None,
     ) -> None:
@@ -287,7 +282,6 @@ class SigmaFittingExtractor:
         self.k_max                = k_max
         self.lambda_k             = lambda_k
         self.prominence_frac      = prominence_frac
-        self.r2_sample_cap        = r2_sample_cap
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self._init_workers        = 80 if init_workers is None else init_workers
 
@@ -609,83 +603,6 @@ class SigmaFittingExtractor:
 
         return total_attempted
 
-    def _estimate_r2(
-        self,
-        output           : np.ndarray,
-        tomogram_mmap    : np.ndarray,
-        height_axis      : np.ndarray,
-        threshold_factor : float,
-        truncation_index : int,
-    ) -> dict:
-        
-        H, Az, R = tomogram_mmap.shape
-        rng      = np.random.default_rng(0)
-        idx_flat = rng.choice(Az * R, size=min(self.r2_sample_cap, Az * R), replace=False)
-        az_idx   = idx_flat // R
-        r_idx    = idx_flat %  R
-
-        profiles = np.abs(tomogram_mmap[:, az_idx, r_idx]).T.astype(np.float64)
-
-        if threshold_factor > 0.0:
-            col_max  = profiles.max(axis=1, keepdims=True)
-            profiles = np.where(profiles > col_max * threshold_factor, profiles, 0.0)
-       
-        if truncation_index < H:
-            profiles[:, truncation_index:] = 0.0
-
-        active = profiles.max(axis=1) > 1e-7
-        nan_stats = dict(mse_norm=float("nan"), mse_denorm=float("nan"), r2_valid=False)
-        if not active.any():
-            return nan_stats
-
-        y    = profiles[active]
-        h64  = height_axis.astype(np.float64)
-        f    = output[:, az_idx, r_idx].T[active].astype(np.float64)
-        amps = f[:, 0::3]
-        mus  = f[:, 1::3]
-        sigs = np.maximum(f[:, 2::3], 1e-6)
-
-        diff = h64[None, None, :] - mus[:, :, None]
-        pred = (amps[:, :, None] * np.exp(np.clip(-(diff ** 2) / (2.0 * sigs[:, :, None] ** 2 + 1e-10), -100.0, 0.0))).sum(axis=1)
-
-        pmax_y       = y.max(axis=1, keepdims=True)
-        safe_pmax    = np.where(pmax_y > 1e-10, pmax_y, 1.0)
-        y_norm       = y    / safe_pmax
-        pred_norm    = pred / safe_pmax
-        active_bins  = y > 0.0
-        n_active     = np.maximum(active_bins.sum(axis=1), 1)
-        mse_norm     = float(((active_bins * (y_norm  - pred_norm) ** 2).sum(axis=1) / n_active).mean())
-
-        mse_denorm   = float(((active_bins * (y - pred) ** 2).sum(axis=1) / n_active).mean())
-
-        pred_m  = np.where(active_bins, pred, 0.0)
-        mean_y  = (y * active_bins).sum(axis=1, keepdims=True) / np.maximum(active_bins.sum(axis=1, keepdims=True), 1)
-        ss_res  = (active_bins * (y - pred_m) ** 2).sum(axis=1)
-        ss_tot  = (active_bins * (y - mean_y) ** 2).sum(axis=1)
-
-        with np.errstate(invalid="ignore", divide="ignore"):
-            r2 = np.where(ss_tot > 1e-20, 1.0 - ss_res / ss_tot, np.nan)
-
-        finite = np.isfinite(r2)
-        if not finite.any():
-            return dict(mse_norm=mse_norm, mse_denorm=mse_denorm, r2_valid=False)
-
-        r2f = r2[finite]
-        p10, p25, p50, p75, p90 = np.percentile(r2f, [10, 25, 50, 75, 90])
-        return dict(
-            mse_norm    = mse_norm,
-            mse_denorm  = mse_denorm,
-            r2_valid    = True,
-            r2_mean     = float(r2f.mean()),
-            r2_median   = float(p50),
-            r2_std      = float(r2f.std()),
-            r2_p10      = float(p10),
-            r2_p25      = float(p25),
-            r2_p75      = float(p75),
-            r2_p90      = float(p90),
-            r2_neg_frac = float((r2f < 0).mean()),
-        )
-
     def run(
         self,
         tomogram_path : Path,
@@ -713,18 +630,5 @@ class SigmaFittingExtractor:
 
         self.logger.section("[Results]")
         self.logger.subsection(f"Active pixels fitted : {total_attempted:,} / {R * Az:,}")
-        stats = self._estimate_r2(output, tomogram_mmap, height_axis, threshold_factor, truncation_index)
-
-        self.logger.subsection(f"MSE (normalised)     : {stats['mse_norm']:.5f}")
-        self.logger.subsection(f"MSE (denormalised)   : {stats['mse_denorm']:.5f}")
-        if stats['r2_valid']:
-            self.logger.subsection(f"R²  mean             : {stats['r2_mean']:.4f}")
-            self.logger.subsection(f"R²  median           : {stats['r2_median']:.4f}")
-            self.logger.subsection(f"R²  std              : {stats['r2_std']:.4f}")
-            self.logger.subsection(f"R²  p10 / p25        : {stats['r2_p10']:.4f}  /  {stats['r2_p25']:.4f}")
-            self.logger.subsection(f"R²  p75 / p90        : {stats['r2_p75']:.4f}  /  {stats['r2_p90']:.4f}")
-            self.logger.subsection(f"R²  < 0  fraction    : {stats['r2_neg_frac']:.3f}")
-        else:
-            self.logger.subsection("R²                   : N/A")
 
         return output

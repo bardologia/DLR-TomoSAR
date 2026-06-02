@@ -7,7 +7,7 @@ import tempfile
 import atexit
 from pathlib import Path
 
-gpu_ids = [0, 1, 2, 3]
+gpu_ids = [0, 1, 3]
 
 def _make_experiments() -> list[dict]:
     extra_losses = [
@@ -18,20 +18,24 @@ def _make_experiments() -> list[dict]:
         ("complete_use_cosine_curve",       "complete_weight_cosine_curve"),
         ("complete_use_spectral_coherence", "complete_weight_spectral_coh"),
         ("complete_use_ssim_curve",         "complete_weight_ssim_curve"),
-        ("complete_use_param_huber",        "complete_weight_param_huber"),
-        ("complete_use_smoothness_tv",      "complete_weight_smoothness_tv"),
     ]
-    weights = [2.0, 1.0, 0.5, 0.25, 0.125]
+    weights = [0.01, 0.05, 0.02]
 
     exps = []
     for use_key, weight_key in extra_losses:
         for w in weights:
             exps.append({
-                "curriculum_enabled"     : True,
-                "warmup_use_param_l1"    : True,  "warmup_weight_param_l1"  : 1.0,
-                "complete_use_param_l1"  : True,  "complete_weight_param_l1": 1.0,
-                use_key                  : True,  weight_key                : w,
+                "curriculum_enabled"              : True,
+                "curriculum_swap_epoch"           : 30,
+                "curriculum_reset_early_stopping" : True,
+                "curriculum_reset_lr"             : True,
+                "curriculum_reset_warmup"         : True,
+                "curriculum_reset_optimizer"      : False,
+                "warmup_use_param_l1"             : True,  "warmup_weight_param_l1"  : 1.0,
+                "complete_use_param_l1"           : True,  "complete_weight_param_l1": 1.0,
+                use_key                           : True,  weight_key                : w,
             })
+    
     return exps
 
 experiments = _make_experiments()

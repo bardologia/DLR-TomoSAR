@@ -20,15 +20,16 @@ class Warmup:
 
         self.logger.section("[Warmup Scheduler]")
         self.logger.kv_table({
-            "Enabled":      self.enabled,
-            "Steps":        self.warmup_steps,
-            "Mode":         self.mode,
-            "Start Factor": self.warmup_start_factor,
+            "Enabled"      : self.enabled,
+            "Steps"        : self.warmup_steps,
+            "Mode"         : self.mode,
+            "Start Factor" : self.warmup_start_factor,
         })
 
     def factor(self) -> float:
         if not self.enabled or self.warmup_steps <= 0:
             return 1.0
+       
         if self.current_step >= self.warmup_steps:
             return 1.0
 
@@ -71,7 +72,6 @@ class Warmup:
         return factor
 
     def reset(self) -> None:
-        """Restart the warmup from step 0 (e.g. after a curriculum phase swap)."""
         self.current_step       = 0
         self.warmup_finished    = False
         self._logged_completion = False

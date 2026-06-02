@@ -78,6 +78,9 @@ class StatsComputer:
             cpp        = len(slot_kinds)
             keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_slaves * cpp))
 
+        if input_config.use_dem:
+            keys.append("dem/elevation")
+
         return keys
 
     @staticmethod

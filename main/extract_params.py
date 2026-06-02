@@ -14,7 +14,7 @@ from configuration.param_extraction_config import FitMode, ExtractionConfig, Fit
 from pipelines.param_pipeline.pipeline     import ParamExtractionPipeline
 
 
-processed_data_path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
+dataset_base_path   = Path("/ste/rnd/User/vice_vi/Dataset")
 pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat")
 tomogram_filename   = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
 
@@ -28,27 +28,32 @@ parameter_workers   = 50
 
 
 def main() -> None:
-    config = ExtractionConfig(
-        processed_data_path = processed_data_path,
-        pyrat_directory     = pyrat_directory,
+    dataset_dirs = sorted(p for p in dataset_base_path.iterdir() if p.is_dir())
 
-        output_prefix     = output_prefix,
-        output_suffix     = output_suffix,
+    for i, processed_data_path in enumerate(dataset_dirs):
+        print(f"\n[Run {i + 1}/{len(dataset_dirs)}] {processed_data_path.name}")
 
-        tomogram_filename = tomogram_filename,
-        height_range      = height_range,
+        config = ExtractionConfig(
+            processed_data_path = processed_data_path,
+            pyrat_directory     = pyrat_directory,
 
-        fit_settings      = FitSettings(fit_config=FitMode.SigmaOnly(k_max=fit_k_max, lambda_k=fit_lambda_k)),
+            output_prefix     = output_prefix,
+            output_suffix     = output_suffix,
 
-        parameter_workers = parameter_workers,
-    )
+            tomogram_filename = tomogram_filename,
+            height_range      = height_range,
 
-    pipeline  = ParamExtractionPipeline(config)
-    outputs   = pipeline.run()
+            fit_settings      = FitSettings(fit_config=FitMode.SigmaOnly(k_max=fit_k_max, lambda_k=fit_lambda_k)),
 
-    print("[Execution Successful] Outputs:")
-    for name, path in outputs.items():
-        print(f"  {name:>18}: {path}")
+            parameter_workers = parameter_workers,
+        )
+
+        pipeline  = ParamExtractionPipeline(config)
+        outputs   = pipeline.run()
+
+        print("[Execution Successful] Outputs:")
+        for name, path in outputs.items():
+            print(f"  {name:>18}: {path}")
 
 
 if __name__ == "__main__":

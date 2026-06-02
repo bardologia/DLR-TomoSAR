@@ -15,9 +15,9 @@ class EarlyStopping:
 
         self.logger.section("[Early Stopping]")
         self.logger.kv_table({
-            "Patience":     self.patience,
-            "Min Delta":    self.min_delta,
-            "Restore Best": self.restore_best,
+            "Patience"     : self.patience,
+            "Min Delta"    : self.min_delta,
+            "Restore Best" : self.restore_best,
         })
 
         self.best_loss        = None
@@ -59,7 +59,6 @@ class EarlyStopping:
             self.best_params = {name: param.clone().detach().cpu() for name, param in model.state_dict().items()}
 
     def reset(self) -> None:
-        """Clear all state so early stopping starts fresh (e.g. after a curriculum phase swap)."""
         self.best_loss   = None
         self.counter     = 0
         self.best_epoch  = -1

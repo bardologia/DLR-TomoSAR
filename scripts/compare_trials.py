@@ -192,13 +192,6 @@ def _loss_row(cfg: dict) -> dict[str, str]:
 
 
 def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
-    names = [t["name"] for t in trials]
-    header  = "| Attribute | " + " | ".join(f"`{n}`" for n in names) + " |"
-    divider = "| --- |" + " --- |" * len(names)
-
-    def row(label: str, fn) -> str:
-        cells = [_fmt(fn(t)) for t in trials]
-        return "| " + label + " | " + " | ".join(cells) + " |"
 
     def cfg_val(t, *keys):
         d = t["trainer_cfg"]
@@ -218,32 +211,47 @@ def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
                 return "—"
         return d if d is not None else "—"
 
+    # Each column is one attribute; each row is one trial.
+    LOSS_COLS: list[tuple[str, callable]] = [
+        ("Active losses + weights", lambda t: _loss_row(t["trainer_cfg"])),
+        ("Param match",             lambda t: _loss_cfg(t["trainer_cfg"]).get("param_match", "—")),
+        ("TV weight",               lambda t: _loss_cfg(t["trainer_cfg"]).get("weight_smoothness_tv", "—")),
+    ]
+    OPT_COLS: list[tuple[str, callable]] = [
+        ("LR",             lambda t: cfg_val(t, "optimizer", "lr")),
+        ("Scheduler",      lambda t: cfg_val(t, "scheduler", "type")),
+        ("Max epochs",     lambda t: cfg_val(t, "scheduler", "epochs")),
+        ("η_min",          lambda t: cfg_val(t, "scheduler", "eta_min")),
+        ("Warmup",         lambda t: cfg_val(t, "warmup", "warmup_enabled")),
+        ("EMA",            lambda t: cfg_val(t, "ema", "use_ema")),
+        ("AMP",            lambda t: cfg_val(t, "training", "use_amp")),
+    ]
+    CKPT_COLS: list[tuple[str, callable]] = [
+        ("Best epoch",    lambda t: t["log_best"].get("best_epoch",    sum_val(t, "best_epoch"))),
+        ("Best val loss", lambda t: t["log_best"].get("best_val_loss", sum_val(t, "best_val_loss"))),
+        ("Has inf",       lambda t: "✅" if t["has_inf"] else "⏳ pending"),
+        ("Inference run", lambda t: t["inf_dir"].name if t["inf_dir"] else "—"),
+    ]
+
+    def make_table(cols: list[tuple[str, callable]]) -> list[str]:
+        col_labels = [c[0] for c in cols]
+        header  = "| Trial | " + " | ".join(col_labels) + " |"
+        divider = "| --- |" + " --- |" * len(cols)
+        rows = []
+        for t in trials:
+            cells = [_fmt(fn(t)) for _, fn in cols]
+            rows.append("| `" + t["name"] + "` | " + " | ".join(cells) + " |")
+        return [header, divider, *rows, ""]
+
     lines = [
         "# Training Comparison",
         f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_\n",
         "## Loss Configuration\n",
-        header, divider,
-        row("Active losses + weights", lambda t: _loss_row(t["trainer_cfg"])),
-        row("Param match strategy",    lambda t: _loss_cfg(t["trainer_cfg"]).get("param_match", "—")),
-        row("TV weight",               lambda t: _loss_cfg(t["trainer_cfg"]).get("weight_smoothness_tv", "—")),
-        "",
+        *make_table(LOSS_COLS),
         "## Optimiser & Scheduler\n",
-        header, divider,
-        row("Learning rate",  lambda t: cfg_val(t, "optimizer", "lr")),
-        row("Scheduler type", lambda t: cfg_val(t, "scheduler", "type")),
-        row("Max epochs",     lambda t: cfg_val(t, "scheduler", "epochs")),
-        row("η_min",          lambda t: cfg_val(t, "scheduler", "eta_min")),
-        row("Warmup",         lambda t: cfg_val(t, "warmup", "warmup_enabled")),
-        row("Use EMA",        lambda t: cfg_val(t, "ema", "use_ema")),
-        row("Use AMP",        lambda t: cfg_val(t, "training", "use_amp")),
-        "",
+        *make_table(OPT_COLS),
         "## Best Checkpoint\n",
-        header, divider,
-        row("Best epoch",     lambda t: t["log_best"].get("best_epoch",    sum_val(t, "best_epoch"))),
-        row("Best val loss",  lambda t: t["log_best"].get("best_val_loss", sum_val(t, "best_val_loss"))),
-        row("Has inference",  lambda t: "✅" if t["has_inf"] else "⏳ pending"),
-        row("Inference run",  lambda t: t["inf_dir"].name if t["inf_dir"] else "—"),
-        "",
+        *make_table(CKPT_COLS),
     ]
 
     out = out_dir / "training_comparison.md"
@@ -337,14 +345,17 @@ FIGURE_SECTIONS: list[tuple[str, list[str]]] = [
 
 def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool = False) -> list[Path]:
     inf_trials = [t for t in trials if t["has_inf"]]
-    names = [t["name"] for t in inf_trials]
 
-    header  = "| Metric | " + " | ".join(f"`{n}`" for n in names) + " |"
-    divider = "| --- |" + " --- |" * len(names)
-
-    def metric_row(label: str, key: str) -> str:
-        cells = [_fmt(t["metrics"].get(key, "—")) for t in inf_trials]
-        return "| " + label + " | " + " | ".join(cells) + " |"
+    def make_metrics_table(metrics: list[tuple[str, str]]) -> list[str]:
+        """One row per trial, one column per metric."""
+        col_labels = [label for _, label in metrics]
+        header  = "| Trial | " + " | ".join(col_labels) + " |"
+        divider = "| --- |" + " --- |" * len(metrics)
+        rows = []
+        for t in inf_trials:
+            cells = [_fmt(t["metrics"].get(key, "—")) for key, _ in metrics]
+            rows.append("| `" + t["name"] + "` | " + " | ".join(cells) + " |")
+        return [header, divider, *rows, ""]
 
     # ── File 1: numerical metrics only ───────────────────────────────────────
     lines = [
@@ -353,10 +364,7 @@ def write_test_results_comparison(trials: list[dict], out_dir: Path, embed: bool
         "> Only trials that have at least one completed inference run are shown.\n",
     ]
     for section_title, metrics in METRIC_SECTIONS:
-        lines += [f"## {section_title}\n", header, divider]
-        for key, label in metrics:
-            lines.append(metric_row(label, key))
-        lines.append("")
+        lines += [f"## {section_title}\n", *make_metrics_table(metrics)]
 
     metrics_out = out_dir / "test_results_metrics.md"
     metrics_out.write_text("\n".join(lines), encoding="utf-8")

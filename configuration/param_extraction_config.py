@@ -21,13 +21,16 @@ FitConfig = FitMode.SigmaOnly
 
 @dataclass
 class FitSettings:
-    number_of_gaussians : int       = 3
     max_fit_iterations  : int       = 5000
     fit_config          : FitConfig = field(default_factory=FitMode.SigmaOnly)
 
     @property
+    def number_of_gaussians(self) -> int:
+        return self.fit_config.k_max
+
+    @property
     def parameters_per_profile(self) -> int:
-        return 3 * self.number_of_gaussians
+        return 3 * self.fit_config.k_max
 
     @property
     def fitting_method(self) -> str:
@@ -52,9 +55,7 @@ class ExtractionConfig:
     adam_lr              : float                         = 2e-1
     adam_b1              : float                         = 0.95
     adam_b2              : float                         = 0.999
-    adam_warmup_steps    : int                           = 100
     gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 3])
-    r2_sample_cap        : int                           = 4096
 
 
     @property

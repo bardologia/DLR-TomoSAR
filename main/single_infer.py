@@ -22,7 +22,7 @@ from configuration.inference_config        import InferenceConfig
 from pipelines.inference_pipeline.pipeline import InferencePipeline
 
 
-run_directory = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/help/unet_baseline_hard_new")
+run_directory = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test/resunet_w-pHub1")
 
 def main() -> None:
     cfg = InferenceConfig(

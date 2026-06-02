@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-GPU_ID = "1"
+GPU_ID = "3"
 os.environ["CUDA_VISIBLE_DEVICES"]          = str(GPU_ID)
 os.environ["MKL_NUM_THREADS"]               = "4"
 os.environ["NUMEXPR_NUM_THREADS"]           = "4"
@@ -41,19 +41,20 @@ from configuration.training_config      import (
 from pipelines.training_pipeline.pipeline import TrainingPipeline
 
 
-run_name      = "resunet_curriculum"
+run_name      = "resunet_w-pL11_new"
 model_name    = "resunet"
 seed          = 0
 
 dataset_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
 params_path   = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/curriculum/"
+logdir        = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test/"
 
 batch_size    = 256
 num_workers   = 8
 
 n_gaussians              = 5
-epochs                   = 150
+epochs                   = 90
+epochs_scheduler         = 60
 validation_frequency     = 1
 early_stopping_patience  = 50
 early_stopping_min_delta = 0.0001
@@ -84,8 +85,8 @@ warmup_use_spectral_coherence     = False
 warmup_weight_spectral_coh        = 0.0
 warmup_use_ssim_curve             = False
 warmup_weight_ssim_curve          = 0.0
-warmup_use_param_l1               = False
-warmup_weight_param_l1            = 0.0
+warmup_use_param_l1               = True
+warmup_weight_param_l1            = 1.0
 warmup_use_param_huber            = False
 warmup_weight_param_huber         = 0.0
 warmup_use_smoothness_tv          = False
@@ -165,7 +166,7 @@ def main() -> None:
         
         early_stopping   = EarlyStoppingConfig(patience=early_stopping_patience, min_delta=early_stopping_min_delta),
         
-        scheduler        = SchedulerConfig(epochs=epochs),
+        scheduler        = SchedulerConfig(epochs=epochs_scheduler),
         
         ema              = EMAConfig(use_ema=False),
         

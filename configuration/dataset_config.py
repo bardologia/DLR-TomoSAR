@@ -22,6 +22,8 @@ class InputConfig:
     use_interferograms            : bool           = True
     interferograms_representation : Representation = Representation.ANGLE_ONLY
 
+    use_dem                       : bool           = False
+
     @property
     def primary_channels_per_pass(self) -> int:
         return self.primary_representation.channels_per_pass if self.use_primary else 0
@@ -38,7 +40,8 @@ class InputConfig:
         n = self.primary_channels_per_pass
         if n_secondaries > 0:
             n += n_secondaries * (self.secondaries_channels_per_pass + self.interferograms_channels_per_pass)
-      
+        if self.use_dem:
+            n += 1
         return n
 
     def as_dict(self) -> dict:
@@ -49,6 +52,7 @@ class InputConfig:
             "secondaries_representation"    : self.secondaries_representation.value,
             "use_interferograms"            : self.use_interferograms,
             "interferograms_representation" : self.interferograms_representation.value,
+            "use_dem"                       : self.use_dem,
         }
 
     @classmethod
@@ -61,6 +65,7 @@ class InputConfig:
                 secondaries_representation    = Representation(payload["secondaries"]["representation"]),
                 use_interferograms            = bool(payload["interferograms"]["use"]),
                 interferograms_representation = Representation(payload["interferograms"]["representation"]),
+                use_dem                       = bool(payload.get("dem", {}).get("use", False)),
             )
         else:
             return cls(
@@ -70,6 +75,7 @@ class InputConfig:
                 secondaries_representation    = Representation(payload.get("secondaries_representation", Representation.MAG_ONLY.value)),
                 use_interferograms            = bool(payload.get("use_interferograms", True)),
                 interferograms_representation = Representation(payload.get("interferograms_representation", Representation.ANGLE_ONLY.value)),
+                use_dem                       = bool(payload.get("use_dem", False)),
             )
 
       

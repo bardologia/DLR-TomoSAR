@@ -29,16 +29,13 @@ class ParamExtractionPipeline:
 
         self.parameter_extractor   = ParameterExtractor(
             parameter_extraction = config.fit_settings,
-            parameter_workers    = config.parameter_workers,
             logger               = self.logger,
-            use_gpu              = config.use_gpu,
             gpu_batch_size       = config.gpu_batch_size,
             adam_steps           = config.adam_steps,
             adam_lr              = config.adam_lr,
             adam_b1              = config.adam_b1,
             adam_b2              = config.adam_b2,
             gpu_device_ids       = config.gpu_device_ids,
-            r2_sample_cap        = config.r2_sample_cap,
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
         )
         self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
@@ -73,40 +70,33 @@ class ParamExtractionPipeline:
         self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk")
         np.save(str(npy_path), np.ascontiguousarray(parameters_array), allow_pickle=False)
         
-        del parameters_array
-        gc.collect()
-        
         return npy_path
 
-    def _stage_metrics(self, npy_path: Path, meta_path: Path) -> dict:
-        self.logger.subsection("Loading saved parameters for metrics")
-        parameters_array = np.load(str(npy_path)).astype(np.float32, copy=False)
-        with open(meta_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
-        result = self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path)
-        del parameters_array
-        gc.collect()
-        return result
+    def _stage_metrics(self, parameters_array: np.ndarray, metadata: dict) -> dict:
+        return self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path)
 
-    def _stage_plots(self, npy_path: Path, meta_path: Path, metrics_dict: dict) -> dict[str, Path]:
-        self.logger.subsection("Loading saved parameters for plots")
-        parameters_array = np.load(str(npy_path)).astype(np.float32, copy=False)
-        with open(meta_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
-        result = self.result_plotter.run(parameters_array, metrics_dict, metadata, self.tomogram_path)
-        del parameters_array
-        gc.collect()
-        return result
+    def _stage_plots(self, parameters_array: np.ndarray, metadata: dict, metrics_dict: dict) -> dict[str, Path]:
+        return self.result_plotter.run(parameters_array, metrics_dict, metadata, self.tomogram_path)
 
     def run(self) -> dict[str, Path]:
         self.logger.section("[Param Extraction Pipeline Execution]")
 
         parameters_array = self._stage_extract()
         npy_path         = self._stage_save(parameters_array)
-        meta_path        = self.metadata_manager.save_run_metadata(npy_path, self.tomogram_path, self.height_range)
+        del parameters_array
+        gc.collect()
 
-        metrics_dict = self._stage_metrics(npy_path, meta_path)
-        plot_paths   = self._stage_plots(npy_path, meta_path, metrics_dict)
+        meta_path = self.metadata_manager.save_run_metadata(npy_path, self.tomogram_path, self.height_range)
+
+        self.logger.subsection("Loading saved parameters for metrics and plots")
+        parameters_array = np.load(str(npy_path)).astype(np.float32, copy=False)
+        with open(meta_path, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+
+        metrics_dict = self._stage_metrics(parameters_array, metadata)
+        plot_paths   = self._stage_plots(parameters_array, metadata, metrics_dict)
+        del parameters_array
+        gc.collect()
 
         self.logger.section("[Param Extraction Completed]")
 

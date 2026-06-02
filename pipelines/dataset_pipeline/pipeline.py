@@ -39,6 +39,7 @@ class DatasetPipeline:
                 "Primary"             : f"use={ic.use_primary} rep={ic.primary_representation.value}",
                 "Secondaries"         : f"use={ic.use_secondaries} rep={ic.secondaries_representation.value}",
                 "Interferograms"      : f"use={ic.use_interferograms} rep={ic.interferograms_representation.value}",
+                "DEM"                 : f"use={ic.use_dem}",
                 "Output Parameters"   : ",".join(oc.role_names),
                 "Patch Size"          : config.patch.size,
                 "Patch Stride"        : config.patch.stride,
@@ -69,6 +70,7 @@ class DatasetPipeline:
             x_axis           = self.config.x_axis,
             n_gaussians      = self.config.n_gaussians,
             augmenter        = self.augmenter,
+            dem              = arrays.get("dem") if self.config.input_config.use_dem else None,
         )
         
         return dataset, patcher

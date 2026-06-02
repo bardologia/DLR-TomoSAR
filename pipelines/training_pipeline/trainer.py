@@ -63,14 +63,14 @@ class Trainer:
         self.base_lrs   = [float(pg["lr"]) for pg in param_groups]
         self.optimizer  = self._build_optimizer(param_groups)
 
-        self.warmup           = Warmup(self.config, self.logger, self.tracker)
-        self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
-        self.ema              = EMA(self.config, self.logger, self.tracker)
-        self.early_stopping   = EarlyStopping(self.config, self.logger, self.tracker)
-        self.criterion        = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats)
-        self.checkpoint       = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
-        self.grad_clipper     = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
-        self.overfitter       = OverfitManager(self.config, self.logger)
+        self.warmup              = Warmup(self.config, self.logger, self.tracker)
+        self.lr_scheduler        = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
+        self.ema                 = EMA(self.config, self.logger, self.tracker)
+        self.early_stopping      = EarlyStopping(self.config, self.logger, self.tracker)
+        self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats)
+        self.checkpoint          = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
+        self.grad_clipper        = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
+        self.overfitter          = OverfitManager(self.config, self.logger)
         self.resource_monitor    = ResourceMonitor(config = self.config.resources, logger = self.logger, tracker = self.tracker, step_getter = lambda: self.global_step)
         self.permutation_metrics = PermutationMetrics(self.config.permutation_metrics, logger=self.logger)
         
@@ -82,7 +82,6 @@ class Trainer:
         self.val_losses   = []
 
     def maybe_run_loss_probe(self, train_loader, probe_config=None) -> None:
-        """Run the loss-scale probe when ``probe_config.enabled`` is True."""
         if probe_config is None or not probe_config.enabled:
             return
 
@@ -191,6 +190,9 @@ class Trainer:
             self.criterion.loss_cfg = lc.complete
             self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
 
+            self.criterion.matcher.strategy = lc.complete.param_match
+            self.logger.subsection(f"ParamMatcher strategy updated to '{lc.complete.param_match}'.")
+
             if lc.reset_early_stopping:
                 self.early_stopping.reset()
                 self.logger.subsection("Early stopping reset.")
@@ -209,10 +211,9 @@ class Trainer:
                         state = self.optimizer.state.get(p)
                         if state:
                             state.clear()
+                
                 self.logger.subsection("Optimizer state (Adam moments) cleared.")
 
-            # Immediately push a warmup-adjusted LR to the optimizer so the
-            # swap epoch trains from a low LR instead of the stale decayed one.
             if lc.reset_lr or lc.reset_warmup:
                 warmup_factor = self.warmup.factor() if (self.warmup.enabled and not self.warmup.is_finished()) else 1.0
                 immediate_lrs = [lr * warmup_factor for lr in self.lr_scheduler.base_lrs]
@@ -244,6 +245,7 @@ class Trainer:
 
                 for k, v in loss_dict["components"].items():
                     components_sum[k] = components_sum.get(k, 0.0) + float(v)
+                
                 for k, v in loss_dict["weighted"].items():
                     weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
 
@@ -298,18 +300,15 @@ class Trainer:
 
                     for k, v in loss_dict["components"].items():
                         components_sum[k] = components_sum.get(k, 0.0) + float(v)
+                   
                     for k, v in loss_dict["weighted"].items():
                         weighted_sum[k] = weighted_sum.get(k, 0.0) + float(v)
 
                     if gt_params is not None:
-                        ppg = self.gaussian_cfg.params_per_gaussian
-                        if self.norm_stats is not None and self.norm_stats.stats.output_stats is not None:
-                            pred_phys = self.norm_stats.denormalize_output(pred_params)
-                            gt_phys   = self.norm_stats.denormalize_output(gt_params)
-                        else:
-                            pred_phys = pred_params
-                            gt_phys   = gt_params
-                        perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), ppg)
+                        pred_phys = self.norm_stats.denormalize_output(pred_params)
+                        gt_phys   = self.norm_stats.denormalize_output(gt_params)
+                    
+                        perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), 3)
                         for k, v in perm_m.items():
                             perm_sum[k] = perm_sum.get(k, 0.0) + (v if v == v else 0.0)  # skip NaN
 

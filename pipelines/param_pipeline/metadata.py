@@ -27,7 +27,7 @@ class ExtractionMetadataManager:
             "output_prefix"       : self.config.output_prefix,
             "output_suffix"       : self.config.output_suffix_value,
             "parameters_npy"      : npy_path.name,
-            "number_of_gaussians" : getattr(ext.fit_config, "k_max", ext.number_of_gaussians),
+            "number_of_gaussians" : ext.fit_config.k_max,
         }
 
         with open(meta_path, "w", encoding="utf-8") as f:

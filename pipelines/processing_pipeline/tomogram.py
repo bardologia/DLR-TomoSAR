@@ -34,8 +34,24 @@ def _run_pyrat(
     apply_resampling      : bool,
     apply_presumming      : bool,
     pyrat_threads         : int,
+    parent_sys_path       : list | None = None,
 ) -> int:
-    
+    import os as _os
+
+    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    # Ensure the conda env's own libgcc / libhwy are found before the system ones.
+    # This is needed when the conda-packaged GDAL was built against a newer GCC
+    # than what the system libgcc_s.so.1 provides.
+    _conda_lib = _os.path.join(sys.prefix, "lib")
+    _ldpath = _os.environ.get("LD_LIBRARY_PATH", "")
+    if _conda_lib not in _ldpath.split(":"):
+        _os.environ["LD_LIBRARY_PATH"] = _conda_lib + (":" + _ldpath if _ldpath else "")
+
+    # Restore the parent's sys.path so conda/venv site-packages are visible
+    if parent_sys_path is not None:
+        sys.path[:] = parent_sys_path
+
     if pyrat_root_path not in sys.path:
         sys.path.insert(0, pyrat_root_path)
 
@@ -110,8 +126,17 @@ class TomogramProcessor:
         tomogram_config     : TomogramConfiguration,
         temporary_directory : Path,
     ) -> None:
+        import os as _os
+
+        _conda_lib = _os.path.join(sys.prefix, "lib")
+        _ldpath    = _os.environ.get("LD_LIBRARY_PATH", "")
+        if _conda_lib not in _ldpath.split(":"):
+            _os.environ["LD_LIBRARY_PATH"] = _conda_lib + (":" + _ldpath if _ldpath else "")
+
         parallel_config = self.config.parallel
         tasks           = []
+
+        parent_sys_path = list(sys.path)
 
         for subsection_index, subsection_crop in enumerate(subsections):
             tasks.append((
@@ -132,9 +157,10 @@ class TomogramProcessor:
                 tomogram_config.apply_resampling,
                 tomogram_config.apply_presumming,
                 parallel_config.pyrat_threads,
+                parent_sys_path,
             ))
 
-        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {parallel_config.tomogram_workers} workers...")
+        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {parallel_config.tomogram_workers} workers")
 
         with ProcessPoolExecutor(max_workers=parallel_config.tomogram_workers, mp_context=mp.get_context("spawn")) as executor:
             futures = [executor.submit(_run_pyrat, *task) for task in tasks]
@@ -163,8 +189,8 @@ class TomogramProcessor:
         combined_dem      = np.concatenate(dem_chunks,      axis=0)
         combined_tomogram = np.concatenate(tomogram_chunks, axis=1)
 
-        self.logger.subsection(f"-> Combined DEM shape      : {combined_dem.shape}")
-        self.logger.subsection(f"-> Combined Tomogram shape : {combined_tomogram.shape}")
+        self.logger.subsection(f"Combined DEM shape      : {combined_dem.shape}")
+        self.logger.subsection(f"Combined Tomogram shape : {combined_tomogram.shape}")
       
         return combined_dem, combined_tomogram
 

@@ -17,6 +17,7 @@ from pipelines.dataset_pipeline.load                 import PatchDataset
 from pipelines.dataset_pipeline.normalize            import Stats, Normalizer
 from pipelines.dataset_pipeline.patch                import Patcher, GridInfo
 from models                                          import get_model
+from configuration.training_config                   import GaussianConfig
 
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
@@ -152,12 +153,14 @@ class RunLoader:
         
         return ckpt, x_axis, meta
 
-    def _wrap_model(self, model, device: str, norm_stats: Stats) -> ModelWrapper:
+    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
             params_per_gaussian = 3,
             normalizer          = Normalizer(norm_stats),
+            x_axis              = torch.from_numpy(x_axis),
+            amp_max             = amp_max,
         )
 
     def load(
@@ -196,8 +199,9 @@ class RunLoader:
         used_ema = self._apply_ema(model, ckpt, use_ema)
 
         model.eval()
-        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
-        model      = self._wrap_model(model, device, norm_stats)
+        norm_stats  = Stats.load(self.run_directory / "meta", self.logger)
+        gauss_cfg   = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
+        model       = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
 
         dataset, grid, region, global_crop = self._build_dataset(
             dataset_config = dataset_config,

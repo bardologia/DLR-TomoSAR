@@ -13,24 +13,19 @@ class ParameterExtractor:
     def __init__(
         self,
         parameter_extraction : FitSettings,
-        parameter_workers    : int,
         logger               : Logger,
-        use_gpu              : bool                = True,
         gpu_batch_size       : int                 = 256,
         adam_steps           : int                 = 800,
         adam_lr              : float               = 1e-2,
         adam_b1              : float               = 0.9,
         adam_b2              : float               = 0.999,
         gpu_device_ids       : list | None         = None,
-        r2_sample_cap        : int                 = 4096,
         gpu_pixel_batch_size : int                 = 8192,
         init_workers         : int | None          = None,
     ) -> None:
        
         self.parameter_extraction = parameter_extraction
-        self.parameter_workers    = parameter_workers
         self.logger               = logger
-        self.use_gpu              = use_gpu
         self.gpu_batch_size       = gpu_batch_size
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self.adam_steps           = adam_steps
@@ -58,8 +53,8 @@ class ParameterExtractor:
             lambda_k             = lambda_k,
             prominence_frac      = prominence_frac,
             gpu_pixel_batch_size = gpu_pixel_batch_size,
-            r2_sample_cap        = r2_sample_cap,
             gpu_device_ids       = gpu_device_ids,
+            init_workers         = init_workers,
         )
 
         self.logger.section("[Parameter Extractor Initialized]")
@@ -74,7 +69,7 @@ class ParameterExtractor:
         amps = reshaped[:, 0, :, :]
         mus  = reshaped[:, 1, :, :]
     
-        sort_keys    = np.where(amps > 1e-7, mus, np.inf)
+        sort_keys    = np.where(amps > 1e-3, mus, np.inf)
         order        = np.argsort(sort_keys, axis=0)
         out_reshaped = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
         

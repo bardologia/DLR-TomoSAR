@@ -9,6 +9,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from configuration.processing_config import (
     CropRegion,
+    PathConfiguration,
     ProcessingConfiguration,
     TomogramConfiguration,
 )
@@ -26,7 +27,14 @@ track_selection          = "*"
 polarisation             = "hv"
 beamforming_method       = "Capon"
 filter_method            = "Boxcar"
-filter_arguments         = {"win": [20, 10]}
+
+filter_arguments_list    = [
+    {"win": [40, 20]},
+    {"win": [20, 10]},
+    {"win": [10, 10]},
+    {"win": [30, 20]},
+]
+
 height_range             = (-20.0, 80.0)
 
 dataset_type             = "FSAR"
@@ -40,36 +48,43 @@ def main() -> None:
     global_crop            = CropRegion(azimuth_start=azimuth_start, azimuth_end=azimuth_end, range_start=range_start, range_end=range_end)
     max_crop_azimuth_width = (global_crop.azimuth_end - global_crop.azimuth_start) // 16
 
-    shared_tomo = dict(
-        fusar_project_path     = fusar_project_path,
-        base_directory         = base_directory,
-        track_selection        = track_selection,
-        polarisation           = polarisation,
-        beamforming_method     = beamforming_method,
-        filter_method          = filter_method,
-        filter_arguments       = filter_arguments,
-        max_crop_azimuth_width = max_crop_azimuth_width,
-    )
+    for i, filter_arguments in enumerate(filter_arguments_list):
+        win = filter_arguments.get("win", [])
+        win_str = "_".join(str(w) for w in win)
+        dataset_name = f"base_dataset_w{win_str}"
+        print(f"\n[Run {i + 1}/{len(filter_arguments_list)}] {dataset_name}  filter_arguments={filter_arguments}")
 
-    config = ProcessingConfiguration(
-        crop = global_crop,
+        shared_tomo = dict(
+            fusar_project_path     = fusar_project_path,
+            base_directory         = base_directory,
+            track_selection        = track_selection,
+            polarisation           = polarisation,
+            beamforming_method     = beamforming_method,
+            filter_method          = filter_method,
+            filter_arguments       = filter_arguments,
+            max_crop_azimuth_width = max_crop_azimuth_width,
+        )
 
-        input_configs  = TomogramConfiguration(**shared_tomo),
-        output_configs = TomogramConfiguration(**shared_tomo, height_range=height_range),
+        config = ProcessingConfiguration(
+            crop = global_crop,
 
-        dataset_type             = dataset_type,
-        full_stack_identifier    = full_stack_identifier,
-        reduced_stack_identifier = reduced_stack_identifier,
-        tomogram_output_tag      = tomogram_output_tag,
-        parameter_output_tag     = parameter_output_tag,
-    )
+            input_configs  = TomogramConfiguration(**shared_tomo),
+            output_configs = TomogramConfiguration(**shared_tomo, height_range=height_range),
+            
+            paths                    = PathConfiguration(run_subdirectory=dataset_name),
+            dataset_type             = dataset_type,
+            full_stack_identifier    = full_stack_identifier,
+            reduced_stack_identifier = reduced_stack_identifier,
+            tomogram_output_tag      = tomogram_output_tag,
+            parameter_output_tag     = parameter_output_tag,
+        )
 
-    pipeline = ProcessingPipeline(config)
-    outputs  = pipeline.run()
+        pipeline = ProcessingPipeline(config)
+        outputs  = pipeline.run()
 
-    print("[Execution Successful] Outputs:")
-    for name, path in outputs.items():
-        print(f"  {name:>16}: {path}")
+        print("[Execution Successful] Outputs:")
+        for name, path in outputs.items():
+            print(f"  {name:>16}: {path}")
 
 
 if __name__ == "__main__":

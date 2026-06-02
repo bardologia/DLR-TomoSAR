@@ -20,9 +20,10 @@ from pipelines.inference_pipeline.pipeline import InferencePipeline
 from tools.logger                          import Logger
 
 
-logs_dir = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/benchmark")
+logs_dir = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
 
 run_filter: list[str] = []
+save_cubes: bool = False
 
 run_dirs = sorted(
     [d for d in logs_dir.iterdir() if d.is_dir()]
@@ -52,14 +53,14 @@ def main() -> None:
             batch_size         = None,
             num_workers        = 4,
             stitch_window      = "hann",
-            save_cubes         = True,
+            save_cubes         = save_cubes,
             n_best_profiles    = 12,
             n_worst_profiles   = 12,
             n_random_profiles  = 12,
             n_range_slices     = 5,
             n_azimuth_slices   = 5,
             n_elevation_slices = 5,
-            gif_axes           = ["elevation", "range", "azimuth"],
+            gif_axes           = [""],
             gif_fps            = 12,
             gif_max_frames     = 150,
             cpu_workers        = 16,
