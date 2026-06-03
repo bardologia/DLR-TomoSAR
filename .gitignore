@@ -1,3 +1,8 @@
 logs/
+result_storage/result_storage/
+scripts/sweep_results/
+*.pt
+*.npy
+*.tfevents.*
 
 notebooks/main/nohup.out
