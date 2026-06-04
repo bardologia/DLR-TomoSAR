@@ -1306,7 +1306,7 @@ class ProcessAnimator {
     const ladX = gL + 16;
     const plY = (i) => h * 0.26 + (d.N - 1 - i) * 23;
     const flightP = c01((ts - 1.6) / 6.5);
-    const fx0 = gL + 168, fx1 = gR - 36;
+    const fx0 = gL + 296, fx1 = gR - 18;
     const plX = (i) => fx0 + flightP * (fx1 - fx0) - i * 13;
 
     for (let i = 0; i < d.N; i++) {
@@ -1338,10 +1338,11 @@ class ProcessAnimator {
       ctx.strokeStyle = "rgba(124,255,155,0.8)"; ctx.fillStyle = "rgba(124,255,155,0.9)";
       ctx.lineWidth = 1.4;
       const ay0 = h * 0.26 - 32;
-      ctx.beginPath(); ctx.moveTo(fx0 - 6, ay0); ctx.lineTo(fx0 + 110, ay0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(fx0 + 110, ay0); ctx.lineTo(fx0 + 102, ay0 - 4); ctx.lineTo(fx0 + 102, ay0 + 4); ctx.closePath(); ctx.fill();
+      const arrX = gL + 168;
+      ctx.beginPath(); ctx.moveTo(arrX - 6, ay0); ctx.lineTo(arrX + 110, ay0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(arrX + 110, ay0); ctx.lineTo(arrX + 102, ay0 - 4); ctx.lineTo(arrX + 102, ay0 + 4); ctx.closePath(); ctx.fill();
       ctx.font = "13px 'IBM Plex Mono', monospace";
-      ctx.fillText("flight · azimuth", fx0 + 120, ay0 + 4);
+      ctx.fillText("flight · azimuth", arrX + 120, ay0 + 4);
       ctx.restore();
     }
 
@@ -1355,7 +1356,7 @@ class ProcessAnimator {
           const rr = pp * 120;
           ctx.strokeStyle = `rgba(53,230,208,${0.55 * (1 - pp) * ap})`;
           ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.arc(X, Y, rr, Math.PI * 0.28, Math.PI * 0.80); ctx.stroke();
+          ctx.beginPath(); ctx.arc(X, Y, rr, Math.PI * 0.10, Math.PI * 0.52); ctx.stroke();
         }
       }
       ctx.save(); ctx.globalAlpha = ap;
@@ -1399,8 +1400,8 @@ class ProcessAnimator {
       }
     }
     if (ts >= 10.2) {
-      const ch1 = "flaca · full stack -> ground truth";
-      const ch2 = "flaca_2 · reduced stack -> operational";
+      const ch1 = "full stack -> ground truth";
+      const ch2 = "reduced stack -> operational";
       ctx.font = "14px 'IBM Plex Mono', monospace";
       const chW = Math.max(ctx.measureText(ch1).width, ctx.measureText(ch2).width) + 24;
       const chx = Math.min(stX + 6, w - chW - 14);
@@ -1414,7 +1415,7 @@ class ProcessAnimator {
     else if (ts < 4.8) cap = "Upstream of this pipeline: F-SAR focuses & co-registers the SLCs  ·  we start from the finished stack";
     else if (ts < 8.2) cap = "Several passes on vertically offset tracks (5 drawn, illustrative)  ·  same scene, different phase patterns";
     else if (ts < 10.8) cap = "Co-registration is done upstream  ·  each secondary already sits on the primary pixel grid";
-    else cap = "flaca = full stack -> ground-truth tomogram  ·  flaca_2 = reduced stack -> operational inputs  ·  phase carries the height";
+    else cap = "full stack -> ground-truth tomogram  ·  reduced stack -> operational inputs  ·  phase carries the height";
     this._cap(cap);
   }
 
@@ -1701,15 +1702,18 @@ class ProcessAnimator {
       ctx.fillText("|secondary| amplitude", hbX + 12, hbY - 8);
       this._texDraw("\\mathrm{ifg}_i=\\frac{A\\,s_0 s_i^{*}}{|s_0 s_i^{*}|}", hbX + hbW / 2, hbY - 64, 16, { align: "center", color: "#7cff9b", alpha: ca });
       if (clipP >= 1) {
-        const cbx = hbX + 12, cby = hbY + hbH + 18;
         const cbm = this._tex("A=\\mathrm{clip}(|s|,0,1.25)", 15, "#ffcf6b");
-        const cbw = cbm.ready ? cbm.w : 200, cbh = cbm.ready ? cbm.h : 28;
+        const cbw = cbm.ready ? cbm.w : 150, cbh = cbm.ready ? cbm.h : 28;
+        const cby = Math.max(clipY + 18, hbY + hbH * 0.5);
+        const cbx = hbX - 20 - cbw;
         ctx.fillStyle = "rgba(7,12,17,0.92)";
         ctx.strokeStyle = "rgba(120,200,220,0.30)"; ctx.lineWidth = 1.1;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(cbx - 12, cby - 6, cbw + 24, cbh + 12, 7); else ctx.rect(cbx - 12, cby - 6, cbw + 24, cbh + 12);
+        if (ctx.roundRect) ctx.roundRect(cbx - 12, cby - cbh / 2 - 6, cbw + 24, cbh + 12, 7); else ctx.rect(cbx - 12, cby - cbh / 2 - 6, cbw + 24, cbh + 12);
         ctx.fill(); ctx.stroke();
-        this._texDraw("A=\\mathrm{clip}(|s|,0,1.25)", cbx, cby, 15, { color: "#ffcf6b", alpha: ca });
+        ctx.strokeStyle = "rgba(255,207,107,0.4)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(cbx + cbw + 12, cby); ctx.lineTo(hbX, clipY); ctx.stroke(); ctx.setLineDash([]);
+        this._texDraw("A=\\mathrm{clip}(|s|,0,1.25)", cbx, cby - cbh / 2 + 4, 15, { color: "#ffcf6b", alpha: ca });
       }
       ctx.restore();
     }
@@ -1743,9 +1747,10 @@ class ProcessAnimator {
     const lsk = Math.min(26, layW * 0.08);
     const ampR = 1.25, ampRes = 3.4;
 
+    const demNeg = ts < 1.4 ? 0 : ts < 2.2 ? this._ease(c01((ts - 1.4) / 0.8)) : 1;
     const zIfg = (u, v) => 2.4 + d.FRV * d.hgtR(u, v);
     const cIfg = (u, v) => d.phCol(-zIfg(u, v), 0.95);
-    const zDem = (u, v) => 2.4 + d.FRV * d.demR(u, v);
+    const zDem = (u, v) => (2.4 + d.FRV * d.demR(u, v)) * (1 - 2 * demNeg);
     const cDem = (u, v) => d.phCol(-zDem(u, v), 0.95);
     const zRes = (u, v) => d.FRV * 0.55 * d.veg(u, v);
     const cRes = (k) => (u, v) => d.phCol(-k * zRes(u, v), 0.95);
@@ -2033,7 +2038,8 @@ class ProcessAnimator {
     };
 
     const nL = ts < 7.4 ? 0 : ts < 8.55 ? 1 : ts < A4 ? 2 : ts < A5 ? 2 + Math.round(198 * Math.pow(c01((ts - A4) / 2.0), 2)) : 200;
-    const rAcc = nL === 0 ? 0 : nL === 1 ? 0.42 : nL === 2 ? 0.54 : 0.54 + 0.46 * c01((nL - 2) / 198);
+    const accBuild = this._ease(c01((ts - 6.7) / 1.2));
+    const rAcc = 0.54 * accBuild + 0.46 * c01((nL - 2) / 198);
 
 
     if (ts < B0) {
@@ -2080,25 +2086,37 @@ class ProcessAnimator {
 
       ctx.restore();
       ctx.save(); ctx.globalAlpha = ia;
-      if (nL === 0) {
+      if (accBuild < 1) {
+        ctx.save(); ctx.globalAlpha = ia * (1 - accBuild);
         ctx.strokeStyle = "rgba(120,200,220,0.4)"; ctx.setLineDash([5, 5]); ctx.lineWidth = 1.2;
         ctx.strokeRect(mX - 4, mY - 4, d.N * cs + 6, d.N * cs + 6);
         ctx.setLineDash([]);
-        ctx.font = "14px 'IBM Plex Mono', monospace";
-        ctx.fillStyle = "rgba(214,234,229,0.95)";
-        ctx.fillText("R · waiting for looks", mX - 4, mY - 14);
-      } else {
-        const stackN = Math.min(4, nL - 1);
-        for (let q = stackN; q >= 1; q--) layerTile(mX + q * 4, mY - q * 4, cs, 0.45 - q * 0.07, 0, false);
+        if (nL === 0) {
+          ctx.font = "14px 'IBM Plex Mono', monospace";
+          ctx.fillStyle = "rgba(214,234,229,0.95)";
+          ctx.fillText("R · waiting for looks", mX - 4, mY - 14);
+        }
+        ctx.restore();
+      }
+      if (accBuild > 0.001) {
+        const stackN = Math.max(0, Math.min(4, nL - 1));
+        for (let q = stackN; q >= 1; q--) layerTile(mX + q * 4, mY - q * 4, cs, (0.45 - q * 0.07) * accBuild, 0, false);
         for (let i = 0; i < d.N; i++) {
           for (let j = 0; j < d.N; j++) {
             ctx.fillStyle = `rgba(53,230,208,${(0.08 + 0.45 * d.Rmag[i][j]) * rAcc})`;
             ctx.fillRect(mX + j * cs, mY + i * cs, cs - 2, cs - 2);
-            if (nL <= 2) cellArrow(mX + j * cs, mY + i * cs, cs - 2, lkv(0, i) - lkv(0, j), "rgba(230,247,243,0.7)", 1.2);
+            if (nL <= 2) {
+              ctx.save(); ctx.globalAlpha = ia * accBuild;
+              cellArrow(mX + j * cs, mY + i * cs, cs - 2, lkv(0, i) - lkv(0, j), "rgba(230,247,243,0.7)", 1.2);
+              ctx.restore();
+            }
           }
         }
+        ctx.save(); ctx.globalAlpha = ia * accBuild;
         ctx.strokeStyle = "rgba(120,200,220,0.5)"; ctx.lineWidth = 1.2;
         ctx.strokeRect(mX - 4, mY - 4, d.N * cs + 6, d.N * cs + 6);
+        ctx.restore();
+        ctx.save(); ctx.globalAlpha = ia * accBuild;
         ctx.font = "13px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "rgba(206,229,223,0.95)";
         for (let i = 0; i < d.N; i++) {
@@ -2108,6 +2126,7 @@ class ProcessAnimator {
         ctx.font = "15px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "#e6f7f3";
         ctx.fillText(`l = ${nL} / 200 samples`, mX, mY + d.N * cs + 40);
+        ctx.restore();
         if (ts >= A5) {
           const ha = this._ease(c01((ts - A5) / 0.5));
           ctx.save(); ctx.globalAlpha = ha * ia;
@@ -2304,8 +2323,8 @@ class ProcessAnimator {
 
     if (ts >= B0 && ts < C2 && tomoP < 1) {
       const ca = this._ease(c01((ts - B0) / 0.7)) * this._ease(c01((C2 - ts) / 0.5));
-      const stXc = 100, rC = 20;
-      const cyI = (i) => pad.t + 22 + i * 42;
+      const stXc = 200, rC = 21;
+      const cyI = (i) => pad.t + 32 + i * 68;
       ctx.save(); ctx.globalAlpha = ca;
       ctx.font = "13px 'IBM Plex Mono', monospace";
       ctx.strokeStyle = "#e6f7f3"; ctx.lineWidth = 2;
@@ -2330,11 +2349,11 @@ class ProcessAnimator {
           ctx.closePath(); ctx.fill();
           ctx.font = "15px 'IBM Plex Mono', monospace";
           ctx.fillStyle = good ? "#7cff9b" : "#ff6b7d";
-          ctx.fillText(good ? "\u2713" : "\u2717", stXc - rC - 20, cy + 5);
+          ctx.fillText(good ? "\u2713" : "\u2717", stXc + rC + 10, cy + 5);
         }
         ctx.font = "13px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "rgba(214,234,229,0.95)";
-        ctx.fillText(`s${i}`, stXc + rC + 9, cy + 4);
+        ctx.fillText(`s${i}`, stXc - 7, cy - rC - 7);
         const maA = this._ease(c01((ts - B0 - 0.4 - i * 0.16) / 0.5));
         if (maA > 0 && maA < 1) {
           ctx.save(); ctx.globalAlpha = ca * (1 - maA) * 0.6;
@@ -2485,7 +2504,8 @@ class ProcessAnimator {
 
     if (tomoP < 1 && ts >= B0) {
       const ta3 = this._ease(c01((ts - B0) / 0.6)) * (1 - tomoP);
-      const tbW = 230, tbX = 12, tbH = 152, tbY = h - tbH - 8;
+      const tbW = 162, tbX = 12, tbH = 170, tbY = h - tbH - 8;
+      const footY = tbY + tbH - 28;
       ctx.save(); ctx.globalAlpha = ta3;
       ctx.fillStyle = "rgba(7,12,17,0.94)";
       ctx.strokeStyle = "rgba(120,200,220,0.35)"; ctx.lineWidth = 1.2;
@@ -2512,9 +2532,13 @@ class ProcessAnimator {
         }
         this._texDraw(tex3, tbX + 20, ry + 2, 14, { color: act3 ? col3 : "rgba(206,229,223,0.8)", alpha: ra });
       });
-      ctx.save(); ctx.globalAlpha = ta3 * 0.85;
+      ctx.save(); ctx.globalAlpha = ta3 * 0.45;
+      ctx.strokeStyle = "rgba(120,200,220,0.5)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(tbX + 12, footY - 10); ctx.lineTo(tbX + tbW - 12, footY - 10); ctx.stroke();
+      ctx.restore();
+      ctx.save(); ctx.globalAlpha = ta3 * 0.6;
       ctx.font = "11px 'IBM Plex Mono', monospace"; ctx.fillStyle = "#ffcf6b";
-      ctx.fillText("PyRat tomo.fusartomo", tbX + 14, tbY + tbH - 12);
+      ctx.fillText("PyRat tomo.fusartomo", tbX + 12, footY + 8);
       ctx.restore();
       ctx.restore();
     }
@@ -2595,7 +2619,7 @@ class ProcessAnimator {
     }
 
     let cap;
-    if (ts < A2) cap = "Capon on the FULL flaca stack  ·  select = \"*\" (all passes)  ·  Boxcar window 20 x 10";
+    if (ts < A2) cap = "Capon on the FULL stack  ·  select = \"*\" (all passes)  ·  Boxcar window 20 x 10";
     else if (ts < 5.7) cap = "ONE sample = ONE window pixel  ·  y holds 5 complex numbers: the same pixel seen by the passes";
     else if (ts < A3) cap = "Multiply: cell (i, j) = y\u1d62·y\u2c7c*  ·  the phase RELATION between pass i and pass j  ->  one 5x5 layer";
     else if (ts < A4) cap = "Second sample: different absolute phase, the SAME relative pattern — that is what averaging keeps";
