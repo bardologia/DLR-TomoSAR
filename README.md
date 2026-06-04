@@ -1,372 +1,244 @@
-# Training Pipeline — Technical Reference
+<div align="center">
 
-## Table of Contents
+# DLR-TomoSAR
 
-1. [Overview](#1-overview)
-2. [Gaussian Curve Reconstruction](#2-gaussian-curve-reconstruction)
-3. [Loss Function](#3-loss-function)
-4. [Optimizer and Parameter Groups](#4-optimizer-and-parameter-groups)
-5. [Learning Rate Warmup](#5-learning-rate-warmup)
-6. [Learning Rate Scheduler](#6-learning-rate-scheduler)
-7. [Exponential Moving Average (EMA)](#7-exponential-moving-average-ema)
-8. [Early Stopping](#8-early-stopping)
-9. [Mixed-Precision Training](#9-mixed-precision-training)
-10. [Gradient Accumulation](#10-gradient-accumulation)
-11. [Evaluation Metrics](#11-evaluation-metrics)
-12. [Checkpointing](#12-checkpointing)
-13. [Training Loop](#13-training-loop)
+### Deep Per-Pixel Gaussian-Mixture Decomposition of Tomographic SAR Spectra
 
----
+*A configuration-driven deep-learning framework that learns to decompose multi-baseline synthetic-aperture-radar tomographic reflectivity profiles into superpositions of Gaussian components, enabling scatterer separation, vertical-structure characterisation, and elevation-model refinement.*
 
-## 1. Overview
+<br>
 
-The training pipeline optimises a segmentation or regression model to predict per-pixel Gaussian mixture parameters from input images. The model output is a tensor of shape $(B, C, H, W)$, where $C = 3K$ (or $3K + 1$ when a heteroscedastic noise head is enabled) and $K$ is the number of Gaussian components. The predicted parameters are used to reconstruct spectral curves, which are compared against experimental curves to compute the loss.
+![Python](https://img.shields.io/badge/python-3.x-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-deep_learning-EE4C2C?logo=pytorch&logoColor=white)
+![Architectures](https://img.shields.io/badge/architectures-10-1565C0)
+![Optuna](https://img.shields.io/badge/Optuna-HPO-0E4C92)
+![GDAL](https://img.shields.io/badge/GDAL-geospatial_I%2FO-5CAE58)
+![Domain](https://img.shields.io/badge/domain-TomoSAR_remote_sensing-6A1B9A)
 
-Supported model architectures:
-
-| Key | Architecture |
-|---|---|
-| `unet` | UNet |
-| `resunet` | ResUNet |
-| `attention_unet` | Attention UNet |
-| `unetplusplus` | UNet++ |
-| `fcn` | Fully Convolutional Network |
-| `linknet` | LinkNet |
-| `swin_unet` | Swin-UNet |
-| `transunet` | TransUNet |
-| `unetr` | UNETR |
+</div>
 
 ---
 
-## 2. Gaussian Curve Reconstruction
+## Abstract
 
-Given $K$ Gaussian components, the model predicts $3K$ channels per pixel:
+Tomographic Synthetic Aperture Radar (**TomoSAR**) extends conventional interferometry by exploiting multiple, spatially-separated radar acquisitions to resolve the vertical distribution of backscattered energy within a single ground range–azimuth resolution cell. The resulting per-pixel *reflectivity profile* along the elevation axis is frequently **multi-modal**: distinct physical scatterers — the ground surface, a vegetation canopy, dihedral structures — contribute separate, overlapping peaks. Recovering these components is the central inverse problem of TomoSAR analysis and underpins applications such as forest-height estimation, layered-scatterer separation, and the refinement of digital elevation models.
 
-$$
-\hat{\mathbf{p}} = [a_1, \mu_1, \sigma_1, \; a_2, \mu_2, \sigma_2, \; \dots, \; a_K, \mu_K, \sigma_K]
-$$
-
-where $a_k$ is the amplitude, $\mu_k$ is the mean, and $\sigma_k$ is the standard deviation of the $k$-th Gaussian.
-
-For a discrete set of $N$ sample points $\{x_n\}_{n=1}^{N}$ along the spectral axis, the reconstructed curve at each pixel is the superposition:
-
-$$
-\hat{y}(x_n) = \sum_{k=1}^{K} a_k \exp\!\left( -\frac{(x_n - \mu_k)^2}{2\sigma_k^2 + \epsilon} \right)
-$$
-
-where $\epsilon = 10^{-8}$ prevents division by zero.
-
-The output tensor has shape $(B, N, H, W)$.
+**DLR-TomoSAR** casts this decomposition as a **dense, per-pixel regression** task solved by an image-to-parameter neural network. Given a TomoSAR tomogram represented as a multi-channel image, the network predicts, at every pixel, the parameters of a $K$-component Gaussian mixture that reconstructs the elevation profile. The framework provides ten interchangeable convolutional and transformer-based segmentation backbones, a richly configurable composite training objective, an optional heteroscedastic-uncertainty head, and a complete, reproducible pipeline spanning data generation, training, inference, classical parameter fitting, and benchmarking.
 
 ---
 
-## 3. Loss Function
+## 1. Scientific Motivation
 
-### 3.1 Standard Mode (No Noise Head)
+A TomoSAR stack focuses the complex backscatter as a function of elevation $z$, yielding for each ground pixel a one-dimensional reflectivity profile $y(z)$. Because multiple scattering mechanisms may coexist within a single resolution cell, this profile is in general a superposition of contributions that must be *separated* to be interpreted. Modelling each contribution as a Gaussian peak — characterised by its amplitude, elevation centre, and spread — provides a compact, physically-interpretable parameterisation:
 
-When the number of output channels equals $3K$, the loss is the mean squared error between the reconstructed and experimental curves:
+- the **mean** $\mu_k$ localises a scatterer in elevation (e.g. ground level versus canopy top),
+- the **amplitude** $a_k$ quantifies its relative reflectivity, and
+- the **standard deviation** $\sigma_k$ describes its vertical extent (e.g. volumetric vegetation versus a sharp surface return).
 
-$$
-\mathcal{L}_{\text{MSE}} = \frac{1}{B \cdot N \cdot H \cdot W} \sum_{b,n,h,w} \left( \hat{y}_{b,n,h,w} - y_{b,n,h,w} \right)^2
-$$
-
-$$
-\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{MSE}}
-$$
-
-### 3.2 Heteroscedastic Noise Mode
-
-When the number of output channels exceeds $3K$, the model predicts an additional channel $\log \sigma_{\text{noise}}$, representing the log-variance of a per-pixel noise estimate. The noise standard deviation is obtained as:
-
-$$
-\sigma_{\text{noise}} = \text{clamp}\!\left( \exp(\log \sigma_{\text{noise}}), \; 10^{-4}, \; 10.0 \right)
-$$
-
-The loss is the mean of a Gaussian negative log-likelihood:
-
-$$
-\mathcal{L}_{\text{NLL}} = \frac{1}{B \cdot N \cdot H \cdot W} \sum_{b,n,h,w} \left[ \frac{(\hat{y}_{b,n,h,w} - y_{b,n,h,w})^2}{2(\sigma_{\text{noise}}^2 + \epsilon)} + \log \sigma_{\text{noise}} \right]
-$$
-
-$$
-\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{NLL}}
-$$
-
-where $\epsilon = 10^{-8}$.
-
-All loss values are logged in log-scale via $\log(1 + \ell)$.
+Classical estimation of these parameters is performed pixel-by-pixel through iterative optimisation, which is computationally expensive over large scenes and sensitive to initialisation. DLR-TomoSAR learns this mapping directly, amortising the inverse problem across an entire image in a single forward pass while retaining the option of high-fidelity classical fitting for ground-truth generation.
 
 ---
 
-## 4. Optimizer and Parameter Groups
+## 2. Problem Formulation
 
-The optimizer is **AdamW** with configurable betas $(\beta_1, \beta_2)$ and $\epsilon$.
-
-Model parameters are partitioned into two groups with independent learning rates and weight decay coefficients:
-
-| Group | Learning Rate | Weight Decay | Parameters |
-|---|---|---|---|
-| `backbone` | `lr_backbone` | `weight_decay_backbone` | All parameters not belonging to the output head |
-| `output_head` | `lr_output_head` | `weight_decay_output_head` | Parameters of `output_head`, `output_heads`, `score_final`, `score_pool4`, `score_pool3` |
-
-The AdamW update rule for each parameter $\theta$ with learning rate $\eta$, weight decay $\lambda$, and moments $m_t$, $v_t$ is:
+The network maps a multi-channel tomographic image to a dense field of mixture parameters. For an input image with $C_\text{in}$ channels and spatial dimensions $H \times W$, the model outputs a tensor of shape $(B, 3K, H, W)$ (or $(B, 3K+1, H, W)$ when the heteroscedastic-noise head is enabled), where $K$ is the number of Gaussian components. At each pixel the predicted parameters are
 
 $$
-m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t
+\hat{\mathbf{p}} = [\,a_1, \mu_1, \sigma_1,\; a_2, \mu_2, \sigma_2,\; \dots,\; a_K, \mu_K, \sigma_K\,].
 $$
 
-$$
-v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2
-$$
+For $N$ sample points $\{x_n\}_{n=1}^{N}$ along the elevation axis, the reconstructed profile at each pixel is the Gaussian superposition
 
 $$
-\hat{m}_t = \frac{m_t}{1 - \beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1 - \beta_2^t}
+\hat{y}(x_n) = \sum_{k=1}^{K} a_k \exp\!\left( -\frac{(x_n - \mu_k)^2}{2\sigma_k^2 + \epsilon} \right),
+\qquad \epsilon = 10^{-8},
 $$
 
-$$
-\theta_{t+1} = \theta_t - \eta \left( \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} + \lambda \theta_t \right)
-$$
+and the model is trained by comparing $\hat{y}$ against the measured reflectivity profile $y$.
+
+### Input Channel Representations
+
+The complex-valued tomographic data is mapped to real channels through a configurable `Representation` scheme — magnitude only, phase only, or combined magnitude/phase and real/imaginary encodings — with per-channel normalisation strategies (percentile min–max, robust IQR, z-score, or fixed $\pi$-division) selected per physical quantity.
 
 ---
 
-## 5. Learning Rate Warmup
+## 3. Method
 
-When enabled, the warmup phase linearly scales the learning rate from an initial factor to 1.0 over a configurable number of steps.
+### 3.1 Model Architectures
 
-At warmup step $s$ (where $1 \le s \le S_{\text{warmup}}$):
+Ten image-to-parameter backbones are exposed through a single model registry and selected by key. All share a common interface (input channels derived from the chosen representation; output channels equal to $3K$, optionally $+1$ for the noise head) and configurable activation, normalisation, dropout, upsampling, and weight-initialisation strategies.
 
-$$
-\alpha(s) = \alpha_{\text{start}} + \left(1 - \alpha_{\text{start}}\right) \cdot \frac{s}{S_{\text{warmup}}}
-$$
+| Key | Architecture | Distinguishing characteristic |
+|---|---|---|
+| `unet` | U-Net | Canonical encoder–decoder with skip connections |
+| `unet_multihead` | U-Net (multi-head) | Separate prediction heads for amplitude, mean, and $\sigma$ |
+| `unet_pergaussian` | U-Net (per-Gaussian) | Independent branch per Gaussian component |
+| `resunet` | ResU-Net | Residual blocks throughout the backbone |
+| `attention_unet` | Attention U-Net | Attention gates on the skip connections |
+| `unetplusplus` | U-Net++ | Nested, dense skip pathways |
+| `linknet` | LinkNet | Lightweight factorised decoder |
+| `swin_unet` | Swin-UNet | Shifted-window transformer encoder |
+| `transunet` | TransUNet | Hybrid ViT-encoder / CNN-decoder |
+| `unetr` | UNETR | Vision-transformer backbone with U-Net decoding |
 
-$$
-\eta(s) = \alpha(s) \cdot \eta_{\text{base}}
-$$
+Most backbones partition their parameters into encoder / bottleneck / decoder / output-head groups, each assigned an independent learning rate and weight decay.
 
-where $\alpha_{\text{start}}$ is the warmup start factor, $S_{\text{warmup}}$ is the total number of warmup steps, and $\eta_{\text{base}}$ is the base learning rate for each parameter group.
+### 3.2 Composite Training Objective
 
-After step $S_{\text{warmup}}$, the factor is set to $1.0$ and the warmup phase terminates.
+The loss is a configurable, weighted combination of complementary terms, enabling a curriculum that first stabilises global shape before refining detail:
 
-**Configuration parameters:**
+- **Curve-space losses** on the reconstructed profile — MSE, $L_1$, Huber, Charbonnier, cosine similarity, spectral coherence, and SSIM along the elevation axis.
+- **Parameter-space losses** — per-component penalties on amplitude, mean, and $\sigma$, with permutation-invariant component matching to resolve label ambiguity in multi-component decomposition.
+- **Regularisation** — total-variation smoothness over the predicted parameter fields.
+- **Heteroscedastic mode** — when the noise head is active, a Gaussian negative-log-likelihood with a per-pixel predicted noise standard deviation, providing calibrated uncertainty.
 
-| Parameter | Description |
-|---|---|
-| `warmup_enabled` | Boolean flag to enable/disable warmup |
-| `warmup_steps` | Number of warmup steps $S_{\text{warmup}}$ |
-| `warmup_start_factor` | Initial scaling factor $\alpha_{\text{start}}$ |
+A complete, formal description of the objective, optimiser, schedules, and metrics is given in the **[Training Pipeline — Technical Reference](docs/training_pipeline_reference.md)**.
 
----
+### 3.3 Optimisation & Training Engineering
 
-## 6. Learning Rate Scheduler
-
-The scheduler is **Cosine Annealing** (`CosineAnnealingLR`). It is applied per epoch after the warmup phase is completed.
-
-$$
-\eta_t = \eta_{\min} + \frac{1}{2}(\eta_{\max} - \eta_{\min})\left(1 + \cos\left(\frac{t \cdot \pi}{T_{\max}}\right)\right)
-$$
-
-where $\eta_{\max}$ is the initial learning rate (post-warmup), $\eta_{\min}$ is the minimum learning rate (`eta_min`), $t$ is the current epoch, and $T_{\max}$ is the total number of scheduled epochs.
-
-The scheduler does not step during the warmup phase.
+Training is performed with **AdamW** under discriminative per-group learning rates, a **linear-warmup → cosine-annealing** schedule, automatic mixed precision, gradient accumulation, configurable gradient clipping (fixed or adaptive), an exponential moving average of the weights, and early stopping with best-state restoration. The training state is checkpointed in full — model, optimiser, scheduler, EMA shadow, early-stopping and warmup state — so that any run is exactly resumable.
 
 ---
 
-## 7. Exponential Moving Average (EMA)
+## 4. End-to-End Pipeline
 
-When enabled, EMA maintains shadow copies of all trainable parameters. At each optimiser step $t$, the shadow parameters are updated:
+The framework is organised as a sequence of self-contained, individually-runnable stages, each driven by a dedicated entry point in `main/` and a corresponding configuration group.
 
-$$
-\tilde{\theta}_t = \gamma \, \tilde{\theta}_{t-1} + (1 - \gamma) \, \theta_t
-$$
+```
+  raw SAR stack
+       │
+       ▼
+  [1] pre-processing      tomogram formation (beamforming) · cropping · height-range selection
+       │
+       ▼
+  [2] dataset preparation channel representation · patch extraction · region-based split · augmentation · normalisation
+       │
+       ▼
+  [3] training            backbone + composite loss + EMA + warmup/cosine + early stopping
+       │
+       ▼
+  [4] inference           patch stitching · per-pixel metrics · profile/slice/animation visualisation · report
+       │
+       ▼
+  [5] parameter fitting   GPU-batched classical Gaussian fitting (ground-truth generation)
+       │
+       ▼
+  [6] benchmarking / HPO  multi-architecture comparison · Optuna hyperparameter search
+```
 
-where $\gamma \in [0, 1)$ is the decay coefficient and $\theta_t$ are the current model parameters.
-
-During evaluation, the shadow parameters $\tilde{\theta}$ replace the model parameters. After evaluation, the original parameters $\theta$ are restored.
-
-**Tracked diagnostics (per step):**
-
-| Metric | Definition |
-|---|---|
-| Parameter divergence | $\sum_i \|\tilde{\theta}_i - \theta_i\|_2$ |
-| Shadow norm | $\sum_i \|\tilde{\theta}_i\|_2$ |
-| Model norm | $\sum_i \|\theta_i\|_2$ |
-| Norm ratio | $\frac{\text{shadow norm}}{\text{model norm} + 10^{-8}}$ |
-
----
-
-## 8. Early Stopping
-
-Training terminates when the validation loss does not improve by at least $\delta_{\min}$ for $P$ consecutive epochs.
-
-The stopping criterion at epoch $t$ is:
-
-$$
-\text{stop}(t) =
-\begin{cases}
-\text{True}  & \text{if } \ell_{\text{val}}(t') \geq \ell^{*}_{\text{val}} - \delta_{\min} \;\; \forall \, t' \in \{t - P + 1, \dots, t\} \\
-\text{False} & \text{otherwise}
-\end{cases}
-$$
-
-where $\ell^{*}_{\text{val}}$ is the best recorded validation loss and $P$ is the patience.
-
-When `restore_best` is enabled, the model weights are reverted to the state corresponding to $\ell^{*}_{\text{val}}$ upon early termination.
-
-**Configuration parameters:**
-
-| Parameter | Description |
-|---|---|
-| `patience` | Number of epochs $P$ without improvement before stopping |
-| `min_delta` | Minimum improvement threshold $\delta_{\min}$ |
-| `restore_best` | Whether to restore the best model state on stop |
+| Stage | Entry point(s) | Purpose |
+|---|---|---|
+| Pre-processing | `main/pre_process.py` | Form tomograms from the SAR stack; crop, select height range, clip amplitude. |
+| Training | `main/single_train.py`, `main/batch_train.py` | Single run, or multi-GPU parallel experiments. |
+| Overfit test | `main/overfit_test.py` | Capacity check on a single repeated batch. |
+| Inference | `main/single_infer.py`, `main/batch_inference.py` | Predict, stitch patches, compute metrics, render figures and reports. |
+| Parameter extraction | `main/extract_params.py` | Classical GPU-accelerated Gaussian fitting for ground truth. |
+| Benchmarking | `main/benchmark.py` | Compare all architectures on a shared dataset. |
+| Hyperparameter search | `main/tune.py` | Optuna optimisation over learning rates and architecture parameters. |
 
 ---
 
-## 9. Mixed-Precision Training
+## 5. Repository Structure
 
-When `use_amp` is enabled and a CUDA device is available, forward passes execute under `torch.amp.autocast("cuda")`, which selects lower-precision floating-point types (e.g., float16) for eligible operations. Gradient scaling via `torch.amp.GradScaler` prevents underflow during backpropagation:
-
-1. The loss is scaled by a dynamic factor before `.backward()`.
-2. Before the optimiser step, gradients are unscaled.
-3. The scale factor is updated based on the presence of `inf`/`NaN` gradients.
-
----
-
-## 10. Gradient Accumulation
-
-Gradient accumulation allows the effective batch size to exceed the physical batch size by deferring the optimiser step over $A$ mini-batches. Each mini-batch loss is divided by $A$:
-
-$$
-\mathcal{L}_{\text{accum}} = \frac{\mathcal{L}_{\text{total}}}{A}
-$$
-
-The optimiser steps when $(i + 1) \mod A = 0$ or when the current batch is the last in the epoch, where $i$ is the zero-indexed batch index within the epoch.
-
-Gradients are clipped to a maximum norm before each optimiser step:
-
-$$
-\mathbf{g} \leftarrow \frac{\mathbf{g}}{\max\!\left(1, \; \frac{\|\mathbf{g}\|_2}{g_{\max}}\right)}
-$$
-
-where $g_{\max}$ is the configured `max_grad_norm`.
+```
+DLR-TomoSAR/
+├── main/                       # stage entry points (pre-process, train, infer, extract, benchmark, tune)
+├── models/                     # 10 architectures + model registry (UNet, ResUNet, Attention, Swin, TransUNet, UNETR, …)
+├── configuration/              # dataclass configuration for every stage
+│   ├── processing_config.py    #   tomogram formation, cropping, height range
+│   ├── dataset_config.py       #   channels, patches, augmentation, splits
+│   ├── norm_config.py          #   per-channel normalisation strategies
+│   ├── training_config.py      #   trainer, optimiser, scheduler, warmup, EMA, loss
+│   ├── inference_config.py     #   prediction, stitching, metrics, visualisation
+│   ├── param_extraction_config.py  # classical Gaussian-fitting settings
+│   ├── models_config.py        #   per-architecture configuration
+│   └── tuning_config.py        #   hyperparameter search ranges
+├── tools/                      # Gaussian mixture math, representation enum, permutation metrics,
+│                               # rich logging, resource/live monitoring, region splitting, model summary
+├── notebooks/                  # pipeline inspection, normalisation studies, parameter-distribution analysis
+├── docs/
+│   └── training_pipeline_reference.md   # formal, equation-level training specification
+├── coding_style.md             # engineering conventions / developer profile
+├── requirements.txt
+└── README.md
+```
 
 ---
 
-## 11. Evaluation Metrics
+## 6. Installation
 
-All metrics are computed over the full evaluation set by concatenating batch predictions and targets. Let $\hat{y} \in \mathbb{R}^{B \times N \times H \times W}$ denote reconstructed curves and $y$ the experimental curves.
+```bash
+pip install -r requirements.txt
+```
 
-### 11.1 Per-Pixel Curve MSE
-
-$$
-\text{MSE}_{b,h,w} = \frac{1}{N} \sum_{n=1}^{N} (\hat{y}_{b,n,h,w} - y_{b,n,h,w})^2
-$$
-
-### 11.2 Per-Pixel Curve MAE
-
-$$
-\text{MAE}_{b,h,w} = \frac{1}{N} \sum_{n=1}^{N} |\hat{y}_{b,n,h,w} - y_{b,n,h,w}|
-$$
-
-### 11.3 Curve RMSE
-
-$$
-\text{RMSE} = \sqrt{ \frac{1}{B \cdot H \cdot W} \sum_{b,h,w} \text{MSE}_{b,h,w} }
-$$
-
-### 11.4 Per-Pixel Coefficient of Determination ($R^2$)
-
-For each pixel $(b, h, w)$:
-
-$$
-\text{SS}_{\text{res}} = \sum_{n=1}^{N} (\hat{y}_{b,n,h,w} - y_{b,n,h,w})^2
-$$
-
-$$
-\text{SS}_{\text{tot}} = \sum_{n=1}^{N} (y_{b,n,h,w} - \bar{y}_{b,h,w})^2
-$$
-
-$$
-R^2_{b,h,w} = 1 - \frac{\text{SS}_{\text{res}}}{\text{SS}_{\text{tot}} + \epsilon}
-$$
-
-where $\bar{y}_{b,h,w} = \frac{1}{N}\sum_{n} y_{b,n,h,w}$ and $\epsilon = 10^{-8}$.
-
-Reported statistics: mean, standard deviation, median, minimum, maximum over all pixels.
-
-### 11.5 Overall $R^2$
-
-$$
-R^2_{\text{overall}} = 1 - \frac{\sum_{b,n,h,w}(\hat{y}_{b,n,h,w} - y_{b,n,h,w})^2}{\sum_{b,n,h,w}(y_{b,n,h,w} - \bar{y})^2}
-$$
-
-where $\bar{y}$ is the global mean of all experimental curve values.
-
-### 11.6 Per-Pixel Cosine Similarity
-
-$$
-\text{CosSim}_{b,h,w} = \frac{\sum_{n} \hat{y}_{b,n,h,w} \cdot y_{b,n,h,w}}{\|\hat{y}_{b,\cdot,h,w}\|_2 \; \|y_{b,\cdot,h,w}\|_2}
-$$
-
-Reported statistics: mean, standard deviation, median over all pixels.
-
-### 11.7 Parameter Distribution Statistics
-
-For each predicted Gaussian parameter channel $p \in \{a_k, \mu_k, \sigma_k\}_{k=1}^{K}$, the following statistics are computed: mean, standard deviation, minimum, maximum.
-
-When the noise head is active, statistics are computed for $\log \sigma_{\text{noise}}$ and $\sigma_{\text{noise}} = \text{clamp}(\exp(\log \sigma_{\text{noise}}), 10^{-4}, 10.0)$.
+The framework builds on the PyTorch ecosystem and the scientific-Python stack (NumPy, SciPy, scikit-image, Matplotlib, h5py), with **GDAL** for geospatial raster I/O and convex-optimisation solvers (cvxpy, cvxopt, osqp, ecos) supporting the classical fitting routines. A CUDA-capable GPU is recommended; mixed-precision training and GPU-batched parameter fitting assume CUDA availability.
 
 ---
 
-## 12. Checkpointing
+## 7. Usage
 
-A checkpoint is saved whenever the validation loss improves. The checkpoint contains:
+```bash
+# [1] Form tomograms and pre-process the SAR stack
+python main/pre_process.py
 
-| Field | Content |
-|---|---|
-| `epoch` | Epoch number at save time |
-| `global_step` | Total optimiser steps executed |
-| `best_val_loss` | Best recorded validation loss |
-| `best_epoch` | Epoch corresponding to best validation loss |
-| `best_metrics` | Metric dictionary at best epoch |
-| `train_losses` | List of training losses per epoch |
-| `val_losses` | List of validation losses per epoch |
-| `model_state_dict` | Model parameters |
-| `optimizer_state_dict` | Optimiser state |
-| `lr_scheduler_state_dict` | Scheduler state |
-| `ema_state_dict` | EMA shadow parameters, decay, and enabled flag |
-| `early_stopping_state` | Best loss, counter, and best model state |
-| `warmup_state` | Current step and completion flag |
-| `scaler_state_dict` | Gradient scaler state (if AMP is enabled) |
-| `config` | Training configuration |
-| `x_axis` | Spectral axis sample points |
+# [2]+[3] Train a model (architecture and all hyperparameters set in configuration/)
+python main/single_train.py
 
-Checkpoints are stored at `<run_dir>/best_model.pt`.
+# [4] Run inference: stitch predictions, compute metrics, render figures and a report
+python main/single_infer.py
 
-Loading a checkpoint restores all fields and resumes training from the saved epoch.
+# [5] Generate ground-truth parameters via classical GPU-accelerated fitting
+python main/extract_params.py
+
+# [6] Benchmark all architectures / search hyperparameters
+python main/benchmark.py
+python main/tune.py
+```
+
+All behaviour is governed by the dataclass configuration objects in `configuration/`; there are no command-line flags. Edit the relevant configuration group before launching a stage.
 
 ---
 
-## 13. Training Loop
+## 8. Documentation
 
-The training procedure follows these steps for each epoch $t \in \{1, \dots, T\}$:
+- **[Training Pipeline — Technical Reference](docs/training_pipeline_reference.md)** — a complete, equation-level specification of the objective, optimiser and parameter groups, warmup and cosine-annealing schedules, EMA, early stopping, mixed precision, gradient accumulation, the full evaluation-metric suite, checkpointing, and the epoch loop.
+- **`coding_style.md`** — the engineering conventions and design philosophy underpinning the codebase (modular object-oriented design, defensive numerical practice, exhaustive observability, total-state checkpointing).
+- **`notebooks/`** — inspection notebooks documenting each pipeline stage, the input-normalisation strategy, and the empirical distribution of the target parameters.
 
-1. **Train epoch**: iterate over the training data loader, compute forward pass, compute loss, accumulate gradients, and step the optimiser (with warmup, gradient clipping, and EMA updates).
-2. **Evaluate on validation set**: apply EMA parameters, compute loss and all metrics (Section 11), restore original parameters.
-3. **Evaluate on training set**: same procedure as validation, on training data.
-4. **Log loss comparison**: record training and validation losses.
-5. **Checkpoint**: if $\ell_{\text{val}}(t) < \ell^{*}_{\text{val}}$, save checkpoint.
-6. **Scheduler step**: advance cosine annealing (if warmup is complete).
-7. **Early stopping check**: if the stopping criterion (Section 8) is met, terminate.
+---
 
-After training completes (either by exhausting all epochs or by early stopping):
+## 9. Engineering Principles
 
-1. Load the best checkpoint.
-2. Evaluate on training, validation, and test sets (`final_train`, `final_validation`, `final_test`).
-3. Return the three result dictionaries.
+The codebase is written to research-software standards emphasising reproducibility and observability: highly modular, single-responsibility object-oriented design with a central-orchestrator pattern; defensive numerical practice (clamping, $\epsilon$-stabilised denominators); total-state checkpointing for exact resumption; structured hierarchical logging with live resource monitoring; and explicit management of hardware resources and thread contention.
 
-**Overfitting mode**: when enabled, a single batch is sampled from the training loader and repeated for the entire epoch. This mode is used for debugging and verifying model capacity.
+---
 
-**Activation and weight logging**: every 10 epochs (after epoch 0), forward-hook-based activation distributions and model weight distributions are logged.
+## 10. Citation
 
-**Gradient and optimiser diagnostics**: every 100 optimiser steps, gradient norms and optimiser state statistics are logged.
+```bibtex
+@software{dlr_tomosar,
+  title  = {DLR-TomoSAR: Deep Per-Pixel Gaussian-Mixture Decomposition
+            of Tomographic SAR Spectra},
+  author = {{DLR-TomoSAR contributors}},
+  year   = {2026},
+  note   = {Configuration-driven deep-learning framework for TomoSAR
+            reflectivity-profile decomposition}
+}
+```
+
+---
+
+## 11. Selected References
+
+1. Reigber, A. & Moreira, A. *First Demonstration of Airborne SAR Tomography Using Multibaseline L-Band Data.* IEEE TGRS (2000).
+2. Fornaro, G., Serafino, F. & Soldovieri, F. *Three-Dimensional Focusing with Multipass SAR Data.* IEEE TGRS (2003).
+3. Zhu, X. X. & Bamler, R. *Tomographic SAR Inversion by $L_1$-Norm Regularization — The Compressive Sensing Approach.* IEEE TGRS (2010).
+4. Ronneberger, O., Fischer, P. & Brox, T. *U-Net: Convolutional Networks for Biomedical Image Segmentation.* MICCAI (2015).
+5. Hatamizadeh, A. et al. *UNETR: Transformers for 3D Medical Image Segmentation.* WACV (2022).
+6. Cao, H. et al. *Swin-Unet: Unet-like Pure Transformer for Medical Image Segmentation.* ECCV Workshops (2022).
+
+---
+
+<div align="center">
+<sub>Configuration-driven · ten architectures · classical &amp; learned inversion · fully reproducible</sub>
+</div>

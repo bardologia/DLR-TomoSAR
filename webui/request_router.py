@@ -1,0 +1,218 @@
+from __future__ import annotations
+
+import json
+import mimetypes
+import queue
+from pathlib import Path
+from urllib.parse import urlparse
+
+from config_registry import ConfigRegistry
+from equation_library import EquationLibrary
+from model_library import ModelLibrary
+from pipeline_library import PipelineLibrary
+from process_manager import ProcessManager
+from project_paths import ProjectPaths
+from script_catalog import ScriptCatalog
+from script_editor import ScriptEditor
+from web_logger import WebLogger
+
+
+class RequestRouter:
+
+    PROJECT = {
+        "name"        : "DLR-TomoSAR",
+        "tagline"     : "Neural SAR tomography control console",
+        "description" : "Supervised deep learning that replaces per-pixel iterative optimisation in SAR tomographic parameter estimation, inferring all 3K Gaussian-mixture parameters of the elevation spectrum in one forward pass.",
+        "models"      : ["UNet", "ResUNet", "Attention UNet", "UNet++", "FCN", "LinkNet", "Swin-UNet", "TransUNet", "UNETR"],
+        "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
+    }
+
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, editor: ScriptEditor, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager) -> None:
+        self.paths     = paths
+        self.logger    = logger
+        self.catalog   = catalog
+        self.editor    = editor
+        self.configs   = configs
+        self.equations = equations
+        self.models    = models
+        self.pipelines = pipelines
+        self.processes = processes
+
+    def route(self, handler) -> None:
+        parsed = urlparse(handler.path)
+        path   = parsed.path.rstrip("/") or "/"
+        method = handler.command
+
+        try:
+            if method == "GET":
+                self._route_get(handler, path)
+            elif method == "POST":
+                self._route_post(handler, path)
+            else:
+                self._send_json(handler, {"error": "method not allowed"}, 405)
+        except BrokenPipeError:
+            pass
+        except Exception as exc:
+            self.logger.error(f"router error on {method} {path}: {exc}")
+            try:
+                self._send_json(handler, {"error": str(exc)}, 500)
+            except Exception:
+                pass
+
+    def _route_get(self, handler, path: str) -> None:
+        if path == "/" or path == "":
+            self._serve_static(handler, "index.html")
+            return
+        if path.startswith("/static/"):
+            self._serve_static(handler, path[len("/static/"):])
+            return
+        if path == "/api/project":
+            self._send_json(handler, self._project_payload())
+            return
+        if path == "/api/equations":
+            self._send_json(handler, {"groups": self.equations.collect()})
+            return
+        if path == "/api/models":
+            self._send_json(handler, {"families": self.models.collect()})
+            return
+        if path == "/api/pipelines":
+            self._send_json(handler, {"pipelines": self.pipelines.collect()})
+            return
+        if path == "/api/scripts":
+            self._send_json(handler, {"scripts": self.catalog.list_scripts()})
+            return
+        if path.startswith("/api/scripts/"):
+            key    = path[len("/api/scripts/"):]
+            detail = self.catalog.get_script(key)
+            if detail is None:
+                self._send_json(handler, {"error": "not found"}, 404)
+            else:
+                self._send_json(handler, detail)
+            return
+        if path == "/api/configs":
+            self._send_json(handler, {"groups": self.configs.collect()})
+            return
+        if path == "/api/jobs":
+            self._send_json(handler, {"jobs": self.processes.list_jobs()})
+            return
+        if path.startswith("/api/jobs/") and path.endswith("/stream"):
+            job_id = path[len("/api/jobs/"):-len("/stream")]
+            self._stream_job(handler, job_id)
+            return
+
+        self._send_json(handler, {"error": "not found"}, 404)
+
+    def _route_post(self, handler, path: str) -> None:
+        body = self._read_json(handler)
+
+        if path == "/api/run":
+            key         = body.get("script_key", "")
+            interpreter = body.get("interpreter") or self._preferred_interpreter()
+            result      = self.processes.launch(key, interpreter)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path.startswith("/api/scripts/") and path.endswith("/config"):
+            key    = path[len("/api/scripts/"):-len("/config")]
+            values = body.get("values", {})
+            result = self.editor.apply(key, values)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path.startswith("/api/jobs/") and path.endswith("/stop"):
+            job_id = path[len("/api/jobs/"):-len("/stop")]
+            result = self.processes.stop(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        self._send_json(handler, {"error": "not found"}, 404)
+
+    def _project_payload(self) -> dict:
+        interpreters = self.paths.discover_interpreters()
+        return {
+            **self.PROJECT,
+            "repo_root"    : str(self.paths.repo_root),
+            "interpreters" : interpreters,
+            "preferred"    : self.paths.preferred_interpreter(interpreters),
+            "counts"       : {
+                "scripts"   : len(self.catalog.list_scripts()),
+                "models"    : len(self.PROJECT["models"]),
+                "pipelines" : len(self.PROJECT["pipelines"]),
+            },
+        }
+
+    def _preferred_interpreter(self) -> str:
+        interpreters = self.paths.discover_interpreters()
+        return self.paths.preferred_interpreter(interpreters)
+
+    def _stream_job(self, handler, job_id: str) -> None:
+        stream = self.processes.get_stream(job_id)
+        if stream is None:
+            self._send_json(handler, {"error": "unknown job"}, 404)
+            return
+
+        handler.send_response(200)
+        handler.send_header("Content-Type", "text/event-stream")
+        handler.send_header("Cache-Control", "no-cache")
+        handler.send_header("Connection", "keep-alive")
+        handler.send_header("Access-Control-Allow-Origin", "*")
+        handler.end_headers()
+
+        sub = stream.subscribe()
+        try:
+            while True:
+                try:
+                    event = sub.get(timeout=15)
+                except queue.Empty:
+                    handler.wfile.write(b": keepalive\n\n")
+                    handler.wfile.flush()
+                    continue
+
+                payload = json.dumps(event)
+                handler.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                handler.wfile.flush()
+
+                if event.get("type") == "end":
+                    break
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            stream.unsubscribe(sub)
+
+    def _read_json(self, handler) -> dict:
+        length = int(handler.headers.get("Content-Length", 0) or 0)
+        if length <= 0:
+            return {}
+        raw = handler.rfile.read(length)
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return {}
+
+    def _send_json(self, handler, obj: dict, status: int = 200) -> None:
+        payload = json.dumps(obj).encode("utf-8")
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(payload)))
+        handler.send_header("Access-Control-Allow-Origin", "*")
+        handler.end_headers()
+        handler.wfile.write(payload)
+
+    def _serve_static(self, handler, relative: str) -> None:
+        target = (self.paths.static_dir / relative).resolve()
+        if not str(target).startswith(str(self.paths.static_dir.resolve())):
+            self._send_json(handler, {"error": "forbidden"}, 403)
+            return
+        if not target.is_file():
+            self._send_json(handler, {"error": "not found"}, 404)
+            return
+
+        data         = target.read_bytes()
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+
+        handler.send_response(200)
+        handler.send_header("Content-Type", content_type)
+        handler.send_header("Content-Length", str(len(data)))
+        handler.send_header("Cache-Control", "no-cache")
+        handler.end_headers()
+        handler.wfile.write(data)

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DLR-TomoSAR Control Console</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
+<link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <a class="nav__brand" href="#/home" data-route="home">
+    <span class="nav__logo" aria-hidden="true"></span>
+    <span class="nav__name">DLR<span class="nav__name-dim">-TomoSAR</span></span>
+  </a>
+  <nav class="nav__links" aria-label="Sections">
+    <a href="#/model" data-route="model">Model</a>
+    <a href="#/pipelines" data-route="pipelines">Pipelines</a>
+    <a href="#/architectures" data-route="architectures">Architectures</a>
+    <a href="#/scripts" data-route="scripts">Scripts</a>
+    <a href="#/configuration" data-route="configuration">Configuration</a>
+    <a href="#/console" data-route="console">Console</a>
+  </nav>
+  <div class="nav__status" id="nav-status" title="Backend connection">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">connecting</span>
+  </div>
+</header>
+
+<main id="view">
+
+  <!-- HOME -->
+  <section class="page page--home is-active" data-page="home">
+    <canvas class="hero__radar" id="radar" aria-hidden="true"></canvas>
+    <div class="hero__inner">
+      <div class="hero__copy">
+        <h1 class="hero__title">The vertical scene,<br /><em>reconstructed</em> in one pass.</h1>
+        <p class="hero__sub">
+          A neural control console for SAR tomography: predict every Gaussian-mixture
+          parameter of the elevation spectrum without per-pixel fitting.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="#/scripts" data-route="scripts">Open control panel</a>
+          <a class="btn btn--ghost" href="#/model" data-route="model">Explore the model</a>
+        </div>
+        <dl class="hero__stats" id="hero-stats"></dl>
+      </div>
+
+      <figure class="instrument" aria-label="Live elevation power spectrum">
+        <figcaption class="instrument__cap">
+          <span>elevation power spectrum</span>
+          <span class="instrument__live"><span class="dot dot--live"></span>live</span>
+        </figcaption>
+        <canvas id="spectrum" class="instrument__canvas"></canvas>
+        <div class="instrument__readout" id="spectrum-readout"></div>
+      </figure>
+    </div>
+    <nav class="home-jump" id="home-jump" aria-label="Quick links"></nav>
+  </section>
+
+  <!-- MODEL -->
+  <section class="page page--pad" data-page="model">
+    <div class="page__head">
+      <h2 class="page__title">The signal model</h2>
+      <p class="page__lead">
+        From a stack of co-registered F-SAR passes to a K-Gaussian elevation spectrum.
+        Every equation below is what the network learns to amortise.
+      </p>
+    </div>
+    <div class="eq-tabs" id="eq-tabs"></div>
+    <div class="eq-grid" id="eq-grid"></div>
+  </section>
+
+  <!-- PIPELINES -->
+  <section class="page page--pad" data-page="pipelines">
+    <div class="page__head">
+      <h2 class="page__title">Pipelines</h2>
+      <p class="page__lead">
+        Six orchestrated stages take raw radar acquisitions to a trained, evaluated model.
+        Each pipeline maps to an entry point you can launch.
+      </p>
+    </div>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <!-- ARCHITECTURES -->
+  <section class="page page--pad" data-page="architectures">
+    <div class="page__head">
+      <h2 class="page__title">Architectures</h2>
+      <p class="page__lead">
+        Ten interchangeable backbones, all mapping an input patch to per-pixel Gaussian
+        parameters. Pick one to see its topology.
+      </p>
+    </div>
+    <div class="master master--stack">
+      <aside class="master__list" id="model-list" aria-label="Model list"></aside>
+      <div class="master__detail" id="model-detail"></div>
+    </div>
+  </section>
+
+  <!-- SCRIPTS -->
+  <section class="page page--pad" data-page="scripts">
+    <div class="page__head">
+      <h2 class="page__title">Entry points</h2>
+      <p class="page__lead">
+        Nine orchestrated scripts. Inspect the source, tune the configuration block,
+        pick an interpreter, and launch with live output.
+      </p>
+    </div>
+    <div class="filter-row" id="script-filters"></div>
+    <div class="script-grid" id="script-grid"></div>
+  </section>
+
+  <!-- CONFIGURATION -->
+  <section class="page page--pad" data-page="configuration">
+    <div class="page__head page__head--row">
+      <div>
+        <h2 class="page__title">Configuration layer</h2>
+        <p class="page__lead">
+          Every dataclass and default, parsed live from the codebase. Choose a group,
+          then a config to read its fields.
+        </p>
+      </div>
+      <input class="config-search" id="config-search" type="search" placeholder="Search any field" aria-label="Search configuration fields" />
+    </div>
+    <div class="master">
+      <aside class="master__list" id="config-list" aria-label="Configuration list"></aside>
+      <div class="master__detail" id="config-detail"></div>
+    </div>
+  </section>
+
+  <!-- CONSOLE -->
+  <section class="page page--pad" data-page="console">
+    <div class="page__head">
+      <h2 class="page__title">Run console</h2>
+      <p class="page__lead">
+        Launched jobs stream their stdout here in real time over server-sent events.
+      </p>
+    </div>
+    <div class="console">
+      <aside class="console__jobs" id="console-jobs">
+        <div class="console__jobs-head">Jobs</div>
+        <ul class="job-list" id="job-list"></ul>
+      </aside>
+      <div class="console__main">
+        <div class="console__bar" id="console-bar">
+          <span class="console__bar-title" id="console-title">No job selected</span>
+          <div class="console__bar-actions">
+            <button class="btn btn--mini" id="console-clear">Clear</button>
+            <button class="btn btn--mini btn--danger" id="console-stop" disabled>Stop</button>
+          </div>
+        </div>
+        <pre class="console__out" id="console-out" tabindex="0"><span class="console__hint">Launch a script to see live output.</span></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <span>DLR-TomoSAR control console</span>
+  <span class="footer__dim" id="footer-root"></span>
+</footer>
+
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer__scrim" id="drawer-scrim"></div>
+  <div class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <div class="drawer__head">
+      <div>
+        <span class="drawer__kicker" id="drawer-kicker"></span>
+        <h3 class="drawer__title" id="drawer-title"></h3>
+        <p class="drawer__purpose" id="drawer-purpose"></p>
+      </div>
+      <button class="drawer__close" id="drawer-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="drawer__run" id="drawer-run"></div>
+    <div class="drawer__tabs">
+      <button class="drawer__tab is-active" data-pane="config">Configuration</button>
+      <button class="drawer__tab" data-pane="source">Source</button>
+    </div>
+    <div class="drawer__pane is-active" id="pane-config"></div>
+    <div class="drawer__pane" id="pane-source"><pre><code class="language-python" id="source-code"></code></pre></div>
+  </div>
+</div>
+
+<div class="proc-modal" id="proc-modal" aria-hidden="true">
+  <div class="proc-modal__scrim" id="proc-scrim"></div>
+  <div class="proc-modal__panel" role="dialog" aria-modal="true" aria-labelledby="proc-title">
+    <div class="proc-modal__head">
+      <div>
+        <span class="proc-modal__kicker" id="proc-kicker"></span>
+        <h3 class="proc-modal__title" id="proc-title"></h3>
+      </div>
+      <button class="proc-modal__close" id="proc-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="proc-modal__stage"><canvas id="proc-canvas"></canvas></div>
+    <div class="proc-modal__caption" id="proc-caption"></div>
+    <div class="proc-modal__stages" id="proc-stages"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>window.MathJax = { svg: { fontCache: "none" }, startup: { typeset: false } };</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+<script src="/static/js/radar.js"></script>
+<script src="/static/js/process_anim.js"></script>
+<script src="/static/js/diagram.js"></script>
+<script src="/static/js/router.js"></script>
+<script src="/static/js/equations.js"></script>
+<script src="/static/js/pipelines.js"></script>
+<script src="/static/js/models.js"></script>
+<script src="/static/js/configs.js"></script>
+<script src="/static/js/scripts.js"></script>
+<script src="/static/js/console.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

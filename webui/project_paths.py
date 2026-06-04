@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+
+class ProjectPaths:
+
+    def __init__(self) -> None:
+        self.webui_root   = Path(__file__).resolve().parent
+        self.repo_root    = self.webui_root.parent
+        self.main_dir     = self.repo_root / "main"
+        self.scripts_dir  = self.repo_root / "scripts"
+        self.config_dir   = self.repo_root / "configuration"
+        self.static_dir   = self.webui_root / "static"
+        self.backups_dir  = self.webui_root / ".backups"
+
+    def ensure_backups(self) -> None:
+        self.backups_dir.mkdir(parents=True, exist_ok=True)
+
+    def discover_interpreters(self) -> list[dict]:
+        found   = []
+        seen    = set()
+        current = str(Path(sys.executable))
+
+        home  = Path.home()
+        bases = [home / "miniconda3", home / "anaconda3", home / ".conda"]
+        for base in bases:
+            base_py = base / "bin" / "python"
+            if base_py.exists() and str(base_py) not in seen:
+                found.append({"label": "conda:base", "path": str(base_py), "current": str(base_py) == current})
+                seen.add(str(base_py))
+
+            envs_dir = base / "envs"
+            if envs_dir.is_dir():
+                for env in sorted(envs_dir.iterdir()):
+                    env_py = env / "bin" / "python"
+                    if env_py.exists() and str(env_py) not in seen:
+                        found.append({"label": f"conda:{env.name}", "path": str(env_py), "current": str(env_py) == current})
+                        seen.add(str(env_py))
+
+        if current not in seen and Path(current).exists():
+            found.insert(0, {"label": "current", "path": current, "current": True})
+
+        return found
+
+    def preferred_interpreter(self, interpreters: list[dict]) -> str:
+        priority = ["conda:Dune", "conda:nazaria"]
+        for wanted in priority:
+            for item in interpreters:
+                if item["label"] == wanted:
+                    return item["path"]
+        return interpreters[0]["path"] if interpreters else sys.executable
