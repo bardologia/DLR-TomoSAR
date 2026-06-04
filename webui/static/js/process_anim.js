@@ -717,7 +717,20 @@ class ProcessAnimator {
       ctx.restore();
       const eqCx = (pad.l + 78 + (w - pad.r - 256)) / 2;
       this._texDraw("\\hat{\\gamma}(\\xi)=\\sum_{k=1}^{K} a_k\\,e^{-(\\xi-\\mu_k)^2/2\\sigma_k^2}", eqCx, pad.t + 2, 16, { align: "center", alpha: fitFade, color: "rgba(53,230,208,0.95)" });
-      this._texDraw("\\sigma_0=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: fitFade, color: "rgba(255,207,107,0.95)" });
+      const s0Alpha = fitFade * (1 - this._ease(Math.min(1, Math.max(0, (tt - 52.0) / 1.5))));
+      const upAlpha = fitFade * this._ease(Math.min(1, Math.max(0, (tt - 53.0) / 1.5)));
+      if (s0Alpha > 0.01) this._texDraw("\\sigma_0=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: s0Alpha, color: "rgba(255,207,107,0.95)" });
+      if (upAlpha > 0.01) {
+        const upX = pad.l + 6, upY = pad.t + 104;
+        ctx.save(); ctx.globalAlpha = upAlpha;
+        ctx.fillStyle = "rgba(4,7,10,0.7)"; ctx.fillRect(upX - 6, upY - 16, 250, 96);
+        ctx.strokeStyle = "rgba(120,200,220,0.18)"; ctx.lineWidth = 1; ctx.strokeRect(upX - 6, upY - 16, 250, 96);
+        ctx.restore();
+        this._texDraw("g=\\partial\\mathcal{L}/\\partial\\sigma\\;\\;(a,\\mu\\ \\text{fixed})", upX, upY, 11, { align: "left", alpha: upAlpha, color: "rgba(143,176,170,0.95)" });
+        this._texDraw("m\\leftarrow\\beta_1 m+(1-\\beta_1)\\,g", upX, upY + 18, 12, { align: "left", alpha: upAlpha, color: "rgba(53,230,208,0.9)" });
+        this._texDraw("v\\leftarrow\\beta_2 v+(1-\\beta_2)\\,g^2", upX, upY + 38, 12, { align: "left", alpha: upAlpha, color: "rgba(53,230,208,0.9)" });
+        this._texDraw("\\sigma\\leftarrow\\mathrm{clip}\\!\\left(\\sigma-\\eta\\,\\tfrac{\\hat{m}}{\\sqrt{\\hat{v}}+\\epsilon},\\;[\\sigma_{\\min},\\sigma_{\\max}]\\right)", upX, upY + 58, 13, { align: "left", alpha: upAlpha, color: "rgba(255,207,107,0.95)" });
+      }
       if (guessing) {
         ctx.font = "13px 'IBM Plex Mono', monospace";
         cands.slice(0, k).forEach((c) => {
@@ -4489,6 +4502,27 @@ class ProcessAnimator {
       ctx.restore();
     }
 
+    if (ts >= 18.5) {
+      const wa = this._ease(Math.min(1, (ts - 18.5) / 1.4));
+      const panX = dockX(2) + dockW / 2;
+      const panTop = dockY + dockH + 6;
+      const cxm = Math.min(panX, w * 0.44);
+      ctx.save(); ctx.globalAlpha = wa;
+      ctx.strokeStyle = "rgba(124,255,155,0.45)"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(panX, dockY + dockH); ctx.lineTo(panX, panTop + 1); ctx.stroke();
+      ctx.fillStyle = "rgba(124,255,155,0.85)"; ctx.font = "10px 'IBM Plex Mono', monospace";
+      const htxt = "inside scaler.step → AdamW (decoupled weight decay)";
+      ctx.fillText(htxt, cxm - ctx.measureText(htxt).width / 2, panTop + 6);
+      ctx.restore();
+      this._texDraw("\\hat m_t=\\tfrac{m_t}{1-\\beta_1^{t}},\\ \\hat v_t=\\tfrac{v_t}{1-\\beta_2^{t}}", cxm, panTop + 8, 11, { align: "center", alpha: wa, color: "rgba(143,176,170,0.9)" });
+      this._texDraw("\\theta\\leftarrow\\theta-\\eta\\,(\\,\\tfrac{\\hat m_t}{\\sqrt{\\hat v_t}+\\epsilon}+\\lambda\\theta\\,)", cxm, panTop + 24, 14, { align: "center", alpha: wa, color: "rgba(124,255,155,0.95)" });
+      ctx.save(); ctx.globalAlpha = wa;
+      ctx.font = "10px 'IBM Plex Mono', monospace"; ctx.fillStyle = "#7e8c94";
+      const ctag = "β1=0.9 · β2=0.999 · ε=1e-8 · λ=0.1 · per-group η";
+      ctx.fillText(ctag, cxm - ctx.measureText(ctag).width / 2, panTop + 64);
+      ctx.restore();
+    }
+
     if (ts >= 25.0) {
       const wm = Math.sin(this.t * 8) > 0;
       const sm = Math.sin(this.t * 0.8) > 0;
@@ -5388,6 +5422,7 @@ class ProcessAnimator {
       ctx.fillStyle = "#7cff9b";
       ctx.fillText(txt, w - pad.r - tw + 1, pad.t + 25);
       ctx.restore();
+      this._texDraw("\\theta\\leftarrow\\theta-\\eta\\lambda\\theta", w - pad.r - 12, pad.t + 38, 14, { align: "right", alpha: ca, color: "rgba(124,255,155,0.95)" });
     }
 
     if (ts >= 9.4) {
