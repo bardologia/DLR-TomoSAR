@@ -158,6 +158,23 @@ class LaunchView {
     });
     interp.appendChild(select);
 
+    let follow = null;
+    if (this.detail && this.detail.category === "Training") {
+      follow = document.createElement("div");
+      follow.className = "rail-block";
+      follow.innerHTML = `<span class="rail-block__label">After run</span>`;
+      const fsel = document.createElement("select");
+      fsel.className = "run-select";
+      fsel.id = "launch-follow";
+      [["", "nothing"], ["single_infer", "Single Inference"], ["batch_inference", "Batch Inference"]].forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        fsel.appendChild(opt);
+      });
+      follow.appendChild(fsel);
+    }
+
     const cmd = document.createElement("div");
     cmd.className = "rail-block";
     const cmdHead = document.createElement("div");
@@ -193,6 +210,7 @@ class LaunchView {
     actions.appendChild(launch);
 
     host.appendChild(interp);
+    if (follow) host.appendChild(follow);
     host.appendChild(cmd);
     host.appendChild(manifest);
     host.appendChild(actions);
@@ -916,7 +934,8 @@ class LaunchView {
   _launch() {
     if (!this.detail) return;
     const interp = document.getElementById("launch-interpreter").value;
-    this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty });
+    const followEl = document.getElementById("launch-follow");
+    this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, followEl ? followEl.value : "");
   }
 
   _renderSource(d) {

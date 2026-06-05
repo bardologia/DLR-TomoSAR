@@ -57,18 +57,50 @@ class ProcessManager:
         self.streams = {}
         self.lock    = threading.Lock()
 
-    def launch(self, key: str, interpreter: str, overrides: dict | None = None) -> dict:
+    def launch(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None) -> dict:
         script = self.paths.main_dir / f"{key}.py"
         if not script.exists():
             return {"ok": False, "error": "script not found"}
 
-        overrides = self._clean_overrides(overrides)
-        argv      = [interpreter, "-u", str(script)]
-        for path, value in overrides.items():
-            argv += [f"--{path}", value]
-
-        job_id = uuid.uuid4().hex[:12]
+        record = self._make_record(key, interpreter, self._clean_overrides(overrides))
         stream = JobStream()
+
+        with self.lock:
+            self.jobs[record["job_id"]]    = record
+            self.streams[record["job_id"]] = stream
+
+        error = self._start(record, stream)
+        if error is not None:
+            with self.lock:
+                self.jobs.pop(record["job_id"], None)
+                self.streams.pop(record["job_id"], None)
+            return {"ok": False, "error": error}
+
+        if follow_up:
+            self._schedule(record, follow_up)
+
+        return {"ok": True, "job_id": record["job_id"]}
+
+    def _make_record(self, key: str, interpreter: str, overrides: dict) -> dict:
+        return {
+            "job_id"      : uuid.uuid4().hex[:12],
+            "script"      : key,
+            "command"     : self._render_command(interpreter, key, overrides),
+            "interpreter" : interpreter,
+            "overrides"   : overrides,
+            "status"      : "pending",
+            "pid"         : None,
+            "started"     : datetime.now().isoformat(timespec="seconds"),
+            "exit_code"   : None,
+            "follow_of"   : None,
+            "follow_up"   : None,
+        }
+
+    def _start(self, record: dict, stream: JobStream) -> str | None:
+        script = self.paths.main_dir / f"{record['script']}.py"
+        argv   = [record["interpreter"], "-u", str(script)]
+        for path, value in record["overrides"].items():
+            argv += [f"--{path}", value]
 
         env = dict(os.environ)
         env["PYTHONUNBUFFERED"] = "1"
@@ -85,31 +117,63 @@ class ProcessManager:
                 env    = env,
             )
         except OSError as exc:
-            return {"ok": False, "error": str(exc)}
-
-        record = {
-            "job_id"      : job_id,
-            "script"      : key,
-            "command"     : self._render_command(interpreter, key, overrides),
-            "interpreter" : interpreter,
-            "overrides"   : overrides,
-            "status"      : "running",
-            "pid"         : process.pid,
-            "started"     : datetime.now().isoformat(timespec="seconds"),
-            "exit_code"   : None,
-        }
+            return str(exc)
 
         with self.lock:
-            self.jobs[job_id]    = record
-            self.streams[job_id] = stream
+            record["status"]  = "running"
+            record["pid"]     = process.pid
+            record["started"] = datetime.now().isoformat(timespec="seconds")
 
-        self.logger.ok(f"launched {key} as job {job_id} (pid {process.pid})")
+        self.logger.ok(f"launched {record['script']} as job {record['job_id']} (pid {process.pid})")
         stream.publish({"type": "status", "status": "running", "pid": process.pid})
 
-        worker = threading.Thread(target=self._pump, args=(job_id, process, stream), daemon=True)
+        worker = threading.Thread(target=self._pump, args=(record["job_id"], process, stream), daemon=True)
         worker.start()
+        return None
 
-        return {"ok": True, "job_id": job_id}
+    def _schedule(self, parent: dict, key: str) -> None:
+        script = self.paths.main_dir / f"{key}.py"
+        if not script.exists():
+            self.logger.warning(f"follow-up {key} skipped, script not found")
+            return
+
+        record              = self._make_record(key, parent["interpreter"], {})
+        record["status"]    = "scheduled"
+        record["follow_of"] = parent["job_id"]
+
+        stream = JobStream()
+        stream.publish({"type": "status", "status": "scheduled", "after": parent["script"]})
+
+        with self.lock:
+            parent["follow_up"]            = record["job_id"]
+            self.jobs[record["job_id"]]    = record
+            self.streams[record["job_id"]] = stream
+
+        self.logger.muted(f"scheduled {key} as job {record['job_id']} after {parent['script']} ({parent['job_id']})")
+
+    def _resolve_follow_up(self, follow_id: str, code: int) -> None:
+        with self.lock:
+            record = self.jobs.get(follow_id)
+            stream = self.streams.get(follow_id)
+        if record is None or stream is None or record["status"] != "scheduled":
+            return
+
+        if code == 0:
+            error = self._start(record, stream)
+            if error is None:
+                return
+            with self.lock:
+                record["status"] = "failed"
+            stream.publish({"type": "status", "status": "failed", "code": None, "verdict": "error"})
+            stream.publish({"type": "end"})
+            self.logger.error(f"scheduled job {follow_id} failed to start: {error}")
+            return
+
+        with self.lock:
+            record["status"] = "cancelled"
+        stream.publish({"type": "status", "status": "cancelled", "code": None})
+        stream.publish({"type": "end"})
+        self.logger.warning(f"scheduled job {follow_id} cancelled, parent exited with code {code}")
 
     def _clean_overrides(self, overrides: dict | None) -> dict:
         cleaned = {}
@@ -149,6 +213,10 @@ class ProcessManager:
             if record is not None:
                 record["status"]    = "finished" if code == 0 else "failed"
                 record["exit_code"] = code
+            follow_id = record["follow_up"] if record else None
+
+        if follow_id:
+            self._resolve_follow_up(follow_id, code)
 
         verdict = "ok" if code == 0 else "error"
         self.logger.muted(f"job {job_id} exited with code {code}")
@@ -158,8 +226,19 @@ class ProcessManager:
     def stop(self, job_id: str) -> dict:
         with self.lock:
             record = self.jobs.get(job_id)
+            stream = self.streams.get(job_id)
         if record is None:
             return {"ok": False, "error": "unknown job"}
+
+        if record["status"] == "scheduled":
+            with self.lock:
+                record["status"] = "cancelled"
+            if stream is not None:
+                stream.publish({"type": "status", "status": "cancelled", "code": None})
+                stream.publish({"type": "end"})
+            self.logger.warning(f"scheduled job {job_id} cancelled by user")
+            return {"ok": True}
+
         if record["status"] != "running":
             return {"ok": False, "error": "job is not running"}
 

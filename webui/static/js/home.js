@@ -58,8 +58,24 @@ class StatusBoard {
 
     const coreCells = cores.map((_, i) => `<i class="cpu__cell" data-core="${i}" title="core ${i}"></i>`).join("");
 
+    const lim = (sys.alerts && sys.alerts.limits) || {};
+    const limitCells = [
+      [lim.cpu_alert != null ? `${Math.round(lim.cpu_alert)}%` : "--", "cpu alert"],
+      [lim.load_ratio != null ? `${lim.load_ratio.toFixed(1)} / core` : "--", "load limit"],
+      [lim.ram_warn != null ? `${Math.round(lim.ram_warn)}%` : "--", "ram warn"],
+      [lim.ram_kill != null ? `${Math.round(lim.ram_kill)}%` : "--", "ram kill"],
+      [lim.interval != null ? `${Math.round(lim.interval)} s` : "--", "interval"],
+      [lim.cooldown != null ? `${Math.round(lim.cooldown)} s` : "--", "kill cooldown"],
+    ].map(([v, k]) => `<div><dt>${v}</dt><dd>${k}</dd></div>`).join("");
+
     this.els.board.innerHTML =
       `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
+
+      `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
+      `<div class="wd__state"><i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
+      `<span class="wd__status" id="sb-wd-status">--</span>` +
+      `<dl class="wd__limits">${limitCells}</dl>` +
+      `</section>` +
 
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
       `<header class="sboard__cap"><span>cuda devices</span><span class="sboard__n">${gpus.length}</span></header>` +
@@ -128,6 +144,8 @@ class StatusBoard {
   }
 
   _update(sys) {
+    if (window.serverScene && window.serverScene.feed) window.serverScene.feed(sys);
+    this._renderWatchdog(sys.alerts || {});
     this._renderAlerts(sys.alerts || {});
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
@@ -226,6 +244,22 @@ class StatusBoard {
     this._renderProcs(sys.procs || []);
   }
 
+  _renderWatchdog(alerts) {
+    const light = document.getElementById("sb-wd-light");
+    const mode = document.getElementById("sb-wd-mode");
+    const status = document.getElementById("sb-wd-status");
+    if (!light || !mode || !status) return;
+
+    const armed = !!alerts.armed;
+    const active = (alerts.active || []).length;
+
+    light.classList.toggle("is-armed", armed);
+    mode.textContent = armed ? "armed" : "offline";
+    mode.classList.toggle("is-off", !armed);
+    status.textContent = active ? `${active} active alert${active === 1 ? "" : "s"}` : "all clear";
+    status.classList.toggle("is-alert", active > 0);
+  }
+
   _renderAlerts(alerts) {
     const box = document.getElementById("sb-alerts");
     if (!box) return;
@@ -287,10 +321,26 @@ class StatusBoard {
       list.innerHTML = `<li class="sboard__empty">no runs yet</li>`;
       return;
     }
-    list.innerHTML = jobs.slice(0, 8).map((j) => {
+
+    const followers = new Map();
+    jobs.forEach((j) => {
+      if (j.follow_of) followers.set(j.follow_of, j);
+    });
+
+    const row = (j, follow) => {
       const name = this._esc(String(j.command || "").split("/").pop() || "job");
-      const cls = j.status === "running" ? "is-run" : j.status === "failed" ? "is-fail" : "is-done";
-      return `<li class="sboard__job ${cls}"><span class="sboard__jdot" aria-hidden="true"></span><span class="sboard__jname">${name}</span><span class="sboard__jstate">${this._esc(j.status)}</span></li>`;
+      const cls =
+        j.status === "running" ? "is-run" :
+        j.status === "failed" ? "is-fail" :
+        j.status === "scheduled" ? "is-sched" :
+        j.status === "cancelled" ? "is-cancel" : "is-done";
+      const mark = follow ? `<span class="sboard__jarrow" aria-hidden="true">&#8627;</span>` : "";
+      return `<li class="sboard__job ${cls}${follow ? " sboard__job--follow" : ""}">${mark}<span class="sboard__jdot" aria-hidden="true"></span><span class="sboard__jname">${name}</span><span class="sboard__jstate">${this._esc(j.status)}</span></li>`;
+    };
+
+    list.innerHTML = jobs.filter((j) => !j.follow_of).slice(0, 8).map((j) => {
+      const next = followers.get(j.job_id);
+      return row(j, false) + (next ? row(next, true) : "");
     }).join("");
   }
 

@@ -25,6 +25,7 @@ class ResourceWatchdog:
         self.processes = processes
         self.logger    = logger
         self.lock      = threading.Lock()
+        self.armed     = False
         self.active    = {}
         self.events    = deque(maxlen=20)
         self.streaks   = {key: 0 for key in self.SUSTAIN}
@@ -34,11 +35,14 @@ class ResourceWatchdog:
     def start(self) -> None:
         worker = threading.Thread(target=self._watch, daemon=True)
         worker.start()
+        self.armed = True
         self.logger.muted(f"resource watchdog armed (cpu {self.CPU_ALERT:.0f}%, ram warn {self.RAM_WARN:.0f}%, ram kill {self.RAM_KILL:.0f}%)")
 
     def state(self) -> dict:
+        limits = {"cpu_alert": self.CPU_ALERT, "load_ratio": self.LOAD_RATIO, "ram_warn": self.RAM_WARN, "ram_kill": self.RAM_KILL, "interval": self.INTERVAL, "cooldown": self.KILL_COOLDOWN}
+
         with self.lock:
-            return {"active": list(self.active.values()), "events": list(self.events)}
+            return {"armed": self.armed, "limits": limits, "active": list(self.active.values()), "events": list(self.events)}
 
     def _watch(self) -> None:
         while True:

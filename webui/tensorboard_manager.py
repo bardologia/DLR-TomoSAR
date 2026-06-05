@@ -19,6 +19,7 @@ class TensorboardManager:
         "batch_train"  : ("base.logdir",),
     }
 
+    BASE_PORT         = 6007
     STARTUP_TIMEOUT_S = 90.0
     PROBE_INTERVAL_S  = 0.5
 
@@ -146,8 +147,16 @@ class TensorboardManager:
             "url"     : f"/tb/{record['id']}/",
         }
 
-    @staticmethod
-    def _free_port() -> int:
+    @classmethod
+    def _free_port(cls) -> int:
+        for port in range(cls.BASE_PORT, cls.BASE_PORT + 100):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                try:
+                    sock.bind(("127.0.0.1", port))
+                    return port
+                except OSError:
+                    continue
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", 0))
             return sock.getsockname()[1]

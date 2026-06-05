@@ -69,7 +69,10 @@ class App {
       if (radar && window.RadarScene) this.scenes.push(new window.RadarScene(radar));
     } catch (e) {}
     try {
-      if (server && window.ServerScene) this.scenes.push(new window.ServerScene(server));
+      if (server && window.ServerScene) {
+        window.serverScene = new window.ServerScene(server);
+        this.scenes.push(window.serverScene);
+      }
     } catch (e) {}
   }
 

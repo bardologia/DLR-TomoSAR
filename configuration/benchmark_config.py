@@ -6,9 +6,9 @@ from pathlib import Path
 
 @dataclass
 class BenchmarkPathsConfig:
-    dataset_path    : Path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-    parameters_path : Path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-    log_base_dir    : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/benchmark")
+    dataset_path    : Path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")
+    parameters_path : Path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10/params/params_Ng3_sigonly_k5/parameters_Ng3_sigonly_k5.npy")
+    log_base_dir    : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
 
 
 @dataclass

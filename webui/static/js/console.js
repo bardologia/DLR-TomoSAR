@@ -20,7 +20,7 @@ class ConsoleTile {
 
     this.metaEl = document.createElement("span");
     this.metaEl.className = "console-tile__meta";
-    this.metaEl.textContent = `pid ${job.pid}`;
+    this.metaEl.textContent = job.pid ? `pid ${job.pid}` : "queued";
 
     this.badgeEl = document.createElement("span");
     this.badgeEl.className = `badge badge--${job.status}`;
@@ -28,8 +28,6 @@ class ConsoleTile {
 
     this.stopBtn = document.createElement("button");
     this.stopBtn.className = "btn btn--mini btn--danger";
-    this.stopBtn.textContent = "Stop";
-    this.stopBtn.disabled = job.status !== "running";
     this.stopBtn.addEventListener("click", () => this.manager.stop(this.job.job_id));
 
     this.closeBtn = document.createElement("button");
@@ -66,6 +64,7 @@ class ConsoleTile {
     this.fitAddon = new FitAddon.FitAddon();
     this.term.loadAddon(this.fitAddon);
 
+    this.setStatus(job.status);
     this._connect();
   }
 
@@ -97,6 +96,14 @@ class ConsoleTile {
     } else if (data.type === "status") {
       if (data.status === "running") {
         this._note(`process started (pid ${data.pid})`, "36");
+        this.metaEl.textContent = `pid ${data.pid}`;
+        this.setStatus("running");
+      } else if (data.status === "scheduled") {
+        this._note(`scheduled to run after ${data.after || "the current job"}`, "33");
+      } else if (data.status === "cancelled") {
+        this._note("cancelled before start", "33");
+        this.setStatus("cancelled");
+        this.manager.refresh();
       } else {
         this._note(`process ${data.status} (exit ${data.code})`, data.code === 0 ? "36" : "31");
         this.setStatus(data.status);
@@ -115,7 +122,8 @@ class ConsoleTile {
     this.job.status = status;
     this.badgeEl.className = `badge badge--${status}`;
     this.badgeEl.textContent = status;
-    this.stopBtn.disabled = status !== "running";
+    this.stopBtn.textContent = status === "scheduled" ? "Cancel" : "Stop";
+    this.stopBtn.disabled = status !== "running" && status !== "scheduled";
   }
 
   fit() {
@@ -137,7 +145,10 @@ class ConsoleTile {
       this.term.options.fontSize = font;
       dims = this.fitAddon.proposeDimensions();
     }
-    if (dims && dims.rows) this.term.resize(120, Math.max(8, dims.rows));
+    if (!dims || !dims.cols || !dims.rows) return;
+
+    this.term.resize(Math.min(120, dims.cols), Math.max(2, dims.rows));
+    this.term.scrollToBottom();
   }
 
   dispose() {
@@ -169,8 +180,8 @@ class RunConsole {
     this._renderList();
   }
 
-  async launch(scriptKey, interpreter, label, overrides) {
-    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {} });
+  async launch(scriptKey, interpreter, label, overrides, followUp) {
+    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {}, follow_up: followUp || null });
     if (!res.ok) {
       window.toast(res.error || "Launch failed", "error");
       return null;
@@ -242,7 +253,13 @@ class RunConsole {
       return;
     }
 
+    const followers = new Map();
+    this.jobs.forEach((j) => {
+      if (j.follow_of) followers.set(j.follow_of, j);
+    });
+
     this.jobs.forEach((job) => {
+      if (job.follow_of) return;
       const item = document.createElement("li");
       item.className = "job-item" + (this.tiles.has(job.job_id) ? " is-active" : "");
       item.innerHTML =
@@ -250,6 +267,22 @@ class RunConsole {
         `<span class="badge badge--${job.status}">${job.status}</span></div>` +
         `<div class="job-item__meta">${job.started.replace("T", " ")} · pid ${job.pid}</div>`;
       item.addEventListener("click", () => this.toggle(job.job_id));
+
+      const next = followers.get(job.job_id);
+      if (next) {
+        const sub = document.createElement("div");
+        sub.className = "job-item__follow" + (this.tiles.has(next.job_id) ? " is-active" : "");
+        sub.innerHTML =
+          `<span class="job-item__arrow" aria-hidden="true">&#8627;</span>` +
+          `<span class="job-item__name">${next.script}</span>` +
+          `<span class="badge badge--${next.status}">${next.status}</span>`;
+        sub.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.toggle(next.job_id);
+        });
+        item.appendChild(sub);
+      }
+
       this.listEl.appendChild(item);
     });
   }
