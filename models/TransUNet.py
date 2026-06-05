@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import TransUNetConfig, build_activation, build_norm2d, build_upsample, DropPath, initialize_weights
+from configuration.models_config import TransUNetConfig
+from .blocks import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 
 
 # Double 3x3 convolution block: Conv -> Norm -> Act -> Conv -> Norm -> Act (+ optional dropout)

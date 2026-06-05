@@ -3,7 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.models_config import ConvNeXtUNetConfig, DropPath, build_activation, initialize_weights
+from configuration.models_config import ConvNeXtUNetConfig
+from .blocks import DropPath, build_activation, initialize_weights
 from .blocks import match_spatial_size
 
 

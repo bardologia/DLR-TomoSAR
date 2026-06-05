@@ -3,7 +3,6 @@ from configuration.models_config import (
     ConvNeXtUNetConfig,
     DeepLabV3PlusConfig,
     DenseUNetConfig,
-    DropPath,
     FPNNetConfig,
     HRNetLiteConfig,
     LinkNetConfig,
@@ -21,11 +20,8 @@ from configuration.models_config import (
     UNetPerGaussianConfig,
     UNetPlusPlusConfig,
     UNetSkipConfig,
-    build_activation,
-    build_norm2d,
-    build_upsample,
-    initialize_weights,
 )
+from .blocks import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .unet import UNet, UNetMultiHead, UNetPerGaussian
 from .resunet import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
 from .AttentionUNet import AttentionUNet

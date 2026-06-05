@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import DeepLabV3PlusConfig, build_activation, build_norm2d, initialize_weights
+from configuration.models_config import DeepLabV3PlusConfig
+from .blocks import build_activation, build_norm2d, initialize_weights
 from .blocks import ResidualConvBlock
 
 

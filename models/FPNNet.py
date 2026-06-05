@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import FPNNetConfig, build_activation, build_norm2d, initialize_weights
+from configuration.models_config import FPNNetConfig
+from .blocks import build_activation, build_norm2d, initialize_weights
 from .blocks import ResidualConvBlock
 
 

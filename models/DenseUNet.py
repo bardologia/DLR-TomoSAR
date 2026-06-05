@@ -3,7 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.models_config import DenseUNetConfig, build_activation, build_norm2d, initialize_weights
+from configuration.models_config import DenseUNetConfig
+from .blocks import build_activation, build_norm2d, initialize_weights
 from .blocks import match_spatial_size
 
 

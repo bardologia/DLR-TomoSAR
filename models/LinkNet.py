@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import LinkNetConfig, build_activation, build_norm2d, initialize_weights
+from configuration.models_config import LinkNetConfig
+from .blocks import build_activation, build_norm2d, initialize_weights
 
 
 # Resizes source tensor to match the spatial dimensions of reference
