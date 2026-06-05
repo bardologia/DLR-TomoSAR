@@ -2,8 +2,12 @@
 
 class TensorboardView {
   static POLL_MS = 5000;
+  static SETTINGS_KEY = "_tb_global_settings";
+  static AUTO_RELOAD_MS = 31000;
+  static PAGINATION_SIZE = 500;
 
   constructor() {
+    this._seedSettings();
     this.strip = document.getElementById("tb-strip");
     this.frame = document.getElementById("tb-frame");
     this.empty = document.getElementById("tb-empty");
@@ -25,6 +29,19 @@ class TensorboardView {
     });
     this.stopBtn.addEventListener("click", () => this._stop());
     this.startBtn.addEventListener("click", () => this._start());
+  }
+
+  _seedSettings() {
+    let stored = {};
+    try {
+      stored = JSON.parse(localStorage.getItem(TensorboardView.SETTINGS_KEY) || "{}");
+    } catch (e) {
+      stored = {};
+    }
+    stored.autoReload = true;
+    stored.autoReloadPeriodInMs = TensorboardView.AUTO_RELOAD_MS;
+    stored.paginationSize = TensorboardView.PAGINATION_SIZE;
+    localStorage.setItem(TensorboardView.SETTINGS_KEY, JSON.stringify(stored));
   }
 
   enter() {

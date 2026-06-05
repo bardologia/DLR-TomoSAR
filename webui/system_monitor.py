@@ -11,7 +11,7 @@ import time
 
 class SystemMonitor:
 
-    GPU_QUERY    = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit"
+    GPU_QUERY    = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,uuid"
     PROC_LIMIT   = 30
     DU_REFRESH_S = 600.0
 
@@ -31,7 +31,7 @@ class SystemMonitor:
         threading.Thread(target=self._du_loop, daemon=True).start()
 
     def snapshot(self) -> dict:
-        gpu_mem = self._gpu_procs()
+        gpu_mem, gpu_users = self._gpu_procs()
 
         with self.lock:
             cores, total = self._cpu_percents()
@@ -44,7 +44,7 @@ class SystemMonitor:
             "cpu"    : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
             "mem"    : self._memory(),
             "disk"   : self._disk(),
-            "gpus"   : self._gpus(),
+            "gpus"   : self._gpus(gpu_users),
             "procs"  : procs,
         }
 
@@ -135,28 +135,40 @@ class SystemMonitor:
         rows.sort(key=lambda r: (-r["cpu"], -r["gpu"], -r["rss"]))
         return rows[: self.PROC_LIMIT]
 
-    def _gpu_procs(self) -> dict:
+    def _gpu_procs(self) -> tuple[dict, dict]:
         try:
             out = subprocess.run(
-                ["nvidia-smi", "--query-compute-apps=pid,used_gpu_memory", "--format=csv,noheader,nounits"],
+                ["nvidia-smi", "--query-compute-apps=pid,used_gpu_memory,gpu_uuid", "--format=csv,noheader,nounits"],
                 capture_output=True, text=True, timeout=3,
             )
         except (OSError, subprocess.TimeoutExpired):
-            return {}
+            return {}, {}
 
         if out.returncode != 0:
-            return {}
+            return {}, {}
 
         usage = {}
+        users = {}
         for line in out.stdout.strip().splitlines():
             cells = [c.strip() for c in line.split(",")]
-            if len(cells) < 2:
+            if len(cells) < 3:
                 continue
             try:
-                usage[int(cells[0])] = usage.get(int(cells[0]), 0) + float(cells[1])
+                pid = int(cells[0])
+                mem = float(cells[1])
             except ValueError:
                 continue
-        return usage
+
+            usage[pid] = usage.get(pid, 0) + mem
+
+            entry = users.setdefault(cells[2], {"mine": False, "others": False})
+            try:
+                mine = os.stat(f"/proc/{pid}").st_uid == self.uid
+            except OSError:
+                mine = False
+            entry["mine" if mine else "others"] = True
+
+        return usage, users
 
     def _memory(self) -> dict:
         info = {}
@@ -228,7 +240,7 @@ class SystemMonitor:
         except (OSError, ValueError, IndexError):
             return 0.0
 
-    def _gpus(self) -> list[dict]:
+    def _gpus(self, gpu_users: dict | None = None) -> list[dict]:
         try:
             out = subprocess.run(
                 ["nvidia-smi", f"--query-gpu={self.GPU_QUERY}", "--format=csv,noheader,nounits"],
@@ -243,8 +255,9 @@ class SystemMonitor:
         gpus = []
         for line in out.stdout.strip().splitlines():
             cells = [c.strip() for c in line.split(",")]
-            if len(cells) < 8:
+            if len(cells) < 9:
                 continue
+            occupancy = (gpu_users or {}).get(cells[8], {})
             gpus.append({
                 "index"       : self._num(cells[0]),
                 "name"        : cells[1],
@@ -254,6 +267,8 @@ class SystemMonitor:
                 "temp"        : self._num(cells[5]),
                 "power"       : self._num(cells[6]),
                 "power_limit" : self._num(cells[7]),
+                "mine"        : bool(occupancy.get("mine")),
+                "others"      : bool(occupancy.get("others")),
             })
         return gpus
 

@@ -2,13 +2,13 @@
   --bg:            #f2f3f0;
   --bg-1:          #eceeea;
   --bg-2:          #e4e7e2;
-  --surface:       #fbfbf9;
+  --surface:       #ffffff;
   --surface-2:     #f1f2ef;
-  --line:          #d9dcd6;
-  --line-strong:   #b6bcb4;
+  --line:          #c7ccc3;
+  --line-strong:   #9aa196;
   --ink:           #16191b;
-  --ink-dim:       #4e565b;
-  --ink-faint:     #8a9197;
+  --ink-dim:       #3f474c;
+  --ink-faint:     #7d858b;
   --accent:        #1d4fd8;
   --accent-2:      #0f766e;
   --accent-deep:   #15389b;
@@ -226,10 +226,12 @@ em { font-style: italic; color: var(--accent); }
 }
 .sboard {
   border: 1px solid var(--line);
+  border-top: 2px solid var(--accent);
   border-radius: var(--r-card);
   background: var(--surface);
   padding: 16px 18px 18px;
   min-width: 0;
+  box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
 }
 .sboard--gpus { grid-column: 1 / -1; }
 .sboard--alerts { grid-column: 1 / -1; border-color: rgba(185, 28, 28, 0.35); }
@@ -245,7 +247,7 @@ em { font-style: italic; color: var(--accent); }
 .sboard__cap {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--accent-deep);
   margin-bottom: 14px;
 }
 .sboard__n { color: var(--accent); letter-spacing: 0.04em; white-space: nowrap; }
@@ -688,6 +690,12 @@ em { font-style: italic; color: var(--accent); }
 .console-tile__out .xterm { height: 100%; }
 
 /* ---------- TensorBoard ---------- */
+.page--tb { max-width: none; height: 100dvh; min-height: 0; padding: 84px 18px 18px; }
+.page--tb.is-active { display: flex; flex-direction: column; }
+.page--tb .page__head { margin-bottom: 12px; }
+.page--tb .page__title { font-size: 1.4rem; margin-bottom: 4px; }
+.page--tb .page__lead { font-size: 0.85rem; }
+
 .tb-actions { display: flex; gap: 8px; align-items: center; }
 
 .tb-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; min-height: 0; }
@@ -709,8 +717,8 @@ em { font-style: italic; color: var(--accent); }
 
 .tb-stage {
   position: relative;
-  height: calc(100dvh - 320px);
-  min-height: 540px;
+  flex: 1;
+  min-height: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
   overflow: hidden;
 }

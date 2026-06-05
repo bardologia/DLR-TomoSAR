@@ -103,7 +103,12 @@ class ModelLibrary:
         return collapsed
 
     def _notes_dir(self) -> Path:
-        vault_root = Path(__file__).resolve().parent.parent.parent.parent
+        repo_root = Path(__file__).resolve().parent.parent
+        repo_dir  = repo_root / "notes" / "models"
+        if repo_dir.is_dir():
+            return repo_dir
+
+        vault_root = repo_root.parent.parent
         return vault_root / "notes" / "DLR-TomoSAR" / "Models"
 
     def collect(self) -> list[dict]:

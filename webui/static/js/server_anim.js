@@ -36,7 +36,7 @@ class ServerScene extends CanvasBase {
   }
 
   _makeUnit(key, label, v) {
-    return { key, label, v, target: v, bars: Array.from({ length: this.barsMax }, () => v), fanA: Math.random() * 6, alert: 0, hot: false };
+    return { key, label, v, target: v, bars: Array.from({ length: this.barsMax }, () => v), fanA: Math.random() * 6, alert: 0, hot: false, mine: false, others: false };
   }
 
   feed(sys) {
@@ -58,7 +58,7 @@ class ServerScene extends CanvasBase {
     ];
     gpus.forEach((g, i) => {
       const lvl = g.temp >= 85 ? 2 : g.temp >= 70 ? 1 : 0;
-      defs.push({ key: `gpu${i}`, label: `gpu${g.index != null ? g.index : i}`, target: (g.util || 0) / 100, alert: lvl, hot: g.temp >= 70 });
+      defs.push({ key: `gpu${i}`, label: `gpu${g.index != null ? g.index : i}`, target: (g.util || 0) / 100, alert: lvl, hot: g.temp >= 70, mine: !!g.mine, others: !!g.others });
     });
 
     if (!this.fed || defs.length !== this.units.length) {
@@ -71,10 +71,14 @@ class ServerScene extends CanvasBase {
       u.target = Math.max(0, Math.min(1, d.target));
       u.alert  = d.alert;
       u.hot    = d.hot;
+      u.mine   = !!d.mine;
+      u.others = !!d.others;
     });
 
     this.loadTarget = Math.max(0, Math.min(1, (cpu.total || 0) / 100));
     this.alert      = Math.max(0, ...this.units.map((u) => u.alert));
+    this.othersOn   = this.units.some((u) => u.others);
+    this.mineOn     = this.units.some((u) => u.mine);
     this.fed        = true;
 
     if (REDUCED_MOTION) {
@@ -104,10 +108,11 @@ class ServerScene extends CanvasBase {
   }
 
   _rack(ctx, rx, ry, rw, rh) {
-    const tint  = this._tint(this.alert);
+    const occ   = this.othersOn ? this.red : this.mineOn ? this.blue : null;
+    const tint  = this.alert ? this._tint(this.alert) : occ || this._tint(this.alert);
     const pulse = this.alert ? 0.3 * (0.5 + 0.5 * Math.sin(this.t * (this.alert >= 2 ? 9 : 4))) : 0;
 
-    ctx.strokeStyle = this.alert ? `rgba(${tint}, ${0.4 + pulse})` : `rgba(${this.ink}, 0.45)`;
+    ctx.strokeStyle = this.alert || occ ? `rgba(${tint}, ${0.4 + pulse})` : `rgba(${this.ink}, 0.45)`;
     ctx.lineWidth   = 1.2;
     this._round(ctx, rx - 7, ry - 7, rw + 14, rh + 14, 5);
     ctx.stroke();
@@ -118,9 +123,10 @@ class ServerScene extends CanvasBase {
   }
 
   _unit(ctx, u, ux, uy, uw, uh) {
-    const tint = this._tint(u.alert);
+    const occ  = u.others ? this.red : u.mine ? this.blue : null;
+    const tint = u.alert ? this._tint(u.alert) : occ || this._tint(u.alert);
 
-    ctx.strokeStyle = u.alert ? `rgba(${tint}, 0.5)` : `rgba(${this.ink}, 0.35)`;
+    ctx.strokeStyle = u.alert || occ ? `rgba(${tint}, 0.5)` : `rgba(${this.ink}, 0.35)`;
     ctx.lineWidth   = 1;
     this._round(ctx, ux, uy, uw, uh, 3);
     ctx.stroke();
@@ -146,7 +152,7 @@ class ServerScene extends CanvasBase {
     const bw  = (bx1 - bx0) / u.bars.length;
     u.bars.forEach((v, k) => {
       const bh = Math.max(1.5, v * (uh - 9));
-      ctx.fillStyle = `rgba(${u.alert ? tint : this.blue}, ${0.15 + 0.55 * v})`;
+      ctx.fillStyle = `rgba(${u.alert || occ ? tint : this.blue}, ${0.15 + 0.55 * v})`;
       ctx.fillRect(bx0 + k * bw, uy + uh - 4.5 - bh, bw - 2, bh);
     });
 
