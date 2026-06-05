@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.models_config import ConvNeXtUNetConfig, DropPath, build_activation, initialize_weights
-from .UNet import match_spatial_size
+from .blocks import match_spatial_size
 
 
 class ChannelLayerNorm(nn.Module):

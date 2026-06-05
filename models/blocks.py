@@ -4,10 +4,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import UNetConfig, build_activation, build_norm2d, build_upsample, initialize_weights
+from configuration.models_config import build_activation, build_norm2d, build_upsample
 
 
-# Double 3x3 convolution block: Conv -> Norm -> Act -> Conv -> Norm -> Act (+ optional dropout)
+def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
+    if source.shape[2:] != reference.shape[2:]:
+        return functional.interpolate(
+            input         = source,
+            size          = reference.shape[2:],
+            mode          = "bilinear",
+            align_corners = False,
+        )
+    return source
+
+
 class ConvBlock(nn.Module):
     def __init__(
         self,
@@ -47,19 +57,83 @@ class ConvBlock(nn.Module):
         return self.layers(x)
 
 
-# Resizes source tensor to match the spatial dimensions of reference (handles size mismatches)
-def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-    if source.shape[2:] != reference.shape[2:]:
-        return functional.interpolate(
-            input         = source,
-            size          = reference.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
+class ResidualConvBlock(nn.Module):
+    def __init__(
+        self,
+        input_channels:  int,
+        output_channels: int,
+        dropout:         float = 0.0,
+        activation:      str   = "relu",
+        normalization:   str   = "batch",
+        bias:            bool  = False,
+        stride:          int   = 1,
+        first_unit:      bool  = False,
+    ):
+        super().__init__()
+        layers = []
+        if not first_unit:
+            layers.append(build_norm2d(normalization, input_channels))
+            layers.append(build_activation(activation))
+
+        layers.append(
+            nn.Conv2d(
+                in_channels  = input_channels,
+                out_channels = output_channels,
+                kernel_size  = 3,
+                stride       = stride,
+                padding      = 1,
+                bias         = bias,
+            )
         )
-    return source
+        layers.append(build_norm2d(normalization, output_channels))
+        layers.append(build_activation(activation))
+        layers.append(
+            nn.Conv2d(
+                in_channels  = output_channels,
+                out_channels = output_channels,
+                kernel_size  = 3,
+                padding      = 1,
+                bias         = bias,
+            )
+        )
+        if dropout > 0:
+            layers.append(nn.Dropout2d(dropout))
+        self.layers = nn.Sequential(*layers)
+
+        if input_channels != output_channels or stride != 1:
+            self.shortcut = nn.Conv2d(
+                in_channels  = input_channels,
+                out_channels = output_channels,
+                kernel_size  = 1,
+                stride       = stride,
+                bias         = bias,
+            )
+        else:
+            self.shortcut = nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layers(x) + self.shortcut(x)
 
 
-# Encoder: series of ConvBlocks followed by MaxPool downsampling; stores skip connections
+class PixelMLP(nn.Module):
+    def __init__(
+        self,
+        in_channels:     int,
+        hidden_channels: int,
+        out_channels:    int,
+        activation:      str = "relu",
+    ):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=1, bias=True),
+            build_activation(activation),
+            nn.Conv2d(hidden_channels, out_channels, kernel_size=1, bias=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.mlp(x)
+
+
 class Encoder(nn.Module):
     def __init__(
         self,
@@ -97,7 +171,6 @@ class Encoder(nn.Module):
         return x, skip_connections
 
 
-# Decoder: upsample -> concat with skip connection -> ConvBlock at each level
 class Decoder(nn.Module):
     def __init__(
         self,
@@ -137,65 +210,3 @@ class Decoder(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = conv_block(x)
         return x
-
-
-# Standard U-Net: symmetric encoder-decoder with skip connections (Ronneberger et al., 2015)
-class UNet(nn.Module):
-    def __init__(self, config: UNetConfig | None = None):
-        super().__init__()
-        if config is None:
-            config = UNetConfig()
-        self.config = config
-
-        if len(config.features) == 0:
-            raise ValueError("features must contain at least one channel size")
-
-        feature_sizes       = config.features
-        bottleneck_channels = feature_sizes[-1] * config.bottleneck_factor
-
-        self.encoder = Encoder(
-            input_channels = config.in_channels,
-            feature_sizes  = feature_sizes,
-            dropout        = config.dropout,
-            activation     = config.activation,
-            normalization  = config.normalization,
-            bias           = config.conv_bias,
-        )
-        
-        self.bottleneck = ConvBlock(
-            input_channels  = feature_sizes[-1],
-            output_channels = bottleneck_channels,
-            dropout         = config.dropout,
-            activation      = config.activation,
-            normalization   = config.normalization,
-            bias            = config.conv_bias,
-        )
-
-        decoder_feature_sizes = [bottleneck_channels] + feature_sizes[::-1]
-        self.decoder = Decoder(
-            feature_sizes = decoder_feature_sizes,
-            dropout       = config.dropout,
-            activation    = config.activation,
-            normalization = config.normalization,
-            bias          = config.conv_bias,
-            upsample_mode = config.upsample_mode,
-        )
-
-        self.output_head = nn.Conv2d(
-            in_channels  = feature_sizes[0],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
-
-        initialize_weights(module=self, mode=config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Contracting path: extract features at multiple scales
-        x, skip_connections = self.encoder(x)
-        # Bridge: deepest feature representation
-        x                   = self.bottleneck(x)
-        # Expanding path: recover spatial resolution using skip connections
-        x                   = self.decoder(x, skip_connections[::-1])
-        # Final 1x1 conv
-        out = self.output_head(x)
-        return out

@@ -26,13 +26,8 @@ from configuration.models_config import (
     build_upsample,
     initialize_weights,
 )
-from .UNet import UNet
-from .UNet_multihead import UNetMultiHead
-from .UNet_pergaussian import UNetPerGaussian
-from .UNet_skip import UNetSkip
-from .ResUNet import ResUNet
-from .ResUNet_multihead import ResUNetMultiHead
-from .ResUNet_pergaussian import ResUNetPerGaussian
+from .unet import UNet, UNetMultiHead, UNetPerGaussian
+from .resunet import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
 from .AttentionUNet import AttentionUNet
 from .UNetPlusPlus import UNetPlusPlus
 from .LinkNet import LinkNet

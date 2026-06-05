@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.models_config import DenseUNetConfig, build_activation, build_norm2d, initialize_weights
-from .UNet import match_spatial_size
+from .blocks import match_spatial_size
 
 
 class DenseLayer(nn.Module):

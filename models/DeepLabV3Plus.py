@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.models_config import DeepLabV3PlusConfig, build_activation, build_norm2d, initialize_weights
-from .ResUNet import ResidualConvBlock
+from .blocks import ResidualConvBlock
 
 
 class ConvNormAct(nn.Module):
