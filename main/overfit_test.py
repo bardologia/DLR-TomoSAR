@@ -1,30 +1,15 @@
 from __future__ import annotations
 
-import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
-repo_root = Path(__file__).resolve().parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-
-def _pin_environment() -> None:
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--gpu", type=int, default=0)
-    args, _ = parser.parse_known_args()
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    os.environ["MKL_NUM_THREADS"]      = "4"
-    os.environ["NUMEXPR_NUM_THREADS"]  = "4"
-    os.environ["OMP_NUM_THREADS"]      = "4"
+from _bootstrap import EnvironmentPinner
 
 
 def main() -> None:
-    _pin_environment()
+    EnvironmentPinner.gpu()
 
     from configuration.benchmark_config import OverfitTestConfig
     from models import CONFIG_REGISTRY

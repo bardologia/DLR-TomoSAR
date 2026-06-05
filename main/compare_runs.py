@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-import os
-os.environ["MKL_NUM_THREADS"]     = "4"
-os.environ["NUMEXPR_NUM_THREADS"] = "4"
-os.environ["OMP_NUM_THREADS"]     = "4"
-
 import sys
 from pathlib import Path
 
-repo_root = Path(__file__).resolve().parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+from _bootstrap import EnvironmentPinner
+
+EnvironmentPinner.threads()
 
 from configuration.benchmark_config                import BenchmarkConfig
-from pipelines.benchmark_pipeline.stages import ComparisonStage
+from pipelines.benchmark_pipeline.stages          import ComparisonStage
 from tools.config_cli                              import ConfigCli
 from tools.logger                                  import Logger
 
