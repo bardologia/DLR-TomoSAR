@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -44,8 +45,10 @@ class TensorboardManager:
         port  = self._free_port()
         tb_id = uuid.uuid4().hex[:8]
 
-        argv = [
-            interpreter, "-m", "tensorboard.main",
+        tb_bin  = shutil.which("tensorboard")
+        command = [tb_bin] if tb_bin else [interpreter, "-m", "tensorboard.main"]
+
+        argv = command + [
             "--logdir",          logdir,
             "--host",            "127.0.0.1",
             "--port",            str(port),
