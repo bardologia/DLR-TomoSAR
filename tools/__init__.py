@@ -1,6 +1,3 @@
-"""Training tools module."""
-
-from .live_monitor          import LiveMonitor
 from .shape_logger          import ShapeLogger
 from .model_summary         import ModelSummary
 from .tracker               import Tracker
@@ -15,7 +12,6 @@ from .gaussian_mixture      import GaussianMixture
 __all__ = [
     "GaussianMixture",
     "Logger",
-    "LiveMonitor",
     "ShapeLogger",
     "ModelSummary",
     "Tracker",

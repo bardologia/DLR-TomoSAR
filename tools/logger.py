@@ -24,14 +24,6 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-# Import classes from other tools modules for backward compatibility
-from .live_monitor import LiveMonitor
-from .shape_logger import ShapeLogger
-from .model_summary import ModelSummary
-from .tracker import Tracker
-
-# Re-export for backward compatibility
-__all__ = ["Logger", "LiveMonitor", "ShapeLogger", "ModelSummary", "Tracker"]
 
 
 _THEME = Theme({
