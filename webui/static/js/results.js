@@ -101,7 +101,7 @@ class ResultsView {
     this._renderDetail();
   }
 
-  _renderDetail() {
+  async _renderDetail() {
     const detail = this.detail;
     const output = detail.outputs.find((o) => o.stamp === this.activeStamp) || detail.outputs[0];
 
@@ -126,37 +126,64 @@ class ResultsView {
       return;
     }
 
-    if (output.metrics) html += this._metricsHtml(output.metrics);
+    const reportHtml = output.report_url ? await this._reportHtml(output) : null;
 
-    output.groups.forEach((group) => {
-      html += this._sectionHtml(group.title, group.items, "img");
-    });
-
-    if (output.gifs.length) html += this._sectionHtml("Animations", output.gifs, "gif");
-
-    if (output.report_url) {
-      html += `<p class="res-report"><a href="${output.report_url}" target="_blank" rel="noopener">Open report.md</a></p>`;
+    if (reportHtml !== null) {
+      html += `<article class="res-md">${reportHtml}</article>`;
+    } else {
+      output.groups.forEach((group) => {
+        html += this._sectionHtml(group.title, group.items, "img");
+      });
+      if (output.gifs.length) html += this._sectionHtml("Animations", output.gifs, "gif");
     }
 
     this.detailEl.innerHTML = html;
+    this._finalizeReport(output);
     this._bind(output);
   }
 
-  _metricsHtml(metrics) {
-    const entries = Object.entries(metrics).filter(([, v]) => typeof v === "number" || typeof v === "string");
-    if (!entries.length) return "";
+  async _reportHtml(output) {
+    if (!window.marked) return null;
 
-    const cells = entries.map(([key, value]) => {
-      const shown = typeof value === "number" ? this._fmt(value) : this._esc(String(value));
-      return `<div class="res-metric"><dt>${shown}</dt><dd>${this._esc(key)}</dd></div>`;
-    }).join("");
+    let text;
+    try {
+      const res = await fetch(output.report_url);
+      if (!res.ok) return null;
+      text = await res.text();
+    } catch (e) {
+      return null;
+    }
 
-    return (
-      `<section class="res-section res-section--metrics">` +
-      `<h4 class="res-section__cap">Metrics <span>${entries.length}</span></h4>` +
-      `<dl class="res-metrics">${cells}</dl>` +
-      `</section>`
-    );
+    try {
+      return window.marked.parse(text);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _finalizeReport(output) {
+    const body = this.detailEl.querySelector(".res-md");
+    if (!body || !output.report_url) return;
+
+    const base = output.report_url.slice(0, output.report_url.lastIndexOf("/") + 1);
+
+    body.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (!src.startsWith("/") && !src.startsWith("http") && !src.startsWith("data:")) {
+        img.src = base + src;
+      }
+      img.loading = "lazy";
+      img.addEventListener("click", () => this._openLightbox(img.src, img.alt || ""));
+    });
+
+    body.querySelectorAll("a").forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (!href.startsWith("/") && !href.startsWith("http") && !href.startsWith("#")) {
+        a.href = base + href;
+      }
+      a.target = "_blank";
+      a.rel = "noopener";
+    });
   }
 
   _sectionHtml(title, items, kind) {
@@ -198,13 +225,6 @@ class ResultsView {
     if (this.lightbox.hidden) return;
     this.lightbox.hidden = true;
     this.lightboxImg.src = "";
-  }
-
-  _fmt(value) {
-    if (Number.isInteger(value)) return String(value);
-    const abs = Math.abs(value);
-    if (abs !== 0 && (abs < 1e-3 || abs >= 1e5)) return value.toExponential(3);
-    return value.toFixed(4);
   }
 
   _esc(text) {

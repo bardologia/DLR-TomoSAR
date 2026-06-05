@@ -13,6 +13,20 @@ class RunBrowser:
 
     MAX_DEPTH = 4
 
+    SUBDIR_TITLES = {
+        "profiles"            : "Profiles",
+        "pixel_maps"          : "Pixel metric maps",
+        "histograms"          : "Metric histograms",
+        "slices"              : "Tomogram slices",
+        "ssim"                : "SSIM",
+        "elev_metrics"        : "Elevation metrics",
+        "param_maps"          : "Parameter maps",
+        "param_distributions" : "Parameter distributions",
+        "param_scatter"       : "Parameter scatter",
+        "param_error_maps"    : "Parameter error maps",
+        "slots"               : "Slot diagnostics",
+    }
+
     FIGURE_GROUPS = (
         ("profiles_",      "Profiles"),
         ("slice_range_",   "Range slices"),
@@ -93,12 +107,18 @@ class RunBrowser:
 
         grouped = {}
         if figures_dir.is_dir():
+            for subdir in sorted(d for d in figures_dir.iterdir() if d.is_dir()):
+                title = self.SUBDIR_TITLES.get(subdir.name, subdir.name.replace("_", " ").capitalize())
+                items = [{"name": f.stem, "url": self._url(f)} for f in sorted(subdir.glob("*.png"))]
+                if items:
+                    grouped.setdefault(title, []).extend(items)
+
             for figure in sorted(figures_dir.glob("*.png")):
                 title = self._group_title(figure.stem)
                 grouped.setdefault(title, []).append({"name": figure.stem, "url": self._url(figure)})
 
-        order  = ["Profiles", "Range slices", "Azimuth slices", "Elevation slices", "SSIM", "Parameters", "Metric maps", "Slot diagnostics", "Diagnostics"]
-        groups = [{"title": title, "items": grouped[title]} for title in order if title in grouped]
+        order  = list(self.SUBDIR_TITLES.values()) + ["Range slices", "Azimuth slices", "Elevation slices", "Parameters", "Metric maps", "Diagnostics"]
+        groups = [{"title": title, "items": grouped[title]} for title in dict.fromkeys(order) if title in grouped]
         groups += [{"title": title, "items": items} for title, items in grouped.items() if title not in order]
 
         gifs = []

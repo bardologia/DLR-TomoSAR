@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing  import Dict
+from typing  import Dict, List
 
 import numpy as np
 
-from configuration.inference_config        import InferenceConfig
+from configuration.inference_config         import InferenceConfig
 from pipelines.inference_pipeline.animation import Animator
 from pipelines.inference_pipeline.metadata  import InferenceMetadata
 from pipelines.inference_pipeline.metrics   import Metrics
@@ -35,7 +35,7 @@ class FigureComposer:
         global_metrics : dict,
         x_axis_np      : np.ndarray,
         indices        : dict,
-    ) -> Dict[str, Path]:
+    ) -> Dict[str, List[Path]]:
 
         plotter = self.plotter
         meta    = self.meta
@@ -50,7 +50,7 @@ class FigureComposer:
         all_elev_idx    = indices["all_elev_idx"]
 
         _N_elev, _az, _rg = result.pred_curves.shape
-        figure_paths: Dict[str, Path] = {}
+        figure_paths: Dict[str, List[Path]] = {}
 
         pixel_metrics_for_plot = {
             "mse" : result.pixel_mse,
@@ -67,60 +67,54 @@ class FigureComposer:
             seed     = cfg.profile_seed,
         )
 
-        profile_titles = {
-            "best"   : "Best-fit profile reconstructions (lowest per-pixel MSE)",
-            "worst"  : "Worst-fit profile reconstructions (highest per-pixel MSE)",
-            "random" : "Random profile reconstructions",
-        }
-
         for tag, pixels in (("best", selected["best"]), ("worst", selected["worst"]), ("random", selected["random"])):
-            figure_paths[f"profiles_{tag}"] = plotter.plot_profile_panel(
+            figure_paths[f"profiles_{tag}"] = plotter.plot_profiles(
                 pred_curves   = result.pred_curves,
                 gt_curves     = result.gt_curves,
                 params_pred   = result.params_pred,
                 x_axis        = x_axis_np,
                 pixels        = pixels,
-                title         = profile_titles[tag],
-                out_path      = meta.figure_path(f"profiles_{tag}"),
+                tag           = tag,
+                out_dir       = meta.figures_dir / "profiles",
                 n_gaussians   = run.n_gaussians,
                 pixel_metrics = pixel_metrics_for_plot,
                 az_offset     = result.azimuth_offset,
                 rg_offset     = result.range_offset,
             )
 
-            logger.subsection(f"Profiles ({tag:<6}) : {figure_paths[f'profiles_{tag}']}")
+            logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
 
-        for key, data, title, label, extra in (
-            ("pixel_mse_map",  result.pixel_mse,                             "Per-pixel curve MSE (denorm)",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
-            ("pixel_r2_map",   result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
-            ("pixel_peak_map", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
+        for key, fname, data, title, label, extra in (
+            ("pixel_mse_map",  "mse",        result.pixel_mse,                             "Per-pixel curve MSE (denorm)",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
+            ("pixel_r2_map",   "r2",         result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
+            ("pixel_peak_map", "peak_error", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
         ):
-            figure_paths[key] = plotter.plot_pixel_metric_map(
+            figure_paths[key] = [plotter.plot_pixel_metric_map(
                 metric_map = data,
                 title      = title,
                 label      = label,
-                out_path  = meta.figure_path(key),
-                az_offset = result.azimuth_offset,
-                rg_offset = result.range_offset,
+                out_path   = meta.figures_dir / "pixel_maps" / f"{fname}.png",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
                 **extra,
-            )
+            )]
 
-        logger.subsection(f"Pixel maps : mse, r2, peak written to {meta.figures_dir}")
+        logger.subsection(f"Pixel maps : mse, r2, peak written to {meta.figures_dir / 'pixel_maps'}")
 
-        figure_paths["metric_histograms"] = plotter.plot_metric_histogram(
+        figure_paths["metric_histograms"] = plotter.plot_metric_histograms(
             {
-                "pixel_mse (denorm)"    : result.pixel_mse,
-                "pixel_r2 (denorm)"     : result.pixel_r2,
-                "pixel_cosine (denorm)" : result.pixel_cosine,
+                "pixel_mse"    : result.pixel_mse,
+                "pixel_r2"     : result.pixel_r2,
+                "pixel_cosine" : result.pixel_cosine,
             },
-            meta.figure_path("metric_histograms"),
+            meta.figures_dir / "histograms",
         )
 
         figure_paths["param_maps"] = plotter.plot_param_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
-            out_path    = meta.figure_path("param_maps"),
+            out_dir     = meta.figures_dir / "param_maps",
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
         )
@@ -129,21 +123,21 @@ class FigureComposer:
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
-            out_path    = meta.figure_path("param_distributions"),
+            out_dir     = meta.figures_dir / "param_distributions",
         )
 
         figure_paths["param_scatter"] = plotter.plot_param_scatter(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
-            out_path    = meta.figure_path("param_scatter"),
+            out_dir     = meta.figures_dir / "param_scatter",
         )
 
         figure_paths["param_error_maps"] = plotter.plot_param_error_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
-            out_path    = meta.figure_path("param_error_maps"),
+            out_dir     = meta.figures_dir / "param_error_maps",
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
         )
@@ -151,89 +145,93 @@ class FigureComposer:
         figure_paths["slot_mu_distributions"] = plotter.plot_slot_mu_distributions(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
-            out_path       = meta.figure_path("slot_mu_distributions"),
+            out_dir        = meta.figures_dir / "slots",
         )
 
         figure_paths["placeholder_detection"] = plotter.plot_placeholder_detection(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
-            out_path       = meta.figure_path("placeholder_detection"),
+            out_dir        = meta.figures_dir / "slots",
         )
 
         figure_paths["slot_ordering_summary"] = plotter.plot_slot_ordering_summary(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
-            out_path       = meta.figure_path("slot_ordering_summary"),
+            out_dir        = meta.figures_dir / "slots",
         )
 
         figure_paths["active_count_map"] = plotter.plot_active_count_map(
-            params_pred  = result.params_pred[: run.n_gaussians * 3],
-            params_gt    = result.params_gt  [: run.n_gaussians * 3],
-            n_gaussians  = run.n_gaussians,
-            out_path     = meta.figure_path("active_count_map"),
-            az_offset    = result.azimuth_offset,
-            rg_offset    = result.range_offset,
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "slots",
+            az_offset   = result.azimuth_offset,
+            rg_offset   = result.range_offset,
         )
 
-        logger.subsection(f"Param plots : distributions, scatter, error maps written to {meta.figures_dir}")
+        logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
 
-        for axis, indices_arr, tag_fn, metric_key in (
-            ("range",   slice_range_idx, lambda i: f"slice_range_{int(i) + result.range_offset}",    "ssim_gt_range"),
-            ("azimuth", slice_az_idx,    lambda i: f"slice_azimuth_{int(i) + result.azimuth_offset}", "ssim_gt_azimuth"),
+        figure_paths["slices_range"]   = []
+        figure_paths["slices_azimuth"] = []
+        figure_paths["slices_elev"]    = []
+
+        for axis, indices_arr, stem_fn, metric_key, group in (
+            ("range",   slice_range_idx, lambda i: f"range_{int(i) + result.range_offset}",     "ssim_gt_range",   "slices_range"),
+            ("azimuth", slice_az_idx,    lambda i: f"azimuth_{int(i) + result.azimuth_offset}", "ssim_gt_azimuth", "slices_azimuth"),
         ):
             for s_idx, i in enumerate(indices_arr):
-                tag = tag_fn(i)
-                figure_paths[tag] = plotter.plot_tomogram_slice(
+                figure_paths[group] += plotter.plot_tomogram_slice(
                     pred_cube  = result.pred_curves,
                     gt_cube    = result.gt_curves,
                     axis       = axis,
                     index      = int(i),
                     x_axis     = x_axis_np,
-                    out_path   = meta.figure_path(tag),
+                    out_dir    = meta.figures_dir / "slices",
+                    stem       = stem_fn(i),
                     az_offset  = result.azimuth_offset,
                     rg_offset  = result.range_offset,
                     ssim_value = global_metrics.get(f"{metric_key}_{s_idx}"),
                 )
 
         for s_idx, i in enumerate(slice_elev_idx):
-            tag = f"slice_elev_idx_{int(i)}"
-            figure_paths[tag] = plotter.plot_elevation_intensity_slice(
+            figure_paths["slices_elev"] += plotter.plot_elevation_intensity_slice(
                 pred_cube  = result.pred_curves,
                 gt_cube    = result.gt_curves,
                 elev_idx   = int(i),
                 x_axis     = x_axis_np,
-                out_path   = meta.figure_path(tag),
+                out_dir    = meta.figures_dir / "slices",
+                stem       = f"elev_idx_{int(i)}",
                 az_offset  = result.azimuth_offset,
                 rg_offset  = result.range_offset,
                 ssim_value = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
             )
 
-        logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices}")
+        logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
 
         for axis, n_slices, indices_arr, offset in (
             ("range",   _rg,     all_range_idx, result.range_offset),
             ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
             ("elev",    _N_elev, all_elev_idx,  0),
         ):
-            figure_paths[f"ssim_{axis}"] = plotter.plot_ssim_curves(
+            figure_paths[f"ssim_{axis}"] = [plotter.plot_ssim_curves(
                 global_metrics = global_metrics,
                 axis           = axis,
-                out_path       = meta.figure_path(f"ssim_{axis}"),
+                out_path       = meta.figures_dir / "ssim" / f"{axis}.png",
                 n_slices       = n_slices,
                 slice_indices  = indices_arr,
                 ax_offset      = offset,
-            )
+            )]
 
-        logger.subsection(f"SSIM plots : range, azimuth, elev written to {meta.figures_dir}\n")
+        logger.subsection(f"SSIM plots : range, azimuth, elev written to {meta.figures_dir / 'ssim'}\n")
 
         figure_paths["elev_metric_curves"] = plotter.plot_elev_metric_curves(
             global_metrics = global_metrics,
-            out_path       = meta.figure_path("elev_metric_curves"),
+            out_dir        = meta.figures_dir / "elev_metrics",
             n_elev         = _N_elev,
             x_axis         = x_axis_np,
         )
 
-        logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir}\n")
+        logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir / 'elev_metrics'}\n")
 
         return figure_paths
 

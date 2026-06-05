@@ -153,6 +153,18 @@ class App {
       document.getElementById("results-list"),
       document.getElementById("results-detail")
     );
+
+    this.tomogramView = new window.TomogramView({
+      strip      : document.getElementById("cube-strip"),
+      stage      : document.getElementById("cube-stage"),
+      topdown    : document.getElementById("cube-topdown"),
+      cross      : document.getElementById("cube-cross"),
+      coords     : document.getElementById("cube-coords"),
+      hint       : document.getElementById("cube-hint"),
+      rangeImg   : document.getElementById("cube-slice-range"),
+      azimuthImg : document.getElementById("cube-slice-azimuth"),
+      sourceBtns : [...document.querySelectorAll(".cube-source")],
+    });
   }
 
   _initRouter() {
@@ -174,6 +186,7 @@ class App {
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
     if (route === "results") this.resultsView.enter();
+    if (route === "cube") this.tomogramView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }

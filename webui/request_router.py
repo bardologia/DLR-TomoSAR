@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from config_registry import ConfigRegistry
+from cube_explorer import CubeExplorer
 from equation_library import EquationLibrary
 from model_library import ModelLibrary
 from pipeline_library import PipelineLibrary
@@ -33,7 +34,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, runs: RunBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, runs: RunBrowser, cubes: CubeExplorer) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -47,6 +48,7 @@ class RequestRouter:
         self.watchdog    = watchdog
         self.tensorboard = tensorboard
         self.runs        = runs
+        self.cubes       = cubes
 
     def route(self, handler) -> None:
         parsed = urlparse(handler.path)
@@ -89,6 +91,28 @@ class RequestRouter:
                 self._send_json(handler, result, 200 if result.get("ok") else 404)
             else:
                 self._send_json(handler, {"runs": self.runs.list_runs()})
+            return
+        if path == "/api/cubes":
+            self._send_json(handler, {"cubes": self.cubes.list_cubes()})
+            return
+        if path == "/api/cubes/topdown":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.topdown_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+            )
+            self._send_png(handler, png)
+            return
+        if path == "/api/cubes/slice":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.slice_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                axis    = (query.get("axis") or ["range"])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+            )
+            self._send_png(handler, png)
             return
         if path == "/api/project":
             self._send_json(handler, self._project_payload())
@@ -327,6 +351,18 @@ class RequestRouter:
         handler.send_header("Access-Control-Allow-Origin", "*")
         handler.end_headers()
         handler.wfile.write(payload)
+
+    def _send_png(self, handler, png: bytes | None) -> None:
+        if png is None:
+            self._send_json(handler, {"error": "not found"}, 404)
+            return
+
+        handler.send_response(200)
+        handler.send_header("Content-Type", "image/png")
+        handler.send_header("Content-Length", str(len(png)))
+        handler.send_header("Cache-Control", "no-cache")
+        handler.end_headers()
+        handler.wfile.write(png)
 
     def _serve_run_media(self, handler, relative: str) -> None:
         target = self.runs.media_path(relative)

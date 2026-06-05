@@ -1407,6 +1407,51 @@ em { font-style: italic; color: var(--accent); }
 .res-empty { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); padding: 30px 10px; }
 .res-empty code { color: var(--accent-deep); }
 
+.res-md { max-width: 980px; font-size: 14px; line-height: 1.6; color: var(--ink); }
+.res-md h1 { display: none; }
+.res-md h2 {
+  font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent-deep);
+  margin: 34px 0 14px; padding-top: 18px; border-top: 1px solid var(--line);
+}
+.res-md h2:first-child { margin-top: 6px; padding-top: 0; border-top: 0; }
+.res-md h3 {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: 22px 0 10px;
+}
+.res-md p { margin: 8px 0; color: var(--ink-dim); }
+.res-md strong { color: var(--ink); }
+.res-md code {
+  font-family: var(--mono); font-size: 0.88em; color: var(--accent-deep);
+  background: var(--surface-2); border-radius: 2px; padding: 1px 5px;
+}
+.res-md table {
+  border-collapse: collapse; width: 100%; max-width: 760px;
+  font-family: var(--mono); font-size: 12px;
+  margin: 10px 0 16px;
+  background: var(--surface);
+}
+.res-md th {
+  text-align: left; font-weight: 600; color: var(--accent-deep);
+  font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 8px 12px; border-bottom: 1px solid var(--line-strong);
+}
+.res-md td { padding: 6px 12px; border-bottom: 1px solid var(--line); color: var(--ink-dim); vertical-align: top; }
+.res-md td:nth-child(2) { color: var(--ink); }
+.res-md tr:hover td { background: rgba(29, 79, 216, 0.03); }
+.res-md img {
+  display: block; max-width: 100%; width: auto; max-height: 460px;
+  margin: 12px 0 18px;
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r-card);
+  cursor: zoom-in;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.res-md img:hover { border-color: var(--accent); box-shadow: 0 8px 22px rgba(20, 25, 30, 0.10); }
+.res-md a { color: var(--accent); }
+.res-md ul, .res-md ol { color: var(--ink-dim); padding-left: 22px; }
+.res-md hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+
 .lightbox {
   position: fixed; inset: 0; z-index: 90;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -1421,6 +1466,42 @@ em { font-style: italic; color: var(--accent); }
 @media (max-width: 900px) {
   .master--results { grid-template-columns: 1fr; }
   .master__list--results { position: static; max-height: 300px; }
+}
+
+/* ---------- Tomogram explorer ---------- */
+.cube-sources { display: flex; gap: 8px; }
+.cube-source.is-active { border-color: var(--accent); color: var(--accent-deep); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+.cube-hint { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
+
+.cube-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+
+.cube-map {
+  background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--accent);
+  border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+  padding: 14px;
+}
+.cube-map__wrap { position: relative; line-height: 0; }
+.cube-map__wrap img { width: 100%; height: auto; display: block; cursor: crosshair; image-rendering: pixelated; border: 1px solid var(--line); }
+
+.cube-cross { position: absolute; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; }
+.cube-cross::before, .cube-cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px rgba(0, 0, 0, 0.9); }
+.cube-cross::before { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+.cube-cross::after  { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+
+.cube-coords { font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep); margin: 12px 0 0; }
+
+.cube-slices { display: flex; flex-direction: column; gap: 14px; }
+.cube-slice {
+  margin: 0;
+  background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--accent);
+  border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+  padding: 10px;
+}
+.cube-slice img { width: 100%; height: auto; display: block; background: #fff; }
+
+@media (max-width: 1000px) {
+  .cube-stage { grid-template-columns: 1fr; }
 }
 
 /* ---------- Shared card treatment ---------- */

@@ -3,6 +3,7 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config_registry import ConfigRegistry
+from cube_explorer import CubeExplorer
 from equation_library import EquationLibrary
 from model_library import ModelLibrary
 from pipeline_library import PipelineLibrary
@@ -51,6 +52,7 @@ class WebUIServer:
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
         self.runs        = RunBrowser(self.paths, self.logger)
+        self.cubes       = CubeExplorer(self.paths, self.logger)
 
         self.router    = RequestRouter(
             paths       = self.paths,
@@ -66,6 +68,7 @@ class WebUIServer:
             watchdog    = self.watchdog,
             tensorboard = self.tensorboard,
             runs        = self.runs,
+            cubes       = self.cubes,
         )
 
     def serve(self) -> None:

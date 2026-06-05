@@ -122,6 +122,15 @@ class Report:
     def _img(self, key: str, path: Path) -> List[str]:
         return [f"![{key}]({self._rel(path)})", ""]
 
+    def _imgs(self, key: str, paths) -> List[str]:
+        if isinstance(paths, (str, Path)):
+            return self._img(key, Path(paths))
+
+        out: List[str] = []
+        for path in paths:
+            out += self._img(Path(path).stem, Path(path))
+        return out
+
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:
         for prefix in ("ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_"):
@@ -302,9 +311,9 @@ class Report:
             ("profiles_worst",  "4.2 Worst-fit profiles (highest MSE)"),
             ("profiles_random", "4.3 Random profiles"),
         ):
-            if key in fp:
+            if fp.get(key):
                 out.append(f"\n### {title}\n")
-                out += self._img(key, fp[key])
+                out += self._imgs(key, fp[key])
 
         out.append("\n## 5. Per-pixel metric maps\n")
         for key, title in (
@@ -313,9 +322,9 @@ class Report:
             ("pixel_peak_map",    "5.3 Peak-location error map (|\u0394 peak index|)"),
             ("metric_histograms", "5.4 Metric distributions"),
         ):
-            if key in fp:
+            if fp.get(key):
                 out.append(f"\n### {title}\n")
-                out += self._img(key, fp[key])
+                out += self._imgs(key, fp[key])
 
         out.append("\n## 6. Gaussian parameter analysis\n")
         for key, title in (
@@ -328,20 +337,25 @@ class Report:
             ("slot_ordering_summary",  "6.7 Slot ordering summary"),
             ("active_count_map",       "6.8 Active Gaussian count map"),
         ):
-            if key in fp:
+            if fp.get(key):
                 out.append(f"\n### {title}\n")
-                out += self._img(key, fp[key])
+                out += self._imgs(key, fp[key])
 
-        slice_figs = {k: v for k, v in fp.items() if k.startswith("slice_")}
-        if slice_figs:
+        slice_groups = [(key, title) for key, title in (
+            ("slices_range",   "Range cuts"),
+            ("slices_azimuth", "Azimuth cuts"),
+            ("slices_elev",    "Elevation cuts"),
+        ) if fp.get(key)]
+
+        if slice_groups:
             out.append("\n## 7. Tomogram slices\n")
             out.append(
-                "GT and prediction share a colour scale; the error panel is clipped at p99 of that slice. "
-                "SSIM (pred vs GT) is shown in the title.\n"
+                "GT and prediction share a colour scale; the error figure is clipped at p99 of that slice. "
+                "SSIM (pred vs GT) is shown in the prediction title.\n"
             )
-            for n, k in enumerate(sorted(slice_figs), start=1):
-                out.append(f"\n### 7.{n} `{k}`\n")
-                out += self._img(k, slice_figs[k])
+            for n, (key, title) in enumerate(slice_groups, start=1):
+                out.append(f"\n### 7.{n} {title}\n")
+                out += self._imgs(key, fp[key])
 
         out.append("\n## 8. SSIM curves\n")
         out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT.\n")
@@ -350,18 +364,18 @@ class Report:
             ("ssim_azimuth", "8.2 SSIM along azimuth axis"),
             ("ssim_elev",    "8.3 SSIM along elevation axis"),
         ):
-            if key in fp:
+            if fp.get(key):
                 out.append(f"\n### {title}\n")
-                out += self._img(key, fp[key])
+                out += self._imgs(key, fp[key])
 
-        if "elev_metric_curves" in fp:
+        if fp.get("elev_metric_curves"):
             out.append("\n### 8.4 Per-elevation-bin metrics (MAE, RMSE, R\u00b2, cross-entropy)\n")
             out.append(
                 "Each panel shows a metric aggregated over all (az\u00d7rg) pixels for every "
                 "elevation bin (pred vs GT). "
                 "Dashed lines mark the mean over all bins.\n"
             )
-            out += self._img("elev_metric_curves", fp["elev_metric_curves"])
+            out += self._imgs("elev_metric_curves", fp["elev_metric_curves"])
 
         if gp:
             out.append("\n## 9. Animations\n")

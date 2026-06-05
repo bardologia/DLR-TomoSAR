@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib  import Path
-from typing   import Dict
+from typing   import Dict, List
 
 import numpy as np
 
@@ -27,7 +27,7 @@ class InferencePipeline:
         cfg            : InferenceConfig,
         x_axis_np      : np.ndarray,
         global_metrics : dict,
-        figure_paths   : Dict[str, Path],
+        figure_paths   : Dict[str, List[Path]],
         gif_paths      : Dict[str, Path],
     ) -> Path:
 
