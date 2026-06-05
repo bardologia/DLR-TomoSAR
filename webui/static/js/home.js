@@ -48,7 +48,7 @@ class StatusBoard {
     const gpuCards = gpus.length
       ? gpus.map((g, i) =>
           `<article class="gcard" data-gpu="${i}">` +
-          `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__temp">--</span></header>` +
+          `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span><span class="gcard__temp">--</span></header>` +
           `<div class="gcard__row"><span class="gcard__pct">--</span><span class="gcard__unit">% util</span><span class="gcard__vram">--</span></div>` +
           `<canvas class="gcard__graph"></canvas>` +
           `<footer class="gcard__foot"><span class="gcard__power">--</span><span class="gcard__legend"><i class="lg lg--util"></i>util<i class="lg lg--vram"></i>vram</span></footer>` +
@@ -133,6 +133,7 @@ class StatusBoard {
       pct: card.querySelector(".gcard__pct"),
       vramTxt: card.querySelector(".gcard__vram"),
       temp: card.querySelector(".gcard__temp"),
+      who: card.querySelector(".gcard__who"),
       power: card.querySelector(".gcard__power"),
       graph: card.querySelector(".gcard__graph"),
     }));
@@ -178,6 +179,18 @@ class StatusBoard {
       el.vramTxt.innerHTML = `<b>${this._gb(g.mem_used * 1048576)}</b> / ${this._gb(g.mem_total * 1048576)} GB`;
       el.temp.textContent = g.temp != null ? `${Math.round(g.temp)}°C` : "--";
       el.temp.className = "gcard__temp" + (g.temp >= 85 ? " is-danger" : g.temp >= 70 ? " is-warn" : "");
+
+      const holders = (g.holders || []).join(", ");
+      if (holders) {
+        el.who.textContent = holders;
+        el.who.className = "gcard__who " + (g.others ? "is-others" : "is-mine");
+      } else if (g.stale) {
+        el.who.textContent = "stale memory";
+        el.who.className = "gcard__who is-stale";
+      } else {
+        el.who.textContent = "";
+        el.who.className = "gcard__who";
+      }
       el.power.textContent = g.power != null ? `${Math.round(g.power)}${g.power_limit ? ` / ${Math.round(g.power_limit)}` : ""} W` : "--";
       this._spark(el.graph, [
         { data: h.m, color: "15, 118, 110", fill: 0.10 },

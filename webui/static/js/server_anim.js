@@ -58,7 +58,7 @@ class ServerScene extends CanvasBase {
     ];
     gpus.forEach((g, i) => {
       const lvl = g.temp >= 85 ? 2 : g.temp >= 70 ? 1 : 0;
-      defs.push({ key: `gpu${i}`, label: `gpu${g.index != null ? g.index : i}`, target: (g.util || 0) / 100, alert: lvl, hot: g.temp >= 70, mine: !!g.mine, others: !!g.others });
+      defs.push({ key: `gpu${i}`, label: `gpu${g.index != null ? g.index : i}`, target: (g.util || 0) / 100, alert: lvl, hot: g.temp >= 70, mine: !!g.mine, others: !!g.others, stale: !!g.stale });
     });
 
     if (!this.fed || defs.length !== this.units.length) {
@@ -73,12 +73,14 @@ class ServerScene extends CanvasBase {
       u.hot    = d.hot;
       u.mine   = !!d.mine;
       u.others = !!d.others;
+      u.stale  = !!d.stale;
     });
 
     this.loadTarget = Math.max(0, Math.min(1, (cpu.total || 0) / 100));
     this.alert      = Math.max(0, ...this.units.map((u) => u.alert));
     this.othersOn   = this.units.some((u) => u.others);
     this.mineOn     = this.units.some((u) => u.mine);
+    this.staleOn    = this.units.some((u) => u.stale);
     this.fed        = true;
 
     if (REDUCED_MOTION) {
@@ -108,7 +110,7 @@ class ServerScene extends CanvasBase {
   }
 
   _rack(ctx, rx, ry, rw, rh) {
-    const occ   = this.othersOn ? this.red : this.mineOn ? this.blue : null;
+    const occ   = this.othersOn ? this.red : this.mineOn ? this.blue : this.staleOn ? this.amber : null;
     const tint  = this.alert ? this._tint(this.alert) : occ || this._tint(this.alert);
     const pulse = this.alert ? 0.3 * (0.5 + 0.5 * Math.sin(this.t * (this.alert >= 2 ? 9 : 4))) : 0;
 
@@ -123,7 +125,7 @@ class ServerScene extends CanvasBase {
   }
 
   _unit(ctx, u, ux, uy, uw, uh) {
-    const occ  = u.others ? this.red : u.mine ? this.blue : null;
+    const occ  = u.others ? this.red : u.mine ? this.blue : u.stale ? this.amber : null;
     const tint = u.alert ? this._tint(u.alert) : occ || this._tint(u.alert);
     const fg   = occ ? "255, 255, 255" : this.ink;
 

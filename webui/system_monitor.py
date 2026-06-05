@@ -161,14 +161,37 @@ class SystemMonitor:
 
             usage[pid] = usage.get(pid, 0) + mem
 
-            entry = users.setdefault(cells[2], {"mine": False, "others": False})
-            try:
-                mine = os.stat(f"/proc/{pid}").st_uid == self.uid
-            except OSError:
-                mine = False
-            entry["mine" if mine else "others"] = True
+            entry = users.setdefault(cells[2], {"mine": False, "others": False, "stale": False, "names": []})
+            owner = self._pid_owner(pid)
+
+            if owner is None:
+                entry["stale"] = True
+            elif owner == self.user:
+                entry["mine"] = True
+                if owner not in entry["names"]:
+                    entry["names"].append(owner)
+            else:
+                entry["others"] = True
+                if owner not in entry["names"]:
+                    entry["names"].append(owner)
 
         return usage, users
+
+    def _pid_owner(self, pid: int) -> str | None:
+        try:
+            uid   = os.stat(f"/proc/{pid}").st_uid
+            stat  = open(f"/proc/{pid}/stat").read()
+            state = stat[stat.rindex(")") + 2:].split()[0]
+        except (OSError, ValueError, IndexError):
+            return None
+
+        if state == "Z":
+            return None
+
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return str(uid)
 
     def _memory(self) -> dict:
         info = {}
@@ -269,6 +292,8 @@ class SystemMonitor:
                 "power_limit" : self._num(cells[7]),
                 "mine"        : bool(occupancy.get("mine")),
                 "others"      : bool(occupancy.get("others")),
+                "stale"       : bool(occupancy.get("stale")),
+                "holders"     : occupancy.get("names", []),
             })
         return gpus
 

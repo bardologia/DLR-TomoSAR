@@ -10,6 +10,7 @@ from process_manager import ProcessManager
 from project_paths import ProjectPaths
 from request_router import RequestRouter
 from resource_watchdog import ResourceWatchdog
+from run_browser import RunBrowser
 from script_catalog import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor import SystemMonitor
@@ -49,6 +50,7 @@ class WebUIServer:
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
+        self.runs        = RunBrowser(self.paths, self.logger)
 
         self.router    = RequestRouter(
             paths       = self.paths,
@@ -63,6 +65,7 @@ class WebUIServer:
             system      = self.system,
             watchdog    = self.watchdog,
             tensorboard = self.tensorboard,
+            runs        = self.runs,
         )
 
     def serve(self) -> None:

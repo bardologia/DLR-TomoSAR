@@ -171,11 +171,12 @@ em { font-style: italic; color: var(--accent); }
 .page--home { position: relative; min-height: 100dvh; }
 .page--home.is-active { display: block; }
 
-.status__radar {
-  position: absolute;
+.bg-scene {
+  position: fixed;
   inset: 0;
   width: 100%; height: 100%;
   z-index: 0;
+  pointer-events: none;
   opacity: 0.55;
 }
 
@@ -298,6 +299,11 @@ em { font-style: italic; color: var(--accent); }
 .lg { width: 10px; height: 2px; border-radius: 1px; display: inline-block; }
 .lg--util { background: var(--accent); }
 .lg--vram { background: var(--accent-2); }
+.gcard__who { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.gcard__who.is-mine { color: var(--accent); }
+.gcard__who.is-others { color: var(--danger); }
+.gcard__who.is-stale { color: var(--warn); }
+
 .gcard__temp { font-size: 11.5px; color: var(--ink-dim); white-space: nowrap; }
 .gcard__temp.is-warn { color: var(--warn); }
 .gcard__temp.is-danger { color: var(--danger); }
@@ -1322,6 +1328,116 @@ em { font-style: italic; color: var(--accent); }
   .ptable__row { grid-template-columns: 52px 50px 54px 20px minmax(0, 1fr); }
   .ptable__row .ptable__gpu { display: none; }
 }
+
+/* ---------- Inference results ---------- */
+.master--results { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+
+.master__list--results { position: sticky; top: 86px; max-height: calc(100dvh - 110px); overflow-y: auto; padding: 8px; }
+
+.run-group__head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 12px 12px 6px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-deep);
+}
+.run-group__count { color: var(--ink-faint); }
+
+.run-item {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; text-align: left;
+  padding: 9px 12px; border: 1px solid transparent; border-radius: var(--r-card);
+  background: none; cursor: pointer;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.run-item:hover { background: var(--surface-2); }
+.run-item.is-active { background: rgba(29, 79, 216, 0.07); border-color: var(--accent); }
+.run-item__name { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--ink); word-break: break-all; }
+.run-item__meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
+
+.master__detail--results { padding: 20px 22px; }
+
+.res-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
+}
+.res-title { font-family: var(--display); font-size: 1.25rem; font-weight: 600; margin: 0 0 4px; }
+.res-path { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); margin: 0; word-break: break-all; }
+
+.res-stamps { display: flex; gap: 6px; flex-wrap: wrap; }
+.res-stamp {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim);
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.res-stamp:hover { border-color: var(--line-strong); color: var(--ink); }
+.res-stamp.is-active { border-color: var(--accent); color: var(--accent-deep); box-shadow: 0 0 0 1px var(--accent) inset; }
+.res-stamp.is-single { cursor: default; box-shadow: none; }
+
+.res-section { margin-bottom: 26px; }
+.res-section__cap {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent-deep); margin: 0 0 12px;
+}
+.res-section__cap span { color: var(--ink-faint); margin-left: 6px; letter-spacing: 0.04em; }
+
+.res-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; margin: 0; }
+.res-metric dt { font-family: var(--mono); font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.res-metric dd { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); margin: 2px 0 0; word-break: break-all; }
+
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.res-grid--gif { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+
+.res-fig {
+  margin: 0; cursor: zoom-in;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  overflow: hidden;
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.res-fig:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(20, 25, 30, 0.10); }
+.res-fig img { display: block; width: 100%; height: 170px; object-fit: contain; background: #fff; }
+.res-fig--gif img { height: 240px; }
+.res-fig figcaption {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim);
+  padding: 7px 10px; border-top: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.res-report a { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+.res-empty { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); padding: 30px 10px; }
+.res-empty code { color: var(--accent-deep); }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(14, 18, 22, 0.88);
+  cursor: zoom-out;
+  padding: 4vh 4vw;
+}
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 92vw; max-height: 84vh; background: #fff; border-radius: 3px; }
+.lightbox__cap { font-family: var(--mono); font-size: 13px; color: #dde4e7; margin: 0; }
+
+@media (max-width: 900px) {
+  .master--results { grid-template-columns: 1fr; }
+  .master__list--results { position: static; max-height: 300px; }
+}
+
+/* ---------- Shared card treatment ---------- */
+.eq-card,
+.script-card,
+.flow-row,
+.model-card,
+.master__list,
+.master__detail,
+.console__jobs,
+.tb-stage,
+.launch__rail {
+  border-top: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+}
+
+.console__jobs-head { color: var(--accent-deep); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

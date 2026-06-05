@@ -6,7 +6,7 @@ import mimetypes
 import queue
 import threading
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from config_registry import ConfigRegistry
 from equation_library import EquationLibrary
@@ -15,6 +15,7 @@ from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
 from project_paths import ProjectPaths
 from resource_watchdog import ResourceWatchdog
+from run_browser import RunBrowser
 from script_catalog import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor import SystemMonitor
@@ -32,7 +33,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, runs: RunBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -45,6 +46,7 @@ class RequestRouter:
         self.system      = system
         self.watchdog    = watchdog
         self.tensorboard = tensorboard
+        self.runs        = runs
 
     def route(self, handler) -> None:
         parsed = urlparse(handler.path)
@@ -75,6 +77,18 @@ class RequestRouter:
             return
         if path.startswith("/static/"):
             self._serve_static(handler, path[len("/static/"):])
+            return
+        if path.startswith("/runmedia/"):
+            self._serve_run_media(handler, unquote(path[len("/runmedia/"):]))
+            return
+        if path == "/api/runs":
+            query  = parse_qs(urlparse(handler.path).query)
+            run_id = (query.get("id") or [None])[0]
+            if run_id:
+                result = self.runs.detail(run_id)
+                self._send_json(handler, result, 200 if result.get("ok") else 404)
+            else:
+                self._send_json(handler, {"runs": self.runs.list_runs()})
             return
         if path == "/api/project":
             self._send_json(handler, self._project_payload())
@@ -313,6 +327,22 @@ class RequestRouter:
         handler.send_header("Access-Control-Allow-Origin", "*")
         handler.end_headers()
         handler.wfile.write(payload)
+
+    def _serve_run_media(self, handler, relative: str) -> None:
+        target = self.runs.media_path(relative)
+        if target is None or not target.is_file():
+            self._send_json(handler, {"error": "not found"}, 404)
+            return
+
+        data         = target.read_bytes()
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+
+        handler.send_response(200)
+        handler.send_header("Content-Type", content_type)
+        handler.send_header("Content-Length", str(len(data)))
+        handler.send_header("Cache-Control", "max-age=60")
+        handler.end_headers()
+        handler.wfile.write(data)
 
     def _serve_static(self, handler, relative: str) -> None:
         target = (self.paths.static_dir / relative).resolve()

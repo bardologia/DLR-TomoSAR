@@ -11,12 +11,13 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260611y" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260612c" />
 </head>
 <body>
 
 <div class="grain" aria-hidden="true"></div>
 <div class="vignette" aria-hidden="true"></div>
+<canvas class="bg-scene" id="radar" aria-hidden="true"></canvas>
 
 <header class="nav" id="nav">
   <a class="nav__brand" href="#/home" data-route="home">
@@ -30,6 +31,7 @@
     <a href="#/scripts" data-route="scripts">Scripts</a>
     <a href="#/configuration" data-route="configuration">Configuration</a>
     <a href="#/console" data-route="console">Console</a>
+    <a href="#/results" data-route="results">Results</a>
     <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
   </nav>
   <div class="nav__status" id="nav-status" title="Backend connection">
@@ -42,7 +44,6 @@
 
   <!-- HOME -->
   <section class="page page--home is-active" data-page="home">
-    <canvas class="status__radar" id="radar" aria-hidden="true"></canvas>
     <div class="status">
       <header class="status__head">
         <div class="status__id">
@@ -168,6 +169,21 @@
     </div>
   </section>
 
+  <!-- RESULTS -->
+  <section class="page page--pad" data-page="results">
+    <div class="page__head">
+      <h2 class="page__title">Inference results</h2>
+      <p class="page__lead">
+        Every figure and animation produced by an inference run, organized by kind.
+        Pick a run on the left, click any figure to inspect it at full size.
+      </p>
+    </div>
+    <div class="master master--results">
+      <aside class="master__list master__list--results" id="results-list" aria-label="Inference runs"></aside>
+      <div class="master__detail master__detail--results" id="results-detail"></div>
+    </div>
+  </section>
+
   <!-- TENSORBOARD -->
   <section class="page page--pad page--tb" data-page="tensorboard">
     <div class="page__head page__head--row">
@@ -204,6 +220,11 @@
   <span class="footer__dim" id="footer-root"></span>
 </footer>
 
+<div class="lightbox" id="lightbox" hidden>
+  <img id="lightbox-img" alt="" />
+  <p class="lightbox__cap" id="lightbox-cap"></p>
+</div>
+
 <div class="proc-modal" id="proc-modal" aria-hidden="true">
   <div class="proc-modal__scrim" id="proc-scrim"></div>
   <div class="proc-modal__panel" role="dialog" aria-modal="true" aria-labelledby="proc-title">
@@ -231,8 +252,8 @@
 
 <script src="/static/js/radar.js?v=20260611z"></script>
 <script src="/static/js/tomo_anim.js?v=20260611z"></script>
-<script src="/static/js/server_anim.js?v=20260611y"></script>
-<script src="/static/js/home.js?v=20260611y"></script>
+<script src="/static/js/server_anim.js?v=20260612c"></script>
+<script src="/static/js/home.js?v=20260612c"></script>
 <script src="/static/js/process_anim.js?v=20260606r"></script>
 <script src="/static/js/diagram.js?v=20260606r"></script>
 <script src="/static/js/router.js?v=20260606r"></script>
@@ -243,6 +264,7 @@
 <script src="/static/js/scripts.js?v=20260606r"></script>
 <script src="/static/js/launch.js?v=20260611y"></script>
 <script src="/static/js/console.js?v=20260611y"></script>
+<script src="/static/js/results.js?v=20260612a"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
 <script src="/static/js/app.js?v=20260611z"></script>
 </body>

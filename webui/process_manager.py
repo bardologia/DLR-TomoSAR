@@ -5,6 +5,7 @@ import os
 import queue
 import re
 import shlex
+import signal
 import subprocess
 import threading
 import time
@@ -111,10 +112,11 @@ class ProcessManager:
         try:
             process = subprocess.Popen(
                 argv,
-                cwd    = str(self.paths.repo_root),
-                stdout = subprocess.PIPE,
-                stderr = subprocess.STDOUT,
-                env    = env,
+                cwd               = str(self.paths.repo_root),
+                stdout            = subprocess.PIPE,
+                stderr            = subprocess.STDOUT,
+                env               = env,
+                start_new_session = True,
             )
         except OSError as exc:
             return str(exc)
@@ -242,11 +244,7 @@ class ProcessManager:
         if record["status"] != "running":
             return {"ok": False, "error": "job is not running"}
 
-        try:
-            subprocess.run(["kill", "-TERM", str(record["pid"])], check=False)
-        except OSError as exc:
-            return {"ok": False, "error": str(exc)}
-
+        self._signal_group(record["pid"], signal.SIGTERM)
         self.logger.warning(f"stop requested for job {job_id}")
         return {"ok": True}
 
@@ -258,7 +256,7 @@ class ProcessManager:
             return 0
 
         for record in running:
-            subprocess.run(["kill", "-TERM", str(record["pid"])], check=False)
+            self._signal_group(record["pid"], signal.SIGTERM)
             self.logger.warning(f"watchdog stop for job {record['job_id']} (pid {record['pid']})")
 
         deadline = time.monotonic() + grace
@@ -272,10 +270,23 @@ class ProcessManager:
         with self.lock:
             stubborn = [r for r in running if self.jobs[r["job_id"]]["status"] == "running"]
         for record in stubborn:
-            subprocess.run(["kill", "-KILL", str(record["pid"])], check=False)
+            self._signal_group(record["pid"], signal.SIGKILL)
             self.logger.error(f"force kill for job {record['job_id']} (pid {record['pid']})")
 
         return len(running)
+
+    @staticmethod
+    def _signal_group(pid: int, sig: signal.Signals) -> None:
+        try:
+            os.killpg(pid, sig)
+            return
+        except (ProcessLookupError, PermissionError):
+            pass
+
+        try:
+            os.kill(pid, sig)
+        except (ProcessLookupError, PermissionError):
+            pass
 
     def list_jobs(self) -> list[dict]:
         with self.lock:

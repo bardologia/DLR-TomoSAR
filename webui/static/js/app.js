@@ -148,6 +148,11 @@ class App {
     this.configBrowser.load();
 
     this.tensorboardView = new window.TensorboardView();
+
+    this.resultsView = new window.ResultsView(
+      document.getElementById("results-list"),
+      document.getElementById("results-detail")
+    );
   }
 
   _initRouter() {
@@ -168,6 +173,7 @@ class App {
     }
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
+    if (route === "results") this.resultsView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }
