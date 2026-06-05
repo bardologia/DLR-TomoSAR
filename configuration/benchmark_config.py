@@ -8,12 +8,12 @@ from pathlib import Path
 class BenchmarkPathsConfig:
     dataset_path    : Path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")
     parameters_path : Path = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10/params/params_Ng3_sigonly_k5/parameters_Ng3_sigonly_k5.npy")
-    log_base_dir    : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
+    log_base_dir    : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/benchmark_extended")
 
 
 @dataclass
 class OverfitGateConfig:
-    max_steps           : int   = 5000
+    max_steps           : int   = 10000
     stop_threshold      : float = 1e-3
     batch_size          : int   = 9
     azimuth_start       : int   = 1000
@@ -27,8 +27,8 @@ class OverfitGateConfig:
 @dataclass
 class SizeMatchConfig:
     reference_model : str   = "unet"
-    tolerance       : float = 0.005
-    max_iterations  : int   = 40
+    tolerance       : float = 0.01
+    max_iterations  : int   = 100
     scale_low       : float = 0.05
     scale_high      : float = 8.0
     in_channels     : int   = 9
@@ -37,7 +37,7 @@ class SizeMatchConfig:
 @dataclass
 class TrainingQueueConfig:
     epochs               : int             = 200
-    scheduler_epochs     : int | None      = None
+    scheduler_epochs     : int | None      = 200
     validation_frequency : int             = 1
     batch_size           : int             = 256
     num_workers          : int             = 4
@@ -47,9 +47,9 @@ class TrainingQueueConfig:
     early_stop_min_delta : float           = 1e-4
     patch_size           : tuple[int, int] = (64, 64)
     patch_stride         : int             = 32
-    train_azimuth        : tuple[int, int] = (1000, 9120)
-    val_azimuth          : tuple[int, int] = (9120, 12400)
-    test_azimuth         : tuple[int, int] = (12400, 16000)
+    train_azimuth        : tuple[int, int] = (1000, 13000)
+    val_azimuth          : tuple[int, int] = (13000, 14500)
+    test_azimuth         : tuple[int, int] = (14500, 16000)
     log_all_losses       : bool            = False
 
 
@@ -92,7 +92,7 @@ class BenchmarkConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    gpus            : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])
+    gpus            : list[int]  = field(default_factory=lambda: [2, 3])
     skip_models     : list[str]  = field(default_factory=list)
     run_tag         : str | None = None
     resume          : bool       = True

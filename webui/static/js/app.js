@@ -66,7 +66,7 @@ class App {
     const radar = document.getElementById("radar");
     const server = document.getElementById("server-anim");
     try {
-      if (radar && window.RadarScene) this.scenes.push(new window.RadarScene(radar));
+      if (radar && window.TomoScene) this.scenes.push(new window.TomoScene(radar));
     } catch (e) {}
     try {
       if (server && window.ServerScene) {

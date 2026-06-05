@@ -31,7 +31,7 @@ class CrossValidationConfig:
 
     inference_splits : list[str] = field(default_factory=lambda: ["val", "test"])
 
-    gpus            : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])
+    gpus            : list[int]  = field(default_factory=lambda: [2, 3])
     run_tag         : str | None = None
     resume          : bool       = True
     seed            : int        = 0
