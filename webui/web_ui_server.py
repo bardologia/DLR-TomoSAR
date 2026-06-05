@@ -10,7 +10,8 @@ from process_manager import ProcessManager
 from project_paths import ProjectPaths
 from request_router import RequestRouter
 from script_catalog import ScriptCatalog
-from script_editor import ScriptEditor
+from script_config_resolver import ScriptConfigResolver
+from system_monitor import SystemMonitor
 from web_logger import WebLogger
 
 
@@ -36,28 +37,29 @@ class WebUIServer:
         self.logger    = WebLogger()
         self.paths     = ProjectPaths()
 
-        self.catalog   = ScriptCatalog(self.paths)
-        self.editor    = ScriptEditor(self.paths)
+        self.resolver  = ScriptConfigResolver(self.paths)
+        self.catalog   = ScriptCatalog(self.paths, self.resolver)
         self.configs   = ConfigRegistry(self.paths)
         self.equations = EquationLibrary()
         self.models    = ModelLibrary()
         self.pipelines = PipelineLibrary()
         self.processes = ProcessManager(self.paths, self.logger)
+        self.system    = SystemMonitor(self.paths)
 
         self.router    = RequestRouter(
             paths     = self.paths,
             logger    = self.logger,
             catalog   = self.catalog,
-            editor    = self.editor,
+            resolver  = self.resolver,
             configs   = self.configs,
             equations = self.equations,
             models    = self.models,
             pipelines = self.pipelines,
             processes = self.processes,
+            system    = self.system,
         )
 
     def serve(self) -> None:
-        self.paths.ensure_backups()
         self._report_ready()
 
         server        = ThreadingHTTPServer((self.host, self.port), _Handler)

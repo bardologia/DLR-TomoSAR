@@ -17,6 +17,7 @@ class ConfigRegistry:
         "models_config"           : "Models",
         "inference_config"        : "Inference",
         "tuning_config"           : "Tuning",
+        "physics_check_config"    : "Physics Check",
     }
 
     MODULE_ORDER = [
@@ -28,6 +29,7 @@ class ConfigRegistry:
         "models_config",
         "inference_config",
         "tuning_config",
+        "physics_check_config",
     ]
 
     def __init__(self, paths: ProjectPaths) -> None:
@@ -77,12 +79,18 @@ class ConfigRegistry:
         return False
 
     def _parse_fields(self, node: ast.ClassDef) -> list[dict]:
-        fields = []
+        fields   = []
+        group    = 0
+        prev_end = None
         for item in node.body:
             if not isinstance(item, ast.AnnAssign):
                 continue
             if not isinstance(item.target, ast.Name):
                 continue
+
+            if prev_end is not None and item.lineno - prev_end > 1:
+                group += 1
+            prev_end = item.end_lineno
 
             name       = item.target.id
             annotation = self._safe_unparse(item.annotation)
@@ -92,6 +100,7 @@ class ConfigRegistry:
                 "name"    : name,
                 "type"    : annotation,
                 "default" : default,
+                "group"   : group,
             })
         return fields
 

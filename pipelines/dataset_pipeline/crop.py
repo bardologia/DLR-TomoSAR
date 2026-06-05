@@ -18,10 +18,11 @@ class Cropper:
         self.logger        = logger
   
         self.logger.section("[Cropper Initialized]")
-        rows = [
-            {"Split": name, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size}
-            for name, region in split_regions.items()
-        ]
+        rows = []
+        for name, regions in split_regions.region_lists():
+            for index, region in enumerate(regions):
+                label = name if len(regions) == 1 else f"{name}[{index}]"
+                rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
         self.logger.metrics_table(rows, ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
 
     def to_local_slices(self, region: CropRegion) -> Tuple[slice, slice]:

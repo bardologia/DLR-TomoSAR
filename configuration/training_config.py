@@ -19,6 +19,19 @@ class LossNormalizationConfig:
     param_l1          : float = 1.000000
     param_huber       : float = 5.399934
     smoothness_tv     : float = 1.532997
+    total_power       : float = 1.000000
+    moments           : float = 1.000000
+    coherence_resyn   : float = 1.000000
+    covariance_match  : float = 1.000000
+    capon_cycle       : float = 1.000000
+
+
+@dataclass
+class GeometryConfig:
+    wavelength  : float = 0.23
+    slant_range : float = 5000.0
+    baselines   : tuple = (0.0, 11.25, 22.5, 33.75, 45.0, 56.25, 67.5, 78.75, 90.0)
+    kz_values   : tuple = ()
 
 
 @dataclass
@@ -68,6 +81,25 @@ class LossConfig:
 
     use_smoothness_tv        : bool  = False
     weight_smoothness_tv     : float = 1e-4
+
+    use_total_power          : bool  = False
+    weight_total_power       : float = 0.0
+
+    use_moments              : bool  = False
+    weight_moments           : float = 0.0
+    moments_weights          : tuple = (1.0, 1.0, 1.0)
+
+    use_coherence_resyn      : bool  = False
+    weight_coherence_resyn   : float = 0.0
+
+    use_covariance_match     : bool  = False
+    weight_covariance_match  : float = 0.0
+
+    use_capon_cycle          : bool  = False
+    weight_capon_cycle       : float = 0.0
+    capon_loading            : float = 1e-2
+
+    physics_floor            : float = 1e-3
 
     norm : LossNormalizationConfig = field(default_factory=LossNormalizationConfig)
 
@@ -246,6 +278,7 @@ class PermutationMetricsConfig:
 @dataclass
 class TrainerConfig:
     gaussian            : GaussianConfig
+    geometry            : GeometryConfig           = field(default_factory=GeometryConfig)
     early_stopping      : EarlyStoppingConfig      = field(default_factory=EarlyStoppingConfig)
     warmup              : WarmupConfig             = field(default_factory=WarmupConfig)
     scheduler           : SchedulerConfig          = field(default_factory=SchedulerConfig)

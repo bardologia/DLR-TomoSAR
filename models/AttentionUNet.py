@@ -71,7 +71,8 @@ class AttentionGate(nn.Module):
             nn.Conv2d(
                 in_channels  = skip_channels,
                 out_channels = intermediate_channels,
-                kernel_size  = 1,
+                kernel_size  = 2,
+                stride       = 2,
                 bias         = bias,
             ),
             build_norm2d(normalization, intermediate_channels),
@@ -85,10 +86,19 @@ class AttentionGate(nn.Module):
             ),
             nn.Sigmoid(),
         )
+        self.output_transform = nn.Sequential(
+            nn.Conv2d(
+                in_channels  = skip_channels,
+                out_channels = skip_channels,
+                kernel_size  = 1,
+                bias         = bias,
+            ),
+            build_norm2d(normalization, skip_channels),
+        )
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, gate_signal: torch.Tensor, skip_connection: torch.Tensor) -> torch.Tensor:
-        # Project gate and skip into shared intermediate space
+        # Project coarse gate and stride-2 downsampled skip into shared intermediate space at the coarse grid
         projected_gate = self.gate_projection(gate_signal)
         projected_skip = self.skip_projection(skip_connection)
 
@@ -100,9 +110,15 @@ class AttentionGate(nn.Module):
                 align_corners = False,
             )
 
-        # Compute attention coefficients via sigmoid and reweight skip features
+        # Compute attention coefficients at the coarse grid, resample to skip resolution, reweight, and recombine channels
         attention_weights = self.attention_score(self.relu(projected_gate + projected_skip))
-        return skip_connection * attention_weights
+        attention_weights = functional.interpolate(
+            input         = attention_weights,
+            size          = skip_connection.shape[2:],
+            mode          = "bilinear",
+            align_corners = False,
+        )
+        return self.output_transform(skip_connection * attention_weights)
 
 
 # Resizes source tensor to match the spatial dimensions of reference
@@ -177,7 +193,7 @@ class AttentionUNet(nn.Module):
             
             self.attention_gates.append(
                 AttentionGate(
-                    gate_channels         = decoder_channels,
+                    gate_channels         = reversed_features[index],
                     skip_channels         = decoder_channels,
                     intermediate_channels = intermediate_channels,
                     normalization         = config.normalization,
@@ -216,16 +232,16 @@ class AttentionUNet(nn.Module):
         # Bottleneck
         x = self.bottleneck(x)
 
-        # Decoder: upsample, apply attention gate to skip, concat, and refine
+        # Decoder: gate skip with the coarse decoder feature, then upsample, concat, and refine
         for upsample, attention_gate, decoder_block, skip in zip(
             self.upsample_layers,
             self.attention_gates,
             self.decoder_blocks,
             reversed(skip_connections),
         ):
+            skip = attention_gate(gate_signal=x, skip_connection=skip)
             x = upsample(x)
             x = match_spatial_size(source=x, reference=skip)
-            skip = attention_gate(gate_signal=x, skip_connection=skip)
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 

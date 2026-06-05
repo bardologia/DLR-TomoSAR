@@ -8,6 +8,7 @@ class Router {
       this.pages[p.dataset.page] = p;
     });
     this.links = [...document.querySelectorAll("[data-route]")];
+    this.navAlias = { launch: "scripts" };
     this.current = null;
 
     window.addEventListener("hashchange", () => this._sync());
@@ -23,30 +24,33 @@ class Router {
 
   _parse() {
     const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
-    return this.pages[raw] ? raw : "home";
+    const [page, ...rest] = raw.split("/");
+    if (this.pages[page]) return { page, param: rest.join("/") || null };
+    return { page: "home", param: null };
   }
 
   _sync() {
-    const route = this._parse();
-    if (route === this.current) return;
-    this.current = route;
+    const { page, param } = this._parse();
+    const key = `${page}/${param || ""}`;
+    if (key === this.current) return;
+    this.current = key;
 
     Object.entries(this.pages).forEach(([id, el]) => {
-      const active = id === route;
-      el.classList.toggle("is-active", active);
+      el.classList.toggle("is-active", id === page);
     });
 
-    this.links.forEach((a) => a.classList.toggle("is-current", a.dataset.route === route));
+    const navTarget = this.navAlias[page] || page;
+    this.links.forEach((a) => a.classList.toggle("is-current", a.dataset.route === navTarget));
 
     window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
-    this._animateIn(this.pages[route]);
+    this._animateIn(this.pages[page]);
 
-    if (this.onChange) this.onChange(route);
+    if (this.onChange) this.onChange(page, param);
   }
 
   _animateIn(page) {
     if (!page || window.REDUCED_MOTION || !window.gsap) return;
-    const blocks = page.querySelectorAll(".page__head, .page__head > *, .eq-tabs, .eq-grid, .flow, .master, .filter-row, .script-grid, .console, .hero__inner");
+    const blocks = page.querySelectorAll(".page__head, .page__head > *, .eq-tabs, .eq-grid, .flow, .master, .filter-row, .script-grid, .console, .launch__top, .launch__rail, .launch__main");
     const targets = blocks.length ? blocks : [page];
     window.gsap.fromTo(
       targets,

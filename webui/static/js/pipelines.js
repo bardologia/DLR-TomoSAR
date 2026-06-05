@@ -71,7 +71,7 @@ class PipelineFlow {
     this.hostEl.querySelectorAll(".flow-row__run").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (window.scriptPanel) window.scriptPanel.open(btn.dataset.script);
+        if (window.router) window.router.go(`launch/${btn.dataset.script}`);
       });
     });
 

@@ -13,7 +13,8 @@ from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
 from project_paths import ProjectPaths
 from script_catalog import ScriptCatalog
-from script_editor import ScriptEditor
+from script_config_resolver import ScriptConfigResolver
+from system_monitor import SystemMonitor
 from web_logger import WebLogger
 
 
@@ -27,16 +28,17 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, editor: ScriptEditor, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor) -> None:
         self.paths     = paths
         self.logger    = logger
         self.catalog   = catalog
-        self.editor    = editor
+        self.resolver  = resolver
         self.configs   = configs
         self.equations = equations
         self.models    = models
         self.pipelines = pipelines
         self.processes = processes
+        self.system    = system
 
     def route(self, handler) -> None:
         parsed = urlparse(handler.path)
@@ -75,11 +77,24 @@ class RequestRouter:
         if path == "/api/models":
             self._send_json(handler, {"families": self.models.collect()})
             return
+        if path.startswith("/api/models/") and path.endswith("/note"):
+            key  = path[len("/api/models/"):-len("/note")]
+            note = self.models.note(key)
+            if note is None:
+                self._send_json(handler, {"error": "not found"}, 404)
+            else:
+                self._send_json(handler, note)
+            return
         if path == "/api/pipelines":
             self._send_json(handler, {"pipelines": self.pipelines.collect()})
             return
         if path == "/api/scripts":
             self._send_json(handler, {"scripts": self.catalog.list_scripts()})
+            return
+        if path.startswith("/api/scripts/") and path.endswith("/config"):
+            key    = path[len("/api/scripts/"):-len("/config")]
+            result = self.resolver.resolve(key, self._preferred_interpreter())
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path.startswith("/api/scripts/"):
             key    = path[len("/api/scripts/"):]
@@ -95,6 +110,9 @@ class RequestRouter:
         if path == "/api/jobs":
             self._send_json(handler, {"jobs": self.processes.list_jobs()})
             return
+        if path == "/api/system":
+            self._send_json(handler, self.system.snapshot())
+            return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):
             job_id = path[len("/api/jobs/"):-len("/stream")]
             self._stream_job(handler, job_id)
@@ -108,14 +126,8 @@ class RequestRouter:
         if path == "/api/run":
             key         = body.get("script_key", "")
             interpreter = body.get("interpreter") or self._preferred_interpreter()
-            result      = self.processes.launch(key, interpreter)
-            self._send_json(handler, result, 200 if result.get("ok") else 400)
-            return
-
-        if path.startswith("/api/scripts/") and path.endswith("/config"):
-            key    = path[len("/api/scripts/"):-len("/config")]
-            values = body.get("values", {})
-            result = self.editor.apply(key, values)
+            overrides   = body.get("overrides", {})
+            result      = self.processes.launch(key, interpreter, overrides)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

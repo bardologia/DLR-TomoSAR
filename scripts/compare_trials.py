@@ -229,7 +229,7 @@ def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
     CKPT_COLS: list[tuple[str, callable]] = [
         ("Best epoch",    lambda t: t["log_best"].get("best_epoch",    sum_val(t, "best_epoch"))),
         ("Best val loss", lambda t: t["log_best"].get("best_val_loss", sum_val(t, "best_val_loss"))),
-        ("Has inf",       lambda t: "✅" if t["has_inf"] else "⏳ pending"),
+        ("Has inf",       lambda t: "yes" if t["has_inf"] else "pending"),
         ("Inference run", lambda t: t["inf_dir"].name if t["inf_dir"] else "—"),
     ]
 
@@ -469,7 +469,7 @@ def main() -> None:
 
     # Summary
     for t in trials:
-        status = f"✅ {t['inf_dir'].name}" if t["has_inf"] else "⏳ no inference yet"
+        status = f"{t['inf_dir'].name}" if t["has_inf"] else "no inference yet"
         print(f"  {t['name']:<45} {status}")
 
     print()

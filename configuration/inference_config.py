@@ -17,52 +17,68 @@ class InferencePaths:
 
 @dataclass
 class InferenceConfig:
-    run_directory      : Path
-    output_subdir      : Optional[str]  = None
-    device             : str            = "cuda"
+    run_directory       : Path
+    output_subdir       : Optional[str]  = None
+    device              : str            = "cuda"
+    seed                : int            = 0
+    log_level           : str            = "INFO"
 
-    use_ema            : bool          = True
-    checkpoint_name    : str           = "best_model.pt"
+    split               : str            = "test"
+    use_ema             : bool           = True
+    checkpoint_name     : str            = "best_model.pt"
+    batch_size          : Optional[int]  = None
+    num_workers         : int            = 4
+    cpu_workers         : int            = 80
+    gif_workers         : int            = 40
 
-    split              : str           = "test"
-    batch_size         : Optional[int] = None
-    num_workers        : int           = 4
+    save_cubes          : bool           = True
+    stitch_window       : str            = "hann"
+    cube_dtype          : str            = "float32"
 
-    gif_workers        : int           = 40
-    cpu_workers        : int           = 80
+    n_best_profiles     : int            = 12
+    n_worst_profiles    : int            = 12
+    n_random_profiles   : int            = 12
+    profile_seed        : int            = 0
 
-    stitch_window      : str           = "hann"
-    cube_dtype         : str           = "float32"
-    save_cubes         : bool          = True
+    n_range_slices      : int            = 5
+    n_azimuth_slices    : int            = 5
+    n_elevation_slices  : int            = 5
 
-    n_best_profiles    : int           = 12
-    n_worst_profiles   : int           = 12
-    n_random_profiles  : int           = 12
-    profile_seed       : int           = 0
+    gif_axes            : List[str]      = field(default_factory=lambda: ["elevation"])
+    gif_fps             : int            = 12
+    gif_max_frames      : int            = 150
+    gif_dpi             : int            = 110
 
-    scatter_amp_zero_thr : float       = 1e-3
-    scatter_bg_sigma_thr : float       = 4.0   # set >0 to snap mu/sigma of bg Gaussians in scatter plot
+    cmap_intensity      : str            = "jet"
+    cmap_error          : str            = "magma"
+    normalize_intensity : bool           = True
+    fig_dpi             : int            = 150
+    save_dpi            : int            = 300
 
-    amp_zero_thr         : float       = 1e-3
-    bg_sigma_threshold   : float       = 4.0
-    bg_sigma_diff_cap    : float       = 0.0
+    paths               : InferencePaths = field(default_factory=InferencePaths)
 
-    n_range_slices     : int           = 5
-    n_azimuth_slices   : int           = 5
-    n_elevation_slices : int           = 5
 
-    gif_axes           : List[str]     = field(default_factory=lambda: ["elevation"])
-    gif_fps            : int           = 12
-    gif_max_frames     : int           = 150
-    gif_dpi            : int           = 110
+@dataclass
+class SingleInferenceConfig:
+    run_directory : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test/resunet_w-pHub1")
+    gpu           : int  = 0
 
-    cmap_intensity     : str           = "jet"
-    cmap_error         : str           = "magma"
-    normalize_intensity: bool          = True
-    fig_dpi            : int           = 150
-    save_dpi           : int           = 300
+    inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
+        run_directory = Path("."),
+        save_cubes    = True,
+        cpu_workers   = 16,
+        gif_axes      = ["elevation", "range", "azimuth"],
+    ))
 
-    seed               : int           = 0
-    log_level          : str           = "INFO"
 
-    paths              : InferencePaths = field(default_factory=InferencePaths)
+@dataclass
+class BatchInferenceConfig:
+    logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
+    run_filter : List[str] = field(default_factory=list)
+    gpu        : int       = 0
+
+    inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
+        run_directory = Path("."),
+        save_cubes    = False,
+        cpu_workers   = 16,
+    ))

@@ -112,3 +112,31 @@ class ProcessingConfiguration:
         if self.paths.run_subdirectory is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.paths.run_subdirectory = f"run_{self.tomogram_tag}_{timestamp}"
+
+@dataclass
+class PreProcessEntryConfig:
+    azimuth_start            : int   = 1000
+    azimuth_end              : int   = 16000
+    range_start              : int   = 500
+    range_end                : int   = 4000
+
+    fusar_project_path       : str   = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
+    base_directory           : str   = "/ste/rnd/"
+    track_selection          : str   = "*"
+    polarisation             : str   = "hv"
+
+    beamforming_method       : str   = "Capon"
+    filter_method            : str   = "Boxcar"
+    height_range             : tuple = (-20.0, 80.0)
+    filter_arguments_list    : list  = field(default_factory=lambda: [
+        {"win": [40, 20]},
+        {"win": [20, 10]},
+        {"win": [10, 10]},
+        {"win": [30, 20]},
+    ])
+
+    dataset_type             : str   = "FSAR"
+    full_stack_identifier    : str   = "1"
+    reduced_stack_identifier : str   = "dtmf"
+    tomogram_output_tag      : str   = "Xtomo_id2X"
+    parameter_output_tag     : str   = "Xparams_id2X"

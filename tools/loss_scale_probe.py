@@ -31,6 +31,11 @@ class LossScaleProbe:
         "use_param_l1",
         "use_param_huber",
         "use_smoothness_tv",
+        "use_total_power",
+        "use_moments",
+        "use_coherence_resyn",
+        "use_covariance_match",
+        "use_capon_cycle",
     ]
 
     _FLAG_TO_WEIGHT = {
@@ -44,6 +49,11 @@ class LossScaleProbe:
         "use_param_l1":           "weight_param_l1",
         "use_param_huber":        "weight_param_huber",
         "use_smoothness_tv":      "weight_smoothness_tv",
+        "use_total_power":        "weight_total_power",
+        "use_moments":            "weight_moments",
+        "use_coherence_resyn":    "weight_coherence_resyn",
+        "use_covariance_match":   "weight_covariance_match",
+        "use_capon_cycle":        "weight_capon_cycle",
     }
 
     def __init__(self, probe_cfg, loss_cfg, gaussian_cfg, norm_stats=None, logger=None):

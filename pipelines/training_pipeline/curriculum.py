@@ -3,8 +3,8 @@ from __future__ import annotations
 
 class CurriculumController:
     def __init__(self, curriculum, criterion, early_stopping, lr_scheduler, warmup, optimizer, update_optimizer, logger):
-        self.curriculum       = curriculum
-        self.criterion        = criterion
+        self.curriculum        = curriculum
+        self.criterion         = criterion
         self.early_stopping    = early_stopping
         self.lr_scheduler      = lr_scheduler
         self.warmup            = warmup

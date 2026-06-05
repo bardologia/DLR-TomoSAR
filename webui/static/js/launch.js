@@ -7,6 +7,7 @@ class LaunchView {
     ["curve space", /curve|spectral|ssim/],
     ["param space", /^param/],
     ["regularization", /smooth|_tv$/],
+    ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|baselines|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
     ["probe", /^probe_/],

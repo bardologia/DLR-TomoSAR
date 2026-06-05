@@ -64,11 +64,15 @@ class App {
 
   _initScenes() {
     const radar = document.getElementById("radar");
-    if (radar && window.RadarScene) this.scenes.push(new window.RadarScene(radar));
     const spectrum = document.getElementById("spectrum");
-    if (spectrum && window.SpectrumScene) {
-      this.scenes.push(new window.SpectrumScene(spectrum, document.getElementById("spectrum-readout")));
-    }
+    try {
+      if (radar && window.RadarScene) this.scenes.push(new window.RadarScene(radar));
+    } catch (e) {}
+    try {
+      if (spectrum && window.SpectrumScene) {
+        this.scenes.push(new window.SpectrumScene(spectrum, document.getElementById("spectrum-readout")));
+      }
+    } catch (e) {}
   }
 
   async _loadProject() {
@@ -80,7 +84,7 @@ class App {
       this._setStatus(false);
       return;
     }
-    this._fillHero();
+    this._initStatus();
   }
 
   _setStatus(ok) {
@@ -91,46 +95,16 @@ class App {
     text.textContent = ok ? "backend live" : "offline";
   }
 
-  _fillHero() {
-    const c = this.project.counts || {};
-    const stats = [
-      { v: c.scripts || 0, l: "entry points" },
-      { v: c.models || 0, l: "architectures" },
-      { v: c.pipelines || 0, l: "pipelines" },
-      { v: "3K", l: "params / pixel" },
-    ];
-    const host = document.getElementById("hero-stats");
-    host.innerHTML = "";
-    stats.forEach((s) => {
-      const block = document.createElement("div");
-      block.innerHTML = `<dt>${s.v}</dt><dd>${s.l}</dd>`;
-      host.appendChild(block);
-    });
-
+  _initStatus() {
     const footRoot = document.getElementById("footer-root");
     if (footRoot) footRoot.textContent = this.project.repo_root || "";
 
-    this._buildHomeJump();
-  }
-
-  _buildHomeJump() {
-    const host = document.getElementById("home-jump");
-    if (!host) return;
-    const links = [
-      { r: "model", t: "Signal model", d: "equations" },
-      { r: "pipelines", t: "Pipelines", d: "six stages" },
-      { r: "architectures", t: "Architectures", d: "ten backbones" },
-      { r: "scripts", t: "Scripts", d: "launch runs" },
-    ];
-    host.innerHTML = "";
-    links.forEach((l) => {
-      const a = document.createElement("a");
-      a.className = "home-jump__item";
-      a.href = `#/${l.r}`;
-      a.dataset.route = l.r;
-      a.innerHTML = `<span class="home-jump__t">${l.t}</span><span class="home-jump__d">${l.d}</span>`;
-      host.appendChild(a);
+    this.statusBoard = new window.StatusBoard({
+      host: document.getElementById("status-host"),
+      sum: document.getElementById("status-sum"),
+      board: document.getElementById("status-board"),
     });
+    this.statusBoard.start();
   }
 
   _initComponents() {
@@ -143,17 +117,14 @@ class App {
     });
     this.runConsole.refresh();
 
-    this.scriptPanel = new window.ScriptPanel(
-      {
-        grid: document.getElementById("script-grid"),
-        filters: document.getElementById("script-filters"),
-        drawer: document.getElementById("drawer"),
-      },
-      this.runConsole,
-      this.project || {}
-    );
+    this.scriptPanel = new window.ScriptPanel({
+      grid: document.getElementById("script-grid"),
+      filters: document.getElementById("script-filters"),
+    });
     this.scriptPanel.load();
     window.scriptPanel = this.scriptPanel;
+
+    this.launchView = new window.LaunchView(this.runConsole, this.project || {});
 
     this.equationView = new window.EquationView(
       document.getElementById("eq-tabs"),
@@ -179,14 +150,20 @@ class App {
   }
 
   _initRouter() {
-    this.router = new window.Router((route) => this._onRoute(route));
+    this.router = new window.Router((route, param) => this._onRoute(route, param));
     window.router = this.router;
     this.router.start();
   }
 
-  _onRoute(route) {
+  _onRoute(route, param) {
     if (route === "home") {
       requestAnimationFrame(() => this.scenes.forEach((s) => s.resize && s.resize()));
+    }
+    if (route === "launch") {
+      if (param) this.launchView.show(param);
+      else this.router.go("scripts");
+    } else {
+      this.launchView.leave();
     }
     setTimeout(() => this.reveal.scan(), 60);
   }

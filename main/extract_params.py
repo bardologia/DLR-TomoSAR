@@ -6,54 +6,46 @@ warnings.filterwarnings("ignore", message=".*pynvml.*", category=FutureWarning)
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+repo_root = Path(__file__).resolve().parent.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
-from configuration.param_extraction_config import FitMode, ExtractionConfig, FitSettings
-from pipelines.param_pipeline.pipeline     import ParamExtractionPipeline
-
-
-dataset_base_path   = Path("/ste/rnd/User/vice_vi/Dataset")
-pyrat_directory     = Path("/ste/rnd/User/vice_vi/pyrat")
-tomogram_filename   = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
-
-output_prefix       = "params"
-output_suffix       = None
-height_range        = None
-
-fit_k_max           = 5
-fit_lambda_k        = 3e-3
-parameter_workers   = 50
+from configuration.param_extraction_config import ExtractParamsEntryConfig, ExtractionConfig, FitMode, FitSettings
+from pipelines.param_pipeline.pipeline import ParamExtractionPipeline
+from tools.config_cli import ConfigCli
+from tools.logger import Logger
 
 
 def main() -> None:
-    dataset_dirs = sorted(p for p in dataset_base_path.iterdir() if p.is_dir())
+    config = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction sweep").apply()
+    logger = Logger(log_dir="logs", name="extract_params")
 
-    for i, processed_data_path in enumerate(dataset_dirs):
-        print(f"\n[Run {i + 1}/{len(dataset_dirs)}] {processed_data_path.name}")
+    dataset_dirs = sorted(p for p in Path(config.dataset_base_path).iterdir() if p.is_dir())
 
-        config = ExtractionConfig(
+    for index, processed_data_path in enumerate(dataset_dirs):
+        logger.section(f"[Run {index + 1}/{len(dataset_dirs)}] {processed_data_path.name}")
+
+        extraction_config = ExtractionConfig(
             processed_data_path = processed_data_path,
-            pyrat_directory     = pyrat_directory,
+            pyrat_directory     = config.pyrat_directory,
 
-            output_prefix     = output_prefix,
-            output_suffix     = output_suffix,
+            output_prefix = config.output_prefix,
+            output_suffix = config.output_suffix,
 
-            tomogram_filename = tomogram_filename,
-            height_range      = height_range,
+            tomogram_filename = config.tomogram_filename,
+            height_range      = config.height_range,
 
-            fit_settings      = FitSettings(fit_config=FitMode.SigmaOnly(k_max=fit_k_max, lambda_k=fit_lambda_k)),
+            fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k)),
 
-            parameter_workers = parameter_workers,
+            parameter_workers = config.parameter_workers,
         )
 
-        pipeline  = ParamExtractionPipeline(config)
-        outputs   = pipeline.run()
+        pipeline = ParamExtractionPipeline(extraction_config)
+        outputs  = pipeline.run()
 
-        print("[Execution Successful] Outputs:")
-        for name, path in outputs.items():
-            print(f"  {name:>18}: {path}")
+        logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+
+    logger.close()
 
 
 if __name__ == "__main__":

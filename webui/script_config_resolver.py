@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+import ast
+import json
+import subprocess
+import threading
+
+from project_paths import ProjectPaths
+
+
+class ScriptConfigResolver:
+
+    BOOTSTRAP = (
+        "import json, os, sys, types\n"
+        "repo = sys.argv[1]\n"
+        "sys.path.insert(0, repo)\n"
+        "package = types.ModuleType('tools')\n"
+        "package.__path__ = [os.path.join(repo, 'tools')]\n"
+        "sys.modules['tools'] = package\n"
+        "import ast as ast_mod, inspect, textwrap\n"
+        "from dataclasses import fields, is_dataclass\n"
+        "from pathlib import Path\n"
+        "from tools.config_cli import _SUPPORTED_TYPES\n"
+        "module = __import__(sys.argv[2], fromlist=[sys.argv[3]])\n"
+        "config = getattr(module, sys.argv[3])()\n"
+        "block_maps = {}\n"
+        "def blocks_for(cls):\n"
+        "    if cls in block_maps:\n"
+        "        return block_maps[cls]\n"
+        "    mapping = {}\n"
+        "    try:\n"
+        "        body  = ast_mod.parse(textwrap.dedent(inspect.getsource(cls))).body[0].body\n"
+        "        group = 0\n"
+        "        prev  = None\n"
+        "        for item in body:\n"
+        "            if not isinstance(item, ast_mod.AnnAssign) or not isinstance(item.target, ast_mod.Name):\n"
+        "                continue\n"
+        "            if prev is not None and item.lineno - prev > 1:\n"
+        "                group += 1\n"
+        "            prev = item.end_lineno\n"
+        "            mapping[item.target.id] = group\n"
+        "    except Exception:\n"
+        "        pass\n"
+        "    block_maps[cls] = mapping\n"
+        "    return mapping\n"
+        "def walk(node, prefix, section, section_class):\n"
+        "    blocks = blocks_for(type(node))\n"
+        "    for f in fields(node):\n"
+        "        value = getattr(node, f.name)\n"
+        "        path  = prefix + f.name\n"
+        "        if is_dataclass(value):\n"
+        "            yield from walk(value, path + '.', path, type(value).__name__)\n"
+        "        else:\n"
+        "            yield path, value, section, section_class, blocks.get(f.name, 0)\n"
+        "leaves = []\n"
+        "for path, value, section, section_class, block in walk(config, '', '', sys.argv[3]):\n"
+        "    editable = value is None or isinstance(value, _SUPPORTED_TYPES)\n"
+        "    if isinstance(value, Path):\n"
+        "        rendered = str(value)\n"
+        "    elif isinstance(value, tuple):\n"
+        "        rendered = str(list(value))\n"
+        "    elif value is None:\n"
+        "        rendered = 'None'\n"
+        "    else:\n"
+        "        rendered = str(value)\n"
+        "    kind = 'none' if value is None else type(value).__name__\n"
+        "    leaves.append({'path': path, 'value': rendered, 'type': kind, 'editable': editable, 'section': section, 'section_class': section_class, 'block': block})\n"
+        "print(json.dumps(leaves))\n"
+    )
+
+    def __init__(self, paths: ProjectPaths) -> None:
+        self.paths = paths
+        self.cache = {}
+        self.lock  = threading.Lock()
+
+    def entry_config(self, key: str) -> dict | None:
+        path = self.paths.main_dir / f"{key}.py"
+        if not path.exists():
+            return None
+
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            return None
+
+        used = self._config_cli_class(tree)
+        if used is None:
+            return None
+
+        located = self._locate_import(tree, used)
+        if located is None:
+            return None
+
+        module, real_name = located
+        return {"module": module, "class": real_name}
+
+    def resolve(self, key: str, interpreter: str) -> dict:
+        entry = self.entry_config(key)
+        if entry is None:
+            return {"ok": False, "error": "no entry configuration detected"}
+
+        signature = self._signature(key)
+        cache_key = (key, interpreter)
+
+        with self.lock:
+            hit = self.cache.get(cache_key)
+            if hit is not None and hit[0] == signature:
+                return hit[1]
+
+        result = self._run_bootstrap(entry, interpreter)
+        if result.get("ok"):
+            with self.lock:
+                self.cache[cache_key] = (signature, result)
+        return result
+
+    def _run_bootstrap(self, entry: dict, interpreter: str) -> dict:
+        argv = [interpreter, "-c", self.BOOTSTRAP, str(self.paths.repo_root), entry["module"], entry["class"]]
+
+        try:
+            proc = subprocess.run(argv, cwd=str(self.paths.repo_root), capture_output=True, text=True, timeout=180)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {"ok": False, "error": f"config resolution failed: {exc}"}
+
+        if proc.returncode != 0:
+            tail = "\n".join(proc.stderr.strip().splitlines()[-4:])
+            return {"ok": False, "error": f"config resolution failed:\n{tail}"}
+
+        try:
+            leaves = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"ok": False, "error": "config resolution produced no output"}
+
+        return {"ok": True, "module": entry["module"], "config_class": entry["class"], "leaves": leaves}
+
+    def _config_cli_class(self, tree: ast.Module) -> str | None:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Name) or node.func.id != "ConfigCli":
+                continue
+            if not node.args:
+                continue
+
+            first = node.args[0]
+            if isinstance(first, ast.Call) and isinstance(first.func, ast.Name):
+                return first.func.id
+        return None
+
+    def _locate_import(self, tree: ast.Module, used: str) -> tuple[str, str] | None:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            if not node.module or not node.module.startswith("configuration"):
+                continue
+            for alias in node.names:
+                if (alias.asname or alias.name) == used:
+                    return node.module, alias.name
+        return None
+
+    def _signature(self, key: str) -> tuple:
+        watched = sorted(self.paths.config_dir.glob("*.py"))
+        watched.append(self.paths.main_dir / f"{key}.py")
+        watched.append(self.paths.repo_root / "tools" / "config_cli.py")
+
+        stamps = []
+        for path in watched:
+            try:
+                stamps.append((path.name, path.stat().st_mtime_ns))
+            except OSError:
+                continue
+        return tuple(stamps)

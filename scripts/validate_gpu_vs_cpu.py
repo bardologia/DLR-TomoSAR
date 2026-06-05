@@ -313,7 +313,7 @@ def main() -> None:
             print(w)
         print(f"\n  Verdict: ⚠  REVIEW WARNINGS before production use")
     else:
-        print(f"\n  Verdict: ✓  GPU backend results are consistent with CPU baseline")
+        print(f"\n  Verdict: GPU backend results are consistent with CPU baseline")
 
     print(SEP)
 

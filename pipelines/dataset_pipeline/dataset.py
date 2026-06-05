@@ -51,9 +51,9 @@ class PatchDataset(Dataset):
         return self.grid.grid.number_of_patches
 
     def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
-        primary_data        = complex_patch[:1]
-        secondaries_data    = complex_patch[1:1 + self.n_secondaries]
-        interferograms_data = complex_patch[1 + self.n_secondaries:]
+        primary_data        = complex_patch[                       : 1                     ]
+        secondaries_data    = complex_patch[1                      : 1 + self.n_secondaries]
+        interferograms_data = complex_patch[1 + self.n_secondaries :                       ]
 
         p_h, p_w     = complex_patch.shape[-2], complex_patch.shape[-1]
         input_tensor = np.empty((self.input_channels, p_h, p_w), dtype=np.float32)

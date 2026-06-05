@@ -57,13 +57,18 @@ class RunLoader:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
+    def _parse_split_payload(self, value):
+        if isinstance(value, list):
+            return [CropRegion(**region) for region in value]
+        return CropRegion(**value)
+
     def _build_dataset_config(self, payload: dict, batch_size: Optional[int], num_workers: int) -> DatasetConfiguration:
         splits = payload["split_regions"]
-        
+
         split_regions = SplitRegions(
-            train = CropRegion(**splits["train"]),
-            val   = CropRegion(**splits["val"]),
-            test  = CropRegion(**splits["test"]),
+            train = self._parse_split_payload(splits["train"]),
+            val   = self._parse_split_payload(splits["val"]),
+            test  = self._parse_split_payload(splits["test"]),
         )
        
         patch = PatchConfiguration(
@@ -88,8 +93,13 @@ class RunLoader:
     def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger)
-        region  = dict(dataset_config.split_regions.items())[split_name]
-        arrays  = cropper.load_split(region)
+
+        regions = dataset_config.split_regions.regions(split_name)
+        if len(regions) != 1:
+            raise ValueError(f"Inference requires a single contiguous region for split '{split_name}'; found {len(regions)} disjoint regions. Stitching is only defined over one rectangular crop.")
+
+        region = regions[0]
+        arrays = cropper.load_split(region)
 
         grid = Patcher.build(
             spatial_size           = (region.azimuth_size, region.range_size),

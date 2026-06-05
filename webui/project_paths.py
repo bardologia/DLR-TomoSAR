@@ -13,10 +13,6 @@ class ProjectPaths:
         self.scripts_dir  = self.repo_root / "scripts"
         self.config_dir   = self.repo_root / "configuration"
         self.static_dir   = self.webui_root / "static"
-        self.backups_dir  = self.webui_root / ".backups"
-
-    def ensure_backups(self) -> None:
-        self.backups_dir.mkdir(parents=True, exist_ok=True)
 
     def discover_interpreters(self) -> list[dict]:
         found   = []

@@ -1,213 +1,91 @@
 from __future__ import annotations
 
-import os
-gpu_id = "1"
-os.environ["CUDA_VISIBLE_DEVICES"]    = str(gpu_id)
-os.environ["MKL_NUM_THREADS"]         = "4"
-os.environ["NUMEXPR_NUM_THREADS"]     = "4"
-os.environ["OMP_NUM_THREADS"]         = "4"
-
+import argparse
 import json
+import os
 import sys
-import traceback
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from configuration.dataset_config import AugmentationConfig, DatasetConfiguration, SplitRegions
-from tools.crop_region            import CropRegion
-from tools.loss_scale_probe       import LossScaleProbeConfig
-from tools.logger                 import Logger
 
-from configuration.training_config import (
-    LossCurriculumConfig,
-    EarlyStoppingConfig,
-    EMAConfig,
-    GaussianConfig,
-    GradientClipperConfig,
-    IOConfig,
-    LossConfig,
-    OptimizerConfig,
-    OverfitConfig,
-    SchedulerConfig,
-    TrainerConfig,
-    TrainingConfigInner,
-    WarmupConfig,
-)
+def _pin_environment() -> None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--gpu", type=int, default=0)
+    args, _ = parser.parse_known_args()
 
-from models import CONFIG_REGISTRY
-from pipelines.training_pipeline.pipeline import TrainingPipeline
-
-dataset_path        = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-params_path         = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-log_base_dir        = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/overfit_test")
-
-overfit_steps       = 5000
-stop_threshold      = 1e-3
-overfit_batchsize   = 9
-overfit_az_lines    = 128
-overfit_range_lines = 128
-az_start            = 1000
-
-n_gaussians         = 5
-seed                = 42
-
-
-skip_models: set[str] = set()
-
-
-def run_overfit(model_name: str, dataset_config: DatasetConfiguration, logger: Logger, run_tag: str) -> dict:
-    logger.subsection(model_name)
-
-    model_config = CONFIG_REGISTRY[model_name]()
-
-    for attr in ("dropout", "attention_dropout", "stochastic_depth_rate"):
-        if hasattr(model_config, attr):
-            setattr(model_config, attr, 0.0)
-
-    for attr in vars(model_config):
-        if attr.endswith("_wd"):
-            setattr(model_config, attr, 0.0)
-
-    trainer_config = TrainerConfig(
-        gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=n_gaussians),
-        early_stopping   = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
-        warmup           = WarmupConfig(warmup_enabled=False),
-        scheduler        = SchedulerConfig(type="constant"),
-        ema              = EMAConfig(use_ema=False, ema_decay=0.999),
-        optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
-        gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
-
-        io = IOConfig(logdir=str(log_base_dir / f"{run_tag}_{model_name}")),
-
-        training = TrainingConfigInner(
-            device               = "gpu",
-            epochs               = 10000,
-            validation_frequency = 9999,
-        ),
-
-        overfit = OverfitConfig(
-            enabled        = True,
-            max_steps      = overfit_steps,
-            stop_threshold = stop_threshold,
-            batch_size     = overfit_batchsize,
-        ),
-
-        curriculum = LossCurriculumConfig(
-            enabled  = False,
-            warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-            complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-        ),
-    )
-
-    pipeline = TrainingPipeline(
-        trainer_config = trainer_config,
-        dataset_config = dataset_config,
-        model_name     = model_name,
-        model_config   = model_config,
-        seed           = seed,
-        run_name       = f"overfit_{model_name}",
-    )
-
-    probe_config = LossScaleProbeConfig(
-        enabled        = False,
-        n_batches      = 100,
-        reference      = "param_l1",
-        exit_after     = True,
-        enabled_losses = {},
-    )
-
-    result = {"model": model_name, "status": None, "final_loss": None, "error": None}
-    try:
-        pipeline.run(probe_config=probe_config)
-        result["status"] = "PASS"
-        logger.info(f" {model_name} :  PASS")
-    except SystemExit:
-        result["status"] = "PASS"
-        logger.info(f" {model_name} :  PASS  (exit via SystemExit)")
-    except Exception as e:
-        result["status"] = "FAIL"
-        result["error"]  = traceback.format_exc()
-        logger.error(f" {model_name}  :  FAIL  |  {type(e).__name__}: {e}")
-
-    return result
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+    os.environ["MKL_NUM_THREADS"]      = "4"
+    os.environ["NUMEXPR_NUM_THREADS"]  = "4"
+    os.environ["OMP_NUM_THREADS"]      = "4"
 
 
 def main() -> None:
-    log_base_dir.mkdir(parents=True, exist_ok=True)
-    run_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-    logger = Logger(log_dir=str(log_base_dir), name="overfit_test")
+    _pin_environment()
 
-    all_models     = list(CONFIG_REGISTRY.keys())
-    models_to_test = [m for m in all_models if m not in skip_models]
+    from configuration.benchmark_config import OverfitTestConfig
+    from models import CONFIG_REGISTRY
+    from pipelines.benchmark_pipeline.workers import OverfitWorker
+    from tools.config_cli import ConfigCli
+    from tools.logger import Logger
+
+    config  = ConfigCli(OverfitTestConfig(), description="Sequential in-process overfit sanity check").apply()
+    run_tag = config.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = Path(config.paths.log_base_dir) / run_tag
+
+    logger = Logger(log_dir=str(run_dir / "pipeline"), name="overfit_test")
+    worker = OverfitWorker(config=config, run_tag=run_tag)
+    models = [m for m in CONFIG_REGISTRY.keys() if m not in set(config.skip_models)]
 
     logger.section("Overfit sanity-check")
     logger.kv_table({
-        "Models":          len(models_to_test),
-        "Steps per model": overfit_steps,
-        "Stop threshold":  stop_threshold,
-        "Batch size":      overfit_batchsize,
+        "Models"          : len(models),
+        "Steps per model" : config.overfit.max_steps,
+        "Stop threshold"  : config.overfit.stop_threshold,
+        "Batch size"      : config.overfit.batch_size,
+        "Run dir"         : str(run_dir),
     }, title="Configuration")
-
-    with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
-        layout = json.load(f)
-    
-    global_crop = CropRegion(*layout["global_crop"])
-    az_end      = az_start + overfit_az_lines
-    range_end   = global_crop.range_start + overfit_range_lines
-    
-    overfit_crop = CropRegion(az_start, az_end, global_crop.range_start, range_end)
-
-    dataset_config = DatasetConfiguration(
-        preprocessing_run_directory = dataset_path,
-        parameters_path             = params_path,
-       
-        split_regions = SplitRegions(
-            train = overfit_crop,
-            val   = overfit_crop,
-            test  = overfit_crop,
-        ),
-    
-        augmentation  = AugmentationConfig(
-            p_flip_h    = 0.0,
-            p_flip_v    = 0.0,
-            p_rot90     = 0.0,
-            p_amp_scale = 0.0,
-            p_noise     = 0.0,
-        ),
-    )
 
     logger.section("Running tests")
     results = []
-    for model_name in models_to_test:
-        result = run_overfit(model_name, dataset_config, logger, run_tag)
+    for model_name in models:
+        logger.subsection(model_name)
+
+        try:
+            worker.run(model_name=model_name)
+        except SystemExit:
+            pass
+        except Exception as e:
+            logger.error(f"{model_name}  :  {type(e).__name__}: {e}")
+
+        result_path = run_dir / "overfit" / model_name / "overfit_result.json"
+        try:
+            with open(result_path, "r", encoding="utf-8") as f:
+                result = json.load(f)
+        except Exception:
+            result = {"model": model_name, "status": "FAIL", "final_loss": None, "converged": None, "error": f"missing result file: {result_path}"}
+
         results.append(result)
+        logger.info(f"{model_name}  :  {result['status']}")
 
     passed = [r for r in results if r["status"] == "PASS"]
-    failed = [r for r in results if r["status"] == "FAIL"]
+    failed = [r for r in results if r["status"] != "PASS"]
 
     logger.section("Summary")
     logger.kv_table({
-        "Total":  len(results),
-        "Passed": len(passed),
-        "Failed": len(failed),
+        "Total"  : len(results),
+        "Passed" : len(passed),
+        "Failed" : len(failed),
     }, title=f"{len(passed)}/{len(results)} passed")
 
-    if passed:
-        logger.subsection("Passed")
-        for r in passed:
-            logger.info(f"{r['model']}")
+    for r in failed:
+        logger.error(f"FAILED  {r['model']}")
 
-    if failed:
-        logger.subsection("Failed")
-        for r in failed:
-            logger.error(f"{r['model']}")
-
-    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = log_base_dir / f"overfit_results_{timestamp}.json"
+    output_path = run_dir / "pipeline" / "overfit_results.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     logger.info(f"Results saved to: {output_path}")

@@ -2,17 +2,19 @@
 
 class EquationView {
   constructor(tabsEl, gridEl) {
-    this.tabsEl = tabsEl;
-    this.gridEl = gridEl;
-    this.groups = [];
-    this.active = 0;
+    this.tabsEl   = tabsEl;
+    this.gridEl   = gridEl;
+    this.groups   = [];
+    this.active   = 0;
+    this.rendered = new Map();
+    this.mjReady  = null;
   }
 
   async load() {
-    const data = await window.apiGet("/api/equations");
+    const data  = await window.apiGet("/api/equations");
     this.groups = data.groups || [];
     this._renderTabs();
-    this._renderGroup(0);
+    this._select(0);
   }
 
   _renderTabs() {
@@ -20,7 +22,7 @@ class EquationView {
     this.groups.forEach((group, i) => {
       const tab = document.createElement("button");
       tab.className = "eq-tab" + (i === 0 ? " is-active" : "");
-      tab.textContent = group.group;
+      tab.innerHTML = `${this._esc(group.group)}<span class="eq-tab__count">${group.items.length}</span>`;
       tab.addEventListener("click", () => this._select(i));
       this.tabsEl.appendChild(tab);
     });
@@ -35,62 +37,126 @@ class EquationView {
   _renderGroup(index) {
     const group = this.groups[index];
     if (!group) return;
+
     this.gridEl.innerHTML = "";
 
-    group.items.forEach((item, i) => {
-      const card = document.createElement("div");
-      card.className = "eq-card reveal";
-      card.style.transitionDelay = `${i * 0.05}s`;
+    const blurb = document.createElement("p");
+    blurb.className   = "eq-blurb";
+    blurb.textContent = group.blurb || "";
+    this.gridEl.appendChild(blurb);
 
-      const title = document.createElement("h3");
-      title.className = "eq-card__title";
-      title.textContent = item.title;
+    let cards = this.rendered.get(index);
+    if (!cards) {
+      cards = group.items.map((item, i) => this._buildCard(item, i));
+      this.rendered.set(index, cards);
+    }
 
-      const tex = document.createElement("div");
-      tex.className = "eq-card__tex";
-      this._renderTex(tex, item.tex);
-
-      const note = document.createElement("p");
-      note.className = "eq-card__note";
-      note.textContent = item.note;
-
-      card.appendChild(title);
-      card.appendChild(tex);
-      card.appendChild(note);
-
-      if (item.vars && item.vars.length) {
-        const vars = document.createElement("div");
-        vars.className = "eq-card__vars";
-        item.vars.forEach((v) => {
-          const row = document.createElement("div");
-          row.className = "eq-var";
-          const sym = document.createElement("span");
-          sym.className = "eq-var__sym";
-          this._renderTex(sym, v.sym);
-          const desc = document.createElement("span");
-          desc.className = "eq-var__desc";
-          desc.textContent = v.desc;
-          row.appendChild(sym);
-          row.appendChild(desc);
-          vars.appendChild(row);
-        });
-        card.appendChild(vars);
-      }
-
-      this.gridEl.appendChild(card);
-    });
+    const grid = document.createElement("div");
+    grid.className = "eq-cards";
+    cards.forEach((c) => grid.appendChild(c));
+    this.gridEl.appendChild(grid);
 
     window.revealScan();
   }
 
-  _renderTex(el, tex) {
-    if (window.katex) {
-      try {
-        window.katex.render(tex, el, { throwOnError: false, displayMode: false });
-        return;
-      } catch (e) {}
+  _buildCard(item, i) {
+    const card = document.createElement("div");
+    card.className = "eq-card reveal";
+    card.style.transitionDelay = `${Math.min(i * 0.04, 0.4)}s`;
+
+    const title       = document.createElement("h3");
+    title.className   = "eq-card__title";
+    title.textContent = item.title;
+
+    const tex       = document.createElement("div");
+    tex.className   = "eq-card__tex";
+    this._typeset(tex, item.tex, true);
+
+    const note       = document.createElement("p");
+    note.className   = "eq-card__note";
+    note.textContent = item.note;
+
+    card.appendChild(title);
+    card.appendChild(tex);
+    card.appendChild(note);
+
+    if (item.vars && item.vars.length) {
+      const vars     = document.createElement("div");
+      vars.className = "eq-card__vars";
+
+      item.vars.forEach((v) => {
+        const row     = document.createElement("div");
+        row.className = "eq-var";
+        const sym     = document.createElement("span");
+        sym.className = "eq-var__sym";
+        this._typeset(sym, v.sym, false);
+        const desc       = document.createElement("span");
+        desc.className   = "eq-var__desc";
+        desc.textContent = v.desc;
+        row.appendChild(sym);
+        row.appendChild(desc);
+        vars.appendChild(row);
+      });
+
+      card.appendChild(vars);
     }
+
+    return card;
+  }
+
+  _whenMathJax() {
+    if (this.mjReady) return this.mjReady;
+    this.mjReady = new Promise((resolve) => {
+      const check = () => {
+        if (window.MathJax && window.MathJax.tex2svgPromise) resolve();
+        else setTimeout(check, 120);
+      };
+      check();
+    }).then(() => {
+      if (!document.getElementById("MJX-SVG-styles")) {
+        document.head.appendChild(window.MathJax.svgStylesheet());
+      }
+    });
+    return this.mjReady;
+  }
+
+  _stack(tex) {
+    if (tex.indexOf("\\qquad") < 0) return tex;
+    const parts = tex.split(/,?\s*\\qquad\s*/).filter((p) => p.trim().length);
+    if (parts.length < 2) return tex;
+    return "\\begin{gathered}" + parts.join(" \\\\[0.55em] ") + "\\end{gathered}";
+  }
+
+  _typeset(el, tex, display) {
     el.textContent = tex;
+    const source = display ? this._stack(tex) : tex;
+    this._whenMathJax().then(() => {
+      return window.MathJax.tex2svgPromise(source, { display: !!display });
+    }).then((node) => {
+      el.textContent = "";
+      el.appendChild(node);
+      if (display) this._fit(el);
+    }).catch(() => {});
+  }
+
+  _fit(el) {
+    requestAnimationFrame(() => {
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+      const card = el.closest(".eq-card");
+      if (card) card.classList.add("eq-card--wide");
+      requestAnimationFrame(() => {
+        if (el.scrollWidth <= el.clientWidth + 1) return;
+        const svg = el.querySelector("svg");
+        if (svg) {
+          svg.style.maxWidth = "100%";
+          svg.style.height = "auto";
+        }
+      });
+    });
+  }
+
+  _esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   }
 }
 

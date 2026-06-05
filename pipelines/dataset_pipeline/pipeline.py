@@ -15,6 +15,7 @@ from pipelines.dataset_pipeline.patch           import Patcher
 from tools.logger                               import Logger
 from pipelines.dataset_pipeline.normalizer      import Normalizer
 from pipelines.dataset_pipeline.augmentation    import SpatialAugmenter
+from pipelines.dataset_pipeline.multi_region    import MultiRegionDataset
 
 
 class DatasetPipeline:
@@ -50,33 +51,45 @@ class DatasetPipeline:
             title="Dataset Creation",
         )
 
-    def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None) -> Tuple[PatchDataset, Patcher]:
-        region   = dict(self.config.split_regions.items())[split_name]
-        arrays   = self.cropper.load_split(region)
-        spatial  = (region.azimuth_size, region.range_size)
-        
-        patcher  = Patcher.build(
-            spatial_size           = spatial,
-            patch_size             = self.config.patch.size,
-            stride                 = self.config.patch.stride,
-            use_reflective_padding = self.config.patch.use_reflective_padding,
-        )
+    def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None):
+        regions  = self.config.split_regions.regions(split_name)
+        parts    = []
+        patchers = []
 
-        dataset = PatchDataset(
-            inputs           = arrays["inputs"],
-            gt_parameters    = arrays["parameters"],
-            grid             = patcher,
-            input_config     = self.config.input_config,
-            output_config    = self.config.output_config,
-            split_name       = split_name,
-            normalizer       = normalizer,
-            x_axis           = self.config.x_axis,
-            n_gaussians      = self.config.n_gaussians,
-            augmenter        = self.augmenter,
-            dem              = arrays.get("dem") if self.config.input_config.use_dem else None,
-        )
-        
-        return dataset, patcher
+        for region in regions:
+            arrays  = self.cropper.load_split(region)
+            spatial = (region.azimuth_size, region.range_size)
+
+            patcher = Patcher.build(
+                spatial_size           = spatial,
+                patch_size             = self.config.patch.size,
+                stride                 = self.config.patch.stride,
+                use_reflective_padding = self.config.patch.use_reflective_padding,
+            )
+
+            part = PatchDataset(
+                inputs           = arrays["inputs"],
+                gt_parameters    = arrays["parameters"],
+                grid             = patcher,
+                input_config     = self.config.input_config,
+                output_config    = self.config.output_config,
+                split_name       = split_name,
+                normalizer       = normalizer,
+                x_axis           = self.config.x_axis,
+                n_gaussians      = self.config.n_gaussians,
+                augmenter        = self.augmenter,
+                dem              = arrays.get("dem") if self.config.input_config.use_dem else None,
+            )
+
+            parts.append(part)
+            patchers.append(patcher)
+
+        if len(parts) == 1:
+            return parts[0], patchers[0]
+
+        self.logger.subsection(f"Split '{split_name}': {len(parts)} disjoint regions, {sum(len(p) for p in parts)} patches total")
+
+        return MultiRegionDataset(parts), patchers
 
     def run(self) -> Tuple[DataLoader, DataLoader, DataLoader, dict[str, PatchDataset]]:
       
@@ -121,11 +134,16 @@ class DatasetPipeline:
         )
         
         self.metadata_writer.save_patch_metadata({
-            "train" : train_patcher.grid,
-            "val"   : val_patcher.grid,
-            "test"  : test_patcher.grid,
+            "train" : self._patch_grids(train_patcher),
+            "val"   : self._patch_grids(val_patcher),
+            "test"  : self._patch_grids(test_patcher),
         })
 
         datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
-        
+
         return train_loader, val_loader, test_loader, datasets
+
+    def _patch_grids(self, patcher):
+        if isinstance(patcher, list):
+            return [p.grid for p in patcher]
+        return patcher.grid

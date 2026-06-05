@@ -168,7 +168,7 @@ def launch_jobs() -> None:
     for ng, proc, run_logdir in processes:
         ret = proc.wait()
         exit_codes[ng] = ret
-        status = "✓ OK" if ret == 0 else f"✗ FAILED (exit {ret})"
+        status = "OK" if ret == 0 else f"FAILED (exit {ret})"
         print(f"[launcher] Ng={ng}  {status}  —  logs: {run_logdir}")
 
     failed = [ng for ng, code in exit_codes.items() if code != 0]

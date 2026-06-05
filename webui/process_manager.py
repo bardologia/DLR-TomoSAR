@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import queue
+import re
+import shlex
 import subprocess
 import threading
 import uuid
@@ -44,6 +46,8 @@ class JobStream:
 
 class ProcessManager:
 
+    OVERRIDE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
+
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths   = paths
         self.logger  = logger
@@ -51,10 +55,15 @@ class ProcessManager:
         self.streams = {}
         self.lock    = threading.Lock()
 
-    def launch(self, key: str, interpreter: str) -> dict:
+    def launch(self, key: str, interpreter: str, overrides: dict | None = None) -> dict:
         script = self.paths.main_dir / f"{key}.py"
         if not script.exists():
             return {"ok": False, "error": "script not found"}
+
+        overrides = self._clean_overrides(overrides)
+        argv      = [interpreter, "-u", str(script)]
+        for path, value in overrides.items():
+            argv += [f"--{path}", value]
 
         job_id = uuid.uuid4().hex[:12]
         stream = JobStream()
@@ -64,7 +73,7 @@ class ProcessManager:
 
         try:
             process = subprocess.Popen(
-                [interpreter, "-u", str(script)],
+                argv,
                 cwd                = str(self.paths.repo_root),
                 stdout             = subprocess.PIPE,
                 stderr             = subprocess.STDOUT,
@@ -78,8 +87,9 @@ class ProcessManager:
         record = {
             "job_id"      : job_id,
             "script"      : key,
-            "command"     : f"{interpreter} -u main/{key}.py",
+            "command"     : self._render_command(interpreter, key, overrides),
             "interpreter" : interpreter,
+            "overrides"   : overrides,
             "status"      : "running",
             "pid"         : process.pid,
             "started"     : datetime.now().isoformat(timespec="seconds"),
@@ -97,6 +107,20 @@ class ProcessManager:
         worker.start()
 
         return {"ok": True, "job_id": job_id}
+
+    def _clean_overrides(self, overrides: dict | None) -> dict:
+        cleaned = {}
+        for path, value in (overrides or {}).items():
+            if not isinstance(path, str) or not self.OVERRIDE_NAME.match(path):
+                continue
+            cleaned[path] = str(value)
+        return cleaned
+
+    def _render_command(self, interpreter: str, key: str, overrides: dict) -> str:
+        parts = [interpreter, "-u", f"main/{key}.py"]
+        for path, value in overrides.items():
+            parts += [f"--{path}", shlex.quote(value)]
+        return " ".join(parts)
 
     def _pump(self, job_id: str, process: subprocess.Popen, stream: JobStream) -> None:
         line_no = 0

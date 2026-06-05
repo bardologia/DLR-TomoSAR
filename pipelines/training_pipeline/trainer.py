@@ -67,7 +67,7 @@ class Trainer:
         self.lr_scheduler        = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
         self.ema                 = EMA(self.config, self.logger, self.tracker)
         self.early_stopping      = EarlyStopping(self.config, self.logger, self.tracker)
-        self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats)
+        self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry)
         self.checkpoint          = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.grad_clipper        = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
         self.overfitter          = OverfitManager(self.config, self.logger)

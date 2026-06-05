@@ -61,16 +61,19 @@ class ProgressiveProjectionHead(nn.Module):
         bias:            bool  = False,
     ):
         super().__init__()
+        # Front projection: 3x3 conv -> Norm -> Act (paper's consecutive 3x3 projection)
         layers = [
             nn.Conv2d(
                 in_channels  = input_channels,
                 out_channels = output_channels,
-                kernel_size  = 1,
+                kernel_size  = 3,
+                padding      = 1,
                 bias         = bias,
             ),
             build_norm2d(normalization, output_channels),
             build_activation(activation),
         ]
+        # Blue block per Fig. 2: Deconv 2x2 -> Conv 3x3 -> Norm -> Act
         for _ in range(upsample_steps):
             layers.extend([
                 nn.ConvTranspose2d(
@@ -78,6 +81,13 @@ class ProgressiveProjectionHead(nn.Module):
                     out_channels = output_channels,
                     kernel_size  = 2,
                     stride       = 2,
+                    bias         = bias,
+                ),
+                nn.Conv2d(
+                    in_channels  = output_channels,
+                    out_channels = output_channels,
+                    kernel_size  = 3,
+                    padding      = 1,
                     bias         = bias,
                 ),
                 build_norm2d(normalization, output_channels),

@@ -43,18 +43,28 @@ class MetadataWriter:
 
     def save_crop_metadata(self, global_crop: CropRegion, splits: dict[str, CropRegion]) -> Path:
         out_path = self.outpaths["crop"]
-        payload  = {"global_crop" : list(global_crop.as_tuple()), "splits" : {name: list(region.as_tuple()) for name, region in splits.items()}}
-        
+        payload  = {"global_crop" : list(global_crop.as_tuple()), "splits" : {name: self._region_payload(value) for name, value in splits.items()}}
+
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4)
-        
+
         return out_path
 
     def save_patch_metadata(self, grids: dict[str, GridInfo]) -> Path:
         out_path = self.outpaths["patch"]
-        payload  = {name: grid.as_dict() for name, grid in grids.items()}
-        
+        payload  = {name: self._grid_payload(value) for name, value in grids.items()}
+
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4)
-        
+
         return out_path
+
+    def _region_payload(self, value):
+        if isinstance(value, (list, tuple)):
+            return [list(region.as_tuple()) for region in value]
+        return list(value.as_tuple())
+
+    def _grid_payload(self, value):
+        if isinstance(value, (list, tuple)):
+            return [grid.as_dict() for grid in value]
+        return value.as_dict()

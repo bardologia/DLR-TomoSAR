@@ -15,25 +15,11 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-dataset_path = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset")
-params_path  = Path("/ste/rnd/User/vice_vi/Dataset/clean_dataset/params/params_sig_k5/parameters_sig_k5.npy")
-log_base_dir = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/tuning")
-
-gpus                = [0, 1, 2, 3]
-batch_size          = 256
-num_workers         = 4
-warmup_steps        = 200
-eta_min             = 1e-6
-
-skip_models: set[str] = set()
-
-run_tag: str | None = None
-
-
 class TuningOrchestrator:
-    def __init__(self, tag: str) -> None:
+    def __init__(self, tag: str, config) -> None:
         self.tag          = tag
-        self.run_dir      = log_base_dir / tag
+        self.config       = config
+        self.run_dir      = Path(config.paths.log_base_dir) / tag
         self.storage_url  = f"sqlite:///{self.run_dir / 'optuna.db'}"
         self.summary_path = self.run_dir / "tuning_results.json"
 
@@ -61,6 +47,8 @@ class TuningOrchestrator:
         )
         from tools.crop_region import CropRegion
 
+        dataset_path = Path(self.config.paths.dataset_path)
+
         with open(dataset_path / "data" / "dataset.json", "r", encoding="utf-8") as f:
             layout = json.load(f)
         global_crop = CropRegion(*layout["global_crop"])
@@ -73,11 +61,11 @@ class TuningOrchestrator:
 
         dataset_config = DatasetConfiguration(
             preprocessing_run_directory = dataset_path,
-            parameters_path             = params_path,
+            parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
             patch                       = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
-            batch_size                  = batch_size,
-            num_workers                 = num_workers,
+            batch_size                  = self.config.batch_size,
+            num_workers                 = self.config.num_workers,
             shuffle_train               = True,
             pin_memory                  = True,
         )
@@ -85,12 +73,12 @@ class TuningOrchestrator:
         trainer_config = TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
             early_stopping   = EarlyStoppingConfig(patience=8, min_delta=0.0001, restore_best=True),
-            warmup           = WarmupConfig(warmup_steps=warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
-            scheduler        = SchedulerConfig(type="cosine_annealing", epochs=60, eta_min=eta_min),
+            warmup           = WarmupConfig(warmup_steps=self.config.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
+            scheduler        = SchedulerConfig(type="cosine_annealing", epochs=60, eta_min=self.config.eta_min),
             ema              = EMAConfig(use_ema=False, ema_decay=0.999),
             optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
             gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
-            io               = IOConfig(logdir=str(log_base_dir)),
+            io               = IOConfig(logdir=str(self.config.paths.log_base_dir)),
             training         = TrainingConfigInner(device="gpu", epochs=60, validation_frequency=1, gradient_accumulation_steps=1, max_grad_norm=None, verbose=True),
 
             curriculum = LossCurriculumConfig(
@@ -105,7 +93,7 @@ class TuningOrchestrator:
     def _spawn_workers(self, model_name: str, phase: int, trial_counts: list[int]) -> list[tuple]:
         sname = self._study_name(model_name, phase)
         procs = []
-        for gpu_id, n_trials in zip(gpus, trial_counts):
+        for gpu_id, n_trials in zip(self.config.gpus, trial_counts):
             log_path = self.run_dir / model_name / f"phase{phase}_gpu{gpu_id}.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             cmd = [
@@ -118,6 +106,7 @@ class TuningOrchestrator:
                 "--study-name",   sname,
                 "--storage-url",  self.storage_url,
                 "--run-tag",      self.tag,
+                "--run-dir",      str(self.run_dir),
             ]
             log_fh = open(log_path, "w")
             proc   = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh)
@@ -137,9 +126,9 @@ class TuningOrchestrator:
                 else:
                     log_fh.close()
                     if ret == 0:
-                        self.logger.info(f"✓  [GPU {gpu_id}] phase-{phase} worker — {model_name}  DONE")
+                        self.logger.info(f"[GPU {gpu_id}] phase-{phase} worker — {model_name}  DONE")
                     else:
-                        self.logger.error(f"✗  [GPU {gpu_id}] phase-{phase} worker — {model_name}  FAILED (exit {ret})  →  {log_path}")
+                        self.logger.error(f"[GPU {gpu_id}] phase-{phase} worker — {model_name}  FAILED (exit {ret}, see {log_path})")
                         ok = False
             procs = still
         return ok
@@ -255,11 +244,12 @@ class TuningOrchestrator:
 
     def schedule(self, target_model: str | None = None) -> None:
         from models import CONFIG_REGISTRY
+        from tools.config_cli import ConfigCli
         from tools.logger import Logger
-        from configuration.tuning_config import TuningConfig
 
-        tune_cfg = TuningConfig()
+        tune_cfg = self.config.tuning
         self.run_dir.mkdir(parents=True, exist_ok=True)
+        ConfigCli.save_resolved(self.config, self.run_dir / "resolved_config.json")
 
         self.logger = Logger(log_dir=str(self.run_dir), name="tune_scheduler")
 
@@ -270,13 +260,13 @@ class TuningOrchestrator:
                 sys.exit(f"ERROR: unknown model '{target_model}'. Available: {list(CONFIG_REGISTRY.keys())}")
             models_to_run = [target_model]
         else:
-            models_to_run = [m for m in all_models if m not in skip_models]
+            models_to_run = [m for m in all_models if m not in set(self.config.skip_models)]
 
         self.logger.section("Hyperparameter Tuning")
         self.logger.kv_table({
             "Run tag"         : self.tag,
             "Models"          : len(models_to_run),
-            "GPUs"            : gpus,
+            "GPUs"            : self.config.gpus,
             "Phase-1 trials"  : tune_cfg.phase1.n_trials,
             "Phase-2 trials"  : tune_cfg.phase2.n_trials,
             "Storage"         : self.storage_url,
@@ -312,12 +302,11 @@ class TuningOrchestrator:
         import optuna
         from models import CONFIG_REGISTRY
         from tools.logger import Logger
-        from configuration.tuning_config import TuningConfig
         from pipelines.tuning_pipeline.pipeline import TuningPipeline
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        model_log_dir = str(log_base_dir / self.tag / model_name / f"phase{phase}_gpu{gpu_id}")
+        model_log_dir = str(self.run_dir / model_name / f"phase{phase}_gpu{gpu_id}")
         logger        = Logger(log_dir=model_log_dir, name=f"tune_worker_p{phase}_gpu{gpu_id}_{model_name}")
 
         logger.section(f"[GPU {gpu_id}] Phase {phase} Worker — {model_name}")
@@ -329,7 +318,7 @@ class TuningOrchestrator:
             "Storage"    : storage_url,
         })
 
-        tune_cfg                 = TuningConfig()
+        tune_cfg                 = self.config.tuning
         trainer_cfg, dataset_cfg = self._build_base_configs()
         model_config_cls         = CONFIG_REGISTRY[model_name]
 
@@ -339,7 +328,7 @@ class TuningOrchestrator:
             base_trainer_config = trainer_cfg,
             base_dataset_config = dataset_cfg,
             tune_cfg            = tune_cfg,
-            log_dir             = str(log_base_dir / self.tag / model_name),
+            log_dir             = str(self.run_dir / model_name),
             logger              = logger,
         )
 
@@ -349,7 +338,7 @@ class TuningOrchestrator:
             pipeline.run_phase1(study, n_trials)
 
         elif phase == 2:
-            p1_best_path = log_base_dir / self.tag / model_name / "phase1_best.json"
+            p1_best_path = self.run_dir / model_name / "phase1_best.json"
             if not p1_best_path.exists():
                 logger.error(f"Phase-1 best params not found at {p1_best_path}")
                 sys.exit(1)
@@ -361,7 +350,7 @@ class TuningOrchestrator:
             logger.error(f"Unknown phase: {phase}")
             sys.exit(1)
 
-        logger.info(f"✓  [GPU {gpu_id}] Phase {phase} — {model_name}  DONE")
+        logger.info(f"[GPU {gpu_id}] Phase {phase} — {model_name}  DONE")
         logger.close()
 
 
@@ -375,10 +364,11 @@ def main() -> None:
     parser.add_argument("--study-name",  type=str,  default=None)
     parser.add_argument("--storage-url", type=str,  default=None)
     parser.add_argument("--run-tag",     type=str,  default=None)
-    args = parser.parse_args()
+    parser.add_argument("--run-dir",     type=str,  default=None)
+    args, _ = parser.parse_known_args()
 
-    tag          = args.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
-    orchestrator = TuningOrchestrator(tag=tag)
+    from configuration.tuning_config import TuningEntryConfig
+    from tools.config_cli import ConfigCli
 
     if args.worker:
         if args.model is None:
@@ -386,6 +376,12 @@ def main() -> None:
         if args.study_name is None or args.storage_url is None:
             sys.exit("ERROR: --worker requires --study-name and --storage-url")
 
+        tag    = args.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+        config = TuningEntryConfig()
+        if args.run_dir:
+            config = ConfigCli.load_resolved(config, Path(args.run_dir) / "resolved_config.json")
+
+        orchestrator = TuningOrchestrator(tag=tag, config=config)
         orchestrator.run_worker(
             model_name  = args.model,
             gpu_id      = args.gpu,
@@ -396,6 +392,10 @@ def main() -> None:
         )
 
     else:
+        config = ConfigCli(TuningEntryConfig(), description="Two-phase hyperparameter tuning").apply()
+        tag    = args.run_tag or config.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        orchestrator = TuningOrchestrator(tag=tag, config=config)
         orchestrator.schedule(target_model=args.model)
 
 

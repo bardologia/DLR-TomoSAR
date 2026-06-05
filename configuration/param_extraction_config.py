@@ -136,3 +136,17 @@ class ExtractionConfig:
                             return (float(hr[0]), float(hr[1]))
 
         
+
+@dataclass
+class ExtractParamsEntryConfig:
+    dataset_base_path : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
+    pyrat_directory   : Path         = Path("/ste/rnd/User/vice_vi/pyrat")
+    tomogram_filename : str          = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
+
+    output_prefix     : str          = "params"
+    output_suffix     : str | None   = None
+    height_range      : tuple | None = None
+
+    fit_k_max         : int          = 5
+    fit_lambda_k      : float        = 3e-3
+    parameter_workers : int          = 50

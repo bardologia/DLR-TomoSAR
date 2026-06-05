@@ -8,8 +8,10 @@ from pipelines.dataset_pipeline.stats           import Stats
 from pipelines.dataset_pipeline.stats_computer  import StatsComputer
 from pipelines.dataset_pipeline.patch           import Patcher, GridInfo
 from pipelines.dataset_pipeline.pipeline        import DatasetPipeline
+from pipelines.dataset_pipeline.multi_region    import MultiRegionDataset
 
 __all__ = [
+    "MultiRegionDataset",
     "Cropper",
     "Layout",
     "DatasetPipeline",
