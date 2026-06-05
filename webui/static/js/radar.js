@@ -47,7 +47,7 @@ class RadarScene extends CanvasBase {
 
   onResize() {
     this._seed();
-    if (REDUCED_MOTION) this._draw();
+    if (REDUCED_MOTION && this.angle != null) this._draw();
   }
 
   _seed() {
@@ -75,7 +75,7 @@ class RadarScene extends CanvasBase {
     ctx.save();
     ctx.translate(cx, cy);
 
-    ctx.strokeStyle = "rgba(120, 200, 220, 0.10)";
+    ctx.strokeStyle = "rgba(29, 79, 216, 0.14)";
     ctx.lineWidth = 1;
     for (let i = 1; i <= 6; i++) {
       ctx.beginPath();
@@ -87,16 +87,16 @@ class RadarScene extends CanvasBase {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-      ctx.strokeStyle = "rgba(120, 200, 220, 0.06)";
+      ctx.strokeStyle = "rgba(29, 79, 216, 0.08)";
       ctx.stroke();
     }
 
     if (!REDUCED_MOTION) {
       const grad = ctx.createConicGradient(this.angle, 0, 0);
-      grad.addColorStop(0, "rgba(53, 230, 208, 0.0)");
-      grad.addColorStop(0.04, "rgba(53, 230, 208, 0.22)");
-      grad.addColorStop(0.09, "rgba(53, 230, 208, 0.02)");
-      grad.addColorStop(1, "rgba(53, 230, 208, 0.0)");
+      grad.addColorStop(0, "rgba(29, 79, 216, 0.0)");
+      grad.addColorStop(0.04, "rgba(29, 79, 216, 0.08)");
+      grad.addColorStop(0.09, "rgba(29, 79, 216, 0.007)");
+      grad.addColorStop(1, "rgba(29, 79, 216, 0.0)");
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, rad, 0, Math.PI * 2);
@@ -106,7 +106,7 @@ class RadarScene extends CanvasBase {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(Math.cos(this.angle) * rad, Math.sin(this.angle) * rad);
-      ctx.strokeStyle = "rgba(53, 230, 208, 0.5)";
+      ctx.strokeStyle = "rgba(29, 79, 216, 0.18)";
       ctx.lineWidth = 1.4;
       ctx.stroke();
     }
@@ -117,12 +117,12 @@ class RadarScene extends CanvasBase {
       const base = 0.18 + p.lit * 0.82;
       ctx.beginPath();
       ctx.arc(x, y, p.s * (0.7 + p.lit * 1.4), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(124, 255, 155, ${base})`;
+      ctx.fillStyle = `rgba(29, 79, 216, ${base})`;
       ctx.fill();
       if (p.lit > 0.05) {
         ctx.beginPath();
         ctx.arc(x, y, p.s * 4 * p.lit, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(53, 230, 208, ${0.12 * p.lit})`;
+        ctx.fillStyle = `rgba(29, 79, 216, ${0.12 * p.lit})`;
         ctx.fill();
       }
     }
@@ -151,6 +151,7 @@ class SpectrumScene extends CanvasBase {
     super(canvas);
     this.readout = readout;
     this.t = 0;
+    this.hues = ["45, 212, 191", "111, 155, 255", "167, 139, 250"];
     this.components = [
       { a: 0.9, mu: 0.32, sig: 0.05, va: 0.12, vm: 0.04, vs: 0.015, pa: 0, pm: 1.2, ps: 2.1 },
       { a: 0.55, mu: 0.58, sig: 0.07, va: 0.1, vm: 0.05, vs: 0.02, pa: 2, pm: 0.7, ps: 1.1 },
@@ -165,7 +166,7 @@ class SpectrumScene extends CanvasBase {
   }
 
   onResize() {
-    if (REDUCED_MOTION) this._draw();
+    if (REDUCED_MOTION && this.components) this._draw();
   }
 
   _params() {
@@ -197,7 +198,7 @@ class SpectrumScene extends CanvasBase {
 
     ctx.clearRect(0, 0, w, h);
 
-    ctx.strokeStyle = "rgba(120, 200, 220, 0.08)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = padT + ((h - padT - padB) / 4) * i;
@@ -218,18 +219,41 @@ class SpectrumScene extends CanvasBase {
     const maxY = 1.7;
     const py = (y) => padT + (1 - Math.min(1, y / maxY)) * (h - padT - padB);
 
-    ctx.strokeStyle = "rgba(120, 160, 180, 0.22)";
-    for (const p of params) {
+    const steps = 160;
+
+    params.forEach((p, k) => {
+      const hue = this.hues[k % this.hues.length];
+
       ctx.save();
       ctx.setLineDash([2, 4]);
+      ctx.strokeStyle = `rgba(${hue}, 0.3)`;
       ctx.beginPath();
       ctx.moveTo(px(p.mu), py(0));
       ctx.lineTo(px(p.mu), py(this._curve(params, p.mu)));
       ctx.stroke();
       ctx.restore();
-    }
 
-    const steps = 160;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const x = i / steps;
+        const d = x - p.mu;
+        const y = p.a * Math.exp(-(d * d) / (2 * p.sig * p.sig));
+        const sx = px(x);
+        const sy = py(y);
+        if (i === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.strokeStyle = `rgba(${hue}, 0.55)`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.lineTo(px(1), py(0));
+      ctx.lineTo(px(0), py(0));
+      ctx.closePath();
+      ctx.fillStyle = `rgba(${hue}, 0.05)`;
+      ctx.fill();
+    });
+
     ctx.beginPath();
     for (let i = 0; i <= steps; i++) {
       const x = i / steps;
@@ -242,11 +266,11 @@ class SpectrumScene extends CanvasBase {
 
     const stroke = ctx.getLineDash ? ctx : ctx;
     const lineGrad = ctx.createLinearGradient(padL, 0, w - padR, 0);
-    lineGrad.addColorStop(0, "#7cff9b");
-    lineGrad.addColorStop(1, "#35e6d0");
+    lineGrad.addColorStop(0, "#6f9bff");
+    lineGrad.addColorStop(1, "#2dd4bf");
     ctx.strokeStyle = lineGrad;
     ctx.lineWidth = 2;
-    ctx.shadowColor = "rgba(53, 230, 208, 0.6)";
+    ctx.shadowColor = "rgba(45, 212, 191, 0.6)";
     ctx.shadowBlur = 10;
     ctx.stroke();
     ctx.shadowBlur = 0;
@@ -255,25 +279,25 @@ class SpectrumScene extends CanvasBase {
     ctx.lineTo(px(0), py(0));
     ctx.closePath();
     const fill = ctx.createLinearGradient(0, padT, 0, h - padB);
-    fill.addColorStop(0, "rgba(53, 230, 208, 0.28)");
-    fill.addColorStop(1, "rgba(53, 230, 208, 0.0)");
+    fill.addColorStop(0, "rgba(45, 212, 191, 0.28)");
+    fill.addColorStop(1, "rgba(45, 212, 191, 0.0)");
     ctx.fillStyle = fill;
     ctx.fill();
 
-    ctx.fillStyle = "rgba(94, 114, 128, 0.85)";
+    ctx.fillStyle = "#8d979d";
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.fillText("P", 8, padT + 8);
     ctx.fillText("ξ", w - padR - 8, h - 6);
 
     if (this.readout) {
-      const dom = params.reduce((a, b) => (b.a > a.a ? b : a), params[0]);
-      const muM = (-20 + dom.mu * 100).toFixed(1);
-      const sigM = (dom.sig * 100).toFixed(1);
-      this.readout.innerHTML =
-        `K <b>${params.length}</b>` +
-        `<span>peak μ <b>${muM} m</b></span>` +
-        `<span>σ <b>${sigM} m</b></span>` +
-        `<span>a <b>${dom.a.toFixed(2)}</b></span>`;
+      let html = `K <b>${params.length}</b>`;
+      params.forEach((p, k) => {
+        const hue = this.hues[k % this.hues.length];
+        const muM = (-20 + p.mu * 100).toFixed(1);
+        const sigM = (p.sig * 100).toFixed(1);
+        html += `<span class="sp-k"><i style="background:rgb(${hue})"></i>μ <b>${muM}</b> σ <b>${sigM}</b> a <b>${p.a.toFixed(2)}</b></span>`;
+      });
+      this.readout.innerHTML = html;
     }
   }
 

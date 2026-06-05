@@ -151,8 +151,8 @@ class StatusBoard {
       el.temp.className = "gcard__temp" + (g.temp >= 85 ? " is-danger" : g.temp >= 70 ? " is-warn" : "");
       el.power.textContent = g.power != null ? `${Math.round(g.power)}${g.power_limit ? ` / ${Math.round(g.power_limit)}` : ""} W` : "--";
       this._spark(el.graph, [
-        { data: h.m, color: "124, 255, 155", fill: 0.10 },
-        { data: h.u, color: "53, 230, 208", fill: 0.16 },
+        { data: h.m, color: "15, 118, 110", fill: 0.10 },
+        { data: h.u, color: "29, 79, 216", fill: 0.16 },
       ]);
     });
 
@@ -167,10 +167,10 @@ class StatusBoard {
       const cell = this.coreEls[i];
       if (!cell) return;
       const a = 0.05 + Math.min(1, u / 100) * 0.85;
-      cell.style.background = `rgba(53, 230, 208, ${a.toFixed(3)})`;
+      cell.style.background = `rgba(29, 79, 216, ${a.toFixed(3)})`;
       cell.title = `core ${i} · ${Math.round(u)}%`;
     });
-    this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "53, 230, 208", fill: 0.16 }]);
+    this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "29, 79, 216", fill: 0.16 }]);
 
     if (mem.total) {
       const used = mem.total - mem.available;
@@ -180,7 +180,7 @@ class StatusBoard {
       const swapUsed = (mem.swap_total || 0) - (mem.swap_free || 0);
       this._bar("sb-swap-bar", mem.swap_total ? (100 * swapUsed) / mem.swap_total : 0);
       this._txt("sb-swap-txt", mem.swap_total ? `<b>${this._gb(swapUsed)}</b> / ${this._gb(mem.swap_total)} GB` : "none");
-      this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "124, 255, 155", fill: 0.12 }]);
+      this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "15, 118, 110", fill: 0.12 }]);
     }
 
     if (disk.total) {
@@ -259,7 +259,7 @@ class StatusBoard {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    ctx.strokeStyle = "rgba(120, 170, 200, 0.10)";
+    ctx.strokeStyle = "rgba(20, 30, 40, 0.08)";
     ctx.lineWidth = 1;
     [0.25, 0.5, 0.75].forEach((f) => {
       const y = Math.round(h * f) + 0.5;

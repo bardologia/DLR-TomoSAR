@@ -1,7 +1,7 @@
 "use strict";
 
 class LaunchView {
-  static PALETTE = ["#3fe0cb", "#7cff9b", "#6fb5ff", "#a98bff", "#ff8fd0", "#ffaa70", "#8fd0e8", "#d0e86f"];
+  static PALETTE = ["#1d4fd8", "#0f766e", "#b45309", "#7c3aed", "#be185d", "#0e7490", "#4d7c0f", "#b91c1c"];
 
   static FIELD_TAXONOMY = [
     ["curve space", /curve|spectral|ssim/],
