@@ -1,5 +1,18 @@
 # DLR-TomoSAR Refactoring Plan
 
+## Execution status (2026-06-05, branch refactor/file-consolidation)
+
+All phases executed and committed except two deliberate deviations:
+
+1. Phase 5a (RuntimeConfig/ComputeConfig field-group nesting) was skipped via the plan's documented escape hatch: it renames every ConfigCli flag path and requires a webui FIELD_TAXONOMY resync for marginal gain. The repeated scalar fields across entry configs are intentional CLI surface.
+2. UNetSkip kept its name and registry key instead of the proposed ResUNetMaxpool rename (cosmetic churn against checkpoint/webui stability); it now lives in models/resunet.py with the other residual variants.
+
+Additional fixes found during execution: a latent NameError in the tuning scheduler (bare gpus), and LiveMonitor wrongly classified as dead (consumed at call time by Logger.live_monitor) — restored into tools/logger.py. Four scripts targeting the removed pre-sigma param-extraction API (validate_gpu_vs_cpu, test_gpu_vs_scipy, tune_adam, test_toy_scipy_vs_jax) were unfixable and deleted; they remain in git history.
+
+Verification: compileall clean; module import sweep clean except pre-existing missing env deps (h5py, jax); all 12 entry points run; pyflakes shows no undefined names; all 21 model state_dict key sets and parameter counts byte-identical before and after (sha256 over sorted keys); webui ConfigRegistry parses all 9 config modules.
+
+Final counts (excluding webui and notebooks): 119 Python files, from 198. main 13, pipelines 54, models 18, tools 9, configuration 14, scripts 11.
+
 Goal: reduce file count by merging components that work together or sequentially (multiple classes per file), extract logic repeated across pipelines into shared components, and remove dead code. Optimized for readability, maintainability, ease of adding features, and trackability.
 
 Scope: all pipelines, main entry points, configuration, tools, models, scripts. Webui is untouched except for the launch.js sync required by configuration changes.
