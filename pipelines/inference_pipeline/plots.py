@@ -43,6 +43,24 @@ class PlotTools:
         return GaussianReconstructor.components(params, x_axis, n_gaussians)
 
     @staticmethod
+    def _triple_panel(
+        fig,
+        axes,
+        panels    : List[Tuple[np.ndarray, str, str, float, float]],
+        x_label   : str,
+        int_label : str,
+        extent    : list,
+        origin    : str,
+    ) -> None:
+
+        for ax_i, (data, label, cm_used, vlo, vhi) in zip(axes, panels):
+            im = ax_i.imshow(data, cmap=cm_used, vmin=vlo, vmax=vhi, extent=extent, aspect="auto", origin=origin)
+            ax_i.set_title(label)
+            ax_i.set_xlabel(x_label)
+            lbl_cb = int_label if cm_used == panels[0][2] else "|error|"
+            fig.colorbar(im, ax=ax_i, fraction=0.045, pad=0.02).set_label(lbl_cb)
+
+    @staticmethod
     def _shared_clim(*arrays: np.ndarray, q_low: float = 1.0, q_high: float = 99.0) -> Tuple[float, float]:
         flat = np.concatenate([a.reshape(-1) for a in arrays])
         flat = flat[np.isfinite(flat)]
@@ -498,34 +516,52 @@ class Ploter(PlotTools):
                     pred_flat = pred_flat[active_mask]
                 pred = pred_flat[np.isfinite(pred_flat)]
 
-                has_pred = pred.size > 0
-                lo = float(np.percentile(pred, 0.5))  if has_pred else 0.0
-                hi = float(np.percentile(pred, 99.5)) if has_pred else 1.0
-
-                fig, ax = plt.subplots(figsize=(4.8, 3.4))
-
-                has_gt = False
+                gt = np.empty(0, dtype=np.float64)
                 if params_gt is not None and ch < params_gt.shape[0]:
                     gt_flat = params_gt[ch].reshape(-1)
                     if active_mask is not None:
                         gt_flat = gt_flat[active_mask]
-                    gt     = gt_flat[np.isfinite(gt_flat)]
-                    has_gt = gt.size > 0
-                    if has_gt:
-                        lo = min(lo, float(np.percentile(gt, 0.5)))  if has_pred else float(np.percentile(gt, 0.5))
-                        hi = max(hi, float(np.percentile(gt, 99.5))) if has_pred else float(np.percentile(gt, 99.5))
-                        ax.hist(gt, bins=bins, range=(lo, hi), density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
-                        ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
+                    gt = gt_flat[np.isfinite(gt_flat)]
+
+                has_pred = pred.size > 0
+                has_gt   = gt.size > 0
+                if not has_pred and not has_gt:
+                    continue
+
+                combined = np.concatenate([arr for arr in (pred, gt) if arr.size])
+                is_amp   = j == 0
+
+                if is_amp:
+                    positive  = combined[combined > 0]
+                    if positive.size == 0:
+                        continue
+                    lo        = max(float(np.percentile(positive, 0.5)), 1e-6)
+                    hi        = float(positive.max()) * 1.02
+                    bin_edges = np.geomspace(lo, hi, bins + 1)
+                else:
+                    lo        = float(np.percentile(combined, 0.5))
+                    hi        = float(np.percentile(combined, 99.5))
+                    bin_edges = np.linspace(lo, hi, bins + 1)
+
+                fig, ax = plt.subplots(figsize=(4.8, 3.4))
+
+                if has_gt:
+                    ax.hist(gt, bins=bin_edges, density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
+                    ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
 
                 if has_pred:
-                    ax.hist(pred, bins=bins, range=(lo, hi), density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
+                    ax.hist(pred, bins=bin_edges, density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
                     ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med Pred={np.median(pred):.3g}")
 
-                ax.set_title(f"g{k + 1} — {lbl}  (active pixels only)", fontsize=10)
+                if is_amp:
+                    ax.set_xscale("log")
+                    ax.set_title(f"g{k + 1} — {lbl}  (active pixels, full range, max={float(combined.max()):.3g})", fontsize=10)
+                else:
+                    ax.set_title(f"g{k + 1} — {lbl}  (active pixels only)", fontsize=10)
+
                 ax.set_xlabel(short)
                 ax.set_ylabel("density")
-                if has_pred or has_gt:
-                    ax.legend(fontsize=7, framealpha=0.9)
+                ax.legend(fontsize=7, framealpha=0.9)
                 ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
                 fig.tight_layout()
 
