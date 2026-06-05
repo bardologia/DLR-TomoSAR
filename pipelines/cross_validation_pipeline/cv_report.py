@@ -5,9 +5,9 @@ import math
 from datetime import datetime
 from pathlib import Path
 
-from pipelines.benchmark_pipeline.comparison_report import _METRIC_SECTIONS, _PER_BIN_PATTERN, ComparisonReport
-from pipelines.benchmark_pipeline.trial_collector import TrialRecord
-from pipelines.cross_validation_pipeline.fold_planner import FoldPlanner
+from pipelines.benchmark_pipeline.results import _METRIC_SECTIONS, _PER_BIN_PATTERN, ComparisonReport
+from pipelines.benchmark_pipeline.results import TrialRecord
+from pipelines.cross_validation_pipeline.folds import FoldPlanner
 from tools.logger import Logger
 
 

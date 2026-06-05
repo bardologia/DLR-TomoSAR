@@ -5,7 +5,7 @@ from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from configuration.inference_config import InferenceConfig
-from tools.crop_region              import CropRegion
+from tools.regions              import CropRegion
 
 from configuration.dataset_config import (
     AugmentationConfig,

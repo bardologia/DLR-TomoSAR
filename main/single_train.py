@@ -26,7 +26,7 @@ def main() -> None:
     _pin_environment()
 
     from configuration.single_train_config import SingleTrainConfig
-    from pipelines.training_pipeline.single_run import SingleTrainRunner
+    from pipelines.training_pipeline.pipeline import SingleTrainRunner
     from tools.config_cli import ConfigCli
 
     config = ConfigCli(SingleTrainConfig(), description="Single training run").apply()

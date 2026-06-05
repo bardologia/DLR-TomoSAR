@@ -6,7 +6,7 @@ from typing  import Dict, Tuple
 
 import numpy as np
 
-from tools.gaussian_mixture import GaussianMixture
+from tools.gaussians import GaussianMixture
 from tools.logger           import Logger
 
 

@@ -7,19 +7,112 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from tools                                          import Tracker, ResourceMonitor, PermutationMetrics
-from pipelines.training_pipeline.early_stopping     import EarlyStopping
-from pipelines.training_pipeline.warmup             import Warmup
-from pipelines.training_pipeline.scheduler          import Scheduler
-from pipelines.training_pipeline.ema                import EMA
-from pipelines.training_pipeline.gradient_clipper   import GradientClipper
-from pipelines.training_pipeline.overfit            import OverfitManager
-from pipelines.training_pipeline.checkpoint         import Checkpoint
-from pipelines.training_pipeline.loss               import Loss
-from pipelines.training_pipeline.train_step         import TrainStep
-from pipelines.training_pipeline.metric_aggregator  import MetricAggregator
-from pipelines.training_pipeline.curriculum         import CurriculumController
-from pipelines.training_pipeline.training_docs      import TrainingDocs
+from tools                                  import Tracker, ResourceMonitor, PermutationMetrics
+from pipelines.training_pipeline.callbacks  import Warmup, Scheduler, EarlyStopping, EMA, GradientClipper
+from pipelines.training_pipeline.control    import Checkpoint, OverfitManager, CurriculumController
+from pipelines.training_pipeline.loss       import Loss
+from pipelines.training_pipeline.docs       import TrainingDocs
+
+
+class TrainStep:
+    def __init__(self, model, optimizer, scaler, criterion, grad_clipper, ema, device, logger, tracker, accumulation_steps, use_amp, ema_every):
+        self.model              = model
+        self.optimizer          = optimizer
+        self.scaler             = scaler
+        self.criterion          = criterion
+        self.grad_clipper       = grad_clipper
+        self.ema                = ema
+        self.device             = device
+        self.logger             = logger
+        self.tracker            = tracker
+        self.accumulation_steps = accumulation_steps
+        self.use_amp            = use_amp
+        self.ema_every          = ema_every
+
+    def step(self, images: torch.Tensor, gt_params: torch.Tensor | None, batch_idx: int, n_batches: int, global_step: int):
+        loss, loss_dict = self._forward(images, gt_params, global_step)
+        self._backward(loss, batch_idx, n_batches, global_step)
+
+        return loss, loss_dict
+
+    def _forward(self, images: torch.Tensor, gt_params: torch.Tensor | None, global_step: int):
+        if self.tracker.debug:
+            if torch.isnan(images).any() or torch.isinf(images).any():
+                self.logger.warning(f"NaN or Inf detected in input images at step {global_step}!")
+            if gt_params is not None and (torch.isnan(gt_params).any() or torch.isinf(gt_params).any()):
+                self.logger.warning(f"NaN or Inf detected in ground truth parameters at step {global_step}!")
+
+        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
+            pred_params = self.model(images)
+            if self.tracker.debug and (torch.isnan(pred_params).any() or torch.isinf(pred_params).any()):
+                self.logger.warning(f"NaN or Inf detected in model predictions at step {global_step}!")
+
+            loss_dict   = self.criterion(pred_params, gt_params)
+            loss        = loss_dict["total_loss"]
+            loss        = loss / self.accumulation_steps
+
+        if torch.isnan(loss) or torch.isinf(loss):
+            self.logger.warning(f"Total loss evaluated to NaN or Inf at step {global_step}!")
+
+        return loss, loss_dict
+
+    def _backward(self, loss: torch.Tensor, batch_idx: int, n_batches: int, global_step: int) -> None:
+        self.scaler.scale(loss).backward()
+
+        if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
+            self.scaler.unscale_(self.optimizer)
+
+            grad_norm = self.grad_clipper.maybe_clip(self.model, global_step)
+            self.grad_clipper.record(grad_norm, global_step)
+
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            self.optimizer.zero_grad(set_to_none=True)
+
+            if self.ema.enabled:
+                if global_step % self.ema_every == 0:
+                    self.ema.update(self.model, step=global_step)
+
+
+class MetricAggregator:
+    def __init__(self):
+        self.components_sum: dict = {}
+        self.weighted_sum:   dict = {}
+        self.monitor_sum:    dict = {}
+        self.extra_sum:      dict = {}
+        self.count                = 0
+
+    def add(self, loss_dict: dict) -> None:
+        for k, v in loss_dict["components"].items():
+            self.components_sum[k] = self.components_sum.get(k, 0.0) + float(v)
+
+        for k, v in loss_dict["weighted"].items():
+            self.weighted_sum[k] = self.weighted_sum.get(k, 0.0) + float(v)
+
+        for k, v in loss_dict.get("monitor", {}).items():
+            self.monitor_sum[k] = self.monitor_sum.get(k, 0.0) + float(v)
+
+        self.count += 1
+
+    def add_extra(self, extra: dict) -> None:
+        for k, v in extra.items():
+            self.extra_sum[k] = self.extra_sum.get(k, 0.0) + (v if v == v else 0.0)
+
+    def reduce_components(self) -> dict:
+        n = max(1, self.count)
+        return {k: v / n for k, v in self.components_sum.items()}
+
+    def reduce_weighted(self) -> dict:
+        n = max(1, self.count)
+        return {k: v / n for k, v in self.weighted_sum.items()}
+
+    def reduce_monitor(self) -> dict:
+        n = max(1, self.count)
+        return {k: v / n for k, v in self.monitor_sum.items()}
+
+    def reduce_extra(self) -> dict:
+        n = max(1, self.count)
+        return {k: v / n for k, v in self.extra_sum.items()}
 
 
 class Trainer:
@@ -111,7 +204,7 @@ class Trainer:
         if probe_config is None or not probe_config.enabled:
             return
 
-        from tools.loss_scale_probe import LossScaleProbe
+        from pipelines.training_pipeline.docs import LossScaleProbe
 
         probe = LossScaleProbe(
             probe_cfg    = probe_config,

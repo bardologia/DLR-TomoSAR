@@ -1,28 +1,101 @@
 from __future__ import annotations
 
 import json
-import torch
 from dataclasses import dataclass
+from datetime    import datetime
 from pathlib     import Path
 from typing      import Optional, Tuple
-import numpy as np
 
-from torch.utils.data                                import DataLoader
-from pipelines.inference_pipeline.wrapper            import ModelWrapper
-from tools.logger                                    import Logger
-from configuration.dataset_config                    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
-from configuration.processing_config                 import CropRegion
-from pipelines.dataset_pipeline.crop                 import Cropper
-from pipelines.dataset_pipeline.layout               import Layout
-from pipelines.dataset_pipeline.dataset              import PatchDataset
-from pipelines.dataset_pipeline.stats                import Stats
-from pipelines.dataset_pipeline.normalizer           import Normalizer
-from pipelines.dataset_pipeline.patch                import Patcher, GridInfo
-from models                                          import get_model
-from configuration.training_config                   import GaussianConfig
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
+from configuration.dataset_config    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
+from configuration.inference_config  import InferenceConfig
+from configuration.processing_config import CropRegion
+from configuration.training_config   import GaussianConfig
+from models                          import get_model
+from pipelines.dataset_pipeline.datasets      import PatchDataset
+from pipelines.dataset_pipeline.normalization import Normalizer, Stats
+from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
+from pipelines.shared.io             import FileIO
+from tools.gaussians                 import GaussianClamp
+from tools.logger                    import Logger
 
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
+
+
+class InferenceMetadata:
+    def __init__(self, config: InferenceConfig) -> None:
+        self.config  = config
+        paths        = config.paths
+
+        base = config.run_directory / "inference"
+        self.output_dir     = base / config.output_subdir if config.output_subdir else base / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.figures_dir    = self.output_dir / paths.figures_subdir
+        self.animations_dir = self.output_dir / paths.animations_subdir
+        self.logs_dir       = self.output_dir / paths.logs_subdir
+        self.cube_dir       = self.output_dir / paths.cubes_subdir
+        self.metrics_path   = self.output_dir / paths.metrics_filename
+        self.report_path    = self.output_dir / paths.report_filename
+
+    def figure_path(self, name: str, ext: str = "png") -> Path:
+        return self.figures_dir / f"{name}.{ext}"
+
+    def create_dirs(self) -> None:
+        FileIO.ensure_dirs(
+            self.output_dir,
+            self.figures_dir,
+            self.animations_dir,
+            self.logs_dir,
+            self.cube_dir,
+        )
+
+
+class ModelWrapper:
+    def __init__(
+        self,
+        model,
+        device,
+        *,
+        params_per_gaussian: int = 3,
+        normalizer=None,
+        x_axis: torch.Tensor | None = None,
+        amp_max: float | None = None,
+    ) -> None:
+
+        self._model               = model
+        self._device              = device
+        self._params_per_gaussian = params_per_gaussian
+        self._normalizer          = normalizer
+        self._x_axis              = x_axis
+        self._amp_max             = amp_max
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self._device)
+
+        with torch.no_grad():
+            out = self._model(x_t)
+
+        out = self.denormalize_output(out)
+
+        return out.cpu().numpy()
+
+    def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
+        if self._normalizer is not None:
+            out = self._normalizer.denormalize_output(out)
+
+        if self._x_axis is not None and self._amp_max is not None:
+            out = GaussianClamp.apply(
+                out,
+                x_axis      = self._x_axis.to(out.device),
+                amp_max     = self._amp_max,
+                ppg         = self._params_per_gaussian,
+                leaky_slope = 0.0,
+            )
+
+        return out
 
 
 @dataclass
@@ -53,7 +126,7 @@ class RunLoader:
 
     def _read_json(self, name: str) -> dict:
         path = self.meta_directory / name
-        
+
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -70,7 +143,7 @@ class RunLoader:
             val   = self._parse_split_payload(splits["val"]),
             test  = self._parse_split_payload(splits["test"]),
         )
-       
+
         patch = PatchConfiguration(
             size                   = tuple(payload["patch"]["size"]),
             stride                 = int(payload["patch"]["stride"]),
@@ -129,12 +202,12 @@ class RunLoader:
 
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        
+
         if model_name in _IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
-        
+
         model, _ = get_model(model_name, **overrides)
-        
+
         return model
 
     def _apply_ema(self, model, ckpt: dict, use_ema: bool) -> bool:
@@ -150,7 +223,7 @@ class RunLoader:
                 if name in shadow:
                     param.data.copy_(shadow[name].to(param.device, dtype=param.dtype))
                     applied += 1
-        
+
         self.logger.subsection(f"EMA : applied to {applied} parameters")
         return True
 
@@ -158,13 +231,13 @@ class RunLoader:
         ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
         raw    = ckpt["x_axis"]
         x_axis = raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
-        
+
         meta = {
             "epoch"         : int(ckpt["epoch"]),
             "best_val_loss" : float(ckpt["best_val_loss"]),
             "best_epoch"    : int(ckpt["best_epoch"]),
         }
-        
+
         return ckpt, x_axis, meta
 
     def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
@@ -187,12 +260,12 @@ class RunLoader:
         use_ema         : bool,
         checkpoint_name : str,
     ) -> Run:
-       
+
         self.logger.section("[Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
 
         run_summary    = self._read_json("run_summary.json")
-        
+
         dataset_config = self._build_dataset_config(
             payload     = self._read_json("dataset_creation_config.json"),
             batch_size  = batch_size,
@@ -203,7 +276,7 @@ class RunLoader:
         in_channels    = int(run_summary["in_channels"])
         out_channels   = int(run_summary["out_channels"])
         n_gaussians    = out_channels // 3
-      
+
         ckpt_path = self.run_directory / checkpoint_name
         model     = self._build_model(model_name, in_channels, out_channels, dataset_config.patch.size[0])
         model     = model.to(device)

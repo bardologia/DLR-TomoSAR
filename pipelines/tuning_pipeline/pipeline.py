@@ -4,9 +4,8 @@ from pathlib import Path
 
 import optuna
 
-from configuration.tuning_config            import TuningConfig
-from pipelines.tuning_pipeline.phase1_tuner import Phase1Tuner
-from pipelines.tuning_pipeline.phase2_tuner import Phase2Tuner
+from configuration.tuning_config      import TuningConfig
+from pipelines.tuning_pipeline.tuners import Phase1Tuner, Phase2Tuner
 
 
 class TuningPipeline:

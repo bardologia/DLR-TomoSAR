@@ -4,12 +4,11 @@ import gc
 from pathlib import Path
 from typing  import Literal, NamedTuple, Tuple
 
-from configuration.processing_config                 import ProcessingConfiguration, TomogramConfiguration
-from pipelines.processing_pipeline.artifacts         import ArtifactRegistry
-from pipelines.processing_pipeline.interferogram     import InterferogramBuilder
-from pipelines.processing_pipeline.metadata          import MetadataManager
-from pipelines.processing_pipeline.tomogram          import TomogramProcessor
-from tools.logger                                    import Logger
+from configuration.processing_config             import ProcessingConfiguration, TomogramConfiguration
+from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, MetadataManager
+from pipelines.processing_pipeline.interferogram import InterferogramBuilder
+from pipelines.processing_pipeline.tomogram      import TomogramProcessor
+from tools.logger                                import Logger
 
 
 class TomogramVariant(NamedTuple):

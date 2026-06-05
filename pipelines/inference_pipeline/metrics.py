@@ -3,13 +3,31 @@ from __future__ import annotations
 import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses        import dataclass
 from pathlib            import Path
 from typing             import Dict, Optional, Tuple
 
-import numpy                            as np
-from skimage.metrics                    import structural_similarity as ssim
-from tqdm                               import tqdm
-from pipelines.inference_pipeline.types import Result
+import numpy         as np
+from skimage.metrics import structural_similarity as ssim
+from tqdm            import tqdm
+
+
+@dataclass
+class Result:
+    pred_curves        : np.ndarray
+    gt_curves          : np.ndarray
+    params_pred        : np.ndarray
+    params_gt          : np.ndarray
+
+    pixel_mse          : np.ndarray
+    pixel_mae          : np.ndarray
+    pixel_r2           : np.ndarray
+    pixel_cosine       : np.ndarray
+    pixel_peak_err_idx : np.ndarray
+
+    cube_directory     : Path
+    azimuth_offset     : int
+    range_offset       : int
 
 
 class Metrics:

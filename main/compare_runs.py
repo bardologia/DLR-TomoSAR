@@ -13,7 +13,7 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from configuration.benchmark_config                import BenchmarkConfig
-from pipelines.benchmark_pipeline.comparison_stage import ComparisonStage
+from pipelines.benchmark_pipeline.stages import ComparisonStage
 from tools.config_cli                              import ConfigCli
 from tools.logger                                  import Logger
 

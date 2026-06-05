@@ -45,7 +45,7 @@ class TuningOrchestrator:
             GradientClipperConfig, IOConfig, LossConfig, OptimizerConfig,
             SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,
         )
-        from tools.crop_region import CropRegion
+        from tools.regions import CropRegion
 
         dataset_path = Path(self.config.paths.dataset_path)
 

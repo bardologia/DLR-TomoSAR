@@ -6,10 +6,8 @@ from pathlib import Path
 
 from configuration.cross_validation_config import CrossValidationConfig
 from tools.config_cli import ConfigCli
-from pipelines.cross_validation_pipeline.config_factory import FoldConfigFactory
-from pipelines.cross_validation_pipeline.cv_report_stage import CrossValidationReportStage
-from pipelines.cross_validation_pipeline.fold_inference_stage import FoldInferenceStage
-from pipelines.cross_validation_pipeline.fold_training_stage import FoldTrainingStage
+from pipelines.cross_validation_pipeline.folds import FoldConfigFactory
+from pipelines.cross_validation_pipeline.stages import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
 from tools.logger import Logger
 
 

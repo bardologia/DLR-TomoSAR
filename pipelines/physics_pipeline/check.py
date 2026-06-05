@@ -3,10 +3,10 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from configuration.param_extraction_config           import ExtractionConfig, FitMode, FitSettings
-from pipelines.training_pipeline.physics_components  import PhysicsComponents
-from tools.gaussian_mixture                           import GaussianMixture
-from tools.tomo_geometry                              import TomoGeometry
+from configuration.param_extraction_config import ExtractionConfig, FitMode, FitSettings
+from pipelines.training_pipeline.loss       import PhysicsComponents
+from tools.gaussians                        import GaussianMixture
+from tools.tomo_geometry                    import TomoGeometry
 
 
 class PhysicsQuantitiesCheck:

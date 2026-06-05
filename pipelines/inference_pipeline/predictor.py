@@ -2,16 +2,91 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing             import List, Tuple
+from typing             import List, Optional, Tuple
 
 import numpy as np
 
-from pipelines.inference_pipeline.loader         import Run
-from pipelines.inference_pipeline.metadata       import InferenceMetadata
-from pipelines.inference_pipeline.reconstruction import GaussianReconstructor
-from pipelines.inference_pipeline.stitching      import CubeStitcher
-from pipelines.inference_pipeline.types          import Result
-from tools.logger                                import Logger
+from pipelines.dataset_pipeline.spatial     import GridInfo
+from pipelines.inference_pipeline.loader    import InferenceMetadata, Run
+from pipelines.inference_pipeline.metrics   import Result
+from tools.gaussians                        import GaussianReconstructor
+from tools.logger                           import Logger
+
+
+class CubeStitcher:
+    def __init__(
+        self,
+        grid           : GridInfo,
+        n_channels     : int,
+        window_kind    : str           = "hann",
+        dtype          : str           = "float32",
+        memmap_path    : Optional[str] = None,
+    ) -> None:
+        self.grid       = grid
+        self.n_channels = int(n_channels)
+        self.dtype      = np.dtype(dtype)
+        self.window     = CubeStitcher.make_patch_window(grid.patch_size, kind=window_kind)
+
+        H_pad, W_pad = grid.padded_size
+        shape_pad    = (self.n_channels, H_pad, W_pad)
+
+        if memmap_path is not None:
+            self._accum = np.lib.format.open_memmap(memmap_path, mode="w+", dtype=self.dtype, shape=shape_pad)
+            self._accum[...] = 0
+        else:
+            self._accum = np.zeros(shape_pad, dtype=self.dtype)
+
+        self._weight = np.zeros((H_pad, W_pad), dtype=np.float32)
+
+    @staticmethod
+    def make_patch_window(patch_size: Tuple[int, int], kind: str = "hann") -> np.ndarray:
+        ph, pw = patch_size
+        if kind == "uniform":
+            return np.ones((ph, pw), dtype=np.float32)
+
+        if kind == "hann":
+            wv = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(ph) + 0.5) / ph)
+            wh = 0.5 - 0.5 * np.cos(2.0 * np.pi * (np.arange(pw) + 0.5) / pw)
+
+        elif kind == "triangular":
+            wv = 1.0 - np.abs((np.arange(ph) + 0.5) / ph * 2.0 - 1.0)
+            wh = 1.0 - np.abs((np.arange(pw) + 0.5) / pw * 2.0 - 1.0)
+
+        else:
+            raise ValueError(f"Unknown window kind: {kind!r}")
+
+        wv = np.clip(wv, 1e-3, None).astype(np.float32)
+        wh = np.clip(wh, 1e-3, None).astype(np.float32)
+
+        return np.outer(wv, wh)
+
+    @property
+    def number_of_patches(self) -> int:
+        return self.grid.number_of_patches
+
+    def add_patch(self, idx: int, patch: np.ndarray) -> None:
+        ph, pw = self.grid.patch_size
+        iv, ih = divmod(idx, self.grid.n_h)
+        v0     = iv * self.grid.stride
+        h0     = ih * self.grid.stride
+        w      = self.window
+
+        self._accum[:, v0:v0 + ph, h0:h0 + pw] += (patch * w[None, :, :]).astype(self.dtype, copy=False)
+        self._weight[v0:v0 + ph, h0:h0 + pw]   += w
+
+    def add_patch_batch(self, indices: np.ndarray, batch_patches: np.ndarray) -> None:
+        for b, idx in enumerate(indices):
+            self.add_patch(int(idx), batch_patches[b])
+
+    def finalize_cube(self) -> np.ndarray:
+        H, W         = self.grid.spatial_size
+        pad_t, pad_l = self.grid.pad_top, self.grid.pad_left
+
+        weight_safe = np.where(self._weight > 0, self._weight, 1.0)
+        cube        = self._accum / weight_safe[None, :, :]
+        cube        = cube[:, pad_t:pad_t + H, pad_l:pad_l + W]
+
+        return np.ascontiguousarray(cube.astype(self.dtype, copy=False))
 
 
 class Predictor:
@@ -26,7 +101,7 @@ class Predictor:
         meta           : InferenceMetadata,
         cpu_workers    : int | None = None,
     ) -> None:
-        
+
         self.run            = run
         self.logger         = logger
         self.window_kind    = window_kind
@@ -103,17 +178,17 @@ class Predictor:
         with self.logger.track(transient=True) as prog:
             task = prog.add_task("[section]GPU Forward Pass[/section]", total=len(run.loader))
             for batch in run.loader:
-                images, gt_params_b = batch[0], batch[1]  # tensors from DataLoader
+                images, gt_params_b = batch[0], batch[1]
 
-                pred_params = run.model(images) 
+                pred_params = run.model(images)
 
-                gt_params_ready = gt_params_b[:, :n_K * 3]                                    # (norm, tensor)
-                gt_params_ready = run.dataset.normalizer.denormalize_output(gt_params_ready)  # (denorm, tensor)
+                gt_params_ready = gt_params_b[:, :n_K * 3]
+                gt_params_ready = run.dataset.normalizer.denormalize_output(gt_params_ready)
 
                 B = images.shape[0]
                 all_indices.append(list(range(sample_count, sample_count + B)))
-                all_pred_params.append(pred_params)                                            # (denorm, ndarray)
-                all_gt_params.append(gt_params_ready.cpu().numpy().astype(np.float32))         # (denorm, ndarray)
+                all_pred_params.append(pred_params)
+                all_gt_params.append(gt_params_ready.cpu().numpy().astype(np.float32))
                 sample_count += B
                 prog.advance(task)
 
@@ -127,7 +202,7 @@ class Predictor:
         ns = run.dataset.normalizer
         norm_loc   = np.array(ns.stats.output_stats.loc,   dtype=np.float32)
         norm_scale = np.array(ns.stats.output_stats.scale, dtype=np.float32)
-    
+
         tasks = [(pred, gt, run.x_axis, n_K, out_ch, norm_loc, norm_scale) for pred, gt in zip(all_pred_params, all_gt_params)]
         results: List[tuple | None] = [None] * len(tasks)
 
@@ -140,7 +215,7 @@ class Predictor:
                     results[idx] = fut.result()
                     prog.advance(task_id)
 
-        return results  
+        return results
 
     def _stitch_results(self, all_indices : List[List[int]], cpu_results : List[tuple]) -> Result:
         run    = self.run
@@ -200,7 +275,7 @@ class Predictor:
         pixel_peak : np.ndarray,
         pixel_w    : np.ndarray,
     ) -> Result:
-     
+
         pred_curves_cube = pred_curve_stitcher.finalize_cube()
         gt_curves_cube   = gt_curve_stitcher.finalize_cube()
         params_pred_cube = param_pred_stitcher.finalize_cube()
@@ -275,5 +350,5 @@ class Predictor:
         all_indices, all_pred_params, all_gt_params = self._forward_pass()
         cpu_results = self._compute_metrics(all_pred_params, all_gt_params)
         results     = self._stitch_results(all_indices, cpu_results)
-        
+
         return results

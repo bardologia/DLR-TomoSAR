@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from pathlib  import Path
-from typing   import Dict, List
+from pathlib import Path
+from typing  import Dict, List
 
 import numpy as np
 
-from configuration.inference_config          import InferenceConfig
-from pipelines.inference_pipeline.figures      import FigureComposer
-from pipelines.inference_pipeline.loader       import RunLoader
-from pipelines.inference_pipeline.metadata     import InferenceMetadata
-from pipelines.inference_pipeline.metrics      import Metrics
-from pipelines.inference_pipeline.plots        import Ploter
-from pipelines.inference_pipeline.predictor    import Predictor
-from pipelines.inference_pipeline.report       import Report, ReportPayloadBuilder
-from tools.logger                              import Logger
+from configuration.inference_config         import InferenceConfig
+from pipelines.inference_pipeline.figures   import FigureComposer
+from pipelines.inference_pipeline.loader    import InferenceMetadata, RunLoader
+from pipelines.inference_pipeline.metrics   import Metrics
+from pipelines.inference_pipeline.plots     import Ploter
+from pipelines.inference_pipeline.predictor import Predictor
+from pipelines.inference_pipeline.report    import Report, ReportPayloadBuilder
+from tools.logger                           import Logger
 
 
 class InferencePipeline:

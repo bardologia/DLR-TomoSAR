@@ -12,38 +12,16 @@ import matplotlib.pyplot as plt
 import numpy             as np
 from scipy.stats         import gaussian_kde
 
-from tools.gaussian_mixture import GaussianMixture
-from tools.logger           import Logger
+from pipelines.shared.plotting import PlotBase
+from tools.gaussians           import GaussianMixture
+from tools.logger              import Logger
 
-
-_SCIENTIFIC_RC: dict = {
-    "font.family"         : "serif",
-    "font.serif"          : ["Times New Roman", "DejaVu Serif"],
-    "mathtext.fontset"    : "dejavuserif",
-    "font.size"           : 11,
-    "axes.titlesize"      : 12,
-    "axes.labelsize"      : 11,
-    "xtick.labelsize"     : 9,
-    "ytick.labelsize"     : 9,
-    "legend.fontsize"     : 9,
-    "axes.linewidth"      : 0.8,
-    "xtick.direction"     : "in",
-    "ytick.direction"     : "in",
-    "xtick.top"           : True,
-    "ytick.right"         : True,
-    "xtick.minor.visible" : True,
-    "ytick.minor.visible" : True,
-    "image.interpolation" : "nearest",
-    "savefig.bbox"        : "tight",
-    "pdf.fonttype"        : 42,
-    "ps.fonttype"         : 42,
-}
 
 _TIER_COLOR  = {"low": "#d62728", "mid": "#ff7f0e", "high": "#2ca02c"}
 _TIER_LABEL  = {"low": r"Low $R^2$  ($\leq p_{25}$)", "mid": r"Mid $R^2$  ($p_{40}$–$p_{60}$)", "high": r"High $R^2$ ($\geq p_{75}$)"}
 
 
-class FittingResultPlotter:
+class FittingResultPlotter(PlotBase):
     def __init__(
         self,
         output_directory : Path,
@@ -73,32 +51,6 @@ class FittingResultPlotter:
         for d in dirs.values():
             d.mkdir(parents=True, exist_ok=True)
         return dirs
-
-    def _apply_style(self) -> None:
-        plt.rcParams.update(_SCIENTIFIC_RC)
-        plt.rcParams["figure.dpi"]  = self.fig_dpi
-        plt.rcParams["savefig.dpi"] = self.save_dpi
-
-    @staticmethod
-    def _save(fig: plt.Figure, path: Path) -> Path:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(path, bbox_inches="tight")
-        plt.close(fig)
-        return path
-
-    @staticmethod
-    def _shared_clim(*arrays: np.ndarray, q_lo: float = 1.0, q_hi: float = 99.0) -> Tuple[float, float]:
-        flat = np.concatenate([a.reshape(-1) for a in arrays])
-        flat = flat[np.isfinite(flat)]
-        if flat.size == 0:
-            return (0.0, 1.0)
-        return float(np.percentile(flat, q_lo)), float(np.percentile(flat, q_hi))
-
-    @staticmethod
-    def _cmap_with_bad(name: str, bad_color: str = "0.88") -> mcolors.Colormap:
-        cmap = plt.cm.get_cmap(name).copy()
-        cmap.set_bad(color=bad_color)
-        return cmap
 
     def _select_pixels_by_r2_tiers(self, r2_map : np.ndarray, seed : int = 42) -> Dict[str, np.ndarray]:
         rng   = np.random.default_rng(seed)

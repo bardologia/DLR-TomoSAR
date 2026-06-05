@@ -6,7 +6,7 @@ from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig, OverfitTestConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
-from tools.loss_scale_probe import LossScaleProbeConfig
+from pipelines.training_pipeline.docs import LossScaleProbeConfig
 
 
 class BenchmarkWorker:

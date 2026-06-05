@@ -32,7 +32,7 @@ def _worker(stage: str, fold_index: int, split: str | None, gpu_id: int, run_tag
     os.environ["OMP_NUM_THREADS"]      = "4"
 
     from configuration.cross_validation_config       import CrossValidationConfig
-    from pipelines.cross_validation_pipeline.workers import FoldInferenceWorker, FoldTrainingWorker
+    from pipelines.cross_validation_pipeline.folds import FoldInferenceWorker, FoldTrainingWorker
     from tools.config_cli                            import ConfigCli
 
     config        = CrossValidationConfig()

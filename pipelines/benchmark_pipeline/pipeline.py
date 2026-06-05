@@ -9,11 +9,7 @@ from models import CONFIG_REGISTRY
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 
-from pipelines.benchmark_pipeline.comparison_stage import ComparisonStage
-from pipelines.benchmark_pipeline.inference_stage import InferenceStage
-from pipelines.benchmark_pipeline.overfit_stage import OverfitStage
-from pipelines.benchmark_pipeline.size_match_stage import SizeMatchStage
-from pipelines.benchmark_pipeline.training_stage import TrainingStage
+from pipelines.benchmark_pipeline.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage
 
 
 class BenchmarkPipeline:

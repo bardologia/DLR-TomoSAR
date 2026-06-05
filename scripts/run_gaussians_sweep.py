@@ -41,7 +41,7 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
         DatasetCreationConfiguration, InputConfig, PatchConfiguration,
         Representation, SplitRegions,
     )
-    from tools.crop_region import CropRegion
+    from tools.regions import CropRegion
     from configuration.training_config import (
         EarlyStoppingConfig, EMAConfig, GaussianConfig, IOConfig, LossConfig,
         OptimizerConfig, OverfitConfig, SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,

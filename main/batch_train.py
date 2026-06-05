@@ -8,7 +8,7 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from configuration.single_train_config import BatchTrainConfig
-from pipelines.benchmark_pipeline.gpu_queue import GpuJob, GpuQueue
+from pipelines.shared.orchestration import GpuJob, GpuQueue
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 

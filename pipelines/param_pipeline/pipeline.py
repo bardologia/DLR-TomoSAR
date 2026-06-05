@@ -1,17 +1,144 @@
 from __future__ import annotations
 
 import gc
+import json
+from datetime import datetime
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 
-from configuration.param_extraction_config import ExtractionConfig
-from pipelines.param_pipeline.artifact_io  import ParameterIO
-from pipelines.param_pipeline.fitting      import ParameterExtractor
-from pipelines.param_pipeline.metadata     import ExtractionMetadataManager
-from pipelines.param_pipeline.metrics      import FittingMetricsCalculator
-from pipelines.param_pipeline.plots        import FittingResultPlotter
-from tools.logger                          import Logger
+from configuration.param_extraction_config import ExtractionConfig, FitSettings
+from pipelines.param_pipeline.metrics       import FittingMetricsCalculator
+from pipelines.param_pipeline.plots         import FittingResultPlotter
+from pipelines.shared.io                    import FileIO
+from tools.logger                           import Logger
+
+
+class ExtractionMetadataManager:
+    def __init__(self, config: ExtractionConfig, logger: Logger) -> None:
+        self.config = config
+        self.logger = logger
+
+    def save_run_metadata(self, npy_path: Path, tomogram_path: Path, height_range: tuple) -> Path:
+        meta_path = self.config.output_directory / "param_extraction_meta.json"
+        ext       = self.config.fit_settings
+
+        payload = {
+            "timestamp"           : datetime.now().isoformat(timespec="seconds"),
+            "processed_data_path" : str(self.config.processed_data_path),
+            "source_tomogram"     : str(tomogram_path),
+            "height_range"        : list(height_range),
+            "output_directory"    : str(self.config.output_directory),
+            "output_prefix"       : self.config.output_prefix,
+            "output_suffix"       : self.config.output_suffix_value,
+            "parameters_npy"      : npy_path.name,
+            "number_of_gaussians" : ext.fit_config.k_max,
+        }
+
+        FileIO.save_json(payload, meta_path)
+
+        self.logger.subsection(f"-> Metadata written: {meta_path}")
+        return meta_path
+
+
+class ParameterIO:
+    def __init__(self, logger : Logger) -> None:
+        self.logger = logger
+
+    def save_params(self, parameters_array : np.ndarray, npy_path : Path) -> Path:
+        npy_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self.logger.subsection(f"Saving parameter stack of shape {parameters_array.shape} to disk")
+        np.save(str(npy_path), np.ascontiguousarray(parameters_array), allow_pickle=False)
+
+        return npy_path
+
+    def load_params(self, npy_path : Path) -> np.ndarray:
+        self.logger.subsection("Loading saved parameters for metrics and plots")
+        return np.load(str(npy_path)).astype(np.float32, copy=False)
+
+    def load_metadata(self, meta_path : Path) -> dict:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+
+class ParameterExtractor:
+    def __init__(
+        self,
+        parameter_extraction : FitSettings,
+        logger               : Logger,
+        gpu_batch_size       : int                 = 256,
+        adam_steps           : int                 = 800,
+        adam_lr              : float               = 1e-2,
+        adam_b1              : float               = 0.9,
+        adam_b2              : float               = 0.999,
+        gpu_device_ids       : list | None         = None,
+        gpu_pixel_batch_size : int                 = 8192,
+        init_workers         : int | None          = None,
+    ) -> None:
+
+        from pipelines.param_pipeline.sigma import SigmaFittingExtractor
+
+        self.parameter_extraction = parameter_extraction
+        self.logger               = logger
+        self.gpu_batch_size       = gpu_batch_size
+        self.gpu_pixel_batch_size = gpu_pixel_batch_size
+        self.adam_steps           = adam_steps
+        self.adam_lr              = adam_lr
+        self.adam_b1              = adam_b1
+        self.adam_b2              = adam_b2
+        self.gpu_device_ids       = gpu_device_ids
+        self.init_workers         = init_workers
+
+        fit_cfg = parameter_extraction.fit_config
+
+        k_max           = fit_cfg.k_max
+        lambda_k        = fit_cfg.lambda_k
+        prominence_frac = fit_cfg.prominence_frac
+
+        self._gpu_extractor = SigmaFittingExtractor(
+            fit_settings         = parameter_extraction,
+            logger               = logger,
+            range_batch_size     = gpu_batch_size,
+            adam_steps           = adam_steps,
+            adam_lr              = adam_lr,
+            adam_b1              = adam_b1,
+            adam_b2              = adam_b2,
+            k_max                = k_max,
+            lambda_k             = lambda_k,
+            prominence_frac      = prominence_frac,
+            gpu_pixel_batch_size = gpu_pixel_batch_size,
+            gpu_device_ids       = gpu_device_ids,
+            init_workers         = init_workers,
+        )
+
+        self.logger.section("[Parameter Extractor Initialized]")
+        self.logger.subsection(f"Backend : JAX GPU (Sigma Only)")
+        self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
+
+    @staticmethod
+    def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int) -> np.ndarray:
+        n_params, Az, R = parameters_array.shape
+        reshaped = parameters_array.reshape(n_gaussians, 3, Az, R)
+
+        amps = reshaped[:, 0, :, :]
+        mus  = reshaped[:, 1, :, :]
+
+        sort_keys    = np.where(amps > 1e-3, mus, np.inf)
+        order        = np.argsort(sort_keys, axis=0)
+        out_reshaped = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
+
+        return out_reshaped.reshape(n_params, Az, R)
+
+    def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> np.ndarray:
+        self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
+
+        parameters_array = self._gpu_extractor.run(tomogram_path, height_range)
+        parameters_array = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max)
+
+        self.logger.subsection("[Extraction Complete]")
+        return parameters_array
 
 
 class ParamExtractionPipeline:

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from tools.crop_region import CropRegion
+from tools.regions import CropRegion
 
 __all__ = ["CropRegion"]
 

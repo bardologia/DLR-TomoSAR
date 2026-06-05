@@ -1,21 +1,69 @@
 from __future__ import annotations
 
-from pathlib                                 import Path
-from typing                                  import Optional, Tuple
-from torch.utils.data                        import DataLoader
-from configuration.dataset_config            import DatasetConfiguration
-from pipelines.dataset_pipeline.crop           import Cropper
-from pipelines.dataset_pipeline.dataset         import PatchDataset
-from pipelines.dataset_pipeline.loader          import Loader
-from pipelines.dataset_pipeline.layout          import Layout
-from pipelines.dataset_pipeline.metadata        import MetadataWriter
-from pipelines.dataset_pipeline.stats           import Stats
-from pipelines.dataset_pipeline.stats_computer  import StatsComputer
-from pipelines.dataset_pipeline.patch           import Patcher
-from tools.logger                               import Logger
-from pipelines.dataset_pipeline.normalizer      import Normalizer
-from pipelines.dataset_pipeline.augmentation    import SpatialAugmenter
-from pipelines.dataset_pipeline.multi_region    import MultiRegionDataset
+from dataclasses import asdict
+from pathlib     import Path
+from typing      import Optional, Tuple
+
+from torch.utils.data import DataLoader
+
+from configuration.dataset_config             import DatasetConfiguration
+from configuration.processing_config          import CropRegion
+from pipelines.dataset_pipeline.datasets      import Loader, MultiRegionDataset, PatchDataset, SpatialAugmenter
+from pipelines.dataset_pipeline.normalization import Normalizer, Stats, StatsComputer
+from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
+from pipelines.shared.io                      import FileIO
+from tools.logger                             import Logger
+
+
+class MetadataWriter:
+    def __init__(self, run_directory: Path, logger: Logger) -> None:
+        self.run_directory      = Path(run_directory)
+        self.logger             = logger
+        self.metadata_directory = self.run_directory / "meta"
+
+        self.outpaths           = {
+            "dataset_configuration" : self.metadata_directory / "dataset_creation_config.json",
+            "crop"                  : self.metadata_directory / "crop.json",
+            "patch"                 : self.metadata_directory / "patch.json",
+        }
+
+        FileIO.ensure_dir(self.metadata_directory)
+
+        self.logger.section("[MetadataWriter Initialized]")
+        self.logger.subsection(f"Metadata Directory : {self.metadata_directory} \n")
+
+    def save_dataset_configuration(self, config: DatasetConfiguration) -> Path:
+        out_path = self.outpaths["dataset_configuration"]
+        payload  = asdict(config)
+
+        payload["preprocessing_run_directory"] = str(config.preprocessing_run_directory)
+        payload["input_config"]                = config.input_config.as_dict()
+        payload["output_config"]               = config.output_config.as_dict()
+        payload.pop("x_axis", None)
+
+        return FileIO.save_json(payload, out_path)
+
+    def save_crop_metadata(self, global_crop: CropRegion, splits: dict[str, CropRegion]) -> Path:
+        out_path = self.outpaths["crop"]
+        payload  = {"global_crop" : list(global_crop.as_tuple()), "splits" : {name: self._region_payload(value) for name, value in splits.items()}}
+
+        return FileIO.save_json(payload, out_path)
+
+    def save_patch_metadata(self, grids: dict[str, GridInfo]) -> Path:
+        out_path = self.outpaths["patch"]
+        payload  = {name: self._grid_payload(value) for name, value in grids.items()}
+
+        return FileIO.save_json(payload, out_path)
+
+    def _region_payload(self, value):
+        if isinstance(value, (list, tuple)):
+            return [list(region.as_tuple()) for region in value]
+        return list(value.as_tuple())
+
+    def _grid_payload(self, value):
+        if isinstance(value, (list, tuple)):
+            return [grid.as_dict() for grid in value]
+        return value.as_dict()
 
 
 class DatasetPipeline:
@@ -34,7 +82,7 @@ class DatasetPipeline:
 
         ic = config.input_config
         oc = config.output_config
-        
+
         self.logger.section("[DatasetPipeline Initialized]")
         self.logger.kv_table(
             {
@@ -94,7 +142,7 @@ class DatasetPipeline:
         return MultiRegionDataset(parts), patchers
 
     def run(self) -> Tuple[DataLoader, DataLoader, DataLoader, dict[str, PatchDataset]]:
-      
+
         train_ds, train_patcher = self._build_dataset("train")
 
         norm_stats = StatsComputer.compute(
@@ -130,12 +178,12 @@ class DatasetPipeline:
         )
 
         self.metadata_writer.save_dataset_configuration(self.config)
-        
+
         self.metadata_writer.save_crop_metadata(
             global_crop = self.layout.global_crop,
             splits      = dict(self.config.split_regions.items()),
         )
-        
+
         self.metadata_writer.save_patch_metadata({
             "train" : self._patch_grids(train_patcher),
             "val"   : self._patch_grids(val_patcher),

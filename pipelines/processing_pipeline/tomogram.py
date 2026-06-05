@@ -46,16 +46,10 @@ class TomogramProcessor:
             self.logger.subsection(f"Crop width ({total_width}) fits within limit ({max_width}). Single section.")
             return [crop.as_tuple()]
 
-        subsections     = []
-        current_azimuth = azimuth_start
-        
-        while current_azimuth < azimuth_end:
-            next_azimuth = min(current_azimuth + max_width, azimuth_end)
-            subsections.append((current_azimuth, next_azimuth, crop.range_start, crop.range_end))
-            current_azimuth = next_azimuth
+        subsections = [region.as_tuple() for region in crop.subdivide_by_azimuth(max_width)]
 
         self.logger.subsection(f"Crop subdivided into {len(subsections)} sections.")
-        
+
         return subsections
 
     def _dispatch_workers(
