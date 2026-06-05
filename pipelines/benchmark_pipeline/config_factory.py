@@ -121,6 +121,7 @@ class ConfigFactory:
                 gradient_accumulation_steps = 1,
                 max_grad_norm               = None,
                 verbose                     = True,
+                log_all_losses              = training.log_all_losses,
             ),
 
             overfit = OverfitConfig(enabled=False),

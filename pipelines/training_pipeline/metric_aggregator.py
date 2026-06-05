@@ -5,6 +5,7 @@ class MetricAggregator:
     def __init__(self):
         self.components_sum: dict = {}
         self.weighted_sum:   dict = {}
+        self.monitor_sum:    dict = {}
         self.extra_sum:      dict = {}
         self.count                = 0
 
@@ -14,6 +15,9 @@ class MetricAggregator:
 
         for k, v in loss_dict["weighted"].items():
             self.weighted_sum[k] = self.weighted_sum.get(k, 0.0) + float(v)
+
+        for k, v in loss_dict.get("monitor", {}).items():
+            self.monitor_sum[k] = self.monitor_sum.get(k, 0.0) + float(v)
 
         self.count += 1
 
@@ -28,6 +32,10 @@ class MetricAggregator:
     def reduce_weighted(self) -> dict:
         n = max(1, self.count)
         return {k: v / n for k, v in self.weighted_sum.items()}
+
+    def reduce_monitor(self) -> dict:
+        n = max(1, self.count)
+        return {k: v / n for k, v in self.monitor_sum.items()}
 
     def reduce_extra(self) -> dict:
         n = max(1, self.count)

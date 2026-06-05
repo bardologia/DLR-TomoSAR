@@ -6,6 +6,8 @@ import json
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
+from .detach import Detacher
+
 _SUPPORTED_TYPES = (bool, int, float, str, Path, list, tuple, dict)
 
 
@@ -16,6 +18,7 @@ class ConfigCli:
         self.parser    = argparse.ArgumentParser(description=description, add_help=False)
 
         self.parser.add_argument("--help-config", action="store_true", dest="_help_config")
+        self.parser.add_argument("--detach", "--nohup", action="store_true", dest="_detach")
 
         for path, value in self._leaves(config):
             if value is not None and not isinstance(value, _SUPPORTED_TYPES):
@@ -34,6 +37,9 @@ class ConfigCli:
         if getattr(args, "_help_config", False):
             self._print_config_help()
             raise SystemExit(0)
+
+        if getattr(args, "_detach", False):
+            Detacher().ensure()
 
         for path, current in list(self._leaves(self.config)):
             raw = getattr(args, path, None)
@@ -94,6 +100,8 @@ class ConfigCli:
         print(f"Configuration overrides for {type(self.config).__name__} (pass as --<path> <value>):")
         for path, type_name, default in rows:
             print(f"  --{path:<{width}}  {type_name:<6}  default: {default}")
+        print("Execution flags:")
+        print("  --detach (alias --nohup)  relaunch detached from the terminal, output to logs/<script>_<stamp>.out")
 
     @staticmethod
     def set_path(config, path: str, value) -> None:

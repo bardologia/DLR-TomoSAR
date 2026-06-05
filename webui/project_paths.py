@@ -41,7 +41,7 @@ class ProjectPaths:
         return found
 
     def preferred_interpreter(self, interpreters: list[dict]) -> str:
-        priority = ["conda:Dune", "conda:nazaria"]
+        priority = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
         for wanted in priority:
             for item in interpreters:
                 if item["label"] == wanted:

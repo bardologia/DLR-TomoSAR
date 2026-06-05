@@ -11,17 +11,18 @@ from tools.tomo_geometry                            import TomoGeometry
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None, geometry_cfg=None):
-        self.x_axis       = x_axis
-        self.logger       = logger
-        self.tracker      = tracker
-        self.gaussian_cfg = gaussian_cfg
-        self.reconstruct  = self.reconstruct_gaussians
-        self.loss_cfg     = loss_cfg if loss_cfg is not None else LossConfig()
-        self.norm_stats   = norm_stats
-        self.geometry_cfg = geometry_cfg if geometry_cfg is not None else GeometryConfig()
-        self.geometry     = TomoGeometry(self.geometry_cfg, x_axis)
-        self.dx           = float(x_axis[1] - x_axis[0])
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None, geometry_cfg=None, log_all_losses=False):
+        self.x_axis         = x_axis
+        self.logger         = logger
+        self.tracker        = tracker
+        self.gaussian_cfg   = gaussian_cfg
+        self.reconstruct    = self.reconstruct_gaussians
+        self.loss_cfg       = loss_cfg if loss_cfg is not None else LossConfig()
+        self.norm_stats     = norm_stats
+        self.geometry_cfg   = geometry_cfg if geometry_cfg is not None else GeometryConfig()
+        self.geometry       = TomoGeometry(self.geometry_cfg, x_axis)
+        self.dx             = float(x_axis[1] - x_axis[0])
+        self.log_all_losses = log_all_losses
 
         cfg = self.loss_cfg
 
@@ -47,6 +48,7 @@ class Loss:
         self.logger.kv_table({
             "Sample points":  x_axis.shape[0],
             "Param matching": cfg.param_match,
+            "Log all losses": self.log_all_losses,
         })
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
 
@@ -163,141 +165,68 @@ class Loss:
         pred_curves  = self.reconstruct(pred_params_phys.float())
         exp_curves   = exp_curves.float()
 
-        components:  dict  = {}
-        weighted:    dict  = {}
-        total_loss         = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
-        weight_sum:  float = 0.0  
-
         lc = LossComponents
-
-        needs_diff = cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
-        diff       = (pred_curves - exp_curves) if needs_diff else None
-
-        if cfg.use_mse_curve:
-            eff_w                           = cfg.eff("weight_mse_curve")
-            val                             = lc.mse_diff(diff)
-            components["mse_curve"]         = val
-            weighted["mse_curve"]           = eff_w * val
-            total_loss                      = total_loss + weighted["mse_curve"]
-            weight_sum                     += eff_w
-
-        if cfg.use_l1_curve:
-            eff_w                           = cfg.eff("weight_l1_curve")
-            val                             = lc.l1_diff(diff)
-            components["l1_curve"]          = val
-            weighted["l1_curve"]            = eff_w * val
-            total_loss                      = total_loss + weighted["l1_curve"]
-            weight_sum                     += eff_w
-
-        if cfg.use_huber_curve:
-            eff_w                           = cfg.eff("weight_huber_curve")
-            val                             = lc.huber_diff(diff, cfg.huber_delta)
-            components["huber_curve"]       = val
-            weighted["huber_curve"]         = eff_w * val
-            total_loss                      = total_loss + weighted["huber_curve"]
-            weight_sum                     += eff_w
-
-        if cfg.use_charbonnier_curve:
-            eff_w                           = cfg.eff("weight_charbonnier_curve")
-            val                             = lc.charbonnier_diff(diff, cfg.charbonnier_eps)
-            components["charbonnier_curve"] = val
-            weighted["charbonnier_curve"]   = eff_w * val
-            total_loss                      = total_loss + weighted["charbonnier_curve"]
-            weight_sum                     += eff_w
-
-        if cfg.use_cosine_curve:
-            eff_w                           = cfg.eff("weight_cosine_curve")
-            val                             = lc.cosine(pred_curves, exp_curves, axis=1)
-            components["cosine_curve"]      = val
-            weighted["cosine_curve"]        = eff_w * val
-            total_loss                      = total_loss + weighted["cosine_curve"]
-            weight_sum                     += eff_w
-
-        if cfg.use_spectral_coherence:
-            eff_w                           = cfg.eff("weight_spectral_coh")
-            val                             = lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window)
-            components["spectral_coh"]      = val
-            weighted["spectral_coh"]        = eff_w * val
-            total_loss                      = total_loss + weighted["spectral_coh"]
-            weight_sum                     += eff_w
-
-        if cfg.use_ssim_curve:
-            eff_w                           = cfg.eff("weight_ssim_curve")
-            val                             = lc.ssim(pred_curves, exp_curves, cfg)
-            components["ssim_curve"]        = val
-            weighted["ssim_curve"]          = eff_w * val
-            total_loss                      = total_loss + weighted["ssim_curve"]
-            weight_sum                     += eff_w
-
         pc = PhysicsComponents
 
-        if cfg.use_total_power:
-            eff_w                           = cfg.eff("weight_total_power")
-            val                             = pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor)
-            components["total_power"]       = val
-            weighted["total_power"]         = eff_w * val
-            total_loss                      = total_loss + weighted["total_power"]
-            weight_sum                     += eff_w
+        needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
+        diff       = (pred_curves - exp_curves) if needs_diff else None
 
-        if cfg.use_moments:
-            eff_w                           = cfg.eff("weight_moments")
-            val                             = pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights)
-            components["moments"]           = val
-            weighted["moments"]             = eff_w * val
-            total_loss                      = total_loss + weighted["moments"]
-            weight_sum                     += eff_w
+        per_param_l1: dict = {}
 
-        if cfg.use_coherence_resyn:
-            eff_w                           = cfg.eff("weight_coherence_resyn")
-            val                             = pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor)
-            components["coherence_resyn"]   = val
-            weighted["coherence_resyn"]     = eff_w * val
-            total_loss                      = total_loss + weighted["coherence_resyn"]
-            weight_sum                     += eff_w
+        def param_l1_term():
+            val, per_param = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+            per_param_l1.update(per_param)
+            return val
 
-        if cfg.use_covariance_match:
-            eff_w                           = cfg.eff("weight_covariance_match")
-            val                             = pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor)
-            components["covariance_match"]  = val
-            weighted["covariance_match"]    = eff_w * val
-            total_loss                      = total_loss + weighted["covariance_match"]
-            weight_sum                     += eff_w
+        terms = [
+            ("mse_curve",         "denorm", cfg.use_mse_curve,          "weight_mse_curve",          lambda: lc.mse_diff(diff)),
+            ("l1_curve",          "denorm", cfg.use_l1_curve,           "weight_l1_curve",           lambda: lc.l1_diff(diff)),
+            ("huber_curve",       "denorm", cfg.use_huber_curve,        "weight_huber_curve",        lambda: lc.huber_diff(diff, cfg.huber_delta)),
+            ("charbonnier_curve", "denorm", cfg.use_charbonnier_curve,  "weight_charbonnier_curve",  lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps)),
+            ("cosine_curve",      "denorm", cfg.use_cosine_curve,       "weight_cosine_curve",       lambda: lc.cosine(pred_curves, exp_curves, axis=1)),
+            ("spectral_coh",      "denorm", cfg.use_spectral_coherence, "weight_spectral_coh",       lambda: lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window)),
+            ("ssim_curve",        "denorm", cfg.use_ssim_curve,         "weight_ssim_curve",         lambda: lc.ssim(pred_curves, exp_curves, cfg)),
+            ("total_power",       "denorm", cfg.use_total_power,        "weight_total_power",        lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor)),
+            ("moments",           "denorm", cfg.use_moments,            "weight_moments",            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights)),
+            ("coherence_resyn",   "denorm", cfg.use_coherence_resyn,    "weight_coherence_resyn",    lambda: pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor)),
+            ("covariance_match",  "denorm", cfg.use_covariance_match,   "weight_covariance_match",   lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor)),
+            ("capon_cycle",       "denorm", cfg.use_capon_cycle,        "weight_capon_cycle",        lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor)),
+            ("param_huber",       "norm",   cfg.use_param_huber,        "weight_param_huber",        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0]),
+            ("smoothness_tv",     "norm",   cfg.use_smoothness_tv,      "weight_smoothness_tv",      lambda: lc.tv(pred_params_norm)),
+            ("param_l1",          "norm",   cfg.use_param_l1,           "weight_param_l1",           param_l1_term),
+        ]
 
-        if cfg.use_capon_cycle:
-            eff_w                           = cfg.eff("weight_capon_cycle")
-            val                             = pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor)
-            components["capon_cycle"]       = val
-            weighted["capon_cycle"]         = eff_w * val
-            total_loss                      = total_loss + weighted["capon_cycle"]
-            weight_sum                     += eff_w
+        components:  dict  = {}
+        weighted:    dict  = {}
+        monitor:     dict  = {}
+        total_loss         = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
+        weight_sum:  float = 0.0
 
-        if cfg.use_param_huber:
-            eff_w                           = cfg.eff("weight_param_huber")
-            val, _                          = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")
-            components["param_huber"]       = val
-            weighted["param_huber"]         = eff_w * val
-            total_loss                      = total_loss + weighted["param_huber"]
-            weight_sum                     += eff_w
-        
-        if cfg.use_smoothness_tv:
-            eff_w                           = cfg.eff("weight_smoothness_tv")
-            val                             = lc.tv(pred_params_norm)
-            components["smoothness_tv"]     = val
-            weighted["smoothness_tv"]       = eff_w * val
-            total_loss                      = total_loss + weighted["smoothness_tv"]
-            weight_sum                     += eff_w
+        for name, space, is_used, weight_key, compute in terms:
+            if is_used:
+                eff_w             = cfg.eff(weight_key)
+                val               = compute()
+                components[name]  = val
+                weighted[name]    = eff_w * val
+                total_loss        = total_loss + weighted[name]
+                weight_sum       += eff_w
+
+                if self.log_all_losses:
+                    monitor[f"{name}_{space}"] = val
+
+            elif self.log_all_losses:
+                with torch.no_grad():
+                    monitor[f"{name}_{space}"] = compute()
 
         if cfg.use_param_l1:
-            eff_w                           = cfg.eff("weight_param_l1")
-            val, per_param                  = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
-            components["param_l1"]          = val
-            weighted["param_l1"]            = eff_w * val
-            total_loss                      = total_loss + weighted["param_l1"]
-            weight_sum                     += eff_w
-
-            for pname, pval in per_param.items():
+            eff_w = cfg.eff("weight_param_l1")
+            for pname, pval in per_param_l1.items():
                 components[f"param_l1/{pname}"] = pval
                 weighted[f"param_l1/{pname}"]   = eff_w * pval
+
+        if self.log_all_losses:
+            for pname, pval in per_param_l1.items():
+                monitor[f"param_l1/{pname}_norm"] = pval
 
         if weight_sum > 0.0:
             total_loss = total_loss / weight_sum
@@ -306,4 +235,5 @@ class Loss:
             "total_loss" : total_loss,
             "components" : components,
             "weighted"   : weighted,
+            "monitor"    : monitor,
         }

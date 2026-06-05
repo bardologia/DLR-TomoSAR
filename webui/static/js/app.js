@@ -64,14 +64,12 @@ class App {
 
   _initScenes() {
     const radar = document.getElementById("radar");
-    const spectrum = document.getElementById("spectrum");
+    const server = document.getElementById("server-anim");
     try {
       if (radar && window.RadarScene) this.scenes.push(new window.RadarScene(radar));
     } catch (e) {}
     try {
-      if (spectrum && window.SpectrumScene) {
-        this.scenes.push(new window.SpectrumScene(spectrum, document.getElementById("spectrum-readout")));
-      }
+      if (server && window.ServerScene) this.scenes.push(new window.ServerScene(server));
     } catch (e) {}
   }
 
@@ -110,10 +108,8 @@ class App {
   _initComponents() {
     this.runConsole = new window.RunConsole({
       list: document.getElementById("job-list"),
-      out: document.getElementById("console-out"),
-      title: document.getElementById("console-title"),
-      stop: document.getElementById("console-stop"),
-      clear: document.getElementById("console-clear"),
+      tiles: document.getElementById("console-tiles"),
+      hint: document.getElementById("console-hint"),
     });
     this.runConsole.refresh();
 
@@ -147,6 +143,8 @@ class App {
       document.getElementById("config-search")
     );
     this.configBrowser.load();
+
+    this.tensorboardView = new window.TensorboardView();
   }
 
   _initRouter() {
@@ -165,6 +163,9 @@ class App {
     } else {
       this.launchView.leave();
     }
+    if (route === "tensorboard") this.tensorboardView.enter();
+    else this.tensorboardView.leave();
+    if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }
 }

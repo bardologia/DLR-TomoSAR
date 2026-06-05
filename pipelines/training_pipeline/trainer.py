@@ -67,7 +67,7 @@ class Trainer:
         self.lr_scheduler        = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
         self.ema                 = EMA(self.config, self.logger, self.tracker)
         self.early_stopping      = EarlyStopping(self.config, self.logger, self.tracker)
-        self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry)
+        self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=config.training.log_all_losses)
         self.checkpoint          = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.grad_clipper        = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
         self.overfitter          = OverfitManager(self.config, self.logger)
@@ -225,6 +225,10 @@ class Trainer:
         self.tracker.log_metrics("loss_components/train", aggregator.reduce_components(), epoch)
         self.tracker.log_metrics("loss_weighted/train",   aggregator.reduce_weighted(),   epoch)
 
+        monitor = aggregator.reduce_monitor()
+        if monitor:
+            self.tracker.log_metrics("loss_all/train", monitor, epoch)
+
         self.tracker.log_memory(epoch)
 
         return avg_loss
@@ -270,6 +274,8 @@ class Trainer:
 
             self.tracker.log_metrics(f"loss_components/{stage}", aggregator.reduce_components(), epoch)
             self.tracker.log_metrics(f"loss_weighted/{stage}",   aggregator.reduce_weighted(),   epoch)
+            if aggregator.monitor_sum:
+                self.tracker.log_metrics(f"loss_all/{stage}", aggregator.reduce_monitor(), epoch)
             if aggregator.extra_sum:
                 self.tracker.log_metrics(f"permutation/{stage}", aggregator.reduce_extra(), epoch)
 

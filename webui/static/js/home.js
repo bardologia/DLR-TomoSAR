@@ -59,6 +59,8 @@ class StatusBoard {
     const coreCells = cores.map((_, i) => `<i class="cpu__cell" data-core="${i}" title="core ${i}"></i>`).join("");
 
     this.els.board.innerHTML =
+      `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
+
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
       `<header class="sboard__cap"><span>cuda devices</span><span class="sboard__n">${gpus.length}</span></header>` +
       `<div class="sboard__gpugrid">${gpuCards}</div>` +
@@ -71,6 +73,10 @@ class StatusBoard {
       `<dl class="cpu__load"><div><dt id="sb-load1">--</dt><dd>load 1m</dd></div><div><dt id="sb-load5">--</dt><dd>5m</dd></div><div><dt id="sb-load15">--</dt><dd>15m</dd></div></dl>` +
       `</div>` +
       `<canvas class="sboard__graph" id="sb-cpu-graph"></canvas>` +
+      `<div class="sboard__metric"><span>avg usage</span><span id="sb-cpu-avg">--</span></div>` +
+      `<div class="bar"><i class="bar__fill" id="sb-cpu-bar"></i></div>` +
+      `<div class="sboard__metric"><span>active cores</span><span id="sb-cpu-active">--</span></div>` +
+      `<div class="bar"><i class="bar__fill bar__fill--cores" id="sb-cores-bar"></i></div>` +
       `<div class="cpu__grid" id="sb-cores">${coreCells}</div>` +
       `</section>` +
 
@@ -87,7 +93,11 @@ class StatusBoard {
       `<header class="sboard__cap"><span>storage</span><span class="sboard__n" id="sb-disk-total"></span></header>` +
       `<div class="sboard__metric"><span class="sboard__path" id="sb-disk-path"></span><span id="sb-disk-txt">--</span></div>` +
       `<div class="bar"><i class="bar__fill" id="sb-disk-bar"></i></div>` +
-      `<div class="sboard__metric"><span>free</span><span id="sb-disk-free">--</span></div>` +
+      `<div class="sboard__metric"><span>free &middot; all users</span><span id="sb-disk-free">--</span></div>` +
+      `<div class="sboard__metric"><span class="sboard__path" id="sb-disk-user-path">${this._esc(sys.user || "user")} &middot; total</span><span id="sb-disk-user">--</span></div>` +
+      `<div class="bar"><i class="bar__fill bar__fill--user" id="sb-disk-user-bar"></i></div>` +
+      `<div class="sboard__metric"><span class="sboard__path" id="sb-disk-repo-path">dlr root</span><span id="sb-disk-repo">--</span></div>` +
+      `<div class="bar"><i class="bar__fill bar__fill--repo" id="sb-disk-repo-bar"></i></div>` +
       `</section>` +
 
       `<section class="sboard sboard--procs" aria-label="Processes">` +
@@ -118,6 +128,7 @@ class StatusBoard {
   }
 
   _update(sys) {
+    this._renderAlerts(sys.alerts || {});
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
     const disk = sys.disk || {};
@@ -163,13 +174,23 @@ class StatusBoard {
       const el = document.getElementById(id);
       if (el && load[i] != null) el.textContent = load[i].toFixed(1);
     });
-    (cpu.cores || []).forEach((u, i) => {
+    const cores = cpu.cores || [];
+    cores.forEach((u, i) => {
       const cell = this.coreEls[i];
       if (!cell) return;
       const a = 0.05 + Math.min(1, u / 100) * 0.85;
       cell.style.background = `rgba(29, 79, 216, ${a.toFixed(3)})`;
       cell.title = `core ${i} · ${Math.round(u)}%`;
     });
+
+    if (cores.length) {
+      const avg    = cores.reduce((s, u) => s + u, 0) / cores.length;
+      const active = cores.filter((u) => u >= 50).length;
+      this._bar("sb-cpu-bar", avg);
+      this._bar("sb-cores-bar", (100 * active) / cores.length);
+      this._txt("sb-cpu-avg", `<b>${avg.toFixed(1)}</b> %`);
+      this._txt("sb-cpu-active", `<b>${active}</b> / ${cores.length} dispatched`);
+    }
     this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "29, 79, 216", fill: 0.16 }]);
 
     if (mem.total) {
@@ -187,12 +208,45 @@ class StatusBoard {
       this._bar("sb-disk-bar", (100 * disk.used) / disk.total);
       this._txt("sb-disk-txt", `<b>${this._tb(disk.used)}</b> / ${this._tb(disk.total)}`);
       this._txt("sb-disk-total", this._tb(disk.total));
-      this._txt("sb-disk-free", this._tb(disk.free));
+      this._txt("sb-disk-free", `<b>${this._tb(disk.free)}</b>`);
       const path = document.getElementById("sb-disk-path");
       if (path) path.textContent = disk.path || "";
+
+      const userPath = document.getElementById("sb-disk-user-path");
+      if (userPath && disk.user_path) userPath.title = disk.user_path;
+      this._txt("sb-disk-user", disk.user_used != null ? `<b>${this._tb(disk.user_used)}</b>` : "scanning&hellip;");
+      this._bar("sb-disk-user-bar", disk.user_used ? (100 * disk.user_used) / disk.total : 0);
+
+      const repoPath = document.getElementById("sb-disk-repo-path");
+      if (repoPath && disk.repo_path) repoPath.title = disk.repo_path;
+      this._txt("sb-disk-repo", disk.repo_used != null ? `<b>${this._tb(disk.repo_used)}</b>` : "scanning&hellip;");
+      this._bar("sb-disk-repo-bar", disk.repo_used ? (100 * disk.repo_used) / disk.total : 0);
     }
 
     this._renderProcs(sys.procs || []);
+  }
+
+  _renderAlerts(alerts) {
+    const box = document.getElementById("sb-alerts");
+    if (!box) return;
+
+    const active = alerts.active || [];
+    const events = (alerts.events || []).slice(-3);
+    if (!active.length && !events.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+
+    const chips = active.map((a) =>
+      `<span class="alert alert--${a.level === "danger" ? "danger" : "warn"}">${this._esc(a.message)}</span>`
+    ).join("");
+    const log = events.map((e) =>
+      `<span class="alert alert--event"><b>${this._esc(e.time.replace("T", " "))}</b> ${this._esc(e.message)}</span>`
+    ).join("");
+
+    box.hidden = false;
+    box.innerHTML = `<header class="sboard__cap"><span>alerts</span><span class="sboard__n">${active.length} active</span></header><div class="alert__list">${chips}${log}</div>`;
   }
 
   _renderProcs(procs) {

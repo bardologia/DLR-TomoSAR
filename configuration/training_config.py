@@ -230,6 +230,7 @@ class TrainingConfigInner:
     max_grad_norm               : float = None
     verbose                     : bool  = True
     log_debug                   : bool  = True
+    log_all_losses              : bool  = False
 
 
 @dataclass

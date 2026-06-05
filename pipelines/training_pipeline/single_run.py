@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from pathlib import Path
+
 from configuration.single_train_config import SingleTrainConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
 from tools.loss_scale_probe import LossScaleProbeConfig
@@ -32,7 +35,27 @@ class SingleTrainRunner:
             run_name       = self.config.run_name,
         )
 
-        return pipeline.run(probe_config=self._probe_config())
+        results = pipeline.run(probe_config=self._probe_config())
+
+        if self.config.infer_after:
+            self._run_inference(pipeline.run_metadata.run_directory)
+
+        return results
+
+    def _run_inference(self, run_directory: Path):
+        import gc
+
+        import torch
+
+        from pipelines.inference_pipeline.pipeline import InferencePipeline
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
+
+        return InferencePipeline(inference_config).run()
 
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(

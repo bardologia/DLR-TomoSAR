@@ -1,61 +1,85 @@
 "use strict";
 
-class RunConsole {
-  constructor(refs) {
-    this.listEl = refs.list;
-    this.outEl = refs.out;
-    this.titleEl = refs.title;
-    this.stopBtn = refs.stop;
-    this.clearBtn = refs.clear;
-    this.jobs = [];
-    this.activeId = null;
+class ConsoleTile {
+  constructor(job, manager, host) {
+    this.job = job;
+    this.manager = manager;
     this.source = null;
+    this.opened = false;
 
-    this.stopBtn.addEventListener("click", () => this._stopActive());
-    this.clearBtn.addEventListener("click", () => this._clearOut());
+    this.root = document.createElement("div");
+    this.root.className = "console-tile";
+
+    const bar = document.createElement("div");
+    bar.className = "console-tile__bar";
+
+    this.nameEl = document.createElement("span");
+    this.nameEl.className = "console-tile__name";
+    this.nameEl.textContent = job.script;
+    this.nameEl.title = job.command;
+
+    this.metaEl = document.createElement("span");
+    this.metaEl.className = "console-tile__meta";
+    this.metaEl.textContent = `pid ${job.pid}`;
+
+    this.badgeEl = document.createElement("span");
+    this.badgeEl.className = `badge badge--${job.status}`;
+    this.badgeEl.textContent = job.status;
+
+    this.stopBtn = document.createElement("button");
+    this.stopBtn.className = "btn btn--mini btn--danger";
+    this.stopBtn.textContent = "Stop";
+    this.stopBtn.disabled = job.status !== "running";
+    this.stopBtn.addEventListener("click", () => this.manager.stop(this.job.job_id));
+
+    this.closeBtn = document.createElement("button");
+    this.closeBtn.className = "btn btn--mini";
+    this.closeBtn.textContent = "Close";
+    this.closeBtn.addEventListener("click", () => this.manager.close(this.job.job_id));
+
+    bar.append(this.nameEl, this.metaEl, this.badgeEl, this.stopBtn, this.closeBtn);
+
+    this.outEl = document.createElement("div");
+    this.outEl.className = "console-tile__out";
+
+    this.root.append(bar, this.outEl);
+    host.appendChild(this.root);
+
+    this.term = new Terminal({
+      cols: 120,
+      rows: 24,
+      convertEol: true,
+      disableStdin: true,
+      cursorBlink: false,
+      cursorInactiveStyle: "none",
+      scrollback: 10000,
+      fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
+      fontSize: 12,
+      lineHeight: 1.25,
+      theme: {
+        background: "#0e1216",
+        foreground: "#dde4e7",
+        cursor: "#0e1216",
+        selectionBackground: "#2a3a52",
+      },
+    });
+    this.fitAddon = new FitAddon.FitAddon();
+    this.term.loadAddon(this.fitAddon);
+
+    this._connect();
   }
 
-  async refresh() {
-    const data = await window.apiGet("/api/jobs");
-    this.jobs = data.jobs || [];
-    this._renderList();
+  _connect() {
+    this.source = new EventSource(`/api/jobs/${this.job.job_id}/stream`);
+    this.source.onmessage = (ev) => this._onEvent(ev);
+    this.source.onerror = () => this._disconnect();
   }
 
-  async launch(scriptKey, interpreter, label, overrides) {
-    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {} });
-    if (!res.ok) {
-      window.toast(res.error || "Launch failed", "error");
-      return null;
-    }
-    window.toast(`Launched ${label || scriptKey}`, "ok");
-    await this.refresh();
-    this.select(res.job_id);
-    if (window.router) window.router.go("console");
-    return res.job_id;
-  }
-
-  select(jobId) {
+  _disconnect() {
     if (this.source) {
       this.source.close();
       this.source = null;
     }
-    this.activeId = jobId;
-    const job = this.jobs.find((j) => j.job_id === jobId);
-    this.titleEl.textContent = job ? `${job.command}` : jobId;
-    this.outEl.innerHTML = "";
-    this._renderList();
-
-    const running = job && job.status === "running";
-    this.stopBtn.disabled = !running;
-
-    this.source = new EventSource(`/api/jobs/${jobId}/stream`);
-    this.source.onmessage = (ev) => this._onEvent(ev);
-    this.source.onerror = () => {
-      if (this.source) {
-        this.source.close();
-        this.source = null;
-      }
-    };
   }
 
   _onEvent(ev) {
@@ -66,43 +90,146 @@ class RunConsole {
       return;
     }
 
-    if (data.type === "line") {
-      this._appendLine(data.text, "");
+    if (data.type === "chunk") {
+      this.term.write(data.data);
+    } else if (data.type === "line") {
+      this.term.writeln(data.text);
     } else if (data.type === "status") {
       if (data.status === "running") {
-        this._appendLine(`process started (pid ${data.pid})`, "status");
+        this._note(`process started (pid ${data.pid})`, "36");
       } else {
-        const verdict = data.code === 0 ? "status" : "err";
-        this._appendLine(`process ${data.status} (exit ${data.code})`, verdict);
-        this.stopBtn.disabled = true;
-        this.refresh();
+        this._note(`process ${data.status} (exit ${data.code})`, data.code === 0 ? "36" : "31");
+        this.setStatus(data.status);
+        this.manager.refresh();
       }
     } else if (data.type === "end") {
-      if (this.source) {
-        this.source.close();
-        this.source = null;
-      }
+      this._disconnect();
     }
   }
 
-  _appendLine(text, kind) {
-    const atBottom = this.outEl.scrollHeight - this.outEl.scrollTop - this.outEl.clientHeight < 60;
-    const span = document.createElement("span");
-    span.className = "console__line is-new" + (kind ? ` console__line--${kind}` : "");
-    span.textContent = text;
-    this.outEl.appendChild(span);
-    if (atBottom) this.outEl.scrollTop = this.outEl.scrollHeight;
+  _note(text, color) {
+    this.term.write(`\r\n\x1b[2;${color}m── ${text} ──\x1b[0m\r\n`);
   }
 
-  _clearOut() {
-    this.outEl.innerHTML = "";
+  setStatus(status) {
+    this.job.status = status;
+    this.badgeEl.className = `badge badge--${status}`;
+    this.badgeEl.textContent = status;
+    this.stopBtn.disabled = status !== "running";
   }
 
-  async _stopActive() {
-    if (!this.activeId) return;
-    const res = await window.apiPost(`/api/jobs/${this.activeId}/stop`, {});
+  fit() {
+    const w = this.outEl.clientWidth;
+    const h = this.outEl.clientHeight;
+    if (!w || !h) return;
+
+    if (!this.opened) {
+      this.term.open(this.outEl);
+      this.opened = true;
+    }
+
+    let font = Math.max(8, Math.min(16, (w - 16) / 72));
+    this.term.options.fontSize = font;
+
+    let dims = this.fitAddon.proposeDimensions();
+    if (dims && dims.cols && dims.cols < 120) {
+      font = Math.max(7, (font * dims.cols) / 120);
+      this.term.options.fontSize = font;
+      dims = this.fitAddon.proposeDimensions();
+    }
+    if (dims && dims.rows) this.term.resize(120, Math.max(8, dims.rows));
+  }
+
+  dispose() {
+    this._disconnect();
+    this.term.dispose();
+    this.root.remove();
+  }
+}
+
+class RunConsole {
+  constructor(refs) {
+    this.listEl = refs.list;
+    this.tilesEl = refs.tiles;
+    this.hintEl = refs.hint;
+    this.jobs = [];
+    this.tiles = new Map();
+    this.dismissed = new Set();
+    this._fitTimer = null;
+
+    window.addEventListener("resize", () => this._queueFit());
+  }
+
+  async refresh() {
+    const data = await window.apiGet("/api/jobs");
+    this.jobs = data.jobs || [];
+    this.jobs
+      .filter((j) => j.status === "running" && !this.dismissed.has(j.job_id) && !this.tiles.has(j.job_id))
+      .forEach((j) => this.open(j.job_id));
+    this._renderList();
+  }
+
+  async launch(scriptKey, interpreter, label, overrides) {
+    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {} });
+    if (!res.ok) {
+      window.toast(res.error || "Launch failed", "error");
+      return null;
+    }
+    window.toast(`Launched ${label || scriptKey}`, "ok");
+    if (window.router) window.router.go("console");
+    await this.refresh();
+    this.open(res.job_id);
+    return res.job_id;
+  }
+
+  open(jobId) {
+    if (this.tiles.has(jobId)) return;
+    const job = this.jobs.find((j) => j.job_id === jobId);
+    if (!job) return;
+    this.dismissed.delete(jobId);
+    this.tiles.set(jobId, new ConsoleTile(job, this, this.tilesEl));
+    this._layout();
+    this._renderList();
+  }
+
+  close(jobId) {
+    const tile = this.tiles.get(jobId);
+    if (!tile) return;
+    tile.dispose();
+    this.tiles.delete(jobId);
+    this.dismissed.add(jobId);
+    this._layout();
+    this._renderList();
+  }
+
+  toggle(jobId) {
+    if (this.tiles.has(jobId)) this.close(jobId);
+    else this.open(jobId);
+  }
+
+  async stop(jobId) {
+    const res = await window.apiPost(`/api/jobs/${jobId}/stop`, {});
     if (res.ok) window.toast("Stop signal sent", "ok");
     else window.toast(res.error || "Could not stop", "error");
+  }
+
+  onShow() {
+    this._queueFit();
+  }
+
+  _layout() {
+    const n = this.tiles.size;
+    this.hintEl.style.display = n ? "none" : "flex";
+    const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    this.tilesEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    this.tilesEl.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+    this._queueFit();
+  }
+
+  _queueFit() {
+    clearTimeout(this._fitTimer);
+    this._fitTimer = setTimeout(() => this.tiles.forEach((t) => t.fit()), 120);
   }
 
   _renderList() {
@@ -117,12 +244,12 @@ class RunConsole {
 
     this.jobs.forEach((job) => {
       const item = document.createElement("li");
-      item.className = "job-item" + (job.job_id === this.activeId ? " is-active" : "");
+      item.className = "job-item" + (this.tiles.has(job.job_id) ? " is-active" : "");
       item.innerHTML =
         `<div class="job-item__top"><span class="job-item__name">${job.script}</span>` +
         `<span class="badge badge--${job.status}">${job.status}</span></div>` +
         `<div class="job-item__meta">${job.started.replace("T", " ")} · pid ${job.pid}</div>`;
-      item.addEventListener("click", () => this.select(job.job_id));
+      item.addEventListener("click", () => this.toggle(job.job_id));
       this.listEl.appendChild(item);
     });
   }

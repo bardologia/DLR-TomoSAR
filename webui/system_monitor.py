@@ -11,8 +11,9 @@ import time
 
 class SystemMonitor:
 
-    GPU_QUERY  = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit"
-    PROC_LIMIT = 30
+    GPU_QUERY    = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit"
+    PROC_LIMIT   = 30
+    DU_REFRESH_S = 600.0
 
     def __init__(self, paths) -> None:
         self.paths       = paths
@@ -24,6 +25,10 @@ class SystemMonitor:
         self.user        = pwd.getpwuid(self.uid).pw_name
         self.clk         = os.sysconf("SC_CLK_TCK")
         self.page        = os.sysconf("SC_PAGE_SIZE")
+        self.user_root   = self._user_root()
+        self.du_usage    = {"user": None, "repo": None}
+
+        threading.Thread(target=self._du_loop, daemon=True).start()
 
     def snapshot(self) -> dict:
         gpu_mem = self._gpu_procs()
@@ -174,7 +179,48 @@ class SystemMonitor:
             usage = shutil.disk_usage(self.paths.repo_root)
         except OSError:
             return {}
-        return {"path": str(self.paths.repo_root), "total": usage.total, "used": usage.used, "free": usage.free}
+
+        return {
+            "path"      : str(self.paths.repo_root),
+            "total"     : usage.total,
+            "used"      : usage.used,
+            "free"      : usage.free,
+            "user_path" : str(self.user_root),
+            "user_used" : self.du_usage["user"],
+            "repo_path" : str(self.paths.repo_root),
+            "repo_used" : self.du_usage["repo"],
+        }
+
+    def _user_root(self):
+        current = self.paths.repo_root.resolve()
+
+        while current != current.parent:
+            parent = current.parent
+            try:
+                if os.stat(parent).st_uid != self.uid:
+                    break
+            except OSError:
+                break
+            current = parent
+
+        return current
+
+    def _du_loop(self) -> None:
+        while True:
+            self.du_usage["repo"] = self._du(self.paths.repo_root)
+            self.du_usage["user"] = self._du(self.user_root) if self.user_root != self.paths.repo_root else self.du_usage["repo"]
+            time.sleep(self.DU_REFRESH_S)
+
+    def _du(self, path) -> int | None:
+        try:
+            out = subprocess.run(["du", "-s", "--block-size=1", str(path)], capture_output=True, text=True, timeout=900)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+        try:
+            return int(out.stdout.split()[0])
+        except (ValueError, IndexError):
+            return None
 
     def _uptime(self) -> float:
         try:

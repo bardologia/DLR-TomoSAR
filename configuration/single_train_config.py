@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.inference_config import InferenceConfig
 from configuration.training_config import GeometryConfig, LossConfig, LossCurriculumConfig, OverfitConfig
 
 
@@ -12,6 +13,15 @@ def _default_curriculum() -> LossCurriculumConfig:
         enabled  = False,
         warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0),
         complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
+    )
+
+
+def _default_inference() -> InferenceConfig:
+    return InferenceConfig(
+        run_directory = Path("."),
+        save_cubes    = True,
+        cpu_workers   = 16,
+        gif_axes      = ["elevation", "range", "azimuth"],
     )
 
 
@@ -35,6 +45,9 @@ class SingleTrainConfig:
     probe_n_batches  : int  = 1000
     probe_reference  : str  = "param_l1"
     probe_exit_after : bool = True
+
+    infer_after : bool            = False
+    inference   : InferenceConfig = field(default_factory=_default_inference)
 
 
 @dataclass

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import http.client
 import json
 import mimetypes
 import queue
+import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,9 +14,11 @@ from model_library import ModelLibrary
 from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
 from project_paths import ProjectPaths
+from resource_watchdog import ResourceWatchdog
 from script_catalog import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor import SystemMonitor
+from tensorboard_manager import TensorboardManager
 from web_logger import WebLogger
 
 
@@ -28,17 +32,19 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor) -> None:
-        self.paths     = paths
-        self.logger    = logger
-        self.catalog   = catalog
-        self.resolver  = resolver
-        self.configs   = configs
-        self.equations = equations
-        self.models    = models
-        self.pipelines = pipelines
-        self.processes = processes
-        self.system    = system
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager) -> None:
+        self.paths       = paths
+        self.logger      = logger
+        self.catalog     = catalog
+        self.resolver    = resolver
+        self.configs     = configs
+        self.equations   = equations
+        self.models      = models
+        self.pipelines   = pipelines
+        self.processes   = processes
+        self.system      = system
+        self.watchdog    = watchdog
+        self.tensorboard = tensorboard
 
     def route(self, handler) -> None:
         parsed = urlparse(handler.path)
@@ -46,7 +52,9 @@ class RequestRouter:
         method = handler.command
 
         try:
-            if method == "GET":
+            if parsed.path.startswith("/tb/"):
+                self._proxy_tensorboard(handler)
+            elif method == "GET":
                 self._route_get(handler, path)
             elif method == "POST":
                 self._route_post(handler, path)
@@ -110,8 +118,13 @@ class RequestRouter:
         if path == "/api/jobs":
             self._send_json(handler, {"jobs": self.processes.list_jobs()})
             return
+        if path == "/api/tensorboard":
+            self._send_json(handler, {"instances": self.tensorboard.list_instances()})
+            return
         if path == "/api/system":
-            self._send_json(handler, self.system.snapshot())
+            payload           = self.system.snapshot()
+            payload["alerts"] = self.watchdog.state()
+            self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):
             job_id = path[len("/api/jobs/"):-len("/stream")]
@@ -128,6 +141,10 @@ class RequestRouter:
             interpreter = body.get("interpreter") or self._preferred_interpreter()
             overrides   = body.get("overrides", {})
             result      = self.processes.launch(key, interpreter, overrides)
+
+            if result.get("ok") and self.tensorboard.logdir_keys(key):
+                threading.Thread(target=self._autostart_tensorboard, args=(key, overrides, interpreter), daemon=True).start()
+
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
@@ -137,7 +154,93 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
+        if path == "/api/tensorboard/start":
+            interpreter = body.get("interpreter") or self._preferred_interpreter()
+            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "single_train"), {}, interpreter)
+
+            if not logdir:
+                self._send_json(handler, {"ok": False, "error": "could not resolve a training log directory"}, 400)
+                return
+
+            result = self.tensorboard.ensure(logdir, interpreter)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path.startswith("/api/tensorboard/") and path.endswith("/stop"):
+            tb_id  = path[len("/api/tensorboard/"):-len("/stop")]
+            result = self.tensorboard.stop(tb_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
         self._send_json(handler, {"error": "not found"}, 404)
+
+    def _autostart_tensorboard(self, key: str, overrides: dict, interpreter: str) -> None:
+        try:
+            logdir = self._training_logdir(key, overrides, interpreter)
+            if logdir:
+                self.tensorboard.ensure(logdir, interpreter)
+        except Exception as exc:
+            self.logger.error(f"tensorboard autostart failed: {exc}")
+
+    def _training_logdir(self, key: str, overrides: dict, interpreter: str) -> str | None:
+        leaf_keys = self.tensorboard.logdir_keys(key)
+        if not leaf_keys:
+            return None
+
+        for leaf in leaf_keys:
+            value = (overrides or {}).get(leaf)
+            if value:
+                return str(value)
+
+        resolved = self.resolver.resolve(key, interpreter)
+        if not resolved.get("ok"):
+            return None
+
+        leaves = {item["path"]: item["value"] for item in resolved["leaves"]}
+        for leaf in leaf_keys:
+            if leaves.get(leaf):
+                return str(leaves[leaf])
+
+        return None
+
+    def _proxy_tensorboard(self, handler) -> None:
+        segments = handler.path.split("/")
+        tb_id    = segments[2].split("?")[0] if len(segments) > 2 else ""
+        record   = self.tensorboard.get(tb_id)
+
+        if record is None:
+            self._send_json(handler, {"error": "unknown tensorboard instance"}, 404)
+            return
+
+        length = int(handler.headers.get("Content-Length", 0) or 0)
+        body   = handler.rfile.read(length) if length > 0 else None
+
+        headers = {"Host": f"127.0.0.1:{record['port']}", "Accept-Encoding": "identity"}
+        for name in ("Content-Type", "Accept", "X-XSRF-Protected"):
+            value = handler.headers.get(name)
+            if value:
+                headers[name] = value
+
+        connection = http.client.HTTPConnection("127.0.0.1", record["port"], timeout=60)
+        try:
+            connection.request(handler.command, handler.path, body=body, headers=headers)
+            response = connection.getresponse()
+            payload  = response.read()
+            status   = response.status
+            passthru = {name: response.getheader(name) for name in ("Content-Type", "Content-Encoding", "Cache-Control", "Location")}
+        except OSError as exc:
+            self._send_json(handler, {"error": f"tensorboard unreachable: {exc}"}, 502)
+            return
+        finally:
+            connection.close()
+
+        handler.send_response(status)
+        for name, value in passthru.items():
+            if value:
+                handler.send_header(name, value)
+        handler.send_header("Content-Length", str(len(payload)))
+        handler.end_headers()
+        handler.wfile.write(payload)
 
     def _project_payload(self) -> dict:
         interpreters = self.paths.discover_interpreters()

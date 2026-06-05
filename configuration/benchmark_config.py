@@ -50,6 +50,7 @@ class TrainingQueueConfig:
     train_azimuth        : tuple[int, int] = (1000, 9120)
     val_azimuth          : tuple[int, int] = (9120, 12400)
     test_azimuth         : tuple[int, int] = (12400, 16000)
+    log_all_losses       : bool            = False
 
 
 @dataclass

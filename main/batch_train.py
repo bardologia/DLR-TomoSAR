@@ -67,6 +67,7 @@ class BatchTrainScheduler:
             "Model"          : self.config.base.model_name,
             "Experiments"    : len(experiments),
             "GPUs"           : self.config.gpus,
+            "Infer after"    : self.config.base.infer_after,
             "Base overrides" : self.base_overrides or "—",
             "Log dir"        : str(self.log_dir),
         }, title="Configuration")

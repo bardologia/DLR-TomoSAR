@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import codecs
 import os
 import queue
 import re
 import shlex
 import subprocess
 import threading
+import time
 import uuid
 from collections import deque
 from datetime import datetime
@@ -70,16 +72,17 @@ class ProcessManager:
 
         env = dict(os.environ)
         env["PYTHONUNBUFFERED"] = "1"
+        env["FORCE_COLOR"]      = "1"
+        env["COLUMNS"]          = "120"
+        env["LINES"]            = "32"
 
         try:
             process = subprocess.Popen(
                 argv,
-                cwd                = str(self.paths.repo_root),
-                stdout             = subprocess.PIPE,
-                stderr             = subprocess.STDOUT,
-                env                = env,
-                text               = True,
-                bufsize            = 1,
+                cwd    = str(self.paths.repo_root),
+                stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT,
+                env    = env,
             )
         except OSError as exc:
             return {"ok": False, "error": str(exc)}
@@ -123,10 +126,20 @@ class ProcessManager:
         return " ".join(parts)
 
     def _pump(self, job_id: str, process: subprocess.Popen, stream: JobStream) -> None:
-        line_no = 0
-        for raw in process.stdout:
-            line_no += 1
-            stream.publish({"type": "line", "n": line_no, "text": raw.rstrip("\n")})
+        fd      = process.stdout.fileno()
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
+
+        while True:
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                break
+            text = decoder.decode(chunk)
+            if text:
+                stream.publish({"type": "chunk", "data": text})
+
+        tail = decoder.decode(b"", final=True)
+        if tail:
+            stream.publish({"type": "chunk", "data": tail})
 
         process.wait()
         code = process.returncode
@@ -157,6 +170,33 @@ class ProcessManager:
 
         self.logger.warning(f"stop requested for job {job_id}")
         return {"ok": True}
+
+    def stop_all(self, grace: float = 8.0) -> int:
+        with self.lock:
+            running = [dict(r) for r in self.jobs.values() if r["status"] == "running"]
+
+        if not running:
+            return 0
+
+        for record in running:
+            subprocess.run(["kill", "-TERM", str(record["pid"])], check=False)
+            self.logger.warning(f"watchdog stop for job {record['job_id']} (pid {record['pid']})")
+
+        deadline = time.monotonic() + grace
+        while time.monotonic() < deadline:
+            with self.lock:
+                alive = [r for r in running if self.jobs[r["job_id"]]["status"] == "running"]
+            if not alive:
+                return len(running)
+            time.sleep(0.5)
+
+        with self.lock:
+            stubborn = [r for r in running if self.jobs[r["job_id"]]["status"] == "running"]
+        for record in stubborn:
+            subprocess.run(["kill", "-KILL", str(record["pid"])], check=False)
+            self.logger.error(f"force kill for job {record['job_id']} (pid {record['pid']})")
+
+        return len(running)
 
     def list_jobs(self) -> list[dict]:
         with self.lock:
