@@ -9,9 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260606q" />
 </head>
 <body>
 
@@ -41,40 +40,33 @@
 
   <!-- HOME -->
   <section class="page page--home is-active" data-page="home">
-    <canvas class="hero__radar" id="radar" aria-hidden="true"></canvas>
-    <div class="hero__inner">
-      <div class="hero__copy">
-        <h1 class="hero__title">The vertical scene,<br /><em>reconstructed</em> in one pass.</h1>
-        <p class="hero__sub">
-          A neural control console for SAR tomography: predict every Gaussian-mixture
-          parameter of the elevation spectrum without per-pixel fitting.
-        </p>
-        <div class="hero__cta">
-          <a class="btn btn--primary" href="#/scripts" data-route="scripts">Open control panel</a>
-          <a class="btn btn--ghost" href="#/model" data-route="model">Explore the model</a>
+    <canvas class="status__radar" id="radar" aria-hidden="true"></canvas>
+    <div class="status">
+      <header class="status__head">
+        <div class="status__id">
+          <p class="hero__kicker">server observatory &middot; neural SAR tomography</p>
+          <h1 class="status__host" id="status-host">&hellip;</h1>
+          <p class="status__sum" id="status-sum">connecting to backend&hellip;</p>
         </div>
-        <dl class="hero__stats" id="hero-stats"></dl>
-      </div>
-
-      <figure class="instrument" aria-label="Live elevation power spectrum">
-        <figcaption class="instrument__cap">
-          <span>elevation power spectrum</span>
-          <span class="instrument__live"><span class="dot dot--live"></span>live</span>
-        </figcaption>
-        <canvas id="spectrum" class="instrument__canvas"></canvas>
-        <div class="instrument__readout" id="spectrum-readout"></div>
-      </figure>
+        <figure class="instrument instrument--mini" aria-label="Live elevation power spectrum decomposing into Gaussian components">
+          <figcaption class="instrument__cap">
+            <span>elevation spectrum</span>
+            <span class="instrument__live"><span class="dot dot--live"></span>live</span>
+          </figcaption>
+          <canvas id="spectrum" class="instrument__canvas instrument__canvas--mini"></canvas>
+        </figure>
+      </header>
+      <div class="status__board" id="status-board"></div>
     </div>
-    <nav class="home-jump" id="home-jump" aria-label="Quick links"></nav>
   </section>
 
   <!-- MODEL -->
   <section class="page page--pad" data-page="model">
     <div class="page__head">
-      <h2 class="page__title">The signal model</h2>
+      <h2 class="page__title">The mathematics, end to end</h2>
       <p class="page__lead">
-        From a stack of co-registered F-SAR passes to a K-Gaussian elevation spectrum.
-        Every equation below is what the network learns to amortise.
+        Every equation from every pipeline stage, signal model to hyperparameter search,
+        exactly as implemented in the codebase.
       </p>
     </div>
     <div class="eq-tabs" id="eq-tabs"></div>
@@ -113,12 +105,36 @@
     <div class="page__head">
       <h2 class="page__title">Entry points</h2>
       <p class="page__lead">
-        Nine orchestrated scripts. Inspect the source, tune the configuration block,
-        pick an interpreter, and launch with live output.
+        Nine orchestrated scripts. Inspect the source, review the entry configuration
+        defaults, override any field, and launch with live output.
       </p>
     </div>
     <div class="filter-row" id="script-filters"></div>
     <div class="script-grid" id="script-grid"></div>
+  </section>
+
+  <!-- LAUNCH -->
+  <section class="page page--launch" data-page="launch">
+    <header class="launch__top">
+      <a class="launch__back" href="#/scripts">&larr; All scripts</a>
+      <div class="launch__heading">
+        <span class="launch__kicker" id="launch-kicker"></span>
+        <h2 class="launch__title" id="launch-title">&hellip;</h2>
+        <p class="launch__purpose" id="launch-purpose"></p>
+      </div>
+      <dl class="launch__facts" id="launch-facts"></dl>
+    </header>
+    <div class="launch__body">
+      <aside class="launch__rail" id="launch-rail" aria-label="Launch controls"></aside>
+      <div class="launch__main">
+        <div class="launch__tabs" role="tablist" aria-label="Script panes">
+          <button class="launch__tab is-active" data-pane="config" role="tab" aria-selected="true">Configuration</button>
+          <button class="launch__tab" data-pane="source" role="tab" aria-selected="false">Source</button>
+        </div>
+        <div class="launch__pane is-active" id="launch-config" role="tabpanel"></div>
+        <div class="launch__pane launch__pane--source" id="launch-source" role="tabpanel"><pre><code class="language-python" id="launch-source-code"></code></pre></div>
+      </div>
+    </div>
   </section>
 
   <!-- CONFIGURATION -->
@@ -127,15 +143,19 @@
       <div>
         <h2 class="page__title">Configuration layer</h2>
         <p class="page__lead">
-          Every dataclass and default, parsed live from the codebase. Choose a group,
-          then a config to read its fields.
+          Every dataclass and default, parsed live from the codebase. Open a module,
+          pick a config, or search across every field.
         </p>
       </div>
-      <input class="config-search" id="config-search" type="search" placeholder="Search any field" aria-label="Search configuration fields" />
+      <div class="config-search-wrap" id="config-search-wrap">
+        <input class="config-search" id="config-search" type="search" placeholder="Search configs and fields" aria-label="Search configuration" />
+        <kbd class="config-search__kbd" aria-hidden="true">/</kbd>
+        <p class="config-meta" id="config-meta" role="status"></p>
+      </div>
     </div>
-    <div class="master">
-      <aside class="master__list" id="config-list" aria-label="Configuration list"></aside>
-      <div class="master__detail" id="config-detail"></div>
+    <div class="master master--config">
+      <aside class="master__list master__list--config" id="config-list" aria-label="Configuration modules"></aside>
+      <div class="master__detail master__detail--config" id="config-detail"></div>
     </div>
   </section>
 
@@ -172,27 +192,6 @@
   <span class="footer__dim" id="footer-root"></span>
 </footer>
 
-<div class="drawer" id="drawer" aria-hidden="true">
-  <div class="drawer__scrim" id="drawer-scrim"></div>
-  <div class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
-    <div class="drawer__head">
-      <div>
-        <span class="drawer__kicker" id="drawer-kicker"></span>
-        <h3 class="drawer__title" id="drawer-title"></h3>
-        <p class="drawer__purpose" id="drawer-purpose"></p>
-      </div>
-      <button class="drawer__close" id="drawer-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="drawer__run" id="drawer-run"></div>
-    <div class="drawer__tabs">
-      <button class="drawer__tab is-active" data-pane="config">Configuration</button>
-      <button class="drawer__tab" data-pane="source">Source</button>
-    </div>
-    <div class="drawer__pane is-active" id="pane-config"></div>
-    <div class="drawer__pane" id="pane-source"><pre><code class="language-python" id="source-code"></code></pre></div>
-  </div>
-</div>
-
 <div class="proc-modal" id="proc-modal" aria-hidden="true">
   <div class="proc-modal__scrim" id="proc-scrim"></div>
   <div class="proc-modal__panel" role="dialog" aria-modal="true" aria-labelledby="proc-title">
@@ -213,20 +212,21 @@
 
 <script>window.MathJax = { svg: { fontCache: "none" }, startup: { typeset: false } };</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" async></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 
-<script src="/static/js/radar.js"></script>
-<script src="/static/js/process_anim.js"></script>
-<script src="/static/js/diagram.js"></script>
-<script src="/static/js/router.js"></script>
-<script src="/static/js/equations.js"></script>
-<script src="/static/js/pipelines.js"></script>
-<script src="/static/js/models.js"></script>
-<script src="/static/js/configs.js"></script>
-<script src="/static/js/scripts.js"></script>
-<script src="/static/js/console.js"></script>
-<script src="/static/js/app.js"></script>
+<script src="/static/js/radar.js?v=20260606q"></script>
+<script src="/static/js/home.js?v=20260606q"></script>
+<script src="/static/js/process_anim.js?v=20260606q"></script>
+<script src="/static/js/diagram.js?v=20260606q"></script>
+<script src="/static/js/router.js?v=20260606q"></script>
+<script src="/static/js/equations.js?v=20260606q"></script>
+<script src="/static/js/pipelines.js?v=20260606q"></script>
+<script src="/static/js/models.js?v=20260606q"></script>
+<script src="/static/js/configs.js?v=20260606q"></script>
+<script src="/static/js/scripts.js?v=20260606q"></script>
+<script src="/static/js/launch.js?v=20260606q"></script>
+<script src="/static/js/console.js?v=20260606q"></script>
+<script src="/static/js/app.js?v=20260606q"></script>
 </body>
 </html>

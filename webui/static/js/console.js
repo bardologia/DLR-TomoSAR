@@ -21,13 +21,13 @@ class RunConsole {
     this._renderList();
   }
 
-  async launch(scriptKey, interpreter, label) {
-    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter });
+  async launch(scriptKey, interpreter, label, overrides) {
+    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {} });
     if (!res.ok) {
-      window.toast(res.error || "launch failed", "error");
+      window.toast(res.error || "Launch failed", "error");
       return null;
     }
-    window.toast(`launched ${label || scriptKey}`, "ok");
+    window.toast(`Launched ${label || scriptKey}`, "ok");
     await this.refresh();
     this.select(res.job_id);
     if (window.router) window.router.go("console");
@@ -101,8 +101,8 @@ class RunConsole {
   async _stopActive() {
     if (!this.activeId) return;
     const res = await window.apiPost(`/api/jobs/${this.activeId}/stop`, {});
-    if (res.ok) window.toast("stop signal sent", "ok");
-    else window.toast(res.error || "could not stop", "error");
+    if (res.ok) window.toast("Stop signal sent", "ok");
+    else window.toast(res.error || "Could not stop", "error");
   }
 
   _renderList() {
