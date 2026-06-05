@@ -165,6 +165,8 @@ class ResultsView {
     const body = this.detailEl.querySelector(".res-md");
     if (!body || !output.report_url) return;
 
+    this._gridify(body);
+
     const base = output.report_url.slice(0, output.report_url.lastIndexOf("/") + 1);
 
     body.querySelectorAll("img").forEach((img) => {
@@ -213,6 +215,47 @@ class ResultsView {
     this.detailEl.querySelectorAll(".res-fig").forEach((fig) => {
       fig.addEventListener("click", () => this._openLightbox(fig.dataset.url, fig.dataset.name));
     });
+  }
+
+  _gridify(body) {
+    const isImgPara = (el) =>
+      el && el.tagName === "P" && el.children.length === 1 && el.children[0].tagName === "IMG" && !el.textContent.trim();
+
+    let node = body.firstElementChild;
+    while (node) {
+      if (!isImgPara(node)) {
+        node = node.nextElementSibling;
+        continue;
+      }
+
+      const run = [node];
+      let next = node.nextElementSibling;
+      while (isImgPara(next)) {
+        run.push(next);
+        next = next.nextElementSibling;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "res-grid res-grid--md";
+      node.before(grid);
+
+      run.forEach((para) => {
+        const img = para.children[0];
+        const isGif = (img.getAttribute("src") || "").toLowerCase().endsWith(".gif");
+
+        const fig = document.createElement("figure");
+        fig.className = "res-fig" + (isGif ? " res-fig--gif" : "");
+
+        const cap = document.createElement("figcaption");
+        cap.textContent = img.alt || "";
+
+        fig.append(img, cap);
+        grid.appendChild(fig);
+        para.remove();
+      });
+
+      node = grid.nextElementSibling;
+    }
   }
 
   _openLightbox(url, name) {

@@ -161,9 +161,15 @@ class App {
       cross      : document.getElementById("cube-cross"),
       coords     : document.getElementById("cube-coords"),
       hint       : document.getElementById("cube-hint"),
-      rangeImg   : document.getElementById("cube-slice-range"),
-      azimuthImg : document.getElementById("cube-slice-azimuth"),
+      slices     : document.getElementById("cube-slices"),
       sourceBtns : [...document.querySelectorAll(".cube-source")],
+      panels     : [...document.querySelectorAll(".cube-slice")].map((root) => ({
+        root,
+        axis    : root.dataset.axis,
+        source  : root.dataset.source,
+        canvas  : root.querySelector("canvas"),
+        caption : root.querySelector("figcaption"),
+      })),
     });
   }
 

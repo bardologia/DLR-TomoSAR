@@ -19,17 +19,6 @@ class CubeExplorer:
 
     SOURCES = ("pred", "gt")
 
-    PLOT_RC = {
-        "font.family"     : "serif",
-        "font.serif"      : ["Times New Roman", "DejaVu Serif"],
-        "font.size"       : 11,
-        "axes.linewidth"  : 0.8,
-        "xtick.direction" : "in",
-        "ytick.direction" : "in",
-        "savefig.bbox"    : "tight",
-        "savefig.dpi"     : 130,
-    }
-
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths     = paths
         self.logger    = logger
@@ -77,45 +66,21 @@ class CubeExplorer:
         if entry is None or axis not in ("range", "azimuth"):
             return None
 
-        cube           = entry["cube"]
+        cube               = entry["cube"]
         n_elev, n_az, n_rg = cube.shape
-        az             = int(np.clip(az, 0, n_az - 1))
-        rg             = int(np.clip(rg, 0, n_rg - 1))
-        x_axis         = entry["x_axis"]
+        az                 = int(np.clip(az, 0, n_az - 1))
+        rg                 = int(np.clip(rg, 0, n_rg - 1))
 
         if axis == "range":
-            data    = np.asarray(cube[:, :, rg], dtype=np.float32)
-            x_label = "azimuth index"
-            marker  = az
-            title   = f"{source} — range cut @ rg={rg}"
-            x_lo, x_hi = 0, n_az
+            data = np.asarray(cube[:, :, rg], dtype=np.float32)
         else:
-            data    = np.asarray(cube[:, az, :], dtype=np.float32)
-            x_label = "range index"
-            marker  = rg
-            title   = f"{source} — azimuth cut @ az={az}"
-            x_lo, x_hi = 0, n_rg
+            data = np.asarray(cube[:, az, :], dtype=np.float32)
 
-        sort_idx = np.argsort(x_axis)
-        data     = data[sort_idx]
-        x_sorted = x_axis[sort_idx]
-
-        vmin, vmax = np.percentile(data[np.isfinite(data)], [1.0, 99.0])
-        extent     = [x_lo, x_hi, float(x_sorted[0]), float(x_sorted[-1])]
-
-        plt.rcParams.update(self.PLOT_RC)
-        fig, ax = plt.subplots(figsize=(7.6, 3.4))
-        im      = ax.imshow(data, cmap="jet", vmin=float(vmin), vmax=float(vmax), extent=extent, aspect="auto", origin="lower", interpolation="nearest")
-        ax.axvline(marker, color="white", linewidth=0.9, linestyle="--", alpha=0.85)
-        ax.set_title(title, fontsize=11)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel("elevation [m]" if entry["has_axis"] else "elevation bin")
-        fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02).set_label("intensity")
-        fig.tight_layout()
+        sort_idx = np.argsort(entry["x_axis"])
+        data     = np.flipud(data[sort_idx])
 
         buf = io.BytesIO()
-        fig.savefig(buf, format="png")
-        plt.close(fig)
+        plt.imsave(buf, data, cmap="jet", vmin=entry["vmin"], vmax=entry["vmax"], format="png")
         return buf.getvalue()
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
@@ -142,14 +107,31 @@ class CubeExplorer:
         if cube.ndim != 3:
             return None
 
-        mean              = np.zeros(cube.shape[1:], dtype=np.float32)
+        mean    = np.zeros(cube.shape[1:], dtype=np.float32)
+        samples = []
+        step    = max(1, cube.shape[0] // 8)
         for i in range(cube.shape[0]):
-            mean += np.asarray(cube[i], dtype=np.float32)
-        mean             /= cube.shape[0]
+            plane = np.asarray(cube[i], dtype=np.float32)
+            mean += plane
+            if i % step == 0:
+                samples.append(plane[:: max(1, plane.shape[0] // 200), :: max(1, plane.shape[1] // 200)].ravel())
+        mean /= cube.shape[0]
+
+        sampled    = np.concatenate(samples)
+        sampled    = sampled[np.isfinite(sampled)]
+        vmin, vmax = (np.percentile(sampled, [1.0, 99.0]) if sampled.size else (0.0, 1.0))
 
         x_axis, has_axis = self._elevation_axis(stamp_dir, cube.shape[0])
 
-        entry = {"cube": cube, "mean": mean, "x_axis": x_axis, "has_axis": has_axis, "mtime": mtime}
+        entry = {
+            "cube"     : cube,
+            "mean"     : mean,
+            "x_axis"   : x_axis,
+            "has_axis" : has_axis,
+            "vmin"     : float(vmin),
+            "vmax"     : float(vmax),
+            "mtime"    : mtime,
+        }
         with self.lock:
             self.cache[key] = entry
 

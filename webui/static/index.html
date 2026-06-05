@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260612e" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260612g" />
 </head>
 <body>
 
@@ -191,8 +191,9 @@
       <div>
         <h2 class="page__title">Tomogram explorer</h2>
         <p class="page__lead">
-          Top-down mean intensity of a saved inference cube. Click any point on the map
-          to cut the tomogram along range and azimuth through that point.
+          Top-down mean intensity of a saved inference cube. Hover the map to cut the
+          tomogram live along range and azimuth, prediction next to ground truth.
+          Click to pin a point, click again to release.
         </p>
       </div>
       <div class="cube-sources">
@@ -210,9 +211,15 @@
         </div>
         <p class="cube-coords" id="cube-coords">click a point on the map</p>
       </div>
-      <div class="cube-slices">
-        <figure class="cube-slice" hidden><img id="cube-slice-range" alt="Range slice" /></figure>
-        <figure class="cube-slice" hidden><img id="cube-slice-azimuth" alt="Azimuth slice" /></figure>
+      <div class="cube-slices" id="cube-slices" hidden>
+        <div class="cube-pair">
+          <figure class="cube-slice" data-axis="range" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="range" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
+        </div>
+        <div class="cube-pair">
+          <figure class="cube-slice" data-axis="azimuth" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="azimuth" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
+        </div>
       </div>
     </div>
   </section>
@@ -298,8 +305,8 @@
 <script src="/static/js/scripts.js?v=20260606r"></script>
 <script src="/static/js/launch.js?v=20260611y"></script>
 <script src="/static/js/console.js?v=20260611y"></script>
-<script src="/static/js/results.js?v=20260612c"></script>
-<script src="/static/js/tomogram.js?v=20260612e"></script>
+<script src="/static/js/results.js?v=20260612g"></script>
+<script src="/static/js/tomogram.js?v=20260612g"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
 <script src="/static/js/app.js?v=20260611z"></script>
 </body>
