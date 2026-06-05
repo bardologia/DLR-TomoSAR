@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from project_paths import ProjectPaths
 from web_logger import WebLogger
@@ -19,7 +21,6 @@ class TensorboardManager:
         "batch_train"  : ("base.logdir",),
     }
 
-    BASE_PORT         = 6007
     STARTUP_TIMEOUT_S = 90.0
     PROBE_INTERVAL_S  = 0.5
 
@@ -52,19 +53,23 @@ class TensorboardManager:
             "--reload_interval", "30",
         ]
 
-        try:
-            process = subprocess.Popen(argv, cwd=str(self.paths.repo_root), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except OSError as exc:
-            return {"ok": False, "error": str(exc)}
+        stderr_path = Path(tempfile.gettempdir()) / f"tensorboard_{tb_id}.log"
+
+        with open(stderr_path, "wb") as stderr_file:
+            try:
+                process = subprocess.Popen(argv, cwd=str(self.paths.repo_root), stdout=stderr_file, stderr=stderr_file)
+            except OSError as exc:
+                return {"ok": False, "error": str(exc)}
 
         record = {
-            "id"      : tb_id,
-            "logdir"  : logdir,
-            "port"    : port,
-            "pid"     : process.pid,
-            "status"  : "starting",
-            "started" : datetime.now().isoformat(timespec="seconds"),
-            "process" : process,
+            "id"          : tb_id,
+            "logdir"      : logdir,
+            "port"        : port,
+            "pid"         : process.pid,
+            "status"      : "starting",
+            "started"     : datetime.now().isoformat(timespec="seconds"),
+            "process"     : process,
+            "stderr_path" : stderr_path,
         }
 
         with self.lock:
@@ -120,7 +125,7 @@ class TensorboardManager:
         while time.monotonic() < deadline:
             if record["process"].poll() is not None:
                 record["status"] = "failed"
-                self.logger.error(f"tensorboard {record['id']} exited during startup")
+                self.logger.error(f"tensorboard {record['id']} exited during startup: {self._stderr_tail(record)}")
                 return
 
             try:
@@ -134,7 +139,7 @@ class TensorboardManager:
         record["status"] = "failed"
         if record["process"].poll() is None:
             record["process"].terminate()
-        self.logger.error(f"tensorboard {record['id']} failed to start within {self.STARTUP_TIMEOUT_S:.0f}s")
+        self.logger.error(f"tensorboard {record['id']} failed to start within {self.STARTUP_TIMEOUT_S:.0f}s: {self._stderr_tail(record)}")
 
     def _view(self, record: dict) -> dict:
         return {
@@ -147,16 +152,15 @@ class TensorboardManager:
             "url"     : f"/tb/{record['id']}/",
         }
 
-    @classmethod
-    def _free_port(cls) -> int:
-        for port in range(cls.BASE_PORT, cls.BASE_PORT + 100):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                try:
-                    sock.bind(("127.0.0.1", port))
-                    return port
-                except OSError:
-                    continue
+    def _stderr_tail(self, record: dict, max_chars: int = 500) -> str:
+        try:
+            text = record["stderr_path"].read_text(errors="replace").strip()
+        except OSError:
+            return "no stderr captured"
+        return text[-max_chars:] if text else "no stderr captured"
 
+    @staticmethod
+    def _free_port() -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", 0))
             return sock.getsockname()[1]
