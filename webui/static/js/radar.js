@@ -16,6 +16,7 @@ class CanvasBase {
 
   _resize() {
     const rect = this.canvas.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
     this.w = Math.max(1, rect.width);
     this.h = Math.max(1, rect.height);
     this.canvas.width = this.w * this.dpr;
@@ -141,8 +142,8 @@ class RadarScene extends CanvasBase {
       else p.lit *= 0.965;
     }
 
-    this._draw();
     requestAnimationFrame(this._loop);
+    this._draw();
   }
 }
 

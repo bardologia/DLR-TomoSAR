@@ -112,15 +112,17 @@ class RunLoader:
         gt_parameters = arrays["parameters"]
 
         dataset = PatchDataset(
-            inputs        = inputs,
-            gt_parameters = gt_parameters,
-            grid          = grid,
-            input_config  = dataset_config.input_config,
-            output_config = dataset_config.output_config,
-            split_name    = split_name,
-            normalizer    = Normalizer(norm_stats),
-            x_axis        = x_axis,
-            n_gaussians   = n_gaussians,
+            inputs           = inputs,
+            gt_parameters    = gt_parameters,
+            grid             = grid,
+            input_config     = dataset_config.input_config,
+            output_config    = dataset_config.output_config,
+            split_name       = split_name,
+            n_secondaries    = arrays["n_secondaries"],
+            n_interferograms = arrays["n_interferograms"],
+            normalizer       = Normalizer(norm_stats),
+            x_axis           = x_axis,
+            n_gaussians      = n_gaussians,
         )
 
         return dataset, grid, region, layout.global_crop

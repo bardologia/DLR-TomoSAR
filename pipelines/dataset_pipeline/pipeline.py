@@ -74,6 +74,8 @@ class DatasetPipeline:
                 input_config     = self.config.input_config,
                 output_config    = self.config.output_config,
                 split_name       = split_name,
+                n_secondaries    = arrays["n_secondaries"],
+                n_interferograms = arrays["n_interferograms"],
                 normalizer       = normalizer,
                 x_axis           = self.config.x_axis,
                 n_gaussians      = self.config.n_gaussians,
@@ -96,15 +98,16 @@ class DatasetPipeline:
         train_ds, train_patcher = self._build_dataset("train")
 
         norm_stats = StatsComputer.compute(
-            dataset       = train_ds,
-            params_path   = self.config.parameters_path,
-            logger        = self.logger,
-            input_config  = self.config.input_config,
-            output_config = self.config.output_config,
-            n_slaves      = train_ds.n_slaves,
-            n_gaussians   = self.config.n_gaussians,
-            num_workers   = self.config.num_workers,
-            max_samples   = 4000,
+            dataset          = train_ds,
+            params_path      = self.config.parameters_path,
+            logger           = self.logger,
+            input_config     = self.config.input_config,
+            output_config    = self.config.output_config,
+            n_secondaries    = train_ds.n_secondaries,
+            n_interferograms = train_ds.n_interferograms,
+            n_gaussians      = self.config.n_gaussians,
+            num_workers      = self.config.num_workers,
+            max_samples      = 4000,
         )
 
         norm_stats.save(self.training_run_directory / "meta")

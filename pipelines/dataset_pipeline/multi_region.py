@@ -30,6 +30,7 @@ class MultiRegionDataset(Dataset):
         self.n_gaussians            = first.n_gaussians
         self.input_layers           = first.input_layers
         self.n_secondaries          = first.n_secondaries
+        self.n_interferograms       = first.n_interferograms
         self.n_slaves               = first.n_slaves
         self.input_channels         = first.input_channels
         self.output_channel_indices = first.output_channel_indices

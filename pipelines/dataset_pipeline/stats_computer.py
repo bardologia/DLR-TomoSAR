@@ -15,8 +15,8 @@ from torch.utils.data                 import Subset
 
 class StatsComputer:
     @staticmethod
-    def _input_to_group(input_config : InputConfig, n_slaves : int) -> list[str]:
-        return input_config.channel_group_keys(n_slaves)
+    def _input_to_group(input_config : InputConfig, n_secondaries : int, n_interferograms : int) -> list[str]:
+        return input_config.channel_group_keys(n_secondaries, n_interferograms)
 
     @staticmethod
     def _compact_ranges(indices: list[int], max_items: int = 6) -> str:
@@ -204,12 +204,13 @@ class StatsComputer:
     @staticmethod
     def compute_input_stats(
         dataset,
-        logger       : Logger,
-        input_config : InputConfig,
-        n_slaves     : int,
-        max_samples  : int = 0,
-        num_workers  : int = 4,
-        batch_size   : int = 512,
+        logger           : Logger,
+        input_config     : InputConfig,
+        n_secondaries    : int,
+        n_interferograms : int,
+        max_samples      : int = 0,
+        num_workers      : int = 4,
+        batch_size       : int = 512,
     ) -> Stats:
 
         logger.section("[Input Normalization Statistics]")
@@ -224,7 +225,7 @@ class StatsComputer:
             "Input channels": in_channels,
         })
 
-        group_keys = StatsComputer._input_to_group(input_config, n_slaves)
+        group_keys = StatsComputer._input_to_group(input_config, n_secondaries, n_interferograms)
         assert len(group_keys) == in_channels, (f"Group key count ({len(group_keys)}) != tensor channels ({in_channels})")
 
         logger.section("[Input grouping by slot-kind]")
@@ -293,25 +294,27 @@ class StatsComputer:
     @staticmethod
     def compute(
         dataset,
-        params_path   : Path,
-        logger        : Logger,
-        input_config  : InputConfig,
-        output_config : "OutputConfig",
-        n_slaves      : int,
-        n_gaussians   : int,
-        max_samples   : int = 0,
-        num_workers   : int = 4,
-        batch_size    : int = 512,
+        params_path      : Path,
+        logger           : Logger,
+        input_config     : InputConfig,
+        output_config    : "OutputConfig",
+        n_secondaries    : int,
+        n_interferograms : int,
+        n_gaussians      : int,
+        max_samples      : int = 0,
+        num_workers      : int = 4,
+        batch_size       : int = 512,
     ) -> Stats:
 
         input_only = StatsComputer.compute_input_stats(
-            dataset      = dataset,
-            logger       = logger,
-            input_config = input_config,
-            n_slaves     = n_slaves,
-            num_workers  = num_workers,
-            max_samples  = max_samples,
-            batch_size   = batch_size,
+            dataset          = dataset,
+            logger           = logger,
+            input_config     = input_config,
+            n_secondaries    = n_secondaries,
+            n_interferograms = n_interferograms,
+            num_workers      = num_workers,
+            max_samples      = max_samples,
+            batch_size       = batch_size,
         )
 
         output_only = StatsComputer.compute_output_stats(

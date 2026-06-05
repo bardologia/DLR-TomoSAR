@@ -36,15 +36,15 @@ class InputConfig:
     def interferograms_channels_per_pass(self) -> int:
         return self.interferograms_representation.channels_per_pass if self.use_interferograms else 0
 
-    def total_channels(self, n_secondaries: int) -> int:
-        n = self.primary_channels_per_pass
-        if n_secondaries > 0:
-            n += n_secondaries * (self.secondaries_channels_per_pass + self.interferograms_channels_per_pass)
+    def total_channels(self, n_secondaries: int, n_interferograms: int) -> int:
+        n  = self.primary_channels_per_pass
+        n += n_secondaries    * self.secondaries_channels_per_pass
+        n += n_interferograms * self.interferograms_channels_per_pass
         if self.use_dem:
             n += 1
         return n
 
-    def channel_group_keys(self, n_secondaries: int) -> list[str]:
+    def channel_group_keys(self, n_secondaries: int, n_interferograms: int) -> list[str]:
         keys: list[str] = []
 
         if self.use_primary:
@@ -60,7 +60,7 @@ class InputConfig:
         if self.use_interferograms:
             slot_kinds = self.interferograms_representation.slot_kinds
             cpp        = len(slot_kinds)
-            keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_secondaries * cpp))
+            keys.extend(f"ifg/{slot_kinds[i % cpp]}" for i in range(n_interferograms * cpp))
 
         if self.use_dem:
             keys.append("dem/elevation")

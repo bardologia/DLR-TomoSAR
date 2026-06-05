@@ -31,7 +31,7 @@ class SizeMatchConfig:
     max_iterations  : int   = 40
     scale_low       : float = 0.05
     scale_high      : float = 8.0
-    in_channels     : int   = 11
+    in_channels     : int   = 9
 
 
 @dataclass

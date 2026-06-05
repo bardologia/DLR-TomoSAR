@@ -70,7 +70,9 @@ class Cropper:
         })
 
         return {
-            "inputs"     : inputs_split,
-            "dem"        : dem_split,
-            "parameters" : parameters_split,
+            "inputs"           : inputs_split,
+            "dem"              : dem_split,
+            "parameters"       : parameters_split,
+            "n_secondaries"    : n_secondaries,
+            "n_interferograms" : n_interferograms,
         }

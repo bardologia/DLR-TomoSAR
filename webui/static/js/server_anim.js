@@ -125,6 +125,13 @@ class ServerScene extends CanvasBase {
   _unit(ctx, u, ux, uy, uw, uh) {
     const occ  = u.others ? this.red : u.mine ? this.blue : null;
     const tint = u.alert ? this._tint(u.alert) : occ || this._tint(u.alert);
+    const fg   = occ ? "255, 255, 255" : this.ink;
+
+    if (occ) {
+      ctx.fillStyle = `rgba(${occ}, 0.9)`;
+      this._round(ctx, ux, uy, uw, uh, 3);
+      ctx.fill();
+    }
 
     ctx.strokeStyle = u.alert || occ ? `rgba(${tint}, 0.5)` : `rgba(${this.ink}, 0.35)`;
     ctx.lineWidth   = 1;
@@ -138,13 +145,13 @@ class ServerScene extends CanvasBase {
     if (u.alert >= 2) led = 0.5 + 0.5 * Math.sin(this.t * 10);
     ctx.beginPath();
     ctx.arc(ux + 10, cy, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${tint}, ${led})`;
+    ctx.fillStyle = occ ? `rgba(${fg}, ${led})` : `rgba(${tint}, ${led})`;
     ctx.fill();
 
     ctx.font         = "600 8.5px ui-monospace, SFMono-Regular, Menlo, monospace";
     ctx.textBaseline = "middle";
     ctx.textAlign    = "left";
-    ctx.fillStyle    = `rgba(${this.ink}, 0.55)`;
+    ctx.fillStyle    = `rgba(${fg}, ${occ ? 0.9 : 0.55})`;
     ctx.fillText(u.label, ux + 19, cy + 0.5);
 
     const bx0 = ux + 52;
@@ -152,17 +159,17 @@ class ServerScene extends CanvasBase {
     const bw  = (bx1 - bx0) / u.bars.length;
     u.bars.forEach((v, k) => {
       const bh = Math.max(1.5, v * (uh - 9));
-      ctx.fillStyle = `rgba(${u.alert || occ ? tint : this.blue}, ${0.15 + 0.55 * v})`;
+      ctx.fillStyle = occ ? `rgba(${fg}, ${0.3 + 0.5 * v})` : `rgba(${u.alert ? tint : this.blue}, ${0.15 + 0.55 * v})`;
       ctx.fillRect(bx0 + k * bw, uy + uh - 4.5 - bh, bw - 2, bh);
     });
 
     ctx.textAlign = "right";
-    ctx.fillStyle = `rgba(${this.ink}, 0.7)`;
+    ctx.fillStyle = `rgba(${fg}, ${occ ? 0.95 : 0.7})`;
     ctx.fillText(`${Math.round(u.v * 100)}%`, ux + uw - 29, cy + 0.5);
 
     const fx = ux + uw - 15;
     const fr = Math.min(7.5, uh * 0.3);
-    ctx.strokeStyle = u.hot ? `rgba(${this.red}, 0.55)` : `rgba(${this.ink}, 0.4)`;
+    ctx.strokeStyle = occ ? `rgba(${fg}, 0.7)` : u.hot ? `rgba(${this.red}, 0.55)` : `rgba(${this.ink}, 0.4)`;
     ctx.beginPath();
     ctx.arc(fx, cy, fr, 0, Math.PI * 2);
     ctx.stroke();
@@ -287,8 +294,8 @@ class ServerScene extends CanvasBase {
     }
     this.packets = this.packets.filter((pk) => (pk.p += pk.speed) <= 1);
 
-    this._draw();
     requestAnimationFrame(this._loop);
+    this._draw();
   }
 }
 

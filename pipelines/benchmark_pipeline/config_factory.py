@@ -45,6 +45,13 @@ class ConfigFactory:
 
         return CropRegion(*layout["global_crop"])
 
+    def benchmark_input_config(self) -> InputConfig:
+        return InputConfig(
+            use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
+            use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
+            use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
+        )
+
     def training_dataset_config(self) -> DatasetConfiguration:
         crop     = self.global_crop()
         training = self.config.training
@@ -59,12 +66,8 @@ class ConfigFactory:
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
-            patch        = PatchConfiguration(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
-            input_config = InputConfig(
-                use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
-                use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
-                use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
-            ),
+            patch         = PatchConfiguration(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
+            input_config  = self.benchmark_input_config(),
             batch_size    = training.batch_size,
             num_workers   = training.num_workers,
             shuffle_train = True,
@@ -88,6 +91,8 @@ class ConfigFactory:
                 val   = overfit_crop,
                 test  = overfit_crop,
             ),
+
+            input_config = self.benchmark_input_config(),
 
             augmentation = AugmentationConfig(
                 p_flip_h    = 0.0,
