@@ -143,7 +143,6 @@ class Trainer:
         self.x_axis    = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
 
         self.docs = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
-        self.docs.emit_model_summary()
 
         self.epochs               = self.config.training.epochs
         self.validation_frequency = self.config.training.validation_frequency
@@ -304,6 +303,7 @@ class Trainer:
 
                 self.warmup.step()
                 self.global_step += 1
+                self.tracker.set_step(self.global_step)
 
                 clear_n = self.config.memory.clear_cache_every_n_steps
                 if clear_n > 0 and self.global_step % clear_n == 0:
@@ -399,7 +399,7 @@ class Trainer:
         try:
             data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
 
-            self.docs.emit_shape_log(data_loader, self.device)
+            self.docs.emit(data_loader, self.device)
 
             epochs = self.epochs
             with self.logger.live_monitor("Training Progress") as live_mon:

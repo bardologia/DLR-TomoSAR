@@ -124,9 +124,12 @@ class TrialCollector:
             return None
 
     def _parse_parameters(self, trial_dir: Path, size_match: dict) -> int | None:
-        summary_path = trial_dir / "docs" / "model_summary.md"
+        for filename in ("model_doc.md", "model_summary.md"):
+            summary_path = trial_dir / "docs" / filename
 
-        if summary_path.exists():
+            if not summary_path.exists():
+                continue
+
             match = _TOTAL_PARAMS_PATTERN.search(summary_path.read_text(encoding="utf-8", errors="ignore"))
             if match:
                 return int(match.group(1).replace(",", ""))

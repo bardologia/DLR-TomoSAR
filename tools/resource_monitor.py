@@ -270,7 +270,7 @@ class ResourceMonitor:
     def _publish(self, metrics):
         step = int(self.step_getter() or 0)
         if self.log_to_tb and self.tracker is not None:
-            self.tracker.log_scalars_flat("system/resources", metrics, step)
+            self.tracker.log_metrics("system/resources", metrics, step)
 
     def _run(self):
         while not self._stop_evt.is_set():

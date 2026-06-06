@@ -25,6 +25,8 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
+from tools.markdown import MarkdownDoc, MarkdownTable
+
 
 class LiveMonitor:
     def __init__(self, console: Console, title: str = "Training Monitor") -> None:
@@ -116,13 +118,7 @@ def _make_progress(console: Console, transient: bool = False) -> Progress:
 
 class Logger:
 
-    LOG_LEVELS = {
-        'DEBUG'    : logging.DEBUG,
-        'INFO'     : logging.INFO,
-        'WARNING'  : logging.WARNING,
-        'ERROR'    : logging.ERROR,
-        'CRITICAL' : logging.CRITICAL,
-    }
+    LOG_LEVELS = {name: getattr(logging, name) for name in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")}
 
     def __init__(self, log_dir: str = "logs", name: str = "experiment", level: str = "INFO", config: Any = None) -> None:
         self.log_dir    = log_dir
@@ -191,14 +187,25 @@ class Logger:
     def warning(self, message: str) -> None:  
         self.logger.warning(message)
     
-    def error(self, message: str) -> None:    
+    def error(self, message: str) -> None:
         self.logger.error(message)
-    def critical(self, message: str) -> None: 
+
+    def critical(self, message: str) -> None:
         self.logger.critical(message)
 
-    def progress(self, current: int, total: int, prefix: str = "", suffix: str = "") -> None:
-        percentage = 100.0 * (current / float(total)) if total else 0.0
-        self.logger.info(f"{prefix} [{current}/{total}] ({percentage:.1f}%) {suffix}")
+    def ok(self, message: str) -> None:
+        self.console.print(f"  [ok]+[/ok] {message}")
+        if self._file_handler is not None:
+            self._file_handler.handle(self.logger.makeRecord(self.name, logging.INFO, "", 0, f"  + {message}", None, None,))
+
+    @staticmethod
+    def _fmt(value: Any) -> str:
+        if isinstance(value, float):
+            return f"{value:.6g}"
+        return str(value)
+
+    def render(self, renderable: Any) -> None:
+        self.console.print(renderable)
 
     def panel(self, body: Any, title: Optional[str] = None, style: str = "cyan") -> None:
         self.console.print(Panel(body, title=title, border_style=style))
@@ -206,25 +213,34 @@ class Logger:
     def rule(self, title: str = "", style: str = "cyan") -> None:
         self.console.print(Rule(title, style=style))
 
-    def table(self, table: Table) -> None:
-        self.console.print(table)
-
     def kv_table(self, data: Mapping[str, Any], title: Optional[str] = None, key_header: str = "Field", value_header: str = "Value") -> None:
         tbl = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
         tbl.add_column(key_header, style="key", no_wrap=True)
         tbl.add_column(value_header, style="value")
+
         for k, v in data.items():
-            tbl.add_row(str(k), str(v))
+            tbl.add_row(str(k), self._fmt(v))
+
         self.console.print(tbl)
 
     def metrics_table(self, rows: Sequence[Mapping[str, Any]], columns: Sequence[str], title: Optional[str] = None, column_styles: Optional[Mapping[str, str]] = None,) -> None:
         styles = column_styles or {}
-        tbl = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+        tbl    = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+
         for col in columns:
             tbl.add_column(col, style=styles.get(col, "value"))
+
         for row in rows:
-            tbl.add_row(*[str(row.get(c, "")) for c in columns])
+            tbl.add_row(*[self._fmt(row.get(c, "")) for c in columns])
+
         self.console.print(tbl)
+
+    @contextmanager
+    def timer(self, label: str):
+        start = datetime.now()
+        yield
+        elapsed = (datetime.now() - start).total_seconds()
+        self.info(f"{label} completed in {elapsed:.2f}s")
 
     @contextmanager
     def track(self, transient: bool = False):
@@ -258,53 +274,30 @@ class Logger:
         self.close()
         return False
 
-    @staticmethod
-    def save_profiler_results(stats, output):
-   
+    def save_profiler_results(self, stats, output):
         sorted_stats = sorted(stats.stats.items(), key=lambda x: x[1][3], reverse=True)
-        rows = []
-        
+
+        columns = ["Function", "Calls", "Total Time (s)", "Per Call (s)", "Cumulative Time (s)", "Cumulative Per Call (s)", "Location"]
+        align   = ["left", "right", "right", "right", "right", "right", "left"]
+        table   = MarkdownTable(columns, align=align)
+
         for func, (cc, nc, tt, ct, callers) in sorted_stats:
             filename, lineno, func_name = func
-            per_call_total = tt / nc if nc > 0 else 0
-            per_call_cum = ct / nc if nc > 0 else 0
-            location = f"{filename}:{lineno}"
-            
-            rows.append({
-                'function': func_name,
-                'calls': str(nc),
-                'total_time': f"{tt:.6f}",
-                'per_call': f"{per_call_total:.6f}",
-                'cumulative': f"{ct:.6f}",
-                'per_call_cum': f"{per_call_cum:.6f}",
-                'location': location
-            })
 
-        col_names = ['Function', 'Calls', 'Total Time (s)', 'Per Call (s)', 'Cumulative Time (s)', 'Cumulative Per Call (s)', 'Location']
-        col_keys = ['function', 'calls', 'total_time', 'per_call', 'cumulative', 'per_call_cum', 'location']
-        
-        widths = []
-        for header, key in zip(col_names, col_keys):
-            max_width = len(header)
-            for row in rows:
-                max_width = max(max_width, len(row[key]))
-            widths.append(max_width)
-        
-        def fmt_row(cells):
-            return "| " + " | ".join(f"{c:<{w}}" for c, w in zip(cells, widths)) + " |"
-        
-        def fmt_sep():
-            return "| " + " | ".join("-" * w for w in widths) + " |"
-        
-        with open(output, 'w') as f:
-            f.write("# Profiler Results\n\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.write(fmt_row(col_names) + "\n")
-            f.write(fmt_sep() + "\n")
-            
-            for row in rows:
-                cells = [row[key] for key in col_keys]
-                f.write(fmt_row(cells) + "\n")
-        
-        print(f"\nFull profiler results saved to: {output}")
+            per_call_total = tt / nc if nc > 0 else 0
+            per_call_cum   = ct / nc if nc > 0 else 0
+
+            table.add_row(func_name, nc, f"{tt:.6f}", f"{per_call_total:.6f}", f"{ct:.6f}", f"{per_call_cum:.6f}", f"{filename}:{lineno}")
+
+        doc = MarkdownDoc("Profiler Results")
+        doc.paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        doc.table(table)
+        doc.save(output)
+
+        self.info(f"Full profiler results saved to: {output}")
         return output
+
+
+class NullLogger:
+    def __getattr__(self, name: str):
+        return lambda *args, **kwargs: None

@@ -9,164 +9,166 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+from rich.tree import Tree
 from torch.utils.data import DataLoader
 
-
-class ModelSummary:
-    def __init__(self, logger, model: nn.Module):
-        self.model        = model
-        self.rows         = []
-        self.total_params = 0
-        self.logger       = logger
-
-    def count_params(self, module: nn.Module):
-        return sum(p.numel() for p in module.parameters())
-
-    def count_own_params(self, module: nn.Module):
-        return sum(p.numel() for p in module.parameters(recurse=False))
-
-    def to_markdown(self, title="Model Summary") -> str:
-        if not self.rows:
-            return f"# {title}\n\nNo layers found."
-
-        rows_fmt = [(name, typ, f"{params:,}") for name, typ, params in self.rows]
-
-        col1 = max(len("Layer"), *(len(name) for name, _, _ in rows_fmt))
-        col2 = max(len("Type"), *(len(typ) for _, typ, _ in rows_fmt))
-        col3 = max(len("Parameters"), *(len(p) for _, _, p in rows_fmt))
-
-        def line(a, b, c):
-            return f"| {a:<{col1}} | {b:<{col2}} | {c:>{col3}} |"
-
-        table = []
-        table.append(line("Layer", "Type", "Parameters"))
-        table.append(f"| {'-'*col1} | {'-'*col2} | {'-'*col3} |")
-        for name, typ, params in rows_fmt:
-            table.append(line(name, typ, params))
-
-        total = f"{self.total_params:,}"
-
-        md = []
-        md.append(f"# {title}\n")
-        md.extend(table)
-        md.append(f"\n**Total Parameters:** `{total}`")
-        return "\n".join(md)
-
-    def run(self):
-        self.logger.section("[Model Summary]")
-        self.logger.info("Generating model architecture summary")
-
-        self.total_params = sum(p.numel() for p in self.model.parameters())
-
-        for name, module in self.model.named_modules():
-            if name == "":
-                continue
-            own_params = self.count_own_params(module)
-            self.rows.append((name, module.__class__.__name__, own_params))
-
-    def save_markdown(self, path: str, title: str = "Model Summary"):
-        md = self.to_markdown(title=title)
-        Path(path).write_text(md, encoding="utf-8")
-        self.logger.info(f"Model summary saved to {path}")
+from tools import NullLogger, NullTracker
+from tools.markdown import MarkdownDoc, MarkdownTable
 
 
-class ShapeLogger:
-    def __init__(self, model, logger, include_types, docs_dir: str):
+class LayerRecord:
+    def __init__(self, name: str, module: nn.Module) -> None:
+        self.name      = name
+        self.module    = module
+        self.type_name = module.__class__.__name__
+        self.depth     = name.count(".") + 1
+        self.trainable = sum(p.numel() for p in module.parameters(recurse=False) if p.requires_grad)
+        self.frozen    = sum(p.numel() for p in module.parameters(recurse=False) if not p.requires_grad)
+        self.in_shape  = None
+        self.out_shape = None
+        self.visited   = False
+
+    @property
+    def own_params(self) -> int:
+        return self.trainable + self.frozen
+
+
+class ModelInspector:
+    def __init__(self, model: nn.Module, logger, docs_dir, include_types=None) -> None:
         self.model         = model
-        self.include_types = include_types
         self.logger        = logger
         self.docs_dir      = Path(docs_dir)
+        self.include_types = include_types
         self.records       = []
         self.hooks         = []
 
-    def _hook(self, name):
+    def _shape_of(self, value):
+        if hasattr(value, "shape"):
+            return tuple(value.shape)
+        if isinstance(value, (tuple, list)):
+            head = value[0] if value else None
+            return tuple(head.shape) if hasattr(head, "shape") else f"{type(value).__name__}[{len(value)}]"
+        return type(value).__name__
+
+    def _hook(self, record: LayerRecord):
         def fn(module, inputs, output):
-            x = inputs[0]
-            in_shape  = tuple(x.shape) if hasattr(x, "shape") else str(type(x))
-            if isinstance(output, tuple):
-                if hasattr(output[0], "shape"):
-                    out_shape = tuple(output[0].shape)
-                else:
-                    out_shape = f"tuple[{len(output)}]"
-            else:
-                out_shape = tuple(output.shape) if hasattr(output, "shape") else str(type(output))
-
-            self.records.append((name, module.__class__.__name__, in_shape, out_shape))
-
+            record.in_shape  = self._shape_of(inputs[0]) if inputs else None
+            record.out_shape = self._shape_of(output)
+            record.visited   = True
         return fn
 
-    def attach(self):
-        self.logger.subsection("Hooks attached to layers for shape logging. \n")
+    def _build(self) -> None:
+        self.records = [LayerRecord(name, module) for name, module in self.model.named_modules() if name != ""]
 
-        for name, module in self.model.named_modules():
-            if name == "":
-                continue
+    def _attach(self) -> None:
+        self.hooks = [record.module.register_forward_hook(self._hook(record)) for record in self.records]
 
-            if isinstance(module, self.include_types):
-                self.hooks.append(module.register_forward_hook(self._hook(name)))
+    def _detach(self) -> None:
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks = []
+
+    @torch.no_grad()
+    def run(self, sample: torch.Tensor) -> "ModelInspector":
+        self._build()
+        self._attach()
+
+        was_training = self.model.training
+        self.model.eval()
+
+        try:
+            self.model(sample)
+        finally:
+            self._detach()
+            if was_training:
+                self.model.train()
 
         return self
 
-    def detach(self):
-        if self.hooks == []:
-            return
+    def totals(self) -> dict:
+        trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        frozen    = sum(p.numel() for p in self.model.parameters() if not p.requires_grad)
+        size_mb   = sum(p.numel() * p.element_size() for p in self.model.parameters()) / 1024 ** 2
 
-        self.logger.subsection("Hooks detached from layers. \n")
+        return {
+            "total"     : trainable + frozen,
+            "trainable" : trainable,
+            "frozen"    : frozen,
+            "size_mb"   : size_mb,
+        }
 
-        for h in self.hooks:
-            h.remove()
+    def _selected(self) -> list[LayerRecord]:
+        if self.include_types is None:
+            return list(self.records)
+        return [r for r in self.records if isinstance(r.module, self.include_types) or r.own_params > 0]
 
-        self.hooks.clear()
+    def _shape_cell(self, shape) -> Optional[str]:
+        return str(shape) if shape is not None else None
 
-    def clear(self):
-        self.records.clear()
+    def _node_label(self, record: LayerRecord) -> str:
+        leaf  = record.name.rpartition(".")[2]
+        label = f"[key]{leaf}[/key] [muted]{record.type_name}[/muted]"
 
-    def to_markdown(self, title: str = "Shape Log", sort_by_layer: bool = False) -> str:
-        rows = list(self.records)
-        if sort_by_layer:
-            rows.sort(key=lambda r: r[0])
+        if record.visited:
+            label += f"  {record.in_shape} [muted]->[/muted] {record.out_shape}"
+        if record.own_params > 0:
+            label += f"  [value]{record.own_params:,}[/value]"
 
-        def s(x):
-            return str(x)
+        return label
 
-        def layer_cell(name: str) -> str:
-            return f"`{name}`"
+    def render_console(self) -> None:
+        totals = self.totals()
+        tree   = Tree(f"[section]{self.model.__class__.__name__}[/section]")
+        nodes  = {"": tree}
 
-        col_names = ["Layer", "Type", "Input shape", "Output shape"]
-        col_data = [
-            [layer_cell(r[0]) for r in rows],
-            [str(r[1]) for r in rows],
-            [s(r[2]) for r in rows],
-            [s(r[3]) for r in rows],
-        ]
+        for record in self.records:
+            parent             = nodes.get(record.name.rpartition(".")[0], tree)
+            nodes[record.name] = parent.add(self._node_label(record))
 
-        widths = []
-        for header, data in zip(col_names, col_data):
-            widths.append(max([len(header)] + [len(v) for v in data]) if rows else len(header))
+        self.logger.render(tree)
+        self.logger.kv_table({
+            "Total parameters"     : f"{totals['total']:,}",
+            "Trainable parameters" : f"{totals['trainable']:,}",
+            "Frozen parameters"    : f"{totals['frozen']:,}",
+            "Parameter size"       : f"{totals['size_mb']:.2f} MB",
+        }, title="Parameter Totals")
 
-        def fmt_row(cells):
-            return "| " + " | ".join(f"{c:<{w}}" for c, w in zip(cells, widths)) + " |"
+    def to_markdown(self, title: str = "Model Documentation") -> MarkdownDoc:
+        totals = self.totals()
+        rows   = self._selected()
 
-        def fmt_sep():
-            return "| " + " | ".join((":" + "-" * (w - 1)) if w > 1 else "-" for w in widths) + " |"
+        doc = MarkdownDoc(title)
+        doc.bold_kv("Model",                self.model.__class__.__name__)
+        doc.bold_kv("Total Parameters",     f"{totals['total']:,}")
+        doc.bold_kv("Trainable Parameters", f"{totals['trainable']:,}")
+        doc.bold_kv("Frozen Parameters",    f"{totals['frozen']:,}")
+        doc.bold_kv("Parameter Size",       f"{totals['size_mb']:.2f} MB")
+        doc.blank()
 
-        lines = []
-        lines.append(f"# {title}\n")
-        lines.append(fmt_row(col_names))
-        lines.append(fmt_sep())
+        columns = ["Layer", "Type", "Input shape", "Output shape", "Params", "Trainable", "Share %"]
+        align   = ["left", "left", "left", "left", "right", "right", "right"]
+        table   = MarkdownTable(columns, align=align)
 
-        for (name, typ, ins, outs), layer_txt in zip(rows, col_data[0]):
-            lines.append(fmt_row([layer_txt, str(typ), s(ins), s(outs)]))
+        for r in rows:
+            share = 100.0 * r.own_params / totals["total"] if totals["total"] else 0.0
+            table.add_row(
+                f"`{r.name}`",
+                r.type_name,
+                self._shape_cell(r.in_shape),
+                self._shape_cell(r.out_shape),
+                f"{r.own_params:,}",
+                f"{r.trainable:,}",
+                f"{share:.2f}",
+            )
 
-        lines.append(f"\n**Records:** {len(rows)}")
-        return "\n".join(lines)
+        doc.table(table)
+        doc.bold_kv("Layers Documented", len(rows))
+        return doc
 
-    def save_markdown(self, filename="tensor_shape.md", title: str = "Shape Log", sort_by_layer: bool = False):
-        md = self.to_markdown(title=title, sort_by_layer=sort_by_layer)
-        self.docs_dir.mkdir(parents=True, exist_ok=True)
-        path = self.docs_dir / filename
-        path.write_text(md, encoding="utf-8")
-        self.logger.subsection(f"Shape log saved to {path} \n")
+    def save_markdown(self, filename: str = "model_doc.md", title: str = "Model Documentation") -> Path:
+        path = self.to_markdown(title=title).save(self.docs_dir / filename)
+        self.logger.subsection(f"Model documentation saved to {path}")
+        return path
 
 
 class TrainingDocs:
@@ -177,43 +179,26 @@ class TrainingDocs:
         self.run_dir   = Path(run_dir)
         self.enabled   = enabled
 
-    def emit_model_summary(self) -> None:
-        if not self.enabled:
-            return
-
-        summary      = ModelSummary(self.logger, self.model)
-        summary.run()
-        summary_path = self.run_dir / "docs" / "model_summary.md"
-        summary.save_markdown(str(summary_path))
-
     @torch.no_grad()
-    def emit_shape_log(self, data_loader: DataLoader, device: torch.device) -> None:
+    def emit(self, data_loader: DataLoader, device: torch.device) -> None:
         if not self.enabled:
             return
 
-        include_types = getattr(self.model_cfg, "shape_logger_types", None)
-        if include_types is None:
-            return
+        self.logger.section("[Model Documentation]")
 
-        self.logger.section("[Shape Logger]")
-        shape_logger = ShapeLogger(
+        inspector = ModelInspector(
             model         = self.model,
             logger        = self.logger,
-            include_types = include_types,
             docs_dir      = self.run_dir / "docs",
+            include_types = getattr(self.model_cfg, "shape_logger_types", None),
         )
-        shape_logger.attach()
 
-        try:
-            batch  = next(iter(data_loader))
-            images = batch[0].to(device)
-            self.model.eval()
-            self.model(images)
-        finally:
-            shape_logger.detach()
-            self.model.train()
+        batch  = next(iter(data_loader))
+        sample = batch[0].to(device)
 
-        shape_logger.save_markdown(filename="shape_log.md", title="Tensor Shape Log")
+        inspector.run(sample)
+        inspector.render_console()
+        inspector.save_markdown()
 
 
 @dataclass
@@ -297,11 +282,10 @@ class LossScaleProbe:
 
         from pipelines.training_pipeline.loss import Loss
 
-        _null     = _NullLoggerTracker()
         criterion = Loss(
             x_axis       = x_axis,
-            logger       = _null,
-            tracker      = _null,
+            logger       = NullLogger(),
+            tracker      = NullTracker(),
             gaussian_cfg = self.gaussian_cfg,
             loss_cfg     = self.loss_cfg,
             norm_stats   = self.norm_stats,
@@ -363,13 +347,3 @@ class LossScaleProbe:
             sys.exit(0)
 
         return suggested
-
-
-class _NullLoggerTracker:
-    def __getattr__(self, name):
-        return lambda *a, **kw: None
-
-    def section(self, *a, **kw):    pass
-    def subsection(self, *a, **kw): pass
-    def scalar(self, *a, **kw):     pass
-    def add_scalar(self, *a, **kw): pass

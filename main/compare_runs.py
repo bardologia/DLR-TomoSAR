@@ -8,7 +8,7 @@ from _bootstrap import EnvironmentPinner
 EnvironmentPinner.threads()
 
 from configuration.benchmark_config                import BenchmarkConfig
-from pipelines.benchmark_pipeline.stages          import ComparisonStage
+from pipelines.benchmark_pipeline.stages           import ComparisonStage
 from tools.config_cli                              import ConfigCli
 from tools.logger                                  import Logger
 
@@ -37,7 +37,6 @@ def main() -> None:
 
     logger.info(f"Comparison written to: {out_dir}")
     logger.close()
-
 
 if __name__ == "__main__":
     main()

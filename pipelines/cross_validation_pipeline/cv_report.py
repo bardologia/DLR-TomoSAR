@@ -9,6 +9,7 @@ from pipelines.benchmark_pipeline.results import _METRIC_SECTIONS, _PER_BIN_PATT
 from pipelines.benchmark_pipeline.results import TrialRecord
 from pipelines.cross_validation_pipeline.folds import FoldPlanner
 from tools.logger import Logger
+from tools.markdown import MarkdownTable
 
 
 class CrossValidationReport:
@@ -77,9 +78,7 @@ class CrossValidationReport:
 
     def _aggregate_table(self, keys: list[str], records: list[TrialRecord]) -> list[str]:
         fold_labels = [f"`{record.name}`" for record in records]
-        header      = "| Metric | Mean | Std | " + " | ".join(fold_labels) + " |"
-        divider     = "| --- | --- | --- |" + " --- |" * len(records)
-        rows        = []
+        table       = MarkdownTable(["Metric", "Mean", "Std", *fold_labels])
 
         for key in keys:
             values  = [record.metrics.get(key) for record in records]
@@ -89,10 +88,9 @@ class CrossValidationReport:
                 continue
 
             mean, std = self._mean_std([float(value) for value in numeric])
-            cells     = " | ".join(self._fmt(value) for value in values)
-            rows.append(f"| `{key}` | {self._fmt(mean)} | {self._fmt(std)} | {cells} |")
+            table.add_row(f"`{key}`", self._fmt(mean), self._fmt(std), *[self._fmt(value) for value in values])
 
-        return [header, divider, *rows, ""]
+        return [*table.render(), ""]
 
     def _write_aggregate(self) -> Path:
         lines = [
@@ -102,14 +100,16 @@ class CrossValidationReport:
         ]
 
         lines += ["## Fold Plan\n"]
-        lines += ["| Fold | Test azimuth | Val azimuth | Train azimuth regions |", "| --- | --- | --- | --- |"]
+
+        plan_table = MarkdownTable(["Fold", "Test azimuth", "Val azimuth", "Train azimuth regions"])
         for plan in self.planner.plans():
             test_region   = plan.split_regions.regions("test")[0]
             val_region    = plan.split_regions.regions("val")[0]
             train_regions = plan.split_regions.regions("train")
             train_text    = ", ".join(f"[{r.azimuth_start}, {r.azimuth_end})" for r in train_regions)
-            lines.append(f"| {plan.fold_index} | [{test_region.azimuth_start}, {test_region.azimuth_end}) | [{val_region.azimuth_start}, {val_region.azimuth_end}) | {train_text} |")
-        lines.append("")
+            plan_table.add_row(plan.fold_index, f"[{test_region.azimuth_start}, {test_region.azimuth_end})", f"[{val_region.azimuth_start}, {val_region.azimuth_end})", train_text)
+
+        lines += [*plan_table.render(), ""]
 
         lines += self._training_aggregate()
 
@@ -146,7 +146,7 @@ class CrossValidationReport:
 
     def _training_aggregate(self) -> list[str]:
         lines = ["## Training Across Folds\n"]
-        lines += ["| Fold | Best epoch | Best val loss | Epochs run | Duration |", "| --- | --- | --- | --- | --- |"]
+        table = MarkdownTable(["Fold", "Best epoch", "Best val loss", "Epochs run", "Duration"])
 
         best_losses = []
         best_epochs = []
@@ -165,23 +165,23 @@ class CrossValidationReport:
                 durations.append(float(duration_s))
 
             duration = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
-            lines.append(f"| `{record.name}` | {self._fmt(best_epoch)} | {self._fmt(best_val_loss)} | {self._fmt(record.checkpoint.get('n_train_epochs'))} | {duration} |")
+            table.add_row(f"`{record.name}`", self._fmt(best_epoch), self._fmt(best_val_loss), self._fmt(record.checkpoint.get("n_train_epochs")), duration)
 
-        lines.append("")
+        lines += [*table.render(), ""]
 
-        summary_rows = []
+        summary = MarkdownTable(["Quantity", "Mean", "Std"])
         if best_losses:
             mean, std = self._mean_std(best_losses)
-            summary_rows.append(f"| Best val loss | {self._fmt(mean)} | {self._fmt(std)} |")
+            summary.add_row("Best val loss", self._fmt(mean), self._fmt(std))
         if best_epochs:
             mean, std = self._mean_std(best_epochs)
-            summary_rows.append(f"| Best epoch | {self._fmt(mean)} | {self._fmt(std)} |")
+            summary.add_row("Best epoch", self._fmt(mean), self._fmt(std))
         if durations:
             mean, std = self._mean_std(durations)
-            summary_rows.append(f"| Duration (min) | {self._fmt(mean / 60)} | {self._fmt(std / 60)} |")
+            summary.add_row("Duration (min)", self._fmt(mean / 60), self._fmt(std / 60))
 
-        if summary_rows:
-            lines += ["| Quantity | Mean | Std |", "| --- | --- | --- |", *summary_rows, ""]
+        if not summary.is_empty():
+            lines += [*summary.render(), ""]
 
         return lines
 

@@ -6,6 +6,8 @@ from typing   import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from tools.markdown import MarkdownTable
+
 
 class ReportPayloadBuilder:
     @staticmethod
@@ -94,10 +96,10 @@ class Report:
 
     @staticmethod
     def _kv_table(rows: List[Tuple[str, Any]], header: Tuple[str, str] = ("Key", "Value")) -> str:
-        out = [f"| {header[0]} | {header[1]} |", "| --- | --- |"]
+        table = MarkdownTable(header)
         for k, v in rows:
-            out.append(f"| `{k}` | {Report._fmt(v)} |")
-        return "\n".join(out)
+            table.add_row(f"`{k}`", Report._fmt(v))
+        return "\n".join(table.render())
 
     @staticmethod
     def _dict_table(d: Dict[str, Any]) -> str:
@@ -108,10 +110,10 @@ class Report:
         rows   : List[Tuple[str, Any, str]],
         header : Tuple[str, str, str] = ("Metric", "Pred vs GT", "Description"),
     ) -> str:
-        out = [f"| {header[0]} | {header[1]} | {header[2]} |", "| --- | --- | --- |"]
+        table = MarkdownTable(header)
         for label, gt_val, desc in rows:
-            out.append(f"| {label} | {Report._fmt(gt_val)} | {desc} |")
-        return "\n".join(out)
+            table.add_row(label, Report._fmt(gt_val), desc)
+        return "\n".join(table.render())
 
     def _rel(self, p: Path) -> str:
         try:
