@@ -4,227 +4,258 @@
 
 ### Deep Per-Pixel Gaussian-Mixture Decomposition of Tomographic SAR Spectra
 
-*A configuration-driven deep-learning framework that learns to decompose multi-baseline synthetic-aperture-radar tomographic reflectivity profiles into superpositions of Gaussian components, enabling scatterer separation, vertical-structure characterisation, and elevation-model refinement.*
+*A configuration-driven, physics-informed deep-learning framework that decomposes multi-baseline SAR tomographic reflectivity profiles into Gaussian scatterer components — from raw SLC stacks to trained models, benchmarks, and validated physics, with every stage runnable from a single web console.*
 
 <br>
 
-![Python](https://img.shields.io/badge/python-3.x-3776AB?logo=python&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-deep_learning-EE4C2C?logo=pytorch&logoColor=white)
-![Architectures](https://img.shields.io/badge/architectures-10-1565C0)
+![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.11-EE4C2C?logo=pytorch&logoColor=white)
+![Architectures](https://img.shields.io/badge/architectures-21-1565C0)
+![Loss terms](https://img.shields.io/badge/loss_terms-15-8E24AA)
+![Tests](https://img.shields.io/badge/tests-1022-2E7D32)
 ![Optuna](https://img.shields.io/badge/Optuna-HPO-0E4C92)
-![GDAL](https://img.shields.io/badge/GDAL-geospatial_I%2FO-5CAE58)
 ![Domain](https://img.shields.io/badge/domain-TomoSAR_remote_sensing-6A1B9A)
 
 </div>
 
 ---
 
-## Abstract
+## Overview
 
-Tomographic Synthetic Aperture Radar (**TomoSAR**) extends conventional interferometry by exploiting multiple, spatially-separated radar acquisitions to resolve the vertical distribution of backscattered energy within a single ground range–azimuth resolution cell. The resulting per-pixel *reflectivity profile* along the elevation axis is frequently **multi-modal**: distinct physical scatterers — the ground surface, a vegetation canopy, dihedral structures — contribute separate, overlapping peaks. Recovering these components is the central inverse problem of TomoSAR analysis and underpins applications such as forest-height estimation, layered-scatterer separation, and the refinement of digital elevation models.
+Tomographic Synthetic Aperture Radar (**TomoSAR**) extends conventional interferometry by exploiting multiple, spatially separated radar acquisitions to resolve the vertical distribution of backscattered energy within each ground range–azimuth resolution cell. The resulting per-pixel *reflectivity profile* along elevation is frequently **multi-modal**: distinct physical scatterers — the ground surface, a vegetation canopy, dihedral structures — contribute separate, overlapping peaks. Recovering these components is the central inverse problem of TomoSAR analysis and underpins forest-height estimation, layered-scatterer separation, and elevation-model refinement.
 
-**DLR-TomoSAR** casts this decomposition as a **dense, per-pixel regression** task solved by an image-to-parameter neural network. Given a TomoSAR tomogram represented as a multi-channel image, the network predicts, at every pixel, the parameters of a $K$-component Gaussian mixture that reconstructs the elevation profile. The framework provides ten interchangeable convolutional and transformer-based segmentation backbones, a richly configurable composite training objective, an optional heteroscedastic-uncertainty head, and a complete, reproducible pipeline spanning data generation, training, inference, classical parameter fitting, and benchmarking.
+**DLR-TomoSAR** casts this decomposition as a **dense, per-pixel regression** solved by an image-to-parameter neural network: given a tomogram represented as a multi-channel image, the network predicts at every pixel the parameters of a $K$-component Gaussian mixture that reconstructs the elevation profile. Where classical estimation fits each pixel by iterative optimisation, the network amortises the inverse problem across an entire scene in a single forward pass — while the framework retains GPU-batched classical fitting for ground-truth generation and a dedicated physics pipeline that validates the learned decomposition against Capon spectral estimates, covariance structure, and profile moments.
 
----
-
-## 1. Scientific Motivation
-
-A TomoSAR stack focuses the complex backscatter as a function of elevation $z$, yielding for each ground pixel a one-dimensional reflectivity profile $y(z)$. Because multiple scattering mechanisms may coexist within a single resolution cell, this profile is in general a superposition of contributions that must be *separated* to be interpreted. Modelling each contribution as a Gaussian peak — characterised by its amplitude, elevation centre, and spread — provides a compact, physically-interpretable parameterisation:
-
-- the **mean** $\mu_k$ localises a scatterer in elevation (e.g. ground level versus canopy top),
-- the **amplitude** $a_k$ quantifies its relative reflectivity, and
-- the **standard deviation** $\sigma_k$ describes its vertical extent (e.g. volumetric vegetation versus a sharp surface return).
-
-Classical estimation of these parameters is performed pixel-by-pixel through iterative optimisation, which is computationally expensive over large scenes and sensitive to initialisation. DLR-TomoSAR learns this mapping directly, amortising the inverse problem across an entire image in a single forward pass while retaining the option of high-fidelity classical fitting for ground-truth generation.
+The framework is **end-to-end and self-contained**: raw SLC stack processing, dataset construction, training, inference, classical parameter extraction, physics validation, architecture benchmarking, cross-validation, and hyperparameter search are each a self-sufficient pipeline with its own entry point and dataclass configuration — all orchestrated, monitored, and launched from a built-in web control console.
 
 ---
 
-## 2. Problem Formulation
+## Highlights
 
-The network maps a multi-channel tomographic image to a dense field of mixture parameters. For an input image with $C_\text{in}$ channels and spatial dimensions $H \times W$, the model outputs a tensor of shape $(B, 3K, H, W)$ (or $(B, 3K+1, H, W)$ when the heteroscedastic-noise head is enabled), where $K$ is the number of Gaussian components. At each pixel the predicted parameters are
+| | |
+|---|---|
+| **21 architectures** | CNN, residual, attention, dense, pyramid, and transformer backbones behind one registry and a uniform configuration interface |
+| **15-term composite objective** | Curve-space, parameter-space, and physics-informed loss terms, freely weighted and combinable, with a two-phase loss curriculum |
+| **Physics-informed training** | Moment matching, coherence re-synthesis, covariance matching, Capon cycle-consistency, and total-power conservation derived from the tomographic signal model |
+| **Full SAR processing chain** | SLC stack to interferograms (DEM deramping) to Capon/Bartlett beamforming to tomographic cubes |
+| **Classical baseline** | GPU-batched Gaussian fitting (peak initialisation, $\sigma$-only refinement via SciPy or JAX, best-$K$ selection by $R^2$) for ground-truth generation |
+| **Rigorous evaluation** | Parameter-count-matched architecture benchmarking, azimuth-stratified $k$-fold cross-validation, two-phase Optuna hyperparameter search |
+| **Web control console** | Standard-library HTTP server with live SSE job streaming, typed configuration editing, KaTeX-rendered theory, run browsing, and resource monitoring |
+| **1022 tests** | Full pytest suite including a state-dict regression baseline that pins parameter keys and shapes of all 21 models, guaranteeing checkpoint compatibility |
+
+---
+
+## 1. Problem Formulation
+
+A TomoSAR stack focuses the complex backscatter as a function of elevation $z$, yielding for each ground pixel a one-dimensional reflectivity profile $y(z)$. Modelling each scattering contribution as a Gaussian peak provides a compact, physically interpretable parameterisation: the **mean** $\mu_k$ localises a scatterer in elevation, the **amplitude** $a_k$ quantifies its relative reflectivity, and the **standard deviation** $\sigma_k$ describes its vertical extent (volumetric vegetation versus a sharp surface return).
+
+For an input image with $C_\text{in}$ channels and spatial dimensions $H \times W$, the model outputs a tensor of shape $(B, 3K, H, W)$, giving at each pixel
 
 $$
 \hat{\mathbf{p}} = [\,a_1, \mu_1, \sigma_1,\; a_2, \mu_2, \sigma_2,\; \dots,\; a_K, \mu_K, \sigma_K\,].
 $$
 
-For $N$ sample points $\{x_n\}_{n=1}^{N}$ along the elevation axis, the reconstructed profile at each pixel is the Gaussian superposition
+For $N$ sample points $\{x_n\}_{n=1}^{N}$ along the elevation axis, the reconstructed profile is the Gaussian superposition
 
 $$
 \hat{y}(x_n) = \sum_{k=1}^{K} a_k \exp\!\left( -\frac{(x_n - \mu_k)^2}{2\sigma_k^2 + \epsilon} \right),
-\qquad \epsilon = 10^{-8},
 $$
 
-and the model is trained by comparing $\hat{y}$ against the measured reflectivity profile $y$.
+and the model is trained by comparing $\hat{y}$ against the measured reflectivity profile $y$ — and, through the physics terms, against quantities derived directly from the complex SAR data.
 
-### Input Channel Representations
-
-The complex-valued tomographic data is mapped to real channels through a configurable `Representation` scheme — magnitude only, phase only, or combined magnitude/phase and real/imaginary encodings — with per-channel normalisation strategies (percentile min–max, robust IQR, z-score, or fixed $\pi$-division) selected per physical quantity.
+The complex tomographic input is mapped to real channels through a configurable `Representation` scheme (magnitude, phase, or combined encodings) with per-channel normalisation strategies selected per physical quantity.
 
 ---
 
-## 3. Method
+## 2. Model Zoo — 21 Architectures
 
-### 3.1 Model Architectures
+All backbones share a common interface (input channels derived from the chosen representation, output channels equal to $3K$) and are exposed through a single model registry with per-architecture dataclass configuration: features, activation, normalisation, upsampling mode, and discriminative learning rates and weight decays for the encoder, bottleneck, decoder, and output-head parameter groups.
 
-Ten image-to-parameter backbones are exposed through a single model registry and selected by key. All share a common interface (input channels derived from the chosen representation; output channels equal to $3K$, optionally $+1$ for the noise head) and configurable activation, normalisation, dropout, upsampling, and weight-initialisation strategies.
+| Family | Registry keys |
+|---|---|
+| U-Net | `unet` · `unet_multihead` · `unet_pergaussian` · `unet_skip` |
+| Residual U-Net | `resunet` · `resunet_multihead` · `resunet_pergaussian` |
+| Attention / nested skips | `attention_unet` · `unetplusplus` · `u2net` |
+| Transformer hybrids | `swin_unet` · `transunet` · `unetr` · `segformer` |
+| Modern convolutional | `convnext_unet` · `deeplabv3plus` · `fpn` |
+| Dense / multi-resolution | `dense_unet` · `multires_unet` · `hrnet` |
+| Lightweight | `linknet` |
 
-| Key | Architecture | Distinguishing characteristic |
-|---|---|---|
-| `unet` | U-Net | Canonical encoder–decoder with skip connections |
-| `unet_multihead` | U-Net (multi-head) | Separate prediction heads for amplitude, mean, and $\sigma$ |
-| `unet_pergaussian` | U-Net (per-Gaussian) | Independent branch per Gaussian component |
-| `resunet` | ResU-Net | Residual blocks throughout the backbone |
-| `attention_unet` | Attention U-Net | Attention gates on the skip connections |
-| `unetplusplus` | U-Net++ | Nested, dense skip pathways |
-| `linknet` | LinkNet | Lightweight factorised decoder |
-| `swin_unet` | Swin-UNet | Shifted-window transformer encoder |
-| `transunet` | TransUNet | Hybrid ViT-encoder / CNN-decoder |
-| `unetr` | UNETR | Vision-transformer backbone with U-Net decoding |
+The *multi-head* variants predict amplitude, mean, and $\sigma$ through separate heads; the *per-Gaussian* variants devote an independent branch to each mixture component. Per-architecture design notes live in `notes/models/`.
 
-Most backbones partition their parameters into encoder / bottleneck / decoder / output-head groups, each assigned an independent learning rate and weight decay.
+---
 
-### 3.2 Composite Training Objective
+## 3. Composite Training Objective
 
-The loss is a configurable, weighted combination of complementary terms, enabling a curriculum that first stabilises global shape before refining detail:
+The loss is a weighted combination of fifteen complementary terms, each individually switchable and normalised by empirically calibrated factors so that weights are comparable across terms:
 
-- **Curve-space losses** on the reconstructed profile — MSE, $L_1$, Huber, Charbonnier, cosine similarity, spectral coherence, and SSIM along the elevation axis.
-- **Parameter-space losses** — per-component penalties on amplitude, mean, and $\sigma$, with permutation-invariant component matching to resolve label ambiguity in multi-component decomposition.
-- **Regularisation** — total-variation smoothness over the predicted parameter fields.
-- **Heteroscedastic mode** — when the noise head is active, a Gaussian negative-log-likelihood with a per-pixel predicted noise standard deviation, providing calibrated uncertainty.
+**Curve-space** — agreement of the reconstructed profile with the measured spectrum:
+MSE · $L_1$ · Huber · Charbonnier · cosine similarity · spectral coherence · SSIM along the elevation axis.
 
-A complete, formal description of the objective, optimiser, schedules, and metrics is given in the **[Training Pipeline — Technical Reference](docs/training_pipeline_reference.md)**.
+**Parameter-space** — direct supervision of the mixture parameters against classically fitted ground truth, with permutation-invariant component matching (Hungarian assignment) to resolve label ambiguity:
+per-component $L_1$ · per-component Huber.
 
-### 3.3 Optimisation & Training Engineering
+**Physics-informed** — consistency with quantities derived from the tomographic signal model and acquisition geometry (wavelength, baselines, $k_z$):
+total-power conservation against the Capon spectrum · first- and second-moment matching (centroid and spread) · steering-based coherence re-synthesis · covariance matching · Capon cycle-consistency.
 
-Training is performed with **AdamW** under discriminative per-group learning rates, a **linear-warmup → cosine-annealing** schedule, automatic mixed precision, gradient accumulation, configurable gradient clipping (fixed or adaptive), an exponential moving average of the weights, and early stopping with best-state restoration. The training state is checkpointed in full — model, optimiser, scheduler, EMA shadow, early-stopping and warmup state — so that any run is exactly resumable.
+**Regularisation** — total-variation smoothness over the predicted parameter fields.
+
+A **loss curriculum** swaps the active term set at a configured epoch — typically a stabilising warm-up objective followed by the complete composite — optionally resetting the optimiser, schedule, and early-stopping state at the transition. The training entry point can fan the curriculum out into parallel trials for direct comparison.
+
+### Training engineering
+
+Training uses **AdamW** with per-group discriminative learning rates, a **linear-warmup to cosine-annealing** schedule, automatic mixed precision (bfloat16), gradient accumulation, fixed or adaptive gradient clipping with NaN/Inf detection, an **exponential moving average** of the weights, and early stopping with best-state restoration. Checkpoints capture the *complete* training state — model, optimiser, scheduler, EMA shadow, early-stopping and warm-up state — so any run is exactly resumable.
 
 ---
 
 ## 4. End-to-End Pipeline
 
-The framework is organised as a sequence of self-contained, individually-runnable stages, each driven by a dedicated entry point in `main/` and a corresponding configuration group.
+Nine entry points in `main/` drive eight self-contained pipelines, each governed by its own configuration group:
 
 ```
-  raw SAR stack
-       │
-       ▼
-  [1] pre-processing      tomogram formation (beamforming) · cropping · height-range selection
-       │
-       ▼
-  [2] dataset preparation channel representation · patch extraction · region-based split · augmentation · normalisation
-       │
-       ▼
-  [3] training            backbone + composite loss + EMA + warmup/cosine + early stopping
-       │
-       ▼
-  [4] inference           patch stitching · per-pixel metrics · profile/slice/animation visualisation · report
-       │
-       ▼
-  [5] parameter fitting   GPU-batched classical Gaussian fitting (ground-truth generation)
-       │
-       ▼
-  [6] benchmarking / HPO  multi-architecture comparison · Optuna hyperparameter search
+  raw SLC stack
+       |
+       v
+  [1] pre_process       interferogram formation, DEM deramping, Capon/Bartlett
+       |                beamforming, cropping, height-range selection -> tomographic cubes
+       v
+  [2] extract_params    GPU-batched classical Gaussian fitting: peak initialisation,
+       |                sigma refinement (SciPy/JAX), best-K selection by R^2 -> ground truth
+       v
+  [3] train             backbone + 15-term composite loss + curriculum + EMA
+       |                + warmup/cosine + early stopping (optionally fanned into trials)
+       v
+  [4] infer             prediction, patch stitching, per-pixel metrics,
+       |                profile/slice/error visualisation, report generation
+       v
+  [5] physics_check     learned decomposition vs Capon spectra: moments,
+       |                coherence, covariance, cycle-consistency
+       v
+  [6] evaluate at scale benchmark (21 architectures, size-matched, multi-GPU)
+                        cross_validate (azimuth-stratified k-fold)
+                        tune (two-phase Optuna search) - compare_runs
 ```
 
-| Stage | Entry point(s) | Purpose |
+| Entry point | Pipeline | Purpose |
 |---|---|---|
-| Pre-processing | `main/pre_process.py` | Form tomograms from the SAR stack; crop, select height range, clip amplitude. |
-| Training | `main/single_train.py`, `main/batch_train.py` | Single run, or multi-GPU parallel experiments. |
-| Overfit test | `main/overfit_test.py` | Capacity check on a single repeated batch. |
-| Inference | `main/single_infer.py`, `main/batch_inference.py` | Predict, stitch patches, compute metrics, render figures and reports. |
-| Parameter extraction | `main/extract_params.py` | Classical GPU-accelerated Gaussian fitting for ground truth. |
-| Benchmarking | `main/benchmark.py` | Compare all architectures on a shared dataset. |
-| Hyperparameter search | `main/tune.py` | Optuna optimisation over learning rates and architecture parameters. |
+| `main/pre_process.py` | `processing_pipeline` | SLC stack to interferograms to beamformed tomographic cubes |
+| `main/extract_params.py` | `param_pipeline` | Classical GPU-batched Gaussian fitting for ground-truth generation |
+| `main/train.py` | `training_pipeline` | Single run or curriculum-trial fan-out |
+| `main/infer.py` | `inference_pipeline` | Prediction, stitching, metrics, figures, and reports over one or more runs |
+| `main/physics_check.py` | `physics_pipeline` | Agreement of fitted quantities with the tomographic signal model |
+| `main/benchmark.py` | `benchmark_pipeline` | All-architecture comparison with parameter-count matching and multi-GPU worker dispatch |
+| `main/cross_validate.py` | `cross_validation_pipeline` | $k$-fold cross-validation with azimuth-based, leakage-free fold assignment |
+| `main/tune.py` | `tuning_pipeline` | Two-phase Optuna search: learning rates / weight decay, then architecture parameters |
+| `main/compare_runs.py` | shared | Comparative summary tables across completed runs |
+
+Dataset construction (channel representation, patch extraction, region-based splitting, normalisation) is handled by the shared `dataset_pipeline`; cross-pipeline orchestration, run I/O, metadata, and plotting live in `pipelines/shared/`.
 
 ---
 
-## 5. Repository Structure
+## 5. Web Control Console
+
+The repository ships a zero-dependency web console (`webui/`) that turns the entire framework into an interactive control surface:
+
+```bash
+webui/run.sh            # serves on http://localhost:8765
+```
+
+- **Launch** any of the nine entry points with typed, validated configuration overrides and a live command preview; jobs stream their stdout to the browser in real time over server-sent events, with stop control.
+- **Configuration** pages are generated live by AST-parsing the dataclasses in `configuration/` — every field, type, and default, always in sync with the code.
+- **Theory** pages render the signal model, mixture target, loss terms, and optimiser as KaTeX equations; **architecture** pages document all 21 backbones with selection guidance; **pipeline** pages map the staged flow to launchable scripts.
+- **Run browser** and **cube explorer** inspect completed runs and tomographic volumes; integrated **TensorBoard** lifecycle management and a **resource watchdog** track GPU, CPU, and memory throughout.
+
+The backend is standard-library only (`http.server` + SSE) — no additional packages to install. See `webui/README.md` for the full architecture and API reference.
+
+---
+
+## 6. Configuration System
+
+All behaviour is governed by dataclass configuration groups in `configuration/` — one module per stage, with defaults embedded in the dataclasses. Every entry point wraps its config in `ConfigCli`, which exposes each leaf field as a dotted-path command-line override:
+
+```bash
+python main/train.py --help-config                      # list every field, type, and default
+python main/train.py --loss.use_moments true --trainer.use_amp true
+python main/train.py --detach                           # run detached (nohup-style)
+```
+
+Defaults live in the dataclasses, single-run variations are expressed as CLI overrides, and batch experiments apply programmatic override functions — the same mechanism used by the benchmark, cross-validation, and tuning pipelines and by the web console's launch page.
+
+---
+
+## 7. Repository Structure
 
 ```
 DLR-TomoSAR/
-├── main/                       # stage entry points (pre-process, train, infer, extract, benchmark, tune)
-├── models/                     # 10 architectures + model registry (UNet, ResUNet, Attention, Swin, TransUNet, UNETR, …)
-├── configuration/              # dataclass configuration for every stage
-│   ├── processing_config.py    #   tomogram formation, cropping, height range
-│   ├── dataset_config.py       #   channels, patches, augmentation, splits
-│   ├── norm_config.py          #   per-channel normalisation strategies
-│   ├── training_config.py      #   trainer, optimiser, scheduler, warmup, EMA, loss
-│   ├── inference_config.py     #   prediction, stitching, metrics, visualisation
-│   ├── param_extraction_config.py  # classical Gaussian-fitting settings
-│   ├── models_config.py        #   per-architecture configuration
-│   └── tuning_config.py        #   hyperparameter search ranges
-├── tools/                      # Gaussian mixture math, representation enum, permutation metrics,
-│                               # rich logging, resource/live monitoring, region splitting, model summary
-├── notebooks/                  # pipeline inspection, normalisation studies, parameter-distribution analysis
-├── docs/
-│   └── training_pipeline_reference.md   # formal, equation-level training specification
-├── coding_style.md             # engineering conventions / developer profile
-├── requirements.txt
-└── README.md
+├── main/             9 stage entry points (pre_process, extract_params, train, infer,
+│                     physics_check, benchmark, cross_validate, tune, compare_runs)
+├── pipelines/        8 self-contained pipelines + shared orchestration, I/O, plotting
+├── models/           21 registered architectures, shared blocks, model registry
+├── configuration/    dataclass configuration groups for every stage
+├── tools/            shared utilities: ConfigCli, Logger, MetricTracker, ResourceMonitor,
+│                     Gaussian mixture ops, tomographic geometry, region splitting,
+│                     permutation metrics, markdown reporting
+├── webui/            web control console (stdlib HTTP + SSE, KaTeX, live job streaming)
+├── scripts/          state-dict baseline generation, parameter sweeps, SAR simulation,
+│                     tomogram rendering and comparison utilities
+├── tests/            1022 tests across 16 suites, incl. state-dict regression baseline
+├── notebooks/        87 confirmation notebooks across 9 per-pipeline suites
+├── notes/            per-architecture design notes and refactoring documentation
+├── presentations/    generated presentation suites and the users' guide (LaTeX/PDF)
+├── pyproject.toml    installable package, pinned dependencies, pytest configuration
+└── requirements.txt  pinned mirror of pyproject.toml
 ```
 
 ---
 
-## 6. Installation
+## 8. Installation
 
 ```bash
-pip install -r requirements.txt
+pip install -e .                    # core framework
+pip install -e ".[processing]"     # + h5py for SLC/HDF5 data loading
+pip install -e ".[sigma]"          # + JAX-accelerated sigma optimisation
+pip install -e ".[dev]"            # + pytest, pyflakes
 ```
 
-The framework builds on the PyTorch ecosystem and the scientific-Python stack (NumPy, SciPy, scikit-image, Matplotlib, h5py), with **GDAL** for geospatial raster I/O and convex-optimisation solvers (cvxpy, cvxopt, osqp, ecos) supporting the classical fitting routines. A CUDA-capable GPU is recommended; mixed-precision training and GPU-batched parameter fitting assume CUDA availability.
+Requires **Python 3.11+** and builds on the PyTorch 2.11 ecosystem with NumPy, SciPy, scikit-image, Matplotlib, Optuna, TensorBoard, and Rich. A CUDA-capable GPU is recommended: mixed-precision training, multi-GPU benchmarking, and GPU-batched parameter fitting assume CUDA availability.
 
 ---
 
-## 7. Usage
+## 9. Usage
 
 ```bash
-# [1] Form tomograms and pre-process the SAR stack
+# [1] Form tomographic cubes from the SLC stack
 python main/pre_process.py
 
-# [2]+[3] Train a model (architecture and all hyperparameters set in configuration/)
-python main/single_train.py
-
-# [4] Run inference: stitch predictions, compute metrics, render figures and a report
-python main/single_infer.py
-
-# [5] Generate ground-truth parameters via classical GPU-accelerated fitting
+# [2] Generate ground-truth parameters via classical GPU-batched fitting
 python main/extract_params.py
 
-# [6] Benchmark all architectures / search hyperparameters
-python main/benchmark.py
-python main/tune.py
+# [3] Train (architecture and all hyperparameters via configuration/ or overrides)
+python main/train.py --loss.use_huber_curve true --loss.use_moments true
+
+# [4] Inference: stitch predictions, compute metrics, render figures and a report
+python main/infer.py
+
+# [5] Validate the learned decomposition against the physics
+python main/physics_check.py
+
+# [6] Evaluate at scale
+python main/benchmark.py        # size-matched comparison of all 21 architectures
+python main/cross_validate.py   # azimuth-stratified k-fold
+python main/tune.py             # two-phase Optuna search
 ```
 
-All behaviour is governed by the dataclass configuration objects in `configuration/`; there are no command-line flags. Edit the relevant configuration group before launching a stage.
+Or launch and monitor everything from the web console: `webui/run.sh`.
 
 ---
 
-## 8. Documentation
+## 10. Verification and Reproducibility
 
-- **[Training Pipeline — Technical Reference](docs/training_pipeline_reference.md)** — a complete, equation-level specification of the objective, optimiser and parameter groups, warmup and cosine-annealing schedules, EMA, early stopping, mixed precision, gradient accumulation, the full evaluation-metric suite, checkpointing, and the epoch loop.
-- **`coding_style.md`** — the engineering conventions and design philosophy underpinning the codebase (modular object-oriented design, defensive numerical practice, exhaustive observability, total-state checkpointing).
-- **`notebooks/`** — inspection notebooks documenting each pipeline stage, the input-normalisation strategy, and the empirical distribution of the target parameters.
-
----
-
-## 9. Engineering Principles
-
-The codebase is written to research-software standards emphasising reproducibility and observability: highly modular, single-responsibility object-oriented design with a central-orchestrator pattern; defensive numerical practice (clamping, $\epsilon$-stabilised denominators); total-state checkpointing for exact resumption; structured hierarchical logging with live resource monitoring; and explicit management of hardware resources and thread contention.
-
----
-
-## 10. Citation
-
-```bibtex
-@software{dlr_tomosar,
-  title  = {DLR-TomoSAR: Deep Per-Pixel Gaussian-Mixture Decomposition
-            of Tomographic SAR Spectra},
-  author = {{DLR-TomoSAR contributors}},
-  year   = {2026},
-  note   = {Configuration-driven deep-learning framework for TomoSAR
-            reflectivity-profile decomposition}
-}
-```
+- **Test suite** — 1022 tests across 16 suites cover every pipeline, all configuration dataclasses, the loss terms, callbacks, orchestration, and shared numerical utilities. Run with `pytest`.
+- **State-dict regression baseline** — `tests/state_dict_baseline.json` pins the parameter keys and shapes of all 21 registered models; any refactor must leave this test green, guaranteeing that existing checkpoints continue to load. The baseline is regenerated only for intentional architecture changes via `scripts/generate_state_dict_baseline.py`.
+- **Confirmation notebooks** — 87 self-contained notebooks across 9 per-pipeline suites visually verify each stage on seeded synthetic inputs, from channel representations and beamforming through loss behaviour, fold assignment, and benchmark scheduling.
+- **Total-state checkpointing** — every training run is exactly resumable; configuration snapshots and pipeline metadata are persisted alongside every run.
+- **Pinned environment** — dependencies are pinned to exact versions in `pyproject.toml` and mirrored in `requirements.txt`.
 
 ---
 
@@ -232,13 +263,29 @@ The codebase is written to research-software standards emphasising reproducibili
 
 1. Reigber, A. & Moreira, A. *First Demonstration of Airborne SAR Tomography Using Multibaseline L-Band Data.* IEEE TGRS (2000).
 2. Fornaro, G., Serafino, F. & Soldovieri, F. *Three-Dimensional Focusing with Multipass SAR Data.* IEEE TGRS (2003).
-3. Zhu, X. X. & Bamler, R. *Tomographic SAR Inversion by $L_1$-Norm Regularization — The Compressive Sensing Approach.* IEEE TGRS (2010).
-4. Ronneberger, O., Fischer, P. & Brox, T. *U-Net: Convolutional Networks for Biomedical Image Segmentation.* MICCAI (2015).
-5. Hatamizadeh, A. et al. *UNETR: Transformers for 3D Medical Image Segmentation.* WACV (2022).
+3. Lombardini, F. & Reigber, A. *Adaptive Spectral Estimation for Multibaseline SAR Tomography with Airborne L-Band Data.* IGARSS (2003).
+4. Zhu, X. X. & Bamler, R. *Tomographic SAR Inversion by L1-Norm Regularization — The Compressive Sensing Approach.* IEEE TGRS (2010).
+5. Ronneberger, O., Fischer, P. & Brox, T. *U-Net: Convolutional Networks for Biomedical Image Segmentation.* MICCAI (2015).
 6. Cao, H. et al. *Swin-Unet: Unet-like Pure Transformer for Medical Image Segmentation.* ECCV Workshops (2022).
+7. Hatamizadeh, A. et al. *UNETR: Transformers for 3D Medical Image Segmentation.* WACV (2022).
+
+---
+
+## 12. Citation
+
+```bibtex
+@software{dlr_tomosar,
+  title  = {DLR-TomoSAR: Deep Per-Pixel Gaussian-Mixture Decomposition
+            of Tomographic SAR Spectra},
+  author = {{DLR-TomoSAR contributors}},
+  year   = {2026},
+  note   = {Configuration-driven, physics-informed deep-learning framework
+            for TomoSAR reflectivity-profile decomposition}
+}
+```
 
 ---
 
 <div align="center">
-<sub>Configuration-driven · ten architectures · classical &amp; learned inversion · fully reproducible</sub>
+<sub>21 architectures · 15-term physics-informed objective · classical &amp; learned inversion · 1022 tests · one console</sub>
 </div>
