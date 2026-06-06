@@ -488,7 +488,7 @@ class TestProcessingPipeline:
 
         class StubInterferogramBuilder:
             def __init__(self, *args, **kwargs):
-                pass
+                self.track_baselines = None
 
             def run(self, crop_tuple, primary_path, secondaries_path, interferograms_path):
                 recorder["inputs"].append((primary_path, secondaries_path, interferograms_path))

@@ -30,4 +30,5 @@ class TomoGeometry:
             "Wavelength":   f"{self.cfg.wavelength} m",
             "Slant range":  f"{self.cfg.slant_range} m",
             "kz source":    "explicit kz_values" if len(self.cfg.kz_values) > 0 else "baselines via 4*pi*b/(lambda*r0)",
+            "Baselines origin": getattr(self.cfg, "baselines_origin", "config"),
         }

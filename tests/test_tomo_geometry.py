@@ -152,7 +152,7 @@ class TestDescribe:
         geo = TomoGeometry(GeoCfg(kz_values=(0.1, 0.2)), _axis())
         d   = geo.describe()
 
-        assert set(d.keys()) == {"Tracks", "kz min", "kz max", "Wavelength", "Slant range", "kz source"}
+        assert set(d.keys()) == {"Tracks", "kz min", "kz max", "Wavelength", "Slant range", "kz source", "Baselines origin"}
 
     def test_describe_reports_track_count(self):
         geo = TomoGeometry(GeoCfg(kz_values=(0.1, 0.2, 0.3)), _axis())

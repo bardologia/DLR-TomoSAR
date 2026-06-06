@@ -7,6 +7,7 @@ from typing import Literal, Tuple
 from configuration.processing_config import ProcessingConfiguration, TomogramConfiguration
 from pipelines.shared.io             import FileIO
 from tools.logger                    import Logger
+from tools.track_baselines           import TrackBaselines
 
 
 ArtifactType = Literal["tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced", "primary_reduced", "secondaries_reduced", "interferograms_reduced"]
@@ -98,6 +99,15 @@ class MetadataManager:
 
         self.logger.subsection(f"Metadata written: {meta_path}")
         return meta_path
+
+    def save_baselines(self, table: TrackBaselines) -> Path:
+        self.registry.ensure_directory_structure()
+        out_path = self.config.paths.metadata_directory / TrackBaselines.FILENAME
+
+        table.save(out_path)
+
+        self.logger.section(f"[Track Baselines Saved] {out_path}")
+        return out_path
 
     def save_pipeline_configuration(self) -> Path:
         self.registry.ensure_directory_structure()

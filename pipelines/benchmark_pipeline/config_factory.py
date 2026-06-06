@@ -21,6 +21,7 @@ from configuration.training_config import (
     EarlyStoppingConfig,
     EMAConfig,
     GaussianConfig,
+    GeometryConfig,
     GradientClipperConfig,
     IOConfig,
     LossConfig,
@@ -109,6 +110,7 @@ class ConfigFactory:
 
         return TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
+            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path),
             early_stopping   = EarlyStoppingConfig(patience=training.early_stop_patience, min_delta=training.early_stop_min_delta, restore_best=True),
             warmup           = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler        = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
@@ -143,6 +145,7 @@ class ConfigFactory:
 
         return TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
+            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path),
             early_stopping   = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
             warmup           = WarmupConfig(warmup_enabled=False),
             scheduler        = SchedulerConfig(type="constant"),

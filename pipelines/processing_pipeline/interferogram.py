@@ -9,12 +9,14 @@ import numpy as np
 
 from configuration.processing_config import ProcessingConfiguration
 from tools.logger                    import Logger
+from tools.track_baselines           import BaselineExtractor, TrackBaselines
 
 
 class InterferogramBuilder:
     def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
-        self.config = config
-        self.logger = logger
+        self.config          = config
+        self.logger          = logger
+        self.track_baselines = None
 
         self.logger.section("[InterferogramBuilder Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
@@ -46,9 +48,24 @@ class InterferogramBuilder:
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 
+        self.track_baselines = self._extract_baselines([tomography_object.master, *tomography_object.slaves], crop_tuple)
+
         primary, secondaries, interferograms = self._compute_interferograms(tomography_object)
         self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
         return primary, secondaries, interferograms
+
+    def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> TrackBaselines | None:
+        try:
+            azimuth_window = (crop_tuple[0], crop_tuple[1])
+            extractor      = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
+            table          = extractor.extract()
+
+            self.logger.kv_table(table.describe(), title="Track Baselines")
+            return table
+
+        except Exception as error:
+            self.logger.subsection(f"[FSAR] Baseline extraction skipped: {error}")
+            return None
 
     def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         import pyrat as pyrat_module
