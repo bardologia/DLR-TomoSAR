@@ -798,7 +798,7 @@ class TestProcessingConfig:
         cfg  = PreProcessEntryConfig()
         name = cfg.resolve_dataset_name([20, 10], "20260606_120000")
 
-        assert name == "17sartom-traun_L_1000a16000a500a4000_w20_10_hv_1_dtmf_20260606_120000"
+        assert name == "17sartom-traun_L_az1000-16000_rg500-4000_w20_10_hv_1_dtmf_20260606_120000"
 
     def test_preprocess_dataset_name_provided_single_win(self):
         cfg = PreProcessEntryConfig(dataset_name="traun_test", win_list=[[20, 10]])

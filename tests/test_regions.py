@@ -59,6 +59,11 @@ class TestCropRegionAccessors:
 
         assert region.as_identifier_string() == "-1a2a-3a4"
 
+    def test_as_labeled_string_separates_axes(self):
+        region = CropRegion(1000, 16000, 500, 4000)
+
+        assert region.as_labeled_string() == "az1000-16000_rg500-4000"
+
     def test_azimuth_size(self):
         region = CropRegion(5, 17, 0, 1)
 

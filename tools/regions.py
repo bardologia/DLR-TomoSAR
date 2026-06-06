@@ -23,6 +23,9 @@ class CropRegion:
     def as_identifier_string(self) -> str:
         return "a".join(str(value) for value in self.as_tuple())
 
+    def as_labeled_string(self) -> str:
+        return f"az{self.azimuth_start}-{self.azimuth_end}_rg{self.range_start}-{self.range_end}"
+
     @property
     def azimuth_size(self) -> int:
         return self.azimuth_end - self.azimuth_start

@@ -151,4 +151,4 @@ class PreProcessEntryConfig:
         crop   = CropRegion(azimuth_start=self.azimuth_start, azimuth_end=self.azimuth_end, range_start=self.range_start, range_end=self.range_end)
         source = Path(self.fusar_project_path).stem
 
-        return f"{source}_{crop.as_identifier_string()}_w{win_string}_{self.polarisation}_{self.full_stack_identifier}_{self.reduced_stack_identifier}_{run_identifier}"
+        return f"{source}_{crop.as_labeled_string()}_w{win_string}_{self.polarisation}_{self.full_stack_identifier}_{self.reduced_stack_identifier}_{run_identifier}"
