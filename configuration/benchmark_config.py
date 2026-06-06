@@ -101,12 +101,4 @@ class BenchmarkConfig:
     poll_interval_s : float      = 5.0
 
 
-@dataclass
-class OverfitTestConfig:
-    gpu         : int        = 0
-    run_tag     : str | None = None
-    n_gaussians : int        = 5
-    skip_models : list[str]  = field(default_factory=list)
 
-    paths   : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
-    overfit : OverfitGateConfig    = field(default_factory=OverfitGateConfig)

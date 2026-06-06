@@ -4,13 +4,13 @@ import json
 import traceback
 from pathlib import Path
 
-from configuration.benchmark_config import BenchmarkConfig, OverfitTestConfig
+from configuration.benchmark_config import BenchmarkConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
 from pipelines.training_pipeline.docs import LossScaleProbeConfig
 
 
 class BenchmarkWorker:
-    def __init__(self, config: BenchmarkConfig | OverfitTestConfig, run_tag: str) -> None:
+    def __init__(self, config: BenchmarkConfig, run_tag: str) -> None:
         self.config  = config
         self.run_tag = run_tag
         self.run_dir = Path(config.paths.log_base_dir) / run_tag

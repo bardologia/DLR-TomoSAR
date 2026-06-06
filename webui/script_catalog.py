@@ -22,11 +22,6 @@ class ScriptCatalog:
             "category": "Training",
             "purpose" : "Train one model end to end, or fan out loss-curriculum trials (warmup x complete combinations) across GPUs.",
         },
-        "overfit_test": {
-            "title"   : "Overfit Test",
-            "category": "Training",
-            "purpose" : "Overfit a single batch to verify model capacity and wiring.",
-        },
         "infer": {
             "title"   : "Inference",
             "category": "Inference",
@@ -53,7 +48,6 @@ class ScriptCatalog:
         "pre_process",
         "extract_params",
         "train",
-        "overfit_test",
         "infer",
         "benchmark",
         "physics_check",
