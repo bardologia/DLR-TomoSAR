@@ -15,18 +15,25 @@ from tools.logger import Logger
 
 
 def main() -> None:
-    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing sweep").apply()
+    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, run sequentially once per win filter").apply()
     logger = Logger(log_dir="logs", name="pre_process")
 
     global_crop            = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
     max_crop_azimuth_width = (global_crop.azimuth_end - global_crop.azimuth_start) // 16
 
-    for index, filter_arguments in enumerate(config.filter_arguments_list):
-        win          = filter_arguments.get("win", [])
-        win_str      = "_".join(str(w) for w in win)
-        dataset_name = f"base_dataset_w{win_str}"
+    logger.section("Pre-processing queue")
+    logger.kv_table({
+        "Win filters" : ", ".join(str(win) for win in config.win_list),
+        "Runs"        : len(config.win_list),
+        "Crop"        : global_crop.as_tuple(),
+    }, title="Configuration")
 
-        logger.section(f"[Run {index + 1}/{len(config.filter_arguments_list)}] {dataset_name}")
+    for index, win in enumerate(config.win_list):
+        filter_arguments = {"win": list(win)}
+        win_str          = "_".join(str(w) for w in win)
+        dataset_name     = f"base_dataset_w{win_str}"
+
+        logger.section(f"[Run {index + 1}/{len(config.win_list)}] {dataset_name}")
         logger.kv_table({"Filter arguments": str(filter_arguments)})
 
         shared_tomo = dict(

@@ -17,7 +17,7 @@ class LaunchView {
     ["source", /fusar|track_selection|polarisation|^base_directory$/],
     ["run", /^run_|^gpu$|^seed$|^device|^log|dir|path/],
     ["reset", /^reset_/],
-    ["beamforming", /beamforming|^filter_|^height_range$/],
+    ["beamforming", /beamforming|^filter_|^height_range$|^win_list$/],
     ["stitching", /stitch|cube/],
     ["figures", /cmap|dpi|intensity/],
   ];

@@ -11,10 +11,22 @@ from tools.logger import Logger
 
 
 def main() -> None:
-    config = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction sweep").apply()
-    logger = Logger(log_dir="logs", name="extract_params")
+    config    = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction over one or more dataset directories").apply()
+    logger    = Logger(log_dir="logs", name="extract_params")
+    base_path = Path(config.dataset_base_path)
 
-    dataset_dirs = sorted(p for p in Path(config.dataset_base_path).iterdir() if p.is_dir())
+    dataset_dirs = sorted(
+        [d for d in base_path.iterdir() if d.is_dir()]
+        if not config.dataset_filter
+        else [base_path / name for name in config.dataset_filter]
+    )
+
+    logger.section("Extraction queue")
+    logger.kv_table({
+        "Datasets" : len(dataset_dirs),
+        "Base path": str(base_path),
+        "Filter"   : config.dataset_filter or "all dataset directories",
+    }, title="Configuration")
 
     for index, processed_data_path in enumerate(dataset_dirs):
         logger.section(f"[Run {index + 1}/{len(dataset_dirs)}] {processed_data_path.name}")

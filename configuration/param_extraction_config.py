@@ -140,6 +140,7 @@ class ExtractionConfig:
 @dataclass
 class ExtractParamsEntryConfig:
     dataset_base_path : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
+    dataset_filter    : list         = field(default_factory=list)
     pyrat_directory   : Path         = Path("/ste/rnd/User/vice_vi/pyrat")
     tomogram_filename : str          = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
 

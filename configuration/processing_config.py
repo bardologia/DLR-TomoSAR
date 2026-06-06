@@ -128,11 +128,11 @@ class PreProcessEntryConfig:
     beamforming_method       : str   = "Capon"
     filter_method            : str   = "Boxcar"
     height_range             : tuple = (-20.0, 80.0)
-    filter_arguments_list    : list  = field(default_factory=lambda: [
-        {"win": [40, 20]},
-        {"win": [20, 10]},
-        {"win": [10, 10]},
-        {"win": [30, 20]},
+    win_list                 : list  = field(default_factory=lambda: [
+        [40, 20],
+        [20, 10],
+        [10, 10],
+        [30, 20],
     ])
 
     dataset_type             : str   = "FSAR"
