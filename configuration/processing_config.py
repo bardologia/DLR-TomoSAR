@@ -69,16 +69,15 @@ class ParallelConfiguration:
             threads = max(1, self.pyrat_threads)
             return max(1, min(subsection_count, budget // threads)), threads
 
-        best_plan  = (1, max(1, min(self.THREAD_CAP, budget)))
-        best_score = None
+        best_plan  = None
+        best_waves = None
 
         for workers in range(1, min(subsection_count, budget) + 1):
             threads = max(1, min(self.THREAD_CAP, budget // workers))
             waves   = math.ceil(subsection_count / workers)
-            score   = waves / threads
 
-            if best_score is None or score < best_score:
-                best_plan, best_score = (workers, threads), score
+            if best_plan is None or waves * best_plan[1] <= best_waves * threads:
+                best_plan, best_waves = (workers, threads), waves
 
         return best_plan
 

@@ -117,7 +117,7 @@ class EquationLibrary:
                 {
                     "title" : "Worker auto-sizing",
                     "tex"   : r"(P, T) = \arg\min_{P \cdot T \le B}\ \frac{\lceil M/P \rceil}{T}, \qquad B = \lfloor f_{\mathrm{effort}} \cdot C \rfloor,\ T \le 16",
-                    "note"  : "Workers and PyRat threads are chosen together to minimise estimated makespan (waves of jobs divided by per-job speed-up) under the effort core budget: low uses 25% of cores, medium 50%, high 80%. Explicit tomogram_workers or pyrat_threads overrides pin their value and the other adapts to the remaining budget.",
+                    "note"  : "Workers and PyRat threads are chosen together to minimise estimated makespan (waves of jobs divided by per-job speed-up) under the effort core budget: low uses 25% of cores, medium 50%, high 80%. Tied plans resolve toward more workers, trading resident memory for the better scaling of process parallelism. Explicit tomogram_workers or pyrat_threads overrides pin their value and the other adapts to the remaining budget.",
                     "vars"  : [
                         {"sym": r"P",                  "desc": "process-pool workers actually launched"},
                         {"sym": r"T",                  "desc": "threads per PyRat subprocess, capped at 16"},

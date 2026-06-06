@@ -747,6 +747,12 @@ class TestProcessingConfig:
         assert par.core_budget()    == 102
         assert par.resolve_plan(17) == (17, 6)
 
+    def test_parallel_resolve_plan_ties_prefer_more_workers(self, monkeypatch):
+        monkeypatch.setattr(ParallelConfiguration, "available_cores", staticmethod(lambda: 128))
+
+        assert ParallelConfiguration(effort="high").resolve_plan(15)   == (15, 6)
+        assert ParallelConfiguration(effort="medium").resolve_plan(15) == (15, 4)
+
     def test_parallel_core_budget_scales_with_effort(self):
         budgets = [ParallelConfiguration(effort=effort).core_budget() for effort in ("low", "medium", "high")]
 
