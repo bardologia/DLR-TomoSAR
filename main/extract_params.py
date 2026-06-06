@@ -41,7 +41,7 @@ def main() -> None:
             tomogram_filename = config.tomogram_filename,
             height_range      = config.height_range,
 
-            fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k)),
+            fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor)),
 
             parameter_workers = config.parameter_workers,
         )

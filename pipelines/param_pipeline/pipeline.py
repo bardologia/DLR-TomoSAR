@@ -36,6 +36,7 @@ class ExtractionMetadataManager:
             "diagnostics_npz"     : diagnostics_path.name,
             "number_of_gaussians" : ext.fit_config.k_max,
             "lambda_k"            : ext.fit_config.lambda_k,
+            "sigma_init_divisor"  : getattr(ext.fit_config, "sigma_init_divisor", 1.0),
         }
 
         FileIO.save_json(payload, meta_path)
@@ -108,9 +109,10 @@ class ParameterExtractor:
 
         fit_cfg = parameter_extraction.fit_config
 
-        k_max           = fit_cfg.k_max
-        lambda_k        = fit_cfg.lambda_k
-        prominence_frac = fit_cfg.prominence_frac
+        k_max              = fit_cfg.k_max
+        lambda_k           = fit_cfg.lambda_k
+        prominence_frac    = fit_cfg.prominence_frac
+        sigma_init_divisor = getattr(fit_cfg, "sigma_init_divisor", 1.0)
 
         self._gpu_extractor = SigmaFittingExtractor(
             fit_settings         = parameter_extraction,
@@ -123,6 +125,7 @@ class ParameterExtractor:
             k_max                = k_max,
             lambda_k             = lambda_k,
             prominence_frac      = prominence_frac,
+            sigma_init_divisor   = sigma_init_divisor,
             gpu_pixel_batch_size = gpu_pixel_batch_size,
             gpu_device_ids       = gpu_device_ids,
             init_workers         = init_workers,

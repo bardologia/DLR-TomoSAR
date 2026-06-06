@@ -605,15 +605,22 @@ class TestParamExtractionConfig:
     def test_fit_mode_sigma_only_defaults(self):
         sigma = FitMode.SigmaOnly()
 
-        assert sigma.k_max            == 5
-        assert sigma.lambda_k         > 0.0
+        assert sigma.k_max              == 5
+        assert sigma.lambda_k           > 0.0
+        assert sigma.sigma_init_divisor > 0.0
         assert 0.0 < sigma.threshold_factor < 1.0
 
     def test_output_suffix_value_derived(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data")
 
-        assert cfg.output_suffix_value == "Ng5_sigonly_k5"
-        assert cfg.output_subdir_name  == "params_Ng5_sigonly_k5"
+        assert cfg.output_suffix_value == "sigmaonly_k5_sig4"
+        assert cfg.output_subdir_name  == "params_sigmaonly_k5_sig4"
+
+    def test_output_suffix_value_encodes_sigma_divisor(self):
+        fit = FitSettings(fit_config=FitMode.SigmaOnly(k_max=3, sigma_init_divisor=2.5))
+        cfg = ExtractionConfig(processed_data_path="/tmp/data", fit_settings=fit)
+
+        assert cfg.output_suffix_value == "sigmaonly_k3_sig2p5"
 
     def test_output_suffix_value_explicit_override(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data", output_suffix="custom")
@@ -625,8 +632,8 @@ class TestParamExtractionConfig:
 
         assert cfg.data_directory     == tmp_path / "data"
         assert cfg.metadata_directory == tmp_path / "meta"
-        assert cfg.output_directory   == tmp_path / "params" / "params_Ng5_sigonly_k5"
-        assert cfg.parameters_npy_path.name == "parameters_Ng5_sigonly_k5.npy"
+        assert cfg.output_directory   == tmp_path / "params" / "params_sigmaonly_k5_sig4"
+        assert cfg.parameters_npy_path.name == "parameters_sigmaonly_k5_sig4.npy"
 
     def test_discover_tomogram_path_none_when_missing(self, tmp_path):
         (tmp_path / "data").mkdir()

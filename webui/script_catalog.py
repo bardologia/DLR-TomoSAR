@@ -17,7 +17,7 @@ class ScriptCatalog:
             "title"     : "Extract Parameters",
             "category"  : "Data",
             "purpose"   : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets.",
-            "essentials": ["dataset_base_path", "tomogram_filename", "output_prefix", "fit_k_max"],
+            "essentials": ["dataset_base_path", "tomogram_filename", "output_prefix", "fit_k_max", "fit_sigma_init_divisor"],
         },
         "train": {
             "title"     : "Train",

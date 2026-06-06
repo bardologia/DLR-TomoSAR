@@ -9,11 +9,12 @@ from typing import List, Optional, Tuple, Union
 class FitMode:
     @dataclass
     class SigmaOnly:
-        threshold_factor : float = 0.25
-        truncation_index : int   = 170
-        k_max            : int   = 5
-        lambda_k         : float = 3e-3
-        prominence_frac  : float = 0.05
+        threshold_factor   : float = 0.25
+        truncation_index   : int   = 170
+        k_max              : int   = 5
+        lambda_k           : float = 3e-3
+        prominence_frac    : float = 0.05
+        sigma_init_divisor : float = 4.0
 
 
 FitConfig = FitMode.SigmaOnly
@@ -70,15 +71,18 @@ class ExtractionConfig:
     def output_suffix_value(self) -> str:
         if self.output_suffix:
             return self.output_suffix
-        fs = self.fit_settings
+
+        fs     = self.fit_settings
         method = fs.fitting_method
+
         if method.startswith("sigma_only"):
-            cfg = self.fit_settings.fit_config
-            k_max = getattr(cfg, "k_max", self.fit_settings.number_of_gaussians)
-            method_short = f"sigonly_k{k_max}"
-        else:
-            method_short = "filt"
-        return f"Ng{fs.number_of_gaussians}_{method_short}"
+            cfg     = fs.fit_config
+            k_max   = getattr(cfg, "k_max", fs.number_of_gaussians)
+            divisor = getattr(cfg, "sigma_init_divisor", 1.0)
+            div_tag = f"{divisor:g}".replace(".", "p")
+            return f"sigmaonly_k{k_max}_sig{div_tag}"
+
+        return f"Ng{fs.number_of_gaussians}_filt"
 
     @property
     def output_subdir_name(self) -> str:
@@ -152,6 +156,7 @@ class ExtractParamsEntryConfig:
     output_suffix     : str | None   = None
     height_range      : tuple | None = None
 
-    fit_k_max         : int          = 5
-    fit_lambda_k      : float        = 3e-3
-    parameter_workers : int          = 50
+    fit_k_max              : int    = 5
+    fit_lambda_k           : float  = 3e-3
+    fit_sigma_init_divisor : float  = 4.0
+    parameter_workers      : int    = 50

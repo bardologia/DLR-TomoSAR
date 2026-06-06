@@ -216,12 +216,13 @@ class PeakInitialiser:
 
         return amps, mus, sigs
 
-    def run(self, prof_raw : np.ndarray, height_axis : np.ndarray, K : int, prominence_frac : float = 0.05, n_workers : int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def run(self, prof_raw : np.ndarray, height_axis : np.ndarray, K : int, prominence_frac : float = 0.05, n_workers : int = 1, sigma_divisor : float = 1.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         N, H        = prof_raw.shape
         h_span      = float(height_axis[-1] - height_axis[0])
         dh          = float(height_axis[1] - height_axis[0])
-        sigma_guess = max(2.0 * dh, h_span / (8.0 * K))
-        min_dist    = max(1, int(sigma_guess / dh))
+        sigma_base  = max(2.0 * dh, h_span / (8.0 * K))
+        sigma_guess = sigma_base / max(float(sigma_divisor), 1e-6)
+        min_dist    = max(1, int(sigma_base / dh))
         smoothed    = uniform_filter1d(prof_raw.astype(np.float32), size=5, mode="nearest", axis=1).copy()
 
         chunk_size = max(1, -(-N // (n_workers * 2)))
@@ -322,6 +323,7 @@ class SigmaFittingExtractor:
         k_max               : int                 = 5,
         lambda_k            : float               = 3e-3,
         prominence_frac     : float               = 0.05,
+        sigma_init_divisor  : float               = 1.0,
         gpu_pixel_batch_size: int                 = 8192,
         gpu_device_ids      : Optional[List[int]] = None,
         init_workers        : Optional[int]       = None,
@@ -337,6 +339,7 @@ class SigmaFittingExtractor:
         self.k_max                = k_max
         self.lambda_k             = lambda_k
         self.prominence_frac      = prominence_frac
+        self.sigma_init_divisor   = sigma_init_divisor
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self._init_workers        = 80 if init_workers is None else init_workers
 
@@ -364,6 +367,7 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"adam_lr            : {adam_lr}")
         self.logger.subsection(f"k_max              : {k_max}")
         self.logger.subsection(f"lambda_k           : {lambda_k}")
+        self.logger.subsection(f"sigma_init_divisor : {sigma_init_divisor}")
         self.logger.subsection(f"init_workers       : {self._init_workers}")
         self.logger.subsection(f"n_devices          : {self._n_devices}")
 
@@ -544,7 +548,7 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"K             : {self.k_max} (shared init)")
         self.logger.subsection(f"Workers       : {self._init_workers} / {n_cpus} logical CPUs")
 
-        amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self._init_workers)
+        amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self._init_workers, self.sigma_init_divisor)
         inits = {K: (amps_km[:, :K].copy(), mus_km[:, :K].copy(), sigs_km[:, :K].copy()) for K in range(1, self.k_max + 1)}
 
         self.logger.subsection(f"Init shared for all {self.k_max} K values")

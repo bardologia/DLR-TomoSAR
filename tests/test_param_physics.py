@@ -680,6 +680,19 @@ class TestPeakInitialiser:
         assert np.all(amps >= 1e-10)
         assert np.all(np.isfinite(mus))
 
+    def test_sigma_divisor_shrinks_initial_sigma(self):
+        from pipelines.param_pipeline.sigma import PeakInitialiser
+
+        height_axis = np.linspace(-20.0, 20.0, 81, dtype=np.float32)
+        prof        = np.exp(-(height_axis ** 2) / (2.0 * 3.0 ** 2)).astype(np.float32)[None, :]
+
+        init = PeakInitialiser()
+        _, _, sigs_base    = init.run(prof, height_axis, K=1, prominence_frac=0.05, n_workers=1)
+        _, mus, sigs_small = init.run(prof, height_axis, K=1, prominence_frac=0.05, n_workers=1, sigma_divisor=4.0)
+
+        assert np.allclose(sigs_small, sigs_base / 4.0)
+        assert np.abs(mus[0, 0]) <= 1.0
+
 
 @requires_jax
 class TestBestKSelector:
