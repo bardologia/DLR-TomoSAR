@@ -794,6 +794,22 @@ class TestProcessingConfig:
 
         assert len(b.win_list) == 4
 
+    def test_preprocess_dataset_name_default_composition(self):
+        cfg  = PreProcessEntryConfig()
+        name = cfg.resolve_dataset_name([20, 10], "20260606_120000")
+
+        assert name == "1000a16000a500a4000_w20_10_hv_1_dtmf_20260606_120000"
+
+    def test_preprocess_dataset_name_provided_single_win(self):
+        cfg = PreProcessEntryConfig(dataset_name="traun_test", win_list=[[20, 10]])
+
+        assert cfg.resolve_dataset_name([20, 10], "20260606_120000") == "traun_test"
+
+    def test_preprocess_dataset_name_provided_multiple_wins(self):
+        cfg = PreProcessEntryConfig(dataset_name="traun_test")
+
+        assert cfg.resolve_dataset_name([20, 10], "20260606_120000") == "traun_test_w20_10"
+
 
 class TestTrainingConfig:
     def test_geometry_defaults(self):

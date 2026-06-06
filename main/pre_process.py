@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import _bootstrap
 
+from datetime import datetime
+
 from configuration.processing_config import (
     CropRegion,
     PathConfiguration,
@@ -20,6 +22,7 @@ def main() -> None:
 
     global_crop            = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
     max_crop_azimuth_width = (global_crop.azimuth_end - global_crop.azimuth_start) // 16
+    run_identifier         = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     logger.section("Pre-processing queue")
     logger.kv_table({
@@ -30,8 +33,7 @@ def main() -> None:
 
     for index, win in enumerate(config.win_list):
         filter_arguments = {"win": list(win)}
-        win_str          = "_".join(str(w) for w in win)
-        dataset_name     = f"base_dataset_w{win_str}"
+        dataset_name     = config.resolve_dataset_name(win, run_identifier)
 
         logger.section(f"[Run {index + 1}/{len(config.win_list)}] {dataset_name}")
         logger.kv_table({"Filter arguments": str(filter_arguments)})

@@ -135,8 +135,19 @@ class PreProcessEntryConfig:
         [30, 20],
     ])
 
-    dataset_type             : str   = "FSAR"
-    full_stack_identifier    : str   = "1"
-    reduced_stack_identifier : str   = "dtmf"
-    tomogram_output_tag      : str   = "Xtomo_id2X"
-    parameter_output_tag     : str   = "Xparams_id2X"
+    dataset_name             : Optional[str] = None
+    dataset_type             : str           = "FSAR"
+    full_stack_identifier    : str           = "1"
+    reduced_stack_identifier : str           = "dtmf"
+    tomogram_output_tag      : str           = "Xtomo_id2X"
+    parameter_output_tag     : str           = "Xparams_id2X"
+
+    def resolve_dataset_name(self, win: List[int], run_identifier: str) -> str:
+        win_string = "_".join(str(value) for value in win)
+
+        if self.dataset_name:
+            return self.dataset_name if len(self.win_list) == 1 else f"{self.dataset_name}_w{win_string}"
+
+        crop = CropRegion(azimuth_start=self.azimuth_start, azimuth_end=self.azimuth_end, range_start=self.range_start, range_end=self.range_end)
+
+        return f"{crop.as_identifier_string()}_w{win_string}_{self.polarisation}_{self.full_stack_identifier}_{self.reduced_stack_identifier}_{run_identifier}"
