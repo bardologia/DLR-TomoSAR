@@ -21,9 +21,8 @@ def main() -> None:
     config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, run sequentially once per win filter").apply()
     logger = Logger(log_dir="logs", name="pre_process")
 
-    global_crop            = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
-    max_crop_azimuth_width = (global_crop.azimuth_end - global_crop.azimuth_start) // 16
-    run_identifier         = datetime.now().strftime("%Y%m%d_%H%M%S")
+    global_crop    = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
+    run_identifier = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     logger.section("Pre-processing queue")
     logger.kv_table({
@@ -47,7 +46,6 @@ def main() -> None:
             beamforming_method     = config.beamforming_method,
             filter_method          = config.filter_method,
             filter_arguments       = filter_arguments,
-            max_crop_azimuth_width = max_crop_azimuth_width,
         )
 
         processing_config = ProcessingConfiguration(
