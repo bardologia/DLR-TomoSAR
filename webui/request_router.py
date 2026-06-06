@@ -195,7 +195,7 @@ class RequestRouter:
 
         if path == "/api/tensorboard/start":
             interpreter = body.get("interpreter") or self._preferred_interpreter()
-            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "single_train"), {}, interpreter)
+            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train"), {}, interpreter)
 
             if not logdir:
                 self._send_json(handler, {"ok": False, "error": "could not resolve a training log directory"}, 400)

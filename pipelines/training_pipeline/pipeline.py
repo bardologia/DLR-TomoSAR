@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import asdict, replace
 from datetime    import datetime
 from pathlib     import Path
@@ -14,8 +15,10 @@ from configuration.dataset_config         import DatasetConfiguration
 from configuration.training_config        import TrainerConfig
 from pipelines.dataset_pipeline.pipeline  import DatasetPipeline
 from pipelines.shared.io                  import FileIO
+from pipelines.shared.orchestration       import GpuJob, GpuQueue
 from pipelines.training_pipeline.docs     import LossScaleProbeConfig
 from pipelines.training_pipeline.trainer  import Trainer
+from tools.config_cli                     import ConfigCli
 from tools.logger                         import Logger
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
@@ -267,4 +270,65 @@ class SingleTrainRunner:
             reference      = self.config.probe_reference,
             exit_after     = self.config.probe_exit_after,
             enabled_losses = {},
+        )
+
+
+class TrainScheduler:
+
+    SCHEDULER_FIELDS = ("trials_enabled", "warmup_losses", "complete_losses", "gpus", "poll_interval_s")
+
+    def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
+        self.config       = config
+        self.entry_script = Path(entry_script)
+        self.log_dir      = Path(config.logdir) / "batch_train_logs"
+
+        self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
+
+        self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
+
+    def experiments(self) -> list[tuple[str, dict]]:
+        model = self.config.model_name
+
+        experiments = []
+        for warmup_label, warmup_loss in self.config.warmup_losses.items():
+            for complete_label, complete_loss in self.config.complete_losses.items():
+                run_name  = f"{model}_w-{warmup_label}_c-{complete_label}"
+                overrides = {"curriculum.enabled": True}
+                overrides.update({f"curriculum.warmup.{key}":   value for key, value in warmup_loss.items()})
+                overrides.update({f"curriculum.complete.{key}": value for key, value in complete_loss.items()})
+                experiments.append((run_name, overrides))
+
+        return experiments
+
+    def run(self) -> None:
+        experiments = self.experiments()
+
+        self.logger.section("Loss-curriculum trials")
+        self.logger.kv_table({
+            "Model"           : self.config.model_name,
+            "Warmup losses"   : len(self.config.warmup_losses),
+            "Complete losses" : len(self.config.complete_losses),
+            "Trials"          : len(experiments),
+            "GPUs"            : self.config.gpus,
+            "Infer after"     : self.config.infer_after,
+            "CLI overrides"   : self.forward_overrides or "—",
+            "Log dir"         : str(self.log_dir),
+        }, title="Configuration")
+
+        queue   = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s)
+        results = queue.run([self._job(run_name, overrides) for run_name, overrides in experiments])
+
+        self.logger.section("Summary")
+        rows = [{"Trial": r.name, "Status": r.status, "Duration": f"{r.duration_s / 60:.1f} min"} for r in results]
+        self.logger.metrics_table(rows, columns=["Trial", "Status", "Duration"])
+
+        self.logger.close()
+
+    def _job(self, run_name: str, overrides: dict) -> GpuJob:
+        argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name})
+
+        return GpuJob(
+            name     = run_name,
+            command  = [sys.executable, str(self.entry_script), "--trial"] + argv,
+            log_path = self.log_dir / f"{run_name}.log",
         )

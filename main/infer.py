@@ -9,12 +9,12 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.gpu()
 
-    from configuration.inference_config import BatchInferenceConfig
+    from configuration.inference_config import InferenceEntryConfig
     from pipelines.inference_pipeline.pipeline import InferencePipeline
     from tools.config_cli import ConfigCli
     from tools.logger import Logger
 
-    config   = ConfigCli(BatchInferenceConfig(), description="Batch inference over run directories").apply()
+    config   = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories").apply()
     logs_dir = Path(config.logs_dir)
 
     run_dirs = sorted(
@@ -23,11 +23,12 @@ def main() -> None:
         else [logs_dir / name for name in config.run_filter]
     )
 
-    with Logger(log_dir=str(logs_dir), name="batch_inference") as logger:
-        logger.section("Batch inference")
+    with Logger(log_dir=str(logs_dir), name="inference") as logger:
+        logger.section("Inference")
         logger.kv_table({
             "Runs"     : len(run_dirs),
             "Logs dir" : str(logs_dir),
+            "Filter"   : config.run_filter or "all run directories",
         }, title="Configuration")
 
         for run_dir in run_dirs:

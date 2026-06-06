@@ -29,14 +29,14 @@ class PipelineLibrary:
             {
                 "key"    : "training",
                 "name"   : "Training",
-                "script" : "single_train",
+                "script" : "train",
                 "blurb"  : "Supervised loop with AdamW, EMA, warmup, cosine annealing, and curriculum loss.",
                 "stages" : ["Curve reconstruction", "Loss", "Optimiser step", "Eval and checkpoint"],
             },
             {
                 "key"    : "inference",
                 "name"   : "Inference",
-                "script" : "single_infer",
+                "script" : "infer",
                 "blurb"  : "Sliding-window prediction, overlap-add stitching, metrics, and report generation.",
                 "stages" : ["Windowed predict", "Cube stitch", "Metrics", "Report and figures"],
             },

@@ -138,7 +138,7 @@ class TensorboardView {
   async _start() {
     this.startBtn.disabled = true;
     try {
-      const res = await window.apiPost("/api/tensorboard/start", { script_key: "single_train" });
+      const res = await window.apiPost("/api/tensorboard/start", { script_key: "train" });
       if (res && res.error) window.toast(res.error, "error");
       else window.toast("TensorBoard starting", "ok");
     } catch (e) {

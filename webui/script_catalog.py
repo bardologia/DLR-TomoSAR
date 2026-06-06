@@ -17,30 +17,20 @@ class ScriptCatalog:
             "category": "Data",
             "purpose" : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets.",
         },
-        "single_train": {
-            "title"   : "Single Train",
+        "train": {
+            "title"   : "Train",
             "category": "Training",
-            "purpose" : "Train one model configuration end to end with EMA, warmup, and scheduling.",
-        },
-        "batch_train": {
-            "title"   : "Batch Train",
-            "category": "Training",
-            "purpose" : "Train several model configurations in sequence for comparison.",
+            "purpose" : "Train one model end to end, or fan out loss-curriculum trials (warmup x complete combinations) across GPUs.",
         },
         "overfit_test": {
             "title"   : "Overfit Test",
             "category": "Training",
             "purpose" : "Overfit a single batch to verify model capacity and wiring.",
         },
-        "single_infer": {
-            "title"   : "Single Inference",
+        "infer": {
+            "title"   : "Inference",
             "category": "Inference",
-            "purpose" : "Run sliding-window prediction, stitch cubes, and generate the report.",
-        },
-        "batch_inference": {
-            "title"   : "Batch Inference",
-            "category": "Inference",
-            "purpose" : "Evaluate inference across multiple trained runs.",
+            "purpose" : "Run sliding-window prediction, stitch cubes, and generate reports for one or more trained runs.",
         },
         "benchmark": {
             "title"   : "Benchmark",
@@ -62,11 +52,9 @@ class ScriptCatalog:
     ORDER = [
         "pre_process",
         "extract_params",
-        "single_train",
-        "batch_train",
+        "train",
         "overfit_test",
-        "single_infer",
-        "batch_inference",
+        "infer",
         "benchmark",
         "physics_check",
         "tune",

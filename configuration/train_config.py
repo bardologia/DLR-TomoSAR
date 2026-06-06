@@ -25,8 +25,39 @@ def _default_inference() -> InferenceConfig:
     )
 
 
+def _default_warmup_losses() -> dict:
+    return {
+        "pL11" : {"use_param_l1": True, "weight_param_l1": 1.0},
+    }
+
+
+def _default_complete_losses() -> dict:
+    curve_terms = {
+        "mse"   : ("use_mse_curve",          "weight_mse_curve"),
+        "l1"    : ("use_l1_curve",           "weight_l1_curve"),
+        "huber" : ("use_huber_curve",        "weight_huber_curve"),
+        "charb" : ("use_charbonnier_curve",  "weight_charbonnier_curve"),
+        "cos"   : ("use_cosine_curve",       "weight_cosine_curve"),
+        "spec"  : ("use_spectral_coherence", "weight_spectral_coh"),
+        "ssim"  : ("use_ssim_curve",         "weight_ssim_curve"),
+    }
+    weights = [0.01, 0.05, 0.02]
+
+    losses = {}
+    for label, (use_key, weight_key) in curve_terms.items():
+        for weight in weights:
+            losses[f"pL11-{label}{weight:g}"] = {
+                "use_param_l1"    : True,
+                "weight_param_l1" : 1.0,
+                use_key           : True,
+                weight_key        : weight,
+            }
+
+    return losses
+
+
 @dataclass
-class SingleTrainConfig:
+class TrainEntryConfig:
     run_name        : str | None = None
     model_name      : str        = "resunet"
     gpu             : int        = 0
@@ -49,9 +80,8 @@ class SingleTrainConfig:
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
 
-
-@dataclass
-class BatchTrainConfig:
-    gpus            : list[int]         = field(default_factory=lambda: [0, 1, 3])
-    poll_interval_s : float             = 5.0
-    base            : SingleTrainConfig = field(default_factory=SingleTrainConfig)
+    trials_enabled  : bool      = False
+    warmup_losses   : dict      = field(default_factory=_default_warmup_losses)
+    complete_losses : dict      = field(default_factory=_default_complete_losses)
+    gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
+    poll_interval_s : float     = 5.0

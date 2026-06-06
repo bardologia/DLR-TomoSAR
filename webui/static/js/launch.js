@@ -166,7 +166,7 @@ class LaunchView {
       const fsel = document.createElement("select");
       fsel.className = "run-select";
       fsel.id = "launch-follow";
-      [["", "nothing"], ["single_infer", "Single Inference"], ["batch_inference", "Batch Inference"]].forEach(([value, label]) => {
+      [["", "nothing"], ["infer", "Inference"]].forEach(([value, label]) => {
         const opt = document.createElement("option");
         opt.value = value;
         opt.textContent = label;

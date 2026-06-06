@@ -59,26 +59,14 @@ class InferenceConfig:
 
 
 @dataclass
-class SingleInferenceConfig:
-    run_directory : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test/resunet_w-pHub1")
-    gpu           : int  = 0
-
-    inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
-        run_directory = Path("."),
-        save_cubes    = True,
-        cpu_workers   = 16,
-        gif_axes      = ["elevation", "range", "azimuth"],
-    ))
-
-
-@dataclass
-class BatchInferenceConfig:
+class InferenceEntryConfig:
     logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
     run_filter : List[str] = field(default_factory=list)
     gpu        : int       = 0
 
     inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
         run_directory = Path("."),
-        save_cubes    = False,
+        save_cubes    = True,
         cpu_workers   = 16,
+        gif_axes      = ["elevation", "range", "azimuth"],
     ))

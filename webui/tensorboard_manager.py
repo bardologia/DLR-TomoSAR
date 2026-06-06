@@ -18,8 +18,7 @@ from web_logger import WebLogger
 class TensorboardManager:
 
     TRAINING_LOGDIRS = {
-        "single_train" : ("logdir",),
-        "batch_train"  : ("base.logdir",),
+        "train" : ("logdir",),
     }
 
     STARTUP_TIMEOUT_S = 90.0
