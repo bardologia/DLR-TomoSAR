@@ -2,63 +2,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
 
 from configuration.models_config import UNetPlusPlusConfig
-from .blocks import build_activation, build_norm2d, initialize_weights
-
-
-# Double 3x3 convolution block: Conv -> Norm -> Act -> Conv -> Norm -> Act (+ optional dropout)
-class ConvBlock(nn.Module):
-    def __init__(
-        self,
-        input_channels:  int,
-        output_channels: int,
-        dropout:         float = 0.0,
-        activation:      str   = "relu",
-        normalization:   str   = "batch",
-        bias:            bool  = False,
-    ):
-        super().__init__()
-        layers = [
-            nn.Conv2d(
-                in_channels  = input_channels,
-                out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
-                bias         = bias,
-            ),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-            nn.Conv2d(
-                in_channels  = output_channels,
-                out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
-                bias         = bias,
-            ),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-        ]
-        if dropout > 0:
-            layers.append(nn.Dropout2d(dropout))
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.layers(x)
-
-
-# Resizes source tensor to match the spatial dimensions of reference
-def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-    if source.shape[2:] != reference.shape[2:]:
-        return functional.interpolate(
-            input         = source,
-            size          = reference.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
-        )
-    return source
-
+from .blocks import ConvBlock, initialize_weights, match_spatial_size
 
 # UNet++: nested U-Net with dense skip connections (Zhou et al., 2018)
 class UNetPlusPlus(nn.Module):

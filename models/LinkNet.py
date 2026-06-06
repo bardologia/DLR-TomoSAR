@@ -2,23 +2,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
 
 from configuration.models_config import LinkNetConfig
-from .blocks import build_activation, build_norm2d, initialize_weights
-
-
-# Resizes source tensor to match the spatial dimensions of reference
-def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-    if source.shape[2:] != reference.shape[2:]:
-        return functional.interpolate(
-            input         = source,
-            size          = reference.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
-        )
-    return source
-
+from .blocks import build_activation, build_norm2d, initialize_weights, match_spatial_size
 
 # Encoder block with stride-2 conv for downsampling and a residual shortcut path
 class ResidualEncoderBlock(nn.Module):

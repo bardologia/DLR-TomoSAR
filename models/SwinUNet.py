@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.models_config import SwinUNetConfig
-from .blocks import DropPath, build_activation, initialize_weights
+from .blocks import DropPath, build_activation, initialize_weights, match_spatial_size
 
 
 # Multi-head self-attention within local windows, with learned relative position bias
@@ -206,19 +206,6 @@ class SwinTransformerBlock(nn.Module):
         normalized = self.norm_2(x)
         x = x + self.drop_path(self.feed_forward(normalized))
         return x
-
-
-# Resizes source tensor to match the spatial dimensions of reference
-def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-    if source.shape[2:] != reference.shape[2:]:
-        return functional.interpolate(
-            input         = source,
-            size          = reference.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
-        )
-    return source
-
 
 # Reshapes flat token sequence back into a 2D feature map (B, C, H, W)
 def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:

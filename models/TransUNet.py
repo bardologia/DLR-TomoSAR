@@ -5,48 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.models_config import TransUNetConfig
-from .blocks import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
-
-
-# Double 3x3 convolution block: Conv -> Norm -> Act -> Conv -> Norm -> Act (+ optional dropout)
-class ConvBlock(nn.Module):
-    def __init__(
-        self,
-        input_channels:  int,
-        output_channels: int,
-        dropout:         float = 0.0,
-        activation:      str   = "relu",
-        normalization:   str   = "batch",
-        bias:            bool  = False,
-    ):
-        super().__init__()
-        layers = [
-            nn.Conv2d(
-                in_channels  = input_channels,
-                out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
-                bias         = bias,
-            ),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-            nn.Conv2d(
-                in_channels  = output_channels,
-                out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
-                bias         = bias,
-            ),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-        ]
-        if dropout > 0:
-            layers.append(nn.Dropout2d(dropout))
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.layers(x)
-
+from .blocks import ConvBlock, DropPath, build_activation, build_upsample, initialize_weights, match_spatial_size
 
 # Standard multi-head self-attention with scaled dot-product (Vaswani et al., 2017)
 class MultiHeadSelfAttention(nn.Module):
@@ -149,19 +108,6 @@ class PatchEmbedding(nn.Module):
         x = x.flatten(2).transpose(1, 2)
         x = self.norm(x)
         return x, grid_height, grid_width
-
-
-# Resizes source tensor to match the spatial dimensions of reference
-def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
-    if source.shape[2:] != reference.shape[2:]:
-        return functional.interpolate(
-            input         = source,
-            size          = reference.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
-        )
-    return source
-
 
 # Reshapes flat token sequence back into a 2D feature map (B, C, H, W)
 def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:
