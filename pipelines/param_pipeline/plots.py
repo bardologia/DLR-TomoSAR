@@ -77,27 +77,83 @@ class FittingResultPlotter(PlotBase):
     def _reconstruct_pixel(self, params : np.ndarray, height_axis : np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
         return GaussianMixture.evaluate_pixel(params, height_axis, self.n_gaussians)
 
-    def _plot_n_gaussians_map(self, activity_map : np.ndarray, out_path : Path) -> Path:
-        Az, R    = activity_map.shape
-        n_K      = self.n_gaussians
-        levels   = list(range(n_K + 2))
+    @staticmethod
+    def _subsample(values : np.ndarray, n_max : int, seed : int = 0) -> np.ndarray:
+        vals = values[np.isfinite(values)]
+        if vals.size > n_max:
+            rng  = np.random.default_rng(seed)
+            vals = rng.choice(vals, size=n_max, replace=False)
+        return vals
+
+    @staticmethod
+    def _paired_subsample(arrays : List[np.ndarray], n_max : int, seed : int = 0) -> List[np.ndarray]:
+        flats = [a.reshape(-1) for a in arrays]
+        ok    = np.ones(flats[0].size, dtype=bool)
+
+        for flat in flats:
+            ok &= np.isfinite(flat)
+
+        idx = np.where(ok)[0]
+        if idx.size > n_max:
+            rng = np.random.default_rng(seed)
+            idx = rng.choice(idx, size=n_max, replace=False)
+
+        return [flat[idx] for flat in flats]
+
+    @staticmethod
+    def _binned_median(x : np.ndarray, y : np.ndarray, n_bins : int = 30, min_count : int = 50) -> Tuple[np.ndarray, np.ndarray]:
+        edges   = np.linspace(float(x.min()), float(x.max()), n_bins + 1)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        medians = np.full(n_bins, np.nan)
+        which   = np.digitize(x, edges[1:-1])
+
+        for b in range(n_bins):
+            sel = which == b
+            if int(sel.sum()) >= min_count:
+                medians[b] = float(np.median(y[sel]))
+
+        return centers, medians
+
+    @staticmethod
+    def _violin_with_iqr(ax, data_by_slot : List[np.ndarray], palette : List) -> None:
+        positions = list(range(1, len(data_by_slot) + 1))
+        plot_data = [d if d.size > 0 else np.array([0.0]) for d in data_by_slot]
+        parts     = ax.violinplot(plot_data, positions=positions, showmedians=True, showextrema=False, widths=0.7)
+
+        for body, color in zip(parts["bodies"], palette):
+            body.set_facecolor(color)
+            body.set_alpha(0.60)
+
+        parts["cmedians"].set_color("black")
+        parts["cmedians"].set_linewidth(1.8)
+
+        for i, (slot_data, color) in enumerate(zip(data_by_slot, palette)):
+            if slot_data.size < 4:
+                continue
+            q25, q50, q75 = np.percentile(slot_data, [25, 50, 75])
+            ax.vlines(i + 1, q25, q75, color=color, lw=3.0, zorder=3)
+            ax.scatter(i + 1, q50, color="white", s=22, zorder=5, edgecolors=color, linewidths=1.2)
+
+    def _plot_discrete_k_map(self, k_map : np.ndarray, title : str, cbar_label : str, out_path : Path) -> Path:
+        Az, R    = k_map.shape
+        levels   = list(range(self.n_gaussians + 1))
         palette  = plt.cm.get_cmap("tab10", len(levels))
         cmap     = mcolors.ListedColormap([palette(i) for i in range(len(levels))])
         bounds   = [l - 0.5 for l in levels] + [levels[-1] + 0.5]
         norm     = mcolors.BoundaryNorm(bounds, cmap.N)
 
         fig, ax  = plt.subplots(figsize=(8, 6))
-        im       = ax.imshow(activity_map, cmap=cmap, norm=norm, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
+        im       = ax.imshow(k_map, cmap=cmap, norm=norm, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
         ax.set_xlabel("range [px]")
         ax.set_ylabel("azimuth [px]")
-        ax.set_title(r"Number of active Gaussians per pixel  ($A_k \geq 10^{-3}$)")
+        ax.set_title(title)
 
         cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02, ticks=levels, boundaries=bounds)
-        cb.set_label(r"active Gaussians $K$")
+        cb.set_label(cbar_label)
         cb.ax.set_yticklabels([str(v) for v in levels])
 
-        n_total    = activity_map.size
-        text_lines = [f"$K={k}$: {(activity_map == k).sum() / n_total * 100:.1f}\\%" for k in levels if (activity_map == k).sum() > 0]
+        n_total    = k_map.size
+        text_lines = [f"$K={k}$: {(k_map == k).sum() / n_total * 100:.1f}\\%" for k in levels if (k_map == k).sum() > 0]
         ax.text(0.02, 0.98, "\n".join(text_lines), transform=ax.transAxes, fontsize=8, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
@@ -299,22 +355,7 @@ class FittingResultPlotter(PlotBase):
             palette   = [cm.tab10(i) for i in range(self.n_gaussians)]
             positions = list(range(1, self.n_gaussians + 1))
 
-            plot_data  = [d if d.size > 0 else np.array([0.0]) for d in data_by_slot]
-            parts      = ax.violinplot(plot_data, positions=positions, showmedians=True, showextrema=False, widths=0.7)
-            
-            for body, color in zip(parts["bodies"], palette):
-                body.set_facecolor(color)
-                body.set_alpha(0.60)
-            
-            parts["cmedians"].set_color("black")
-            parts["cmedians"].set_linewidth(1.8)
-
-            for k, (slot_data, color) in enumerate(zip(data_by_slot, palette)):
-                if slot_data.size < 4:
-                    continue
-                q25, q50, q75 = np.percentile(slot_data, [25, 50, 75])
-                ax.vlines(k + 1, q25, q75, color=color, lw=3.0, zorder=3)
-                ax.scatter(k + 1, q50, color="white", s=22, zorder=5, edgecolors=color, linewidths=1.2)
+            self._violin_with_iqr(ax, data_by_slot, palette)
 
             ax.set_xticks(positions)
             ax.set_xticklabels(labels, fontsize=10)
@@ -393,7 +434,234 @@ class FittingResultPlotter(PlotBase):
 
         fig.suptitle("Global fitting quality summary", fontsize=13)
         fig.tight_layout(rect=(0, 0, 1, 0.94))
-        
+
+        return self._save(fig, out_path)
+
+    def _plot_mse_penalty_per_k(self, mse_per_k : np.ndarray, per_k_summary : dict, out_path : Path) -> Path:
+        k_vals  = list(range(1, self.n_gaussians + 1))
+        palette = [cm.tab10((k - 1) % 10) for k in k_vals]
+
+        fig, axes = plt.subplots(1, 3, figsize=(16.5, 4.8))
+
+        ax   = axes[0]
+        data = [np.log10(np.maximum(self._subsample(mse_per_k[k - 1].reshape(-1), 200_000, seed=k), 1e-12)) for k in k_vals]
+        self._violin_with_iqr(ax, data, palette)
+        ax.set_xticks(k_vals)
+        ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+        ax.set_xlabel(r"model order $K$")
+        ax.set_ylabel(r"$\log_{10}\,\mathrm{MSE}$")
+        ax.set_title("Residual MSE distribution per model order")
+        ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+
+        ax        = axes[1]
+        mse_means = [per_k_summary.get(f"k{k}_mse_mean",       float("nan")) for k in k_vals]
+        pty_means = [per_k_summary.get(f"k{k}_penalty_mean",   float("nan")) for k in k_vals]
+        tot_means = [per_k_summary.get(f"k{k}_penalised_mean", float("nan")) for k in k_vals]
+        ax.bar(k_vals, mse_means,                   color="#1f77b4", alpha=0.78, edgecolor="white", lw=0.5, label="mean MSE")
+        ax.bar(k_vals, pty_means, bottom=mse_means, color="#d62728", alpha=0.78, edgecolor="white", lw=0.5, label=r"mean penalty $\lambda_K K \bar{A}$")
+        ax.plot(k_vals, tot_means, color="black", lw=1.3, ls="--", marker="o", ms=4, label="mean penalised score")
+        ax.set_xticks(k_vals)
+        ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+        ax.set_xlabel(r"model order $K$")
+        ax.set_ylabel("score")
+        ax.set_title("Penalised score decomposition per model order")
+        ax.legend(framealpha=0.90)
+        ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+
+        ax    = axes[2]
+        wins  = [per_k_summary.get(f"k{k}_win_fraction", float("nan")) for k in k_vals]
+        bars  = ax.bar(k_vals, wins, color=palette, alpha=0.80, edgecolor="white", lw=0.5)
+        ax.set_xticks(k_vals)
+        ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+        ax.set_xlabel(r"model order $K$")
+        ax.set_ylabel("fraction of active pixels")
+        ax.set_ylim(0, 1.08)
+        ax.set_title("Selected model order distribution")
+        ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+
+        for bar, val in zip(bars, wins):
+            if np.isfinite(val):
+                ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01, f"{val:.3f}", ha="center", va="bottom", fontsize=8)
+
+        fig.suptitle("Model-order selection diagnostics", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.93))
+
+        return self._save(fig, out_path)
+
+    def _plot_k_ambiguity_distribution(self, metrics_dict : dict, per_k_summary : dict, out_path : Path) -> Path:
+        rel    = metrics_dict["k_relative_margin_map"].reshape(-1)
+        best_k = metrics_dict["best_k_map"].reshape(-1)
+        ok     = np.isfinite(rel)
+
+        if int(ok.sum()) == 0:
+            fig, ax = plt.subplots(figsize=(4, 2))
+            ax.set_axis_off()
+            ax.set_title("K-selection ambiguity\n(no data)")
+            return self._save(fig, out_path)
+
+        log_rel   = np.log10(np.maximum(rel[ok], 1e-9))
+        bk_valid  = best_k[ok]
+        threshold = float(per_k_summary.get("ambiguity_threshold", 0.05))
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4.6))
+
+        ax     = axes[0]
+        sample = self._subsample(log_rel, 2_000_000)
+        ax.hist(sample, bins=120, density=True, color="#1f77b4", alpha=0.65, edgecolor="none")
+        ax.axvline(np.log10(threshold),       color="#d62728", lw=1.2, ls="--", label=f"ambiguity threshold ({threshold:.2f})")
+        ax.axvline(float(np.median(log_rel)), color="black",   lw=1.2, ls=":",  label="median")
+        ax.set_xlabel(r"$\log_{10}$ relative selection margin  $(\mathcal{L}_{2\mathrm{nd}} - \mathcal{L}_{K^*}) / \mathcal{L}_{K^*}$")
+        ax.set_ylabel("probability density")
+        ax.set_title("K-selection ambiguity distribution")
+        ax.legend(framealpha=0.90)
+        ax.grid(True, which="major", lw=0.3, alpha=0.40)
+
+        amb_frac = per_k_summary.get("k_ambiguous_fraction", float("nan"))
+        if np.isfinite(amb_frac):
+            ax.text(0.02, 0.98, f"ambiguous fraction: {amb_frac:.3f}", transform=ax.transAxes, fontsize=9, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
+
+        ax      = axes[1]
+        k_vals  = list(range(1, self.n_gaussians + 1))
+        palette = [cm.tab10((k - 1) % 10) for k in k_vals]
+        data    = [self._subsample(log_rel[bk_valid == k], 200_000, seed=k) for k in k_vals]
+        self._violin_with_iqr(ax, data, palette)
+        ax.axhline(np.log10(threshold), color="#d62728", lw=1.0, ls="--")
+        ax.set_xticks(k_vals)
+        ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+        ax.set_xlabel(r"selected model order $K^*$")
+        ax.set_ylabel(r"$\log_{10}$ relative selection margin")
+        ax.set_title("Ambiguity conditioned on selected model order")
+        ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+
+        fig.suptitle("How decisive was the model-order choice", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.92))
+
+        return self._save(fig, out_path)
+
+    def _plot_snr_map(self, snr_db_map : np.ndarray, out_path : Path) -> Path:
+        Az, R    = snr_db_map.shape
+        cmap_obj = self._cmap_with_bad("viridis")
+        vmin     = float(np.nanpercentile(snr_db_map, 1.0))
+        vmax     = float(np.nanpercentile(snr_db_map, 99.0))
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im      = ax.imshow(snr_db_map, cmap=cmap_obj, vmin=vmin, vmax=vmax, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
+        ax.set_xlabel("range [px]")
+        ax.set_ylabel("azimuth [px]")
+        ax.set_title("Per-pixel SNR estimate  (peak over lowest-quartile noise floor)")
+        cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
+        cb.set_label("SNR [dB]")
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
+    def _plot_snr_vs_fit_quality(
+        self,
+        snr_db_map     : np.ndarray,
+        r2_map         : np.ndarray,
+        best_k_map     : Optional[np.ndarray],
+        rel_margin_map : Optional[np.ndarray],
+        snr_summary    : dict,
+        out_path       : Path,
+    ) -> Path:
+        n_panels  = 1 + int(best_k_map is not None) + int(rel_margin_map is not None)
+        fig, axes = plt.subplots(1, n_panels, figsize=(5.8 * n_panels, 4.8), squeeze=False)
+        col       = 0
+
+        ax   = axes[0, col]
+        s, r = self._paired_subsample([snr_db_map, np.maximum(r2_map, -1.0)], 400_000)
+        hb   = ax.hexbin(s, r, gridsize=70, bins="log", cmap="magma", mincnt=1)
+        fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
+
+        centers, medians = self._binned_median(s, r)
+        ax.plot(centers, medians, color="cyan", lw=1.6, label=r"binned median $R^2$")
+        ax.set_xlabel("SNR [dB]")
+        ax.set_ylabel(r"$R^2$")
+        ax.set_title(r"Fit quality vs SNR")
+        ax.legend(loc="lower right", framealpha=0.90)
+
+        pearson  = snr_summary.get("snr_r2_pearson",  float("nan"))
+        spearman = snr_summary.get("snr_r2_spearman", float("nan"))
+        ax.text(0.02, 0.98, f"Pearson $r$ = {pearson:.3f}\nSpearman $\\rho$ = {spearman:.3f}", transform=ax.transAxes, fontsize=9, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
+        col += 1
+
+        if best_k_map is not None:
+            ax      = axes[0, col]
+            k_vals  = list(range(1, self.n_gaussians + 1))
+            palette = [cm.tab10((k - 1) % 10) for k in k_vals]
+            snr_f   = snr_db_map.reshape(-1)
+            bk_f    = best_k_map.reshape(-1)
+            data    = [self._subsample(snr_f[bk_f == k], 200_000, seed=k) for k in k_vals]
+            self._violin_with_iqr(ax, data, palette)
+            ax.set_xticks(k_vals)
+            ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+            ax.set_xlabel(r"selected model order $K^*$")
+            ax.set_ylabel("SNR [dB]")
+            ax.set_title("SNR conditioned on selected model order")
+            ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+            col += 1
+
+        if rel_margin_map is not None:
+            ax       = axes[0, col]
+            s_m, rel = self._paired_subsample([snr_db_map, rel_margin_map], 400_000)
+            log_rel  = np.log10(np.maximum(rel, 1e-9))
+            hb       = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
+            fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
+
+            centers, medians = self._binned_median(s_m, log_rel)
+            ax.plot(centers, medians, color="cyan", lw=1.6, label="binned median margin")
+            ax.set_xlabel("SNR [dB]")
+            ax.set_ylabel(r"$\log_{10}$ relative selection margin")
+            ax.set_title("K-selection ambiguity vs SNR")
+            ax.legend(loc="lower right", framealpha=0.90)
+
+        fig.suptitle("Signal-to-noise ratio and fitting quality", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.93))
+
+        return self._save(fig, out_path)
+
+    def _plot_param_joint_distributions(self, parameters_array : np.ndarray, out_path : Path) -> Path:
+        amp_pool : List[np.ndarray] = []
+        mu_pool  : List[np.ndarray] = []
+        sig_pool : List[np.ndarray] = []
+
+        for k in range(self.n_gaussians):
+            amp_flat = parameters_array[3 * k].reshape(-1)
+            active   = amp_flat >= self.amp_threshold
+            amp_pool.append(amp_flat[active])
+            mu_pool .append(parameters_array[3 * k + 1].reshape(-1)[active])
+            sig_pool.append(parameters_array[3 * k + 2].reshape(-1)[active])
+
+        amps = np.concatenate(amp_pool) if amp_pool else np.empty(0, dtype=np.float32)
+
+        if amps.size == 0:
+            fig, ax = plt.subplots(figsize=(4, 2))
+            ax.set_axis_off()
+            ax.set_title("Joint parameter distributions\n(no active components)")
+            return self._save(fig, out_path)
+
+        mus      = np.concatenate(mu_pool)
+        sigs     = np.concatenate(sig_pool)
+        log_amps = np.log10(np.maximum(amps, 1e-12))
+
+        pairs = [
+            (mus,      sigs,     r"$\mu$ [m]",        r"$\sigma$ [m]"),
+            (mus,      log_amps, r"$\mu$ [m]",        r"$\log_{10} A$"),
+            (sigs,     log_amps, r"$\sigma$ [m]",     r"$\log_{10} A$"),
+        ]
+
+        fig, axes = plt.subplots(1, 3, figsize=(16.5, 4.8))
+
+        for ax, (x, y, x_label, y_label) in zip(axes, pairs):
+            xs, ys = self._paired_subsample([x, y], 400_000)
+            hb     = ax.hexbin(xs, ys, gridsize=70, bins="log", cmap="viridis", mincnt=1)
+            fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("component count")
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
+
+        fig.suptitle("Joint parameter distributions  (active components, all slots pooled)", fontsize=13)
+        fig.tight_layout(rect=(0, 0, 1, 0.93))
+
         return self._save(fig, out_path)
 
     def run(self, parameters_array : np.ndarray, metrics_dict : dict, metadata : dict, tomogram_path : Path) -> Dict[str, Path]:
@@ -410,7 +678,21 @@ class FittingResultPlotter(PlotBase):
         saved: Dict[str, Path] = {}
 
         self.logger.subsection("Plotting active-Gaussian count colormap")
-        saved["n_gaussians_map"] = self._plot_n_gaussians_map(activity_map, dirs["colormaps"] / "n_gaussians_map.png")
+        saved["n_gaussians_map"] = self._plot_discrete_k_map(
+            activity_map,
+            r"Number of active Gaussians per pixel  ($A_k \geq 10^{-3}$)",
+            r"active Gaussians $K$",
+            dirs["colormaps"] / "n_gaussians_map.png",
+        )
+
+        if "best_k_map" in metrics_dict:
+            self.logger.subsection("Plotting selected model-order colormap")
+            saved["best_k_map"] = self._plot_discrete_k_map(
+                metrics_dict["best_k_map"],
+                r"Selected model order $K^*$ per pixel  (penalised-MSE minimiser)",
+                r"selected $K^*$",
+                dirs["colormaps"] / "best_k_map.png",
+            )
 
         self.logger.subsection("Plotting R\u00b2 spatial map")
         saved["r2_spatial_map"] = self._plot_r2_spatial_map(r2_map, dirs["colormaps"] / "r2_map.png")
@@ -469,8 +751,46 @@ class FittingResultPlotter(PlotBase):
         for key, path in self._plot_parameter_distributions(parameters_array, dirs["distributions"]).items():
             saved[key] = path
 
+        self.logger.subsection("Plotting joint parameter distributions")
+        saved["param_joint_distributions"] = self._plot_param_joint_distributions(parameters_array, dirs["distributions"] / "param_joint_distributions.png")
+
         self.logger.subsection("Plotting global metrics summary")
         saved["global_summary"] = self._plot_global_metrics_summary(summary, dirs["metrics"] / "global_summary.png")
+
+        snr_db_map    = metrics_dict.get("snr_db_map")
+        per_k_summary = metrics_dict.get("per_k_summary", {})
+
+        if snr_db_map is not None:
+            self.logger.subsection("Plotting SNR spatial map")
+            saved["snr_map"] = self._plot_snr_map(snr_db_map, dirs["colormaps"] / "snr_map.png")
+
+        if "mse_per_k" in metrics_dict:
+            self.logger.subsection("Plotting per-K MSE and penalty decomposition")
+            saved["mse_penalty_per_k"] = self._plot_mse_penalty_per_k(metrics_dict["mse_per_k"], per_k_summary, dirs["metrics"] / "mse_penalty_per_k.png")
+
+        if "k_relative_margin_map" in metrics_dict:
+            self.logger.subsection("Plotting K-selection ambiguity maps and distribution")
+            margin_keys   = ["k_margin_prev_map", "k_margin_next_map", "k_relative_margin_map"]
+            margin_titles = [r"margin to $K^*-1$", r"margin to $K^*+1$", "relative margin to runner-up"]
+
+            saved["k_ambiguity_maps"] = self._plot_spatial_maps(
+                metrics_dict, margin_keys, margin_titles,
+                r"K-selection margins  $\mathcal{L}_{K} - \mathcal{L}_{K^*}$  (small = ambiguous choice)",
+                "penalised-score margin",
+                dirs["colormaps"] / "k_ambiguity_maps.png",
+                cmap="cividis",
+            )
+            saved["k_ambiguity_distribution"] = self._plot_k_ambiguity_distribution(metrics_dict, per_k_summary, dirs["distributions"] / "k_ambiguity_distribution.png")
+
+        if snr_db_map is not None:
+            self.logger.subsection("Plotting SNR against fit quality and K-selection ambiguity")
+            saved["snr_vs_fit_quality"] = self._plot_snr_vs_fit_quality(
+                snr_db_map, r2_map,
+                metrics_dict.get("best_k_map"),
+                metrics_dict.get("k_relative_margin_map"),
+                metrics_dict.get("snr_summary", {}),
+                dirs["metrics"] / "snr_vs_fit_quality.png",
+            )
 
         self.logger.subsection("Loading tomogram for example fit plots (memory-mapped)")
         tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r")                 # (n_elev, Az, R)

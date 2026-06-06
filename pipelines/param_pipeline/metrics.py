@@ -2,12 +2,128 @@ from __future__ import annotations
 
 import gc
 from pathlib import Path
-from typing  import Dict, Tuple
+from typing  import Dict, Optional, Tuple
 
 import numpy as np
+from scipy.stats import pearsonr, spearmanr
 
 from tools.gaussians import GaussianMixture
-from tools.logger           import Logger
+from tools.logger    import Logger
+
+
+class SnrEstimator:
+    def __init__(self, logger : Logger, noise_fraction : float = 0.25, range_chunk : int = 512) -> None:
+        self.logger         = logger
+        self.noise_fraction = noise_fraction
+        self.range_chunk    = range_chunk
+
+    def run(self, tomogram : np.ndarray) -> np.ndarray:
+        H, Az, R = tomogram.shape
+        n_floor  = max(1, int(round(H * self.noise_fraction)))
+        snr_db   = np.full((Az, R), np.nan, dtype=np.float32)
+
+        for r_start in range(0, R, self.range_chunk):
+            r_end = min(r_start + self.range_chunk, R)
+            amp   = np.abs(tomogram[:, :, r_start:r_end]).astype(np.float32)
+
+            peak  = amp.max(axis=0)
+            floor = np.partition(amp, n_floor - 1, axis=0)[:n_floor].mean(axis=0)
+            valid = (peak > 0.0) & (floor > 0.0)
+
+            ratio                    = np.maximum(peak, 1e-12) / np.maximum(floor, 1e-12)
+            snr_db[:, r_start:r_end] = np.where(valid, 10.0 * np.log10(ratio), np.nan).astype(np.float32)
+
+            del amp
+
+        return snr_db
+
+
+class KSelectionDiagnostics:
+    def __init__(self, k_max : int, logger : Logger, ambiguity_threshold : float = 0.05) -> None:
+        self.k_max               = k_max
+        self.logger              = logger
+        self.ambiguity_threshold = ambiguity_threshold
+
+    def _compute_margin_maps(self, penalised_per_k : np.ndarray, best_k_map : np.ndarray) -> Dict[str, np.ndarray]:
+        k_max  = penalised_per_k.shape[0]
+        active = best_k_map > 0
+        idx    = np.clip(best_k_map.astype(np.int64) - 1, 0, k_max - 1)
+
+        pen_best = np.take_along_axis(penalised_per_k, idx[None, :, :], axis=0)[0]
+        pen_prev = np.take_along_axis(penalised_per_k, np.clip(idx - 1, 0, k_max - 1)[None, :, :], axis=0)[0]
+        pen_next = np.take_along_axis(penalised_per_k, np.clip(idx + 1, 0, k_max - 1)[None, :, :], axis=0)[0]
+
+        has_prev = active & (best_k_map > 1)
+        has_next = active & (best_k_map < k_max)
+
+        margin_prev = np.where(has_prev, pen_prev - pen_best, np.nan).astype(np.float32)
+        margin_next = np.where(has_next, pen_next - pen_best, np.nan).astype(np.float32)
+
+        masked = penalised_per_k.copy()
+        np.put_along_axis(masked, idx[None, :, :], np.inf, axis=0)
+
+        second        = masked.min(axis=0)
+        second_valid  = active & np.isfinite(second)
+        margin_second = np.where(second_valid, second - pen_best,                                np.nan).astype(np.float32)
+        rel_margin    = np.where(second_valid, margin_second / np.maximum(np.abs(pen_best), 1e-12), np.nan).astype(np.float32)
+
+        del masked
+
+        return {
+            "k_margin_prev_map"     : margin_prev,
+            "k_margin_next_map"     : margin_next,
+            "k_margin_second_map"   : margin_second,
+            "k_relative_margin_map" : rel_margin,
+        }
+
+    def _compute_per_k_summary(self, mse_per_k : np.ndarray, penalised_per_k : np.ndarray, best_k_map : np.ndarray) -> Dict[str, float]:
+        active   = best_k_map > 0
+        n_active = int(active.sum())
+        summary  : Dict[str, float] = {"n_active_pixels": float(n_active)}
+
+        for k in range(1, self.k_max + 1):
+            mse_k     = mse_per_k      [k - 1][active].astype(np.float64)
+            pen_k     = penalised_per_k[k - 1][active].astype(np.float64)
+            penalty_k = pen_k - mse_k
+
+            mse_v = mse_k    [np.isfinite(mse_k)]
+            pen_v = pen_k    [np.isfinite(pen_k)]
+            pty_v = penalty_k[np.isfinite(penalty_k)]
+            wins  = int((best_k_map == k).sum())
+
+            summary[f"k{k}_mse_mean"]       = float(mse_v.mean())             if mse_v.size > 0 else float("nan")
+            summary[f"k{k}_mse_median"]     = float(np.median(mse_v))         if mse_v.size > 0 else float("nan")
+            summary[f"k{k}_mse_p25"]        = float(np.percentile(mse_v, 25)) if mse_v.size > 0 else float("nan")
+            summary[f"k{k}_mse_p75"]        = float(np.percentile(mse_v, 75)) if mse_v.size > 0 else float("nan")
+            summary[f"k{k}_penalised_mean"] = float(pen_v.mean())             if pen_v.size > 0 else float("nan")
+            summary[f"k{k}_penalty_mean"]   = float(pty_v.mean())             if pty_v.size > 0 else float("nan")
+            summary[f"k{k}_win_fraction"]   = float(wins) / n_active          if n_active > 0   else float("nan")
+
+        return summary
+
+    def run(self, diagnostics : dict) -> Tuple[Dict[str, np.ndarray], Dict[str, float]]:
+        mse_per_k       = diagnostics["mse_per_k"].astype(np.float32, copy=False)
+        penalised_per_k = diagnostics["penalised_per_k"].astype(np.float32, copy=False)
+        best_k_map      = diagnostics["best_k_map"]
+
+        margin_maps = self._compute_margin_maps(penalised_per_k, best_k_map)
+        summary     = self._compute_per_k_summary(mse_per_k, penalised_per_k, best_k_map)
+
+        rel   = margin_maps["k_relative_margin_map"].reshape(-1)
+        rel_v = rel[np.isfinite(rel)]
+
+        summary["k_relative_margin_median"] = float(np.median(rel_v))                            if rel_v.size > 0 else float("nan")
+        summary["k_ambiguous_fraction"]     = float((rel_v < self.ambiguity_threshold).mean())   if rel_v.size > 0 else float("nan")
+        summary["ambiguity_threshold"]      = float(self.ambiguity_threshold)
+
+        maps = {
+            "mse_per_k"       : mse_per_k,
+            "penalised_per_k" : penalised_per_k,
+            "best_k_map"      : best_k_map,
+            **margin_maps,
+        }
+
+        return maps, summary
 
 
 class FittingMetricsCalculator:
@@ -16,9 +132,12 @@ class FittingMetricsCalculator:
         self.logger        = logger
         self.amp_threshold = amp_threshold
 
+        self.snr_estimator = SnrEstimator(logger=logger)
+        self.k_diagnostics = KSelectionDiagnostics(k_max=n_gaussians, logger=logger)
+
     @staticmethod
     def _load_tomogram(tomogram_path: Path) -> np.ndarray:
-        return np.load(str(tomogram_path)).astype(np.float32, copy=False)        
+        return np.load(str(tomogram_path)).astype(np.float32, copy=False)
 
     @staticmethod
     def _build_height_axis(height_range: Tuple[float, float], n_elev: int) -> np.ndarray:
@@ -47,10 +166,10 @@ class FittingMetricsCalculator:
         return (1.0 - ss_res / ss_tot).astype(np.float32)
 
     def _compute_activity_map(self, parameters_array: np.ndarray) -> np.ndarray:
-        active = np.zeros(parameters_array.shape[1:], dtype=np.int32)              
+        active = np.zeros(parameters_array.shape[1:], dtype=np.int32)
         for k in range(self.n_gaussians):
             active += (parameters_array[3 * k] >= self.amp_threshold).astype(np.int32)
-        
+
         return active
 
     def _compute_per_gaussian_maps(self, parameters_array: np.ndarray) -> Dict[str, np.ndarray]:
@@ -61,14 +180,14 @@ class FittingMetricsCalculator:
             maps[f"amp_{k}"]   = np.where(active, amp_k,                                           np.nan).astype(np.float32)
             maps[f"mu_{k}"]    = np.where(active, parameters_array[3 * k + 1].astype(np.float32),  np.nan).astype(np.float32)
             maps[f"sigma_{k}"] = np.where(active, parameters_array[3 * k + 2].astype(np.float32),  np.nan).astype(np.float32)
-       
+
         return maps
 
     def _compute_mu_separation_maps(self, parameters_array: np.ndarray) -> Dict[str, np.ndarray]:
         maps: Dict[str, np.ndarray] = {}
         if self.n_gaussians < 2:
             return maps
-        
+
         for k in range(self.n_gaussians - 1):
             a_k   = parameters_array[3 * k            ]
             a_kp1 = parameters_array[3 * (k + 1)      ]
@@ -76,7 +195,7 @@ class FittingMetricsCalculator:
             m_kp1 = parameters_array[3 * (k + 1)   + 1]
             both  = (a_k >= self.amp_threshold) & (a_kp1 >= self.amp_threshold)
             maps[f"mu_sep_{k}_{k + 1}"] = np.where(both, np.abs(m_kp1.astype(np.float32) - m_k.astype(np.float32)), np.nan).astype(np.float32)
-        
+
         return maps
 
     def _compute_global_summary(self, r2_map : np.ndarray, activity_map : np.ndarray) -> Dict[str, float]:
@@ -108,19 +227,56 @@ class FittingMetricsCalculator:
 
         return summary
 
-    def run(self, parameters_array : np.ndarray, metadata : dict, tomogram_path : Path) -> dict:
+    def _compute_snr_summary(self, snr_db_map : np.ndarray, r2_map : np.ndarray, best_k_map : Optional[np.ndarray], max_samples : int = 1_000_000) -> Dict[str, float]:
+        snr = snr_db_map.reshape(-1).astype(np.float64)
+        r2  = r2_map.reshape(-1).astype(np.float64)
+        ok  = np.isfinite(snr) & np.isfinite(r2)
+        idx = np.where(ok)[0]
+
+        if idx.size > max_samples:
+            rng = np.random.default_rng(0)
+            idx = rng.choice(idx, size=max_samples, replace=False)
+
+        s = snr[idx]
+        r = r2 [idx]
+
+        summary: Dict[str, float] = {
+            "snr_db_mean"   : float(s.mean())             if s.size > 0 else float("nan"),
+            "snr_db_median" : float(np.median(s))         if s.size > 0 else float("nan"),
+            "snr_db_p10"    : float(np.percentile(s, 10)) if s.size > 0 else float("nan"),
+            "snr_db_p90"    : float(np.percentile(s, 90)) if s.size > 0 else float("nan"),
+        }
+
+        if s.size > 2 and s.std() > 0.0 and r.std() > 0.0:
+            summary["snr_r2_pearson"]  = float(pearsonr (s, r)[0])
+            summary["snr_r2_spearman"] = float(spearmanr(s, r)[0])
+        else:
+            summary["snr_r2_pearson"]  = float("nan")
+            summary["snr_r2_spearman"] = float("nan")
+
+        if best_k_map is not None:
+            snr_full = snr_db_map.astype(np.float64)
+            for k in range(1, self.n_gaussians + 1):
+                vals = snr_full[(best_k_map == k) & np.isfinite(snr_db_map)]
+                summary[f"snr_db_median_k{k}"] = float(np.median(vals)) if vals.size > 0 else float("nan")
+
+        return summary
+
+    def run(self, parameters_array : np.ndarray, metadata : dict, tomogram_path : Path, diagnostics : Optional[dict] = None) -> dict:
         self.logger.section("[Fitting Metrics Calculation]")
 
-
         self.logger.subsection(f"Loading tomogram : {Path(tomogram_path).name}")
-        tomogram     = self._load_tomogram(Path(tomogram_path))                     
+        tomogram     = self._load_tomogram(Path(tomogram_path))
         height_range = tuple(metadata["height_range"])
-        height_axis  = self._build_height_axis(height_range, tomogram.shape[0])    
+        height_axis  = self._build_height_axis(height_range, tomogram.shape[0])
 
         self.logger.subsection(f"Tomogram shape  : {tomogram.shape}")
         self.logger.subsection(f"Height range    : [{height_range[0]:.1f}, {height_range[1]:.1f}] m")
-        self.logger.subsection("Computing per-pixel R\u00b2 map (single-pass, float32)")
+        self.logger.subsection("Computing per-pixel R² map (single-pass, float32)")
         r2_map = self._compute_r2_map(tomogram, parameters_array, height_axis)
+
+        self.logger.subsection("Computing per-pixel SNR map (peak vs lowest-quartile noise floor)")
+        snr_db_map = self.snr_estimator.run(tomogram)
 
         del tomogram
         gc.collect()
@@ -131,13 +287,31 @@ class FittingMetricsCalculator:
         sep_maps     = self._compute_mu_separation_maps(parameters_array)
         summary      = self._compute_global_summary(r2_map, activity_map)
 
-        self.logger.subsection(f"R\u00b2 \u2014 mean={summary['r2_mean']:.4f} median={summary['r2_median']:.4f} neg_frac={summary['r2_neg_frac']:.4f}")
+        k_maps    : Dict[str, np.ndarray] = {}
+        k_summary : Dict[str, float]      = {}
+
+        if diagnostics is not None and "best_k_map" in diagnostics:
+            self.logger.subsection("Computing model-order selection diagnostics")
+            k_maps, k_summary = self.k_diagnostics.run(diagnostics)
+
+        self.logger.subsection("Computing SNR statistics and SNR-to-fit-quality relation")
+        snr_summary = self._compute_snr_summary(snr_db_map, r2_map, k_maps.get("best_k_map"))
+
+        self.logger.subsection(f"R² — mean={summary['r2_mean']:.4f} median={summary['r2_median']:.4f} neg_frac={summary['r2_neg_frac']:.4f}")
+        self.logger.subsection(f"SNR — median={snr_summary['snr_db_median']:.2f} dB, Spearman(SNR, R²)={snr_summary['snr_r2_spearman']:.3f}")
+
+        if k_summary:
+            self.logger.subsection(f"K selection — median relative margin={k_summary['k_relative_margin_median']:.4f}, ambiguous fraction={k_summary['k_ambiguous_fraction']:.4f}")
 
         return {
             "r2_map"         : r2_map,
             "activity_map"   : activity_map,
+            "snr_db_map"     : snr_db_map,
             "height_axis"    : height_axis,
             "global_summary" : summary,
+            "snr_summary"    : snr_summary,
+            "per_k_summary"  : k_summary,
+            **k_maps,
             **gauss_maps,
             **sep_maps,
         }

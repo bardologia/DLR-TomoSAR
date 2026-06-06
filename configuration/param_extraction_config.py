@@ -92,6 +92,10 @@ class ExtractionConfig:
     def parameters_npy_path(self) -> Path:
         return self.output_directory / f"parameters_{self.output_suffix_value}.npy"
 
+    @property
+    def diagnostics_npz_path(self) -> Path:
+        return self.output_directory / f"fit_diagnostics_{self.output_suffix_value}.npz"
+
     def discover_tomogram_path(self) -> Path:
         data_dir = self.data_directory
 

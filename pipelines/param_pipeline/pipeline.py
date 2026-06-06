@@ -20,7 +20,7 @@ class ExtractionMetadataManager:
         self.config = config
         self.logger = logger
 
-    def save_run_metadata(self, npy_path: Path, tomogram_path: Path, height_range: tuple) -> Path:
+    def save_run_metadata(self, npy_path: Path, diagnostics_path: Path, tomogram_path: Path, height_range: tuple) -> Path:
         meta_path = self.config.output_directory / "param_extraction_meta.json"
         ext       = self.config.fit_settings
 
@@ -33,7 +33,9 @@ class ExtractionMetadataManager:
             "output_prefix"       : self.config.output_prefix,
             "output_suffix"       : self.config.output_suffix_value,
             "parameters_npy"      : npy_path.name,
+            "diagnostics_npz"     : diagnostics_path.name,
             "number_of_gaussians" : ext.fit_config.k_max,
+            "lambda_k"            : ext.fit_config.lambda_k,
         }
 
         FileIO.save_json(payload, meta_path)
@@ -57,6 +59,19 @@ class ParameterIO:
     def load_params(self, npy_path : Path) -> np.ndarray:
         self.logger.subsection("Loading saved parameters for metrics and plots")
         return np.load(str(npy_path)).astype(np.float32, copy=False)
+
+    def save_diagnostics(self, diagnostics : dict, npz_path : Path) -> Path:
+        npz_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self.logger.subsection(f"Saving fit diagnostics ({', '.join(diagnostics.keys())}) to disk")
+        np.savez(str(npz_path), **diagnostics)
+
+        return npz_path
+
+    def load_diagnostics(self, npz_path : Path) -> dict:
+        self.logger.subsection("Loading fit diagnostics for metrics and plots")
+        with np.load(str(npz_path)) as data:
+            return {key: data[key] for key in data.files}
 
     def load_metadata(self, meta_path : Path) -> dict:
         with open(meta_path, "r", encoding="utf-8") as f:
@@ -131,14 +146,14 @@ class ParameterExtractor:
 
         return out_reshaped.reshape(n_params, Az, R)
 
-    def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> np.ndarray:
+    def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> Tuple[np.ndarray, dict]:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
 
-        parameters_array = self._gpu_extractor.run(tomogram_path, height_range)
-        parameters_array = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max)
+        parameters_array, diagnostics = self._gpu_extractor.run(tomogram_path, height_range)
+        parameters_array              = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max)
 
         self.logger.subsection("[Extraction Complete]")
-        return parameters_array
+        return parameters_array, diagnostics
 
 
 class ParamExtractionPipeline:
@@ -187,15 +202,28 @@ class ParamExtractionPipeline:
         self.logger.subsection(f"N gaussians       : {config.fit_settings.number_of_gaussians}")
         self.logger.subsection(f"Fit method        : {config.fit_settings.fitting_method}")
 
-    def _stage_extract(self) -> np.ndarray:
+    def _stage_extract(self) -> Tuple[np.ndarray, dict]:
         self.logger.subsection("Extracting multi-Gaussian parameters")
         return self.parameter_extractor.run(tomogram_path = self.tomogram_path, height_range = self.height_range)
 
     def _stage_save(self, parameters_array: np.ndarray) -> Path:
         return self.parameter_io.save_params(parameters_array, self.config.parameters_npy_path)
 
-    def _stage_metrics(self, parameters_array: np.ndarray, metadata: dict) -> dict:
-        return self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path)
+    def _stage_metrics(self, parameters_array: np.ndarray, metadata: dict, diagnostics: dict) -> dict:
+        return self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path, diagnostics)
+
+    def _stage_summary(self, metrics_dict: dict) -> Path:
+        payload = {
+            "global_summary" : metrics_dict.get("global_summary", {}),
+            "per_k_summary"  : metrics_dict.get("per_k_summary",  {}),
+            "snr_summary"    : metrics_dict.get("snr_summary",    {}),
+        }
+
+        summary_path = self.output_directory / "fit_metrics_summary.json"
+        FileIO.save_json(payload, summary_path)
+
+        self.logger.subsection(f"-> Metrics summary written: {summary_path}")
+        return summary_path
 
     def _stage_plots(self, parameters_array: np.ndarray, metadata: dict, metrics_dict: dict) -> dict[str, Path]:
         return self.result_plotter.run(parameters_array, metrics_dict, metadata, self.tomogram_path)
@@ -203,26 +231,31 @@ class ParamExtractionPipeline:
     def run(self) -> dict[str, Path]:
         self.logger.section("[Param Extraction Pipeline Execution]")
 
-        parameters_array = self._stage_extract()
-        npy_path         = self._stage_save(parameters_array)
-        del parameters_array
+        parameters_array, diagnostics = self._stage_extract()
+        npy_path                      = self._stage_save(parameters_array)
+        diag_path                     = self.parameter_io.save_diagnostics(diagnostics, self.config.diagnostics_npz_path)
+        del parameters_array, diagnostics
         gc.collect()
 
-        meta_path = self.metadata_manager.save_run_metadata(npy_path, self.tomogram_path, self.height_range)
+        meta_path = self.metadata_manager.save_run_metadata(npy_path, diag_path, self.tomogram_path, self.height_range)
 
         parameters_array = self.parameter_io.load_params(npy_path)
         metadata         = self.parameter_io.load_metadata(meta_path)
+        diagnostics      = self.parameter_io.load_diagnostics(diag_path)
 
-        metrics_dict = self._stage_metrics(parameters_array, metadata)
+        metrics_dict = self._stage_metrics(parameters_array, metadata, diagnostics)
+        summary_path = self._stage_summary(metrics_dict)
         plot_paths   = self._stage_plots(parameters_array, metadata, metrics_dict)
-        del parameters_array
+        del parameters_array, diagnostics
         gc.collect()
 
         self.logger.section("[Param Extraction Completed]")
 
         return {
             "parameters_npy"   : npy_path,
+            "diagnostics_npz"  : diag_path,
             "metadata"         : meta_path,
+            "metrics_summary"  : summary_path,
             "output_directory" : self.output_directory,
             "source_tomogram"  : self.tomogram_path,
             "plots"            : plot_paths,

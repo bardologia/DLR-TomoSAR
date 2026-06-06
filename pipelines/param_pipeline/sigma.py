@@ -267,7 +267,7 @@ class BestKSelector:
         scale_all     : np.ndarray,
         height_axis   : np.ndarray,
         n_params_out  : int,
-    ) -> np.ndarray:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         N_act = prof_norm_all.shape[0]
 
@@ -306,7 +306,7 @@ class BestKSelector:
         self.logger.subsection(f"Best-K dist     : {k_dist}")
         self.logger.subsection(f"Mean MSE (best) : {float(mse_all[np.arange(N_act), best_K_idx].mean()):.5f}")
 
-        return best_params
+        return best_params, mse_all.astype(np.float32), penalised_all.astype(np.float32), best_K_idx.astype(np.int16)
 
 
 class SigmaFittingExtractor:
@@ -521,14 +521,17 @@ class SigmaFittingExtractor:
         sigma_lower_j : jnp.ndarray,
         sigma_upper_j : jnp.ndarray,
         n_params_out  : int,
-    ) -> np.ndarray:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         N          = profiles_flat.shape[0]
-        output     = np.zeros((N, n_params_out), dtype=np.float32)
+        output     = np.zeros((N, n_params_out),    dtype=np.float32)
+        mse_out    = np.full ((N, self.k_max), np.nan, dtype=np.float32)
+        pen_out    = np.full ((N, self.k_max), np.nan, dtype=np.float32)
+        best_k_out = np.zeros(N,                    dtype=np.int16)
         active_idx = np.where(active)[0]
 
         if len(active_idx) == 0:
-            return output
+            return output, mse_out, pen_out, best_k_out
 
         prof_raw_all  = profiles_flat[active_idx]
         prof_norm_all = profiles_norm[active_idx].astype(np.float32)
@@ -548,10 +551,14 @@ class SigmaFittingExtractor:
 
         gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, N_act)
 
-        best_params = self._best_k_selector.select(gpu_results, prof_norm_all, scale_all, height_axis, n_params_out)
+        best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, prof_norm_all, scale_all, height_axis, n_params_out)
 
-        output[active_idx] = best_params
-        return output
+        output    [active_idx] = best_params
+        mse_out   [active_idx] = mse_act
+        pen_out   [active_idx] = pen_act
+        best_k_out[active_idx] = best_idx_act + 1
+
+        return output, mse_out, pen_out, best_k_out
 
     def _run_fitting(
         self,
@@ -567,6 +574,9 @@ class SigmaFittingExtractor:
         H                : int,
         n_params_out     : int,
         output           : np.ndarray,
+        mse_maps         : np.ndarray,
+        penalised_maps   : np.ndarray,
+        best_k_map       : np.ndarray,
     ) -> int:
 
         self.logger.section("[Range Bin Loading]")
@@ -593,7 +603,7 @@ class SigmaFittingExtractor:
 
                         total_attempted += int(active.sum())
 
-                        fitted = self._fit_batch(
+                        fitted, mse_batch, pen_batch, best_k_batch = self._fit_batch(
                             profiles_flat, profiles_norm,
                             active, safe_scale,
                             height_axis, height_ax_j,
@@ -601,9 +611,12 @@ class SigmaFittingExtractor:
                             n_params_out,
                         )
 
-                        output[:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
+                        output        [:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
+                        mse_maps      [:, :, r_start:r_end] = mse_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+                        penalised_maps[:, :, r_start:r_end] = pen_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+                        best_k_map    [:,    r_start:r_end] = best_k_batch.reshape(r_count, Az).T
 
-                        del profiles_flat, profiles_norm, safe_scale, active, fitted
+                        del profiles_flat, profiles_norm, safe_scale, active, fitted, mse_batch, pen_batch, best_k_batch
                         gc.collect()
 
                         progress.advance(bar_task, advance=r_count)
@@ -622,7 +635,7 @@ class SigmaFittingExtractor:
         self,
         tomogram_path : Path,
         height_range  : Tuple[float, float],
-    ) -> np.ndarray:
+    ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
 
         (
             tomogram_mmap, H, Az, R,
@@ -634,16 +647,27 @@ class SigmaFittingExtractor:
 
         self._warmup_kernel(height_ax_j, H, sigma_lower_j, sigma_upper_j)
 
-        output = np.zeros((n_params_out, Az, R), dtype=np.float32)
+        output         = np.zeros((n_params_out, Az, R),        dtype=np.float32)
+        mse_maps       = np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32)
+        penalised_maps = np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32)
+        best_k_map     = np.zeros((Az, R),                      dtype=np.int16)
 
         total_attempted = self._run_fitting(
             tomogram_mmap, height_axis, height_ax_j,
             sigma_lower_j, sigma_upper_j,
             threshold_factor, truncation_index,
             Az, R, H, n_params_out, output,
+            mse_maps, penalised_maps, best_k_map,
         )
 
         self.logger.section("[Results]")
         self.logger.subsection(f"Active pixels fitted : {total_attempted:,} / {R * Az:,}")
 
-        return output
+        diagnostics = {
+            "mse_per_k"       : mse_maps,
+            "penalised_per_k" : penalised_maps,
+            "best_k_map"      : best_k_map,
+            "lambda_k"        : np.float32(self.lambda_k),
+        }
+
+        return output, diagnostics
