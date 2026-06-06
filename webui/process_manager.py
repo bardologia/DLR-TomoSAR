@@ -100,6 +100,21 @@ class ProcessManager:
             "follow_up"   : None,
         }
 
+    def _runtime_env(self, interpreter: str) -> dict:
+        env = dict(os.environ)
+        env["PYTHONUNBUFFERED"] = "1"
+        env["FORCE_COLOR"]      = "1"
+        env["COLUMNS"]          = "120"
+        env["LINES"]            = "32"
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+        library_dir  = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(interpreter))), "lib")
+        library_path = env.get("LD_LIBRARY_PATH", "")
+        if library_dir not in library_path.split(":"):
+            env["LD_LIBRARY_PATH"] = library_dir + (":" + library_path if library_path else "")
+
+        return env
+
     def _start(self, record: dict, stream: JobStream) -> str | None:
         script = self.paths.main_dir / f"{record['script']}.py"
         argv   = [record["interpreter"], "-u", str(script)]
@@ -108,11 +123,7 @@ class ProcessManager:
         if record.get("detach"):
             argv.append("--detach")
 
-        env = dict(os.environ)
-        env["PYTHONUNBUFFERED"] = "1"
-        env["FORCE_COLOR"]      = "1"
-        env["COLUMNS"]          = "120"
-        env["LINES"]            = "32"
+        env = self._runtime_env(record["interpreter"])
 
         try:
             process = subprocess.Popen(
