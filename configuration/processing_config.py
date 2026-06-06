@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from tools.regions import CropRegion
 
@@ -30,8 +31,12 @@ class TomogramConfiguration:
 
 @dataclass
 class ParallelConfiguration:
+    effort           : str           = "high"
     tomogram_workers : Optional[int] = None
-    pyrat_threads    : int           = 15
+    pyrat_threads    : Optional[int] = None
+
+    EFFORT_FRACTIONS : ClassVar[Dict[str, float]] = {"low": 0.25, "medium": 0.5, "high": 0.8}
+    THREAD_CAP       : ClassVar[int]              = 16
 
     @staticmethod
     def available_cores() -> int:
@@ -40,14 +45,42 @@ class ParallelConfiguration:
         except AttributeError:
             return os.cpu_count() or 1
 
-    def resolve_workers(self, subsection_count: int) -> int:
+    def core_budget(self) -> int:
+        if self.effort not in self.EFFORT_FRACTIONS:
+            raise ValueError(f"Unknown effort '{self.effort}', expected one of {sorted(self.EFFORT_FRACTIONS)}")
+        return max(1, int(self.available_cores() * self.EFFORT_FRACTIONS[self.effort]))
+
+    def interferogram_threads(self) -> int:
+        if self.pyrat_threads is not None:
+            return max(1, self.pyrat_threads)
+        return self.core_budget()
+
+    def resolve_plan(self, subsection_count: int) -> Tuple[int, int]:
+        budget = self.core_budget()
+
+        if self.tomogram_workers is not None and self.pyrat_threads is not None:
+            return max(1, min(subsection_count, self.tomogram_workers)), max(1, self.pyrat_threads)
+
         if self.tomogram_workers is not None:
-            return max(1, min(subsection_count, self.tomogram_workers))
+            workers = max(1, min(subsection_count, self.tomogram_workers))
+            return workers, max(1, min(self.THREAD_CAP, budget // workers))
 
-        cores  = self.available_cores()
-        budget = max(1, cores // max(1, self.pyrat_threads))
+        if self.pyrat_threads is not None:
+            threads = max(1, self.pyrat_threads)
+            return max(1, min(subsection_count, budget // threads)), threads
 
-        return max(1, min(subsection_count, budget))
+        best_plan  = (1, max(1, min(self.THREAD_CAP, budget)))
+        best_score = None
+
+        for workers in range(1, min(subsection_count, budget) + 1):
+            threads = max(1, min(self.THREAD_CAP, budget // workers))
+            waves   = math.ceil(subsection_count / workers)
+            score   = waves / threads
+
+            if best_score is None or score < best_score:
+                best_plan, best_score = (workers, threads), score
+
+        return best_plan
 
 
 @dataclass
@@ -135,8 +168,7 @@ class PreProcessEntryConfig:
         [30, 20],
     ])
 
-    tomogram_workers         : Optional[int] = None
-    pyrat_threads            : int           = 15
+    effort                   : str           = "high"
 
     dataset_name             : Optional[str] = None
     dataset_type             : str           = "FSAR"

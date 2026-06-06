@@ -726,17 +726,39 @@ class TestProcessingConfig:
 
         assert b.filter_arguments == {"win": [20, 10]}
 
-    def test_parallel_resolve_fixed_workers_clamped(self):
-        par = ParallelConfiguration(tomogram_workers=4)
+    def test_parallel_resolve_plan_explicit_overrides(self):
+        par = ParallelConfiguration(tomogram_workers=4, pyrat_threads=3)
 
-        assert par.resolve_workers(10) == 4
-        assert par.resolve_workers(2)  == 2
+        assert par.resolve_plan(10) == (4, 3)
+        assert par.resolve_plan(2)  == (2, 3)
 
-    def test_parallel_resolve_auto_at_least_one(self):
-        par = ParallelConfiguration()
+    def test_parallel_resolve_plan_respects_budget(self):
+        for effort in ("low", "medium", "high"):
+            par              = ParallelConfiguration(effort=effort)
+            workers, threads = par.resolve_plan(17)
 
-        assert par.resolve_workers(100) >= 1
-        assert par.resolve_workers(1)   >= 1
+            assert workers >= 1 and threads >= 1
+            assert workers * threads <= max(par.core_budget(), par.THREAD_CAP)
+
+    def test_parallel_resolve_plan_single_wave_on_high(self, monkeypatch):
+        monkeypatch.setattr(ParallelConfiguration, "available_cores", staticmethod(lambda: 128))
+        par = ParallelConfiguration(effort="high")
+
+        assert par.core_budget()    == 102
+        assert par.resolve_plan(17) == (17, 6)
+
+    def test_parallel_core_budget_scales_with_effort(self):
+        budgets = [ParallelConfiguration(effort=effort).core_budget() for effort in ("low", "medium", "high")]
+
+        assert budgets == sorted(budgets)
+
+    def test_parallel_unknown_effort_rejected(self):
+        with pytest.raises(ValueError):
+            ParallelConfiguration(effort="turbo").core_budget()
+
+    def test_parallel_interferogram_threads_prefers_override(self):
+        assert ParallelConfiguration(pyrat_threads=7).interferogram_threads() == 7
+        assert ParallelConfiguration(effort="low").interferogram_threads()    == ParallelConfiguration(effort="low").core_budget()
 
     def test_parallel_available_cores_positive(self):
         assert ParallelConfiguration.available_cores() >= 1
@@ -794,12 +816,11 @@ class TestProcessingConfig:
 
         assert len(b.win_list) == 4
 
-    def test_preprocess_parallel_defaults_match_parallel_configuration(self):
-        cfg      = PreProcessEntryConfig()
-        parallel = ParallelConfiguration()
+    def test_preprocess_effort_default_matches_parallel_configuration(self):
+        cfg = PreProcessEntryConfig()
 
-        assert cfg.tomogram_workers == parallel.tomogram_workers
-        assert cfg.pyrat_threads    == parallel.pyrat_threads
+        assert cfg.effort == ParallelConfiguration().effort
+        assert cfg.effort in ParallelConfiguration.EFFORT_FRACTIONS
 
     def test_preprocess_dataset_name_default_composition(self):
         cfg  = PreProcessEntryConfig()

@@ -11,7 +11,7 @@ class ScriptCatalog:
             "title"     : "Pre-process",
             "category"  : "Data",
             "purpose"   : "Ingest raw F-SAR products, beamform the tomogram, and form interferograms.",
-            "essentials": ["dataset_name", "tomogram_workers", "pyrat_threads", "azimuth_start", "azimuth_end", "range_start", "range_end", "polarisation", "base_directory"],
+            "essentials": ["dataset_name", "effort", "azimuth_start", "azimuth_end", "range_start", "range_end", "polarisation", "base_directory"],
         },
         "extract_params": {
             "title"     : "Extract Parameters",

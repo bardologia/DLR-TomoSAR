@@ -116,14 +116,15 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Worker auto-sizing",
-                    "tex"   : r"P = \begin{cases} \min(M,\ W_{\mathrm{cfg}}) & W_{\mathrm{cfg}} \neq \texttt{None} \\ \min\!\left(M,\ \lfloor C/T \rfloor\right) & W_{\mathrm{cfg}} = \texttt{None} \end{cases}",
-                    "note"  : "Concurrent PyRat workers are sized so total thread demand P·T never exceeds the available cores, avoiding CPU oversubscription; the result is floored at 1 worker.",
+                    "tex"   : r"(P, T) = \arg\min_{P \cdot T \le B}\ \frac{\lceil M/P \rceil}{T}, \qquad B = \lfloor f_{\mathrm{effort}} \cdot C \rfloor,\ T \le 16",
+                    "note"  : "Workers and PyRat threads are chosen together to minimise estimated makespan (waves of jobs divided by per-job speed-up) under the effort core budget: low uses 25% of cores, medium 50%, high 80%. Explicit tomogram_workers or pyrat_threads overrides pin their value and the other adapts to the remaining budget.",
                     "vars"  : [
-                        {"sym": r"P",                "desc": "process-pool workers actually launched"},
-                        {"sym": r"M",                "desc": "number of subsections (one job each)"},
-                        {"sym": r"W_{\mathrm{cfg}}", "desc": "configured tomogram_workers (None = auto)"},
-                        {"sym": r"C",                "desc": "available physical cores"},
-                        {"sym": r"T",                "desc": "threads per PyRat subprocess, default 15"},
+                        {"sym": r"P",                  "desc": "process-pool workers actually launched"},
+                        {"sym": r"T",                  "desc": "threads per PyRat subprocess, capped at 16"},
+                        {"sym": r"M",                  "desc": "number of subsections (one job each)"},
+                        {"sym": r"B",                  "desc": "core budget from the effort setting"},
+                        {"sym": r"f_{\mathrm{effort}}", "desc": "effort fraction: low 0.25, medium 0.5, high 0.8"},
+                        {"sym": r"C",                  "desc": "available physical cores"},
                     ],
                 },
                 {

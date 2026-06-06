@@ -20,7 +20,7 @@ class InterferogramBuilder:
 
         self.logger.section("[InterferogramBuilder Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
-        self.logger.subsection(f"PyRat Threads : {self.config.parallel.pyrat_threads}")
+        self.logger.subsection(f"PyRat Threads : {self.config.parallel.interferogram_threads()}")
 
         pyrat_root = str(self.config.paths.pyrat_directory)
         if pyrat_root not in sys.path:
@@ -30,7 +30,7 @@ class InterferogramBuilder:
         from pyrat import pyrat_init, tomo
 
         self.logger.subsection("Initializing PyRat for FSAR...")
-        pyrat_init(debug=False, nthreads=self.config.parallel.pyrat_threads)
+        pyrat_init(debug=False, nthreads=self.config.parallel.interferogram_threads())
         tomogram_config = self.config.input_configs
 
         tomography_object = tomo.FuSARtomo(

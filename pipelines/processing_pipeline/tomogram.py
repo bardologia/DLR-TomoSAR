@@ -24,8 +24,8 @@ class TomogramProcessor:
 
         self.logger.section("[TomogramProcessor Initialization]")
         self.logger.subsection(f"Max Azimuth Width : {self.config.input_configs.max_crop_azimuth_width}")
-        self.logger.subsection(f"Parallel Workers  : {self.config.parallel.tomogram_workers if self.config.parallel.tomogram_workers is not None else 'auto'}")
-        self.logger.subsection(f"PyRat Threads     : {self.config.parallel.pyrat_threads}")
+        self.logger.subsection(f"Parallel Effort   : {self.config.parallel.effort}")
+        self.logger.subsection(f"Core Budget       : {self.config.parallel.core_budget()}")
         self.logger.subsection(f"Cores Available   : {self.config.parallel.available_cores()}")
 
     def _create_temp(self) -> Path:
@@ -69,6 +69,8 @@ class TomogramProcessor:
         parallel_config = self.config.parallel
         tasks           = []
 
+        resolved_workers, worker_threads = parallel_config.resolve_plan(len(subsections))
+
         parent_sys_path = list(sys.path)
 
         for subsection_index, subsection_crop in enumerate(subsections):
@@ -89,13 +91,11 @@ class TomogramProcessor:
                 output_directory      = str(temporary_directory),
                 apply_resampling      = tomogram_config.apply_resampling,
                 apply_presumming      = tomogram_config.apply_presumming,
-                pyrat_threads         = parallel_config.pyrat_threads,
+                pyrat_threads         = worker_threads,
                 parent_sys_path       = parent_sys_path,
             ))
 
-        resolved_workers = parallel_config.resolve_workers(len(tasks))
-
-        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({parallel_config.pyrat_threads} threads each, {parallel_config.available_cores()} cores available)")
+        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({worker_threads} threads each, budget {parallel_config.core_budget()} of {parallel_config.available_cores()} cores)")
 
         with ProcessPoolExecutor(max_workers=resolved_workers, mp_context=mp.get_context("spawn")) as executor:
             futures = [executor.submit(run_pyrat, task) for task in tasks]
