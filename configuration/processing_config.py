@@ -135,6 +135,9 @@ class PreProcessEntryConfig:
         [30, 20],
     ])
 
+    tomogram_workers         : Optional[int] = None
+    pyrat_threads            : int           = 15
+
     dataset_name             : Optional[str] = None
     dataset_type             : str           = "FSAR"
     full_stack_identifier    : str           = "1"

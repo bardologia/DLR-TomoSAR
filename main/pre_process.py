@@ -6,6 +6,7 @@ from datetime import datetime
 
 from configuration.processing_config import (
     CropRegion,
+    ParallelConfiguration,
     PathConfiguration,
     PreProcessEntryConfig,
     ProcessingConfiguration,
@@ -54,6 +55,8 @@ def main() -> None:
 
             input_configs  = TomogramConfiguration(**shared_tomo),
             output_configs = TomogramConfiguration(**shared_tomo, height_range=config.height_range),
+
+            parallel = ParallelConfiguration(tomogram_workers=config.tomogram_workers, pyrat_threads=config.pyrat_threads),
 
             paths                    = PathConfiguration(run_subdirectory=dataset_name),
             dataset_type             = config.dataset_type,

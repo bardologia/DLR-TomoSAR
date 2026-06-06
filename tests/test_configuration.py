@@ -794,6 +794,13 @@ class TestProcessingConfig:
 
         assert len(b.win_list) == 4
 
+    def test_preprocess_parallel_defaults_match_parallel_configuration(self):
+        cfg      = PreProcessEntryConfig()
+        parallel = ParallelConfiguration()
+
+        assert cfg.tomogram_workers == parallel.tomogram_workers
+        assert cfg.pyrat_threads    == parallel.pyrat_threads
+
     def test_preprocess_dataset_name_default_composition(self):
         cfg  = PreProcessEntryConfig()
         name = cfg.resolve_dataset_name([20, 10], "20260606_120000")
