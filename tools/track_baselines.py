@@ -29,14 +29,19 @@ class TrackBaselines:
     def n_tracks(self) -> int:
         return len(self.labels)
 
-    def baselines(self, component: str = "vertical") -> tuple:
+    def baselines(self, component: str = "vertical", look_angle_deg: float | None = None) -> tuple:
         if component == "vertical":
             return tuple(self.vertical)
         if component == "horizontal":
             return tuple(self.horizontal)
         if component == "magnitude":
             return tuple(float(np.hypot(v, h)) for v, h in zip(self.vertical, self.horizontal))
-        raise ValueError(f"Unknown baseline component '{component}', expected 'vertical', 'horizontal' or 'magnitude'")
+        if component == "perpendicular":
+            if look_angle_deg is None:
+                raise ValueError("Baseline component 'perpendicular' requires look_angle_deg")
+            theta = float(np.deg2rad(look_angle_deg))
+            return tuple(float(h * np.cos(theta) + v * np.sin(theta)) for v, h in zip(self.vertical, self.horizontal))
+        raise ValueError(f"Unknown baseline component '{component}', expected 'vertical', 'horizontal', 'magnitude' or 'perpendicular'")
 
     def describe(self) -> dict:
         window = "full track" if self.azimuth_window is None else f"[{self.azimuth_window[0]}, {self.azimuth_window[1]})"
@@ -109,17 +114,18 @@ class TrackReader:
 
 class TrackFileResolver:
     TRACK_SUBDIR      = Path("INF") / "INF-TRACK"
-    TRACK_PATTERN     = "track_*.rat"
+    TRACK_PATTERNS    = ("track_sar_resa_*.rat", "track_*.rat")
     TRACK_DIR_PATTERN = re.compile(r"[Tt]\d+\w*")
 
     def resolve(self, pass_directory: str | Path) -> Path:
-        directory  = Path(pass_directory) / self.TRACK_SUBDIR
-        candidates = sorted(directory.glob(self.TRACK_PATTERN))
+        directory = Path(pass_directory) / self.TRACK_SUBDIR
 
-        if not candidates:
-            raise FileNotFoundError(f"No track file matching '{self.TRACK_PATTERN}' under {directory}")
+        for pattern in self.TRACK_PATTERNS:
+            candidates = sorted(directory.glob(pattern))
+            if candidates:
+                return candidates[0]
 
-        return candidates[0]
+        raise FileNotFoundError(f"No track file matching {self.TRACK_PATTERNS} under {directory}")
 
     def label(self, pass_directory: str | Path) -> str:
         path = Path(pass_directory)
@@ -131,19 +137,48 @@ class TrackFileResolver:
         return {self.label(directory): self.resolve(directory) for directory in pass_directories}
 
 
+class BaselineValidator:
+    PRODUCT_PATTERN = re.compile(r"^track_[a-z]+(?:_[a-z]+)*")
+
+    def __init__(self, std_threshold: float = 5.0):
+        self.std_threshold = std_threshold
+
+    def _product(self, filename: str) -> str | None:
+        match = self.PRODUCT_PATTERN.match(filename)
+        return match.group(0) if match is not None else None
+
+    def _check_products(self, table: TrackBaselines) -> None:
+        products = {self._product(Path(f).name) for f in table.track_files}
+        products.discard(None)
+
+        if len(products) > 1:
+            raise ValueError(f"Mixed track file products {sorted(products)}; all tracks must come from the same product, prefer track_sar_resa")
+
+    def _check_stds(self, table: TrackBaselines) -> None:
+        for label, v_std, h_std in zip(table.labels, table.vertical_std, table.horizontal_std):
+            worst = max(float(v_std), float(h_std))
+            if worst > self.std_threshold:
+                raise ValueError(f"Track {label} position std {worst:.1f} m exceeds threshold {self.std_threshold:.1f} m; the track file is likely a different product or coordinate frame")
+
+    def validate(self, table: TrackBaselines) -> None:
+        self._check_products(table)
+        self._check_stds(table)
+
+
 class BaselineExtractor:
     HORIZONTAL_ROW = 2
     VERTICAL_ROW   = 3
 
-    def __init__(self, track_paths: dict, azimuth_window: tuple | None = None, reader: Callable | None = None):
+    def __init__(self, track_paths: dict, azimuth_window: tuple | None = None, reader: Callable | None = None, validator: BaselineValidator | None = None):
         self.track_paths    = {label: Path(path) for label, path in track_paths.items()}
         self.azimuth_window = azimuth_window
         self.reader         = TrackReader(reader)
+        self.validator      = validator if validator is not None else BaselineValidator()
 
     @classmethod
-    def from_pass_directories(cls, pass_directories: list, azimuth_window: tuple | None = None, reader: Callable | None = None) -> "BaselineExtractor":
+    def from_pass_directories(cls, pass_directories: list, azimuth_window: tuple | None = None, reader: Callable | None = None, validator: BaselineValidator | None = None) -> "BaselineExtractor":
         track_paths = TrackFileResolver().resolve_passes(pass_directories)
-        return cls(track_paths, azimuth_window=azimuth_window, reader=reader)
+        return cls(track_paths, azimuth_window=azimuth_window, reader=reader, validator=validator)
 
     def _window_slice(self, n_samples: int) -> slice:
         if self.azimuth_window is None:
@@ -178,7 +213,7 @@ class BaselineExtractor:
         reference_h = h_mean[0]
         reference_v = v_mean[0]
 
-        return TrackBaselines(
+        table = TrackBaselines(
             labels         = labels,
             vertical       = [v - reference_v for v in v_mean],
             horizontal     = [h - reference_h for h in h_mean],
@@ -187,3 +222,7 @@ class BaselineExtractor:
             track_files    = [str(f) for f in files],
             azimuth_window = tuple(self.azimuth_window) if self.azimuth_window is not None else None,
         )
+
+        self.validator.validate(table)
+
+        return table

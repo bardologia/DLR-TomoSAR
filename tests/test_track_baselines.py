@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from configuration.training_config import GeometryConfig
-from tools.track_baselines import BaselineExtractor, TrackBaselines, TrackFileResolver, TrackReader
+from tools.track_baselines import BaselineExtractor, BaselineValidator, TrackBaselines, TrackFileResolver, TrackReader
 
 
 def _track(horizontal, vertical, n_samples=100):
@@ -99,6 +99,20 @@ class TestBaselineComponents:
     def test_magnitude_component(self):
         assert self._table().baselines("magnitude") == pytest.approx((0.0, 5.0))
 
+    def test_perpendicular_at_nadir_is_horizontal(self):
+        assert self._table().baselines("perpendicular", look_angle_deg=0.0) == pytest.approx((0.0, 3.0))
+
+    def test_perpendicular_at_grazing_is_vertical(self):
+        assert self._table().baselines("perpendicular", look_angle_deg=90.0) == pytest.approx((0.0, 4.0))
+
+    def test_perpendicular_mixes_components(self):
+        expected = 3.0 * np.cos(np.deg2rad(45.0)) + 4.0 * np.sin(np.deg2rad(45.0))
+        assert self._table().baselines("perpendicular", look_angle_deg=45.0) == pytest.approx((0.0, expected))
+
+    def test_perpendicular_requires_look_angle(self):
+        with pytest.raises(ValueError):
+            self._table().baselines("perpendicular")
+
     def test_unknown_component_raises(self):
         with pytest.raises(ValueError):
             self._table().baselines("diagonal")
@@ -168,6 +182,19 @@ class TestTrackFileResolver:
 
         assert resolved.name == "track_sar_resa_17sartom0103_Lhh_t01L.rat"
 
+    def test_prefers_resampled_track_over_loc(self, tmp_path):
+        pass_dir = self._make_pass(tmp_path, "PS02", "T01L", "track_loc_17sartom0102_Lhh_t01L.rat")
+        (pass_dir / "INF" / "INF-TRACK" / "track_sar_resa_17sartom0102_Lhh_t01L.rat").touch()
+        resolved = TrackFileResolver().resolve(pass_dir)
+
+        assert resolved.name == "track_sar_resa_17sartom0102_Lhh_t01L.rat"
+
+    def test_falls_back_to_loc_when_alone(self, tmp_path):
+        pass_dir = self._make_pass(tmp_path, "PS02", "T01L", "track_loc_17sartom0102_Lhh_t01L.rat")
+        resolved = TrackFileResolver().resolve(pass_dir)
+
+        assert resolved.name == "track_loc_17sartom0102_Lhh_t01L.rat"
+
     def test_missing_track_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             TrackFileResolver().resolve(tmp_path / "PS03" / "T01L")
@@ -186,6 +213,44 @@ class TestTrackFileResolver:
         assert list(mapped.keys()) == ["PS03", "PS07"]
 
 
+class TestBaselineValidation:
+    def test_mixed_products_raise(self):
+        tracks = {
+            "track_loc_17sartom0102_Lhh_t01L.rat"      : _track(5.0, 10.0),
+            "track_sar_resa_17sartom0104_Lhh_t01L.rat" : _track(8.0, 25.0),
+        }
+        extractor = BaselineExtractor({"PS02": "track_loc_17sartom0102_Lhh_t01L.rat", "PS04": "track_sar_resa_17sartom0104_Lhh_t01L.rat"}, reader=_fake_reader(tracks))
+
+        with pytest.raises(ValueError, match="Mixed track file products"):
+            extractor.extract()
+
+    def test_consistent_products_pass(self):
+        tracks = {
+            "track_sar_resa_17sartom0102_Lhh_t01L.rat" : _track(5.0, 10.0),
+            "track_sar_resa_17sartom0104_Lhh_t01L.rat" : _track(8.0, 25.0),
+        }
+        extractor = BaselineExtractor({"PS02": "track_sar_resa_17sartom0102_Lhh_t01L.rat", "PS04": "track_sar_resa_17sartom0104_Lhh_t01L.rat"}, reader=_fake_reader(tracks))
+        table     = extractor.extract()
+
+        assert table.vertical == pytest.approx([0.0, 15.0])
+
+    def test_large_std_raises(self):
+        wild      = np.concatenate([np.full(50, -300.0), np.full(50, 300.0)])
+        tracks    = {"a.rat": _track(wild, 0.0)}
+        extractor = BaselineExtractor({"m": "a.rat"}, reader=_fake_reader(tracks))
+
+        with pytest.raises(ValueError, match="exceeds threshold"):
+            extractor.extract()
+
+    def test_threshold_override_allows_large_std(self):
+        wild      = np.concatenate([np.full(50, -300.0), np.full(50, 300.0)])
+        tracks    = {"a.rat": _track(wild, 0.0)}
+        extractor = BaselineExtractor({"m": "a.rat"}, reader=_fake_reader(tracks), validator=BaselineValidator(std_threshold=500.0))
+        table     = extractor.extract()
+
+        assert table.horizontal_std[0] == pytest.approx(300.0)
+
+
 class TestGeometryResolution:
     def _write_baselines(self, dataset_dir):
         table = TrackBaselines(labels=["m", "s"], vertical=[0.0, 14.7], horizontal=[0.0, -1.2], vertical_std=[0.0, 0.0], horizontal_std=[0.0, 0.0])
@@ -194,9 +259,25 @@ class TestGeometryResolution:
     def test_auto_uses_dataset_file(self, tmp_path):
         path     = self._write_baselines(tmp_path)
         resolved = GeometryConfig().resolved(tmp_path)
+        theta    = np.deg2rad(GeometryConfig().look_angle_deg)
+        expected = -1.2 * np.cos(theta) + 14.7 * np.sin(theta)
 
-        assert resolved.baselines        == pytest.approx((0.0, 14.7))
+        assert resolved.baselines        == pytest.approx((0.0, expected))
         assert resolved.baselines_origin == str(path)
+
+    def test_vertical_component_selected(self, tmp_path):
+        self._write_baselines(tmp_path)
+        resolved = GeometryConfig(baseline_component="vertical").resolved(tmp_path)
+
+        assert resolved.baselines == pytest.approx((0.0, 14.7))
+
+    def test_look_angle_changes_perpendicular_baseline(self, tmp_path):
+        self._write_baselines(tmp_path)
+        nadir    = GeometryConfig(look_angle_deg=0.0).resolved(tmp_path)
+        grazing  = GeometryConfig(look_angle_deg=90.0).resolved(tmp_path)
+
+        assert nadir.baselines   == pytest.approx((0.0, -1.2))
+        assert grazing.baselines == pytest.approx((0.0, 14.7))
 
     def test_auto_without_file_keeps_manual(self, tmp_path):
         config   = GeometryConfig(baselines=(0.0, 10.0))

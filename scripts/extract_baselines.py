@@ -32,9 +32,10 @@ class ExtractBaselinesEntryConfig:
     azimuth_start    : int  = 1000
     azimuth_end      : int  = 16000
 
-    component        : str  = "vertical"
+    component        : str  = "perpendicular"
     wavelength       : float = 0.23
     slant_range      : float = 5000.0
+    look_angle_deg   : float = 45.0
 
     dataset_dir      : str  = ""
 
@@ -56,7 +57,8 @@ class BaselineExtractionRun:
         geometry_cfg = GeometryConfig(
             wavelength       = self.config.wavelength,
             slant_range      = self.config.slant_range,
-            baselines        = table.baselines(self.config.component),
+            look_angle_deg   = self.config.look_angle_deg,
+            baselines        = table.baselines(self.config.component, look_angle_deg=self.config.look_angle_deg),
             baselines_origin = "extracted",
         )
 
