@@ -179,7 +179,8 @@ class RequestRouter:
             interpreter = body.get("interpreter") or self._preferred_interpreter()
             overrides   = body.get("overrides", {})
             follow_up   = body.get("follow_up") or None
-            result      = self.processes.launch(key, interpreter, overrides, follow_up)
+            detach      = bool(body.get("detach"))
+            result      = self.processes.launch(key, interpreter, overrides, follow_up, detach)
 
             if result.get("ok") and self.tensorboard.logdir_keys(key):
                 threading.Thread(target=self._autostart_tensorboard, args=(key, overrides, interpreter), daemon=True).start()

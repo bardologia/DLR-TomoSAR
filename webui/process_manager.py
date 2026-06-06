@@ -58,12 +58,12 @@ class ProcessManager:
         self.streams = {}
         self.lock    = threading.Lock()
 
-    def launch(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None) -> dict:
+    def launch(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None, detach: bool = False) -> dict:
         script = self.paths.main_dir / f"{key}.py"
         if not script.exists():
             return {"ok": False, "error": "script not found"}
 
-        record = self._make_record(key, interpreter, self._clean_overrides(overrides))
+        record = self._make_record(key, interpreter, self._clean_overrides(overrides), detach)
         stream = JobStream()
 
         with self.lock:
@@ -77,18 +77,21 @@ class ProcessManager:
                 self.streams.pop(record["job_id"], None)
             return {"ok": False, "error": error}
 
-        if follow_up:
+        if follow_up and detach:
+            self.logger.warning(f"follow-up {follow_up} ignored, {key} launched detached")
+        elif follow_up:
             self._schedule(record, follow_up)
 
         return {"ok": True, "job_id": record["job_id"]}
 
-    def _make_record(self, key: str, interpreter: str, overrides: dict) -> dict:
+    def _make_record(self, key: str, interpreter: str, overrides: dict, detach: bool = False) -> dict:
         return {
             "job_id"      : uuid.uuid4().hex[:12],
             "script"      : key,
-            "command"     : self._render_command(interpreter, key, overrides),
+            "command"     : self._render_command(interpreter, key, overrides, detach),
             "interpreter" : interpreter,
             "overrides"   : overrides,
+            "detach"      : detach,
             "status"      : "pending",
             "pid"         : None,
             "started"     : datetime.now().isoformat(timespec="seconds"),
@@ -102,6 +105,8 @@ class ProcessManager:
         argv   = [record["interpreter"], "-u", str(script)]
         for path, value in record["overrides"].items():
             argv += [f"--{path}", value]
+        if record.get("detach"):
+            argv.append("--detach")
 
         env = dict(os.environ)
         env["PYTHONUNBUFFERED"] = "1"
@@ -185,10 +190,12 @@ class ProcessManager:
             cleaned[path] = str(value)
         return cleaned
 
-    def _render_command(self, interpreter: str, key: str, overrides: dict) -> str:
+    def _render_command(self, interpreter: str, key: str, overrides: dict, detach: bool = False) -> str:
         parts = [interpreter, "-u", f"main/{key}.py"]
         for path, value in overrides.items():
             parts += [f"--{path}", shlex.quote(value)]
+        if detach:
+            parts.append("--detach")
         return " ".join(parts)
 
     def _pump(self, job_id: str, process: subprocess.Popen, stream: JobStream) -> None:

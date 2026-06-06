@@ -11,8 +11,8 @@ class EquationLibrary:
             self._dataset(),
             self._training_loss(),
             self._training_optim(),
-            self._inference(),
             self._diagnostics(),
+            self._inference(),
             self._tuning(),
         ]
 
@@ -102,30 +102,6 @@ class EquationLibrary:
             "blurb" : "From F-SAR SLC data to the beamformed tomogram and DEM-deramped interferograms, dispatched across parallel PyRat workers.",
             "items" : [
                 {
-                    "title" : "DEM-phase deramping",
-                    "tex"   : r"\tilde{s}_i = s_i\cdot\exp\!\left(j\,\phi_{\mathrm{DEM},i}\right)",
-                    "note"  : "Removing the DEM-predicted phase decorrelates the interferogram from terrain topography, leaving sub-resolution elevation structure.",
-                    "vars"  : [
-                        {"sym": r"\tilde{s}_i",            "desc": "DEM-deramped secondary SLC of pass i"},
-                        {"sym": r"s_i",                    "desc": "co-registered secondary SLC value"},
-                        {"sym": r"j",                      "desc": "imaginary unit, j² = −1"},
-                        {"sym": r"\phi_{\mathrm{DEM},i}", "desc": "DEM phase of pass i from PyRat (radians)"},
-                    ],
-                },
-                {
-                    "title" : "Amplitude-weighted complex interferogram",
-                    "tex"   : r"\phi_i = A_i\cdot\frac{s_0\,\overline{\tilde{s}_i}}{\left|s_0\,\overline{\tilde{s}_i}\right|}, \qquad A_i = \min\!\left(|s_i|,\,A_{\max}\right)",
-                    "note"  : "Unit-phasor normalisation removes inter-pass amplitude variation while preserving coherence; the clipped secondary amplitude is reintroduced as a signal-to-noise proxy. A 1e-30 stabiliser guards the denominator in code.",
-                    "vars"  : [
-                        {"sym": r"\phi_i",                  "desc": "complex interferogram of pass i"},
-                        {"sym": r"s_0",                     "desc": "master (primary) SLC value"},
-                        {"sym": r"\overline{\tilde{s}_i}", "desc": "complex conjugate of the deramped secondary"},
-                        {"sym": r"A_i",                     "desc": "clipped secondary amplitude weight"},
-                        {"sym": r"|s_i|",                   "desc": "secondary SLC magnitude"},
-                        {"sym": r"A_{\max}",                "desc": "max_amplitude_clip = 1.25"},
-                    ],
-                },
-                {
                     "title" : "Azimuth crop subdivision",
                     "tex"   : r"M = \left\lceil \frac{W_{az}}{W_{\max}} \right\rceil, \qquad s_m = a_{\mathrm{start}} + m\,W_{\max}, \qquad e_m = \min\!\left(s_m + W_{\max},\, a_{\mathrm{end}}\right)",
                     "note"  : "The azimuth crop is divided into M non-overlapping subsections, one isolated PyRat subprocess each.",
@@ -148,6 +124,30 @@ class EquationLibrary:
                         {"sym": r"W_{\mathrm{cfg}}", "desc": "configured tomogram_workers (None = auto)"},
                         {"sym": r"C",                "desc": "available physical cores"},
                         {"sym": r"T",                "desc": "threads per PyRat subprocess, default 15"},
+                    ],
+                },
+                {
+                    "title" : "DEM-phase deramping",
+                    "tex"   : r"\tilde{s}_i = s_i\cdot\exp\!\left(j\,\phi_{\mathrm{DEM},i}\right)",
+                    "note"  : "Removing the DEM-predicted phase decorrelates the interferogram from terrain topography, leaving sub-resolution elevation structure.",
+                    "vars"  : [
+                        {"sym": r"\tilde{s}_i",            "desc": "DEM-deramped secondary SLC of pass i"},
+                        {"sym": r"s_i",                    "desc": "co-registered secondary SLC value"},
+                        {"sym": r"j",                      "desc": "imaginary unit, j² = −1"},
+                        {"sym": r"\phi_{\mathrm{DEM},i}", "desc": "DEM phase of pass i from PyRat (radians)"},
+                    ],
+                },
+                {
+                    "title" : "Amplitude-weighted complex interferogram",
+                    "tex"   : r"\phi_i = A_i\cdot\frac{s_0\,\overline{\tilde{s}_i}}{\left|s_0\,\overline{\tilde{s}_i}\right|}, \qquad A_i = \min\!\left(|s_i|,\,A_{\max}\right)",
+                    "note"  : "Unit-phasor normalisation removes inter-pass amplitude variation while preserving coherence; the clipped secondary amplitude is reintroduced as a signal-to-noise proxy. A 1e-30 stabiliser guards the denominator in code.",
+                    "vars"  : [
+                        {"sym": r"\phi_i",                  "desc": "complex interferogram of pass i"},
+                        {"sym": r"s_0",                     "desc": "master (primary) SLC value"},
+                        {"sym": r"\overline{\tilde{s}_i}", "desc": "complex conjugate of the deramped secondary"},
+                        {"sym": r"A_i",                     "desc": "clipped secondary amplitude weight"},
+                        {"sym": r"|s_i|",                   "desc": "secondary SLC magnitude"},
+                        {"sym": r"A_{\max}",                "desc": "max_amplitude_clip = 1.25"},
                     ],
                 },
                 {
@@ -276,6 +276,16 @@ class EquationLibrary:
                     ],
                 },
                 {
+                    "title" : "GPU amplitude normalisation",
+                    "tex"   : r"a_k^{\mathrm{norm}} = a_k^{\mathrm{raw}} / s",
+                    "note"  : "Peak amplitudes detected on the raw profile are divided by the per-pixel scale so the GPU fit operates entirely on normalised profiles.",
+                    "vars"  : [
+                        {"sym": r"a_k^{\mathrm{norm}}", "desc": "amplitude on the normalised profile scale"},
+                        {"sym": r"a_k^{\mathrm{raw}}",  "desc": "amplitude detected on the raw profile"},
+                        {"sym": r"s",                   "desc": "per-pixel profile maximum"},
+                    ],
+                },
+                {
                     "title" : "Phase 2 — sigma fitting objective",
                     "tex"   : r"\mathcal{L}(\sigma) = \frac{1}{H}\sum_{h=1}^{H}\left(\sum_{k=1}^{K} a_k\,\exp\!\left(-\frac{(x_h-\mu_k)^2}{2\sigma_k^2}\right) - \tilde{\gamma}(x_h)\right)^2",
                     "note"  : "With amplitudes and means frozen from Phase 1, only the widths are optimised: a well-conditioned 1D problem per component, vectorised over pixels with jax.vmap and differentiated with jax.value_and_grad.",
@@ -288,16 +298,6 @@ class EquationLibrary:
                         {"sym": r"\mu_k",                "desc": "fixed mean elevation from Phase 1 (m)"},
                         {"sym": r"x_h",                  "desc": "h-th elevation sample (m)"},
                         {"sym": r"\tilde{\gamma}(x_h)",  "desc": "normalised measured profile"},
-                    ],
-                },
-                {
-                    "title" : "GPU amplitude normalisation",
-                    "tex"   : r"a_k^{\mathrm{norm}} = a_k^{\mathrm{raw}} / s",
-                    "note"  : "Peak amplitudes detected on the raw profile are divided by the per-pixel scale so the GPU fit operates entirely on normalised profiles.",
-                    "vars"  : [
-                        {"sym": r"a_k^{\mathrm{norm}}", "desc": "amplitude on the normalised profile scale"},
-                        {"sym": r"a_k^{\mathrm{raw}}",  "desc": "amplitude detected on the raw profile"},
-                        {"sym": r"s",                   "desc": "per-pixel profile maximum"},
                     ],
                 },
                 {
@@ -620,27 +620,6 @@ class EquationLibrary:
             "blurb" : "The composable multi-term objective, term by term: ten switchable components over curve space and parameter space, plus clamping, matching, and weight calibration.",
             "items" : [
                 {
-                    "title" : "Effective term weight",
-                    "tex"   : r"\mathrm{eff}_j = \alpha_j \cdot \nu_j",
-                    "note"  : "Each enabled term carries a user weight times a fixed empirical normaliser from LossNormalizationConfig (mse 0.2565, l1 0.7994, huber 1.3050, charbonnier 0.7953, cosine 0.1229, coherence 0.1176, ssim 2.4106, param L1 1.0, param huber 5.3999, tv 1.5330).",
-                    "vars"  : [
-                        {"sym": r"\mathrm{eff}_j", "desc": "effective weight of term j"},
-                        {"sym": r"\alpha_j",       "desc": "user weight, the weight_* config value"},
-                        {"sym": r"\nu_j",          "desc": "fixed normalisation factor of term j"},
-                    ],
-                },
-                {
-                    "title" : "Normalised weighted total loss",
-                    "tex"   : r"\mathcal{L}_{\mathrm{total}} = \frac{\sum_j \mathrm{eff}_j\,\ell_j}{\sum_j \mathrm{eff}_j}",
-                    "note"  : "Sum over enabled terms divided by the total effective weight; returned unnormalised when no term is enabled. A curriculum may swap the whole configuration at a fixed epoch.",
-                    "vars"  : [
-                        {"sym": r"\mathcal{L}_{\mathrm{total}}", "desc": "scalar training loss"},
-                        {"sym": r"\ell_j",                       "desc": "raw value of enabled term j"},
-                        {"sym": r"\mathrm{eff}_j",               "desc": "effective weight of term j"},
-                        {"sym": r"j",                            "desc": "index over enabled terms (use_* = True)"},
-                    ],
-                },
-                {
                     "title" : "Physical parameter bounds",
                     "tex"   : r"a \in \left[0,\ a_{\max}\right], \qquad \mu \in \left[x_{\min},\ x_{\max}\right], \qquad \sigma \in \left[\tfrac{\Delta x}{2},\ \tfrac{x_{\max} - x_{\min}}{2}\right]",
                     "note"  : "Denormalised predictions are clamped to these bounds before curve reconstruction, using a straight-through leaky clamp (slope 0.01) so gradients survive saturation, then renormalised (gaussian_utils.py).",
@@ -827,6 +806,27 @@ class EquationLibrary:
                     ],
                 },
                 {
+                    "title" : "Effective term weight",
+                    "tex"   : r"\mathrm{eff}_j = \alpha_j \cdot \nu_j",
+                    "note"  : "Each enabled term carries a user weight times a fixed empirical normaliser from LossNormalizationConfig (mse 0.2565, l1 0.7994, huber 1.3050, charbonnier 0.7953, cosine 0.1229, coherence 0.1176, ssim 2.4106, param L1 1.0, param huber 5.3999, tv 1.5330).",
+                    "vars"  : [
+                        {"sym": r"\mathrm{eff}_j", "desc": "effective weight of term j"},
+                        {"sym": r"\alpha_j",       "desc": "user weight, the weight_* config value"},
+                        {"sym": r"\nu_j",          "desc": "fixed normalisation factor of term j"},
+                    ],
+                },
+                {
+                    "title" : "Normalised weighted total loss",
+                    "tex"   : r"\mathcal{L}_{\mathrm{total}} = \frac{\sum_j \mathrm{eff}_j\,\ell_j}{\sum_j \mathrm{eff}_j}",
+                    "note"  : "Sum over enabled terms divided by the total effective weight; returned unnormalised when no term is enabled. A curriculum may swap the whole configuration at a fixed epoch.",
+                    "vars"  : [
+                        {"sym": r"\mathcal{L}_{\mathrm{total}}", "desc": "scalar training loss"},
+                        {"sym": r"\ell_j",                       "desc": "raw value of enabled term j"},
+                        {"sym": r"\mathrm{eff}_j",               "desc": "effective weight of term j"},
+                        {"sym": r"j",                            "desc": "index over enabled terms (use_* = True)"},
+                    ],
+                },
+                {
                     "title" : "Loss scale probe — outlier filter",
                     "tex"   : r"\mathrm{keep}\ v \iff Q_1 - 3\,\mathrm{IQR} \leq v \leq Q_3 + 3\,\mathrm{IQR}, \qquad \mathrm{IQR} = Q_3 - Q_1",
                     "note"  : "The probe runs every term with weight 1 over a few batches; per-term raw values pass an IQR filter before averaging (loss_scale_probe.py).",
@@ -863,31 +863,6 @@ class EquationLibrary:
                         {"sym": r"\eta_{\mathrm{enc}}, \eta_{\mathrm{bot}}, \eta_{\mathrm{dec}}", "desc": "encoder, bottleneck, decoder learning rates"},
                         {"sym": r"\eta_{\mathrm{head}}", "desc": "output-head learning rate"},
                         {"sym": r"\lambda_{\bullet}",    "desc": "weight decay, same default for every group"},
-                    ],
-                },
-                {
-                    "title" : "AdamW moment estimates",
-                    "tex"   : r"m_t = \beta_1 m_{t-1} + (1-\beta_1)\,g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2)\,g_t^2",
-                    "note"  : "Exponential moving averages of the gradient and its square, per parameter.",
-                    "vars"  : [
-                        {"sym": r"m_t",              "desc": "first moment estimate at step t"},
-                        {"sym": r"v_t",              "desc": "second moment estimate at step t"},
-                        {"sym": r"g_t",              "desc": "gradient at step t"},
-                        {"sym": r"t",                "desc": "optimiser step"},
-                        {"sym": r"\beta_1, \beta_2", "desc": "moment decay coefficients (optimizer.betas)"},
-                    ],
-                },
-                {
-                    "title" : "AdamW decoupled update",
-                    "tex"   : r"\theta_{t+1} = \theta_t - \eta\left(\frac{\hat{m}_t}{\sqrt{\hat{v}_t}+\epsilon} + \lambda\theta_t\right), \qquad \hat{m}_t = \frac{m_t}{1-\beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1-\beta_2^t}",
-                    "note"  : "Bias-corrected moments with weight decay decoupled from the gradient path.",
-                    "vars"  : [
-                        {"sym": r"\theta_t",             "desc": "parameter value at step t"},
-                        {"sym": r"\eta",                 "desc": "learning rate of the parameter group"},
-                        {"sym": r"\hat{m}_t, \hat{v}_t", "desc": "bias-corrected first and second moments"},
-                        {"sym": r"\beta_1^t, \beta_2^t", "desc": "decay factors to the power t"},
-                        {"sym": r"\lambda",              "desc": "weight decay of the parameter group"},
-                        {"sym": r"\epsilon",             "desc": "optimizer.eps stability constant"},
                     ],
                 },
                 {
@@ -1027,17 +1002,6 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "EMA shadow update",
-                    "tex"   : r"\tilde{\theta}^{(i)}_t = \gamma\,\tilde{\theta}^{(i)}_{t-1} + (1 - \gamma)\,\theta^{(i)}_t",
-                    "note"  : "Shadow weights track the model once every 10 optimiser steps and replace it for validation and checkpointing; the summed L2 shadow-model divergence is logged in debug mode.",
-                    "vars"  : [
-                        {"sym": r"\tilde{\theta}^{(i)}_t", "desc": "EMA shadow of parameter tensor i"},
-                        {"sym": r"\theta^{(i)}_t",         "desc": "live parameter tensor i"},
-                        {"sym": r"\gamma",                 "desc": "ema_decay = 0.999"},
-                        {"sym": r"t",                      "desc": "EMA update index (every 10 steps)"},
-                    ],
-                },
-                {
                     "title" : "Global gradient norm",
                     "tex"   : r"\|\mathbf{g}\|_2 = \sqrt{\sum_i \left\|\nabla_{\theta^{(i)}}\mathcal{L}\right\|_2^2}",
                     "note"  : "The 2-norm of per-tensor gradient norms, computed after GradScaler unscaling; a warning fires above 100 (exploding-gradient heuristic).",
@@ -1067,6 +1031,42 @@ class EquationLibrary:
                         {"sym": r"W",                          "desc": "adaptive_window = 200"},
                         {"sym": r"\bar{g}, \sigma_g",          "desc": "mean and std of the window"},
                         {"sym": r"k",                          "desc": "adaptive_mean_std_k = 2.0"},
+                    ],
+                },
+                {
+                    "title" : "AdamW moment estimates",
+                    "tex"   : r"m_t = \beta_1 m_{t-1} + (1-\beta_1)\,g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2)\,g_t^2",
+                    "note"  : "Exponential moving averages of the gradient and its square, per parameter.",
+                    "vars"  : [
+                        {"sym": r"m_t",              "desc": "first moment estimate at step t"},
+                        {"sym": r"v_t",              "desc": "second moment estimate at step t"},
+                        {"sym": r"g_t",              "desc": "gradient at step t"},
+                        {"sym": r"t",                "desc": "optimiser step"},
+                        {"sym": r"\beta_1, \beta_2", "desc": "moment decay coefficients (optimizer.betas)"},
+                    ],
+                },
+                {
+                    "title" : "AdamW decoupled update",
+                    "tex"   : r"\theta_{t+1} = \theta_t - \eta\left(\frac{\hat{m}_t}{\sqrt{\hat{v}_t}+\epsilon} + \lambda\theta_t\right), \qquad \hat{m}_t = \frac{m_t}{1-\beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1-\beta_2^t}",
+                    "note"  : "Bias-corrected moments with weight decay decoupled from the gradient path.",
+                    "vars"  : [
+                        {"sym": r"\theta_t",             "desc": "parameter value at step t"},
+                        {"sym": r"\eta",                 "desc": "learning rate of the parameter group"},
+                        {"sym": r"\hat{m}_t, \hat{v}_t", "desc": "bias-corrected first and second moments"},
+                        {"sym": r"\beta_1^t, \beta_2^t", "desc": "decay factors to the power t"},
+                        {"sym": r"\lambda",              "desc": "weight decay of the parameter group"},
+                        {"sym": r"\epsilon",             "desc": "optimizer.eps stability constant"},
+                    ],
+                },
+                {
+                    "title" : "EMA shadow update",
+                    "tex"   : r"\tilde{\theta}^{(i)}_t = \gamma\,\tilde{\theta}^{(i)}_{t-1} + (1 - \gamma)\,\theta^{(i)}_t",
+                    "note"  : "Shadow weights track the model once every 10 optimiser steps and replace it for validation and checkpointing; the summed L2 shadow-model divergence is logged in debug mode.",
+                    "vars"  : [
+                        {"sym": r"\tilde{\theta}^{(i)}_t", "desc": "EMA shadow of parameter tensor i"},
+                        {"sym": r"\theta^{(i)}_t",         "desc": "live parameter tensor i"},
+                        {"sym": r"\gamma",                 "desc": "ema_decay = 0.999"},
+                        {"sym": r"t",                      "desc": "EMA update index (every 10 steps)"},
                     ],
                 },
                 {
@@ -1100,51 +1100,6 @@ class EquationLibrary:
             "group" : "Inference",
             "blurb" : "Patch predictions stitched into dense cubes by weighted overlap-add, then scored by the full curve, parameter, and slot metric suite.",
             "items" : [
-                {
-                    "title" : "Hann window",
-                    "tex"   : r"w_v[i] = 0.5 - 0.5\cos\!\left(\frac{2\pi(i + 0.5)}{P}\right)",
-                    "note"  : "The default per-axis profile; de-emphasises patch borders in favour of centres, suppressing seams at overlaps.",
-                    "vars"  : [
-                        {"sym": r"w_v[i]", "desc": "vertical window weight at offset i"},
-                        {"sym": r"i",      "desc": "pixel offset within the patch, 0 to P−1"},
-                        {"sym": r"P",      "desc": "patch side length on that axis"},
-                    ],
-                },
-                {
-                    "title" : "Triangular and uniform windows, 2D assembly",
-                    "tex"   : r"w_v[i] = 1 - \left|\frac{2(i + 0.5)}{P} - 1\right|, \qquad w = w_v \otimes w_h, \qquad w_{\mathrm{uniform}} = \mathbf{1}^{P_H \times P_W}",
-                    "note"  : "Per-axis factors are floored at 1e-3 before the outer product, guaranteeing strictly positive weights at every covered position.",
-                    "vars"  : [
-                        {"sym": r"w_v, w_h", "desc": "vertical and horizontal axis profiles"},
-                        {"sym": r"w",        "desc": "2D patch weighting window"},
-                        {"sym": r"\otimes",  "desc": "outer product"},
-                        {"sym": r"P",        "desc": "patch side length per axis"},
-                        {"sym": r"P_H, P_W", "desc": "patch height and width"},
-                    ],
-                },
-                {
-                    "title" : "Overlap-add accumulation",
-                    "tex"   : r"A[:,\,v_0{:}v_0{+}P_H,\ h_0{:}h_0{+}P_W] \mathrel{+}= p \cdot w, \qquad W[v_0{:}v_0{+}P_H,\ h_0{:}h_0{+}P_W] \mathrel{+}= w",
-                    "note"  : "Every patch output is scattered into a weighted accumulator at its grid position, alongside a matching weight accumulator (stitching.py).",
-                    "vars"  : [
-                        {"sym": r"A",          "desc": "value accumulator, shape (C, H_pad, W_pad)"},
-                        {"sym": r"W",          "desc": "weight accumulator, shape (H_pad, W_pad)"},
-                        {"sym": r"p",          "desc": "patch output, shape (C, P_H, P_W)"},
-                        {"sym": r"w",          "desc": "2D patch weighting window"},
-                        {"sym": r"(v_0, h_0)", "desc": "patch top-left position in the padded grid"},
-                    ],
-                },
-                {
-                    "title" : "Cube finalisation",
-                    "tex"   : r"\hat{C}[:, h, w] = \frac{A[:,\,h + p_t,\ w + p_l]}{W[h + p_t,\ w + p_l]}",
-                    "note"  : "Accumulated values divided by accumulated weights, then trimmed of grid padding; uncovered positions divide by 1 instead and yield 0.",
-                    "vars"  : [
-                        {"sym": r"\hat{C}",  "desc": "final stitched cube"},
-                        {"sym": r"A, W",     "desc": "value and weight accumulators"},
-                        {"sym": r"(h, w)",   "desc": "pixel position in the trimmed cube"},
-                        {"sym": r"p_t, p_l", "desc": "top and left padding offsets"},
-                    ],
-                },
                 {
                     "title" : "GT slot alignment",
                     "tex"   : r"\kappa_k = \begin{cases} +\infty & a^{\mathrm{GT}}_k < 10^{-3} \\ \mu^{\mathrm{GT}}_k & \text{otherwise} \end{cases}, \qquad \mathrm{GT} \leftarrow \mathrm{take}\!\left(\mathrm{GT},\ \operatorname{argsort}_k \kappa_k\right)",
@@ -1195,6 +1150,51 @@ class EquationLibrary:
                         {"sym": r"\hat{y}, y",              "desc": "predicted and GT elevation profiles"},
                         {"sym": r"\|\cdot\|_2",             "desc": "L2 norm over the elevation axis"},
                         {"sym": r"\operatorname{argmax}_n", "desc": "bin index of the profile maximum"},
+                    ],
+                },
+                {
+                    "title" : "Hann window",
+                    "tex"   : r"w_v[i] = 0.5 - 0.5\cos\!\left(\frac{2\pi(i + 0.5)}{P}\right)",
+                    "note"  : "The default per-axis profile; de-emphasises patch borders in favour of centres, suppressing seams at overlaps.",
+                    "vars"  : [
+                        {"sym": r"w_v[i]", "desc": "vertical window weight at offset i"},
+                        {"sym": r"i",      "desc": "pixel offset within the patch, 0 to P−1"},
+                        {"sym": r"P",      "desc": "patch side length on that axis"},
+                    ],
+                },
+                {
+                    "title" : "Triangular and uniform windows, 2D assembly",
+                    "tex"   : r"w_v[i] = 1 - \left|\frac{2(i + 0.5)}{P} - 1\right|, \qquad w = w_v \otimes w_h, \qquad w_{\mathrm{uniform}} = \mathbf{1}^{P_H \times P_W}",
+                    "note"  : "Per-axis factors are floored at 1e-3 before the outer product, guaranteeing strictly positive weights at every covered position.",
+                    "vars"  : [
+                        {"sym": r"w_v, w_h", "desc": "vertical and horizontal axis profiles"},
+                        {"sym": r"w",        "desc": "2D patch weighting window"},
+                        {"sym": r"\otimes",  "desc": "outer product"},
+                        {"sym": r"P",        "desc": "patch side length per axis"},
+                        {"sym": r"P_H, P_W", "desc": "patch height and width"},
+                    ],
+                },
+                {
+                    "title" : "Overlap-add accumulation",
+                    "tex"   : r"A[:,\,v_0{:}v_0{+}P_H,\ h_0{:}h_0{+}P_W] \mathrel{+}= p \cdot w, \qquad W[v_0{:}v_0{+}P_H,\ h_0{:}h_0{+}P_W] \mathrel{+}= w",
+                    "note"  : "Every patch output is scattered into a weighted accumulator at its grid position, alongside a matching weight accumulator (stitching.py).",
+                    "vars"  : [
+                        {"sym": r"A",          "desc": "value accumulator, shape (C, H_pad, W_pad)"},
+                        {"sym": r"W",          "desc": "weight accumulator, shape (H_pad, W_pad)"},
+                        {"sym": r"p",          "desc": "patch output, shape (C, P_H, P_W)"},
+                        {"sym": r"w",          "desc": "2D patch weighting window"},
+                        {"sym": r"(v_0, h_0)", "desc": "patch top-left position in the padded grid"},
+                    ],
+                },
+                {
+                    "title" : "Cube finalisation",
+                    "tex"   : r"\hat{C}[:, h, w] = \frac{A[:,\,h + p_t,\ w + p_l]}{W[h + p_t,\ w + p_l]}",
+                    "note"  : "Accumulated values divided by accumulated weights, then trimmed of grid padding; uncovered positions divide by 1 instead and yield 0.",
+                    "vars"  : [
+                        {"sym": r"\hat{C}",  "desc": "final stitched cube"},
+                        {"sym": r"A, W",     "desc": "value and weight accumulators"},
+                        {"sym": r"(h, w)",   "desc": "pixel position in the trimmed cube"},
+                        {"sym": r"p_t, p_l", "desc": "top and left padding offsets"},
                     ],
                 },
                 {

@@ -180,8 +180,8 @@ class RunConsole {
     this._renderList();
   }
 
-  async launch(scriptKey, interpreter, label, overrides, followUp) {
-    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {}, follow_up: followUp || null });
+  async launch(scriptKey, interpreter, label, overrides, followUp, detach) {
+    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {}, follow_up: followUp || null, detach: !!detach });
     if (!res.ok) {
       window.toast(res.error || "Launch failed", "error");
       return null;

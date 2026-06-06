@@ -19,7 +19,7 @@ class ResourceWatchdog:
     RAM_KILL      = 90.0
     CLEAR_MARGIN  = 5.0
     SUSTAIN       = {"cpu": 3, "load": 3, "ram": 2, "ram_kill": 2}
-    KILL_COOLDOWN = 120.0
+    KILL_COOLDOWN = 60.0
 
     def __init__(self, processes: ProcessManager, logger: WebLogger) -> None:
         self.processes = processes

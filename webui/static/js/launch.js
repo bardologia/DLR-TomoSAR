@@ -43,6 +43,10 @@ class LaunchView {
     this.gatedSections = new Set();
     this.classColors = new Map();
     this.query = "";
+    this.modelFamilies = null;
+    this.pinsEl = null;
+    this.builder = null;
+    this.detach = true;
     this.cmdEl = null;
     this.manifestEl = null;
     this.launchBtn = null;
@@ -64,6 +68,10 @@ class LaunchView {
     this.gatedSections = new Set();
     this.classColors = new Map();
     this.query = "";
+    this.modelFamilies = null;
+    this.pinsEl = null;
+    this.builder = null;
+    this.detach = true;
 
     this._renderSkeleton();
 
@@ -87,6 +95,13 @@ class LaunchView {
       return;
     }
     this.config = cfg;
+
+    if (cfg.leaves.some((leaf) => leaf.path === "skip_models")) {
+      const models = await window.apiGet("/api/models");
+      if (this.key !== key) return;
+      this.modelFamilies = (models && models.families) || [];
+    }
+
     this._renderConfig(cfg);
     this._refresh();
   }
@@ -159,6 +174,7 @@ class LaunchView {
     interp.appendChild(select);
 
     let follow = null;
+    let followSelect = null;
     if (this.detail && this.detail.category === "Training") {
       follow = document.createElement("div");
       follow.className = "rail-block";
@@ -173,7 +189,50 @@ class LaunchView {
         fsel.appendChild(opt);
       });
       follow.appendChild(fsel);
+      followSelect = fsel;
     }
+
+    const detach = document.createElement("div");
+    detach.className = "rail-block";
+    detach.innerHTML = `<span class="rail-block__label">Execution</span>`;
+
+    const detachRow = document.createElement("div");
+    detachRow.className = "rail-detach";
+    const detachToggle = document.createElement("button");
+    detachToggle.type = "button";
+    detachToggle.className = "switch";
+    detachToggle.setAttribute("role", "switch");
+    detachToggle.innerHTML = `<span class="switch__knob"></span>`;
+    const detachLabel = document.createElement("span");
+    detachLabel.className = "rail-detach__label";
+    detachLabel.textContent = "Detach from server";
+
+    const hint = document.createElement("p");
+    hint.className = "rail-detach__hint";
+
+    const paintDetach = () => {
+      detachToggle.classList.toggle("is-on", this.detach);
+      detachToggle.setAttribute("aria-checked", String(this.detach));
+      hint.textContent = this.detach
+        ? "The run survives a lost connection or a console restart. Output goes to logs/<script>_<stamp>.out in the repo."
+        : "Output streams to this console. The run dies if the console server goes down.";
+      if (followSelect) {
+        followSelect.disabled = this.detach;
+        followSelect.title = this.detach ? "unavailable for detached runs" : "";
+        if (this.detach) followSelect.value = "";
+      }
+      this._refresh();
+    };
+    detachToggle.addEventListener("click", () => {
+      this.detach = !this.detach;
+      paintDetach();
+    });
+
+    detachRow.appendChild(detachToggle);
+    detachRow.appendChild(detachLabel);
+    detach.appendChild(detachRow);
+    detach.appendChild(hint);
+    paintDetach();
 
     const cmd = document.createElement("div");
     cmd.className = "rail-block";
@@ -211,6 +270,7 @@ class LaunchView {
 
     host.appendChild(interp);
     if (follow) host.appendChild(follow);
+    host.appendChild(detach);
     host.appendChild(cmd);
     host.appendChild(manifest);
     host.appendChild(actions);
@@ -245,8 +305,29 @@ class LaunchView {
 
     host.appendChild(this._buildToolbar(cfg));
 
+    const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
+    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean);
+    const claimed = new Set(pinned.map((leaf) => leaf.path));
+
+    const modelLeaf  = byPath.get("skip_models");
+    const modelPanel = modelLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelTogglePanel(this, modelLeaf) : null;
+    if (modelPanel) claimed.add("skip_models");
+
+    if (byPath.get("trials_enabled") && byPath.get("warmup_losses") && byPath.get("complete_losses")) {
+      const candidate = new window.ExperimentBuilder(this, byPath);
+      if (candidate.terms.length) {
+        this.builder = candidate;
+        ["trials_enabled", "warmup_losses", "complete_losses"].forEach((path) => claimed.add(path));
+      }
+    }
+
+    if (pinned.length) host.appendChild(this._buildPins(pinned));
+    if (this.builder) host.appendChild(this.builder.build());
+    if (modelPanel) host.appendChild(modelPanel.build());
+
     const grouped = new Map();
     cfg.leaves.forEach((leaf) => {
+      if (claimed.has(leaf.path)) return;
       if (!grouped.has(leaf.section)) grouped.set(leaf.section, []);
       grouped.get(leaf.section).push(leaf);
     });
@@ -308,6 +389,24 @@ class LaunchView {
     return bar;
   }
 
+  _buildPins(pinned) {
+    const panel = document.createElement("section");
+    panel.className = "launch-pins";
+
+    const head = document.createElement("header");
+    head.className = "launch-pins__head";
+    head.innerHTML = `<h3 class="launch-pins__name">Run essentials</h3><span class="launch-pins__hint">check these before every launch</span>`;
+
+    const grid = document.createElement("div");
+    grid.className = "launch-pins__grid";
+    pinned.forEach((leaf) => grid.appendChild(this._buildRow(leaf, "", true)));
+
+    panel.appendChild(head);
+    panel.appendChild(grid);
+    this.pinsEl = panel;
+    return panel;
+  }
+
   _classColor(sectionClass) {
     if (!this.classColors.has(sectionClass)) {
       this.classColors.set(sectionClass, LaunchView.PALETTE[this.classColors.size % LaunchView.PALETTE.length]);
@@ -326,12 +425,22 @@ class LaunchView {
 
     const head = document.createElement("header");
     head.className = "band-head";
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-expanded", "false");
     head.innerHTML =
+      `<span class="band-head__chev">&rsaquo;</span>` +
       `<span class="cc-dot" aria-hidden="true"></span>` +
       `<h3 class="band-head__name">${key}</h3>` +
       `<span class="edit-badge" hidden></span>` +
       `<span class="band-head__class">${rootClass}</span>` +
       `<span class="band-head__count">${nFields} fields</span>`;
+    head.addEventListener("click", () => this._toggleBand(band, head));
+    head.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      this._toggleBand(band, head);
+    });
 
     const body = document.createElement("div");
     body.className = "band-body";
@@ -363,8 +472,13 @@ class LaunchView {
     });
 
     body.appendChild(bandChildren);
-    this.bands.push({ el: band, badge: head.querySelector(".edit-badge"), sections: bandSections });
+    this.bands.push({ el: band, head, badge: head.querySelector(".edit-badge"), sections: bandSections });
     return band;
+  }
+
+  _toggleBand(band, head) {
+    const open = band.classList.toggle("is-open");
+    head.setAttribute("aria-expanded", String(open));
   }
 
   _buildSubPanel(section, leaves) {
@@ -672,7 +786,7 @@ class LaunchView {
     return row;
   }
 
-  _buildRow(leaf, section) {
+  _buildRow(leaf, section, pinned = false) {
     const short = section ? leaf.path.slice(section.length + 1) : leaf.path;
 
     const row = document.createElement("div");
@@ -700,7 +814,7 @@ class LaunchView {
 
     row.appendChild(control.el);
     this.controls[leaf.path] = { leaf, reset: control.reset };
-    this.states.push({ leaf, row, section: leaf.section });
+    this.states.push({ leaf, row, section: leaf.section, pinned });
     return row;
   }
 
@@ -849,7 +963,14 @@ class LaunchView {
       const visible = band.sections.some((section) => sectionVisible.get(section));
       band.el.hidden = !visible;
       anyVisible = anyVisible || visible;
+      if (this.query && visible && !band.el.classList.contains("is-open")) this._toggleBand(band.el, band.head);
     });
+
+    if (this.pinsEl) {
+      const rows = [...this.pinsEl.querySelectorAll(".cfg-edit__row")];
+      this.pinsEl.hidden = rows.length > 0 && rows.every((row) => row.hidden);
+      anyVisible = anyVisible || !this.pinsEl.hidden;
+    }
 
     const none = document.querySelector(".launch-nomatch");
     if (none) none.hidden = anyVisible;
@@ -859,9 +980,10 @@ class LaunchView {
     if (!this.detail) return "";
     let text = this.detail.command;
     Object.entries(this.dirty).forEach(([path, value]) => {
-      const rendered = /\s/.test(value) ? `'${value}'` : value;
+      const rendered = /^[\w@%+=:,./-]+$/.test(value) ? value : `'${String(value).replace(/'/g, `'\\''`)}'`;
       text += ` --${path} ${rendered}`;
     });
+    if (this.detach) text += " --detach";
     return text;
   }
 
@@ -879,6 +1001,7 @@ class LaunchView {
     }
 
     if (this.manifestEl) this._renderManifest();
+    if (this.builder) this.builder.refreshFromView();
     this._refreshBadges();
     this._refreshGates();
   }
@@ -913,7 +1036,8 @@ class LaunchView {
 
   _refreshBadges() {
     const counts = new Map();
-    this.states.forEach(({ leaf }) => {
+    this.states.forEach(({ leaf, pinned }) => {
+      if (pinned) return;
       if (this.dirty[leaf.path] !== undefined) counts.set(leaf.section, (counts.get(leaf.section) || 0) + 1);
     });
 
@@ -935,7 +1059,8 @@ class LaunchView {
     if (!this.detail) return;
     const interp = document.getElementById("launch-interpreter").value;
     const followEl = document.getElementById("launch-follow");
-    this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, followEl ? followEl.value : "");
+    const follow = this.detach ? "" : (followEl ? followEl.value : "");
+    this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, follow, this.detach);
   }
 
   _renderSource(d) {

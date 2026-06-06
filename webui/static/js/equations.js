@@ -64,9 +64,28 @@ class EquationView {
     card.className = "eq-card reveal";
     card.style.transitionDelay = `${Math.min(i * 0.04, 0.4)}s`;
 
+    const step = String(i + 1).padStart(2, "0");
+
+    card.appendChild(this._buildFace(item, step, "eq-card__base", false));
+    card.appendChild(this._buildFace(item, step, "eq-card__zoom", true));
+
+    return card;
+  }
+
+  _buildFace(item, step, className, detailed) {
+    const face     = document.createElement("div");
+    face.className = className;
+
+    const head       = document.createElement("div");
+    head.className   = "eq-card__head";
+    const badge      = document.createElement("span");
+    badge.className   = "eq-card__step";
+    badge.textContent = step;
     const title       = document.createElement("h3");
     title.className   = "eq-card__title";
     title.textContent = item.title;
+    head.appendChild(badge);
+    head.appendChild(title);
 
     const tex       = document.createElement("div");
     tex.className   = "eq-card__tex";
@@ -76,11 +95,11 @@ class EquationView {
     note.className   = "eq-card__note";
     note.textContent = item.note;
 
-    card.appendChild(title);
-    card.appendChild(tex);
-    card.appendChild(note);
+    face.appendChild(head);
+    face.appendChild(tex);
+    face.appendChild(note);
 
-    if (item.vars && item.vars.length) {
+    if (detailed && item.vars && item.vars.length) {
       const vars     = document.createElement("div");
       vars.className = "eq-card__vars";
 
@@ -98,10 +117,10 @@ class EquationView {
         vars.appendChild(row);
       });
 
-      card.appendChild(vars);
+      face.appendChild(vars);
     }
 
-    return card;
+    return face;
   }
 
   _whenMathJax() {
