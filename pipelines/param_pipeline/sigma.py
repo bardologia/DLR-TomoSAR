@@ -176,6 +176,14 @@ class PmapSigmaAdamKernel:
 
 
 class PeakInitialiser:
+    def __init__(self, n_workers : int = 1) -> None:
+        self.n_workers = n_workers
+        self._pool     = ProcessPoolExecutor(max_workers=n_workers)
+        list(self._pool.map(abs, range(n_workers)))
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=False, cancel_futures=True)
+
     @staticmethod
     def _prominence_worker(smoothed_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         chunk_N, H = smoothed_chunk.shape
@@ -216,7 +224,7 @@ class PeakInitialiser:
 
         return amps, mus, sigs
 
-    def run(self, prof_raw : np.ndarray, height_axis : np.ndarray, K : int, prominence_frac : float = 0.05, n_workers : int = 1, sigma_divisor : float = 1.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def run(self, prof_raw : np.ndarray, height_axis : np.ndarray, K : int, prominence_frac : float = 0.05, sigma_divisor : float = 1.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         N, H        = prof_raw.shape
         h_span      = float(height_axis[-1] - height_axis[0])
         dh          = float(height_axis[1] - height_axis[0])
@@ -225,7 +233,7 @@ class PeakInitialiser:
         min_dist    = max(1, int(sigma_base / dh))
         smoothed    = uniform_filter1d(prof_raw.astype(np.float32), size=5, mode="nearest", axis=1).copy()
 
-        chunk_size = max(1, -(-N // (n_workers * 2)))
+        chunk_size = max(1, -(-N // (self.n_workers * 2)))
         chunks     = [smoothed[i:i + chunk_size] for i in range(0, N, chunk_size)]
 
         worker_fn  = partial(
@@ -237,8 +245,7 @@ class PeakInitialiser:
             prominence_frac = prominence_frac,
         )
 
-        with ProcessPoolExecutor(max_workers=n_workers) as pool:
-            chunk_results = list(pool.map(worker_fn, chunks))
+        chunk_results = list(self._pool.map(worker_fn, chunks))
 
         amps = np.concatenate([r[0] for r in chunk_results], axis=0)
         mus  = np.concatenate([r[1] for r in chunk_results], axis=0)
@@ -268,11 +275,13 @@ class BestKSelector:
         scale_all     : np.ndarray,
         height_axis   : np.ndarray,
         n_params_out  : int,
+        batch_tag     : str = "",
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         N_act = prof_norm_all.shape[0]
+        tag   = f"{batch_tag} | " if batch_tag else ""
 
-        self.logger.section("[Phase 3 — Penalty Scoring & Best-K Selection]")
+        self.logger.section(f"[{tag}Phase 3 — Penalty Scoring & Best-K Selection]")
         self.logger.subsection(f"lambda_k : {self.lambda_k}")
 
         penalised_all = np.empty((N_act, self.k_max), dtype=np.float64)
@@ -343,7 +352,7 @@ class SigmaFittingExtractor:
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self._init_workers        = 80 if init_workers is None else init_workers
 
-        self._peak_initialiser = PeakInitialiser()
+        self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
         self._best_k_selector  = BestKSelector(k_max=k_max, lambda_k=lambda_k, logger=logger)
 
         all_gpu_devices = [d for d in jax.devices() if d.platform in ("gpu", "cuda")]
@@ -464,6 +473,13 @@ class SigmaFittingExtractor:
 
         return pf, norm, scale, active, r_end
 
+    @staticmethod
+    def _pad_rows(arr : np.ndarray, target : int) -> np.ndarray:
+        pad = target - arr.shape[0]
+        if pad == 0:
+            return np.ascontiguousarray(arr, dtype=np.float32)
+        return np.concatenate([arr.astype(np.float32, copy=False), np.zeros((pad, arr.shape[1]), dtype=np.float32)], axis=0)
+
     def _fit_all_K(
         self,
         inits         : dict,
@@ -473,12 +489,13 @@ class SigmaFittingExtractor:
         sigma_lower_j : jnp.ndarray,
         sigma_upper_j : jnp.ndarray,
         N_act         : int,
+        batch_tag     : str,
     ) -> dict:
 
         gpu_results = {}
         B           = self.gpu_pixel_batch_size
 
-        self.logger.section("[Phase 2 — GPU Sigma Fitting]")
+        self.logger.section(f"[{batch_tag} | Phase 2 — GPU Sigma Fitting]")
 
         for K in range(1, self.k_max + 1):
             amps_raw, mus, sigs_init = inits[K]
@@ -486,13 +503,14 @@ class SigmaFittingExtractor:
             final_sigs = np.empty((N_act, K), dtype=np.float32)
 
             for i_start in range(0, N_act, B):
-                i_end = min(i_start + B, N_act)
-                out_s = self._kernel(
-                    jnp.array(sigs_init  [i_start:i_end], dtype=jnp.float32),
+                i_end   = min(i_start + B, N_act)
+                n_chunk = i_end - i_start
+                out_s   = self._kernel(
+                    jnp.array(self._pad_rows(sigs_init    [i_start:i_end], B)),
                     height_ax_j,
-                    jnp.array(prof_norm_all[i_start:i_end], dtype=jnp.float32),
-                    jnp.array(amps_norm [i_start:i_end],    dtype=jnp.float32),
-                    jnp.array(mus[i_start:i_end],           dtype=jnp.float32),
+                    jnp.array(self._pad_rows(prof_norm_all[i_start:i_end], B)),
+                    jnp.array(self._pad_rows(amps_norm    [i_start:i_end], B)),
+                    jnp.array(self._pad_rows(mus          [i_start:i_end], B)),
                     sigma_lower_j,
                     sigma_upper_j,
                     self.adam_steps,
@@ -501,16 +519,13 @@ class SigmaFittingExtractor:
                     self.adam_b2,
                 )
 
-                final_sigs[i_start:i_end] = np.array(out_s, dtype=np.float32)
+                final_sigs[i_start:i_end] = np.array(out_s[:n_chunk], dtype=np.float32)
                 del out_s
 
             gpu_results[K] = (amps_norm, mus, final_sigs)
             self.logger.subsection(f"K={K} done")
 
-        jax.clear_caches()
         gc.collect()
-
-        self.logger.subsection("GPU memory released")
 
         return gpu_results
 
@@ -525,6 +540,7 @@ class SigmaFittingExtractor:
         sigma_lower_j : jnp.ndarray,
         sigma_upper_j : jnp.ndarray,
         n_params_out  : int,
+        batch_tag     : str,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         N          = profiles_flat.shape[0]
@@ -543,19 +559,19 @@ class SigmaFittingExtractor:
         N_act         = len(active_idx)
 
         n_cpus = os.cpu_count() or 1
-        self.logger.section("[Phase 1 — CPU Initialisation]")
+        self.logger.section(f"[{batch_tag} | Phase 1 — CPU Initialisation]")
         self.logger.subsection(f"Active pixels : {N_act}")
         self.logger.subsection(f"K             : {self.k_max} (shared init)")
         self.logger.subsection(f"Workers       : {self._init_workers} / {n_cpus} logical CPUs")
 
-        amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self._init_workers, self.sigma_init_divisor)
+        amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self.sigma_init_divisor)
         inits = {K: (amps_km[:, :K].copy(), mus_km[:, :K].copy(), sigs_km[:, :K].copy()) for K in range(1, self.k_max + 1)}
 
         self.logger.subsection(f"Init shared for all {self.k_max} K values")
 
-        gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, N_act)
+        gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, N_act, batch_tag)
 
-        best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, prof_norm_all, scale_all, height_axis, n_params_out)
+        best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, prof_norm_all, scale_all, height_axis, n_params_out, batch_tag=batch_tag)
 
         output    [active_idx] = best_params
         mse_out   [active_idx] = mse_act
@@ -583,8 +599,11 @@ class SigmaFittingExtractor:
         best_k_map       : np.ndarray,
     ) -> int:
 
+        n_batches = -(-R // self.range_batch_size)
+
         self.logger.section("[Range Bin Loading]")
         self.logger.subsection(f"Streaming range batches (load fused with fitting)")
+        self.logger.subsection(f"Range batches : {n_batches} x {self.range_batch_size} bins, phases 1-3 repeat once per batch")
 
         total_attempted = 0
 
@@ -593,14 +612,17 @@ class SigmaFittingExtractor:
 
             with ThreadPoolExecutor(max_workers=2) as pool:
                 r               = 0
+                batch_index     = 0
                 prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H, threshold_factor, truncation_index,)
 
                 try:
                     while r < R:
                         profiles_flat, profiles_norm, safe_scale, active, r_end = prefetch_future.result()
 
-                        r_start = r
-                        r_count = r_end - r
+                        r_start      = r
+                        r_count      = r_end - r
+                        batch_index += 1
+                        batch_tag    = f"Batch {batch_index}/{n_batches}"
 
                         if r_end < R:
                             prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H, threshold_factor, truncation_index)
@@ -613,6 +635,7 @@ class SigmaFittingExtractor:
                             height_axis, height_ax_j,
                             sigma_lower_j, sigma_upper_j,
                             n_params_out,
+                            batch_tag,
                         )
 
                         output        [:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
@@ -622,6 +645,8 @@ class SigmaFittingExtractor:
 
                         del profiles_flat, profiles_norm, safe_scale, active, fitted, mse_batch, pen_batch, best_k_batch
                         gc.collect()
+
+                        self.logger.subsection(f"{batch_tag} complete — range bins {r_start}-{r_end} of {R}")
 
                         progress.advance(bar_task, advance=r_count)
                         r = r_end
@@ -656,13 +681,18 @@ class SigmaFittingExtractor:
         penalised_maps = np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32)
         best_k_map     = np.zeros((Az, R),                      dtype=np.int16)
 
-        total_attempted = self._run_fitting(
-            tomogram_mmap, height_axis, height_ax_j,
-            sigma_lower_j, sigma_upper_j,
-            threshold_factor, truncation_index,
-            Az, R, H, n_params_out, output,
-            mse_maps, penalised_maps, best_k_map,
-        )
+        try:
+            total_attempted = self._run_fitting(
+                tomogram_mmap, height_axis, height_ax_j,
+                sigma_lower_j, sigma_upper_j,
+                threshold_factor, truncation_index,
+                Az, R, H, n_params_out, output,
+                mse_maps, penalised_maps, best_k_map,
+            )
+        finally:
+            self._peak_initialiser.close()
+            jax.clear_caches()
+            gc.collect()
 
         self.logger.section("[Results]")
         self.logger.subsection(f"Active pixels fitted : {total_attempted:,} / {R * Az:,}")

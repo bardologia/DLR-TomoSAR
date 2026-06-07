@@ -640,8 +640,9 @@ class TestPeakInitialiser:
         prof        = np.exp(-((height_axis - peak_mu) ** 2) / (2.0 * 3.0 ** 2)).astype(np.float32)
         prof        = prof[None, :]
 
-        init = PeakInitialiser()
-        amps, mus, sigs = init.run(prof, height_axis, K=1, prominence_frac=0.05, n_workers=1)
+        init = PeakInitialiser(n_workers=1)
+        amps, mus, sigs = init.run(prof, height_axis, K=1, prominence_frac=0.05)
+        init.close()
 
         assert amps.shape == (1, 1)
         assert mus.shape == (1, 1)
@@ -657,8 +658,9 @@ class TestPeakInitialiser:
         prof       += np.exp(-((height_axis - 10.0) ** 2) / (2.0 * 3.0 ** 2))
         prof        = prof.astype(np.float32)[None, :]
 
-        init = PeakInitialiser()
-        amps, mus, sigs = init.run(prof, height_axis, K=2, prominence_frac=0.05, n_workers=1)
+        init = PeakInitialiser(n_workers=1)
+        amps, mus, sigs = init.run(prof, height_axis, K=2, prominence_frac=0.05)
+        init.close()
 
         assert amps.shape == (1, 2)
         found = sorted(float(m) for m in mus[0])
@@ -671,8 +673,9 @@ class TestPeakInitialiser:
         height_axis = np.linspace(-10.0, 10.0, 41, dtype=np.float32)
         prof        = np.zeros((1, 41), dtype=np.float32)[None, :].reshape(1, 41)
 
-        init = PeakInitialiser()
-        amps, mus, sigs = init.run(prof, height_axis, K=2, prominence_frac=0.05, n_workers=1)
+        init = PeakInitialiser(n_workers=1)
+        amps, mus, sigs = init.run(prof, height_axis, K=2, prominence_frac=0.05)
+        init.close()
 
         assert amps.shape == (1, 2)
         assert np.all(amps >= 1e-10)
@@ -684,12 +687,35 @@ class TestPeakInitialiser:
         height_axis = np.linspace(-20.0, 20.0, 81, dtype=np.float32)
         prof        = np.exp(-(height_axis ** 2) / (2.0 * 3.0 ** 2)).astype(np.float32)[None, :]
 
-        init = PeakInitialiser()
-        _, _, sigs_base    = init.run(prof, height_axis, K=1, prominence_frac=0.05, n_workers=1)
-        _, mus, sigs_small = init.run(prof, height_axis, K=1, prominence_frac=0.05, n_workers=1, sigma_divisor=4.0)
+        init = PeakInitialiser(n_workers=1)
+        _, _, sigs_base    = init.run(prof, height_axis, K=1, prominence_frac=0.05)
+        _, mus, sigs_small = init.run(prof, height_axis, K=1, prominence_frac=0.05, sigma_divisor=4.0)
+        init.close()
 
         assert np.allclose(sigs_small, sigs_base / 4.0)
         assert np.abs(mus[0, 0]) <= 1.0
+
+
+@requires_jax
+class TestPadRows:
+    def test_pad_rows_extends_to_target_with_zeros(self):
+        from pipelines.param_pipeline.sigma import SigmaFittingExtractor
+
+        arr = np.arange(6, dtype=np.float32).reshape(3, 2)
+        out = SigmaFittingExtractor._pad_rows(arr, 5)
+
+        assert out.shape == (5, 2)
+        assert np.allclose(out[:3], arr)
+        assert np.allclose(out[3:], 0.0)
+
+    def test_pad_rows_identity_at_target(self):
+        from pipelines.param_pipeline.sigma import SigmaFittingExtractor
+
+        arr = np.arange(6, dtype=np.float32).reshape(3, 2)
+        out = SigmaFittingExtractor._pad_rows(arr, 3)
+
+        assert out.shape == (3, 2)
+        assert np.allclose(out, arr)
 
 
 @requires_jax

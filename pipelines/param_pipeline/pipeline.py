@@ -208,6 +208,7 @@ class ParamExtractionPipeline:
             adam_b2              = config.adam_b2,
             gpu_device_ids       = config.gpu_device_ids,
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
+            init_workers         = config.parameter_workers,
         )
         self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
         self.parameter_io       = ParameterIO(logger=self.logger)
