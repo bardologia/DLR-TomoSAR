@@ -110,7 +110,7 @@ class ParameterExtractor:
         self,
         parameter_extraction : FitSettings,
         logger               : Logger,
-        gpu_batch_size       : int                 = 256,
+        range_batch_size     : int                 = 256,
         adam_steps           : int                 = 800,
         adam_lr              : float               = 1e-2,
         adam_b1              : float               = 0.9,
@@ -124,7 +124,7 @@ class ParameterExtractor:
 
         self.parameter_extraction = parameter_extraction
         self.logger               = logger
-        self.gpu_batch_size       = gpu_batch_size
+        self.range_batch_size     = range_batch_size
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self.adam_steps           = adam_steps
         self.adam_lr              = adam_lr
@@ -143,7 +143,7 @@ class ParameterExtractor:
         self._gpu_extractor = SigmaFittingExtractor(
             fit_settings         = parameter_extraction,
             logger               = logger,
-            range_batch_size     = gpu_batch_size,
+            range_batch_size     = range_batch_size,
             adam_steps           = adam_steps,
             adam_lr              = adam_lr,
             adam_b1              = adam_b1,
@@ -201,7 +201,7 @@ class ParamExtractionPipeline:
         self.parameter_extractor   = ParameterExtractor(
             parameter_extraction = config.fit_settings,
             logger               = self.logger,
-            gpu_batch_size       = config.gpu_batch_size,
+            range_batch_size     = config.range_batch_size,
             adam_steps           = config.adam_steps,
             adam_lr              = config.adam_lr,
             adam_b1              = config.adam_b1,

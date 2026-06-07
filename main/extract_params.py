@@ -40,6 +40,7 @@ def main() -> None:
             fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor)),
 
             gpu_device_ids    = [int(device) for device in config.gpu_device_ids],
+            range_batch_size  = config.range_batch_size,
             parameter_workers = config.parameter_workers,
         )
 
