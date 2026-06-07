@@ -328,6 +328,7 @@ class _DummyModelConfig:
     attention_dropout      : float = 0.3
     stochastic_depth_rate  : float = 0.2
     features_wd            : float = 0.01
+    encoder_lr             : float = 3e-4
     keep_me               : int   = 7
 
 
@@ -342,6 +343,13 @@ class TestConfigFactoryPrepareOverfit:
         assert prepared.stochastic_depth_rate == 0.0
         assert prepared.features_wd           == 0.0
         assert prepared.keep_me               == 7
+
+    def test_prepare_overfit_scales_learning_rates(self, benchmark_config):
+        factory = ConfigFactory(benchmark_config)
+
+        prepared = factory.prepare_overfit_model_config(_DummyModelConfig())
+
+        assert prepared.encoder_lr == pytest.approx(3e-3)
 
     def test_prepare_overfit_returns_same_object(self, benchmark_config):
         factory  = ConfigFactory(benchmark_config)

@@ -184,6 +184,9 @@ class ConfigFactory:
             if attribute.endswith("_wd"):
                 setattr(model_config, attribute, 0.0)
 
+            if attribute.endswith("_lr"):
+                setattr(model_config, attribute, getattr(model_config, attribute) * 10.0)
+
         return model_config
 
     def inference_config(self, run_directory: Path) -> InferenceConfig:
