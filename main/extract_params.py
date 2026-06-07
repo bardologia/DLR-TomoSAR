@@ -5,27 +5,24 @@ from pathlib import Path
 import _bootstrap
 
 from configuration.param_extraction_config import ExtractParamsEntryConfig, ExtractionConfig, FitMode, FitSettings
-from pipelines.param_pipeline.pipeline import ParamExtractionPipeline
+from pipelines.param_pipeline.pipeline import DatasetQueueResolver, ParamExtractionPipeline
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 
 
 def main() -> None:
-    config    = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction over one or more dataset directories").apply()
-    logger    = Logger(log_dir="logs", name="extract_params")
-    base_path = Path(config.dataset_base_path)
-
-    dataset_dirs = sorted(
-        [d for d in base_path.iterdir() if d.is_dir()]
-        if not config.dataset_filter
-        else [base_path / name for name in config.dataset_filter]
-    )
+    config       = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction over one or more dataset directories").apply()
+    logger       = Logger(log_dir="logs", name="extract_params")
+    base_path    = Path(config.dataset_base_path)
+    dataset_dirs = DatasetQueueResolver(base_path, config.dataset_filter).resolve()
 
     logger.section("Extraction queue")
     logger.kv_table({
         "Datasets" : len(dataset_dirs),
+        "Queue"    : ", ".join(d.name for d in dataset_dirs),
         "Base path": str(base_path),
         "Filter"   : config.dataset_filter or "all dataset directories",
+        "GPUs"     : config.gpu_device_ids,
     }, title="Configuration")
 
     for index, processed_data_path in enumerate(dataset_dirs):
@@ -38,11 +35,11 @@ def main() -> None:
             output_prefix = config.output_prefix,
             output_suffix = config.output_suffix,
 
-            tomogram_filename = config.tomogram_filename,
-            height_range      = config.height_range,
+            height_range = config.height_range,
 
             fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor)),
 
+            gpu_device_ids    = [int(device) for device in config.gpu_device_ids],
             parameter_workers = config.parameter_workers,
         )
 

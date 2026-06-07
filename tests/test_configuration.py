@@ -622,31 +622,34 @@ class TestParamExtractionConfig:
         assert cfg.output_directory   == tmp_path / "params" / "params_sigmaonly_k5_sig4"
         assert cfg.parameters_npy_path.name == "parameters_sigmaonly_k5_sig4.npy"
 
-    def test_discover_tomogram_path_none_when_missing(self, tmp_path):
+    def test_discover_tomogram_path_raises_when_missing(self, tmp_path):
         (tmp_path / "data").mkdir()
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
-        assert cfg.discover_tomogram_path() is None
+        with pytest.raises(FileNotFoundError, match="found none"):
+            cfg.discover_tomogram_path()
 
-    def test_discover_tomogram_path_explicit_filename(self, tmp_path):
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        target = data_dir / "tomogram_full_explicit.npy"
-        target.write_bytes(b"x")
-
-        cfg = ExtractionConfig(processed_data_path=tmp_path, tomogram_filename="tomogram_full_explicit.npy")
-
-        assert cfg.discover_tomogram_path() == target
-
-    def test_discover_tomogram_path_glob_fallback(self, tmp_path):
+    def test_discover_tomogram_path_single_match(self, tmp_path):
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         match = data_dir / "tomogram_full_001.npy"
         match.write_bytes(b"x")
+        (data_dir / "dem_full_001.npy").write_bytes(b"x")
 
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
         assert cfg.discover_tomogram_path() == match
+
+    def test_discover_tomogram_path_raises_on_multiple_matches(self, tmp_path):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "tomogram_full_001.npy").write_bytes(b"x")
+        (data_dir / "tomogram_full_002.npy").write_bytes(b"x")
+
+        cfg = ExtractionConfig(processed_data_path=tmp_path)
+
+        with pytest.raises(FileNotFoundError, match="tomogram_full_001.npy"):
+            cfg.discover_tomogram_path()
 
     def test_discover_height_range_explicit(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data", height_range=(-10.0, 50.0))
@@ -663,10 +666,11 @@ class TestParamExtractionConfig:
 
         assert cfg.discover_height_range() == (-5.0, 80.0)
 
-    def test_discover_height_range_none_when_unavailable(self, tmp_path):
+    def test_discover_height_range_raises_when_unavailable(self, tmp_path):
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
-        assert cfg.discover_height_range() is None
+        with pytest.raises(FileNotFoundError, match="height_range"):
+            cfg.discover_height_range()
 
     def test_entry_config_defaults(self):
         cfg = ExtractParamsEntryConfig()
@@ -675,6 +679,7 @@ class TestParamExtractionConfig:
         assert cfg.fit_lambda_k      > 0.0
         assert cfg.parameter_workers > 0
         assert cfg.dataset_filter    == []
+        assert cfg.gpu_device_ids    == [0, 1, 3]
 
     def test_gpu_device_ids_default_independent(self):
         a = ExtractionConfig(processed_data_path="/tmp/a")
@@ -683,6 +688,57 @@ class TestParamExtractionConfig:
         a.gpu_device_ids.append(9)
 
         assert b.gpu_device_ids == [0, 1, 3]
+
+
+class TestDatasetQueueResolver:
+    def _make_dataset(self, base, name):
+        (base / name / "data").mkdir(parents=True)
+        return base / name
+
+    def test_resolves_all_dataset_dirs_without_filter(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        a = self._make_dataset(tmp_path, "ds_a")
+        b = self._make_dataset(tmp_path, "ds_b")
+
+        assert DatasetQueueResolver(tmp_path, []).resolve() == [a, b]
+
+    def test_resolves_filtered_subset(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        self._make_dataset(tmp_path, "ds_a")
+        b = self._make_dataset(tmp_path, "ds_b")
+
+        assert DatasetQueueResolver(tmp_path, ["ds_b"]).resolve() == [b]
+
+    def test_rejects_string_filter(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        with pytest.raises(TypeError, match="dataset_filter"):
+            DatasetQueueResolver(tmp_path, "ds_a").resolve()
+
+    def test_rejects_missing_base_path(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        with pytest.raises(NotADirectoryError, match="dataset_base_path"):
+            DatasetQueueResolver(tmp_path / "absent", []).resolve()
+
+    def test_rejects_entries_without_data_directory(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        self._make_dataset(tmp_path, "ds_a")
+        (tmp_path / "ds_broken").mkdir()
+
+        with pytest.raises(NotADirectoryError, match="ds_broken"):
+            DatasetQueueResolver(tmp_path, []).resolve()
+
+    def test_rejects_unknown_filter_names(self, tmp_path):
+        from pipelines.param_pipeline.pipeline import DatasetQueueResolver
+
+        self._make_dataset(tmp_path, "ds_a")
+
+        with pytest.raises(NotADirectoryError, match="ds_typo"):
+            DatasetQueueResolver(tmp_path, ["ds_typo"]).resolve()
 
 
 class TestPhysicsCheckConfig:

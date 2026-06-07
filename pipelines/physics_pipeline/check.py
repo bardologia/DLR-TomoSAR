@@ -41,7 +41,6 @@ class PhysicsQuantitiesCheck:
 
         extraction = ExtractionConfig(
             processed_data_path = cfg.dataset_path,
-            tomogram_filename   = cfg.tomogram_filename,
             height_range        = cfg.height_range,
             output_prefix       = cfg.output_prefix,
             output_suffix       = cfg.output_suffix,

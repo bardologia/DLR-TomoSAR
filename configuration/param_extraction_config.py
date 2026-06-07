@@ -44,12 +44,10 @@ class ExtractionConfig:
     pyrat_directory      : Path                          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/pyrat"))
     output_prefix        : str                           = "params"
     output_suffix        : Optional[str]                 = None
-    tomogram_filename    : Optional[str]                 = None
     height_range         : Optional[Tuple[float, float]] = None
     fit_settings         : FitSettings                   = field(default_factory=FitSettings)
     parameter_workers    : int                           = 20
 
-    use_gpu              : bool                          = True
     gpu_batch_size       : int                           = 256
     gpu_pixel_batch_size : int                           = 24576
     adam_steps           : int                           = 3000
@@ -102,29 +100,13 @@ class ExtractionConfig:
 
     def discover_tomogram_path(self) -> Path:
         data_dir = self.data_directory
+        matches  = sorted(data_dir.glob("tomogram_full_*.npy"))
 
-        if self.tomogram_filename:
-            candidate = data_dir / self.tomogram_filename
-            if candidate.is_file():
-                return candidate
+        if len(matches) != 1:
+            found = ", ".join(m.name for m in matches) or "none"
+            raise FileNotFoundError(f"Expected exactly one tomogram_full_*.npy in {data_dir}, found {found}")
 
-        layout_path = data_dir / "dataset.json"
-        if layout_path.is_file():
-            with open(layout_path, "r", encoding="utf-8") as f:
-                layout = json.load(f)
-            fname = layout.get("artifacts", {}).get("tomogram_full")
-            if fname:
-                candidate = data_dir / fname
-                if candidate.is_file():
-                    return candidate
-
-        params_matches = sorted(data_dir.glob("tomogram_full_*params*.npy"))
-        if params_matches:
-            return params_matches[0]
-
-        any_matches = sorted(data_dir.glob("tomogram_full_*.npy"))
-        if any_matches:
-            return any_matches[0]
+        return matches[0]
 
     def discover_height_range(self) -> Tuple[float, float]:
         if self.height_range is not None:
@@ -140,14 +122,14 @@ class ExtractionConfig:
                 if isinstance(hr, (list, tuple)) and len(hr) == 2:
                     return (float(hr[0]), float(hr[1]))
 
-        
+        raise FileNotFoundError(f"No height_range override given and no config_state_*.json with a tomogram height_range under {meta_dir}")
+
 
 @dataclass
 class ExtractParamsEntryConfig:
     dataset_base_path : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
     dataset_filter    : list         = field(default_factory=list)
     pyrat_directory   : Path         = Path("/ste/rnd/User/vice_vi/pyrat")
-    tomogram_filename : str          = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
 
     output_prefix     : str          = "params"
     output_suffix     : str | None   = None
@@ -156,4 +138,6 @@ class ExtractParamsEntryConfig:
     fit_k_max              : int    = 5
     fit_lambda_k           : float  = 3e-3
     fit_sigma_init_divisor : float  = 4.0
-    parameter_workers      : int    = 50
+
+    gpu_device_ids    : list         = field(default_factory=lambda: [0, 1, 3])
+    parameter_workers : int          = 50

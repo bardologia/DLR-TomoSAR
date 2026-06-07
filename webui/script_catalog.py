@@ -17,7 +17,7 @@ class ScriptCatalog:
             "title"     : "Extract Parameters",
             "category"  : "Data",
             "purpose"   : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets.",
-            "essentials": ["dataset_base_path", "tomogram_filename", "output_prefix", "fit_k_max", "fit_sigma_init_divisor"],
+            "essentials": ["dataset_base_path", "dataset_filter", "gpu_device_ids", "output_prefix", "fit_k_max", "fit_sigma_init_divisor"],
         },
         "train": {
             "title"     : "Train",
@@ -41,7 +41,7 @@ class ScriptCatalog:
             "title"     : "Physics Check",
             "category"  : "Analysis",
             "purpose"   : "Compare physical quantities between Gaussian fits and the Capon tomogram to establish physics loss floors.",
-            "essentials": ["dataset_path", "tomogram_filename", "device"],
+            "essentials": ["dataset_path", "device"],
         },
         "tune": {
             "title"     : "Tune",

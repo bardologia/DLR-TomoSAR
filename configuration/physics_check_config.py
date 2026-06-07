@@ -9,7 +9,6 @@ from configuration.training_config import GeometryConfig
 @dataclass
 class PhysicsCheckEntryConfig:
     dataset_path      : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
-    tomogram_filename : str          = "tomogram_full_1000a16000a500a4000_1_Xtomo_id2X.npy"
     height_range      : tuple | None = None
     secondary_labels  : tuple | None = ("PS04", "PS06", "PS08", "PS26")
 

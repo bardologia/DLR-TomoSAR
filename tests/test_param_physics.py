@@ -304,7 +304,6 @@ class TestFittingMetricsRun:
 @dataclass
 class _PhysicsCfg:
     dataset_path      : Path
-    tomogram_filename : str
     height_range      : tuple
     fit_k_max         : int   = 1
     output_prefix     : str   = "params"
@@ -340,18 +339,16 @@ def _build_check(tmp_path: Path, n_gaussians: int = 1, height_range=(-20.0, 20.0
     np.save(data_dir / tomo_name, tomogram)
 
     cfg = _PhysicsCfg(
-        dataset_path      = tmp_path,
-        tomogram_filename = tomo_name,
-        height_range      = height_range,
-        fit_k_max         = n_gaussians,
-        n_pixels          = n_pixels,
+        dataset_path = tmp_path,
+        height_range = height_range,
+        fit_k_max    = n_gaussians,
+        n_pixels     = n_pixels,
     )
 
     from configuration.param_extraction_config import ExtractionConfig, FitMode, FitSettings
 
     extraction = ExtractionConfig(
         processed_data_path = cfg.dataset_path,
-        tomogram_filename   = cfg.tomogram_filename,
         height_range        = cfg.height_range,
         output_prefix       = cfg.output_prefix,
         output_suffix       = cfg.output_suffix,
@@ -367,7 +364,7 @@ def _build_check(tmp_path: Path, n_gaussians: int = 1, height_range=(-20.0, 20.0
 
 class TestPhysicsCheckConstruction:
     def test_device_is_cpu_without_cuda(self):
-        cfg   = _PhysicsCfg(dataset_path=Path("/tmp"), tomogram_filename="x.npy", height_range=(-1.0, 1.0))
+        cfg   = _PhysicsCfg(dataset_path=Path("/tmp"), height_range=(-1.0, 1.0))
         check = PhysicsQuantitiesCheck(cfg, NullLogger())
 
         assert check.device.type == "cpu"
