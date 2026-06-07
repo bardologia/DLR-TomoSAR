@@ -267,7 +267,35 @@ class Report:
         ]))
         out.append("")
 
+        out += self._build_tracks_table()
         out += self._build_baseline_comparison()
+
+        return out
+
+    def _build_tracks_table(self) -> List[str]:
+        tracks = self.global_metrics.get("tracks")
+        if not isinstance(tracks, dict):
+            return []
+
+        out = ["\n### 2.4 Tracks used in this run\n"]
+        out.append(
+            f"Baselines relative to the reference pass `{tracks.get('reference')}` over azimuth window "
+            f"{tracks.get('azimuth_window')}; absolute values are the resa-frame windowed means.\n"
+        )
+
+        labels   = tracks.get("labels", [])
+        n_tracks = len(labels)
+
+        def column(key: str) -> list:
+            values = tracks.get(key) or [float("nan")] * n_tracks
+            return values if len(values) == n_tracks else [float("nan")] * n_tracks
+
+        table = MarkdownTable(("Pass", "Horizontal [m]", "Vertical [m]", "H std [m]", "V std [m]", "H absolute [m]", "V absolute [m]"))
+        for row in zip(labels, column("horizontal"), column("vertical"), column("horizontal_std"), column("vertical_std"), column("horizontal_absolute"), column("vertical_absolute")):
+            table.add_row(row[0], *(self._fmt(value) for value in row[1:]))
+
+        out.append("\n".join(table.render()))
+        out.append("")
 
         return out
 
@@ -350,7 +378,7 @@ class Report:
         for k, v in sorted(gm.items()):
             if self._is_per_slice_ssim(k):
                 continue
-            if "_raw" in k:
+            if "_raw" in k or k == "tracks":
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
@@ -376,6 +404,22 @@ class Report:
         fp  = self.figure_paths
         gp  = self.gif_paths
         out = []
+
+        track_groups = [(key, title) for key, title in (
+            ("track_geometry", "Baseline geometry of the passes used"),
+            ("track_profiles", "Per-azimuth baseline profiles"),
+            ("input_channels", "Pass amplitudes and interferogram phases over the inference region"),
+        ) if fp.get(key)]
+
+        if track_groups:
+            out.append("\n## 3b. Passes and interferograms used\n")
+            out.append(
+                "The model inputs for this run: the primary, the selected secondary passes and "
+                "their interferograms against the primary.\n"
+            )
+            for n, (key, title) in enumerate(track_groups, start=1):
+                out.append(f"\n### 3b.{n} {title}\n")
+                out += self._imgs(key, fp[key])
 
         out.append("\n## 4. Profile reconstructions\n")
         out.append(

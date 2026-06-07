@@ -164,6 +164,112 @@ class Ploter(PlotTools):
             figsize    = (7, 5),
         )
 
+    def plot_track_geometry(self, baselines, out_path: Path) -> Path:
+        fig, ax = plt.subplots(figsize=(5.4, 4.6))
+
+        for index, label in enumerate(baselines.labels):
+            color  = "black" if index == 0 else f"C{(index - 1) % 10}"
+            marker = "*" if index == 0 else "o"
+            size   = 140 if index == 0 else 60
+            ax.scatter(baselines.horizontal[index], baselines.vertical[index], s=size, marker=marker, color=color, zorder=3)
+            ax.annotate(label, (baselines.horizontal[index], baselines.vertical[index]), textcoords="offset points", xytext=(7, 5), fontsize=9)
+            ax.errorbar(baselines.horizontal[index], baselines.vertical[index], xerr=baselines.horizontal_std[index], yerr=baselines.vertical_std[index], fmt="none", ecolor=color, elinewidth=0.7, capsize=2, alpha=0.6)
+
+        ax.set_xlabel(r"horizontal baseline $b_{\perp,\mathrm{h}}$ [m]")
+        ax.set_ylabel(r"vertical baseline $b_{\perp,\mathrm{v}}$ [m]")
+        ax.set_title(f"Passes used  (reference {baselines.reference}, mean over azimuth window)")
+        ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
+    def plot_track_profiles(self, profiles, out_dir: Path, split_azimuth: Optional[Tuple[int, int]] = None) -> List[Path]:
+        azimuth = profiles.azimuth_axis
+        paths   = []
+
+        for component, data, symbol in (
+            ("horizontal", profiles.relative_to_reference("horizontal"), r"$b_{\perp,\mathrm{h}}$"),
+            ("vertical",   profiles.relative_to_reference("vertical"),   r"$b_{\perp,\mathrm{v}}$"),
+        ):
+            fig, ax = plt.subplots(figsize=(7.2, 3.6))
+
+            for index, label in enumerate(profiles.labels):
+                color = "black" if index == 0 else f"C{(index - 1) % 10}"
+                ax.plot(azimuth, data[index], color=color, linewidth=1.0, label=label)
+
+            if split_azimuth is not None:
+                ax.axvspan(split_azimuth[0], split_azimuth[1], color="C7", alpha=0.18, label="inference split")
+
+            ax.set_xlabel("azimuth sample index")
+            ax.set_ylabel(f"{symbol} relative to {profiles.labels[0]} [m]")
+            ax.set_title(f"Per-azimuth {component} baselines of the passes used")
+            ax.legend(framealpha=0.9, fontsize=8, ncol=2)
+            ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
+            fig.tight_layout()
+
+            paths.append(self._save(fig, out_dir / f"baseline_profiles_{component}.png"))
+
+        return paths
+
+    def plot_input_channels(
+        self,
+        complex_inputs : np.ndarray,
+        n_secondaries  : int,
+        labels         : Optional[List[str]],
+        out_dir        : Path,
+        az_offset      : int,
+        rg_offset      : int,
+        primary_label  : str = "primary",
+    ) -> List[Path]:
+
+        H, W   = complex_inputs.shape[-2:]
+        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
+        names  = list(labels) if labels else [f"secondary {i + 1}" for i in range(n_secondaries)]
+        paths  = []
+
+        def _amplitude_panel(channel: np.ndarray, title: str, filename: str) -> Path:
+            amplitude = np.abs(channel).astype(np.float32)
+            vmax      = float(np.percentile(amplitude, 99.0))
+
+            return self._imshow_figure(
+                data       = amplitude,
+                title      = title,
+                x_label    = "range index",
+                y_label    = "azimuth index",
+                cbar_label = "amplitude",
+                extent     = extent,
+                cmap       = "gray",
+                vmin       = 0.0,
+                vmax       = max(vmax, 1e-6),
+                origin     = "upper",
+                path       = out_dir / filename,
+                figsize    = (7, 5),
+            )
+
+        paths.append(_amplitude_panel(complex_inputs[0], f"Primary {primary_label} — amplitude", "pass_primary_amplitude.png"))
+
+        for i in range(n_secondaries):
+            paths.append(_amplitude_panel(complex_inputs[1 + i], f"Secondary {names[i]} — amplitude", f"pass_{names[i]}_amplitude.png"))
+
+        for i in range(n_secondaries):
+            phase = np.angle(complex_inputs[1 + n_secondaries + i]).astype(np.float32)
+
+            paths.append(self._imshow_figure(
+                data       = phase,
+                title      = f"Interferogram {primary_label} × {names[i]} — phase",
+                x_label    = "range index",
+                y_label    = "azimuth index",
+                cbar_label = "phase [rad]",
+                extent     = extent,
+                cmap       = "twilight",
+                vmin       = -np.pi,
+                vmax       = np.pi,
+                origin     = "upper",
+                path       = out_dir / f"interferogram_{names[i]}_phase.png",
+            ))
+
+        return paths
+
     def plot_improvement_map(
         self,
         improvement : np.ndarray,

@@ -21,6 +21,7 @@ from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, 
 from pipelines.shared.io             import FileIO
 from tools.gaussians                 import GaussianClamp
 from tools.logger                    import Logger
+from tools.track_baselines           import TrackBaselines, TrackProfiles
 
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
@@ -119,6 +120,8 @@ class Run:
     complex_inputs   : np.ndarray | None = None
     n_secondaries    : int               = 0
     secondary_labels : list | None       = None
+    track_baselines  : TrackBaselines | None = None
+    track_profiles   : TrackProfiles  | None = None
 
 
 class RunLoader:
@@ -246,6 +249,30 @@ class RunLoader:
 
         return ckpt, x_axis, meta
 
+    def _load_track_info(self, dataset_config: DatasetConfiguration) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
+        dataset_dir = Path(dataset_config.preprocessing_run_directory)
+        labels      = dataset_config.secondary_labels
+
+        baselines_path = dataset_dir / "meta" / TrackBaselines.FILENAME
+        profiles_path  = TrackProfiles.profiles_file(dataset_dir)
+
+        baselines = None
+        profiles  = None
+
+        try:
+            if baselines_path.is_file():
+                baselines = TrackBaselines.load(baselines_path).subset(labels)
+            if profiles_path.is_file():
+                profiles = TrackProfiles.load(profiles_path).subset(labels)
+        except Exception as error:
+            self.logger.subsection(f"Track info unavailable: {error}")
+            return None, None
+
+        if baselines is not None:
+            self.logger.kv_table(baselines.describe(), title="Tracks Used in This Run")
+
+        return baselines, profiles
+
     def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
@@ -304,6 +331,8 @@ class RunLoader:
             norm_stats     = norm_stats,
         )
 
+        track_baselines, track_profiles = self._load_track_info(dataset_config)
+
         loader = DataLoader(
             dataset,
             batch_size  = dataset_config.batch_size,
@@ -349,4 +378,6 @@ class RunLoader:
             complex_inputs   = arrays["inputs"],
             n_secondaries    = arrays["n_secondaries"],
             secondary_labels = arrays.get("secondary_labels"),
+            track_baselines  = track_baselines,
+            track_profiles   = track_profiles,
         )

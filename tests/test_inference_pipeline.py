@@ -17,6 +17,7 @@ from pipelines.inference_pipeline.predictor  import CubeStitcher, Predictor
 from pipelines.inference_pipeline.report     import Report, ReportPayloadBuilder
 from pipelines.inference_pipeline.plots      import Ploter, PlotTools
 from pipelines.inference_pipeline.figures    import Animator
+from tools.track_baselines                   import TrackBaselines, TrackProfiles
 
 
 def _make_result(
@@ -1174,6 +1175,117 @@ class TestPloter:
         assert len(paths) == 2
         for pth in paths:
             assert pth.exists()
+
+
+class TestTrackAndChannelPlots:
+    def _plotter(self):
+        return Ploter(fig_dpi=60, save_dpi=60)
+
+    def _baselines(self):
+        return TrackBaselines(
+            labels         = ["PS02", "PS04", "PS26"],
+            vertical       = [0.0, -0.76, -2.49],
+            horizontal     = [0.0, 7.20, 151.27],
+            vertical_std   = [0.48, 0.68, 0.34],
+            horizontal_std = [0.39, 0.73, 0.40],
+            azimuth_window = (1000, 16000),
+        )
+
+    def _profiles(self):
+        rng = np.random.default_rng(0)
+        return TrackProfiles(
+            labels        = ["PS02", "PS04", "PS26"],
+            horizontal    = rng.random((3, 50)),
+            vertical      = rng.random((3, 50)),
+            azimuth_start = 1000,
+        )
+
+    def test_plot_track_geometry(self, tmp_path):
+        out = self._plotter().plot_track_geometry(self._baselines(), tmp_path / "tracks" / "geometry.png")
+
+        assert out.exists()
+
+    def test_plot_track_profiles(self, tmp_path):
+        paths = self._plotter().plot_track_profiles(self._profiles(), tmp_path / "tracks", split_azimuth=(1010, 1030))
+
+        assert len(paths) == 2
+        for path in paths:
+            assert path.exists()
+
+    def test_plot_input_channels(self, tmp_path):
+        rng    = np.random.default_rng(1)
+        inputs = (rng.normal(size=(5, 8, 9)) + 1j * rng.normal(size=(5, 8, 9))).astype(np.complex64)
+
+        paths = self._plotter().plot_input_channels(
+            complex_inputs = inputs,
+            n_secondaries  = 2,
+            labels         = ["PS04", "PS06"],
+            out_dir        = tmp_path / "channels",
+            az_offset      = 0,
+            rg_offset      = 0,
+            primary_label  = "PS02",
+        )
+
+        assert len(paths) == 5
+        names = {path.name for path in paths}
+        assert "pass_primary_amplitude.png" in names
+        assert "pass_PS04_amplitude.png" in names
+        assert "interferogram_PS06_phase.png" in names
+
+    def test_plot_input_channels_without_labels(self, tmp_path):
+        inputs = np.ones((3, 6, 6), dtype=np.complex64)
+
+        paths = self._plotter().plot_input_channels(
+            complex_inputs = inputs,
+            n_secondaries  = 1,
+            labels         = None,
+            out_dir        = tmp_path / "channels",
+            az_offset      = 0,
+            rg_offset      = 0,
+        )
+
+        assert len(paths) == 3
+
+
+class TestReportTracksTable:
+    def _report(self, tmp_path, metrics):
+        return Report(
+            output_dir       = tmp_path,
+            run_summary      = {},
+            inference_config = {},
+            checkpoint_meta  = {},
+            global_metrics   = metrics,
+            figure_paths     = {},
+            gif_paths        = {},
+            report_path      = tmp_path / "report.md",
+        )
+
+    def test_tracks_table_rendered(self, tmp_path):
+        tracks  = TrackBaselines(
+            labels         = ["PS02", "PS04"],
+            vertical       = [0.0, -0.76],
+            horizontal     = [0.0, 7.20],
+            vertical_std   = [0.48, 0.68],
+            horizontal_std = [0.39, 0.73],
+        ).to_payload()
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1, "tracks": tracks})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "Tracks used in this run" in content
+        assert "PS04" in content
+
+    def test_tracks_excluded_from_full_metric_tables(self, tmp_path):
+        tracks  = TrackBaselines(labels=["PS02"], vertical=[0.0], horizontal=[0.0], vertical_std=[0.1], horizontal_std=[0.1]).to_payload()
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1, "tracks": tracks})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "`tracks`" not in content
+
+    def test_no_tracks_no_section(self, tmp_path):
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "Tracks used in this run" not in content
 
 
 def _make_logger(tmp_path) -> "object":

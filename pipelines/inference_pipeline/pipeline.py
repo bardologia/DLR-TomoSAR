@@ -100,11 +100,12 @@ class InferencePipeline:
 
         try:
             baseline = ClassicalBaseline(
-                run_directory = cfg.run_directory,
-                logger        = logger,
-                window        = tuple(cfg.capon_window),
-                loading       = cfg.capon_loading,
-                phase_sign    = cfg.capon_phase_sign,
+                run_directory     = cfg.run_directory,
+                logger            = logger,
+                preprocessing_dir = run.dataset_config.preprocessing_run_directory,
+                window            = tuple(cfg.capon_window) if cfg.capon_window is not None else None,
+                loading           = cfg.capon_loading,
+                phase_sign        = cfg.capon_phase_sign,
             )
 
             reduced = baseline.compute(
@@ -142,6 +143,11 @@ class InferencePipeline:
             range_indices = indices["all_range_idx"],
             az_indices    = indices["all_az_idx"],
         )
+
+        track_baselines = getattr(run, "track_baselines", None)
+        if track_baselines is not None:
+            global_metrics["tracks"] = track_baselines.to_payload()
+
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics
 
