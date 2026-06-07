@@ -10,6 +10,31 @@ from scipy.ndimage import uniform_filter
 from tools.logger import Logger
 
 
+class PreprocessConfigReader:
+    TOMOGRAM_KEYS = ("tomogram_config", "output_configs", "input_configs")
+
+    def __init__(self, preprocessing_dir: Path) -> None:
+        self.preprocessing_dir = Path(preprocessing_dir)
+
+    def read(self) -> dict:
+        meta_dir   = self.preprocessing_dir / "meta"
+        candidates = sorted(meta_dir.glob("config_state_*.json"))
+
+        if not candidates:
+            raise FileNotFoundError(f"No config_state_*.json under {meta_dir}; cannot read the pre-processing Capon configuration")
+
+        state    = json.loads(candidates[0].read_text(encoding="utf-8"))
+        tomo_cfg = next(state[key] for key in self.TOMOGRAM_KEYS if state.get(key) is not None)
+
+        return {
+            "window"                : tuple(int(v) for v in tomo_cfg["filter_arguments"]["win"]),
+            "filter_method"         : str(tomo_cfg.get("filter_method", "Boxcar")),
+            "beamforming_method"    : str(tomo_cfg.get("beamforming_method", "Capon")),
+            "beamforming_arguments" : list(tomo_cfg.get("beamforming_arguments", [])),
+            "source"                : str(candidates[0]),
+        }
+
+
 class GeometryLoader:
     TRAINER_CONFIG = Path("docs") / "trainer_config.json"
 
@@ -89,20 +114,40 @@ class CaponSpectrum:
 class ClassicalBaseline:
     def __init__(
         self,
-        run_directory : Path,
-        logger        : Logger,
+        run_directory     : Path,
+        logger            : Logger,
         *,
-        window        : tuple = (20, 10),
-        loading       : float = 1e-2,
-        phase_sign    : float = 1.0,
-        chunk_rows    : int   = 64,
+        preprocessing_dir : Path | None  = None,
+        window            : tuple | None = None,
+        loading           : float        = 1e-2,
+        phase_sign        : float        = 1.0,
+        chunk_rows        : int          = 64,
     ) -> None:
-        self.logger     = logger
-        self.geometry   = GeometryLoader(run_directory, logger)
-        self.window     = window
-        self.loading    = loading
-        self.phase_sign = phase_sign
-        self.chunk_rows = chunk_rows
+        self.logger            = logger
+        self.geometry          = GeometryLoader(run_directory, logger)
+        self.preprocessing_dir = preprocessing_dir
+        self.window            = window
+        self.loading           = loading
+        self.phase_sign        = phase_sign
+        self.chunk_rows        = chunk_rows
+
+    def _resolve_window(self) -> tuple:
+        if self.window is not None:
+            self.logger.subsection(f"Window origin   : explicit override {tuple(self.window)}")
+            return tuple(self.window)
+
+        if self.preprocessing_dir is None:
+            raise ValueError("Either an explicit capon_window or the preprocessing_dir is required to resolve the covariance window")
+
+        preprocess = PreprocessConfigReader(self.preprocessing_dir).read()
+
+        self.logger.subsection(f"Window origin   : pre-processing config {preprocess['source']}")
+        if preprocess["beamforming_method"].lower() != "capon":
+            self.logger.subsection(f"Note            : full tomogram used '{preprocess['beamforming_method']}'; the baseline is always Capon")
+        if preprocess["beamforming_arguments"]:
+            self.logger.subsection(f"Note            : pre-processing beamforming arguments {preprocess['beamforming_arguments']} are PyRAT-internal and not replicated")
+
+        return preprocess["window"]
 
     def _build_stack(self, complex_inputs: np.ndarray, n_secondaries: int) -> np.ndarray:
         n_tracks = 1 + n_secondaries
@@ -122,9 +167,12 @@ class ClassicalBaseline:
 
     def compute(self, complex_inputs: np.ndarray, n_secondaries: int, x_axis: np.ndarray, secondary_labels=None) -> np.ndarray:
         self.logger.section("[Classical Capon Baseline]")
+
+        window = self._resolve_window()
+
         self.logger.kv_table({
             "Passes"      : f"primary + {n_secondaries} secondaries" + (f"  ({', '.join(secondary_labels)})" if secondary_labels else ""),
-            "Window"      : str(tuple(self.window)),
+            "Window"      : str(window),
             "Loading"     : self.loading,
             "Phase sign"  : self.phase_sign,
             "Elevations"  : int(np.asarray(x_axis).size),
@@ -135,7 +183,7 @@ class ClassicalBaseline:
             raise ValueError(f"Geometry provides {kz.size} kz values but the stack has {1 + n_secondaries} tracks; the training geometry must match the selected passes")
 
         stack      = self._build_stack(complex_inputs, n_secondaries)
-        covariance = CovarianceEstimator(self.window).estimate(stack)
+        covariance = CovarianceEstimator(window).estimate(stack)
         spectrum   = CaponSpectrum(kz, x_axis, self.loading, self.phase_sign, self.chunk_rows).compute(covariance)
 
         reduced = self.normalize_per_pixel(spectrum)

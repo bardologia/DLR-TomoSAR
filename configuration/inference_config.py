@@ -36,7 +36,7 @@ class InferenceConfig:
     cube_dtype          : str            = "float32"
 
     compare_classical   : bool           = True
-    capon_window        : tuple          = (20, 10)
+    capon_window        : Optional[tuple] = None
     capon_loading       : float          = 1e-2
     capon_phase_sign    : float          = 1.0
 

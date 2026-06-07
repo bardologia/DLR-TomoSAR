@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pipelines.inference_pipeline.baseline import CaponSpectrum, ClassicalBaseline, CovarianceEstimator, GeometryLoader
+from pipelines.inference_pipeline.baseline import CaponSpectrum, ClassicalBaseline, CovarianceEstimator, GeometryLoader, PreprocessConfigReader
 from pipelines.inference_pipeline.metrics  import Metrics, Result
 from tools.logger import NullLogger
 
@@ -26,6 +26,21 @@ def _write_trainer_config(run_dir: Path, baselines, wavelength=0.23, slant_range
         },
     }
     (docs / "trainer_config.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _write_config_state(dataset_dir: Path, win=(20, 10), method="Capon", key="tomogram_config", beamforming_arguments=()):
+    meta = dataset_dir / "meta"
+    meta.mkdir(parents=True, exist_ok=True)
+    payload = {
+        key: {
+            "filter_method"         : "Boxcar",
+            "filter_arguments"      : {"win": list(win)},
+            "beamforming_method"    : method,
+            "beamforming_arguments" : list(beamforming_arguments),
+            "height_range"          : [-20.0, 80.0],
+        },
+    }
+    (meta / "config_state_test.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _synthetic_inputs(kz, height, n_az=24, n_rg=24, amplitude=2.0):
@@ -127,6 +142,59 @@ class TestCaponSpectrum:
         chunked = CaponSpectrum(kz, x_axis, loading=1e-2, phase_sign=1.0, chunk_rows=2).compute(cov)
 
         assert full == pytest.approx(chunked, rel=1e-4)
+
+
+class TestPreprocessConfigReader:
+    def test_reads_window_and_method(self, tmp_path):
+        _write_config_state(tmp_path, win=(40, 20), method="Capon")
+
+        config = PreprocessConfigReader(tmp_path).read()
+
+        assert config["window"] == (40, 20)
+        assert config["beamforming_method"] == "Capon"
+
+    def test_legacy_output_configs_key(self, tmp_path):
+        _write_config_state(tmp_path, win=(10, 10), key="output_configs")
+
+        config = PreprocessConfigReader(tmp_path).read()
+
+        assert config["window"] == (10, 10)
+
+    def test_missing_state_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            PreprocessConfigReader(tmp_path).read()
+
+
+class TestWindowResolution:
+    def _baseline(self, tmp_path, **kwargs):
+        _write_trainer_config(tmp_path, baselines=(0.0, 10.0))
+        return ClassicalBaseline(tmp_path, NullLogger(), **kwargs)
+
+    def test_window_from_preprocessing_config(self, tmp_path):
+        dataset_dir = tmp_path / "dataset"
+        _write_config_state(dataset_dir, win=(40, 20))
+        baseline = self._baseline(tmp_path, preprocessing_dir=dataset_dir)
+
+        assert baseline._resolve_window() == (40, 20)
+
+    def test_explicit_window_overrides_preprocessing(self, tmp_path):
+        dataset_dir = tmp_path / "dataset"
+        _write_config_state(dataset_dir, win=(40, 20))
+        baseline = self._baseline(tmp_path, preprocessing_dir=dataset_dir, window=(5, 5))
+
+        assert baseline._resolve_window() == (5, 5)
+
+    def test_no_window_and_no_dataset_raises(self, tmp_path):
+        baseline = self._baseline(tmp_path)
+
+        with pytest.raises(ValueError, match="capon_window"):
+            baseline._resolve_window()
+
+    def test_missing_config_state_raises(self, tmp_path):
+        baseline = self._baseline(tmp_path, preprocessing_dir=tmp_path / "dataset")
+
+        with pytest.raises(FileNotFoundError):
+            baseline._resolve_window()
 
 
 class TestClassicalBaseline:
