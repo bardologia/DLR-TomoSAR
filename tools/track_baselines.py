@@ -161,6 +161,29 @@ class TrackProfiles:
         profiles = self.vertical if component == "vertical" else self.horizontal
         return profiles - profiles[0]
 
+    def planar_deviation(self) -> np.ndarray:
+        h_centered = self.horizontal - np.nanmean(self.horizontal, axis=1, keepdims=True)
+        v_centered = self.vertical   - np.nanmean(self.vertical,   axis=1, keepdims=True)
+        return np.sqrt(h_centered ** 2 + v_centered ** 2)
+
+    def deviation_radii(self) -> np.ndarray:
+        return np.sqrt(np.nanmean(self.planar_deviation() ** 2, axis=1))
+
+    def position_summary(self) -> dict:
+        deviation = self.planar_deviation()
+
+        return {
+            "labels"          : list(self.labels),
+            "horizontal_mean" : [float(x) for x in np.nanmean(self.horizontal, axis=1)],
+            "vertical_mean"   : [float(x) for x in np.nanmean(self.vertical,   axis=1)],
+            "horizontal_span" : [float(x) for x in np.nanmax(self.horizontal, axis=1) - np.nanmin(self.horizontal, axis=1)],
+            "vertical_span"   : [float(x) for x in np.nanmax(self.vertical,   axis=1) - np.nanmin(self.vertical,   axis=1)],
+            "deviation_rms"   : [float(x) for x in np.sqrt(np.nanmean(deviation ** 2, axis=1))],
+            "deviation_max"   : [float(x) for x in np.nanmax(deviation, axis=1)],
+            "azimuth_start"   : int(self.azimuth_start),
+            "n_samples"       : self.n_samples,
+        }
+
     def subset(self, secondary_labels) -> "TrackProfiles":
         if secondary_labels is None:
             return self

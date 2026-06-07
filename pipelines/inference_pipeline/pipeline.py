@@ -139,6 +139,9 @@ class InferencePipeline:
         if run.track_baselines is not None:
             global_metrics["tracks"] = run.track_baselines.to_payload()
 
+        if run.track_profiles is not None:
+            global_metrics["track_positions"] = run.track_profiles.position_summary()
+
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics
 

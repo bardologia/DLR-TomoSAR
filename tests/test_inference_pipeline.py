@@ -1214,6 +1214,11 @@ class TestTrackAndChannelPlots:
         for path in paths:
             assert path.exists()
 
+    def test_plot_track_flight_3d(self, tmp_path):
+        out = self._plotter().plot_track_flight_3d(self._profiles(), tmp_path / "tracks" / "flight_tracks_3d.png")
+
+        assert out.exists()
+
     def test_plot_input_channels(self, tmp_path):
         rng    = np.random.default_rng(1)
         inputs = (rng.normal(size=(5, 8, 9)) + 1j * rng.normal(size=(5, 8, 9))).astype(np.complex64)
@@ -1288,6 +1293,34 @@ class TestReportTracksTable:
         content = report.assemble().read_text(encoding="utf-8")
 
         assert "Tracks used in this run" not in content
+
+    def _positions(self):
+        return TrackProfiles(
+            labels        = ["PS02", "PS04"],
+            horizontal    = np.array([[0.0, 0.0], [3.0, 5.0]]),
+            vertical      = np.array([[1.0, 1.0], [2.0, 4.0]]),
+            azimuth_start = 1000,
+        ).position_summary()
+
+    def test_track_positions_table_rendered(self, tmp_path):
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1, "track_positions": self._positions()})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "Track positions and temporal deviation" in content
+        assert "Planar dev RMS [m]" in content
+        assert "PS04" in content
+
+    def test_track_positions_excluded_from_full_metric_tables(self, tmp_path):
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1, "track_positions": self._positions()})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "`track_positions`" not in content
+
+    def test_no_positions_no_section(self, tmp_path):
+        report  = self._report(tmp_path, {"curve_mse_gt": 0.1})
+        content = report.assemble().read_text(encoding="utf-8")
+
+        assert "Track positions and temporal deviation" not in content
 
 
 def _make_logger(tmp_path) -> "object":

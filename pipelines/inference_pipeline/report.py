@@ -268,6 +268,7 @@ class Report:
         out.append("")
 
         out += self._build_tracks_table()
+        out += self._build_track_positions_table()
         out += self._build_baseline_comparison()
 
         return out
@@ -299,6 +300,35 @@ class Report:
 
         return out
 
+    def _build_track_positions_table(self) -> List[str]:
+        positions = self.global_metrics.get("track_positions")
+        if not isinstance(positions, dict):
+            return []
+
+        out = ["\n### 2.5 Track positions and temporal deviation\n"]
+        out.append(
+            f"Absolute mean positions in the resa track frame over {positions['n_samples']} azimuth samples "
+            f"starting at index {positions['azimuth_start']}. Spans are peak-to-peak excursions per component; "
+            f"the planar deviation is the distance of each sample from the per-pass mean position in the "
+            f"horizontal-vertical plane, summarising how much the pass drifted over time.\n"
+        )
+
+        labels   = positions["labels"]
+        n_tracks = len(labels)
+
+        def column(key: str) -> list:
+            values = positions[key]
+            return values if len(values) == n_tracks else [float("nan")] * n_tracks
+
+        table = MarkdownTable(("Pass", "H mean [m]", "V mean [m]", "H span [m]", "V span [m]", "Planar dev RMS [m]", "Planar dev max [m]"))
+        for row in zip(labels, column("horizontal_mean"), column("vertical_mean"), column("horizontal_span"), column("vertical_span"), column("deviation_rms"), column("deviation_max")):
+            table.add_row(row[0], *(self._fmt(value) for value in row[1:]))
+
+        out.append("\n".join(table.render()))
+        out.append("")
+
+        return out
+
     @staticmethod
     def _improvement(baseline: Any, model: Any) -> str:
         if not isinstance(baseline, (int, float)) or not isinstance(model, (int, float)):
@@ -312,7 +342,7 @@ class Report:
         if gm.get("curve_mse_red") is None:
             return []
 
-        out = ["\n### 2.5 Classical Capon baseline (passes used in training)\n"]
+        out = ["\n### 2.6 Classical Capon baseline (passes used in training)\n"]
         out.append(
             "The reduced tomogram is re-synthesised at inference time with classical Capon beamforming "
             "from exactly the passes this model was trained on, per-pixel max-normalised like the GT. "
@@ -378,7 +408,7 @@ class Report:
         for k, v in sorted(gm.items()):
             if self._is_per_slice_ssim(k):
                 continue
-            if "_raw" in k or k == "tracks":
+            if "_raw" in k or k in ("tracks", "track_positions"):
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
@@ -406,9 +436,10 @@ class Report:
         out = []
 
         track_groups = [(key, title) for key, title in (
-            ("track_geometry", "Baseline geometry of the passes used"),
-            ("track_profiles", "Per-azimuth baseline profiles"),
-            ("input_channels", "Pass amplitudes and interferogram phases over the inference region"),
+            ("track_geometry",  "Baseline geometry of the passes used"),
+            ("track_profiles",  "Per-azimuth baseline profiles"),
+            ("track_flight_3d", "3D flight tracks with temporal deviation envelopes"),
+            ("input_channels",  "Pass amplitudes and interferogram phases over the inference region"),
         ) if fp.get(key)]
 
         if track_groups:

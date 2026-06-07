@@ -334,6 +334,12 @@ class FigureComposer:
             )
             logger.subsection(f"Track profiles : {len(figure_paths['track_profiles'])} figures in {meta.figures_dir / 'tracks'}")
 
+            figure_paths["track_flight_3d"] = [plotter.plot_track_flight_3d(
+                profiles = run.track_profiles,
+                out_path = meta.figures_dir / "tracks" / "flight_tracks_3d.png",
+            )]
+            logger.subsection(f"Flight tracks 3D : {meta.figures_dir / 'tracks' / 'flight_tracks_3d.png'}")
+
         if run.complex_inputs is not None and run.n_secondaries > 0:
             figure_paths["input_channels"] = plotter.plot_input_channels(
                 complex_inputs = run.complex_inputs,

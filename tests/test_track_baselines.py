@@ -165,6 +165,50 @@ class TestProfilePersistence:
         assert TrackProfiles.profiles_file(tmp_path) == tmp_path / "data" / TrackProfiles.FILENAME
 
 
+class TestProfileDeviation:
+    def _profiles(self):
+        return TrackProfiles(
+            labels        = ["PS02", "PS04"],
+            horizontal    = np.array([[2.0, 2.0, 2.0, 2.0], [0.0, 0.0, 6.0, 6.0]]),
+            vertical      = np.array([[5.0, 5.0, 5.0, 5.0], [1.0, 5.0, 1.0, 5.0]]),
+            azimuth_start = 1000,
+        )
+
+    def test_planar_deviation_zero_for_constant_track(self):
+        deviation = self._profiles().planar_deviation()
+
+        assert deviation[0] == pytest.approx(np.zeros(4))
+
+    def test_planar_deviation_combines_components(self):
+        deviation = self._profiles().planar_deviation()
+
+        assert deviation[1] == pytest.approx(np.full(4, np.hypot(3.0, 2.0)))
+
+    def test_deviation_radii_are_rms(self):
+        radii = self._profiles().deviation_radii()
+
+        assert radii[0] == pytest.approx(0.0)
+        assert radii[1] == pytest.approx(np.hypot(3.0, 2.0))
+
+    def test_position_summary_values(self):
+        summary = self._profiles().position_summary()
+
+        assert summary["labels"]          == ["PS02", "PS04"]
+        assert summary["horizontal_mean"] == pytest.approx([2.0, 3.0])
+        assert summary["vertical_mean"]   == pytest.approx([5.0, 3.0])
+        assert summary["horizontal_span"] == pytest.approx([0.0, 6.0])
+        assert summary["vertical_span"]   == pytest.approx([0.0, 4.0])
+        assert summary["deviation_rms"]   == pytest.approx([0.0, np.hypot(3.0, 2.0)])
+        assert summary["deviation_max"]   == pytest.approx([0.0, np.hypot(3.0, 2.0)])
+        assert summary["azimuth_start"]   == 1000
+        assert summary["n_samples"]       == 4
+
+    def test_position_summary_is_plain_json(self):
+        import json
+
+        json.dumps(self._profiles().position_summary())
+
+
 class TestProfileSubset:
     def _profiles(self):
         return TrackProfiles(
