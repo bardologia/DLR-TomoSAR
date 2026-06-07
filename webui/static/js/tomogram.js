@@ -1,6 +1,8 @@
 "use strict";
 
 class TomogramView {
+  static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
+
   constructor(refs) {
     this.strip = refs.strip;
     this.stage = refs.stage;
@@ -11,13 +13,18 @@ class TomogramView {
     this.hint = refs.hint;
     this.panels = refs.panels;
     this.slicesEl = refs.slices;
+    this.progress = refs.progress;
+    this.progressFill = refs.progressFill;
+    this.progressLabel = refs.progressLabel;
 
     this.cubes = [];
     this.selectedId = null;
+    this.meta = null;
     this.source = "pred";
     this.point = null;
     this.pinned = false;
-    this.loaded = false;
+    this.entered = false;
+    this.polling = false;
     this.fetching = false;
     this.queued = null;
 
@@ -29,8 +36,8 @@ class TomogramView {
   }
 
   async enter() {
-    if (this.loaded) return;
-    this.loaded = true;
+    if (this.entered) return;
+    this.entered = true;
     await this.refresh();
   }
 
@@ -53,7 +60,8 @@ class TomogramView {
       return;
     }
 
-    if (!this.cubes.some((c) => c.id === this.selectedId)) this.select(this.cubes[0].id);
+    this.hint.textContent = "Select a cube directory to load it into memory.";
+    this.hint.hidden = false;
   }
 
   _renderStrip() {
@@ -71,62 +79,126 @@ class TomogramView {
     });
   }
 
-  _cube() {
-    return this.cubes.find((c) => c.id === this.selectedId) || null;
-  }
+  async select(cubeId) {
+    if (this.polling) {
+      window.toast("A cube is still loading.", "warn");
+      return;
+    }
+    if (cubeId === this.selectedId && this.meta) return;
 
-  select(cubeId) {
     this.selectedId = cubeId;
+    this.meta = null;
     this.point = null;
     this.pinned = false;
     this.queued = null;
     this.cross.hidden = true;
     this.coords.textContent = "hover the map to explore, click to pin";
+    this.stage.hidden = true;
     this.slicesEl.hidden = true;
+    this.hint.hidden = true;
     this._renderStrip();
 
-    const cube = this._cube();
-    if (!cube) return;
+    const res = await window.apiPost("/api/cubes/load", { id: cubeId });
+    if (!res.ok) {
+      this.hint.textContent = res.error || "Cube load failed.";
+      this.hint.hidden = false;
+      return;
+    }
 
-    if (!cube.sources.includes(this.source)) this.source = cube.sources[0] || "pred";
+    this._setProgress(0, "loading");
+    this.progress.hidden = false;
+    await this._poll();
+  }
+
+  async _poll() {
+    this.polling = true;
+
+    while (true) {
+      let st;
+      try {
+        st = await window.apiGet("/api/cubes/status");
+      } catch (e) {
+        this._failLoad("Backend unreachable.");
+        break;
+      }
+
+      if (st.id !== this.selectedId) {
+        this.progress.hidden = true;
+        break;
+      }
+
+      if (st.state === "loading") {
+        this._setProgress(st.progress || 0, st.stage || "loading");
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+
+      if (st.state === "ready" && st.cube) {
+        this._setProgress(1, "ready");
+        this._display(st.cube);
+        break;
+      }
+
+      this._failLoad(st.error || "Cube load failed.");
+      break;
+    }
+
+    this.polling = false;
+  }
+
+  _failLoad(message) {
+    this.progress.hidden = true;
+    this.hint.textContent = message;
+    this.hint.hidden = false;
+  }
+
+  _setProgress(frac, stage) {
+    const pct = Math.max(0, Math.min(100, Math.round(frac * 100)));
+    this.progressFill.style.width = `${pct}%`;
+    const label = TomogramView.LABELS[stage] || stage;
+    this.progressLabel.textContent = `${label} — ${pct}%`;
+  }
+
+  _display(meta) {
+    this.meta = meta;
+    this.progress.hidden = true;
+
+    if (!meta.sources.includes(this.source)) this.source = meta.sources[0];
     this._syncSourceBtns();
 
     this.panels.forEach((panel) => {
-      panel.root.hidden = panel.source === "gt" && !cube.sources.includes("gt");
+      panel.root.hidden = !meta.sources.includes(panel.source);
     });
 
     this.hint.hidden = true;
     this.stage.hidden = false;
-    this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(cubeId)}&source=${this.source}`;
+    this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
   }
 
   _setSource(source) {
-    const cube = this._cube();
-    if (source === this.source || !cube || !cube.sources.includes(source)) return;
+    if (source === this.source || !this.meta || !this.meta.sources.includes(source)) return;
     this.source = source;
     this._syncSourceBtns();
     this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
   }
 
   _syncSourceBtns() {
-    const cube = this._cube();
     this.sourceBtns.forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.source === this.source);
-      btn.disabled = !cube || !cube.sources.includes(btn.dataset.source);
+      btn.disabled = !this.meta || !this.meta.sources.includes(btn.dataset.source);
     });
   }
 
   _pointFromEvent(ev) {
-    const cube = this._cube();
-    if (!cube) return null;
+    if (!this.meta) return null;
 
     const rect = this.topdown.getBoundingClientRect();
     const fx = (ev.clientX - rect.left) / rect.width;
     const fy = (ev.clientY - rect.top) / rect.height;
 
     return {
-      az: Math.min(cube.n_az - 1, Math.max(0, Math.floor(fy * cube.n_az))),
-      rg: Math.min(cube.n_rg - 1, Math.max(0, Math.floor(fx * cube.n_rg))),
+      az: Math.min(this.meta.n_az - 1, Math.max(0, Math.floor(fy * this.meta.n_az))),
+      rg: Math.min(this.meta.n_rg - 1, Math.max(0, Math.floor(fx * this.meta.n_rg))),
       fx,
       fy,
     };
@@ -186,8 +258,7 @@ class TomogramView {
   }
 
   async _drawSlices(az, rg) {
-    const cube = this._cube();
-    if (!cube) return;
+    if (!this.meta) return;
 
     this.slicesEl.hidden = false;
 
@@ -208,7 +279,7 @@ class TomogramView {
           const ctx = canvas.getContext("2d");
           ctx.drawImage(bitmap, 0, 0);
 
-          const markerFrac = panel.axis === "range" ? az / cube.n_az : rg / cube.n_rg;
+          const markerFrac = panel.axis === "range" ? az / this.meta.n_az : rg / this.meta.n_rg;
           ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
           ctx.setLineDash([4, 4]);
           ctx.lineWidth = 1;
@@ -218,10 +289,11 @@ class TomogramView {
           ctx.stroke();
           ctx.setLineDash([]);
 
+          const label = TomogramView.LABELS[panel.source] || panel.source;
           panel.caption.textContent =
             panel.axis === "range"
-              ? `${panel.source} — range cut @ rg=${rg}`
-              : `${panel.source} — azimuth cut @ az=${az}`;
+              ? `${label} — range cut @ rg=${rg}`
+              : `${label} — azimuth cut @ az=${az}`;
         } catch (e) {}
       });
 

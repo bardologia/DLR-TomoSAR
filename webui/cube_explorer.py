@@ -17,37 +17,55 @@ from web_logger import WebLogger
 
 class CubeExplorer:
 
-    SOURCES = ("pred", "gt")
+    SOURCES = ("pred", "gt", "reduced", "full")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths     = paths
         self.logger    = logger
         self.logs_root = (paths.repo_root / "logs").resolve()
-        self.cache     = {}
         self.lock      = threading.Lock()
+        self.loaded    = None
+        self.status    = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
 
     def list_cubes(self) -> list[dict]:
         cubes = []
         for cube_file in sorted(self.logs_root.rglob("inference/*/cubes/pred_curves.npy")):
             stamp_dir = cube_file.parent.parent
             run_dir   = stamp_dir.parent.parent
-            shape     = self._shape(cube_file)
-            if shape is None:
-                continue
 
             cubes.append({
-                "id"      : str(stamp_dir.relative_to(self.logs_root)),
-                "run"     : run_dir.name,
-                "group"   : str(run_dir.relative_to(self.logs_root).parent),
-                "stamp"   : stamp_dir.name,
-                "sources" : [s for s in self.SOURCES if (stamp_dir / "cubes" / f"{s}_curves.npy").is_file()],
-                "n_elev"  : shape[0],
-                "n_az"    : shape[1],
-                "n_rg"    : shape[2],
+                "id"    : str(stamp_dir.relative_to(self.logs_root)),
+                "run"   : run_dir.name,
+                "group" : str(run_dir.relative_to(self.logs_root).parent),
+                "stamp" : stamp_dir.name,
             })
 
         cubes.sort(key=lambda c: c["id"], reverse=True)
         return cubes
+
+    def start_load(self, cube_id: str) -> dict:
+        stamp_dir = self._stamp_dir(cube_id)
+        if stamp_dir is None:
+            return {"ok": False, "error": f"unknown cube id: {cube_id}"}
+
+        with self.lock:
+            if self.status["state"] == "loading":
+                return {"ok": False, "error": f"a load is already running for {self.status['id']}"}
+            if self.status["state"] == "ready" and self.status["id"] == cube_id and self.loaded is not None:
+                return {"ok": True}
+
+            self.loaded = None
+            self.status = {"state": "loading", "id": cube_id, "progress": 0.0, "stage": "scanning sources", "error": ""}
+
+        threading.Thread(target=self._load_worker, args=(cube_id, stamp_dir), daemon=True).start()
+        return {"ok": True}
+
+    def load_status(self) -> dict:
+        with self.lock:
+            payload = dict(self.status)
+            if payload["state"] == "ready" and self.loaded is not None:
+                payload["cube"] = self.loaded["meta"]
+        return payload
 
     def topdown_png(self, cube_id: str, source: str) -> bytes | None:
         entry = self._entry(cube_id, source)
@@ -72,9 +90,9 @@ class CubeExplorer:
         rg                 = int(np.clip(rg, 0, n_rg - 1))
 
         if axis == "range":
-            data = np.asarray(cube[:, :, rg], dtype=np.float32)
+            data = cube[:, :, rg]
         else:
-            data = np.asarray(cube[:, az, :], dtype=np.float32)
+            data = cube[:, az, :]
 
         sort_idx = np.argsort(entry["x_axis"])
         data     = np.flipud(data[sort_idx])
@@ -84,74 +102,157 @@ class CubeExplorer:
         return buf.getvalue()
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
-        if source not in self.SOURCES:
-            return None
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            return self.loaded["entries"].get(source)
 
+    def _stamp_dir(self, cube_id: str) -> Path | None:
         stamp_dir = (self.logs_root / cube_id).resolve()
         if not str(stamp_dir).startswith(str(self.logs_root)):
             return None
-
-        cube_path = stamp_dir / "cubes" / f"{source}_curves.npy"
-        if not cube_path.is_file():
+        if not (stamp_dir / "cubes" / "pred_curves.npy").is_file():
             return None
+        return stamp_dir
 
-        key   = str(cube_path)
-        mtime = cube_path.stat().st_mtime
-
-        with self.lock:
-            cached = self.cache.get(key)
-            if cached is not None and cached["mtime"] == mtime:
-                return cached
-
-        cube = np.load(cube_path, mmap_mode="r")
-        if cube.ndim != 3:
-            return None
-
-        mean    = np.zeros(cube.shape[1:], dtype=np.float32)
-        samples = []
-        step    = max(1, cube.shape[0] // 8)
-        for i in range(cube.shape[0]):
-            plane = np.asarray(cube[i], dtype=np.float32)
-            mean += plane
-            if i % step == 0:
-                samples.append(plane[:: max(1, plane.shape[0] // 200), :: max(1, plane.shape[1] // 200)].ravel())
-        mean /= cube.shape[0]
-
-        sampled    = np.concatenate(samples)
-        sampled    = sampled[np.isfinite(sampled)]
-        vmin, vmax = (np.percentile(sampled, [1.0, 99.0]) if sampled.size else (0.0, 1.0))
-
-        x_axis, has_axis = self._elevation_axis(stamp_dir, cube.shape[0])
-
-        entry = {
-            "cube"     : cube,
-            "mean"     : mean,
-            "x_axis"   : x_axis,
-            "has_axis" : has_axis,
-            "vmin"     : float(vmin),
-            "vmax"     : float(vmax),
-            "mtime"    : mtime,
-        }
-        with self.lock:
-            self.cache[key] = entry
-
-        self.logger.muted(f"cube loaded: {cube_path} shape={cube.shape}")
-        return entry
-
-    def _elevation_axis(self, stamp_dir: Path, n_elev: int) -> tuple[np.ndarray, bool]:
-        metrics_path = stamp_dir / "metrics.json"
+    def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
-            lo      = float(metrics["x_axis_min"])
-            hi      = float(metrics["x_axis_max"])
-            return np.linspace(lo, hi, n_elev), True
-        except (OSError, ValueError, KeyError):
-            return np.arange(n_elev, dtype=np.float64), False
+            entries, meta = self._load_all(stamp_dir)
+
+            with self.lock:
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta}
+                self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
+
+            self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
+        except Exception as exc:
+            with self.lock:
+                self.loaded = None
+                self.status = {"state": "error", "id": cube_id, "progress": 0.0, "stage": "", "error": str(exc)}
+
+            self.logger.error(f"cube load failed: {cube_id}: {exc}")
+
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict]:
+        cubes_dir = stamp_dir / "cubes"
+        pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
+        if pred_raw.ndim != 3:
+            raise ValueError(f"pred_curves.npy is not a 3D cube: shape={pred_raw.shape}")
+
+        n_elev, n_az, n_rg = pred_raw.shape
+        curve_axis         = self._curve_axis(stamp_dir, n_elev)
+
+        plan = [("pred", pred_raw, curve_axis)]
+        for source in ("gt", "reduced"):
+            path = cubes_dir / f"{source}_curves.npy"
+            if path.is_file():
+                plan.append((source, np.load(path, mmap_mode="r"), curve_axis))
+
+        full_raw = self._full_raw(stamp_dir, n_az, n_rg)
+        if full_raw is not None:
+            plan.append(("full", full_raw, np.arange(full_raw.shape[0], dtype=np.float64)))
+
+        total = sum(raw.shape[0] for _, raw, _ in plan)
+        done  = [0]
+
+        def advance(source: str) -> None:
+            done[0] += 1
+            with self.lock:
+                self.status["progress"] = done[0] / total
+                self.status["stage"]    = source
+
+        entries = {}
+        for source, raw, x_axis in plan:
+            if raw.shape[1:] != (n_az, n_rg):
+                raise ValueError(f"source '{source}' spatial shape {raw.shape[1:]} does not match pred {(n_az, n_rg)}")
+            entries[source] = self._ingest(raw, x_axis, lambda s=source: advance(s))
+
+        meta = {
+            "sources" : [s for s in self.SOURCES if s in entries],
+            "n_az"    : n_az,
+            "n_rg"    : n_rg,
+            "n_elev"  : {s: int(entries[s]["cube"].shape[0]) for s in entries},
+        }
+        return entries, meta
+
+    def _ingest(self, raw: np.ndarray, x_axis: np.ndarray, advance) -> dict:
+        cube = np.empty(raw.shape, dtype=np.float32)
+
+        for i in range(raw.shape[0]):
+            plane   = np.asarray(raw[i])
+            cube[i] = np.abs(plane) if np.iscomplexobj(plane) else plane
+            advance()
+
+        sample     = cube[:, :: max(1, cube.shape[1] // 256), :: max(1, cube.shape[2] // 256)]
+        sample     = sample[np.isfinite(sample)]
+        vmin, vmax = (np.percentile(sample, [1.0, 99.0]) if sample.size else (0.0, 1.0))
+        mean       = cube.mean(axis=0)
+
+        return {
+            "cube"   : cube,
+            "mean"   : mean,
+            "x_axis" : x_axis,
+            "vmin"   : float(vmin),
+            "vmax"   : float(vmax),
+        }
+
+    def _curve_axis(self, stamp_dir: Path, n_elev: int) -> np.ndarray:
+        metrics_path = stamp_dir / "metrics.json"
+        if not metrics_path.is_file():
+            raise FileNotFoundError(f"metrics.json missing in {stamp_dir}; rerun inference to regenerate it")
+
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        return np.linspace(float(metrics["x_axis_min"]), float(metrics["x_axis_max"]), n_elev)
+
+    def _full_raw(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
+        meta_path = stamp_dir.parent.parent / "meta" / "dataset_creation_config.json"
+        if not meta_path.is_file():
+            return None
+
+        payload     = json.loads(meta_path.read_text(encoding="utf-8"))
+        preproc_dir = Path(payload["preprocessing_run_directory"])
+        layout_path = preproc_dir / "data" / "dataset.json"
+        if not layout_path.is_file():
+            return None
+
+        layout    = json.loads(layout_path.read_text(encoding="utf-8"))
+        tomo_name = layout["artifacts"].get("tomogram_full")
+        if not tomo_name:
+            return None
+
+        tomo_path = preproc_dir / "data" / tomo_name
+        if not tomo_path.is_file():
+            return None
+
+        region      = self._matching_region(payload["split_regions"], n_az, n_rg)
+        global_crop = layout["global_crop"]
+        az_lo       = region["azimuth_start"] - global_crop[0]
+        az_hi       = region["azimuth_end"]   - global_crop[0]
+        rg_lo       = region["range_start"]   - global_crop[2]
+        rg_hi       = region["range_end"]     - global_crop[2]
+
+        raw = np.load(tomo_path, mmap_mode="r")
+        if raw.ndim != 3:
+            raise ValueError(f"full tomogram is not a 3D cube: shape={raw.shape}")
+        if az_lo < 0 or rg_lo < 0 or az_hi > raw.shape[1] or rg_hi > raw.shape[2]:
+            raise ValueError(f"cube region az[{az_lo}:{az_hi}] rg[{rg_lo}:{rg_hi}] falls outside the full tomogram {raw.shape}")
+
+        return raw[:, az_lo:az_hi, rg_lo:rg_hi]
 
     @staticmethod
-    def _shape(cube_path: Path) -> tuple | None:
-        try:
-            shape = np.load(cube_path, mmap_mode="r").shape
-        except (OSError, ValueError):
-            return None
-        return shape if len(shape) == 3 else None
+    def _matching_region(split_regions: dict, n_az: int, n_rg: int) -> dict:
+        candidates = []
+        for value in split_regions.values():
+            candidates.extend(value if isinstance(value, list) else [value])
+
+        matches = []
+        for region in candidates:
+            az_size = region["azimuth_end"] - region["azimuth_start"]
+            rg_size = region["range_end"]   - region["range_start"]
+            if (az_size, rg_size) == (n_az, n_rg):
+                key = (region["azimuth_start"], region["azimuth_end"], region["range_start"], region["range_end"])
+                if key not in [m[0] for m in matches]:
+                    matches.append((key, region))
+
+        if len(matches) != 1:
+            raise ValueError(f"cannot resolve the crop region for a {n_az}x{n_rg} cube: {len(matches)} split regions match")
+
+        return matches[0][1]

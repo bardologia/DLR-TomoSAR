@@ -155,15 +155,18 @@ class App {
     );
 
     this.tomogramView = new window.TomogramView({
-      strip      : document.getElementById("cube-strip"),
-      stage      : document.getElementById("cube-stage"),
-      topdown    : document.getElementById("cube-topdown"),
-      cross      : document.getElementById("cube-cross"),
-      coords     : document.getElementById("cube-coords"),
-      hint       : document.getElementById("cube-hint"),
-      slices     : document.getElementById("cube-slices"),
-      sourceBtns : [...document.querySelectorAll(".cube-source")],
-      panels     : [...document.querySelectorAll(".cube-slice")].map((root) => ({
+      strip         : document.getElementById("cube-strip"),
+      stage         : document.getElementById("cube-stage"),
+      topdown       : document.getElementById("cube-topdown"),
+      cross         : document.getElementById("cube-cross"),
+      coords        : document.getElementById("cube-coords"),
+      hint          : document.getElementById("cube-hint"),
+      slices        : document.getElementById("cube-slices"),
+      progress      : document.getElementById("cube-progress"),
+      progressFill  : document.getElementById("cube-progress-fill"),
+      progressLabel : document.getElementById("cube-progress-label"),
+      sourceBtns    : [...document.querySelectorAll(".cube-source")],
+      panels        : [...document.querySelectorAll(".cube-slice")].map((root) => ({
         root,
         axis    : root.dataset.axis,
         source  : root.dataset.source,

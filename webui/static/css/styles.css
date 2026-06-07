@@ -1609,6 +1609,11 @@ em { font-style: italic; color: var(--accent); }
 
 .cube-hint { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
 
+.cube-progress { max-width: 520px; margin: 4px 0 14px; }
+.cube-progress__track { height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.cube-progress__fill { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.3s ease; }
+.cube-progress__label { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin: 8px 0 0; }
+
 .cube-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
 
 .cube-map {

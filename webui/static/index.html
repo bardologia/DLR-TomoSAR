@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260613b" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260614a" />
 </head>
 <body>
 
@@ -191,18 +191,25 @@
       <div>
         <h2 class="page__title">Tomogram explorer</h2>
         <p class="page__lead">
-          Top-down mean intensity of a saved inference cube. Hover the map to cut the
-          tomogram live along range and azimuth, prediction next to ground truth.
-          Click to pin a point, click again to release.
+          Pick a saved inference cube to load it into memory, then hover the top-down map
+          to cut every tomogram live along range and azimuth: prediction, GT parameter
+          reconstruction, reduced-stack Capon and full-stack Capon. Click to pin a point,
+          click again to release.
         </p>
       </div>
       <div class="cube-sources">
         <button type="button" class="btn btn--mini cube-source is-active" data-source="pred">Pred</button>
         <button type="button" class="btn btn--mini cube-source" data-source="gt">GT</button>
+        <button type="button" class="btn btn--mini cube-source" data-source="reduced">Reduced</button>
+        <button type="button" class="btn btn--mini cube-source" data-source="full">Full</button>
       </div>
     </div>
     <div class="tb-strip" id="cube-strip" aria-label="Saved cubes"></div>
-    <p class="cube-hint" id="cube-hint">Loading&hellip;</p>
+    <p class="cube-hint" id="cube-hint">Loading directories&hellip;</p>
+    <div class="cube-progress" id="cube-progress" hidden>
+      <div class="cube-progress__track"><i class="cube-progress__fill" id="cube-progress-fill"></i></div>
+      <p class="cube-progress__label" id="cube-progress-label">loading&hellip;</p>
+    </div>
     <div class="cube-stage" id="cube-stage" hidden>
       <div class="cube-map">
         <div class="cube-map__wrap">
@@ -215,10 +222,14 @@
         <div class="cube-pair">
           <figure class="cube-slice" data-axis="range" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
           <figure class="cube-slice" data-axis="range" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="range" data-source="reduced"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="range" data-source="full"><canvas></canvas><figcaption></figcaption></figure>
         </div>
         <div class="cube-pair">
           <figure class="cube-slice" data-axis="azimuth" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
           <figure class="cube-slice" data-axis="azimuth" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><canvas></canvas><figcaption></figcaption></figure>
+          <figure class="cube-slice" data-axis="azimuth" data-source="full"><canvas></canvas><figcaption></figcaption></figure>
         </div>
       </div>
     </div>
@@ -307,8 +318,8 @@
 <script src="/static/js/launch.js?v=20260613b"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260612g"></script>
-<script src="/static/js/tomogram.js?v=20260612g"></script>
+<script src="/static/js/tomogram.js?v=20260614a"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/app.js?v=20260611z"></script>
+<script src="/static/js/app.js?v=20260614a"></script>
 </body>
 </html>

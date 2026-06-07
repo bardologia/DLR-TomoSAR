@@ -95,6 +95,9 @@ class RequestRouter:
         if path == "/api/cubes":
             self._send_json(handler, {"cubes": self.cubes.list_cubes()})
             return
+        if path == "/api/cubes/status":
+            self._send_json(handler, self.cubes.load_status())
+            return
         if path == "/api/cubes/topdown":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.topdown_png(
@@ -191,6 +194,11 @@ class RequestRouter:
         if path.startswith("/api/jobs/") and path.endswith("/stop"):
             job_id = path[len("/api/jobs/"):-len("/stop")]
             result = self.processes.stop(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/cubes/load":
+            result = self.cubes.start_load(body.get("id", ""))
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
