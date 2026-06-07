@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import signal
 import subprocess
 import sys
 import time
@@ -24,8 +25,9 @@ class TuningOrchestrator:
         self.summary_path = self.run_dir / "tuning_results.json"
         self.db_path      = self.run_dir / "optuna.db"
 
-        self.logger  = None
-        self.results = []
+        self.logger        = None
+        self.results       = []
+        self.active_procs  = []
 
     def _distribute_trials(self, total: int, n_workers: int) -> list[int]:
         base  = total // n_workers
@@ -120,6 +122,8 @@ class TuningOrchestrator:
             proc   = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh)
             procs.append((proc, gpu_id, log_path, log_fh))
             self.logger.info(f"[GPU {gpu_id}] worker — {model_name}  ({n_trials} trials)")
+
+        self.active_procs = list(procs)
         return procs
 
     def _wait_workers(self, procs: list[tuple], model_name: str) -> bool:
@@ -138,8 +142,31 @@ class TuningOrchestrator:
                     else:
                         self.logger.error(f"[GPU {gpu_id}] worker — {model_name}  FAILED (exit {ret}, see {log_path})")
                         ok = False
-            procs = still
+            procs             = still
+            self.active_procs = list(still)
         return ok
+
+    def _terminate_workers(self, signum, frame) -> None:
+        for proc, gpu_id, log_path, log_fh in self.active_procs:
+            if proc.poll() is None:
+                proc.terminate()
+
+        deadline = time.time() + 30
+        for proc, gpu_id, log_path, log_fh in self.active_procs:
+            try:
+                proc.wait(timeout=max(0.1, deadline - time.time()))
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+        if self.logger is not None:
+            self.logger.warning(f"Received signal {signum} — terminated {len(self.active_procs)} workers, resume with --resume")
+            self.logger.close()
+
+        sys.exit(128 + signum)
+
+    def _install_signal_handlers(self) -> None:
+        signal.signal(signal.SIGTERM, self._terminate_workers)
+        signal.signal(signal.SIGINT,  self._terminate_workers)
 
     def _load_or_create_study(self, model_name: str) -> optuna.Study:
         return optuna.create_study(
@@ -229,6 +256,8 @@ class TuningOrchestrator:
             sys.exit(f"ERROR: --resume given but no study found at {self.db_path}")
         if not resume and self.db_path.exists():
             sys.exit(f"ERROR: run tag '{self.tag}' already has a study at {self.db_path} — pass --resume to continue it")
+
+        self._install_signal_handlers()
 
         tune_cfg = self.config.tuning
         self.run_dir.mkdir(parents=True, exist_ok=True)

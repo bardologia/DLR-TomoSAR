@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import signal
 from pathlib import Path
 
 import optuna
@@ -46,6 +47,26 @@ class RecordingLogger:
 
     def warning(self, message: str) -> None:
         self.warnings.append(message)
+
+
+class StubProc:
+    def __init__(self, alive: bool = True) -> None:
+        self.alive      = alive
+        self.terminated = False
+        self.killed     = False
+
+    def poll(self):
+        return None if self.alive else 0
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.alive      = False
+
+    def wait(self, timeout=None) -> int:
+        return 0
+
+    def kill(self) -> None:
+        self.killed = True
 
 
 class TestParamSampler:
@@ -144,6 +165,20 @@ class TestTuningOrchestrator:
         assert orch._fail_stale_trials(study) == 1
         assert orch._count_done(study)        == 1
         assert len(study.get_trials(states=(TrialState.RUNNING,))) == 0
+
+    def test_terminate_workers_stops_live_procs_and_exits(self, tmp_path):
+        orch = self._orchestrator(tmp_path)
+        live = StubProc(alive=True)
+        done = StubProc(alive=False)
+
+        orch.active_procs = [(live, 0, tmp_path / "a.log", None), (done, 1, tmp_path / "b.log", None)]
+
+        with pytest.raises(SystemExit) as excinfo:
+            orch._terminate_workers(signal.SIGTERM, None)
+
+        assert live.terminated
+        assert not done.terminated
+        assert excinfo.value.code == 128 + signal.SIGTERM
 
 
 class TestStudyPlotter:
