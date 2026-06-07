@@ -165,6 +165,61 @@ class TestProfilePersistence:
         assert TrackProfiles.profiles_file(tmp_path) == tmp_path / "data" / TrackProfiles.FILENAME
 
 
+class TestSubset:
+    def _table(self):
+        return TrackBaselines(
+            labels              = ["PS02", "PS04", "PS06", "PS08", "PS26"],
+            vertical            = [0.0, 1.0, 2.0, 3.0, 4.0],
+            horizontal          = [0.0, 10.0, 20.0, 30.0, 40.0],
+            vertical_std        = [0.1, 0.2, 0.3, 0.4, 0.5],
+            horizontal_std      = [0.5, 0.4, 0.3, 0.2, 0.1],
+            vertical_absolute   = [100.0, 101.0, 102.0, 103.0, 104.0],
+            horizontal_absolute = [200.0, 210.0, 220.0, 230.0, 240.0],
+            track_files         = ["a", "b", "c", "d", "e"],
+            azimuth_window      = (1000, 16000),
+        )
+
+    def test_none_returns_same_table(self):
+        table = self._table()
+
+        assert table.subset(None) is table
+
+    def test_subset_keeps_reference_and_selected(self):
+        subset = self._table().subset(("PS04", "PS08"))
+
+        assert subset.labels     == ["PS02", "PS04", "PS08"]
+        assert subset.vertical   == pytest.approx([0.0, 1.0, 3.0])
+        assert subset.horizontal == pytest.approx([0.0, 10.0, 30.0])
+
+    def test_subset_preserves_dataset_order(self):
+        subset = self._table().subset(("PS26", "PS04"))
+
+        assert subset.labels == ["PS02", "PS04", "PS26"]
+
+    def test_subset_carries_all_fields(self):
+        subset = self._table().subset(("PS06",))
+
+        assert subset.vertical_std        == pytest.approx([0.1, 0.3])
+        assert subset.horizontal_absolute == pytest.approx([200.0, 220.0])
+        assert subset.track_files         == ["a", "c"]
+        assert subset.azimuth_window      == (1000, 16000)
+
+    def test_selecting_reference_raises(self):
+        with pytest.raises(ValueError, match="reference"):
+            self._table().subset(("PS02", "PS04"))
+
+    def test_unknown_label_raises(self):
+        with pytest.raises(ValueError, match="Unknown secondary labels"):
+            self._table().subset(("PS99",))
+
+    def test_full_selection_matches_original(self):
+        table  = self._table()
+        subset = table.subset(("PS04", "PS06", "PS08", "PS26"))
+
+        assert subset.labels   == table.labels
+        assert subset.vertical == pytest.approx(table.vertical)
+
+
 class TestBaselineComponents:
     def _table(self):
         return TrackBaselines(labels=["m", "s"], vertical=[0.0, 4.0], horizontal=[0.0, 3.0], vertical_std=[0.0, 0.0], horizontal_std=[0.0, 0.0])
@@ -413,3 +468,17 @@ class TestGeometryResolution:
     def test_unknown_source_raises(self, tmp_path):
         with pytest.raises(ValueError):
             GeometryConfig(baselines_source="guess").resolved(tmp_path)
+
+    def test_secondary_labels_subset_baselines(self, tmp_path):
+        table = TrackBaselines(labels=["m", "s1", "s2", "s3"], vertical=[0.0, 5.0, 10.0, 15.0], horizontal=[0.0, 0.0, 0.0, 0.0], vertical_std=[0.0] * 4, horizontal_std=[0.0] * 4)
+        table.save(GeometryConfig().baselines_file(tmp_path))
+
+        resolved = GeometryConfig(baseline_component="vertical").resolved(tmp_path, secondary_labels=("s1", "s3"))
+
+        assert resolved.baselines == pytest.approx((0.0, 5.0, 15.0))
+
+    def test_secondary_labels_ignored_for_manual(self, tmp_path):
+        config   = GeometryConfig(baselines=(0.0, 10.0), baselines_source="manual")
+        resolved = config.resolved(tmp_path, secondary_labels=("s1",))
+
+        assert resolved.baselines == (0.0, 10.0)

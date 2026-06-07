@@ -23,7 +23,7 @@ class PhysicsQuantitiesCheck:
         capon_t = self._to_tensor(capon_profiles)
         gauss_t = self._to_tensor(gauss_profiles)
 
-        geometry = TomoGeometry(self.config.geometry.resolved(self.config.dataset_path), x_t)
+        geometry = TomoGeometry(self.config.geometry.resolved(self.config.dataset_path, secondary_labels=self.config.secondary_labels), x_t)
         self.logger.kv_table(geometry.describe(), title="Tomographic Geometry")
 
         losses    = self._loss_terms(gauss_t, capon_t, x_t, dx, geometry)

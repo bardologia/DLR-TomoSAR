@@ -315,6 +315,7 @@ class _PhysicsCfg:
     physics_floor     : float = 1e-3
     capon_loading     : float = 1e-2
     moments_weights   : tuple = (1.0, 1.0, 1.0)
+    secondary_labels  : tuple | None = None
     geometry          : GeometryConfig = field(default_factory=lambda: GeometryConfig(baselines=(0.0, 20.0, 40.0)))
 
 

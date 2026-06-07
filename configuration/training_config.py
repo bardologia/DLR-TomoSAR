@@ -42,7 +42,7 @@ class GeometryConfig:
     def baselines_file(self, dataset_dir: str | Path) -> Path:
         return Path(dataset_dir) / "meta" / TrackBaselines.FILENAME
 
-    def resolved(self, dataset_dir: str | Path) -> "GeometryConfig":
+    def resolved(self, dataset_dir: str | Path, secondary_labels=None) -> "GeometryConfig":
         if self.baselines_source not in ("auto", "dataset", "manual"):
             raise ValueError(f"Unknown baselines_source '{self.baselines_source}', expected 'auto', 'dataset' or 'manual'")
 
@@ -55,7 +55,7 @@ class GeometryConfig:
                 raise FileNotFoundError(f"baselines_source='dataset' but {path} does not exist")
             return self
 
-        table = TrackBaselines.load(path)
+        table = TrackBaselines.load(path).subset(secondary_labels)
         return replace(self, baselines=table.baselines(self.baseline_component, look_angle_deg=self.look_angle_deg), baselines_origin=str(path))
 
 
@@ -161,7 +161,8 @@ class GaussianConfig:
         meta_dir     = Path(dataset_dir) / "meta"
         candidates   = sorted(meta_dir.glob("config_state_*.json"))
         cfg          = json.loads(candidates[0].read_text())
-        height_range = cfg["output_configs"]["height_range"]
+        tomo_cfg     = next(cfg[key] for key in ("tomogram_config", "output_configs", "input_configs") if cfg.get(key) is not None)
+        height_range = tomo_cfg["height_range"]
         
         return cls(
             n_default_gaussians = n_gaussians,

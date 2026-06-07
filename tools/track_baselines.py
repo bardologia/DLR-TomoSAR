@@ -31,6 +31,38 @@ class TrackBaselines:
     def n_tracks(self) -> int:
         return len(self.labels)
 
+    def subset(self, secondary_labels) -> "TrackBaselines":
+        if secondary_labels is None:
+            return self
+
+        primary     = self.labels[0]
+        secondaries = list(self.labels[1:])
+        requested   = [str(label) for label in secondary_labels]
+
+        if primary in requested:
+            raise ValueError(f"Pass {primary} is the reference and is always included; remove it from secondary_labels")
+
+        unknown = [label for label in requested if label not in secondaries]
+        if unknown:
+            raise ValueError(f"Unknown secondary labels {unknown}; table secondaries are {secondaries}")
+
+        keep = [0] + [1 + index for index, label in enumerate(secondaries) if label in requested]
+
+        def pick(values: list) -> list:
+            return [values[index] for index in keep] if values else list(values)
+
+        return TrackBaselines(
+            labels              = pick(self.labels),
+            vertical            = pick(self.vertical),
+            horizontal          = pick(self.horizontal),
+            vertical_std        = pick(self.vertical_std),
+            horizontal_std      = pick(self.horizontal_std),
+            vertical_absolute   = pick(self.vertical_absolute),
+            horizontal_absolute = pick(self.horizontal_absolute),
+            track_files         = pick(self.track_files),
+            azimuth_window      = self.azimuth_window,
+        )
+
     def baselines(self, component: str = "vertical", look_angle_deg: float | None = None) -> tuple:
         if component == "vertical":
             return tuple(self.vertical)
