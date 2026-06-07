@@ -219,20 +219,64 @@ class ModelTogglePanel {
 
 
 class ExperimentBuilder {
+
+  static MODES = [
+    { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
+    { key: "warmup",     label: "warmup only", hint: "curriculum disabled, each warmup loss trains alone" },
+    { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
+  ];
+
+  static STRATEGIES = [
+    { key: "uniform",     note: "each trial samples n_secondaries distinct tracks uniformly, n_trials distinct sets" },
+    { key: "gaussian",    note: "indices drawn from Normal(mean, sigma) over the secondary list, mean and sigma required" },
+    { key: "consecutive", note: "block of n_secondaries consecutive tracks, advanced block_step per trial until the stack ends" },
+    { key: "spaced",      note: "n_secondaries tracks spaced 'spacing' apart, advanced block_step per trial until the stack ends" },
+  ];
+
+  static SECONDARY_FIELDS = [
+    { key: "n_secondaries", strategies: ["uniform", "gaussian", "consecutive", "spaced"] },
+    { key: "n_trials",      strategies: ["uniform", "gaussian"] },
+    { key: "seed",          strategies: ["uniform", "gaussian"] },
+    { key: "mean",          strategies: ["gaussian"] },
+    { key: "sigma",         strategies: ["gaussian"] },
+    { key: "block_step",    strategies: ["consecutive", "spaced"] },
+    { key: "spacing",       strategies: ["spaced"] },
+  ];
+
   constructor(view, byPath) {
     this.view         = view;
     this.trialsLeaf   = byPath.get("trials_enabled");
+    this.modeLeaf     = byPath.get("trials_mode");
     this.warmupLeaf   = byPath.get("warmup_losses");
     this.completeLeaf = byPath.get("complete_losses");
     this.modelLeaf    = byPath.get("model_name");
     this.gpusLeaf     = byPath.get("gpus");
-    this.terms        = this._termCatalog();
-    this.variants     = { warmup: [], complete: [] };
-    this.lists        = {};
-    this.summaryEl    = null;
-    this.namesEl      = null;
-    this.root         = null;
-    this._paintSwitch = null;
+
+    this.secondary = new Map();
+    byPath.forEach((leaf) => {
+      if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
+    });
+
+    this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
+    if (this.modeLeaf) this.claimed.push("trials_mode");
+    this.secondary.forEach((leaf) => this.claimed.push(leaf.path));
+
+    this.terms          = this._termCatalog();
+    this.variants       = { warmup: [], complete: [] };
+    this.lists          = {};
+    this.summaryEl      = null;
+    this.namesEl        = null;
+    this.hintEl         = null;
+    this.root           = null;
+    this.columnsEl      = null;
+    this.columnEls      = {};
+    this.secondaryEl    = null;
+    this.strategySelect = null;
+    this.strategyNoteEl = null;
+    this.secondaryRows  = [];
+    this.modeButtons    = new Map();
+    this.modeEl         = null;
+    this._paintSwitch   = null;
   }
 
   build() {
@@ -241,12 +285,18 @@ class ExperimentBuilder {
 
     const head     = document.createElement("header");
     head.className = "special-head";
-    head.innerHTML = `<h3 class="special-head__name">Experiment fan-out</h3><span class="special-head__hint">warmup x complete cross product, one training run each</span>`;
+    head.innerHTML = `<h3 class="special-head__name">Experiment fan-out</h3>`;
+
+    const hint     = document.createElement("span");
+    hint.className = "special-head__hint";
+    this.hintEl    = hint;
+    head.appendChild(hint);
 
     const summary     = document.createElement("span");
     summary.className = "exp-builder__summary";
     this.summaryEl    = summary;
     head.appendChild(summary);
+    if (this.modeLeaf) head.appendChild(this._modeSegment());
     head.appendChild(this._trialsSwitch());
 
     const body     = document.createElement("div");
@@ -254,9 +304,12 @@ class ExperimentBuilder {
 
     const columns     = document.createElement("div");
     columns.className = "exp-builder__columns";
-    columns.appendChild(this._column("warmup", "warmup losses"));
-    columns.appendChild(this._column("complete", "complete losses"));
+    this.columnsEl    = columns;
+    this.columnEls.warmup   = columns.appendChild(this._column("warmup", "warmup losses"));
+    this.columnEls.complete = columns.appendChild(this._column("complete", "complete losses"));
     body.appendChild(columns);
+
+    if (this.modeLeaf && this.secondary.size) body.appendChild(this._secondaryPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -280,8 +333,146 @@ class ExperimentBuilder {
 
   refreshFromView() {
     if (!this.summaryEl) return;
+    this._paintMode();
+    this._paintSecondary();
     this._paintSummary();
     this._paintNames();
+  }
+
+  _mode() {
+    if (!this.modeLeaf) return "curriculum";
+    const value = this.view._effective(this.modeLeaf);
+    return ExperimentBuilder.MODES.some((mode) => mode.key === value) ? value : "curriculum";
+  }
+
+  _strategy() {
+    const leaf = this.secondary.get("strategy");
+    if (!leaf) return "consecutive";
+    const value = this.view._effective(leaf);
+    return ExperimentBuilder.STRATEGIES.some((strategy) => strategy.key === value) ? value : "consecutive";
+  }
+
+  _modeSegment() {
+    const leaf     = this.modeLeaf;
+    const wrap     = document.createElement("div");
+    wrap.className = "exp-mode";
+    wrap.title     = `--${leaf.path}`;
+
+    ExperimentBuilder.MODES.forEach((mode) => {
+      const btn       = document.createElement("button");
+      btn.type        = "button";
+      btn.className   = "exp-mode__btn";
+      btn.textContent = mode.label;
+      btn.addEventListener("click", () => this.view._setValue(leaf, mode.key));
+      this.modeButtons.set(mode.key, btn);
+      wrap.appendChild(btn);
+    });
+
+    this.modeEl = wrap;
+    this.view.controls[leaf.path] = { leaf, reset: () => this._paintMode() };
+    return wrap;
+  }
+
+  _secondaryPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">secondary selection</span>`;
+
+    const strategyLeaf = this.secondary.get("strategy");
+    if (strategyLeaf) {
+      const select     = document.createElement("select");
+      select.className = "run-select exp-secondary__strategy";
+      select.title     = `--${strategyLeaf.path}`;
+      ExperimentBuilder.STRATEGIES.forEach((strategy) => {
+        const opt       = document.createElement("option");
+        opt.value       = strategy.key;
+        opt.textContent = strategy.key;
+        select.appendChild(opt);
+      });
+      select.addEventListener("change", () => this.view._setValue(strategyLeaf, select.value));
+      head.appendChild(select);
+
+      this.strategySelect = select;
+      this.view.controls[strategyLeaf.path] = { leaf: strategyLeaf, reset: () => this._paintSecondary() };
+    }
+
+    const note     = document.createElement("p");
+    note.className = "exp-secondary__note";
+    this.strategyNoteEl = note;
+
+    const grid     = document.createElement("div");
+    grid.className = "exp-secondary__grid";
+    ExperimentBuilder.SECONDARY_FIELDS.forEach((field) => {
+      const leaf = this.secondary.get(field.key);
+      if (leaf) grid.appendChild(this._secondaryRow(field, leaf));
+    });
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(grid);
+    this.secondaryEl = panel;
+    return panel;
+  }
+
+  _secondaryRow(field, leaf) {
+    const row     = document.createElement("div");
+    row.className = "cfg-edit__row";
+    row.title     = `--${leaf.path}`;
+
+    const name     = document.createElement("div");
+    name.className = "cfg-edit__name";
+    name.innerHTML = `${field.key}<span>${leaf.type === "none" ? "float" : leaf.type}</span>`;
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input";
+    input.type       = "number";
+    input.step       = leaf.type === "int" ? "1" : "any";
+    input.value      = leaf.value === "None" ? "" : leaf.value;
+    input.spellcheck = false;
+    if (leaf.value === "None") input.placeholder = "required";
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
+      this.view._setValue(leaf, input.value);
+    });
+
+    row.appendChild(name);
+    row.appendChild(input);
+
+    this.secondaryRows.push({ strategies: field.strategies, row });
+    this.view.controls[leaf.path] = { leaf, reset: () => {
+      input.value = leaf.value === "None" ? "" : leaf.value;
+      input.classList.remove("is-dirty");
+    } };
+    return row;
+  }
+
+  _paintMode() {
+    const mode = this._mode();
+
+    this.modeButtons.forEach((btn, key) => btn.classList.toggle("is-on", key === mode));
+    if (this.modeEl) this.modeEl.classList.toggle("is-dirty", this.view.dirty[this.modeLeaf.path] !== undefined);
+    if (this.hintEl) this.hintEl.textContent = ExperimentBuilder.MODES.find((entry) => entry.key === mode).hint;
+
+    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary";
+    if (this.columnEls.complete) this.columnEls.complete.hidden = mode !== "curriculum";
+    if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
+  }
+
+  _paintSecondary() {
+    if (!this.secondaryEl) return;
+    const strategy = this._strategy();
+
+    if (this.strategySelect) this.strategySelect.value = strategy;
+    this.strategyNoteEl.textContent = ExperimentBuilder.STRATEGIES.find((entry) => entry.key === strategy).note;
+    this.secondaryRows.forEach((entry) => (entry.row.hidden = !entry.strategies.includes(strategy)));
+  }
+
+  _secondaryEffective(key) {
+    const leaf = this.secondary.get(key);
+    return leaf ? this.view._effective(leaf) : "?";
   }
 
   _termCatalog() {
@@ -425,6 +616,8 @@ class ExperimentBuilder {
     this.variants.warmup   = this._variantsFrom(this.warmupLeaf);
     this.variants.complete = this._variantsFrom(this.completeLeaf);
     if (this._paintSwitch) this._paintSwitch();
+    this._paintMode();
+    this._paintSecondary();
     this._paintAll();
   }
 
@@ -544,6 +737,7 @@ class ExperimentBuilder {
   _paintSummary() {
     const nWarm = this.variants.warmup.length;
     const nComp = this.variants.complete.length;
+    const mode  = this._mode();
 
     let gpus = "";
     if (this.gpusLeaf) {
@@ -555,17 +749,48 @@ class ExperimentBuilder {
       }
     }
 
+    if (mode === "warmup") {
+      this.summaryEl.textContent = `${nWarm} warmup loss${nWarm === 1 ? "" : "es"} = ${nWarm} trial${nWarm === 1 ? "" : "s"}${gpus}`;
+      return;
+    }
+
+    if (mode === "secondary") {
+      const strategy = this._strategy();
+      const sampled  = strategy === "uniform" || strategy === "gaussian";
+      const count    = sampled ? `${this._secondaryEffective("n_trials")} trials` : "trial count set by the stack";
+      this.summaryEl.textContent = `${strategy}, ${this._secondaryEffective("n_secondaries")} secondaries, ${count}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
   }
 
   _paintNames() {
     this.namesEl.innerHTML = "";
     const model = this.modelLeaf ? this.view._effective(this.modelLeaf) : "model";
+    const mode  = this._mode();
+
+    if (mode === "secondary") {
+      const pattern       = document.createElement("span");
+      pattern.className   = "exp-name";
+      pattern.textContent = `${model}_sec-${this._strategy()}-tNN_<labels>`;
+      this.namesEl.appendChild(pattern);
+
+      const more       = document.createElement("span");
+      more.className   = "exp-name exp-name--more";
+      more.textContent = "one per selection, labels resolved from the dataset stack";
+      this.namesEl.appendChild(more);
+      return;
+    }
 
     const names = [];
-    this.variants.warmup.forEach((w) => {
-      this.variants.complete.forEach((c) => names.push(`${model}_w-${w.label}_c-${c.label}`));
-    });
+    if (mode === "warmup") {
+      this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
+    } else {
+      this.variants.warmup.forEach((w) => {
+        this.variants.complete.forEach((c) => names.push(`${model}_w-${w.label}_c-${c.label}`));
+      });
+    }
 
     const limit = 12;
     names.slice(0, limit).forEach((name) => {

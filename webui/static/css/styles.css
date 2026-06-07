@@ -1054,6 +1054,22 @@ em { font-style: italic; color: var(--accent); }
 .exp-name { font-family: var(--mono); font-size: 11.5px; color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 9px; background: var(--bg-1); }
 .exp-name--more { color: var(--ink-dim); border-style: dashed; }
 
+.exp-mode { display: flex; border: 1px solid var(--line); border-radius: var(--r-pill); overflow: hidden; }
+.exp-mode__btn { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); padding: 5px 12px; background: var(--bg-1); border: 0; cursor: pointer; transition: color 0.15s var(--ease), background 0.15s var(--ease); }
+.exp-mode__btn + .exp-mode__btn { border-left: 1px solid var(--line); }
+.exp-mode__btn:hover { color: var(--ink); }
+.exp-mode__btn.is-on { color: var(--accent); background: rgba(29, 79, 216, 0.06); }
+.exp-mode.is-dirty { border-color: var(--accent); }
+.exp-builder:not(.is-trials) .exp-mode { display: none; }
+.exp-builder__columns[hidden] { display: none; }
+.exp-col[hidden] { display: none; }
+
+.exp-secondary { background: var(--bg-1); border: 1px solid var(--line); border-radius: 2px; }
+.exp-secondary[hidden] { display: none; }
+.exp-secondary__strategy { margin-left: auto; }
+.exp-secondary__note { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); margin: 0; padding: 10px 12px 0; }
+.exp-secondary__grid { padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 32px; }
+
 .rail-override__change { overflow-wrap: anywhere; }
 .cfg-edit__row--dependent .cfg-edit__name { color: var(--ink-dim); }
 

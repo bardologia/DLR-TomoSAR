@@ -317,7 +317,7 @@ class LaunchView {
       const candidate = new window.ExperimentBuilder(this, byPath);
       if (candidate.terms.length) {
         this.builder = candidate;
-        ["trials_enabled", "warmup_losses", "complete_losses"].forEach((path) => claimed.add(path));
+        candidate.claimed.forEach((path) => claimed.add(path));
       }
     }
 
