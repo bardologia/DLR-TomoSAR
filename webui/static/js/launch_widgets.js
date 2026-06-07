@@ -333,6 +333,7 @@ class ExperimentBuilder {
 
   refreshFromView() {
     if (!this.summaryEl) return;
+    if (this._paintSwitch) this._paintSwitch();
     this._paintMode();
     this._paintSecondary();
     this._paintSummary();
@@ -363,7 +364,10 @@ class ExperimentBuilder {
       btn.type        = "button";
       btn.className   = "exp-mode__btn";
       btn.textContent = mode.label;
-      btn.addEventListener("click", () => this.view._setValue(leaf, mode.key));
+      btn.addEventListener("click", () => {
+        this.view._setValue(leaf, mode.key);
+        if (this.view._effective(this.trialsLeaf) !== "True") this.view._setValue(this.trialsLeaf, "True");
+      });
       this.modeButtons.set(mode.key, btn);
       wrap.appendChild(btn);
     });

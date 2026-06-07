@@ -1060,7 +1060,6 @@ em { font-style: italic; color: var(--accent); }
 .exp-mode__btn:hover { color: var(--ink); }
 .exp-mode__btn.is-on { color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 .exp-mode.is-dirty { border-color: var(--accent); }
-.exp-builder:not(.is-trials) .exp-mode { display: none; }
 .exp-builder__columns[hidden] { display: none; }
 .exp-col[hidden] { display: none; }
 
