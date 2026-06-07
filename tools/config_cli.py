@@ -134,7 +134,14 @@ class ConfigCli:
             return float(raw)
         if isinstance(current, Path):
             return Path(raw)
-        if isinstance(current, (list, dict)):
+        if isinstance(current, list):
+            try:
+                parsed = ast.literal_eval(raw)
+            except (ValueError, SyntaxError):
+                return [token.strip() for token in raw.split(",") if token.strip()]
+            return list(parsed) if isinstance(parsed, (list, tuple)) else [parsed]
+
+        if isinstance(current, dict):
             return ast.literal_eval(raw)
 
         if isinstance(current, tuple):

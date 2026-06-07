@@ -137,6 +137,38 @@ class TestApplyCoercion:
 
         assert config.tags == ["x", "y", "z"]
 
+    def test_apply_list_override_from_comma_separated_names(self):
+        config = make_config()
+        cli    = ConfigCli(config)
+
+        cli.apply(["--tags", "dataset_a, dataset_b"])
+
+        assert config.tags == ["dataset_a", "dataset_b"]
+
+    def test_apply_list_override_from_bare_name(self):
+        config = make_config()
+        cli    = ConfigCli(config)
+
+        cli.apply(["--tags", "dataset_a"])
+
+        assert config.tags == ["dataset_a"]
+
+    def test_apply_list_override_wraps_scalar_literal(self):
+        config = make_config()
+        cli    = ConfigCli(config)
+
+        cli.apply(["--tags", "'dataset_a'"])
+
+        assert config.tags == ["dataset_a"]
+
+    def test_apply_list_override_from_bare_int_tuple(self):
+        config = make_config()
+        cli    = ConfigCli(config)
+
+        cli.apply(["--tags", "0, 1, 3"])
+
+        assert config.tags == [0, 1, 3]
+
     def test_apply_dict_override(self):
         config = make_config()
         cli    = ConfigCli(config)
