@@ -60,7 +60,7 @@ def dataset_dir(tmp_path):
     (data_dir / "dataset.json").write_text(json.dumps(layout), encoding="utf-8")
 
     config_state = {"tomogram_config": {"height_range": [-30.0, 30.0]}}
-    (meta_dir / "config_state_0.json").write_text(json.dumps(config_state), encoding="utf-8")
+    (meta_dir / "config_state.json").write_text(json.dumps(config_state), encoding="utf-8")
 
     return root
 

@@ -92,37 +92,35 @@ class ExtractionConfig:
 
     @property
     def parameters_npy_path(self) -> Path:
-        return self.output_directory / f"parameters_{self.output_suffix_value}.npy"
+        return self.output_directory / "parameters.npy"
 
     @property
     def diagnostics_npz_path(self) -> Path:
-        return self.output_directory / f"fit_diagnostics_{self.output_suffix_value}.npz"
+        return self.output_directory / "fit_diagnostics.npz"
 
     def discover_tomogram_path(self) -> Path:
-        data_dir = self.data_directory
-        matches  = sorted(data_dir.glob("tomogram_full_*.npy"))
+        tomogram_path = self.data_directory / "tomogram_full.npy"
 
-        if len(matches) != 1:
-            found = ", ".join(m.name for m in matches) or "none"
-            raise FileNotFoundError(f"Expected exactly one tomogram_full_*.npy in {data_dir}, found {found}")
+        if not tomogram_path.is_file():
+            raise FileNotFoundError(f"No tomogram_full.npy in {self.data_directory}")
 
-        return matches[0]
+        return tomogram_path
 
     def discover_height_range(self) -> Tuple[float, float]:
         if self.height_range is not None:
             return tuple(self.height_range)
 
-        meta_dir = self.metadata_directory
-        if meta_dir.is_dir():
-            for state_path in sorted(meta_dir.glob("config_state_*.json")):
-                with open(state_path, "r", encoding="utf-8") as f:
-                    state = json.load(f)
+        meta_dir   = self.metadata_directory
+        state_path = meta_dir / "config_state.json"
+        if state_path.is_file():
+            with open(state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
 
-                hr = state["tomogram_config"]["height_range"]
-                if isinstance(hr, (list, tuple)) and len(hr) == 2:
-                    return (float(hr[0]), float(hr[1]))
+            hr = state["tomogram_config"]["height_range"]
+            if isinstance(hr, (list, tuple)) and len(hr) == 2:
+                return (float(hr[0]), float(hr[1]))
 
-        raise FileNotFoundError(f"No height_range override given and no config_state_*.json with a tomogram height_range under {meta_dir}")
+        raise FileNotFoundError(f"No height_range override given and no config_state.json with a tomogram height_range under {meta_dir}")
 
 
 @dataclass

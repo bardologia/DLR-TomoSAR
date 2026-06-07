@@ -159,8 +159,7 @@ class GaussianConfig:
     @classmethod
     def from_dataset(cls, dataset_dir: str | Path, n_gaussians: int) -> "GaussianConfig":
         meta_dir     = Path(dataset_dir) / "meta"
-        candidates   = sorted(meta_dir.glob("config_state_*.json"))
-        cfg          = json.loads(candidates[0].read_text())
+        cfg          = json.loads((meta_dir / "config_state.json").read_text())
         height_range = cfg["tomogram_config"]["height_range"]
         
         return cls(

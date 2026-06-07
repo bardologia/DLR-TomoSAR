@@ -193,15 +193,19 @@ class TestArtifactRegistry:
         assert set(names.keys()) == expected_keys
         assert all(value.endswith((".npy", ".npz")) for value in names.values())
 
-    def test_artifact_filenames_embed_tags(self, tmp_path):
+    def test_artifact_filenames_are_bare(self, tmp_path):
         config   = _make_config(tmp_path)
         registry = ArtifactRegistry(config, NullLogger())
         names    = registry.artifact_filenames()
 
-        assert config.parameter_tag in names["tomogram_full"]
-        assert config.parameter_tag in names["dem_full"]
-        assert config.tomogram_tag  in names["primary"]
-        assert config.tomogram_tag  in names["interferograms"]
+        assert names["tomogram_full"]  == "tomogram_full.npy"
+        assert names["dem_full"]       == "dem_full.npy"
+        assert names["primary"]        == "primary.npy"
+        assert names["secondaries"]    == "secondaries.npy"
+        assert names["interferograms"] == "interferograms.npy"
+
+        assert config.parameter_tag not in names["tomogram_full"]
+        assert config.tomogram_tag  not in names["primary"]
 
     def test_artifact_path_under_data_directory(self, tmp_path):
         config   = _make_config(tmp_path)
@@ -286,10 +290,10 @@ class TestMetadataManager:
         config  = _make_config(tmp_path)
         manager = MetadataManager(config, NullLogger())
 
-        meta_path = manager.save_stage_metadata("inputs", "tagX", {"a": "1", "b": "2"})
+        meta_path = manager.save_stage_metadata("inputs", {"a": "1", "b": "2"})
 
         assert meta_path.exists()
-        assert meta_path.name == "meta_inputs_tagX.txt"
+        assert meta_path.name == "meta_inputs.txt"
         content = meta_path.read_text(encoding="utf-8")
         assert "a: 1" in content
         assert "b: 2" in content

@@ -95,6 +95,10 @@ class TomoConfig:
     def tomo_name(self) -> str:
         return Path(self.tomo_file).stem
 
+    @property
+    def run_directory(self) -> Path:
+        return self.output_dir / self.tomo_name / f"rn{self.range_index}"
+
 
 @dataclass
 class FitResult:
@@ -470,7 +474,7 @@ class SarReconstructor:
                 del recon_tomo
             del recon_tomos_for_gif, all_params_for_gif, all_success_for_gif
 
-        height_sweep_dir = self.config.output_dir / "sar_height_sweep"
+        height_sweep_dir = self.config.run_directory / "sar_height_sweep"
         height_sweep_dir.mkdir(parents=True, exist_ok=True)
         plotter_height = TomoPlotter(self.config)
         plotter_height.plot_sar_height_metrics(height_axis, heightwise_metrics, height_sweep_dir)
@@ -479,7 +483,7 @@ class SarReconstructor:
         return sar_metrics, sar_reference, recon_sar_images
 
     def _save_sar_plots(self, sar_reference, recon_sar_images, sar_metrics, nrmse_maps, abs_error_maps, squared_error_maps, ce_contrib_maps, n_azimuth, n_range):
-        save_dir = self.config.output_dir / "sar_reconstruction"
+        save_dir = self.config.run_directory / "sar_reconstruction"
         save_dir.mkdir(parents=True, exist_ok=True)
         plotter = TomoPlotter(self.config)
         plotter.plot_sar_overview(sar_reference, recon_sar_images, n_azimuth, n_range, save_dir)
@@ -588,9 +592,9 @@ class SarHeightSweepGifGenerator:
         else:
             diff_max = 1.0
 
-        save_dir = self.config.output_dir / "sar_height_sweep"
+        save_dir = self.config.run_directory / "sar_height_sweep"
         save_dir.mkdir(parents=True, exist_ok=True)
-        gif_path = save_dir / f"{self.config.tomo_name}_sar_height_sweep_slices.gif"
+        gif_path = save_dir / "slices.gif"
 
         figure, axes = plt.subplots(2, n_cols, figsize=(4.0 * n_cols, 8.0), constrained_layout=True, squeeze=False)
 
@@ -666,9 +670,9 @@ class SarHeightSweepGifGenerator:
         rmse_vmin, rmse_vmax = _positive_bounds(metric_samples_list[1])
         ce_vmin, ce_vmax = _positive_bounds(metric_samples_list[2])
 
-        save_dir = self.config.output_dir / "sar_height_sweep"
+        save_dir = self.config.run_directory / "sar_height_sweep"
         save_dir.mkdir(parents=True, exist_ok=True)
-        gif_path = save_dir / f"{self.config.tomo_name}_sar_height_sweep_metrics.gif"
+        gif_path = save_dir / "metrics.gif"
 
         figure, axes = plt.subplots(3, n_cols, figsize=(4.0 * n_cols, 10.0), constrained_layout=True, squeeze=False)
         extent = [0, n_range, 0, n_azimuth]
@@ -717,7 +721,7 @@ class SarHeightSweepGifGenerator:
         print("    Generating curves static image...")
         n_cols = len(gauss_list)
 
-        save_dir = self.config.output_dir / "sar_height_sweep"
+        save_dir = self.config.run_directory / "sar_height_sweep"
         save_dir.mkdir(parents=True, exist_ok=True)
         figure, axes = plt.subplots(3, n_cols, figsize=(4.0 * n_cols, 10.0), constrained_layout=True, squeeze=False)
 
@@ -763,7 +767,7 @@ class SarHeightSweepGifGenerator:
                     axis.set_xlabel("Height (m)")
 
         figure.suptitle("Height-wise SAR reconstruction metrics (static)")
-        gif_path = save_dir / f"{self.config.tomo_name}_sar_height_sweep_curves.png"
+        gif_path = save_dir / "curves.png"
         figure.savefig(gif_path, dpi=100)
         plt.close(figure)
         print(f"      Curves image saved → {gif_path}")
@@ -851,9 +855,9 @@ class SarHeightSweepGifGenerator:
         rmse_vmin, rmse_vmax = _positive_bounds(rmse_map_samples)
         ce_vmin, ce_vmax     = _positive_bounds(ce_map_samples)
 
-        save_dir = self.config.output_dir / "sar_height_sweep"
+        save_dir = self.config.run_directory / "sar_height_sweep"
         save_dir.mkdir(parents=True, exist_ok=True)
-        gif_path = save_dir / (f"{self.config.tomo_name}_sar_height_sweep_Ng{n_gaussians}.gif")
+        gif_path = save_dir / f"Ng{n_gaussians}.gif"
 
         figure, axes = plt.subplots(3, 3, figsize=(16, 13), constrained_layout=True, gridspec_kw={"height_ratios": [1.85, 1.85, 1.15]})
         ax_ref, ax_recon, ax_diff          = axes[0, 0], axes[0, 1], axes[0, 2]
@@ -1032,11 +1036,9 @@ class TomoPlotter:
             colorbar_residual = plt.colorbar(image_residual, ax=axes[1, column], shrink=0.75)
             colorbar_residual.set_label("Residual (a.u.)")
 
-        save_dir = self.config.output_dir / "slice_comparison"
+        save_dir = self.config.run_directory / "slice_comparison"
         save_dir.mkdir(parents=True, exist_ok=True)
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_slice_orig_vs_recon_rn{self.config.range_index}_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "slice_orig_vs_recon.png")
         return figure
 
     def plot_peak_heights(self, results: Dict[int, FitResult]) -> plt.Figure:
@@ -1090,11 +1092,9 @@ class TomoPlotter:
             axis.grid(True, alpha=0.25, linewidth=0.5)
 
         axes[-1].set_xlabel("Azimuth (pixels)")
-        save_dir = self.config.output_dir / "peak_heights"
+        save_dir = self.config.run_directory / "peak_heights"
         save_dir.mkdir(parents=True, exist_ok=True)
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_scatterer_heights_rn{self.config.range_index}_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "scatterer_heights.png")
         return figure
 
     def plot_example_fits(self, slide_abs: np.ndarray, height_axis: np.ndarray, results: Dict[int, FitResult], example_pixels: np.ndarray) -> plt.Figure:
@@ -1145,11 +1145,9 @@ class TomoPlotter:
                 if row == 0 and column == n_examples - 1:
                     axis.legend(fontsize=7, loc="upper right", framealpha=0.85, edgecolor="gray")
 
-        save_dir = self.config.output_dir / "exemple_fits"
+        save_dir = self.config.run_directory / "exemple_fits"
         save_dir.mkdir(parents=True, exist_ok=True)
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_profile_fit_examples_rn{self.config.range_index}_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "profile_fit_examples.png")
         return figure
 
     def plot_fit_quality(self, slide_abs: np.ndarray, height_axis: np.ndarray, results: Dict[int, FitResult]) -> plt.Figure:
@@ -1209,11 +1207,9 @@ class TomoPlotter:
             if row == n_gauss_count - 1:
                 axis_error.set_xlabel("Azimuth (pixels)")
 
-        save_dir = self.config.output_dir / "residual_metrics"
+        save_dir = self.config.run_directory / "residual_metrics"
         save_dir.mkdir(parents=True, exist_ok=True)
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_fit_quality_map_rn{self.config.range_index}_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "fit_quality_map.png")
         return figure
 
     def plot_residual_metrics(self, results: Dict[int, FitResult]) -> plt.Figure:
@@ -1252,11 +1248,9 @@ class TomoPlotter:
         axis_improvement.legend(framealpha=0.85, edgecolor="gray")
         axis_improvement.grid(True, alpha=0.25, linewidth=0.5, axis="y")
 
-        save_dir = self.config.output_dir / "residual_metrics"
+        save_dir = self.config.run_directory / "residual_metrics"
         save_dir.mkdir(parents=True, exist_ok=True)
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_reconstruction_error_rn{self.config.range_index}_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "reconstruction_error.png")
         return figure
 
     def plot_sar_overview(self, sar_reference: np.ndarray, recon_sar_images: Dict[int, np.ndarray], n_azimuth: int, n_range: int, save_dir: Path) -> plt.Figure:
@@ -1305,9 +1299,7 @@ class TomoPlotter:
         colorbar_diff = figure.colorbar(last_diff_image, ax=axes[1, 1:], shrink=0.82, pad=0.02)
         colorbar_diff.set_label("Reference - Reconstruction (a.u., symlog)")
 
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_sar_reconstruction_overview_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "overview.png")
         return figure
 
     def plot_sar_metrics(self, sar_metrics: Dict[int, SarMetrics], save_dir: Path) -> plt.Figure:
@@ -1335,9 +1327,7 @@ class TomoPlotter:
             best_index = int(np.nanargmin(values))
             axis.scatter([gauss_list[best_index]], [values[best_index]], color="black", s=26, zorder=3)
 
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_sar_reconstruction_metrics_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "metrics.png")
         return figure
 
     def plot_sar_height_metrics(self, height_axis: np.ndarray, heightwise_metrics: Dict[int, Dict[str, np.ndarray]], save_dir: Path) -> plt.Figure:
@@ -1398,9 +1388,7 @@ class TomoPlotter:
 
         figure.suptitle("Height-wise SAR reconstruction metrics across Gaussian orders")
 
-        ng_min = min(gauss_list)
-        ng_max = max(gauss_list)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_sar_height_metrics_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "height_metrics.png")
         return figure
 
     def plot_sar_error_maps(self, nrmse_maps: dict, abs_error_maps: dict, squared_error_maps: dict, ce_contrib_maps: dict, n_azimuth: int, n_range: int, save_dir: Path) -> plt.Figure:
@@ -1459,9 +1447,7 @@ class TomoPlotter:
             colorbar = figure.colorbar(image, ax=axes[row, :], shrink=0.86, pad=0.015)
             colorbar.set_label(colorbar_label)
 
-        ng_min = min(self.config.n_gauss_range)
-        ng_max = max(self.config.n_gauss_range)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_sar_reconstruction_pixel_metrics_Ng{ng_min}-{ng_max}.png")
+        figure.savefig(save_dir / "pixel_metrics.png")
         return figure
 
 

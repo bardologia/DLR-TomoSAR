@@ -335,8 +335,7 @@ def _build_check(tmp_path: Path, n_gaussians: int = 1, height_range=(-20.0, 20.0
     for j in range(n_elev):
         tomogram[j] = GaussianMixture.evaluate_slice(params, float(height_axis[j]), n_gaussians)
 
-    tomo_name = "tomogram_full_test.npy"
-    np.save(data_dir / tomo_name, tomogram)
+    np.save(data_dir / "tomogram_full.npy", tomogram)
 
     cfg = _PhysicsCfg(
         dataset_path = tmp_path,

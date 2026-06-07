@@ -79,6 +79,10 @@ class ProfileConfig:
     def tomo_name(self) -> str:
         return Path(self.tomo_file).stem
 
+    @property
+    def run_directory(self) -> Path:
+        return self.output_dir / self.tomo_name / f"rn{self.range_index}"
+
 
 @dataclass
 class ProfileFitResult:
@@ -282,7 +286,8 @@ class SliceReconstructor:
 class ParameterStorage:
     @staticmethod
     def save(config: ProfileConfig, fit_result: ProfileFitResult, height_axis: np.ndarray):
-        output_path = config.output_dir / f"pixel_profiles_rn{config.range_index}_{fit_result.n_gaussians}g.hd5"
+        config.run_directory.mkdir(parents=True, exist_ok=True)
+        output_path = config.run_directory / f"pixel_profiles_Ng{fit_result.n_gaussians}.hd5"
         print(f"Saving fitted parameters → {output_path}")
         param_names = ", ".join(f"mu{k + 1}, sigma{k + 1}, A{k + 1}" for k in range(fit_result.n_gaussians))
 
@@ -340,9 +345,9 @@ class ProfilePlotter:
         axis_profiles.grid(True, alpha=0.25, linewidth=0.5)
         axis_profiles.tick_params(labelleft=False)
 
-        save_dir = self.config.output_dir / "pixel_profiles"
+        save_dir = self.config.run_directory / "pixel_profiles"
         save_dir.mkdir(parents=True, exist_ok=True)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_slice_with_profiles_rn{self.config.range_index}_Ng{fit_result.n_gaussians}.png")
+        figure.savefig(save_dir / "slice_with_profiles.png")
         return figure
 
     def plot_parameter_distributions(self, fit_result: ProfileFitResult) -> plt.Figure:
@@ -408,9 +413,9 @@ class ProfilePlotter:
                     axis.legend(fontsize=7, framealpha=0.85, edgecolor="gray")
                 axis.grid(True, alpha=0.25, linewidth=0.5, axis="y")
 
-        save_dir = self.config.output_dir / "pixel_profiles"
+        save_dir = self.config.run_directory / "pixel_profiles"
         save_dir.mkdir(parents=True, exist_ok=True)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_param_distributions_rn{self.config.range_index}_Ng{fit_result.n_gaussians}.png")
+        figure.savefig(save_dir / "param_distributions.png")
         return figure
 
     def plot_parameter_maps(self, fit_result: ProfileFitResult) -> plt.Figure:
@@ -459,9 +464,9 @@ class ProfilePlotter:
                 axis.set_ylim(*y_limits[param_index])
                 axis.grid(True, alpha=0.25, linewidth=0.5)
 
-        save_dir = self.config.output_dir / "params_maps"
+        save_dir = self.config.run_directory / "params_maps"
         save_dir.mkdir(parents=True, exist_ok=True)
-        figure.savefig(save_dir / f"{self.config.tomo_name}_gaussian_params_mu_sigma_A_rn{self.config.range_index}_Ng{fit_result.n_gaussians}.png")
+        figure.savefig(save_dir / "gaussian_params_mu_sigma_A.png")
         return figure
 
 
@@ -478,9 +483,9 @@ class SweepGifGenerator:
         height_fine    = np.linspace(height_axis[0], height_axis[-1], 500)
         global_amp_max = np.nanmax(slide_abs) * 1.1
 
-        save_dir = self.config.output_dir / "profile_sweep"
+        save_dir = self.config.run_directory / "profile_sweep"
         save_dir.mkdir(parents=True, exist_ok=True)
-        gif_path = save_dir / f"{self.config.tomo_name}_azimuth_sweep_profiles_rn{self.config.range_index}_Ng{fit_result.n_gaussians}.gif"
+        gif_path = save_dir / "azimuth_sweep_profiles.gif"
 
         figure, (axis_profile, axis_slice) = plt.subplots(1, 2, figsize=(13, 6), gridspec_kw={"width_ratios": [1, 1.4]})
         plt.subplots_adjust(wspace=0.25)

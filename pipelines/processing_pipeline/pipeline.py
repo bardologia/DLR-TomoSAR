@@ -46,7 +46,6 @@ class ProcessingPipeline:
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = "tomogram_full",
-            identifier_tag   = self.config.parameter_tag,
             metadata_entries = self.metadata_manager.build_tomogram_metadata(tomogram_path, self.config.stack_identifier, self.config.tomogram_config),
         )
 
@@ -69,7 +68,6 @@ class ProcessingPipeline:
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = "inputs",
-            identifier_tag   = self.config.tomogram_tag,
             metadata_entries = self.metadata_manager.build_inputs_metadata(primary_path, secondaries_path, interferograms_path, primary_shape, secondaries_shape, interferograms_shape),
         )
 

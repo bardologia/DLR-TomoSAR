@@ -40,7 +40,7 @@ def _write_config_state(dataset_dir: Path, win=(20, 10), method="Capon", key="to
             "height_range"          : [-20.0, 80.0],
         },
     }
-    (meta / "config_state_test.json").write_text(json.dumps(payload), encoding="utf-8")
+    (meta / "config_state.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _synthetic_inputs(kz, height, n_az=24, n_rg=24, amplitude=2.0):

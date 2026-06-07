@@ -16,12 +16,12 @@ class PreprocessConfigReader:
 
     def read(self) -> dict:
         meta_dir   = self.preprocessing_dir / "meta"
-        candidates = sorted(meta_dir.glob("config_state_*.json"))
+        state_path = meta_dir / "config_state.json"
 
-        if not candidates:
-            raise FileNotFoundError(f"No config_state_*.json under {meta_dir}; cannot read the pre-processing Capon configuration")
+        if not state_path.is_file():
+            raise FileNotFoundError(f"No config_state.json under {meta_dir}; cannot read the pre-processing Capon configuration")
 
-        state    = json.loads(candidates[0].read_text(encoding="utf-8"))
+        state    = json.loads(state_path.read_text(encoding="utf-8"))
         tomo_cfg = state["tomogram_config"]
 
         return {
@@ -29,7 +29,7 @@ class PreprocessConfigReader:
             "filter_method"         : str(tomo_cfg["filter_method"]),
             "beamforming_method"    : str(tomo_cfg["beamforming_method"]),
             "beamforming_arguments" : list(tomo_cfg["beamforming_arguments"]),
-            "source"                : str(candidates[0]),
+            "source"                : str(state_path),
         }
 
 

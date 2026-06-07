@@ -27,15 +27,12 @@ class ArtifactRegistry:
             self.logger.subsection(f"Ensured path : {target_dir}")
 
     def artifact_filenames(self) -> dict[str, str]:
-        tomo_tag  = self.config.tomogram_tag
-        param_tag = self.config.parameter_tag
-
         return {
-            "tomogram_full"  : f"tomogram_full_{param_tag}.npy",
-            "dem_full"       : f"dem_full_{param_tag}.npy",
-            "primary"        : f"primary_{tomo_tag}.npy",
-            "secondaries"    : f"secondaries_{tomo_tag}.npy",
-            "interferograms" : f"interferograms_{tomo_tag}.npy",
+            "tomogram_full"  : "tomogram_full.npy",
+            "dem_full"       : "dem_full.npy",
+            "primary"        : "primary.npy",
+            "secondaries"    : "secondaries.npy",
+            "interferograms" : "interferograms.npy",
             "track_profiles" : TrackProfiles.FILENAME,
         }
 
@@ -88,12 +85,12 @@ class MetadataManager:
             "data_type"            : self.config.dataset_type,
         }
 
-    def save_stage_metadata(self, stage_name: str, identifier_tag: str, metadata_entries: dict[str, str]) -> Path:
+    def save_stage_metadata(self, stage_name: str, metadata_entries: dict[str, str]) -> Path:
         self.registry.ensure_directory_structure()
-        meta_filename = f"meta_{stage_name}_{identifier_tag}.txt"
+        meta_filename = f"meta_{stage_name}.txt"
         meta_path     = self.config.paths.metadata_directory / meta_filename
 
-        self.logger.section(f"[Saving Metadata] Stage: {stage_name} | Tag: {identifier_tag}")
+        self.logger.section(f"[Saving Metadata] Stage: {stage_name}")
         FileIO.save_text_metadata(metadata_entries, meta_path)
 
         self.logger.subsection(f"Metadata written: {meta_path}")
@@ -120,9 +117,7 @@ class MetadataManager:
     def save_pipeline_configuration(self) -> Path:
         self.registry.ensure_directory_structure()
 
-        run_tag       = self.config.tomogram_tag
-        dump_filename = f"config_state_{run_tag}.json"
-        dump_path     = self.config.paths.metadata_directory / dump_filename
+        dump_path = self.config.paths.metadata_directory / "config_state.json"
 
         config_dict = asdict(self.config)
 

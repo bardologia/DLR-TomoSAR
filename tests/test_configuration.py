@@ -620,36 +620,25 @@ class TestParamExtractionConfig:
         assert cfg.data_directory     == tmp_path / "data"
         assert cfg.metadata_directory == tmp_path / "meta"
         assert cfg.output_directory   == tmp_path / "params" / "params_sigmaonly_k5_sig4"
-        assert cfg.parameters_npy_path.name == "parameters_sigmaonly_k5_sig4.npy"
+        assert cfg.parameters_npy_path.name == "parameters.npy"
 
     def test_discover_tomogram_path_raises_when_missing(self, tmp_path):
         (tmp_path / "data").mkdir()
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
-        with pytest.raises(FileNotFoundError, match="found none"):
+        with pytest.raises(FileNotFoundError, match="No tomogram_full.npy"):
             cfg.discover_tomogram_path()
 
     def test_discover_tomogram_path_single_match(self, tmp_path):
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        match = data_dir / "tomogram_full_001.npy"
+        match = data_dir / "tomogram_full.npy"
         match.write_bytes(b"x")
-        (data_dir / "dem_full_001.npy").write_bytes(b"x")
+        (data_dir / "dem_full.npy").write_bytes(b"x")
 
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
         assert cfg.discover_tomogram_path() == match
-
-    def test_discover_tomogram_path_raises_on_multiple_matches(self, tmp_path):
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        (data_dir / "tomogram_full_001.npy").write_bytes(b"x")
-        (data_dir / "tomogram_full_002.npy").write_bytes(b"x")
-
-        cfg = ExtractionConfig(processed_data_path=tmp_path)
-
-        with pytest.raises(FileNotFoundError, match="tomogram_full_001.npy"):
-            cfg.discover_tomogram_path()
 
     def test_discover_height_range_explicit(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data", height_range=(-10.0, 50.0))
@@ -659,7 +648,7 @@ class TestParamExtractionConfig:
     def test_discover_height_range_from_meta(self, tmp_path):
         meta_dir = tmp_path / "meta"
         meta_dir.mkdir()
-        (meta_dir / "config_state_001.json").write_text(
+        (meta_dir / "config_state.json").write_text(
             json.dumps({"tomogram_config": {"height_range": [-5.0, 80.0]}})
         )
         cfg = ExtractionConfig(processed_data_path=tmp_path)
@@ -955,7 +944,7 @@ class TestTrainingConfig:
     def test_gaussian_config_from_dataset(self, tmp_path):
         meta_dir = tmp_path / "meta"
         meta_dir.mkdir()
-        (meta_dir / "config_state_001.json").write_text(
+        (meta_dir / "config_state.json").write_text(
             json.dumps({"tomogram_config": {"height_range": [-5.0, 80.0]}})
         )
         cfg = GaussianConfig.from_dataset(tmp_path, n_gaussians=4)

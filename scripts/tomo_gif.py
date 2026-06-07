@@ -121,15 +121,14 @@ def make_tomo_gif(
     else:
         output_dir = Path(output_dir)
 
-    save_dir = output_dir / 'gifs'
+    save_dir = output_dir / 'gifs' / tomo_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    frames_dir = save_dir / f"{tomo_name}_frames"
+    frames_dir = save_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
 
     if gif_name is None:
-        # Keep the full originating file name visible in GIF file name
-        gif_name = f"{tomo_file_path.name}_range_sweep.gif"
+        gif_name = "range_sweep.gif"
     gif_path = save_dir / gif_name
 
     print(f"Loading tomogram from: {tomo_file_path}")
