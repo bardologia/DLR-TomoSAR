@@ -15,6 +15,7 @@ from configuration.processing_config import (
 )
 from pipelines.processing_pipeline.artifacts      import ArtifactRegistry, MetadataManager
 from pipelines.processing_pipeline.interferogram  import InterferogramBuilder
+from pipelines.processing_pipeline.plots          import StackPlotter
 from pipelines.processing_pipeline.tomogram_worker import PyRatJob, run_pyrat
 from tools.logger                                 import NullLogger
 from tools.regions                                import CropRegion
@@ -476,7 +477,7 @@ class TestProcessingPipeline:
 
         config = _make_config(tmp_path)
 
-        recorder = {"tomograms": [], "inputs": []}
+        recorder = {"tomograms": [], "inputs": [], "plots": []}
 
         class StubTomogramProcessor:
             def __init__(self, *args, **kwargs):
@@ -495,8 +496,17 @@ class TestProcessingPipeline:
                 recorder["inputs"].append((primary_path, secondaries_path, interferograms_path))
                 return (4, 3), (2, 4, 3), (2, 4, 3)
 
+        class StubStackPlotter:
+            def __init__(self, config, logger):
+                self.images_directory = Path(config.paths.run_directory) / "images"
+
+            def run(self, primary_path, secondaries_path, interferograms_path, dem_path, pass_labels=None):
+                recorder["plots"].append((primary_path, secondaries_path, interferograms_path, dem_path, pass_labels))
+                return {}
+
         monkeypatch.setattr(pipeline_module, "TomogramProcessor", StubTomogramProcessor)
         monkeypatch.setattr(pipeline_module, "InterferogramBuilder", StubInterferogramBuilder)
+        monkeypatch.setattr(pipeline_module, "StackPlotter", StubStackPlotter)
 
         pipe = pipeline_module.ProcessingPipeline(config, logger=NullLogger())
         return pipe, config, recorder
@@ -529,12 +539,14 @@ class TestProcessingPipeline:
         expected_keys = {
             "tomogram_full", "dem_full",
             "primary", "secondaries", "interferograms",
-            "run_directory",
+            "images", "run_directory",
         }
         assert set(outputs.keys()) == expected_keys
         assert outputs["run_directory"] == config.paths.run_directory
+        assert outputs["images"] == config.paths.run_directory / "images"
         assert len(recorder["tomograms"]) == 1
         assert len(recorder["inputs"]) == 1
+        assert len(recorder["plots"]) == 1
 
     def test_run_writes_metadata_and_layout(self, tmp_path, monkeypatch):
         pipe, config, _ = self._build_pipeline(tmp_path, monkeypatch)
@@ -545,3 +557,76 @@ class TestProcessingPipeline:
         assert dataset_json.exists()
         meta_files = list(config.paths.metadata_directory.glob("*.txt"))
         assert len(meta_files) >= 2
+
+
+class TestStackPlotter:
+    def _write_arrays(self, tmp_path):
+        rng = np.random.default_rng(0)
+
+        primary        = (rng.standard_normal((6, 5)) + 1j * rng.standard_normal((6, 5))).astype(np.complex64)
+        secondaries    = (rng.standard_normal((2, 6, 5)) + 1j * rng.standard_normal((2, 6, 5))).astype(np.complex64)
+        interferograms = (rng.standard_normal((2, 6, 5)) + 1j * rng.standard_normal((2, 6, 5))).astype(np.complex64)
+        dem            = rng.standard_normal((6, 5)).astype(np.float32)
+
+        paths = {
+            "primary"        : tmp_path / "primary.npy",
+            "secondaries"    : tmp_path / "secondaries.npy",
+            "interferograms" : tmp_path / "interferograms.npy",
+            "dem"            : tmp_path / "dem.npy",
+        }
+
+        np.save(str(paths["primary"]),        primary,        allow_pickle=False)
+        np.save(str(paths["secondaries"]),    secondaries,    allow_pickle=False)
+        np.save(str(paths["interferograms"]), interferograms, allow_pickle=False)
+        np.save(str(paths["dem"]),            dem,            allow_pickle=False)
+
+        return paths
+
+    def test_amplitude_db_matches_log_magnitude(self):
+        data     = np.array([[3.0 + 4.0j, 0.0 + 0.0j]], dtype=np.complex64)
+        expected = np.array([[20.0 * np.log10(5.0), 20.0 * np.log10(1e-12)]], dtype=np.float32)
+
+        assert np.allclose(StackPlotter._amplitude_db(data), expected, atol=1e-4)
+
+    def test_run_saves_all_figures_with_labels(self, tmp_path):
+        config  = _make_config(tmp_path)
+        plotter = StackPlotter(config, logger=NullLogger(), fig_dpi=50, save_dpi=50)
+        paths   = self._write_arrays(tmp_path)
+
+        saved = plotter.run(
+            primary_path        = paths["primary"],
+            secondaries_path    = paths["secondaries"],
+            interferograms_path = paths["interferograms"],
+            dem_path            = paths["dem"],
+            pass_labels         = ["PS02", "PS04", "PS06"],
+        )
+
+        expected_keys = {"primary", "secondary_00", "secondary_01", "interferogram_00", "interferogram_01", "dem_full"}
+        assert set(saved.keys()) == expected_keys
+        for path in saved.values():
+            assert path.exists()
+
+        images_dir = config.paths.run_directory / "images"
+        assert (images_dir / "slc" / "primary.png").exists()
+        assert (images_dir / "slc" / "secondary_01_PS04.png").exists()
+        assert (images_dir / "slc" / "secondary_02_PS06.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_01_PS04.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_02_PS06.png").exists()
+        assert (images_dir / "dem" / "dem_full.png").exists()
+
+    def test_run_without_labels_uses_pass_indices(self, tmp_path):
+        config  = _make_config(tmp_path)
+        plotter = StackPlotter(config, logger=NullLogger(), fig_dpi=50, save_dpi=50)
+        paths   = self._write_arrays(tmp_path)
+
+        saved = plotter.run(
+            primary_path        = paths["primary"],
+            secondaries_path    = paths["secondaries"],
+            interferograms_path = paths["interferograms"],
+            dem_path            = paths["dem"],
+        )
+
+        images_dir = config.paths.run_directory / "images"
+        assert (images_dir / "slc" / "secondary_01_pass_01.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_02_pass_02.png").exists()
+        assert len(saved) == 6
