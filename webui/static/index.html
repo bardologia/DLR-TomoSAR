@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260614a" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260623a" />
 </head>
 <body>
 
@@ -66,9 +66,18 @@
         Every equation from every pipeline stage, signal model to hyperparameter search,
         exactly as implemented in the codebase.
       </p>
+      <div class="model-mode" id="model-mode">
+        <button class="model-mode__btn is-active" data-mode="reference">Reference grid</button>
+        <button class="model-mode__btn" data-mode="walkthrough">Animated walkthrough</button>
+      </div>
     </div>
-    <div class="eq-tabs" id="eq-tabs"></div>
-    <div class="eq-grid" id="eq-grid"></div>
+    <div class="model-view" data-view="reference">
+      <div class="eq-tabs" id="eq-tabs"></div>
+      <div class="eq-grid" id="eq-grid"></div>
+    </div>
+    <div class="model-view is-hidden" data-view="walkthrough">
+      <div class="flowx" id="flowx"></div>
+    </div>
   </section>
 
   <!-- PIPELINES -->
@@ -192,50 +201,66 @@
 
   <!-- CUBE -->
   <section class="page page--pad" data-page="cube">
-    <div class="page__head page__head--row">
-      <div>
-        <h2 class="page__title">Tomogram explorer</h2>
-        <p class="page__lead">
-          Pick a saved inference cube to load it into memory, then hover the top-down map
-          to cut every tomogram live along range and azimuth: prediction, GT parameter
-          reconstruction, reduced-stack Capon and full-stack Capon. Click to pin a point,
-          click again to release.
-        </p>
-      </div>
-      <div class="cube-sources">
-        <button type="button" class="btn btn--mini cube-source is-active" data-source="pred">Pred</button>
-        <button type="button" class="btn btn--mini cube-source" data-source="gt">GT</button>
-        <button type="button" class="btn btn--mini cube-source" data-source="reduced">Reduced</button>
-        <button type="button" class="btn btn--mini cube-source" data-source="full">Full</button>
+    <div class="page__head">
+      <h2 class="page__title">Tomogram explorer</h2>
+      <p class="page__lead">
+        Load a saved inference cube, then hover the top-down map to cut every tomogram
+        live along range and azimuth. Click to pin a point, click again to release.
+      </p>
+    </div>
+
+    <div class="cube-pick">
+      <div class="tb-strip" id="cube-strip" aria-label="Saved cubes"></div>
+      <p class="cube-hint" id="cube-hint">Loading directories&hellip;</p>
+      <div class="cube-progress" id="cube-progress" hidden>
+        <div class="cube-progress__track"><i class="cube-progress__fill" id="cube-progress-fill"></i></div>
+        <p class="cube-progress__label" id="cube-progress-label">loading&hellip;</p>
       </div>
     </div>
-    <div class="tb-strip" id="cube-strip" aria-label="Saved cubes"></div>
-    <p class="cube-hint" id="cube-hint">Loading directories&hellip;</p>
-    <div class="cube-progress" id="cube-progress" hidden>
-      <div class="cube-progress__track"><i class="cube-progress__fill" id="cube-progress-fill"></i></div>
-      <p class="cube-progress__label" id="cube-progress-label">loading&hellip;</p>
-    </div>
+
     <div class="cube-stage" id="cube-stage" hidden>
-      <div class="cube-map">
+      <aside class="cube-map">
+        <div class="cube-map__head">
+          <h3 class="cube-panel-title">Top-down map</h3>
+          <div class="cube-sources" role="group" aria-label="Map source">
+            <button type="button" class="cube-source is-active" data-source="pred"><i class="cube-dot" data-source="pred"></i>Pred</button>
+            <button type="button" class="cube-source" data-source="gt"><i class="cube-dot" data-source="gt"></i>GT</button>
+            <button type="button" class="cube-source" data-source="reduced"><i class="cube-dot" data-source="reduced"></i>Reduced</button>
+            <button type="button" class="cube-source" data-source="full"><i class="cube-dot" data-source="full"></i>Full</button>
+          </div>
+        </div>
         <div class="cube-map__wrap">
           <img id="cube-topdown" alt="Top-down tomogram view" />
           <i class="cube-cross" id="cube-cross" hidden></i>
         </div>
-        <p class="cube-coords" id="cube-coords">click a point on the map</p>
-      </div>
+        <p class="cube-coords" id="cube-coords">Hover the map to explore &middot; click to pin</p>
+      </aside>
+
       <div class="cube-slices" id="cube-slices" hidden>
-        <div class="cube-pair">
-          <figure class="cube-slice" data-axis="range" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="range" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="range" data-source="reduced"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="range" data-source="full"><canvas></canvas><figcaption></figcaption></figure>
-        </div>
-        <div class="cube-pair">
-          <figure class="cube-slice" data-axis="azimuth" data-source="pred"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="azimuth" data-source="gt"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><canvas></canvas><figcaption></figcaption></figure>
-          <figure class="cube-slice" data-axis="azimuth" data-source="full"><canvas></canvas><figcaption></figcaption></figure>
-        </div>
+        <section class="cube-cutgroup" data-axis="range">
+          <h3 class="cube-cutgroup__title">
+            Range cut <span class="cube-cutgroup__sub">tomogram column at the marked azimuth</span>
+            <span class="cube-cutgroup__at" data-axis="range"></span>
+          </h3>
+          <div class="cube-cutgroup__grid">
+            <figure class="cube-slice" data-axis="range" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="range" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="range" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="range" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+          </div>
+        </section>
+        <section class="cube-cutgroup" data-axis="azimuth">
+          <h3 class="cube-cutgroup__title">
+            Azimuth cut <span class="cube-cutgroup__sub">tomogram row at the marked range</span>
+            <span class="cube-cutgroup__at" data-axis="azimuth"></span>
+          </h3>
+          <div class="cube-cutgroup__grid">
+            <figure class="cube-slice" data-axis="azimuth" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="azimuth" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+            <figure class="cube-slice" data-axis="azimuth" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+          </div>
+        </section>
       </div>
     </div>
   </section>
@@ -299,7 +324,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script>window.MathJax = { svg: { fontCache: "none" }, startup: { typeset: false } };</script>
+<script>window.MathJax = { loader: { load: ["[tex]/html"] }, tex: { packages: { "[+]": ["html"] } }, svg: { fontCache: "none" }, startup: { typeset: false } };</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" async></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -315,6 +340,7 @@
 <script src="/static/js/diagram.js?v=20260606r"></script>
 <script src="/static/js/router.js?v=20260606r"></script>
 <script src="/static/js/equations.js?v=20260613a"></script>
+<script src="/static/js/flow_view.js?v=20260623b"></script>
 <script src="/static/js/pipelines.js?v=20260606r"></script>
 <script src="/static/js/models.js?v=20260606r"></script>
 <script src="/static/js/configs.js?v=20260606r"></script>
@@ -325,6 +351,6 @@
 <script src="/static/js/results.js?v=20260615a"></script>
 <script src="/static/js/tomogram.js?v=20260614a"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/app.js?v=20260614a"></script>
+<script src="/static/js/app.js?v=20260617a"></script>
 </body>
 </html>

@@ -17,6 +17,11 @@ class TomogramView {
     this.progressFill = refs.progressFill;
     this.progressLabel = refs.progressLabel;
 
+    this.atLabels = {
+      range   : this.slicesEl.querySelector('.cube-cutgroup__at[data-axis="range"]'),
+      azimuth : this.slicesEl.querySelector('.cube-cutgroup__at[data-axis="azimuth"]'),
+    };
+
     this.cubes = [];
     this.selectedId = null;
     this.meta = null;
@@ -28,8 +33,12 @@ class TomogramView {
     this.fetching = false;
     this.queued = null;
 
+    this.mapWrap = this.topdown.closest(".cube-map__wrap");
+
     this.topdown.addEventListener("mousemove", (ev) => this._onMove(ev));
     this.topdown.addEventListener("click", (ev) => this._onClick(ev));
+    this.topdown.addEventListener("load", () => this.mapWrap.classList.remove("is-loading"));
+    this.topdown.addEventListener("error", () => this.mapWrap.classList.remove("is-loading"));
     this.sourceBtns.forEach((btn) => {
       btn.addEventListener("click", () => this._setSource(btn.dataset.source));
     });
@@ -42,14 +51,20 @@ class TomogramView {
   }
 
   async refresh() {
+    this.hint.hidden = false;
+    this.hint.textContent = "Loading saved cubes…";
+    this.hint.classList.add("is-loading");
+
     let data;
     try {
       data = await window.apiGet("/api/cubes");
     } catch (e) {
+      this.hint.classList.remove("is-loading");
       this.hint.textContent = "Backend unreachable.";
       return;
     }
 
+    this.hint.classList.remove("is-loading");
     this.cubes = data.cubes || [];
     this._renderStrip();
 
@@ -92,7 +107,10 @@ class TomogramView {
     this.pinned = false;
     this.queued = null;
     this.cross.hidden = true;
-    this.coords.textContent = "hover the map to explore, click to pin";
+    this.coords.classList.remove("is-pinned");
+    this.coords.textContent = "Hover the map to explore · click to pin";
+    if (this.atLabels.range)   this.atLabels.range.textContent   = "";
+    if (this.atLabels.azimuth) this.atLabels.azimuth.textContent = "";
     this.stage.hidden = true;
     this.slicesEl.hidden = true;
     this.hint.hidden = true;
@@ -172,6 +190,7 @@ class TomogramView {
 
     this.hint.hidden = true;
     this.stage.hidden = false;
+    this.mapWrap.classList.add("is-loading");
     this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
   }
 
@@ -179,6 +198,7 @@ class TomogramView {
     if (source === this.source || !this.meta || !this.meta.sources.includes(source)) return;
     this.source = source;
     this._syncSourceBtns();
+    this.mapWrap.classList.add("is-loading");
     this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
   }
 
@@ -232,7 +252,10 @@ class TomogramView {
 
     this.point = point;
     this._moveCross(point);
-    this.coords.textContent = `az = ${point.az}   rg = ${point.rg}${this.pinned ? "   [pinned — click to release]" : ""}`;
+    this.coords.classList.toggle("is-pinned", this.pinned);
+    this.coords.textContent = this.pinned
+      ? `az = ${point.az} · rg = ${point.rg} · pinned, click to release`
+      : `az = ${point.az} · rg = ${point.rg}`;
 
     this.queued = { az: point.az, rg: point.rg };
     this._pump();
@@ -262,10 +285,14 @@ class TomogramView {
 
     this.slicesEl.hidden = false;
 
+    if (this.atLabels.range)   this.atLabels.range.textContent   = `rg = ${rg}`;
+    if (this.atLabels.azimuth) this.atLabels.azimuth.textContent = `az = ${az}`;
+
     const jobs = this.panels
       .filter((panel) => !panel.root.hidden)
       .map(async (panel) => {
         const url = `/api/cubes/slice?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&axis=${panel.axis}&az=${az}&rg=${rg}`;
+        const skeletonTimer = setTimeout(() => panel.root.classList.add("is-loading"), 180);
         try {
           const res = await fetch(url);
           if (!res.ok) return;
@@ -288,13 +315,11 @@ class TomogramView {
           ctx.lineTo(markerFrac * canvas.width, canvas.height);
           ctx.stroke();
           ctx.setLineDash([]);
-
-          const label = TomogramView.LABELS[panel.source] || panel.source;
-          panel.caption.textContent =
-            panel.axis === "range"
-              ? `${label} — range cut @ rg=${rg}`
-              : `${label} — azimuth cut @ az=${az}`;
-        } catch (e) {}
+        } catch (e) {
+        } finally {
+          clearTimeout(skeletonTimer);
+          panel.root.classList.remove("is-loading");
+        }
       });
 
     await Promise.all(jobs);

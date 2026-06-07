@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from config_registry import ConfigRegistry
 from cube_explorer import CubeExplorer
 from equation_library import EquationLibrary
+from flow_library import FlowLibrary
 from model_library import ModelLibrary
 from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
@@ -34,13 +35,14 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
         self.resolver    = resolver
         self.configs     = configs
         self.equations   = equations
+        self.flows       = flows
         self.models      = models
         self.pipelines   = pipelines
         self.processes   = processes
@@ -124,6 +126,9 @@ class RequestRouter:
             return
         if path == "/api/equations":
             self._send_json(handler, {"groups": self.equations.collect()})
+            return
+        if path == "/api/flows":
+            self._send_json(handler, {"flows": self.flows.collect()})
             return
         if path == "/api/models":
             self._send_json(handler, {"families": self.models.collect()})

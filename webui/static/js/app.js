@@ -131,6 +131,9 @@ class App {
     );
     this.equationView.load();
 
+    this.flowView = new window.FlowView(document.getElementById("flowx"));
+    this._initModelMode();
+
     this.pipelineFlow = new window.PipelineFlow(document.getElementById("flow"));
     this.pipelineFlow.load();
 
@@ -168,11 +171,24 @@ class App {
       sourceBtns    : [...document.querySelectorAll(".cube-source")],
       panels        : [...document.querySelectorAll(".cube-slice")].map((root) => ({
         root,
-        axis    : root.dataset.axis,
-        source  : root.dataset.source,
-        canvas  : root.querySelector("canvas"),
-        caption : root.querySelector("figcaption"),
+        axis   : root.dataset.axis,
+        source : root.dataset.source,
+        canvas : root.querySelector("canvas"),
       })),
+    });
+  }
+
+  _initModelMode() {
+    const wrap  = document.getElementById("model-mode");
+    const views = [...document.querySelectorAll(".model-view")];
+    if (!wrap) return;
+    wrap.querySelectorAll(".model-mode__btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        wrap.querySelectorAll(".model-mode__btn").forEach((b) => b.classList.toggle("is-active", b === btn));
+        const mode = btn.dataset.mode;
+        views.forEach((v) => v.classList.toggle("is-hidden", v.dataset.view !== mode));
+        if (mode === "walkthrough") this.flowView.load();
+      });
     });
   }
 

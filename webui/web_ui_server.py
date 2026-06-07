@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from config_registry import ConfigRegistry
 from cube_explorer import CubeExplorer
 from equation_library import EquationLibrary
+from flow_library import FlowLibrary
 from model_library import ModelLibrary
 from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
@@ -45,6 +46,7 @@ class WebUIServer:
         self.catalog   = ScriptCatalog(self.paths, self.resolver)
         self.configs   = ConfigRegistry(self.paths)
         self.equations = EquationLibrary()
+        self.flows     = FlowLibrary()
         self.models    = ModelLibrary()
         self.pipelines = PipelineLibrary()
         self.processes   = ProcessManager(self.paths, self.logger)
@@ -61,6 +63,7 @@ class WebUIServer:
             resolver    = self.resolver,
             configs     = self.configs,
             equations   = self.equations,
+            flows       = self.flows,
             models      = self.models,
             pipelines   = self.pipelines,
             processes   = self.processes,

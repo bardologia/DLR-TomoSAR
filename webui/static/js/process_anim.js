@@ -138,7 +138,6 @@ class ProcessAnimator {
     const pad = { l: 46, r: 16, t: 18, b: 30 };
     const px = (x) => pad.l + x * (w - pad.l - pad.r);
     const maxY = 1.35;
-    const py = (v) => pad.t + (1 - Math.min(1, Math.max(0, v) / maxY)) * (h - pad.t - pad.b);
 
     const comps = [{ a: 0.62, mu: 0.30, s: 0.055 }, { a: 0.95, mu: 0.55, s: 0.06 }, { a: 0.40, mu: 0.78, s: 0.045 }];
     const clean = (x) => comps.reduce((y, p) => y + p.a * Math.exp(-((x - p.mu) ** 2) / (2 * p.s * p.s)), 0);
@@ -149,14 +148,16 @@ class ProcessAnimator {
     const TRUNC = 212;
     const ys = [];
     for (let i = 0; i <= NS; i++) ys.push(target(i / NS));
-    const smo = ys.map((v, i) => {
+    const rawMax  = Math.max(...ys);
+    const thrZ    = 0.25 * rawMax;
+    const ysClean = ys.map((v, i) => (i >= TRUNC || v < thrZ) ? 0 : v);
+    const smo = ysClean.map((v, i) => {
       let s = 0;
-      for (let j = -2; j <= 2; j++) s += ys[Math.min(NS, Math.max(0, i + j))];
+      for (let j = -2; j <= 2; j++) s += ysClean[Math.min(NS, Math.max(0, i + j))];
       return s / 5;
     });
     for (let i = TRUNC; i <= NS; i++) smo[i] = 0;
     const maxProf = Math.max(...smo);
-    const thrZ = 0.25 * maxProf;
     const thrP = 0.05 * maxProf;
     const H_SPAN = 40;
     const dh = H_SPAN / NS;
@@ -207,18 +208,24 @@ class ProcessAnimator {
     const R2_0 = FINAL0 + 6.0;
     const CODA0 = R2_0 + 6.0;
 
+    const normP  = tt < 13.0 ? 0 : tt < 15.5 ? this._ease((tt - 13.0) / 2.0) : 1;
+    const topVal = this._lerp(maxY, 1.15 * maxProf, normP);
+    const py     = (v) => pad.t + (1 - Math.min(1, Math.max(0, v) / topVal)) * (h - pad.t - pad.b);
+
     if (tt < SORT0) {
       this._axes(pad, "elevation", tt >= 13.0 ? "normalized power" : "power");
 
       const truncX = px(TRUNC / NS);
       if (tt < 13.0) {
-        const trZ = tt >= 5.5 && tt < 8.0 ? this._ease((tt - 5.5) / 1.0) : tt >= 8.0 ? 1 : 0;
+        const trZ   = tt >= 5.5 && tt < 8.0 ? this._ease((tt - 5.5) / 1.0) : tt >= 8.0 ? 1 : 0;
+        const thrZf = tt >= 2.5 && tt < 5.5 ? this._ease((tt - 2.5) / 2.0) : tt >= 5.5 ? 1 : 0;
+        const dispV = (i) => { let v = ys[i]; if (v < thrZ) v = this._lerp(v, 0, thrZf); if (i >= TRUNC) v = this._lerp(v, 0, trZ); return v; };
         ctx.beginPath();
-        for (let i = 0; i <= NS; i++) { const v = i >= TRUNC ? this._lerp(ys[i], 0, trZ) : ys[i]; const sx = px(i / NS), sy = py(v); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
+        for (let i = 0; i <= NS; i++) { const sx = px(i / NS), sy = py(dispV(i)); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
         ctx.lineTo(px(1), py(0)); ctx.lineTo(px(0), py(0)); ctx.closePath();
         ctx.fillStyle = "rgba(140,168,182,0.14)"; ctx.fill();
         ctx.beginPath();
-        for (let i = 0; i <= NS; i++) { const v = i >= TRUNC ? this._lerp(ys[i], 0, trZ) : ys[i]; const sx = px(i / NS), sy = py(v); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
+        for (let i = 0; i <= NS; i++) { const sx = px(i / NS), sy = py(dispV(i)); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
         ctx.strokeStyle = "rgba(150,176,182,0.6)"; ctx.lineWidth = 1.2; ctx.stroke();
       }
 
@@ -350,12 +357,7 @@ class ProcessAnimator {
       };
 
       if (tt < 5.5) {
-        const dim = Math.min(1, (tt - 2.5) / 1.5);
-        ctx.save(); ctx.globalAlpha = 0.45 * dim;
-        ctx.fillStyle = "#04070a";
-        ctx.fillRect(pad.l, thrY, w - pad.l - pad.r, h - pad.b - thrY);
-        ctx.restore();
-        caption = "Pre-clean 1/2: values below threshold_factor × max (0.25) are zeroed  ·  isolates the lobes";
+        caption = "Pre-clean 1/2: samples below threshold_factor × max (0.25) are zeroed out  ·  the baseline between lobes collapses to zero";
       } else if (tt < 8.0) {
         caption = "Pre-clean 2/2: high-elevation samples beyond truncation_index = 170 are zeroed";
       } else if (tt < 13.0) {
@@ -377,7 +379,7 @@ class ProcessAnimator {
           ctx.restore();
         }
         this._texDraw("\\tilde{\\gamma}(\\xi)=\\dfrac{\\gamma(\\xi)}{\\max_\\xi \\gamma(\\xi)}", w - pad.r - 8, pad.t + 2, 14, { align: "right", alpha: relab, color: "rgba(53,230,208,0.95)" });
-        caption = tn < 1.6 ? "Each pixel is normalized by its own maximum value" : "The fit and its loss are defined on this normalized profile  (γ̃ = γ / max γ)";
+        caption = tn < 1.6 ? "Re-scale to max 1: the profile is divided by its own maximum, so the peak rises to 1.0" : "The fit and its loss are defined on this normalized profile  (γ̃ = γ / max γ)";
       } else if (tt < 22.0) {
         const ts2 = tt - 15.5;
         const refI = ranked[0] ? ranked[0].i : Math.round(0.55 * NS);
@@ -399,7 +401,7 @@ class ProcessAnimator {
         const vx0 = this._lerp(0, focusI / NS - halfW, z);
         const vx1 = this._lerp(1, focusI / NS + halfW, z);
         const vy0 = this._lerp(0, lo2 - spanL * 0.45, z);
-        const vy1 = this._lerp(maxY, hi2 + spanL * 0.55, z);
+        const vy1 = this._lerp(topVal, hi2 + spanL * 0.55, z);
         const zx = (x) => pad.l + ((x - vx0) / (vx1 - vx0)) * (w - pad.l - pad.r);
         const zy = (v) => pad.t + (1 - (v - vy0) / (vy1 - vy0)) * (h - pad.t - pad.b);
 
@@ -506,7 +508,7 @@ class ProcessAnimator {
           const vx0 = this._lerp(0, (midI - halfN) / NS, z);
           const vx1 = this._lerp(1, (midI + halfN) / NS, z);
           const vy0 = this._lerp(0, lo2 - spanL * 0.55, z);
-          const vy1 = this._lerp(maxY, hi2 + spanL * 0.65, z);
+          const vy1 = this._lerp(topVal, hi2 + spanL * 0.65, z);
           const zx = (x) => pad.l + ((x - vx0) / (vx1 - vx0)) * (w - pad.l - pad.r);
           const zy = (v) => pad.t + (1 - (v - vy0) / (vy1 - vy0)) * (h - pad.t - pad.b);
 
@@ -682,7 +684,9 @@ class ProcessAnimator {
       const HOLD = 0.8;
       const guessing = segT < HOLD;
       const prog = guessing ? 0 : this._ease(Math.min(1, (segT - HOLD) / (FIT - HOLD - 0.25)));
-      const S0 = S0v(k);
+      const DIVISOR = 4.0;
+      const S0base  = S0v(k);
+      const S0      = S0base / DIVISOR;
       done = k - 1;
       model = cands.slice(0, k).map((c, i) => {
         const pk = this._ease(Math.min(1, Math.max(0, prog * 1.25 - i * 0.06)));
@@ -719,7 +723,10 @@ class ProcessAnimator {
       this._texDraw("\\hat{\\gamma}(\\xi)=\\sum_{k=1}^{K} a_k\\,e^{-(\\xi-\\mu_k)^2/2\\sigma_k^2}", eqCx, pad.t + 2, 16, { align: "center", alpha: fitFade, color: "rgba(53,230,208,0.95)" });
       const s0Alpha = fitFade * (1 - this._ease(Math.min(1, Math.max(0, (tt - 52.0) / 1.5))));
       const upAlpha = fitFade * this._ease(Math.min(1, Math.max(0, (tt - 53.0) / 1.5)));
-      if (s0Alpha > 0.01) this._texDraw("\\sigma_0=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: s0Alpha, color: "rgba(255,207,107,0.95)" });
+      if (s0Alpha > 0.01) {
+        this._texDraw("\\sigma_{\\mathrm{base}}=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: s0Alpha, color: "rgba(255,207,107,0.95)" });
+        this._texDraw("\\sigma_0=\\sigma_{\\mathrm{base}}/d,\\;\\,d=4", pad.l + 6, pad.t + 26, 12, { align: "left", alpha: s0Alpha, color: "rgba(124,255,155,0.95)" });
+      }
       if (upAlpha > 0.01) {
         const upX = pad.l + 6, upY = pad.t + 104;
         ctx.save(); ctx.globalAlpha = upAlpha;
@@ -732,20 +739,27 @@ class ProcessAnimator {
         this._texDraw("\\sigma\\leftarrow\\mathrm{clip}\\!\\left(\\sigma-\\eta\\,\\tfrac{\\hat{m}}{\\sqrt{\\hat{v}}+\\epsilon},\\;[\\sigma_{\\min},\\sigma_{\\max}]\\right)", upX, upY + 58, 13, { align: "left", alpha: upAlpha, color: "rgba(255,207,107,0.95)" });
       }
       if (guessing) {
+        const divP = this._ease(Math.min(1, segT / HOLD));
+        const half = this._lerp(S0base, S0, divP);
         ctx.font = "13px 'IBM Plex Mono', monospace";
-        cands.slice(0, k).forEach((c) => {
+        cands.slice(0, k).forEach((c, ci) => {
           const yb = py(c.a * 0.607);
-          const x1 = px(c.mu - S0), x2 = px(c.mu + S0);
+          const bx1 = px(c.mu - S0base), bx2 = px(c.mu + S0base);
+          ctx.strokeStyle = "rgba(255,207,107,0.35)"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(bx1, yb); ctx.lineTo(bx2, yb); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(bx1, yb - 5); ctx.lineTo(bx1, yb + 5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(bx2, yb - 5); ctx.lineTo(bx2, yb + 5); ctx.stroke();
+          const x1 = px(c.mu - half), x2 = px(c.mu + half);
           ctx.strokeStyle = "#ffcf6b"; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.moveTo(x1, yb); ctx.lineTo(x2, yb); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(x1, yb - 5); ctx.lineTo(x1, yb + 5); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(x2, yb - 5); ctx.lineTo(x2, yb + 5); ctx.stroke();
           ctx.save(); ctx.textAlign = "center";
-          ctx.fillStyle = "#ffcf6b";
-          ctx.fillText("σ₀", px(c.mu), yb + 19);
+          ctx.fillStyle = "#ffcf6b"; ctx.fillText("σ₀", px(c.mu), yb + 19);
+          if (ci === 0) { ctx.fillStyle = "rgba(255,207,107,0.6)"; ctx.fillText("σ_base", (bx1 + bx2) / 2, yb - 9); }
           ctx.restore();
         });
-        caption = `K = ${k}  ·  initial guess  σ₀ = max(2·Δξ, h_span / (8·K)) = ${sigmaGuess(k).toFixed(1)} m (example)  ·  same σ₀ for every component`;
+        caption = `K = ${k}  ·  σ_base = max(2·Δξ, h_span/(8·K)) = ${sigmaGuess(k).toFixed(1)} m  ·  σ₀ = σ_base / 4 = ${(sigmaGuess(k) / DIVISOR).toFixed(2)} m  ·  same σ₀ for every component`;
       } else if (k === 2 && prog < 0.45) {
         caption = "σ is clipped to [Δξ, h_span/2] during the fit";
       } else {
@@ -859,7 +873,7 @@ class ProcessAnimator {
       const q = this._ease(Math.min(1, Math.max(0, (tf - 3.8) / 1.4)));
       const y1T = this._lerp(midY - 10, plotB, q);
       const y0B = this._lerp(midY + 10, plotT, q);
-      const mapY = (v, y0, y1) => y0 + (1 - Math.min(1, Math.max(0, v) / maxY)) * (y1 - y0);
+      const mapY = (v, y0, y1) => y0 + (1 - Math.min(1, Math.max(0, v) / topVal)) * (y1 - y0);
 
       ctx.beginPath();
       for (let i = 0; i <= NS; i++) { const X = px(i / NS), Y = mapY(ys[i], plotT, y1T); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
@@ -908,7 +922,7 @@ class ProcessAnimator {
       this._axes(pad, "elevation", "normalized power");
       const fm = finalModel(bestK);
       const plotT = pad.t, plotB = h - pad.b;
-      const mapY = (v) => plotT + (1 - Math.min(1, Math.max(0, v) / maxY)) * (plotB - plotT);
+      const mapY = (v) => plotT + (1 - Math.min(1, Math.max(0, v) / topVal)) * (plotB - plotT);
 
       const collapse = this._ease(Math.min(1, Math.max(0, (tr - 1.5) / 1.5)));
       const profA = 1 - collapse;
@@ -932,7 +946,7 @@ class ProcessAnimator {
 
       if (tr >= 1.5 && tr < 4.5) {
         const ssr = this._ease(Math.min(1, (tr - 1.7) / 1.0));
-        const bx = px(0.30), bw = 30, baseY = mapY(0), topY = mapY(maxY * 0.78);
+        const bx = px(0.30), bw = 30, baseY = mapY(0), topY = mapY(topVal * 0.78);
         ctx.fillStyle = "rgba(255,107,125,0.6)"; ctx.fillRect(bx, this._lerp(baseY, topY, ssr * 0.62), bw, this._lerp(0, baseY - topY, ssr) * 0.62);
         ctx.fillStyle = "rgba(230,247,243,0.55)"; ctx.fillRect(bx + 50, this._lerp(baseY, topY, ssr), bw, this._lerp(0, baseY - topY, ssr));
         ctx.font = "11px 'IBM Plex Mono', monospace";
@@ -985,7 +999,7 @@ class ProcessAnimator {
         ctx.fillStyle = "rgba(7,12,17,0.9)"; ctx.fillRect(gx + 1, gy + 1, s - 2, s - 2);
         ctx.strokeStyle = "rgba(53,230,208,0.25)"; ctx.lineWidth = 0.8; ctx.strokeRect(gx + 1, gy + 1, s - 2, s - 2);
         ctx.strokeStyle = "rgba(53,230,208,0.7)"; ctx.lineWidth = 1; ctx.beginPath();
-        for (let g = 0; g <= 6; g++) { const gxx = gx + 3 + (g / 6) * (s - 6), gyy = gy + s - 3 - mix(fm, g / 6) / maxY * (s - 6); g ? ctx.lineTo(gxx, gyy) : ctx.moveTo(gxx, gyy); }
+        for (let g = 0; g <= 6; g++) { const gxx = gx + 3 + (g / 6) * (s - 6), gyy = gy + s - 3 - mix(fm, g / 6) / topVal * (s - 6); g ? ctx.lineTo(gxx, gyy) : ctx.moveTo(gxx, gyy); }
         ctx.stroke();
       }
 
