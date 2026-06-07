@@ -136,7 +136,7 @@ class ExtractionConfig:
                 with open(state_path, "r", encoding="utf-8") as f:
                     state = json.load(f)
 
-                for key in ("output_configs", "input_configs"):
+                for key in ("tomogram_config", "output_configs", "input_configs"):
                     cfg = state.get(key)
                     if isinstance(cfg, dict) and cfg.get("height_range"):
                         hr = cfg["height_range"]

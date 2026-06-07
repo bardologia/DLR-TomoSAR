@@ -23,7 +23,7 @@ class TomogramProcessor:
         self.logger = logger
 
         self.logger.section("[TomogramProcessor Initialization]")
-        self.logger.subsection(f"Max Azimuth Width : {self.config.input_configs.max_crop_azimuth_width}")
+        self.logger.subsection(f"Max Azimuth Width : {self.config.tomogram_config.max_crop_azimuth_width}")
         self.logger.subsection(f"Parallel Effort   : {self.config.parallel.effort}")
         self.logger.subsection(f"Core Budget       : {self.config.parallel.core_budget()}")
         self.logger.subsection(f"Cores Available   : {self.config.parallel.available_cores()}")

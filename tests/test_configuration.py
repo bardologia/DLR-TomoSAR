@@ -799,18 +799,17 @@ class TestProcessingConfig:
         assert cfg.tomogram_tag.startswith("1000a2000a500a1000")
         assert cfg.parameter_tag.startswith("1000a2000a500a1000")
 
-    def test_processing_output_config_defaults_to_input(self):
-        cfg = ProcessingConfiguration(crop=self._crop())
+    def test_processing_single_tomogram_config(self):
+        tomo = TomogramConfiguration(polarisation="vv")
+        cfg  = ProcessingConfiguration(crop=self._crop(), tomogram_config=tomo)
 
-        assert cfg.has_split_configs is False
-        assert cfg.output_config is cfg.input_configs
+        assert cfg.tomogram_config is tomo
 
-    def test_processing_output_config_split(self):
-        out = TomogramConfiguration(polarisation="vv")
-        cfg = ProcessingConfiguration(crop=self._crop(), output_configs=out)
+    def test_processing_tags_share_stack_identifier(self):
+        cfg = ProcessingConfiguration(crop=self._crop(), stack_identifier="flaca")
 
-        assert cfg.has_split_configs is True
-        assert cfg.output_config is out
+        assert "_flaca_" in cfg.tomogram_tag
+        assert "_flaca_" in cfg.parameter_tag
 
     def test_preprocess_entry_defaults(self):
         cfg = PreProcessEntryConfig()
@@ -837,7 +836,7 @@ class TestProcessingConfig:
         cfg  = PreProcessEntryConfig()
         name = cfg.resolve_dataset_name([20, 10], "20260606_120000")
 
-        assert name == "17sartom-traun_L_az1000-16000_rg500-4000_w20_10_hv_1_dtmf_20260606_120000"
+        assert name == "17sartom-traun_L_az1000-16000_rg500-4000_w20_10_hv_1_20260606_120000"
 
     def test_preprocess_dataset_name_provided_single_win(self):
         cfg = PreProcessEntryConfig(dataset_name="traun_test", win_list=[[20, 10]])

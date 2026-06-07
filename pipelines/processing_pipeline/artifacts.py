@@ -10,7 +10,7 @@ from tools.logger                    import Logger
 from tools.track_baselines           import TrackBaselines, TrackProfiles
 
 
-ArtifactType = Literal["tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced", "primary_reduced", "secondaries_reduced", "interferograms_reduced", "track_profiles"]
+ArtifactType = Literal["tomogram_full", "dem_full", "primary", "secondaries", "interferograms", "track_profiles"]
 
 
 class ArtifactRegistry:
@@ -31,14 +31,12 @@ class ArtifactRegistry:
         param_tag = self.config.parameter_tag
 
         return {
-            "tomogram_full"          : f"tomogram_full_{param_tag}.npy",
-            "tomogram_reduced"       : f"tomogram_reduced_{tomo_tag}.npy",
-            "dem_full"               : f"dem_full_{param_tag}.npy",
-            "dem_reduced"            : f"dem_reduced_{tomo_tag}.npy",
-            "primary_reduced"        : f"primary_reduced_{tomo_tag}.npy",
-            "secondaries_reduced"    : f"secondaries_reduced_{tomo_tag}.npy",
-            "interferograms_reduced" : f"interferograms_reduced_{tomo_tag}.npy",
-            "track_profiles"         : TrackProfiles.FILENAME,
+            "tomogram_full"  : f"tomogram_full_{param_tag}.npy",
+            "dem_full"       : f"dem_full_{param_tag}.npy",
+            "primary"        : f"primary_{tomo_tag}.npy",
+            "secondaries"    : f"secondaries_{tomo_tag}.npy",
+            "interferograms" : f"interferograms_{tomo_tag}.npy",
+            "track_profiles" : TrackProfiles.FILENAME,
         }
 
     def artifact_path(self, artifact_type: ArtifactType) -> Path:
@@ -57,9 +55,9 @@ class MetadataManager:
         self.logger.subsection(f"Tomogram Tag  : {config.tomogram_tag}")
         self.logger.subsection(f"Parameter Tag : {config.parameter_tag}")
 
-    def build_tomogram_metadata(self, variant: str, output_path: Path, stack_identifier: str, cfg: TomogramConfiguration) -> dict[str, str]:
+    def build_tomogram_metadata(self, output_path: Path, stack_identifier: str, cfg: TomogramConfiguration) -> dict[str, str]:
         return {
-            f"tomo_{variant}" : str(output_path),
+            "tomo_full"    : str(output_path),
             "crop"         : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
             "FuSARproject" : cfg.fusar_project_path,
             "id"           : stack_identifier,
@@ -73,7 +71,7 @@ class MetadataManager:
         }
 
     def build_inputs_metadata(self, primary_path: Path, secondaries_path: Path, interferograms_path: Path, primary_shape: Tuple[int, ...], secondaries_shape: Tuple[int, ...], interferograms_shape: Tuple[int, ...]) -> dict[str, str]:
-        cfg = self.config.input_configs
+        cfg = self.config.tomogram_config
         return {
             "primary_path"         : str(primary_path),
             "secondaries_path"     : str(secondaries_path),
@@ -83,7 +81,7 @@ class MetadataManager:
             "interferograms_shape" : f"[{', '.join(str(v) for v in interferograms_shape)}]",
             "crop"                 : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
             "FuSARproject"         : cfg.fusar_project_path,
-            "id"                   : self.config.reduced_stack_identifier,
+            "id"                   : self.config.stack_identifier,
             "basedir"              : cfg.base_directory,
             "polarisation"         : cfg.polarisation,
             "select"               : cfg.track_selection,
@@ -134,7 +132,7 @@ class MetadataManager:
         self.logger.subsection(f"Configuration preserved at: {dump_path}")
         return dump_path
 
-    def save_dataset_layout(self) -> Path:
+    def save_dataset_layout(self, pass_labels: list | None = None) -> Path:
         self.registry.ensure_directory_structure()
 
         layout = {
@@ -142,6 +140,7 @@ class MetadataManager:
             "dataset_type"  : self.config.dataset_type,
             "tomogram_tag"  : self.config.tomogram_tag,
             "parameter_tag" : self.config.parameter_tag,
+            "pass_labels"   : list(pass_labels) if pass_labels is not None else None,
             "artifacts"     : self.registry.artifact_filenames(),
         }
 

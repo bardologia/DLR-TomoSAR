@@ -32,12 +32,12 @@ class InterferogramBuilder:
 
         self.logger.subsection("Initializing PyRat for FSAR...")
         pyrat_init(debug=False, nthreads=self.config.parallel.interferogram_threads())
-        tomogram_config = self.config.input_configs
+        tomogram_config = self.config.tomogram_config
 
         tomography_object = tomo.FuSARtomo(
             FuSARproject = tomogram_config.fusar_project_path,
             select       = tomogram_config.track_selection,
-            id           = self.config.reduced_stack_identifier,
+            id           = self.config.stack_identifier,
             basedir      = tomogram_config.base_directory,
             polarisation = tomogram_config.polarisation,
             crop         = list(crop_tuple),
@@ -121,7 +121,7 @@ class InterferogramBuilder:
 
             secondaries[secondary_index] = secondary_slc
 
-            secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, self.config.input_configs.max_amplitude_clip)
+            secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, self.config.tomogram_config.max_amplitude_clip)
             deramped_secondary    = secondary_slc * np.exp(1.0j * dem_phase)
             phasor                = primary_slc * np.conj(deramped_secondary)
             phasor               /= (np.abs(phasor) + 1e-30)

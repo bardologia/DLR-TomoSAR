@@ -38,30 +38,28 @@ def main() -> None:
         logger.section(f"[Run {index + 1}/{len(config.win_list)}] {dataset_name}")
         logger.kv_table({"Filter arguments": str(filter_arguments)})
 
-        shared_tomo = dict(
-            fusar_project_path     = config.fusar_project_path,
-            base_directory         = config.base_directory,
-            track_selection        = config.track_selection,
-            polarisation           = config.polarisation,
-            beamforming_method     = config.beamforming_method,
-            filter_method          = config.filter_method,
-            filter_arguments       = filter_arguments,
+        tomogram_config = TomogramConfiguration(
+            fusar_project_path = config.fusar_project_path,
+            base_directory     = config.base_directory,
+            track_selection    = config.track_selection,
+            polarisation       = config.polarisation,
+            beamforming_method = config.beamforming_method,
+            filter_method      = config.filter_method,
+            filter_arguments   = filter_arguments,
+            height_range       = tuple(config.height_range),
         )
 
         processing_config = ProcessingConfiguration(
-            crop = global_crop,
-
-            input_configs  = TomogramConfiguration(**shared_tomo),
-            output_configs = TomogramConfiguration(**shared_tomo, height_range=config.height_range),
+            crop            = global_crop,
+            tomogram_config = tomogram_config,
 
             parallel = ParallelConfiguration(effort=config.effort),
 
-            paths                    = PathConfiguration(run_subdirectory=dataset_name),
-            dataset_type             = config.dataset_type,
-            full_stack_identifier    = config.full_stack_identifier,
-            reduced_stack_identifier = config.reduced_stack_identifier,
-            tomogram_output_tag      = config.tomogram_output_tag,
-            parameter_output_tag     = config.parameter_output_tag,
+            paths                = PathConfiguration(run_subdirectory=dataset_name),
+            dataset_type         = config.dataset_type,
+            stack_identifier     = config.stack_identifier,
+            tomogram_output_tag  = config.tomogram_output_tag,
+            parameter_output_tag = config.parameter_output_tag,
         )
 
         pipeline = ProcessingPipeline(processing_config)

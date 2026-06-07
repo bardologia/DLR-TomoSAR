@@ -1401,7 +1401,7 @@ class ProcessAnimator {
     }
     if (ts >= 10.2) {
       const ch1 = "full stack -> ground truth";
-      const ch2 = "reduced stack -> operational";
+      const ch2 = "full stack -> model inputs";
       ctx.font = "14px 'IBM Plex Mono', monospace";
       const chW = Math.max(ctx.measureText(ch1).width, ctx.measureText(ch2).width) + 24;
       const chx = Math.min(stX + 6, w - chW - 14);
@@ -1411,11 +1411,11 @@ class ProcessAnimator {
     }
 
     let cap;
-    if (ts < 1.6) cap = "Pipeline order: tomogram FIRST (full, then reduced)  ·  interferograms LAST  ·  here we follow that execution order";
+    if (ts < 1.6) cap = "Pipeline order: full-stack tomogram FIRST  ·  interferograms LAST  ·  here we follow that execution order";
     else if (ts < 4.8) cap = "Upstream of this pipeline: F-SAR focuses & co-registers the SLCs  ·  we start from the finished stack";
     else if (ts < 8.2) cap = "Several passes on vertically offset tracks (5 drawn, illustrative)  ·  same scene, different phase patterns";
     else if (ts < 10.8) cap = "Co-registration is done upstream  ·  each secondary already sits on the primary pixel grid";
-    else cap = "full stack -> ground-truth tomogram  ·  reduced stack -> operational inputs  ·  phase carries the height";
+    else cap = "full stack -> ground-truth tomogram AND model inputs  ·  secondaries selected later at training  ·  phase carries the height";
     this._cap(cap);
   }
 
@@ -1732,7 +1732,7 @@ class ProcessAnimator {
     }
     else if (ts < CLIP0) cap = "ifg\u1d62 = A · s\u2080s\u1d62*/|s\u2080s\u1d62*|  ·  4 raw interferograms — still shaped by topography";
     else if (ts < 28.2) cap = "The amplitude weight A is clipped: A = clip(|s|, 0, 1.25)  ·  bright corner reflectors capped";
-    else cap = "interferograms_reduced  ·  amplitude-weighted unit phasors, ready for DEM deramping";
+    else cap = "interferograms  ·  amplitude-weighted unit phasors, ready for DEM deramping";
     this._cap(cap);
   }
 
@@ -1963,8 +1963,8 @@ class ProcessAnimator {
       const svY0 = Math.max(36, h * 0.5 - 178);
       const sx = w / 2 - (slotW + 170) / 2;
       ctx.font = "14px 'IBM Plex Mono', monospace";
-      const cw2 = ctx.measureText("interferograms_reduced.npy · (4, Az, Rg)").width + 24;
-      this._prChip("interferograms_reduced.npy · (4, Az, Rg)", w / 2 - cw2 / 2, Math.max(22, svY0 - 36), "#7cff9b", this._ease(c01((ts - 7.4) / 0.7)));
+      const cw2 = ctx.measureText("interferograms.npy · (N, Az, Rg)").width + 24;
+      this._prChip("interferograms.npy · (N, Az, Rg)", w / 2 - cw2 / 2, Math.max(22, svY0 - 36), "#7cff9b", this._ease(c01((ts - 7.4) / 0.7)));
       for (let k = 1; k <= 4; k++) {
         const ka = this._ease(c01((ts - 6.5 - (k - 1) * 0.25) / 0.5));
         if (ka <= 0) continue;
@@ -2603,7 +2603,7 @@ class ProcessAnimator {
       const rb = this._ease(c01((e1 - 1.5) / 2.5));
       if (rb > 0) {
         drawTomo(d.tomoCvReduced, blX, blY, tw2, th2, rb, "#7cff9b");
-        if (rb >= 1) this._prChip("tomogram_reduced · (H, Az, Rg) · tomo_tag · operational", blX, blY - 12, "#35e6d0", c01((e1 - 4.0) / 0.5));
+        if (rb >= 1) this._prChip("Capon (reduced) · (H, Az, Rg) · re-synthesised at inference", blX, blY - 12, "#35e6d0", c01((e1 - 4.0) / 0.5));
       }
       if (e1 >= 4.0) {
         const ca2 = this._ease(c01((e1 - 4.0) / 0.6));
@@ -2632,8 +2632,8 @@ class ProcessAnimator {
     else if (ts < C2) cap = "Capon: keep gain 1 at ξ and MINIMISE all other heights  ->  leakage suppressed, peaks sharpen";
     else if (ts < D0) cap = "Ground and canopy resolved below the Rayleigh limit (illustrative two-target demo)";
     else if (ts < TR0) cap = "Repeated for every pixel: tomogram (H, Az, Rg)  ·  height_range = [-20, 80] m  ->  tomogram_full";
-    else if (ts < TR0 + 4.0) cap = "The pipeline beamforms TWICE  ·  reduced stack (few passes) -> same Capon, fewer baselines = broader peaks";
-    else cap = "full = ground-truth resolution reference  ·  reduced = the operational few-pass scenario";
+    else if (ts < TR0 + 4.0) cap = "Pre-processing beamforms ONCE (full stack)  ·  the few-pass Capon baseline is re-synthesised at inference";
+    else cap = "full = ground-truth resolution reference  ·  reduced Capon = the operational few-pass baseline at inference";
     this._cap(cap);
   }
 
@@ -2801,12 +2801,10 @@ class ProcessAnimator {
 
     const cards = [
       ["tomogram_full", "(H,Az,Rg) · param_tag", "#7cff9b"],
-      ["tomogram_reduced", "(H,Az,Rg) · tomo_tag", "#7cff9b"],
-      ["dem_full", "(Az,Rg) · param_tag", "#ffcf6b"],
-      ["dem_reduced", "(Az,Rg) · tomo_tag", "#ffcf6b"],
-      ["primary_reduced", "(Az,Rg) cplx · tomo_tag", "#35e6d0"],
-      ["secondaries_reduced", "(Ns,Az,Rg) cplx", "#35e6d0"],
-      ["interferograms_reduced", "(Ns,Az,Rg) cplx", "#35e6d0"],
+            ["dem_full", "(Az,Rg) · param_tag", "#ffcf6b"],
+            ["primary", "(Az,Rg) cplx · tomo_tag", "#35e6d0"],
+      ["secondaries", "(Ns,Az,Rg) cplx", "#35e6d0"],
+      ["interferograms", "(Ns,Az,Rg) cplx", "#35e6d0"],
     ];
     const cols = 4, cw = (frW - 40) / cols, ch = 56;
     const gx = frX + 20, gy = frY + 28;
@@ -2847,7 +2845,7 @@ class ProcessAnimator {
 
     let cap;
     if (ts < 4.0) cap = "Seven artifacts per run  ·  two tomograms, two DEMs, three complex image arrays";
-    else if (ts < 13.0) cap = "tomogram_full = ground-truth reference (param_tag)  ·  tomogram_reduced = operational (tomo_tag)";
+    else if (ts < 13.0) cap = "tomogram_full = ground-truth reference (param_tag)  ·  inputs hold ALL passes, secondaries selected at training";
     else if (ts < 18.0) cap = "A self-describing dataset.json records the crop, tags, and every filename";
     else cap = "...alongside config_state.json + per-stage meta_*.txt for full reproducibility";
     this._cap(cap);
@@ -2953,11 +2951,11 @@ class ProcessAnimator {
       const ax = sx + sw2 + 40;
       const atW = w - ax - 44;
       const arts = [
-        { n: "primary_reduced", d: "1 reference pass", c: "#35e6d0" },
-        { n: "secondaries_reduced", d: "4 aligned passes", c: "rgba(178,204,210,0.95)" },
-        { n: "interferograms_reduced", d: "4 complex interferograms", c: "#ffcf6b" },
+        { n: "primary", d: "1 reference pass (PS02)", c: "#35e6d0" },
+        { n: "secondaries", d: "selected aligned passes", c: "rgba(178,204,210,0.95)" },
+        { n: "interferograms", d: "selected complex interferograms", c: "#ffcf6b" },
         { n: "parameters", d: "GMM targets · param pipeline", c: "#7cff9b" },
-        { n: "dem_reduced", d: "optional channel · off here", c: "rgba(178,204,210,0.95)" },
+        { n: "dem_full", d: "optional channel · off here", c: "rgba(178,204,210,0.95)" },
       ];
       const atY = sy + 12;
       const tA = c01((tt - 0.4) / 0.6);

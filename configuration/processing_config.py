@@ -112,33 +112,23 @@ class PathConfiguration:
 
 @dataclass
 class ProcessingConfiguration:
-    crop           : CropRegion
-    input_configs  : TomogramConfiguration              = field(default_factory=TomogramConfiguration)
-    output_configs : Optional[TomogramConfiguration]    = None
-    parallel       : ParallelConfiguration              = field(default_factory=ParallelConfiguration)
-    paths          : PathConfiguration                  = field(default_factory=PathConfiguration)
+    crop            : CropRegion
+    tomogram_config : TomogramConfiguration = field(default_factory=TomogramConfiguration)
+    parallel        : ParallelConfiguration = field(default_factory=ParallelConfiguration)
+    paths           : PathConfiguration     = field(default_factory=PathConfiguration)
 
-    dataset_type             : str = "FSAR"
-    full_stack_identifier    : str = "flaca"
-    reduced_stack_identifier : str = "flaca_2"
-    tomogram_output_tag      : str = "Xtomo_id2X"
-    parameter_output_tag     : str = "Xparams_id2X"
+    dataset_type         : str = "FSAR"
+    stack_identifier     : str = "1"
+    tomogram_output_tag  : str = "Xtomo_id2X"
+    parameter_output_tag : str = "Xparams_id2X"
 
     @property
     def tomogram_tag(self) -> str:
-        return f"{self.crop.as_identifier_string()}_{self.reduced_stack_identifier}_{self.tomogram_output_tag}"
+        return f"{self.crop.as_identifier_string()}_{self.stack_identifier}_{self.tomogram_output_tag}"
 
     @property
     def parameter_tag(self) -> str:
-        return f"{self.crop.as_identifier_string()}_{self.full_stack_identifier}_{self.parameter_output_tag}"
-
-    @property
-    def output_config(self) -> TomogramConfiguration:
-        return self.output_configs if self.output_configs is not None else self.input_configs
-
-    @property
-    def has_split_configs(self) -> bool:
-        return self.output_configs is not None
+        return f"{self.crop.as_identifier_string()}_{self.stack_identifier}_{self.parameter_output_tag}"
 
     def __post_init__(self) -> None:
         if self.paths.run_subdirectory is None:
@@ -147,34 +137,33 @@ class ProcessingConfiguration:
 
 @dataclass
 class PreProcessEntryConfig:
-    azimuth_start            : int   = 1000
-    azimuth_end              : int   = 16000
-    range_start              : int   = 500
-    range_end                : int   = 4000
+    azimuth_start        : int   = 1000
+    azimuth_end          : int   = 16000
+    range_start          : int   = 500
+    range_end            : int   = 4000
 
-    fusar_project_path       : str   = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
-    base_directory           : str   = "/ste/rnd/"
-    track_selection          : str   = "*"
-    polarisation             : str   = "hv"
+    fusar_project_path   : str   = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
+    base_directory       : str   = "/ste/rnd/"
+    track_selection      : str   = "*"
+    polarisation         : str   = "hv"
 
-    beamforming_method       : str   = "Capon"
-    filter_method            : str   = "Boxcar"
-    height_range             : tuple = (-20.0, 80.0)
-    win_list                 : list  = field(default_factory=lambda: [
+    beamforming_method   : str   = "Capon"
+    filter_method        : str   = "Boxcar"
+    height_range         : tuple = (-20.0, 80.0)
+    win_list             : list  = field(default_factory=lambda: [
         [40, 20],
         [20, 10],
         [10, 10],
         [30, 20],
     ])
 
-    effort                   : str           = "high"
+    effort               : str           = "high"
 
-    dataset_name             : Optional[str] = None
-    dataset_type             : str           = "FSAR"
-    full_stack_identifier    : str           = "1"
-    reduced_stack_identifier : str           = "dtmf"
-    tomogram_output_tag      : str           = "Xtomo_id2X"
-    parameter_output_tag     : str           = "Xparams_id2X"
+    dataset_name         : Optional[str] = None
+    dataset_type         : str           = "FSAR"
+    stack_identifier     : str           = "1"
+    tomogram_output_tag  : str           = "Xtomo_id2X"
+    parameter_output_tag : str           = "Xparams_id2X"
 
     def resolve_dataset_name(self, win: List[int], run_identifier: str) -> str:
         win_string = "_".join(str(value) for value in win)
@@ -185,4 +174,4 @@ class PreProcessEntryConfig:
         crop   = CropRegion(azimuth_start=self.azimuth_start, azimuth_end=self.azimuth_end, range_start=self.range_start, range_end=self.range_end)
         source = Path(self.fusar_project_path).stem
 
-        return f"{source}_{crop.as_labeled_string()}_w{win_string}_{self.polarisation}_{self.full_stack_identifier}_{self.reduced_stack_identifier}_{run_identifier}"
+        return f"{source}_{crop.as_labeled_string()}_w{win_string}_{self.polarisation}_{self.stack_identifier}_{run_identifier}"

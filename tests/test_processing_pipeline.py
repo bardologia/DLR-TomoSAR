@@ -186,8 +186,8 @@ class TestArtifactRegistry:
         names = registry.artifact_filenames()
 
         expected_keys = {
-            "tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced",
-            "primary_reduced", "secondaries_reduced", "interferograms_reduced", "track_profiles",
+            "tomogram_full", "dem_full",
+            "primary", "secondaries", "interferograms", "track_profiles",
         }
         assert set(names.keys()) == expected_keys
         assert all(value.endswith((".npy", ".npz")) for value in names.values())
@@ -199,17 +199,17 @@ class TestArtifactRegistry:
 
         assert config.parameter_tag in names["tomogram_full"]
         assert config.parameter_tag in names["dem_full"]
-        assert config.tomogram_tag  in names["tomogram_reduced"]
-        assert config.tomogram_tag  in names["primary_reduced"]
+        assert config.tomogram_tag  in names["primary"]
+        assert config.tomogram_tag  in names["interferograms"]
 
     def test_artifact_path_under_data_directory(self, tmp_path):
         config   = _make_config(tmp_path)
         registry = ArtifactRegistry(config, NullLogger())
 
-        path = registry.artifact_path("tomogram_reduced")
+        path = registry.artifact_path("tomogram_full")
 
         assert path.parent == config.paths.data_directory
-        assert path.name == registry.artifact_filenames()["tomogram_reduced"]
+        assert path.name == registry.artifact_filenames()["tomogram_full"]
 
     def test_artifact_path_unknown_type_raises_keyerror(self, tmp_path):
         config   = _make_config(tmp_path)
@@ -242,12 +242,12 @@ class TestMetadataManager:
     def test_build_tomogram_metadata_fields(self, tmp_path):
         config  = _make_config(tmp_path)
         manager = MetadataManager(config, NullLogger())
-        cfg     = config.input_configs
+        cfg     = config.tomogram_config
         out     = tmp_path / "tomo.npy"
 
-        meta = manager.build_tomogram_metadata("reduced", out, "stack_x", cfg)
+        meta = manager.build_tomogram_metadata(out, "stack_x", cfg)
 
-        assert meta["tomo_reduced"] == str(out)
+        assert meta["tomo_full"] == str(out)
         assert meta["id"] == "stack_x"
         assert meta["polarisation"] == cfg.polarisation
         assert meta["filter"] == cfg.filter_method
@@ -258,7 +258,7 @@ class TestMetadataManager:
         config  = _make_config(tmp_path, crop=CropRegion(1, 2, 3, 4))
         manager = MetadataManager(config, NullLogger())
 
-        meta = manager.build_tomogram_metadata("full", tmp_path / "f.npy", "sid", config.input_configs)
+        meta = manager.build_tomogram_metadata(tmp_path / "f.npy", "sid", config.tomogram_config)
 
         assert meta["crop"] == "[1, 2, 3, 4]"
 
@@ -279,7 +279,7 @@ class TestMetadataManager:
         assert meta["secondaries_shape"] == "[8, 100, 50]"
         assert meta["interferograms_shape"] == "[8, 100, 50]"
         assert meta["data_type"] == config.dataset_type
-        assert meta["id"] == config.reduced_stack_identifier
+        assert meta["id"] == config.stack_identifier
 
     def test_save_stage_metadata_writes_file(self, tmp_path):
         config  = _make_config(tmp_path)
@@ -501,41 +501,24 @@ class TestProcessingPipeline:
         pipe = pipeline_module.ProcessingPipeline(config, logger=NullLogger())
         return pipe, config, recorder
 
-    def test_resolve_variant_full(self, tmp_path, monkeypatch):
-        pipe, config, _ = self._build_pipeline(tmp_path, monkeypatch)
-
-        variant = pipe._resolve_variant("full")
-
-        assert variant.stack_identifier == config.full_stack_identifier
-        assert variant.identifier_tag == config.parameter_tag
-        assert variant.tomogram_config is config.output_config
-
-    def test_resolve_variant_reduced(self, tmp_path, monkeypatch):
-        pipe, config, _ = self._build_pipeline(tmp_path, monkeypatch)
-
-        variant = pipe._resolve_variant("reduced")
-
-        assert variant.stack_identifier == config.reduced_stack_identifier
-        assert variant.identifier_tag == config.tomogram_tag
-        assert variant.tomogram_config is config.input_configs
-
     def test_stage_tomogram_returns_artifact_paths(self, tmp_path, monkeypatch):
         pipe, config, recorder = self._build_pipeline(tmp_path, monkeypatch)
 
-        tomo_path, dem_path = pipe._stage_tomogram("reduced")
+        tomo_path, dem_path = pipe._stage_tomogram()
 
-        assert tomo_path == pipe.artifact_registry.artifact_path("tomogram_reduced")
-        assert dem_path == pipe.artifact_registry.artifact_path("dem_reduced")
+        assert tomo_path == pipe.artifact_registry.artifact_path("tomogram_full")
+        assert dem_path == pipe.artifact_registry.artifact_path("dem_full")
         assert len(recorder["tomograms"]) == 1
+        assert recorder["tomograms"][0][2] == config.stack_identifier
 
     def test_stage_inputs_returns_three_paths(self, tmp_path, monkeypatch):
         pipe, config, recorder = self._build_pipeline(tmp_path, monkeypatch)
 
         primary, secondaries, interferograms = pipe._stage_inputs()
 
-        assert primary == pipe.artifact_registry.artifact_path("primary_reduced")
-        assert secondaries == pipe.artifact_registry.artifact_path("secondaries_reduced")
-        assert interferograms == pipe.artifact_registry.artifact_path("interferograms_reduced")
+        assert primary == pipe.artifact_registry.artifact_path("primary")
+        assert secondaries == pipe.artifact_registry.artifact_path("secondaries")
+        assert interferograms == pipe.artifact_registry.artifact_path("interferograms")
         assert len(recorder["inputs"]) == 1
 
     def test_run_returns_full_artifact_mapping(self, tmp_path, monkeypatch):
@@ -544,13 +527,13 @@ class TestProcessingPipeline:
         outputs = pipe.run()
 
         expected_keys = {
-            "tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced",
-            "primary_reduced", "secondaries_reduced", "interferograms_reduced",
+            "tomogram_full", "dem_full",
+            "primary", "secondaries", "interferograms",
             "run_directory",
         }
         assert set(outputs.keys()) == expected_keys
         assert outputs["run_directory"] == config.paths.run_directory
-        assert len(recorder["tomograms"]) == 2
+        assert len(recorder["tomograms"]) == 1
         assert len(recorder["inputs"]) == 1
 
     def test_run_writes_metadata_and_layout(self, tmp_path, monkeypatch):
@@ -561,4 +544,4 @@ class TestProcessingPipeline:
         dataset_json = config.paths.data_directory / "dataset.json"
         assert dataset_json.exists()
         meta_files = list(config.paths.metadata_directory.glob("*.txt"))
-        assert len(meta_files) >= 3
+        assert len(meta_files) >= 2
