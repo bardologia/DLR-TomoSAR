@@ -168,7 +168,7 @@ class LaunchView {
       const opt = document.createElement("option");
       opt.value = it.path;
       opt.textContent = `${it.label}  ·  ${it.path}`;
-      if (it.path === this.project.preferred) opt.selected = true;
+      if (it.path === this.detail.preferred) opt.selected = true;
       select.appendChild(opt);
     });
     interp.appendChild(select);

@@ -144,7 +144,7 @@ class RequestRouter:
             return
         if path.startswith("/api/scripts/") and path.endswith("/config"):
             key    = path[len("/api/scripts/"):-len("/config")]
-            result = self.resolver.resolve(key, self._preferred_interpreter())
+            result = self.resolver.resolve(key, self._preferred_interpreter(key))
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path.startswith("/api/scripts/"):
@@ -181,7 +181,7 @@ class RequestRouter:
 
         if path == "/api/run":
             key         = body.get("script_key", "")
-            interpreter = body.get("interpreter") or self._preferred_interpreter()
+            interpreter = body.get("interpreter") or self._preferred_interpreter(key)
             overrides   = body.get("overrides", {})
             follow_up   = body.get("follow_up") or None
             detach      = bool(body.get("detach"))
@@ -205,7 +205,7 @@ class RequestRouter:
             return
 
         if path == "/api/tensorboard/start":
-            interpreter = body.get("interpreter") or self._preferred_interpreter()
+            interpreter = body.get("interpreter") or self._preferred_interpreter(body.get("script_key", "train"))
             logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train"), {}, interpreter)
 
             if not logdir:
@@ -306,9 +306,9 @@ class RequestRouter:
             },
         }
 
-    def _preferred_interpreter(self) -> str:
+    def _preferred_interpreter(self, script_key: str = "") -> str:
         interpreters = self.paths.discover_interpreters()
-        return self.paths.preferred_interpreter(interpreters)
+        return self.paths.preferred_interpreter(interpreters, script_key)
 
     def _stream_job(self, handler, job_id: str) -> None:
         stream = self.processes.get_stream(job_id)

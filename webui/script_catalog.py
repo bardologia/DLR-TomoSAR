@@ -105,4 +105,5 @@ class ScriptCatalog:
             "language"     : "python",
             "config_class" : entry["class"] if entry else None,
             "command"      : f"python main/{key}.py",
+            "preferred"    : self.paths.preferred_interpreter(self.paths.discover_interpreters(), key),
         }

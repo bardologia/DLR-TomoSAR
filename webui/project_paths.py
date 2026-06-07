@@ -6,6 +6,9 @@ from pathlib import Path
 
 class ProjectPaths:
 
+    PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
+    SCRIPT_PRIORITY = {"pre_process": ["conda:stetools"]}
+
     def __init__(self) -> None:
         self.webui_root   = Path(__file__).resolve().parent
         self.repo_root    = self.webui_root.parent
@@ -40,8 +43,8 @@ class ProjectPaths:
 
         return found
 
-    def preferred_interpreter(self, interpreters: list[dict]) -> str:
-        priority = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
+    def preferred_interpreter(self, interpreters: list[dict], script_key: str = "") -> str:
+        priority = self.SCRIPT_PRIORITY.get(script_key, []) + self.PRIORITY
         for wanted in priority:
             for item in interpreters:
                 if item["label"] == wanted:
