@@ -10,7 +10,7 @@ from configuration.training_config import GeometryConfig
 class PhysicsCheckEntryConfig:
     dataset_path      : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
     height_range      : tuple | None = None
-    secondary_labels  : tuple | None = ("PS04", "PS06", "PS08", "PS26")
+    secondary_labels  : tuple | None = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
 
     fit_k_max         : int          = 5
     output_prefix     : str          = "params"

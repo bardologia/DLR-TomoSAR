@@ -427,24 +427,38 @@ class TestTrackFileResolver:
         with pytest.raises(FileNotFoundError):
             TrackFileResolver().resolve(tmp_path / "PS03" / "T01L")
 
-    def test_label_uses_pass_name_above_track_directory(self, tmp_path):
-        assert TrackFileResolver().label(tmp_path / "PS07" / "T01L") == "PS07"
+    def _make_flightline_pass(self, tmp_path, flight, pass_name, track_dir, filename):
+        directory = tmp_path / flight / pass_name / track_dir / "INF" / "INF-TRACK"
+        directory.mkdir(parents=True)
+        (directory / filename).touch()
+        return tmp_path / flight / pass_name / track_dir
 
-    def test_label_falls_back_to_directory_name(self, tmp_path):
-        assert TrackFileResolver().label(tmp_path / "PS07") == "PS07"
+    def test_label_qualifies_pass_with_flight_line(self, tmp_path):
+        assert TrackFileResolver().label(tmp_path / "FL01" / "PS07" / "T01L") == "FL01_PS07"
+
+    def test_label_qualifies_when_no_track_directory(self, tmp_path):
+        assert TrackFileResolver().label(tmp_path / "FL02" / "PS07") == "FL02_PS07"
 
     def test_resolve_passes_keeps_order(self, tmp_path):
-        first  = self._make_pass(tmp_path, "PS03", "T01L", "track_a.rat")
-        second = self._make_pass(tmp_path, "PS07", "T01L", "track_b.rat")
+        first  = self._make_flightline_pass(tmp_path, "FL01", "PS03", "T01L", "track_a.rat")
+        second = self._make_flightline_pass(tmp_path, "FL01", "PS07", "T01L", "track_b.rat")
         mapped = TrackFileResolver().resolve_passes([first, second])
 
-        assert list(mapped.keys()) == ["PS03", "PS07"]
+        assert list(mapped.keys()) == ["FL01_PS03", "FL01_PS07"]
 
-    def test_resolve_passes_duplicate_label_raises(self, tmp_path):
-        primary   = self._make_pass(tmp_path, "PS02", "T01L", "track_a.rat")
-        secondary = self._make_pass(tmp_path, "PS04", "T01L", "track_b.rat")
+    def test_resolve_passes_disambiguates_cross_flightline(self, tmp_path):
+        fl01   = self._make_flightline_pass(tmp_path, "FL01", "PS29", "T01L", "track_sar_resa_17sartom0129.rat")
+        fl02   = self._make_flightline_pass(tmp_path, "FL02", "PS29", "T01L", "track_sar_resa_17sartom0229.rat")
+        unique = self._make_flightline_pass(tmp_path, "FL01", "PS04", "T01L", "track_sar_resa_17sartom0104.rat")
+        mapped = TrackFileResolver().resolve_passes([unique, fl01, fl02])
 
-        with pytest.raises(DuplicatePassError, match="duplicate labels PS02"):
+        assert list(mapped.keys()) == ["FL01_PS04", "FL01_PS29", "FL02_PS29"]
+
+    def test_resolve_passes_identical_pass_raises(self, tmp_path):
+        primary   = self._make_flightline_pass(tmp_path, "FL01", "PS02", "T01L", "track_a.rat")
+        secondary = self._make_flightline_pass(tmp_path, "FL01", "PS04", "T01L", "track_b.rat")
+
+        with pytest.raises(DuplicatePassError, match="Duplicate pass label FL01_PS02"):
             TrackFileResolver().resolve_passes([primary, secondary, primary])
 
 

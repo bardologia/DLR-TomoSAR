@@ -281,26 +281,26 @@ class TrackFileResolver:
 
         raise FileNotFoundError(f"No track file matching {self.TRACK_PATTERNS} under {directory}")
 
-    def label(self, pass_directory: str | Path) -> str:
+    def _pass_node(self, pass_directory: str | Path) -> Path:
         path = Path(pass_directory)
-        if self.TRACK_DIR_PATTERN.fullmatch(path.name):
-            return path.parent.name
-        return path.name
+        return path.parent if self.TRACK_DIR_PATTERN.fullmatch(path.name) else path
+
+    def label(self, pass_directory: str | Path) -> str:
+        node   = self._pass_node(pass_directory)
+        flight = node.parent.name
+        return f"{flight}_{node.name}" if flight else node.name
 
     def resolve_passes(self, pass_directories: list) -> dict:
-        resolved   = [(self.label(directory), self.resolve(directory)) for directory in pass_directories]
-        mapping    = {}
-        collisions = {}
+        mapping = {}
 
-        for label, path in resolved:
+        for directory in pass_directories:
+            label = self.label(directory)
+            path  = self.resolve(directory)
+
             if label in mapping:
-                collisions.setdefault(label, [mapping[label]]).append(path)
-            else:
-                mapping[label] = path
+                raise DuplicatePassError(f"Duplicate pass label {label}: {mapping[label]} and {path}. Each pass directory must map to a unique flight-qualified label; check for a pass listed twice.")
 
-        if collisions:
-            detail = "; ".join(f"{label} ← {', '.join(str(p) for p in paths)}" for label, paths in collisions.items())
-            raise DuplicatePassError(f"{len(pass_directories)} pass directories resolved to only {len(mapping)} unique labels; duplicate labels {detail}. Each pass must map to a unique label — check the secondary selection for a repeated pass (e.g. the primary also listed as a secondary).")
+            mapping[label] = path
 
         return mapping
 

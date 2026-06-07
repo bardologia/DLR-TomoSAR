@@ -17,10 +17,10 @@ from tools.track_baselines         import BaselineExtractor, TrackBaselines, Tra
 
 def _default_track_paths() -> dict:
     return {
-        "PS03": "/ste/rnd/17SARTOM/FL01/PS03/T01L/INF/INF-TRACK/track_sar_resa_17sartom0103_Lhh_t01L.rat",
-        "PS07": "/ste/rnd/17SARTOM/FL01/PS07/T01L/INF/INF-TRACK/track_sar_resa_17sartom0107_Lhh_t01L.rat",
-        "PS11": "/ste/rnd/17SARTOM/FL01/PS11/T01L/INF/INF-TRACK/track_sar_resa_17sartom0111_Lhh_t01L.rat",
-        "PS15": "/ste/rnd/17SARTOM/FL01/PS15/T01L/INF/INF-TRACK/track_sar_resa_17sartom0115_Lhh_t01L.rat",
+        "FL01_PS03": "/ste/rnd/17SARTOM/FL01/PS03/T01L/INF/INF-TRACK/track_sar_resa_17sartom0103_Lhh_t01L.rat",
+        "FL01_PS07": "/ste/rnd/17SARTOM/FL01/PS07/T01L/INF/INF-TRACK/track_sar_resa_17sartom0107_Lhh_t01L.rat",
+        "FL01_PS11": "/ste/rnd/17SARTOM/FL01/PS11/T01L/INF/INF-TRACK/track_sar_resa_17sartom0111_Lhh_t01L.rat",
+        "FL01_PS15": "/ste/rnd/17SARTOM/FL01/PS15/T01L/INF/INF-TRACK/track_sar_resa_17sartom0115_Lhh_t01L.rat",
     }
 
 

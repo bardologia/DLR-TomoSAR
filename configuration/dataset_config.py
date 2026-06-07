@@ -181,7 +181,7 @@ class DatasetConfiguration:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
     parameters_path             : Optional[Path]          = None
-    secondary_labels            : Optional[Tuple[str, ...]] = ("PS04", "PS06", "PS08", "PS26")
+    secondary_labels            : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
     patch                       : PatchConfiguration      = field(default_factory=PatchConfiguration)
     input_config                : InputConfig             = field(default_factory=InputConfig)
     output_config               : OutputConfig            = field(default_factory=OutputConfig)
