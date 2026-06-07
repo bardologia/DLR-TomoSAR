@@ -161,6 +161,14 @@ class TuningOrchestrator:
     def _save_results(self) -> None:
         FileIO.save_json(self.results, self.summary_path, indent=2)
 
+    def _plot_study(self, study: optuna.Study, model_name: str) -> None:
+        from pipelines.tuning_pipeline.plots import StudyPlotter
+
+        plot_dir = self.run_dir / model_name / "study_plots"
+        plotter  = StudyPlotter(self.logger)
+        saved    = plotter.render(study, plot_dir)
+        self.logger.info(f"Saved {len(saved)} study plots to {plot_dir}")
+
     def _tune_model(self, model_name: str, tune_cfg: TuningConfig) -> None:
         self.logger.section(f"[{model_name}]")
 
@@ -199,6 +207,9 @@ class TuningOrchestrator:
 
         self.logger.subsection(f"Best — trial {payload['trial']}  val_loss={payload['val_loss']:.6f}")
         self.logger.kv_table(payload["params"], title="Best Params")
+
+        if tune_cfg.emit_study_plots:
+            self._plot_study(study, model_name)
 
         self.results.append({
             "model"           : model_name,

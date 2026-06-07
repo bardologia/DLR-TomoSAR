@@ -10,6 +10,7 @@ from optuna.trial import TrialState
 
 from configuration.tuning_config import TuningEntryConfig
 from pipelines.tuning_pipeline.pipeline import TuningOrchestrator
+from pipelines.tuning_pipeline.plots import StudyPlotter
 from pipelines.tuning_pipeline.tuners import BestConfigWriter, ParamSampler
 
 
@@ -18,6 +19,33 @@ SPACE = {
     "activation" : {"type": "categorical",         "choices": ["relu", "gelu"]},
     "features"   : {"type": "indexed_categorical", "choices": [[32, 64], [64, 128]]},
 }
+
+
+class TrialFactory:
+    @staticmethod
+    def completed(value: float, lr: float, idx: int, intermediate: dict | None = None):
+        return optuna.trial.create_trial(
+            params        = {"encoder_lr": lr, "activation": ["relu", "gelu"][idx], "features__idx": idx},
+            distributions = {
+                "encoder_lr"    : FloatDistribution(1e-5, 1e-2, log=True),
+                "activation"    : CategoricalDistribution(["relu", "gelu"]),
+                "features__idx" : CategoricalDistribution([0, 1]),
+            },
+            value               = value,
+            intermediate_values = intermediate or {},
+        )
+
+
+class RecordingLogger:
+    def __init__(self) -> None:
+        self.infos    = []
+        self.warnings = []
+
+    def info(self, message: str) -> None:
+        self.infos.append(message)
+
+    def warning(self, message: str) -> None:
+        self.warnings.append(message)
 
 
 class TestParamSampler:
@@ -43,15 +71,7 @@ class TestParamSampler:
 
 class TestBestConfigWriter:
     def _completed_trial(self, value: float, lr: float, idx: int):
-        return optuna.trial.create_trial(
-            params        = {"encoder_lr": lr, "activation": "gelu", "features__idx": idx},
-            distributions = {
-                "encoder_lr"    : FloatDistribution(1e-5, 1e-2, log=True),
-                "activation"    : CategoricalDistribution(["relu", "gelu"]),
-                "features__idx" : CategoricalDistribution([0, 1]),
-            },
-            value = value,
-        )
+        return TrialFactory.completed(value, lr, idx)
 
     def test_write_without_completed_trials_returns_none(self, tmp_path):
         study  = optuna.create_study(direction="minimize")
@@ -124,3 +144,45 @@ class TestTuningOrchestrator:
         assert orch._fail_stale_trials(study) == 1
         assert orch._count_done(study)        == 1
         assert len(study.get_trials(states=(TrialState.RUNNING,))) == 0
+
+
+class TestStudyPlotter:
+    def _study(self, n_trials: int = 8):
+        study = optuna.create_study(direction="minimize")
+        for i in range(n_trials):
+            value = 1.0 / (i + 1)
+            study.add_trial(TrialFactory.completed(value, 1e-4 * (i + 1), i % 2, intermediate={0: 1.0, 1: value}))
+        return study
+
+    def test_render_writes_core_plots(self, tmp_path):
+        plotter = StudyPlotter(RecordingLogger())
+        saved   = plotter.render(self._study(), tmp_path)
+        names   = {p.name for p in saved}
+
+        assert "optimization_history.png" in names
+        assert "param_importances.png"    in names
+        assert "slice.png"                in names
+        assert "contour.png"              in names
+        assert all(p.exists() for p in saved)
+
+    def test_render_on_empty_study_does_not_raise(self, tmp_path):
+        logger  = RecordingLogger()
+        plotter = StudyPlotter(logger)
+        saved   = plotter.render(optuna.create_study(direction="minimize"), tmp_path)
+
+        assert isinstance(saved, list)
+
+    def test_contour_params_capped_by_importance(self, tmp_path):
+        logger  = RecordingLogger()
+        plotter = StudyPlotter(logger)
+
+        plotter.CONTOUR_MAX_PARAMS = 1
+        top = plotter._contour_params(self._study())
+
+        assert len(top) == 1
+        assert len(logger.infos) == 1
+
+    def test_contour_params_uncapped_returns_none(self, tmp_path):
+        plotter = StudyPlotter(RecordingLogger())
+
+        assert plotter._contour_params(self._study()) is None

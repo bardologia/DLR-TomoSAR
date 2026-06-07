@@ -17,6 +17,7 @@ class TuningConfig:
     pruner_n_warmup_steps   : int  = 8
 
     emit_trial_docs         : bool = False
+    emit_study_plots        : bool = False
 
 
 @dataclass
