@@ -255,18 +255,12 @@ class TestInputConfig:
 
         assert InputConfig.from_dict(cfg.as_dict()) == cfg
 
-    def test_from_dict_nested_layout(self):
-        payload = {
-            "primary"        : {"use": True,  "representation": Representation.MAG_ANGLE.value},
-            "secondaries"    : {"use": False, "representation": Representation.MAG_ONLY.value},
-            "interferograms" : {"use": True,  "representation": Representation.ANGLE_ONLY.value},
-            "dem"            : {"use": True},
-        }
-        cfg = InputConfig.from_dict(payload)
+    def test_from_dict_requires_all_fields(self):
+        payload = InputConfig().as_dict()
+        payload.pop("use_dem")
 
-        assert cfg.use_primary             is True
-        assert cfg.primary_representation  is Representation.MAG_ANGLE
-        assert cfg.use_dem                 is True
+        with pytest.raises(KeyError):
+            InputConfig.from_dict(payload)
 
 
 class TestOutputConfig:
@@ -319,17 +313,12 @@ class TestOutputConfig:
         assert rt.use_mu        == cfg.use_mu
         assert rt.use_sigma     == cfg.use_sigma
 
-    def test_from_dict_nested_layout(self):
-        payload = {
-            "amplitude" : {"use": True},
-            "mu"        : {"use": False},
-            "sigma"     : {"use": True},
-        }
-        cfg = OutputConfig.from_dict(payload)
+    def test_from_dict_requires_all_fields(self):
+        payload = OutputConfig().as_dict()
+        payload.pop("use_mu")
 
-        assert cfg.use_amplitude is True
-        assert cfg.use_mu        is False
-        assert cfg.use_sigma     is True
+        with pytest.raises(KeyError):
+            OutputConfig.from_dict(payload)
 
     def test_default_strategies_are_independent(self):
         a = OutputConfig()
@@ -668,7 +657,7 @@ class TestParamExtractionConfig:
         meta_dir = tmp_path / "meta"
         meta_dir.mkdir()
         (meta_dir / "config_state_001.json").write_text(
-            json.dumps({"output_configs": {"height_range": [-5.0, 80.0]}})
+            json.dumps({"tomogram_config": {"height_range": [-5.0, 80.0]}})
         )
         cfg = ExtractionConfig(processed_data_path=tmp_path)
 
@@ -911,7 +900,7 @@ class TestTrainingConfig:
         meta_dir = tmp_path / "meta"
         meta_dir.mkdir()
         (meta_dir / "config_state_001.json").write_text(
-            json.dumps({"output_configs": {"height_range": [-5.0, 80.0]}})
+            json.dumps({"tomogram_config": {"height_range": [-5.0, 80.0]}})
         )
         cfg = GaussianConfig.from_dataset(tmp_path, n_gaussians=4)
 

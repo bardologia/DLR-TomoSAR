@@ -11,8 +11,6 @@ from tools.logger import Logger
 
 
 class PreprocessConfigReader:
-    TOMOGRAM_KEYS = ("tomogram_config", "output_configs", "input_configs")
-
     def __init__(self, preprocessing_dir: Path) -> None:
         self.preprocessing_dir = Path(preprocessing_dir)
 
@@ -24,13 +22,13 @@ class PreprocessConfigReader:
             raise FileNotFoundError(f"No config_state_*.json under {meta_dir}; cannot read the pre-processing Capon configuration")
 
         state    = json.loads(candidates[0].read_text(encoding="utf-8"))
-        tomo_cfg = next(state[key] for key in self.TOMOGRAM_KEYS if state.get(key) is not None)
+        tomo_cfg = state["tomogram_config"]
 
         return {
             "window"                : tuple(int(v) for v in tomo_cfg["filter_arguments"]["win"]),
-            "filter_method"         : str(tomo_cfg.get("filter_method", "Boxcar")),
-            "beamforming_method"    : str(tomo_cfg.get("beamforming_method", "Capon")),
-            "beamforming_arguments" : list(tomo_cfg.get("beamforming_arguments", [])),
+            "filter_method"         : str(tomo_cfg["filter_method"]),
+            "beamforming_method"    : str(tomo_cfg["beamforming_method"]),
+            "beamforming_arguments" : list(tomo_cfg["beamforming_arguments"]),
             "source"                : str(candidates[0]),
         }
 
@@ -46,13 +44,13 @@ class GeometryLoader:
         payload  = json.loads((self.run_directory / self.TRAINER_CONFIG).read_text(encoding="utf-8"))
         geometry = payload["geometry"]
 
-        if geometry.get("kz_values"):
+        if geometry["kz_values"]:
             kz = np.asarray([float(v) for v in geometry["kz_values"]], dtype=np.float64)
         else:
             scale = 4.0 * math.pi / (float(geometry["wavelength"]) * float(geometry["slant_range"]))
             kz    = scale * np.asarray([float(b) for b in geometry["baselines"]], dtype=np.float64)
 
-        self.logger.subsection(f"Geometry origin : {geometry.get('baselines_origin', 'config')}")
+        self.logger.subsection(f"Geometry origin : {geometry['baselines_origin']}")
         self.logger.subsection(f"kz [rad/m]      : {', '.join(f'{v:.4f}' for v in kz)}")
 
         return kz

@@ -39,7 +39,7 @@ class ConfigFactory:
         self.config = config
 
     def _secondary_labels(self) -> tuple | None:
-        labels = getattr(self.config.paths, "secondary_labels", None)
+        labels = self.config.paths.secondary_labels
         return tuple(labels) if labels else None
 
     def global_crop(self) -> CropRegion:

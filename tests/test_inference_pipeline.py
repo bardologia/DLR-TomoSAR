@@ -643,17 +643,18 @@ class TestReportPayloadBuilder:
         grid         = SimpleNamespace(number_of_patches=4, patch_size=(4, 4), stride=4)
 
         return SimpleNamespace(
-            model_name     = "unet",
-            in_channels    = 6,
-            out_channels   = 6,
-            n_gaussians    = 2,
-            x_axis_length  = 5,
-            split_name     = "test",
-            split_region   = split_region,
-            global_crop    = global_crop,
-            grid           = grid,
-            dataset_config = ds_cfg,
-            used_ema       = True,
+            model_name       = "unet",
+            in_channels      = 6,
+            out_channels     = 6,
+            n_gaussians      = 2,
+            x_axis_length    = 5,
+            split_name       = "test",
+            split_region     = split_region,
+            global_crop      = global_crop,
+            grid             = grid,
+            dataset_config   = ds_cfg,
+            used_ema         = True,
+            secondary_labels = ["PS04", "PS06"],
         )
 
     def test_run_summary_keys(self):
@@ -760,6 +761,7 @@ class TestReportAssemble:
                 batch_size=8,
             ),
             used_ema=False,
+            secondary_labels=["PS04", "PS06"],
         )
         run_summary = ReportPayloadBuilder.run_summary(run, np.linspace(-10.0, 10.0, 5))
         inf_cfg     = {"device": "cpu", "batch_size": 8, "num_workers": 1, "stitch_window": "hann"}

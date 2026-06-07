@@ -29,7 +29,7 @@ class ReportPayloadBuilder:
             "preprocessing_dir" : str(run.dataset_config.preprocessing_run_directory),
             "input_config"      : run.dataset_config.input_config.as_dict(),
             "used_ema"          : run.used_ema,
-            "secondary_labels"  : ", ".join(labels) if (labels := getattr(run, "secondary_labels", None)) else "all passes",
+            "secondary_labels"  : ", ".join(run.secondary_labels) if run.secondary_labels else "all passes",
         }
 
     @staticmethod
@@ -279,15 +279,15 @@ class Report:
 
         out = ["\n### 2.4 Tracks used in this run\n"]
         out.append(
-            f"Baselines relative to the reference pass `{tracks.get('reference')}` over azimuth window "
-            f"{tracks.get('azimuth_window')}; absolute values are the resa-frame windowed means.\n"
+            f"Baselines relative to the reference pass `{tracks['reference']}` over azimuth window "
+            f"{tracks['azimuth_window']}; absolute values are the resa-frame windowed means.\n"
         )
 
-        labels   = tracks.get("labels", [])
+        labels   = tracks["labels"]
         n_tracks = len(labels)
 
         def column(key: str) -> list:
-            values = tracks.get(key) or [float("nan")] * n_tracks
+            values = tracks[key]
             return values if len(values) == n_tracks else [float("nan")] * n_tracks
 
         table = MarkdownTable(("Pass", "Horizontal [m]", "Vertical [m]", "H std [m]", "V std [m]", "H absolute [m]", "V absolute [m]"))

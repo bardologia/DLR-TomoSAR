@@ -156,7 +156,7 @@ class RunLoader:
             use_reflective_padding = bool(payload["patch"]["use_reflective_padding"]),
         )
 
-        secondary_labels = payload.get("secondary_labels")
+        secondary_labels = payload["secondary_labels"]
 
         return DatasetConfiguration(
             preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
@@ -256,17 +256,8 @@ class RunLoader:
         baselines_path = dataset_dir / "meta" / TrackBaselines.FILENAME
         profiles_path  = TrackProfiles.profiles_file(dataset_dir)
 
-        baselines = None
-        profiles  = None
-
-        try:
-            if baselines_path.is_file():
-                baselines = TrackBaselines.load(baselines_path).subset(labels)
-            if profiles_path.is_file():
-                profiles = TrackProfiles.load(profiles_path).subset(labels)
-        except Exception as error:
-            self.logger.subsection(f"Track info unavailable: {error}")
-            return None, None
+        baselines = TrackBaselines.load(baselines_path).subset(labels) if baselines_path.is_file() else None
+        profiles  = TrackProfiles.load(profiles_path).subset(labels)   if profiles_path.is_file()  else None
 
         if baselines is not None:
             self.logger.kv_table(baselines.describe(), title="Tracks Used in This Run")
@@ -377,7 +368,7 @@ class RunLoader:
             used_ema         = used_ema,
             complex_inputs   = arrays["inputs"],
             n_secondaries    = arrays["n_secondaries"],
-            secondary_labels = arrays.get("secondary_labels"),
+            secondary_labels = arrays["secondary_labels"],
             track_baselines  = track_baselines,
             track_profiles   = track_profiles,
         )

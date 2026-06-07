@@ -11,17 +11,9 @@ import numpy as np
 from configuration.processing_config import CropRegion
 from tools.regions                   import SplitRegions
 from tools.logger                    import Logger
-from tools.track_baselines           import TrackBaselines
 
 
 class Layout:
-    LEGACY_KEYS = {
-        "primary"        : "primary_reduced",
-        "secondaries"    : "secondaries_reduced",
-        "interferograms" : "interferograms_reduced",
-        "dem_full"       : "dem_reduced",
-    }
-
     def __init__(self, run_directory: Path, logger: Logger, parameters_path: Path) -> None:
         self.run_directory    = Path(run_directory)
         self.logger           = logger
@@ -37,7 +29,7 @@ class Layout:
         self.tomogram_tag   : str         = payload["tomogram_tag"]
         self.parameter_tag  : str         = payload["parameter_tag"]
         self.artifacts      : dict        = payload["artifacts"]
-        self.pass_labels    : list | None = payload.get("pass_labels") or self._labels_from_baselines()
+        self.pass_labels    : list | None = payload["pass_labels"]
 
         self.logger.section("[Layout Loaded]")
         self.logger.kv_table({
@@ -50,18 +42,9 @@ class Layout:
             "Parameters":      self.parameters_path,
         })
 
-    def _labels_from_baselines(self) -> list | None:
-        baselines_path = self.run_directory / "meta" / TrackBaselines.FILENAME
-        if not baselines_path.is_file():
-            return None
-        return list(TrackBaselines.load(baselines_path).labels)
-
     def artifact_path(self, artifact_key: str) -> Path:
         if artifact_key == "parameters":
             return self.parameters_path
-
-        if artifact_key not in self.artifacts and self.LEGACY_KEYS.get(artifact_key) in self.artifacts:
-            artifact_key = self.LEGACY_KEYS[artifact_key]
 
         return self.data_directory / self.artifacts[artifact_key]
 
@@ -70,7 +53,7 @@ class Layout:
             return None
 
         if not self.pass_labels:
-            raise ValueError("Dataset records no pass labels; secondary selection by label requires pass_labels in dataset.json or meta/baselines.json. Re-run preprocessing or set secondary_labels to None.")
+            raise ValueError("Dataset records no pass labels in dataset.json; baseline extraction must succeed during pre-processing before secondaries can be selected by label.")
 
         primary     = self.pass_labels[0]
         secondaries = list(self.pass_labels[1:])

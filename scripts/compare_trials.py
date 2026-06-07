@@ -151,15 +151,10 @@ def collect_trials(trials_dir: Path) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _loss_cfg(cfg: dict) -> dict:
-    """Return the active loss sub-dict, falling back through known locations."""
-    # Prefer curriculum.complete (the phase that runs for most of training)
     cur = cfg.get("curriculum", {})
     if cur.get("complete"):
         return cur["complete"]
-    if cur.get("warmup"):
-        return cur["warmup"]
-    # Legacy: flat top-level "loss" key
-    return cfg.get("loss", {})
+    return cur.get("warmup", {})
 
 
 def _loss_row(cfg: dict) -> dict[str, str]:

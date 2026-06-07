@@ -94,34 +94,26 @@ class InferencePipeline:
         if not cfg.compare_classical:
             return
 
-        if run.complex_inputs is None or run.n_secondaries == 0:
-            logger.subsection("Classical baseline skipped: run has no complex input stack")
-            return
+        baseline = ClassicalBaseline(
+            run_directory     = cfg.run_directory,
+            logger            = logger,
+            preprocessing_dir = run.dataset_config.preprocessing_run_directory,
+            window            = tuple(cfg.capon_window) if cfg.capon_window is not None else None,
+            loading           = cfg.capon_loading,
+            phase_sign        = cfg.capon_phase_sign,
+        )
 
-        try:
-            baseline = ClassicalBaseline(
-                run_directory     = cfg.run_directory,
-                logger            = logger,
-                preprocessing_dir = run.dataset_config.preprocessing_run_directory,
-                window            = tuple(cfg.capon_window) if cfg.capon_window is not None else None,
-                loading           = cfg.capon_loading,
-                phase_sign        = cfg.capon_phase_sign,
-            )
+        reduced = baseline.compute(
+            complex_inputs   = run.complex_inputs,
+            n_secondaries    = run.n_secondaries,
+            x_axis           = run.x_axis,
+            secondary_labels = run.secondary_labels,
+        )
 
-            reduced = baseline.compute(
-                complex_inputs   = run.complex_inputs,
-                n_secondaries    = run.n_secondaries,
-                x_axis           = run.x_axis,
-                secondary_labels = run.secondary_labels,
-            )
+        result.attach_reduced(reduced)
 
-            result.attach_reduced(reduced)
-
-            if cfg.save_cubes:
-                np.save(result.cube_directory / "reduced_curves.npy", reduced)
-
-        except Exception as error:
-            logger.subsection(f"Classical baseline skipped: {error}")
+        if cfg.save_cubes:
+            np.save(result.cube_directory / "reduced_curves.npy", reduced)
 
     def _compute_slice_indices(self, cfg: InferenceConfig, n_elev: int, n_az: int, n_rg: int) -> dict:
         def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
@@ -144,9 +136,8 @@ class InferencePipeline:
             az_indices    = indices["all_az_idx"],
         )
 
-        track_baselines = getattr(run, "track_baselines", None)
-        if track_baselines is not None:
-            global_metrics["tracks"] = track_baselines.to_payload()
+        if run.track_baselines is not None:
+            global_metrics["tracks"] = run.track_baselines.to_payload()
 
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics

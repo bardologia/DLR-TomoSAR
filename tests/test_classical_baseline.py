@@ -153,12 +153,11 @@ class TestPreprocessConfigReader:
         assert config["window"] == (40, 20)
         assert config["beamforming_method"] == "Capon"
 
-    def test_legacy_output_configs_key(self, tmp_path):
+    def test_unknown_tomogram_key_raises(self, tmp_path):
         _write_config_state(tmp_path, win=(10, 10), key="output_configs")
 
-        config = PreprocessConfigReader(tmp_path).read()
-
-        assert config["window"] == (10, 10)
+        with pytest.raises(KeyError):
+            PreprocessConfigReader(tmp_path).read()
 
     def test_missing_state_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):

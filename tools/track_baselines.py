@@ -111,16 +111,16 @@ class TrackBaselines:
 
     @classmethod
     def from_payload(cls, payload: dict) -> "TrackBaselines":
-        window = payload.get("azimuth_window")
+        window = payload["azimuth_window"]
         return cls(
             labels              = list(payload["labels"]),
             vertical            = [float(v) for v in payload["vertical"]],
             horizontal          = [float(h) for h in payload["horizontal"]],
-            vertical_std        = [float(s) for s in payload.get("vertical_std", [])],
-            horizontal_std      = [float(s) for s in payload.get("horizontal_std", [])],
-            vertical_absolute   = [float(v) for v in payload.get("vertical_absolute", [])],
-            horizontal_absolute = [float(h) for h in payload.get("horizontal_absolute", [])],
-            track_files         = list(payload.get("track_files", [])),
+            vertical_std        = [float(s) for s in payload["vertical_std"]],
+            horizontal_std      = [float(s) for s in payload["horizontal_std"]],
+            vertical_absolute   = [float(v) for v in payload["vertical_absolute"]],
+            horizontal_absolute = [float(h) for h in payload["horizontal_absolute"]],
+            track_files         = list(payload["track_files"]),
             azimuth_window      = tuple(window) if window is not None else None,
         )
 

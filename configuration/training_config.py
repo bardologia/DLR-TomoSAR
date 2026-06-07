@@ -161,8 +161,7 @@ class GaussianConfig:
         meta_dir     = Path(dataset_dir) / "meta"
         candidates   = sorted(meta_dir.glob("config_state_*.json"))
         cfg          = json.loads(candidates[0].read_text())
-        tomo_cfg     = next(cfg[key] for key in ("tomogram_config", "output_configs", "input_configs") if cfg.get(key) is not None)
-        height_range = tomo_cfg["height_range"]
+        height_range = cfg["tomogram_config"]["height_range"]
         
         return cls(
             n_default_gaussians = n_gaussians,

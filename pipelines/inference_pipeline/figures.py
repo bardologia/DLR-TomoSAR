@@ -319,35 +319,30 @@ class FigureComposer:
         _N_elev, _az, _rg = result.pred_curves.shape
         figure_paths: Dict[str, List[Path]] = {}
 
-        track_baselines = getattr(run, "track_baselines", None)
-        track_profiles  = getattr(run, "track_profiles",  None)
-        complex_inputs  = getattr(run, "complex_inputs",  None)
-        n_secondaries   = getattr(run, "n_secondaries",   0)
-
-        if track_baselines is not None:
+        if run.track_baselines is not None:
             figure_paths["track_geometry"] = [plotter.plot_track_geometry(
-                baselines = track_baselines,
+                baselines = run.track_baselines,
                 out_path  = meta.figures_dir / "tracks" / "track_geometry.png",
             )]
             logger.subsection(f"Track geometry : {meta.figures_dir / 'tracks'}")
 
-        if track_profiles is not None:
+        if run.track_profiles is not None:
             figure_paths["track_profiles"] = plotter.plot_track_profiles(
-                profiles      = track_profiles,
+                profiles      = run.track_profiles,
                 out_dir       = meta.figures_dir / "tracks",
                 split_azimuth = (run.split_region.azimuth_start, run.split_region.azimuth_end),
             )
             logger.subsection(f"Track profiles : {len(figure_paths['track_profiles'])} figures in {meta.figures_dir / 'tracks'}")
 
-        if complex_inputs is not None and n_secondaries > 0:
+        if run.complex_inputs is not None and run.n_secondaries > 0:
             figure_paths["input_channels"] = plotter.plot_input_channels(
-                complex_inputs = complex_inputs,
-                n_secondaries  = n_secondaries,
-                labels         = getattr(run, "secondary_labels", None),
+                complex_inputs = run.complex_inputs,
+                n_secondaries  = run.n_secondaries,
+                labels         = run.secondary_labels,
                 out_dir        = meta.figures_dir / "input_channels",
                 az_offset      = result.azimuth_offset,
                 rg_offset      = result.range_offset,
-                primary_label  = track_baselines.reference if track_baselines is not None else "primary",
+                primary_label  = run.track_baselines.reference if run.track_baselines is not None else "primary",
             )
             logger.subsection(f"Input channels : {len(figure_paths['input_channels'])} figures in {meta.figures_dir / 'input_channels'}")
 

@@ -67,8 +67,7 @@ class TuningOrchestrator:
             test  = CropRegion(12400, 16000, global_crop.range_start, global_crop.range_end),
         )
 
-        secondary_labels = getattr(self.config.paths, "secondary_labels", None)
-        secondary_labels = tuple(secondary_labels) if secondary_labels else None
+        secondary_labels = tuple(self.config.paths.secondary_labels) if self.config.paths.secondary_labels else None
 
         dataset_config = DatasetConfiguration(
             preprocessing_run_directory = dataset_path,

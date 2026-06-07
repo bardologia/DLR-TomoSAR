@@ -164,7 +164,8 @@ class TestLayout:
             "dataset_type"  : "FSAR",
             "tomogram_tag"  : "tomo_tag",
             "parameter_tag" : "param_tag",
-            "artifacts"     : {"primary_reduced": "primary.npy", "dem_reduced": "dem.npy"},
+            "pass_labels"   : ["PS02", "PS04"],
+            "artifacts"     : {"primary": "primary.npy", "dem_full": "dem.npy"},
         }
         with open(data_dir / "dataset.json", "w", encoding="utf-8") as f:
             json.dump(payload, f)
@@ -195,7 +196,7 @@ class TestLayout:
 
         layout = Layout(tmp_path, logger=_null_logger(), parameters_path=params)
 
-        assert layout.artifact_path("primary_reduced") == data_dir / "primary.npy"
+        assert layout.artifact_path("primary") == data_dir / "primary.npy"
 
     def test_artifact_path_unknown_key_raises(self, tmp_path):
         self._write_dataset_json(tmp_path)
@@ -214,11 +215,12 @@ class TestCropper:
             "dataset_type"  : "FSAR",
             "tomogram_tag"  : "t",
             "parameter_tag" : "p",
+            "pass_labels"   : ["PS02", "PS04", "PS06", "PS08", "PS26"],
             "artifacts"     : {
-                "primary_reduced"        : "primary.npy",
-                "secondaries_reduced"    : "secondaries.npy",
-                "interferograms_reduced" : "interferograms.npy",
-                "dem_reduced"            : "dem.npy",
+                "primary"        : "primary.npy",
+                "secondaries"    : "secondaries.npy",
+                "interferograms" : "interferograms.npy",
+                "dem_full"       : "dem.npy",
             },
         }
         with open(data_dir / "dataset.json", "w", encoding="utf-8") as f:

@@ -136,12 +136,9 @@ class ExtractionConfig:
                 with open(state_path, "r", encoding="utf-8") as f:
                     state = json.load(f)
 
-                for key in ("tomogram_config", "output_configs", "input_configs"):
-                    cfg = state.get(key)
-                    if isinstance(cfg, dict) and cfg.get("height_range"):
-                        hr = cfg["height_range"]
-                        if isinstance(hr, (list, tuple)) and len(hr) == 2:
-                            return (float(hr[0]), float(hr[1]))
+                hr = state["tomogram_config"]["height_range"]
+                if isinstance(hr, (list, tuple)) and len(hr) == 2:
+                    return (float(hr[0]), float(hr[1]))
 
         
 

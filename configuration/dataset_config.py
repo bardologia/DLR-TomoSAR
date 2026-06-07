@@ -80,26 +80,15 @@ class InputConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "InputConfig":
-        if "primary" in payload:
-            return cls(
-                use_primary                   = bool(payload["primary"]["use"]),
-                primary_representation        = Representation(payload["primary"]["representation"]),
-                use_secondaries               = bool(payload["secondaries"]["use"]),
-                secondaries_representation    = Representation(payload["secondaries"]["representation"]),
-                use_interferograms            = bool(payload["interferograms"]["use"]),
-                interferograms_representation = Representation(payload["interferograms"]["representation"]),
-                use_dem                       = bool(payload.get("dem", {}).get("use", False)),
-            )
-        else:
-            return cls(
-                use_primary                   = bool(payload.get("use_primary", True)),
-                primary_representation        = Representation(payload.get("primary_representation", Representation.MAG_ONLY.value)),
-                use_secondaries               = bool(payload.get("use_secondaries", False)),
-                secondaries_representation    = Representation(payload.get("secondaries_representation", Representation.MAG_ONLY.value)),
-                use_interferograms            = bool(payload.get("use_interferograms", True)),
-                interferograms_representation = Representation(payload.get("interferograms_representation", Representation.ANGLE_ONLY.value)),
-                use_dem                       = bool(payload.get("use_dem", False)),
-            )
+        return cls(
+            use_primary                   = bool(payload["use_primary"]),
+            primary_representation        = Representation(payload["primary_representation"]),
+            use_secondaries               = bool(payload["use_secondaries"]),
+            secondaries_representation    = Representation(payload["secondaries_representation"]),
+            use_interferograms            = bool(payload["use_interferograms"]),
+            interferograms_representation = Representation(payload["interferograms_representation"]),
+            use_dem                       = bool(payload["use_dem"]),
+        )
 
       
 @dataclass
@@ -159,27 +148,12 @@ class OutputConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "OutputConfig":
-        raw_strats = payload.get("output_strategies", {})
-        strategies = {
-            k: ChannelStrategy.from_dict(v)
-            for k, v in raw_strats.items()
-        } if raw_strats else {
-            "out/amp"   : ChannelStrategy.from_slot("out/amp"),
-            "out/mu"    : ChannelStrategy.from_slot("out/mu"),
-            "out/sigma" : ChannelStrategy.from_slot("out/sigma"),
-        }
+        strategies = {key: ChannelStrategy.from_dict(value) for key, value in payload["output_strategies"].items()}
 
-        if "amplitude" in payload:
-            return cls(
-                use_amplitude     = bool(payload["amplitude"]["use"]),
-                use_mu            = bool(payload["mu"]["use"]),
-                use_sigma         = bool(payload["sigma"]["use"]),
-                output_strategies = strategies,
-            )
         return cls(
-            use_amplitude     = bool(payload.get("use_amplitude", True)),
-            use_mu            = bool(payload.get("use_mu", True)),
-            use_sigma         = bool(payload.get("use_sigma", True)),
+            use_amplitude     = bool(payload["use_amplitude"]),
+            use_mu            = bool(payload["use_mu"]),
+            use_sigma         = bool(payload["use_sigma"]),
             output_strategies = strategies,
         )
 

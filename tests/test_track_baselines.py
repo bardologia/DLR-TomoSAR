@@ -326,15 +326,12 @@ class TestPersistence:
         assert loaded.vertical_absolute   == pytest.approx([102.3, 117.0])
         assert loaded.horizontal_absolute == pytest.approx([-44.1, -45.3])
 
-    def test_payload_without_absolutes_loads(self):
+    def test_payload_without_absolutes_raises(self):
         payload = self._table().to_payload()
         payload.pop("vertical_absolute")
-        payload.pop("horizontal_absolute")
 
-        loaded = TrackBaselines.from_payload(payload)
-
-        assert loaded.vertical_absolute   == []
-        assert loaded.horizontal_absolute == []
+        with pytest.raises(KeyError):
+            TrackBaselines.from_payload(payload)
 
 
 class TestTrackReader:
