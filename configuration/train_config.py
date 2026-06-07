@@ -57,6 +57,18 @@ def _default_complete_losses() -> dict:
 
 
 @dataclass
+class SecondaryTrialsConfig:
+    strategy      : str          = "consecutive"
+    n_secondaries : int          = 4
+    n_trials      : int          = 8
+    mean          : float | None = None
+    sigma         : float | None = None
+    block_step    : int          = 1
+    spacing       : int          = 2
+    seed          : int          = 0
+
+
+@dataclass
 class TrainEntryConfig:
     run_name        : str | None = None
     model_name      : str        = "resunet"
@@ -80,8 +92,10 @@ class TrainEntryConfig:
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
 
-    trials_enabled  : bool      = False
-    warmup_losses   : dict      = field(default_factory=_default_warmup_losses)
-    complete_losses : dict      = field(default_factory=_default_complete_losses)
-    gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
-    poll_interval_s : float     = 5.0
+    trials_enabled   : bool                  = False
+    trials_mode      : str                   = "curriculum"
+    warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
+    complete_losses  : dict                  = field(default_factory=_default_complete_losses)
+    secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
+    gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
+    poll_interval_s  : float                 = 5.0

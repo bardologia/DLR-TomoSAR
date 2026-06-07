@@ -17,7 +17,7 @@ def main() -> None:
     from pipelines.training_pipeline.pipeline import SingleTrainRunner, TrainScheduler
     from tools.config_cli import ConfigCli
 
-    cli    = ConfigCli(TrainEntryConfig(), description="Training run, optionally fanned out into loss-curriculum trials")
+    cli    = ConfigCli(TrainEntryConfig(), description="Training run, optionally fanned out into curriculum, warmup-loss or secondary-set trials")
     config = cli.apply()
 
     if args.trial or not config.trials_enabled:

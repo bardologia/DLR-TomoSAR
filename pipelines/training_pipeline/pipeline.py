@@ -11,15 +11,16 @@ import torch
 from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
 from torch.utils.tensorboard import SummaryWriter
 
-from configuration.dataset_config         import DatasetConfiguration
-from configuration.training_config        import TrainerConfig
-from pipelines.dataset_pipeline.pipeline  import DatasetPipeline
-from pipelines.shared.io                  import FileIO
-from pipelines.shared.orchestration       import GpuJob, GpuQueue
-from pipelines.training_pipeline.docs     import LossScaleProbeConfig
-from pipelines.training_pipeline.trainer  import Trainer
-from tools.config_cli                     import ConfigCli
-from tools.logger                         import Logger
+from configuration.dataset_config            import DatasetConfiguration
+from configuration.training_config           import TrainerConfig
+from pipelines.dataset_pipeline.pipeline     import DatasetPipeline
+from pipelines.shared.io                     import FileIO
+from pipelines.shared.orchestration          import GpuJob, GpuQueue
+from pipelines.training_pipeline.docs        import LossScaleProbeConfig
+from pipelines.training_pipeline.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
+from pipelines.training_pipeline.trainer     import Trainer
+from tools.config_cli                        import ConfigCli
+from tools.logger                            import Logger
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
@@ -275,7 +276,7 @@ class SingleTrainRunner:
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "warmup_losses", "complete_losses", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "secondary_trials", "gpus", "poll_interval_s")
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
         self.config       = config
@@ -286,33 +287,32 @@ class TrainScheduler:
 
         self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
 
-    def experiments(self) -> list[tuple[str, dict]]:
-        model = self.config.model_name
+    def planner(self):
+        mode = self.config.trials_mode
 
-        experiments = []
-        for warmup_label, warmup_loss in self.config.warmup_losses.items():
-            for complete_label, complete_loss in self.config.complete_losses.items():
-                run_name  = f"{model}_w-{warmup_label}_c-{complete_label}"
-                overrides = {"curriculum.enabled": True}
-                overrides.update({f"curriculum.warmup.{key}":   value for key, value in warmup_loss.items()})
-                overrides.update({f"curriculum.complete.{key}": value for key, value in complete_loss.items()})
-                experiments.append((run_name, overrides))
+        if mode == "curriculum":
+            return CurriculumTrialPlanner(self.config.model_name, self.config.warmup_losses, self.config.complete_losses)
+        if mode == "warmup":
+            return WarmupTrialPlanner(self.config.model_name, self.config.warmup_losses)
+        if mode == "secondary":
+            return SecondaryTrialPlanner.from_dataset(self.config.model_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
 
-        return experiments
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup' or 'secondary'")
 
     def run(self) -> None:
-        experiments = self.experiments()
+        planner     = self.planner()
+        experiments = planner.plan()
 
-        self.logger.section("Loss-curriculum trials")
+        self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
-            "Model"           : self.config.model_name,
-            "Warmup losses"   : len(self.config.warmup_losses),
-            "Complete losses" : len(self.config.complete_losses),
-            "Trials"          : len(experiments),
-            "GPUs"            : self.config.gpus,
-            "Infer after"     : self.config.infer_after,
-            "CLI overrides"   : self.forward_overrides or "—",
-            "Log dir"         : str(self.log_dir),
+            "Model"         : self.config.model_name,
+            "Mode"          : self.config.trials_mode,
+            **planner.summary(),
+            "Trials"        : len(experiments),
+            "GPUs"          : self.config.gpus,
+            "Infer after"   : self.config.infer_after,
+            "CLI overrides" : self.forward_overrides or "—",
+            "Log dir"       : str(self.log_dir),
         }, title="Configuration")
 
         queue   = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s)
