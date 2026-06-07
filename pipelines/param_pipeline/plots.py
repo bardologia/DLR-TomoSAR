@@ -153,7 +153,7 @@ class FittingResultPlotter(PlotBase):
         cb.ax.set_yticklabels([str(v) for v in levels])
 
         n_total    = k_map.size
-        text_lines = [f"$K={k}$: {(k_map == k).sum() / n_total * 100:.1f}\\%" for k in levels if (k_map == k).sum() > 0]
+        text_lines = [f"$K={k}$: {(k_map == k).sum() / n_total * 100:.1f}%" for k in levels if (k_map == k).sum() > 0]
         ax.text(0.02, 0.98, "\n".join(text_lines), transform=ax.transAxes, fontsize=8, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
