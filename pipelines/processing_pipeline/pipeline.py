@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import gc
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing  import Tuple
 
@@ -102,5 +104,49 @@ class ProcessingPipeline:
             "interferograms" : interferograms_path,
             "run_directory"  : self.config.paths.run_directory,
         }
+
+
+class PreProcessSession:
+    def __init__(self, index: int, total: int, dataset_name: str, config: ProcessingConfiguration) -> None:
+        self.index        = index
+        self.total        = total
+        self.dataset_name = dataset_name
+        self.config       = config
+
+    def execute(self) -> dict[str, Path]:
+        return ProcessingPipeline(self.config).run()
+
+
+class PreProcessScheduler:
+    def __init__(self, sessions: list[PreProcessSession], max_sessions: int, logger: Logger) -> None:
+        self.sessions     = sessions
+        self.max_sessions = max_sessions
+        self.logger       = logger
+
+    def run(self) -> dict[str, dict[str, Path]]:
+        slots   = max(1, min(self.max_sessions, len(self.sessions)))
+        results = {}
+
+        self.logger.subsection(f"Dispatching {len(self.sessions)} sessions across {slots} concurrent slots")
+
+        with ProcessPoolExecutor(max_workers=slots, mp_context=mp.get_context("spawn")) as executor:
+            futures = {executor.submit(session.execute): session for session in self.sessions}
+
+            try:
+                for future in as_completed(futures):
+                    session = futures[future]
+                    outputs = future.result()
+
+                    results[session.dataset_name] = outputs
+
+                    self.logger.section(f"[Session {session.index + 1}/{session.total}] {session.dataset_name} completed")
+                    self.logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+
+            except Exception:
+                for future in futures:
+                    future.cancel()
+                raise
+
+        return results
 
 

@@ -12,13 +12,13 @@ from configuration.processing_config import (
     ProcessingConfiguration,
     TomogramConfiguration,
 )
-from pipelines.processing_pipeline.pipeline import ProcessingPipeline
+from pipelines.processing_pipeline.pipeline import PreProcessScheduler, PreProcessSession
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 
 
 def main() -> None:
-    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, run sequentially once per win filter").apply()
+    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, runs win filters as concurrent sessions").apply()
     logger = Logger(log_dir="logs", name="pre_process")
 
     global_crop    = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
@@ -26,17 +26,19 @@ def main() -> None:
 
     logger.section("Pre-processing queue")
     logger.kv_table({
-        "Win filters" : ", ".join(str(win) for win in config.win_list),
-        "Runs"        : len(config.win_list),
-        "Crop"        : global_crop.as_tuple(),
+        "Win filters"  : ", ".join(str(win) for win in config.win_list),
+        "Runs"         : len(config.win_list),
+        "Max sessions" : config.max_sessions,
+        "Crop"         : global_crop.as_tuple(),
     }, title="Configuration")
+
+    sessions = []
 
     for index, win in enumerate(config.win_list):
         filter_arguments = {"win": list(win)}
         dataset_name     = config.resolve_dataset_name(win, run_identifier)
 
-        logger.section(f"[Run {index + 1}/{len(config.win_list)}] {dataset_name}")
-        logger.kv_table({"Filter arguments": str(filter_arguments)})
+        logger.subsection(f"[Session {index + 1}/{len(config.win_list)}] {dataset_name} queued with filter arguments {filter_arguments}")
 
         tomogram_config = TomogramConfiguration(
             fusar_project_path = config.fusar_project_path,
@@ -62,10 +64,10 @@ def main() -> None:
             parameter_output_tag = config.parameter_output_tag,
         )
 
-        pipeline = ProcessingPipeline(processing_config)
-        outputs  = pipeline.run()
+        sessions.append(PreProcessSession(index=index, total=len(config.win_list), dataset_name=dataset_name, config=processing_config))
 
-        logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+    scheduler = PreProcessScheduler(sessions=sessions, max_sessions=config.max_sessions, logger=logger)
+    scheduler.run()
 
     logger.close()
 

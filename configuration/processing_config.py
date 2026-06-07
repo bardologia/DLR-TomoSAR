@@ -158,6 +158,7 @@ class PreProcessEntryConfig:
     ])
 
     effort               : str           = "high"
+    max_sessions         : int           = 4
 
     dataset_name         : Optional[str] = None
     dataset_type         : str           = "FSAR"
