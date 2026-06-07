@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from configuration.training_config import GeometryConfig
-from tools.track_baselines import BaselineExtractor, BaselineValidator, TrackBaselines, TrackFileResolver, TrackReader
+from tools.track_baselines import BaselineExtractor, BaselineValidator, TrackBaselines, TrackFileResolver, TrackProfiles, TrackReader
 
 
 def _track(horizontal, vertical, n_samples=100):
@@ -85,6 +85,85 @@ class TestBaselineExtraction:
 
         assert table.vertical_std[0] == pytest.approx(0.5)
 
+    def test_absolute_means_preserved(self):
+        tracks    = {"a.rat": _track(5.0, 10.0), "b.rat": _track(8.0, 25.0)}
+        extractor = BaselineExtractor({"m": "a.rat", "s": "b.rat"}, reader=_fake_reader(tracks))
+        table     = extractor.extract()
+
+        assert table.vertical_absolute   == pytest.approx([10.0, 25.0])
+        assert table.horizontal_absolute == pytest.approx([5.0, 8.0])
+
+
+class TestProfileExtraction:
+    def test_profiles_match_windowed_rows(self):
+        ramp            = np.arange(100, dtype=float)
+        tracks          = {"a.rat": _track(0.0, 0.0), "b.rat": _track(ramp, 2.0 * ramp)}
+        extractor       = BaselineExtractor({"m": "a.rat", "s": "b.rat"}, azimuth_window=(10, 20), reader=_fake_reader(tracks), validator=BaselineValidator(std_threshold=1000.0))
+        table, profiles = extractor.extract_with_profiles()
+
+        assert profiles.labels           == ["m", "s"]
+        assert profiles.horizontal.shape == (2, 10)
+        assert profiles.horizontal[1]    == pytest.approx(ramp[10:20])
+        assert profiles.vertical[1]      == pytest.approx(2.0 * ramp[10:20])
+        assert profiles.azimuth_start    == 10
+
+    def test_azimuth_axis_offset_by_window(self):
+        tracks      = {"a.rat": _track(0.0, 0.0)}
+        extractor   = BaselineExtractor({"m": "a.rat"}, azimuth_window=(30, 40), reader=_fake_reader(tracks))
+        _, profiles = extractor.extract_with_profiles()
+
+        assert profiles.azimuth_axis.tolist() == list(range(30, 40))
+
+    def test_profiles_truncated_to_common_length(self):
+        tracks          = {"a.rat": _track(0.0, 0.0, n_samples=50), "b.rat": _track(1.0, 2.0, n_samples=80)}
+        extractor       = BaselineExtractor({"m": "a.rat", "s": "b.rat"}, reader=_fake_reader(tracks))
+        table, profiles = extractor.extract_with_profiles()
+
+        assert profiles.n_samples == 50
+        assert table.vertical[1]  == pytest.approx(2.0)
+
+    def test_relative_profiles_subtract_reference(self):
+        ramp        = np.arange(100, dtype=float)
+        tracks      = {"a.rat": _track(0.0, ramp), "b.rat": _track(0.0, ramp + 7.0)}
+        extractor   = BaselineExtractor({"m": "a.rat", "s": "b.rat"}, reader=_fake_reader(tracks), validator=BaselineValidator(std_threshold=1000.0))
+        _, profiles = extractor.extract_with_profiles()
+        relative    = profiles.relative_to_reference("vertical")
+
+        assert relative[0] == pytest.approx(np.zeros(100))
+        assert relative[1] == pytest.approx(np.full(100, 7.0))
+
+    def test_table_consistent_with_profiles(self):
+        tracks          = {"a.rat": _track(5.0, 10.0), "b.rat": _track(8.0, 25.0)}
+        extractor       = BaselineExtractor({"m": "a.rat", "s": "b.rat"}, reader=_fake_reader(tracks))
+        table, profiles = extractor.extract_with_profiles()
+
+        assert table.vertical_absolute   == pytest.approx(np.nanmean(profiles.vertical,   axis=1))
+        assert table.horizontal_absolute == pytest.approx(np.nanmean(profiles.horizontal, axis=1))
+
+
+class TestProfilePersistence:
+    def _profiles(self):
+        return TrackProfiles(
+            labels        = ["PS03", "PS07"],
+            horizontal    = np.array([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]]),
+            vertical      = np.array([[6.0, 7.0, 8.0], [9.0, 10.0, 11.0]]),
+            azimuth_start = 1000,
+            track_files   = ["a.rat", "b.rat"],
+        )
+
+    def test_round_trip(self, tmp_path):
+        path   = self._profiles().save(tmp_path / "data" / TrackProfiles.FILENAME)
+        loaded = TrackProfiles.load(path)
+
+        assert loaded.labels        == ["PS03", "PS07"]
+        assert loaded.azimuth_start == 1000
+        assert loaded.track_files   == ["a.rat", "b.rat"]
+        assert loaded.horizontal    == pytest.approx(self._profiles().horizontal)
+        assert loaded.vertical      == pytest.approx(self._profiles().vertical)
+
+    def test_profiles_file_resolves_under_data(self, tmp_path):
+        assert TrackProfiles.profiles_file(tmp_path) == tmp_path / "data" / TrackProfiles.FILENAME
+
 
 class TestBaselineComponents:
     def _table(self):
@@ -148,6 +227,26 @@ class TestPersistence:
 
         assert description["Tracks"]    == 2
         assert description["Reference"] == "PS03"
+
+    def test_absolute_means_round_trip(self, tmp_path):
+        table  = self._table()
+        table.vertical_absolute   = [102.3, 117.0]
+        table.horizontal_absolute = [-44.1, -45.3]
+
+        loaded = TrackBaselines.load(table.save(tmp_path / TrackBaselines.FILENAME))
+
+        assert loaded.vertical_absolute   == pytest.approx([102.3, 117.0])
+        assert loaded.horizontal_absolute == pytest.approx([-44.1, -45.3])
+
+    def test_payload_without_absolutes_loads(self):
+        payload = self._table().to_payload()
+        payload.pop("vertical_absolute")
+        payload.pop("horizontal_absolute")
+
+        loaded = TrackBaselines.from_payload(payload)
+
+        assert loaded.vertical_absolute   == []
+        assert loaded.horizontal_absolute == []
 
 
 class TestTrackReader:

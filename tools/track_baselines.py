@@ -11,13 +11,15 @@ import numpy as np
 
 @dataclass
 class TrackBaselines:
-    labels         : list
-    vertical       : list
-    horizontal     : list
-    vertical_std   : list
-    horizontal_std : list
-    track_files    : list = field(default_factory=list)
-    azimuth_window : tuple | None = None
+    labels              : list
+    vertical            : list
+    horizontal          : list
+    vertical_std        : list
+    horizontal_std      : list
+    vertical_absolute   : list = field(default_factory=list)
+    horizontal_absolute : list = field(default_factory=list)
+    track_files         : list = field(default_factory=list)
+    azimuth_window      : tuple | None = None
 
     FILENAME : ClassVar[str] = "baselines.json"
 
@@ -45,7 +47,7 @@ class TrackBaselines:
 
     def describe(self) -> dict:
         window = "full track" if self.azimuth_window is None else f"[{self.azimuth_window[0]}, {self.azimuth_window[1]})"
-        return {
+        table  = {
             "Tracks"             : self.n_tracks,
             "Reference"          : self.reference,
             "Azimuth window"     : window,
@@ -55,29 +57,39 @@ class TrackBaselines:
             "Horizontal std [m]" : ", ".join(f"{s:.2f}" for s in self.horizontal_std),
         }
 
+        if self.vertical_absolute:
+            table["Vertical absolute [m]"]   = ", ".join(f"{v:.2f}" for v in self.vertical_absolute)
+            table["Horizontal absolute [m]"] = ", ".join(f"{h:.2f}" for h in self.horizontal_absolute)
+
+        return table
+
     def to_payload(self) -> dict:
         return {
-            "labels"         : list(self.labels),
-            "reference"      : self.reference,
-            "vertical"       : [float(v) for v in self.vertical],
-            "horizontal"     : [float(h) for h in self.horizontal],
-            "vertical_std"   : [float(s) for s in self.vertical_std],
-            "horizontal_std" : [float(s) for s in self.horizontal_std],
-            "track_files"    : [str(f) for f in self.track_files],
-            "azimuth_window" : list(self.azimuth_window) if self.azimuth_window is not None else None,
+            "labels"              : list(self.labels),
+            "reference"           : self.reference,
+            "vertical"            : [float(v) for v in self.vertical],
+            "horizontal"          : [float(h) for h in self.horizontal],
+            "vertical_std"        : [float(s) for s in self.vertical_std],
+            "horizontal_std"      : [float(s) for s in self.horizontal_std],
+            "vertical_absolute"   : [float(v) for v in self.vertical_absolute],
+            "horizontal_absolute" : [float(h) for h in self.horizontal_absolute],
+            "track_files"         : [str(f) for f in self.track_files],
+            "azimuth_window"      : list(self.azimuth_window) if self.azimuth_window is not None else None,
         }
 
     @classmethod
     def from_payload(cls, payload: dict) -> "TrackBaselines":
         window = payload.get("azimuth_window")
         return cls(
-            labels         = list(payload["labels"]),
-            vertical       = [float(v) for v in payload["vertical"]],
-            horizontal     = [float(h) for h in payload["horizontal"]],
-            vertical_std   = [float(s) for s in payload.get("vertical_std", [])],
-            horizontal_std = [float(s) for s in payload.get("horizontal_std", [])],
-            track_files    = list(payload.get("track_files", [])),
-            azimuth_window = tuple(window) if window is not None else None,
+            labels              = list(payload["labels"]),
+            vertical            = [float(v) for v in payload["vertical"]],
+            horizontal          = [float(h) for h in payload["horizontal"]],
+            vertical_std        = [float(s) for s in payload.get("vertical_std", [])],
+            horizontal_std      = [float(s) for s in payload.get("horizontal_std", [])],
+            vertical_absolute   = [float(v) for v in payload.get("vertical_absolute", [])],
+            horizontal_absolute = [float(h) for h in payload.get("horizontal_absolute", [])],
+            track_files         = list(payload.get("track_files", [])),
+            azimuth_window      = tuple(window) if window is not None else None,
         )
 
     def save(self, path: str | Path) -> Path:
@@ -89,6 +101,64 @@ class TrackBaselines:
     @classmethod
     def load(cls, path: str | Path) -> "TrackBaselines":
         return cls.from_payload(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+@dataclass
+class TrackProfiles:
+    labels        : list
+    horizontal    : np.ndarray
+    vertical      : np.ndarray
+    azimuth_start : int
+    track_files   : list = field(default_factory=list)
+
+    FILENAME : ClassVar[str] = "track_profiles.npz"
+
+    @property
+    def n_tracks(self) -> int:
+        return len(self.labels)
+
+    @property
+    def n_samples(self) -> int:
+        return int(self.horizontal.shape[1])
+
+    @property
+    def azimuth_axis(self) -> np.ndarray:
+        return np.arange(self.azimuth_start, self.azimuth_start + self.n_samples)
+
+    def relative_to_reference(self, component: str = "vertical") -> np.ndarray:
+        profiles = self.vertical if component == "vertical" else self.horizontal
+        return profiles - profiles[0]
+
+    def save(self, path: str | Path) -> Path:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open("wb") as handle:
+            np.savez_compressed(
+                handle,
+                labels        = np.array(self.labels),
+                horizontal    = np.asarray(self.horizontal, dtype=np.float32),
+                vertical      = np.asarray(self.vertical,   dtype=np.float32),
+                azimuth_start = np.int64(self.azimuth_start),
+                track_files   = np.array([str(f) for f in self.track_files]),
+            )
+
+        return path
+
+    @classmethod
+    def load(cls, path: str | Path) -> "TrackProfiles":
+        with np.load(Path(path)) as data:
+            return cls(
+                labels        = [str(label) for label in data["labels"]],
+                horizontal    = np.asarray(data["horizontal"], dtype=float),
+                vertical      = np.asarray(data["vertical"],   dtype=float),
+                azimuth_start = int(data["azimuth_start"]),
+                track_files   = [str(f) for f in data["track_files"]],
+            )
+
+    @classmethod
+    def profiles_file(cls, dataset_dir: str | Path) -> Path:
+        return Path(dataset_dir) / "data" / cls.FILENAME
 
 
 class TrackReader:
@@ -190,39 +260,54 @@ class BaselineExtractor:
 
         return slice(max(0, start), min(n_samples, end))
 
-    def _track_statistics(self, raw: np.ndarray) -> tuple:
+    def _windowed_components(self, raw: np.ndarray) -> tuple:
         window     = self._window_slice(raw.shape[1])
-        horizontal = raw[self.HORIZONTAL_ROW, window]
-        vertical   = raw[self.VERTICAL_ROW,   window]
+        horizontal = np.asarray(raw[self.HORIZONTAL_ROW, window], dtype=float)
+        vertical   = np.asarray(raw[self.VERTICAL_ROW,   window], dtype=float)
 
-        return (
-            float(np.nanmean(horizontal)), float(np.nanstd(horizontal)),
-            float(np.nanmean(vertical)),   float(np.nanstd(vertical)),
-        )
+        return horizontal, vertical, int(window.start)
 
     def extract(self) -> TrackBaselines:
+        table, _ = self.extract_with_profiles()
+        return table
+
+    def extract_with_profiles(self) -> tuple:
         labels     = list(self.track_paths.keys())
         files      = [self.track_paths[label] for label in labels]
-        statistics = [self._track_statistics(self.reader.read(path)) for path in files]
+        components = [self._windowed_components(self.reader.read(path)) for path in files]
 
-        h_mean = [s[0] for s in statistics]
-        h_std  = [s[1] for s in statistics]
-        v_mean = [s[2] for s in statistics]
-        v_std  = [s[3] for s in statistics]
+        n_common   = min(component[0].shape[0] for component in components)
+        horizontal = np.stack([component[0][:n_common] for component in components])
+        vertical   = np.stack([component[1][:n_common] for component in components])
+
+        h_mean = [float(np.nanmean(row)) for row in horizontal]
+        h_std  = [float(np.nanstd(row))  for row in horizontal]
+        v_mean = [float(np.nanmean(row)) for row in vertical]
+        v_std  = [float(np.nanstd(row))  for row in vertical]
 
         reference_h = h_mean[0]
         reference_v = v_mean[0]
 
         table = TrackBaselines(
-            labels         = labels,
-            vertical       = [v - reference_v for v in v_mean],
-            horizontal     = [h - reference_h for h in h_mean],
-            vertical_std   = v_std,
-            horizontal_std = h_std,
-            track_files    = [str(f) for f in files],
-            azimuth_window = tuple(self.azimuth_window) if self.azimuth_window is not None else None,
+            labels              = labels,
+            vertical            = [v - reference_v for v in v_mean],
+            horizontal          = [h - reference_h for h in h_mean],
+            vertical_std        = v_std,
+            horizontal_std      = h_std,
+            vertical_absolute   = v_mean,
+            horizontal_absolute = h_mean,
+            track_files         = [str(f) for f in files],
+            azimuth_window      = tuple(self.azimuth_window) if self.azimuth_window is not None else None,
+        )
+
+        profiles = TrackProfiles(
+            labels        = labels,
+            horizontal    = horizontal,
+            vertical      = vertical,
+            azimuth_start = components[0][2],
+            track_files   = [str(f) for f in files],
         )
 
         self.validator.validate(table)
 
-        return table
+        return table, profiles

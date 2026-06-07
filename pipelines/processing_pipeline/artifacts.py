@@ -7,10 +7,10 @@ from typing import Literal, Tuple
 from configuration.processing_config import ProcessingConfiguration, TomogramConfiguration
 from pipelines.shared.io             import FileIO
 from tools.logger                    import Logger
-from tools.track_baselines           import TrackBaselines
+from tools.track_baselines           import TrackBaselines, TrackProfiles
 
 
-ArtifactType = Literal["tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced", "primary_reduced", "secondaries_reduced", "interferograms_reduced"]
+ArtifactType = Literal["tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced", "primary_reduced", "secondaries_reduced", "interferograms_reduced", "track_profiles"]
 
 
 class ArtifactRegistry:
@@ -38,6 +38,7 @@ class ArtifactRegistry:
             "primary_reduced"        : f"primary_reduced_{tomo_tag}.npy",
             "secondaries_reduced"    : f"secondaries_reduced_{tomo_tag}.npy",
             "interferograms_reduced" : f"interferograms_reduced_{tomo_tag}.npy",
+            "track_profiles"         : TrackProfiles.FILENAME,
         }
 
     def artifact_path(self, artifact_type: ArtifactType) -> Path:
@@ -107,6 +108,15 @@ class MetadataManager:
         table.save(out_path)
 
         self.logger.section(f"[Track Baselines Saved] {out_path}")
+        return out_path
+
+    def save_track_profiles(self, profiles: TrackProfiles) -> Path:
+        self.registry.ensure_directory_structure()
+        out_path = self.registry.artifact_path("track_profiles")
+
+        profiles.save(out_path)
+
+        self.logger.section(f"[Track Profiles Saved] {out_path}")
         return out_path
 
     def save_pipeline_configuration(self) -> Path:

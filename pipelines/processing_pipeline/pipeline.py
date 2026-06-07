@@ -91,6 +91,9 @@ class ProcessingPipeline:
         if self.interferogram_builder.track_baselines is not None:
             self.metadata_manager.save_baselines(self.interferogram_builder.track_baselines)
 
+        if self.interferogram_builder.track_profiles is not None:
+            self.metadata_manager.save_track_profiles(self.interferogram_builder.track_profiles)
+
         gc.collect()
 
         return primary_path, secondaries_path, interferograms_path

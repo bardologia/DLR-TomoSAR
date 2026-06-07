@@ -9,7 +9,7 @@ import numpy as np
 
 from configuration.processing_config import ProcessingConfiguration
 from tools.logger                    import Logger
-from tools.track_baselines           import BaselineExtractor, TrackBaselines
+from tools.track_baselines           import BaselineExtractor, TrackBaselines, TrackProfiles
 
 
 class InterferogramBuilder:
@@ -17,6 +17,7 @@ class InterferogramBuilder:
         self.config          = config
         self.logger          = logger
         self.track_baselines = None
+        self.track_profiles  = None
 
         self.logger.section("[InterferogramBuilder Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
@@ -48,24 +49,24 @@ class InterferogramBuilder:
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 
-        self.track_baselines = self._extract_baselines([tomography_object.master, *tomography_object.slaves], crop_tuple)
+        self.track_baselines, self.track_profiles = self._extract_baselines([tomography_object.master, *tomography_object.slaves], crop_tuple)
 
         primary, secondaries, interferograms = self._compute_interferograms(tomography_object)
         self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
         return primary, secondaries, interferograms
 
-    def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> TrackBaselines | None:
+    def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
         try:
-            azimuth_window = (crop_tuple[0], crop_tuple[1])
-            extractor      = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
-            table          = extractor.extract()
+            azimuth_window  = (crop_tuple[0], crop_tuple[1])
+            extractor       = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
+            table, profiles = extractor.extract_with_profiles()
 
             self.logger.kv_table(table.describe(), title="Track Baselines")
-            return table
+            return table, profiles
 
         except Exception as error:
             self.logger.subsection(f"[FSAR] Baseline extraction skipped: {error}")
-            return None
+            return None, None
 
     def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         import pyrat as pyrat_module

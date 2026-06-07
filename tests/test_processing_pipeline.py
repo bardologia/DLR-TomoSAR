@@ -187,10 +187,10 @@ class TestArtifactRegistry:
 
         expected_keys = {
             "tomogram_full", "tomogram_reduced", "dem_full", "dem_reduced",
-            "primary_reduced", "secondaries_reduced", "interferograms_reduced",
+            "primary_reduced", "secondaries_reduced", "interferograms_reduced", "track_profiles",
         }
         assert set(names.keys()) == expected_keys
-        assert all(value.endswith(".npy") for value in names.values())
+        assert all(value.endswith((".npy", ".npz")) for value in names.values())
 
     def test_artifact_filenames_embed_tags(self, tmp_path):
         config   = _make_config(tmp_path)
@@ -489,6 +489,7 @@ class TestProcessingPipeline:
         class StubInterferogramBuilder:
             def __init__(self, *args, **kwargs):
                 self.track_baselines = None
+                self.track_profiles  = None
 
             def run(self, crop_tuple, primary_path, secondaries_path, interferograms_path):
                 recorder["inputs"].append((primary_path, secondaries_path, interferograms_path))

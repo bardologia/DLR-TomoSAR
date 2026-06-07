@@ -12,7 +12,7 @@ from configuration.training_config import GeometryConfig
 from tools.config_cli              import ConfigCli
 from tools.logger                  import Logger
 from tools.tomo_geometry           import TomoGeometry
-from tools.track_baselines         import BaselineExtractor, TrackBaselines
+from tools.track_baselines         import BaselineExtractor, TrackBaselines, TrackProfiles
 
 
 def _default_track_paths() -> dict:
@@ -72,21 +72,25 @@ class BaselineExtractionRun:
             "kz [rad/m]"              : ", ".join(f"{float(k):.4f}" for k in geometry.kz),
         }, title="Extracted vs Manual Defaults")
 
-    def _maybe_save(self, table: TrackBaselines) -> None:
+    def _maybe_save(self, table: TrackBaselines, profiles: TrackProfiles) -> None:
         if not self.config.dataset_dir:
             return
 
-        out_path = GeometryConfig().baselines_file(self.config.dataset_dir)
-        table.save(out_path)
-        self.logger.subsection(f"Baselines written: {out_path}")
+        baselines_path = GeometryConfig().baselines_file(self.config.dataset_dir)
+        table.save(baselines_path)
+        self.logger.subsection(f"Baselines written: {baselines_path}")
+
+        profiles_path = TrackProfiles.profiles_file(self.config.dataset_dir)
+        profiles.save(profiles_path)
+        self.logger.subsection(f"Track profiles written: {profiles_path}")
 
     def run(self) -> TrackBaselines:
-        extractor = self._build_extractor()
-        table     = extractor.extract()
+        extractor       = self._build_extractor()
+        table, profiles = extractor.extract_with_profiles()
 
         self.logger.kv_table(table.describe(), title="Track Baselines")
         self._log_geometry(table)
-        self._maybe_save(table)
+        self._maybe_save(table, profiles)
 
         return table
 
