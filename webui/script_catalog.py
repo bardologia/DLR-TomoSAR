@@ -46,7 +46,7 @@ class ScriptCatalog:
         "tune": {
             "title"     : "Tune",
             "category"  : "Tuning",
-            "purpose"   : "Run the Optuna two-phase hyperparameter search.",
+            "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
             "essentials": ["run_tag", "gpus"],
         },
     }

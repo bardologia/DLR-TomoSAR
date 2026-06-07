@@ -44,7 +44,7 @@ class PipelineLibrary:
                 "key"    : "tuning",
                 "name"   : "Tuning",
                 "script" : "tune",
-                "blurb"  : "Optuna two-phase hyperparameter search distributed across GPUs.",
-                "stages" : ["Phase 1 search", "Phase 2 search", "Best-trial export"],
+                "blurb"  : "Optuna joint hyperparameter search distributed across GPUs, resumable in chunks.",
+                "stages" : ["Joint search", "Best-config export"],
             },
         ]

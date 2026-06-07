@@ -11,9 +11,9 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--worker",      action="store_true")
+    parser.add_argument("--resume",      action="store_true")
     parser.add_argument("--model",       type=str,  default=None, help="(scheduler) tune only this model; (worker) model being tuned")
     parser.add_argument("--gpu",         type=int,  default=0)
-    parser.add_argument("--phase",       type=int,  default=1)
     parser.add_argument("--n-trials",    type=int,  default=8)
     parser.add_argument("--study-name",  type=str,  default=None)
     parser.add_argument("--storage-url", type=str,  default=None)
@@ -47,18 +47,29 @@ def main() -> None:
         orchestrator.run_worker(
             model_name  = args.model,
             gpu_id      = args.gpu,
-            phase       = args.phase,
             n_trials    = args.n_trials,
             study_name  = args.study_name,
             storage_url = args.storage_url,
         )
 
     else:
-        config = ConfigCli(TuningEntryConfig(), description="Two-phase hyperparameter tuning").apply()
+        cli    = ConfigCli(TuningEntryConfig(), description="Optuna hyperparameter tuning")
+        config = cli.apply()
         tag    = args.run_tag or config.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
 
+        if args.resume:
+            if args.run_tag is None and config.run_tag is None:
+                sys.exit("ERROR: --resume requires --run-tag")
+
+            resolved_path = Path(config.paths.log_base_dir) / tag / "resolved_config.json"
+            if not resolved_path.exists():
+                sys.exit(f"ERROR: --resume given but no resolved config found at {resolved_path}")
+
+            config = ConfigCli.load_resolved(TuningEntryConfig(), resolved_path)
+            config = ConfigCli.apply_overrides(config, cli.overrides)
+
         orchestrator = TuningOrchestrator(tag=tag, config=config, entry_script=entry_script)
-        orchestrator.schedule(target_model=args.model)
+        orchestrator.schedule(target_model=args.model, resume=args.resume)
 
 
 if __name__ == "__main__":

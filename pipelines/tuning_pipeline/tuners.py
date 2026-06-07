@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import os
 from pathlib import Path
 
 import optuna
@@ -25,13 +27,54 @@ class ParamSampler:
 
         return sampled
 
+    def decode(self, params: dict, space: dict) -> dict:
+        decoded = {}
 
-class BaseTuner:
-    run_name_prefix : str = ""
-    section_title   : str = ""
-    config_title    : str = ""
-    error_label     : str = ""
+        for name, value in params.items():
+            if name.endswith("__idx"):
+                param_name = name[:-5]
+                spec       = space.get(param_name, {})
+                if spec.get("type") == "indexed_categorical":
+                    decoded[param_name] = spec["choices"][value]
+            else:
+                decoded[name] = value
 
+        return decoded
+
+
+class BestConfigWriter:
+    def __init__(self, model_name: str, space: dict, path: Path) -> None:
+        self.model_name = model_name
+        self.space      = space
+        self.path       = Path(path)
+        self.sampler    = ParamSampler()
+
+    def __call__(self, study: optuna.Study, frozen_trial: optuna.trial.FrozenTrial) -> None:
+        self.write(study)
+
+    def write(self, study: optuna.Study) -> dict | None:
+        try:
+            best = study.best_trial
+        except ValueError:
+            return None
+
+        payload = {
+            "model"    : self.model_name,
+            "trial"    : best.number,
+            "val_loss" : best.value,
+            "params"   : self.sampler.decode(dict(best.params), self.space),
+        }
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self.path.with_name(self.path.name + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        os.replace(tmp_path, self.path)
+
+        return payload
+
+
+class Tuner:
     def __init__(
         self,
         model_name          : str,
@@ -52,13 +95,14 @@ class BaseTuner:
         self.logger              = logger
         self.emit_trial_docs     = emit_trial_docs
 
-        self.sampler = ParamSampler()
+        self.sampler     = ParamSampler()
+        self.space       = {**model_config_cls.tunable_lr_params(), **model_config_cls.tunable_arch_params()}
+        self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
 
     def _apply_params(self, trial: optuna.Trial, model_config) -> None:
-        raise NotImplementedError
-
-    def _extra_config_rows(self) -> dict:
-        return {}
+        sampled = self.sampler.sample(trial, self.space)
+        for k, v in sampled.items():
+            setattr(model_config, k, v)
 
     def _objective(self, trial: optuna.Trial) -> float:
         from pipelines.tuning_pipeline.trial import TrialPipeline
@@ -72,7 +116,7 @@ class BaseTuner:
         trainer_cfg.training.epochs         = self.tune_cfg.n_epochs
         trainer_cfg.scheduler.epochs        = self.tune_cfg.n_epochs
         trainer_cfg.early_stopping.patience = self.tune_cfg.early_stop_patience
-        trainer_cfg.io.logdir               = str(Path(self.log_dir) / f"trial_{trial.number:04d}")
+        trainer_cfg.io.logdir               = str(Path(self.log_dir) / "trials" / f"trial_{trial.number:04d}")
 
         pipeline = TrialPipeline(
             trainer_config = trainer_cfg,
@@ -80,7 +124,7 @@ class BaseTuner:
             model_name     = self.model_name,
             model_config   = model_config,
             seed           = trial.number,
-            run_name       = f"{self.run_name_prefix}{trial.number:04d}",
+            run_name       = f"trial_{trial.number:04d}",
             trial          = trial,
             emit_docs      = self.emit_trial_docs,
         )
@@ -90,77 +134,20 @@ class BaseTuner:
         except optuna.exceptions.TrialPruned:
             raise
         except Exception as exc:
-            self.logger.error(f"{self.error_label} trial {trial.number} raised: {exc}")
+            self.logger.error(f"Trial {trial.number} raised: {exc}")
             raise optuna.exceptions.TrialPruned()
 
         return best_val_loss
 
     def run(self, study: optuna.Study, n_trials: int) -> None:
-        self.logger.section(f"[{self.section_title} — {self.model_name}]")
+        self.logger.section(f"[Tuner — {self.model_name}]")
 
-        rows = {
+        self.logger.kv_table({
             "Trials (this worker)" : n_trials,
             "Epochs / trial"       : self.tune_cfg.n_epochs,
             "Early-stop patience"  : self.tune_cfg.early_stop_patience,
-        }
-        rows.update(self._extra_config_rows())
-        rows["Log dir"] = self.log_dir
+            "Search dimensions"    : len(self.space),
+            "Log dir"              : self.log_dir,
+        }, title="Tuner config")
 
-        self.logger.kv_table(rows, title=self.config_title)
-
-        study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True)
-
-
-class Phase1Tuner(BaseTuner):
-    run_name_prefix = "phase1_trial_"
-    section_title   = "Phase 1 Tuner"
-    config_title    = "Phase 1 config"
-    error_label     = "Phase-1"
-
-    def _apply_params(self, trial: optuna.Trial, model_config) -> None:
-        sampled = self.sampler.sample(trial, self.model_config_cls.tunable_lr_params())
-        for k, v in sampled.items():
-            setattr(model_config, k, v)
-
-
-class Phase2Tuner(BaseTuner):
-    run_name_prefix = "phase2_trial_"
-    section_title   = "Phase 2 Tuner"
-    config_title    = "Phase 2 config"
-    error_label     = "Phase-2"
-
-    def __init__(
-        self,
-        model_name          : str,
-        model_config_cls,
-        base_trainer_config,
-        base_dataset_config,
-        tune_cfg,
-        best_phase1_params  : dict,
-        log_dir             : str,
-        logger,
-        emit_trial_docs     : bool = False,
-    ) -> None:
-        super().__init__(
-            model_name          = model_name,
-            model_config_cls    = model_config_cls,
-            base_trainer_config = base_trainer_config,
-            base_dataset_config = base_dataset_config,
-            tune_cfg            = tune_cfg,
-            log_dir             = log_dir,
-            logger              = logger,
-            emit_trial_docs     = emit_trial_docs,
-        )
-        self.best_phase1_params = best_phase1_params
-
-    def _apply_params(self, trial: optuna.Trial, model_config) -> None:
-        arch_sampled = self.sampler.sample(trial, self.model_config_cls.tunable_arch_params())
-
-        for k, v in self.best_phase1_params.items():
-            if hasattr(model_config, k):
-                setattr(model_config, k, v)
-        for k, v in arch_sampled.items():
-            setattr(model_config, k, v)
-
-    def _extra_config_rows(self) -> dict:
-        return {"Phase-1 best params": str(self.best_phase1_params)}
+        study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True, callbacks=[self.best_writer])

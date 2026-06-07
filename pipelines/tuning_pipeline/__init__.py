@@ -1,3 +1,3 @@
-from pipelines.tuning_pipeline.pipeline import TuningPipeline
+from pipelines.tuning_pipeline.pipeline import TuningOrchestrator
 
-__all__ = ["TuningPipeline"]
+__all__ = ["TuningOrchestrator"]

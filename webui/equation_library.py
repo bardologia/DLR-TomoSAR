@@ -1506,7 +1506,7 @@ class EquationLibrary:
     def _tuning(self) -> dict:
         return {
             "group" : "Tuning",
-            "blurb" : "Optuna hyperparameter search wrapped around the training pipeline: a two-phase decomposition with TPE sampling and median pruning.",
+            "blurb" : "Optuna hyperparameter search wrapped around the training pipeline: a single joint study with TPE sampling and median pruning, topped up in chunks until the trial target is reached.",
             "items" : [
                 {
                     "title" : "Search objective",
@@ -1521,16 +1521,16 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Two-phase decomposition",
-                    "tex"   : r"\theta^*_{\mathrm{lr}} = \operatorname*{arg\,min}_{\theta_{\mathrm{lr}} \in \Theta_{\mathrm{lr}}} f\!\left(\theta_{\mathrm{lr}},\ \theta^{(0)}_{\mathrm{arch}}\right), \qquad \theta^*_{\mathrm{arch}} = \operatorname*{arg\,min}_{\theta_{\mathrm{arch}} \in \Theta_{\mathrm{arch}}} f\!\left(\theta^*_{\mathrm{lr}},\ \theta_{\mathrm{arch}}\right)",
-                    "note"  : "Learning and regularisation parameters first, architecture second with the winners frozen; exact only under additive separability, traded for halved per-study dimensionality.",
+                    "title" : "Joint search with chunked resume",
+                    "tex"   : r"\theta^* = \operatorname*{arg\,min}_{\theta \in \Theta_{\mathrm{lr}} \times \Theta_{\mathrm{arch}}} f(\theta), \qquad n_{\mathrm{run}} = \max\!\left(0,\ N - \left|\mathcal{T}_{\mathrm{done}}\right|\right)",
+                    "note"  : "Learning, regularisation and architecture parameters are sampled jointly in a single study; the SQLite-backed study is topped up across runs until the trial target is reached, and the best configuration so far is rewritten after every completed trial.",
                     "vars"  : [
-                        {"sym": r"\theta_{\mathrm{lr}}",         "desc": "learning/regularisation hyperparameters"},
-                        {"sym": r"\theta_{\mathrm{arch}}",       "desc": "architecture hyperparameters"},
-                        {"sym": r"\theta^{(0)}_{\mathrm{arch}}", "desc": "default architecture held fixed in Phase 1"},
-                        {"sym": r"\theta^*_{\mathrm{lr}}",       "desc": "Phase-1 winner, frozen in Phase 2"},
-                        {"sym": r"\Theta_{\mathrm{lr}}",         "desc": "per-group rates and decays (log-uniform), dropout"},
-                        {"sym": r"\Theta_{\mathrm{arch}}",       "desc": "widths, bottleneck, activation, normalisation, upsampling"},
+                        {"sym": r"\theta^*",                          "desc": "best joint hyperparameter vector found so far"},
+                        {"sym": r"\Theta_{\mathrm{lr}}",              "desc": "per-group rates and decays (log-uniform), dropout"},
+                        {"sym": r"\Theta_{\mathrm{arch}}",            "desc": "widths, bottleneck, activation, normalisation, upsampling"},
+                        {"sym": r"N",                                 "desc": "trial target for the study, n_trials"},
+                        {"sym": r"\mathcal{T}_{\mathrm{done}}",       "desc": "completed and pruned trials already in storage"},
+                        {"sym": r"n_{\mathrm{run}}",                  "desc": "trials launched by the current chunk"},
                     ],
                 },
                 {

@@ -73,8 +73,6 @@ from configuration.training_config import (
     WarmupConfig,
 )
 from configuration.tuning_config import (
-    Phase1TuneConfig,
-    Phase2TuneConfig,
     TuningConfig,
     TuningEntryConfig,
 )
@@ -1063,25 +1061,24 @@ class TestTrainEntryConfig:
 
 
 class TestTuningConfig:
-    def test_phase1_bounds_ordered(self):
-        p1 = Phase1TuneConfig()
-
-        assert p1.lr_low < p1.lr_high
-        assert p1.wd_low < p1.wd_high
-        assert p1.n_trials > 0
-
-    def test_phase2_defaults(self):
-        p2 = Phase2TuneConfig()
-
-        assert p2.n_trials > 0
-        assert p2.early_stop_patience > 0
-
-    def test_tuning_config_nested(self):
+    def test_search_defaults_positive(self):
         cfg = TuningConfig()
 
-        assert isinstance(cfg.phase1, Phase1TuneConfig)
-        assert isinstance(cfg.phase2, Phase2TuneConfig)
-        assert cfg.n_gpus > 0
+        assert cfg.n_trials > 0
+        assert cfg.n_epochs > 0
+        assert cfg.early_stop_patience > 0
+
+    def test_pruner_defaults_positive(self):
+        cfg = TuningConfig()
+
+        assert cfg.pruner_n_startup_trials > 0
+        assert cfg.pruner_n_warmup_steps > 0
+
+    def test_tuning_config_nested(self):
+        cfg = TuningEntryConfig()
+
+        assert isinstance(cfg.tuning, TuningConfig)
+        assert cfg.tuning.emit_trial_docs is False
 
     def test_tuning_entry_log_dir_override(self):
         cfg = TuningEntryConfig()
