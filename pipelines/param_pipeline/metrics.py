@@ -137,7 +137,7 @@ class FittingMetricsCalculator:
 
     @staticmethod
     def _load_tomogram(tomogram_path: Path) -> np.ndarray:
-        return np.load(str(tomogram_path)).astype(np.float32, copy=False)
+        return np.abs(np.load(str(tomogram_path))).astype(np.float32, copy=False)
 
     @staticmethod
     def _build_height_axis(height_range: Tuple[float, float], n_elev: int) -> np.ndarray:

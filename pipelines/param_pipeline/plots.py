@@ -801,7 +801,7 @@ class FittingResultPlotter(PlotBase):
         self.logger.subsection(f"Extracting {all_pixels.shape[0]} pixel profiles for example fits")
         pixel_profiles: Dict[Tuple[int, int], np.ndarray] = {}
         for az, rg in all_pixels.tolist():
-            pixel_profiles[(az, rg)] = np.array(tomogram_mmap[:, az, rg], dtype=np.float32)
+            pixel_profiles[(az, rg)] = np.abs(np.array(tomogram_mmap[:, az, rg])).astype(np.float32)
 
         del tomogram_mmap
         gc.collect()
