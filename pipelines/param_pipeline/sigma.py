@@ -464,7 +464,7 @@ class SigmaFittingExtractor:
             raw[truncation_index:, :, :] = 0.0
 
         pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H).copy()
-        active = pf.max(axis=1) > 1e-7
+        active = pf.max(axis=1) > 1e-3
         pmax   = pf.max(axis=1, keepdims=True)
         scale  = np.where(active[:, None], pmax, 1.0).astype(np.float32)
         norm   = pf / scale
