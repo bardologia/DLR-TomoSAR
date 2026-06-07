@@ -38,6 +38,10 @@ class ConfigFactory:
     def __init__(self, config: BenchmarkConfig) -> None:
         self.config = config
 
+    def _secondary_labels(self) -> tuple | None:
+        labels = getattr(self.config.paths, "secondary_labels", None)
+        return tuple(labels) if labels else None
+
     def global_crop(self) -> CropRegion:
         layout_path = Path(self.config.paths.dataset_path) / "data" / "dataset.json"
 
@@ -67,6 +71,7 @@ class ConfigFactory:
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
+            secondary_labels            = self._secondary_labels(),
             patch         = PatchConfiguration(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
             input_config  = self.benchmark_input_config(),
             batch_size    = training.batch_size,
@@ -86,6 +91,7 @@ class ConfigFactory:
         return DatasetConfiguration(
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
+            secondary_labels            = self._secondary_labels(),
 
             split_regions = SplitRegions(
                 train = overfit_crop,
@@ -110,7 +116,7 @@ class ConfigFactory:
 
         return TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
-            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path),
+            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
             early_stopping   = EarlyStoppingConfig(patience=training.early_stop_patience, min_delta=training.early_stop_min_delta, restore_best=True),
             warmup           = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler        = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
@@ -145,7 +151,7 @@ class ConfigFactory:
 
         return TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
-            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path),
+            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
             early_stopping   = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
             warmup           = WarmupConfig(warmup_enabled=False),
             scheduler        = SchedulerConfig(type="constant"),

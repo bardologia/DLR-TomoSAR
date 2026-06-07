@@ -11,9 +11,17 @@ import numpy as np
 from configuration.processing_config import CropRegion
 from tools.regions                   import SplitRegions
 from tools.logger                    import Logger
+from tools.track_baselines           import TrackBaselines
 
 
 class Layout:
+    LEGACY_KEYS = {
+        "primary"        : "primary_reduced",
+        "secondaries"    : "secondaries_reduced",
+        "interferograms" : "interferograms_reduced",
+        "dem_full"       : "dem_reduced",
+    }
+
     def __init__(self, run_directory: Path, logger: Logger, parameters_path: Path) -> None:
         self.run_directory    = Path(run_directory)
         self.logger           = logger
@@ -24,11 +32,12 @@ class Layout:
         with open(layout_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
 
-        self.global_crop    : CropRegion = CropRegion(*payload["global_crop"])
-        self.dataset_type   : str        = payload["dataset_type"]
-        self.tomogram_tag   : str        = payload["tomogram_tag"]
-        self.parameter_tag  : str        = payload["parameter_tag"]
-        self.artifacts      : dict       = payload["artifacts"]
+        self.global_crop    : CropRegion  = CropRegion(*payload["global_crop"])
+        self.dataset_type   : str         = payload["dataset_type"]
+        self.tomogram_tag   : str         = payload["tomogram_tag"]
+        self.parameter_tag  : str         = payload["parameter_tag"]
+        self.artifacts      : dict        = payload["artifacts"]
+        self.pass_labels    : list | None = payload.get("pass_labels") or self._labels_from_baselines()
 
         self.logger.section("[Layout Loaded]")
         self.logger.kv_table({
@@ -37,23 +46,56 @@ class Layout:
             "Azimuth (lines)": self.global_crop.azimuth_size,
             "Range (samples)": self.global_crop.range_size,
             "Tomogram Tag":    self.tomogram_tag,
+            "Pass Labels":     ", ".join(self.pass_labels) if self.pass_labels else "unavailable",
             "Parameters":      self.parameters_path,
         })
+
+    def _labels_from_baselines(self) -> list | None:
+        baselines_path = self.run_directory / "meta" / TrackBaselines.FILENAME
+        if not baselines_path.is_file():
+            return None
+        return list(TrackBaselines.load(baselines_path).labels)
 
     def artifact_path(self, artifact_key: str) -> Path:
         if artifact_key == "parameters":
             return self.parameters_path
 
+        if artifact_key not in self.artifacts and self.LEGACY_KEYS.get(artifact_key) in self.artifacts:
+            artifact_key = self.LEGACY_KEYS[artifact_key]
+
         return self.data_directory / self.artifacts[artifact_key]
+
+    def secondary_indices(self, secondary_labels) -> list | None:
+        if secondary_labels is None:
+            return None
+
+        if not self.pass_labels:
+            raise ValueError("Dataset records no pass labels; secondary selection by label requires pass_labels in dataset.json or meta/baselines.json. Re-run preprocessing or set secondary_labels to None.")
+
+        primary     = self.pass_labels[0]
+        secondaries = list(self.pass_labels[1:])
+        requested   = [str(label) for label in secondary_labels]
+
+        if primary in requested:
+            raise ValueError(f"Pass {primary} is the primary and is always included; remove it from secondary_labels")
+
+        unknown = [label for label in requested if label not in secondaries]
+        if unknown:
+            raise ValueError(f"Unknown secondary labels {unknown}; dataset secondaries are {secondaries}")
+
+        return [index for index, label in enumerate(secondaries) if label in requested]
 
 
 class Cropper:
-    def __init__(self, layout: Layout, split_regions: SplitRegions, logger: Logger) -> None:
-        self.layout        = layout
-        self.split_regions = split_regions
-        self.logger        = logger
+    def __init__(self, layout: Layout, split_regions: SplitRegions, logger: Logger, secondary_labels=None) -> None:
+        self.layout            = layout
+        self.split_regions     = split_regions
+        self.logger            = logger
+        self.secondary_indices = layout.secondary_indices(secondary_labels)
+        self.secondary_labels  = self._resolve_labels(secondary_labels)
 
         self.logger.section("[Cropper Initialized]")
+        self.logger.subsection(f"Secondary selection : {', '.join(self.secondary_labels) if self.secondary_labels else 'all passes'}")
         rows = []
         for name, regions in split_regions.region_lists():
             for index, region in enumerate(regions):
@@ -61,21 +103,33 @@ class Cropper:
                 rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
         self.logger.metrics_table(rows, ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
 
+    def _resolve_labels(self, secondary_labels) -> list | None:
+        if self.secondary_indices is None:
+            return None
+        secondaries = self.layout.pass_labels[1:]
+        return [secondaries[index] for index in self.secondary_indices]
+
     def to_local_slices(self, region: CropRegion) -> Tuple[slice, slice]:
         return region.local_slices(self.layout.global_crop)
+
+    def _select_channels(self, array: np.ndarray, az_slice: slice, rg_slice: slice) -> np.ndarray:
+        if self.secondary_indices is None:
+            return array[..., az_slice, rg_slice]
+
+        return np.stack([array[index, az_slice, rg_slice] for index in self.secondary_indices])
 
     def load_split(self, region: CropRegion) -> dict[str, np.ndarray]:
         az_slice, rg_slice = self.to_local_slices(region)
 
-        primary_reduced        = np.load(str(self.layout.artifact_path("primary_reduced")),        mmap_mode="r", allow_pickle=False)
-        secondaries_reduced    = np.load(str(self.layout.artifact_path("secondaries_reduced")),    mmap_mode="r", allow_pickle=False)
-        interferograms_reduced = np.load(str(self.layout.artifact_path("interferograms_reduced")), mmap_mode="r", allow_pickle=False)
-        parameters_reduced     = np.load(str(self.layout.artifact_path("parameters")),             mmap_mode="r", allow_pickle=False)
-        dem_reduced            = np.load(str(self.layout.artifact_path("dem_reduced")),            mmap_mode="r", allow_pickle=False)
+        primary        = np.load(str(self.layout.artifact_path("primary")),        mmap_mode="r", allow_pickle=False)
+        secondaries    = np.load(str(self.layout.artifact_path("secondaries")),    mmap_mode="r", allow_pickle=False)
+        interferograms = np.load(str(self.layout.artifact_path("interferograms")), mmap_mode="r", allow_pickle=False)
+        parameters     = np.load(str(self.layout.artifact_path("parameters")),     mmap_mode="r", allow_pickle=False)
+        dem            = np.load(str(self.layout.artifact_path("dem_full")),       mmap_mode="r", allow_pickle=False)
 
-        primary_view        = primary_reduced        [..., az_slice, rg_slice]
-        secondaries_view    = secondaries_reduced    [..., az_slice, rg_slice]
-        interferograms_view = interferograms_reduced [..., az_slice, rg_slice]
+        primary_view        = primary[..., az_slice, rg_slice]
+        secondaries_view    = self._select_channels(secondaries,    az_slice, rg_slice)
+        interferograms_view = self._select_channels(interferograms, az_slice, rg_slice)
 
         n_secondaries    = secondaries_view.shape[0]
         n_interferograms = interferograms_view.shape[0]
@@ -83,21 +137,22 @@ class Cropper:
         az_size          = primary_view.shape[-2]
         rg_size          = primary_view.shape[-1]
 
-        inputs_split     = np.empty((n_passes, az_size, rg_size), dtype=primary_reduced.dtype)
-        inputs_split[0]                                  = primary_view
-        inputs_split[1:1 + n_secondaries]                = secondaries_view
-        inputs_split[1 + n_secondaries:]                 = interferograms_view
+        inputs_split     = np.empty((n_passes, az_size, rg_size), dtype=primary.dtype)
+        inputs_split[0]                   = primary_view
+        inputs_split[1:1 + n_secondaries] = secondaries_view
+        inputs_split[1 + n_secondaries:]  = interferograms_view
 
-        parameters_split = np.ascontiguousarray(parameters_reduced [..., az_slice, rg_slice])
-        dem_split        = np.ascontiguousarray(dem_reduced        [az_slice, rg_slice].astype(np.float32))
+        parameters_split = np.ascontiguousarray(parameters [..., az_slice, rg_slice])
+        dem_split        = np.ascontiguousarray(dem        [az_slice, rg_slice].astype(np.float32))
 
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
             "Primary"          : primary_view.shape,
             "Secondaries"      : secondaries_view.shape,
             "Interferograms"   : interferograms_view.shape,
+            "Selection"        : ", ".join(self.secondary_labels) if self.secondary_labels else "all passes",
             "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
-            "DEM reduced"      : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
+            "DEM"              : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
             "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
         })
 
@@ -107,6 +162,7 @@ class Cropper:
             "parameters"       : parameters_split,
             "n_secondaries"    : n_secondaries,
             "n_interferograms" : n_interferograms,
+            "secondary_labels" : self.secondary_labels,
         }
 
 

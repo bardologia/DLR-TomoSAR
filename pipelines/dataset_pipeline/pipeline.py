@@ -76,7 +76,7 @@ class DatasetPipeline:
         self.logger = logger or Logger(log_dir=str(log_dir), name="dataset_pipeline", level="INFO")
 
         self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
-        self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger)
+        self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
         self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger)
 

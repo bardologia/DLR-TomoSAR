@@ -265,6 +265,116 @@ class TestCropper:
         assert out["parameters"].shape == (3, 16, 16)
 
 
+class TestSecondarySelection:
+    LABELS = ["PS02", "PS04", "PS06", "PS08", "PS26"]
+
+    def _make_dataset(self, tmp_path, pass_labels=True, az=20, rg=20):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "global_crop"   : [0, az, 0, rg],
+            "dataset_type"  : "FSAR",
+            "tomogram_tag"  : "t",
+            "parameter_tag" : "p",
+            "pass_labels"   : self.LABELS if pass_labels else None,
+            "artifacts"     : {
+                "primary"        : "primary.npy",
+                "secondaries"    : "secondaries.npy",
+                "interferograms" : "interferograms.npy",
+                "dem_full"       : "dem.npy",
+            },
+        }
+        with open(data_dir / "dataset.json", "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+
+        n_sec       = len(self.LABELS) - 1
+        secondaries = np.stack([np.full((az, rg), i + 1, dtype=np.complex64) for i in range(n_sec)])
+        ifgs        = np.stack([np.full((az, rg), 10 * (i + 1), dtype=np.complex64) for i in range(n_sec)])
+
+        np.save(data_dir / "primary.npy",        np.zeros((1, az, rg), dtype=np.complex64))
+        np.save(data_dir / "secondaries.npy",    secondaries)
+        np.save(data_dir / "interferograms.npy", ifgs)
+        np.save(data_dir / "dem.npy",            np.zeros((az, rg), dtype=np.float32))
+        np.save(data_dir / "params.npy",         np.zeros((3, az, rg), dtype=np.float32))
+
+        return data_dir
+
+    def _cropper(self, tmp_path, secondary_labels):
+        from tools.regions import SplitRegions
+        data_dir = tmp_path / "data"
+        layout   = Layout(tmp_path, logger=_null_logger(), parameters_path=data_dir / "params.npy")
+        region   = CropRegion(0, 20, 0, 20)
+        splits   = SplitRegions(train=region, val=region, test=region)
+        return Cropper(layout, splits, logger=_null_logger(), secondary_labels=secondary_labels), region
+
+    def test_layout_exposes_pass_labels(self, tmp_path):
+        self._make_dataset(tmp_path)
+        layout = Layout(tmp_path, logger=_null_logger(), parameters_path=tmp_path / "data" / "params.npy")
+
+        assert layout.pass_labels == self.LABELS
+
+    def test_secondary_indices_map_labels(self, tmp_path):
+        self._make_dataset(tmp_path)
+        layout = Layout(tmp_path, logger=_null_logger(), parameters_path=tmp_path / "data" / "params.npy")
+
+        assert layout.secondary_indices(("PS04", "PS08")) == [0, 2]
+        assert layout.secondary_indices(None) is None
+
+    def test_primary_in_selection_raises(self, tmp_path):
+        self._make_dataset(tmp_path)
+        layout = Layout(tmp_path, logger=_null_logger(), parameters_path=tmp_path / "data" / "params.npy")
+
+        with pytest.raises(ValueError, match="primary"):
+            layout.secondary_indices(("PS02", "PS04"))
+
+    def test_unknown_label_raises(self, tmp_path):
+        self._make_dataset(tmp_path)
+        layout = Layout(tmp_path, logger=_null_logger(), parameters_path=tmp_path / "data" / "params.npy")
+
+        with pytest.raises(ValueError, match="Unknown secondary labels"):
+            layout.secondary_indices(("PS99",))
+
+    def test_selection_without_labels_raises(self, tmp_path):
+        self._make_dataset(tmp_path, pass_labels=False)
+        layout = Layout(tmp_path, logger=_null_logger(), parameters_path=tmp_path / "data" / "params.npy")
+
+        with pytest.raises(ValueError, match="pass labels"):
+            layout.secondary_indices(("PS04",))
+
+    def test_load_split_selects_matching_channels(self, tmp_path):
+        self._make_dataset(tmp_path)
+        cropper, region = self._cropper(tmp_path, secondary_labels=("PS06", "PS26"))
+
+        out = cropper.load_split(region)
+
+        assert out["n_secondaries"]    == 2
+        assert out["n_interferograms"] == 2
+        assert out["secondary_labels"] == ["PS06", "PS26"]
+        assert out["inputs"][1].real   == pytest.approx(np.full((20, 20), 2.0))
+        assert out["inputs"][2].real   == pytest.approx(np.full((20, 20), 4.0))
+        assert out["inputs"][3].real   == pytest.approx(np.full((20, 20), 20.0))
+        assert out["inputs"][4].real   == pytest.approx(np.full((20, 20), 40.0))
+
+    def test_load_split_without_selection_keeps_all(self, tmp_path):
+        self._make_dataset(tmp_path)
+        cropper, region = self._cropper(tmp_path, secondary_labels=None)
+
+        out = cropper.load_split(region)
+
+        assert out["n_secondaries"]    == 4
+        assert out["secondary_labels"] is None
+
+    def test_preset_selection_order_follows_dataset(self, tmp_path):
+        self._make_dataset(tmp_path)
+        cropper, region = self._cropper(tmp_path, secondary_labels=("PS26", "PS04"))
+
+        out = cropper.load_split(region)
+
+        assert out["secondary_labels"] == ["PS04", "PS26"]
+        assert out["inputs"][1].real   == pytest.approx(np.full((20, 20), 1.0))
+        assert out["inputs"][2].real   == pytest.approx(np.full((20, 20), 4.0))
+
+
 class TestSpatialAugmenter:
     def _config(self, **overrides):
         base = dict(p_flip_h=0.0, p_flip_v=0.0, p_rot90=0.0, p_noise=0.0, noise_std=0.0)

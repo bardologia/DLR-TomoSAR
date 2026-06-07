@@ -100,22 +100,25 @@ class ModelWrapper:
 
 @dataclass
 class Run:
-    model           : object
-    model_name      : str
-    in_channels     : int
-    out_channels    : int
-    x_axis          : np.ndarray
-    x_axis_length   : int
-    n_gaussians     : int
-    dataset_config  : DatasetConfiguration
-    split_name      : str
-    split_region    : CropRegion
-    global_crop     : CropRegion
-    grid            : GridInfo
-    dataset         : PatchDataset
-    loader          : DataLoader
-    checkpoint_meta : dict
-    used_ema        : bool
+    model            : object
+    model_name       : str
+    in_channels      : int
+    out_channels     : int
+    x_axis           : np.ndarray
+    x_axis_length    : int
+    n_gaussians      : int
+    dataset_config   : DatasetConfiguration
+    split_name       : str
+    split_region     : CropRegion
+    global_crop      : CropRegion
+    grid             : GridInfo
+    dataset          : PatchDataset
+    loader           : DataLoader
+    checkpoint_meta  : dict
+    used_ema         : bool
+    complex_inputs   : np.ndarray | None = None
+    n_secondaries    : int               = 0
+    secondary_labels : list | None       = None
 
 
 class RunLoader:
@@ -150,10 +153,13 @@ class RunLoader:
             use_reflective_padding = bool(payload["patch"]["use_reflective_padding"]),
         )
 
+        secondary_labels = payload.get("secondary_labels")
+
         return DatasetConfiguration(
             preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
             parameters_path             = Path(payload["parameters_path"]),
             split_regions               = split_regions,
+            secondary_labels            = tuple(secondary_labels) if secondary_labels is not None else None,
             patch                       = patch,
             input_config                = InputConfig.from_dict(payload["input_config"]),
             output_config               = OutputConfig.from_dict(payload["output_config"]),
@@ -163,9 +169,9 @@ class RunLoader:
             pin_memory                  = bool(payload["pin_memory"]),
         )
 
-    def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion]:
+    def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
-        cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger)
+        cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger, secondary_labels=dataset_config.secondary_labels)
 
         regions = dataset_config.split_regions.regions(split_name)
         if len(regions) != 1:
@@ -198,7 +204,7 @@ class RunLoader:
             n_gaussians      = n_gaussians,
         )
 
-        return dataset, grid, region, layout.global_crop
+        return dataset, grid, region, layout.global_crop, arrays
 
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
@@ -290,7 +296,7 @@ class RunLoader:
         gauss_cfg   = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
         model       = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
 
-        dataset, grid, region, global_crop = self._build_dataset(
+        dataset, grid, region, global_crop, arrays = self._build_dataset(
             dataset_config = dataset_config,
             split_name     = split,
             x_axis         = x_axis,
@@ -324,20 +330,23 @@ class RunLoader:
         })
 
         return Run(
-            model           = model,
-            model_name      = model_name,
-            in_channels     = in_channels,
-            out_channels    = out_channels,
-            x_axis          = x_axis,
-            x_axis_length   = int(x_axis.size),
-            n_gaussians     = n_gaussians,
-            dataset_config  = dataset_config,
-            split_name      = split,
-            split_region    = region,
-            global_crop     = global_crop,
-            grid            = grid.grid,
-            dataset         = dataset,
-            loader          = loader,
-            checkpoint_meta = ckpt_meta,
-            used_ema        = used_ema,
+            model            = model,
+            model_name       = model_name,
+            in_channels      = in_channels,
+            out_channels     = out_channels,
+            x_axis           = x_axis,
+            x_axis_length    = int(x_axis.size),
+            n_gaussians      = n_gaussians,
+            dataset_config   = dataset_config,
+            split_name       = split,
+            split_region     = region,
+            global_crop      = global_crop,
+            grid             = grid.grid,
+            dataset          = dataset,
+            loader           = loader,
+            checkpoint_meta  = ckpt_meta,
+            used_ema         = used_ema,
+            complex_inputs   = arrays["inputs"],
+            n_secondaries    = arrays["n_secondaries"],
+            secondary_labels = arrays.get("secondary_labels"),
         )

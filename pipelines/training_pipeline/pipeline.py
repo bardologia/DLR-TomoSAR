@@ -228,7 +228,7 @@ class SingleTrainRunner:
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.overfit    = self.config.overfit
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path)
+        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         model_config = CONFIG_REGISTRY[self.config.model_name]()
         for attribute, value in self.config.model_overrides.items():
