@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple, Union
 
 class FitMode:
     @dataclass
-    class SigmaOnly:
+    class AmpSigma:
         threshold_factor   : float = 0.25
         truncation_index   : int   = 170
         k_max              : int   = 5
@@ -17,13 +17,13 @@ class FitMode:
         sigma_init_divisor : float = 4.0
 
 
-FitConfig = FitMode.SigmaOnly
+FitConfig = FitMode.AmpSigma
 
 
 @dataclass
 class FitSettings:
     max_fit_iterations  : int       = 5000
-    fit_config          : FitConfig = field(default_factory=FitMode.SigmaOnly)
+    fit_config          : FitConfig = field(default_factory=FitMode.AmpSigma)
 
     @property
     def number_of_gaussians(self) -> int:
@@ -35,7 +35,7 @@ class FitSettings:
 
     @property
     def fitting_method(self) -> str:
-        return "sigma_only_adam"
+        return "amp_sigma_adam"
 
 
 @dataclass
@@ -73,12 +73,12 @@ class ExtractionConfig:
         fs     = self.fit_settings
         method = fs.fitting_method
 
-        if method.startswith("sigma_only"):
+        if method.startswith("amp_sigma"):
             cfg     = fs.fit_config
             k_max   = getattr(cfg, "k_max", fs.number_of_gaussians)
             divisor = getattr(cfg, "sigma_init_divisor", 1.0)
             div_tag = f"{divisor:g}".replace(".", "p")
-            return f"sigmaonly_k{k_max}_sig{div_tag}"
+            return f"ampsigma_k{k_max}_sig{div_tag}"
 
         return f"Ng{fs.number_of_gaussians}_filt"
 

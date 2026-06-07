@@ -351,7 +351,7 @@ def _build_check(tmp_path: Path, n_gaussians: int = 1, height_range=(-20.0, 20.0
         height_range        = cfg.height_range,
         output_prefix       = cfg.output_prefix,
         output_suffix       = cfg.output_suffix,
-        fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(k_max=cfg.fit_k_max)),
+        fit_settings        = FitSettings(fit_config=FitMode.AmpSigma(k_max=cfg.fit_k_max)),
     )
     params_path = extraction.parameters_npy_path
     params_path.parent.mkdir(parents=True, exist_ok=True)
