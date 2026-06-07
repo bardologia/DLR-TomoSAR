@@ -22,7 +22,7 @@ class ScriptCatalog:
         "train": {
             "title"     : "Train",
             "category"  : "Training",
-            "purpose"   : "Train one model end to end, or fan out loss-curriculum trials (warmup x complete combinations) across GPUs.",
+            "purpose"   : "Train one model end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
             "essentials": ["run_name", "model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
