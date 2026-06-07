@@ -16,7 +16,7 @@ from pipeline_library import PipelineLibrary
 from process_manager import ProcessManager
 from project_paths import ProjectPaths
 from resource_watchdog import ResourceWatchdog
-from run_browser import RunBrowser
+from results_browser import ResultsBrowser
 from script_catalog import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor import SystemMonitor
@@ -34,7 +34,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, runs: RunBrowser, cubes: CubeExplorer) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -47,7 +47,7 @@ class RequestRouter:
         self.system      = system
         self.watchdog    = watchdog
         self.tensorboard = tensorboard
-        self.runs        = runs
+        self.results     = results
         self.cubes       = cubes
 
     def route(self, handler) -> None:
@@ -80,17 +80,19 @@ class RequestRouter:
         if path.startswith("/static/"):
             self._serve_static(handler, path[len("/static/"):])
             return
-        if path.startswith("/runmedia/"):
-            self._serve_run_media(handler, unquote(path[len("/runmedia/"):]))
+        if path == "/resultsmedia":
+            query = parse_qs(urlparse(handler.path).query)
+            self._serve_results_media(handler, (query.get("path") or [""])[0])
             return
-        if path == "/api/runs":
+        if path == "/api/results/tree":
             query  = parse_qs(urlparse(handler.path).query)
-            run_id = (query.get("id") or [None])[0]
-            if run_id:
-                result = self.runs.detail(run_id)
-                self._send_json(handler, result, 200 if result.get("ok") else 404)
-            else:
-                self._send_json(handler, {"runs": self.runs.list_runs()})
+            result = self.results.tree((query.get("path") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
+            return
+        if path == "/api/results/folder":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.results.folder((query.get("root") or [""])[0], (query.get("rel") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
         if path == "/api/cubes":
             self._send_json(handler, {"cubes": self.cubes.list_cubes()})
@@ -373,9 +375,9 @@ class RequestRouter:
         handler.end_headers()
         handler.wfile.write(png)
 
-    def _serve_run_media(self, handler, relative: str) -> None:
-        target = self.runs.media_path(relative)
-        if target is None or not target.is_file():
+    def _serve_results_media(self, handler, raw_path: str) -> None:
+        target = self.results.file_path(raw_path)
+        if target is None:
             self._send_json(handler, {"error": "not found"}, 404)
             return
 

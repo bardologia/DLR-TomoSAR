@@ -2,189 +2,262 @@
 
 class ResultsView {
   constructor(listEl, detailEl) {
-    this.listEl = listEl;
-    this.detailEl = detailEl;
-    this.runs = [];
-    this.selectedId = null;
-    this.activeStamp = null;
-    this.loaded = false;
+    this.listEl    = listEl;
+    this.detailEl  = detailEl;
+    this.pathForm  = document.getElementById("results-path-form");
+    this.pathInput = document.getElementById("results-path-input");
 
-    this.lightbox = document.getElementById("lightbox");
+    this.root      = null;
+    this.activeRel = null;
+    this.expanded  = new Set();
+    this.loaded    = false;
+
+    this.lightbox    = document.getElementById("lightbox");
     this.lightboxImg = document.getElementById("lightbox-img");
     this.lightboxCap = document.getElementById("lightbox-cap");
     this.lightbox.addEventListener("click", () => this._closeLightbox());
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") this._closeLightbox();
     });
+
+    this.pathForm.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const path = this.pathInput.value.trim();
+      if (path) this.open(path);
+    });
   }
 
-  async enter() {
+  enter() {
     if (this.loaded) return;
     this.loaded = true;
-    await this.refresh();
+
+    const recents = this._recents();
+    if (recents.length) {
+      this.pathInput.value = recents[0];
+      this.open(recents[0]);
+    } else {
+      this._renderSidebar();
+      this.detailEl.innerHTML = `<div class="res-empty">Paste the path of any run directory above &mdash; preprocessing, parameter extraction, training, inference or benchmark &mdash; and press Open.</div>`;
+    }
   }
 
-  async refresh() {
-    let data;
-    try {
-      data = await window.apiGet("/api/runs");
-    } catch (e) {
-      this.listEl.innerHTML = `<div class="clist__empty">Backend unreachable.</div>`;
-      return;
-    }
-
-    this.runs = data.runs || [];
-    this._renderList();
-
-    if (!this.runs.length) {
-      this.detailEl.innerHTML = `<div class="res-empty">No runs with inference outputs found under <code>logs/</code>. Run an inference first.</div>`;
-      return;
-    }
-
-    if (!this.runs.some((r) => r.id === this.selectedId)) this.select(this.runs[0].id);
-  }
-
-  _renderList() {
-    this.listEl.innerHTML = "";
-
-    if (!this.runs.length) {
-      this.listEl.innerHTML = `<div class="clist__empty">No inference runs yet.</div>`;
-      return;
-    }
-
-    const groups = new Map();
-    this.runs.forEach((run) => {
-      const key = run.group || "logs";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(run);
-    });
-
-    groups.forEach((runs, group) => {
-      const head = document.createElement("div");
-      head.className = "run-group__head";
-      head.innerHTML = `<span>${this._esc(group)}</span><span class="run-group__count">${runs.length}</span>`;
-      this.listEl.appendChild(head);
-
-      runs.forEach((run) => {
-        const item = document.createElement("button");
-        item.type = "button";
-        item.className = "run-item" + (run.id === this.selectedId ? " is-active" : "");
-        item.innerHTML =
-          `<span class="run-item__name">${this._esc(run.name)}</span>` +
-          `<span class="run-item__meta">${run.modified.replace("T", " ")} &middot; ${run.outputs} output${run.outputs === 1 ? "" : "s"}</span>`;
-        item.addEventListener("click", () => this.select(run.id));
-        this.listEl.appendChild(item);
-      });
-    });
-  }
-
-  async select(runId) {
-    this.selectedId = runId;
-    this.activeStamp = null;
-    this._renderList();
+  async open(path) {
     this.detailEl.innerHTML = `<div class="res-empty">Loading&hellip;</div>`;
 
-    let detail;
+    let data;
     try {
-      detail = await window.apiGet(`/api/runs?id=${encodeURIComponent(runId)}`);
+      data = await window.apiGet(`/api/results/tree?path=${encodeURIComponent(path)}`);
     } catch (e) {
-      detail = null;
+      data = null;
     }
 
-    if (!detail || !detail.ok) {
-      this.detailEl.innerHTML = `<div class="res-empty">Could not load this run.</div>`;
+    if (!data || !data.ok) {
+      this.root = null;
+      this._renderSidebar();
+      this.detailEl.innerHTML = `<div class="res-empty">${this._esc(data && data.error ? data.error : "Could not open this path.")}</div>`;
       return;
     }
 
-    this.detail = detail;
-    this.activeStamp = detail.outputs.length ? detail.outputs[0].stamp : null;
-    this._renderDetail();
+    this.root            = data;
+    this.pathInput.value = data.root;
+    this._remember(data.root);
+
+    this.expanded = new Set([""]);
+    data.tree.children.forEach((child) => this.expanded.add(child.rel));
+
+    this._renderSidebar();
+    this.selectFolder("");
   }
 
-  async _renderDetail() {
-    const detail = this.detail;
-    const output = detail.outputs.find((o) => o.stamp === this.activeStamp) || detail.outputs[0];
+  async selectFolder(rel) {
+    this.activeRel = rel;
+    this._renderSidebar();
+    this.detailEl.innerHTML = `<div class="res-empty">Loading&hellip;</div>`;
 
-    let html =
-      `<header class="res-head">` +
-      `<div><h3 class="res-title">${this._esc(detail.name)}</h3>` +
-      `<p class="res-path">${this._esc(detail.id)}</p></div>`;
-
-    if (detail.outputs.length > 1) {
-      html += `<div class="res-stamps">`;
-      detail.outputs.forEach((o) => {
-        html += `<button type="button" class="res-stamp${o.stamp === output.stamp ? " is-active" : ""}" data-stamp="${this._esc(o.stamp)}">${this._esc(o.stamp)}</button>`;
-      });
-      html += `</div>`;
-    } else if (output) {
-      html += `<span class="res-stamp is-active is-single">${this._esc(output.stamp)}</span>`;
+    let data;
+    try {
+      data = await window.apiGet(`/api/results/folder?root=${encodeURIComponent(this.root.root)}&rel=${encodeURIComponent(rel)}`);
+    } catch (e) {
+      data = null;
     }
-    html += `</header>`;
 
-    if (!output) {
-      this.detailEl.innerHTML = html + `<div class="res-empty">This run has no inference outputs.</div>`;
+    if (!data || !data.ok) {
+      this.detailEl.innerHTML = `<div class="res-empty">Could not load this folder.</div>`;
       return;
     }
 
-    const reportHtml = output.report_url ? await this._reportHtml(output) : null;
+    this._renderFolder(data);
+  }
 
-    if (reportHtml !== null) {
-      html += `<article class="res-md">${reportHtml}</article>`;
-    } else {
-      output.groups.forEach((group) => {
-        html += this._sectionHtml(group.title, group.items, "img");
+  _renderSidebar() {
+    this.listEl.innerHTML = "";
+
+    const recents = this._recents();
+    if (recents.length) {
+      const head = document.createElement("div");
+      head.className = "run-group__head";
+      head.innerHTML = `<span>Recent</span><span class="run-group__count">${recents.length}</span>`;
+      this.listEl.appendChild(head);
+
+      recents.forEach((path) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "run-item" + (this.root && this.root.root === path ? " is-active" : "");
+        item.innerHTML = `<span class="run-item__name">${this._esc(this._shorten(path))}</span>`;
+        item.title = path;
+        item.addEventListener("click", () => this.open(path));
+        this.listEl.appendChild(item);
       });
-      if (output.gifs.length) html += this._sectionHtml("Animations", output.gifs, "gif");
+    }
+
+    if (!this.root) {
+      if (!recents.length) this.listEl.innerHTML = `<div class="clist__empty">No results opened yet.</div>`;
+      return;
+    }
+
+    const head = document.createElement("div");
+    head.className = "run-group__head";
+    head.innerHTML = `<span>${this._esc(this.root.name)}</span><span class="res-stage">${this._esc(this.root.stage)}</span>`;
+    this.listEl.appendChild(head);
+
+    this._renderNode(this.root.tree, 0);
+  }
+
+  _renderNode(node, depth) {
+    const total  = node.counts.markdown + node.counts.images + node.counts.animations + node.counts.configs;
+    const isOpen = this.expanded.has(node.rel);
+
+    const row = document.createElement("div");
+    row.className = "res-tree__row" + (node.rel === this.activeRel ? " is-active" : "");
+    row.style.paddingLeft = `${8 + depth * 14}px`;
+
+    const caret = document.createElement("span");
+    caret.className = "res-tree__caret" + (node.children.length ? (isOpen ? " is-open" : "") : " is-leaf");
+    caret.textContent = node.children.length ? "▸" : "";
+    caret.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (isOpen) this.expanded.delete(node.rel);
+      else this.expanded.add(node.rel);
+      this._renderSidebar();
+    });
+
+    const name = document.createElement("span");
+    name.className = "res-tree__name";
+    name.textContent = node.rel === "" ? "/" : node.name;
+
+    row.append(caret, name);
+
+    if (total) {
+      const badge = document.createElement("span");
+      badge.className = "res-tree__count";
+      badge.textContent = total;
+      row.appendChild(badge);
+    }
+
+    row.addEventListener("click", () => this.selectFolder(node.rel));
+    this.listEl.appendChild(row);
+
+    if (isOpen) node.children.forEach((child) => this._renderNode(child, depth + 1));
+  }
+
+  _renderFolder(data) {
+    let html =
+      `<header class="res-head">` +
+      `<div><h3 class="res-title">${this._esc(data.rel === "" ? this.root.name : data.rel)}</h3>` +
+      `<p class="res-path">${this._esc(data.abs)}</p></div>` +
+      `<span class="res-stamp is-active is-single">${this._esc(this.root.stage)}</span>` +
+      `</header>`;
+
+    data.markdown.forEach((md, index) => {
+      html += `<section class="res-section">`;
+      html += `<h4 class="res-section__cap">${this._esc(md.name)}</h4>`;
+      html += `<article class="res-md" data-md="${index}"></article>`;
+      html += `</section>`;
+    });
+
+    if (data.images.length)     html += this._sectionHtml("Plots", data.images, "img");
+    if (data.animations.length) html += this._sectionHtml("Animations", data.animations, "gif");
+
+    if (data.configs.length) {
+      html += `<section class="res-section"><h4 class="res-section__cap">Configs <span>${data.configs.length}</span></h4>`;
+      data.configs.forEach((cfg, index) => {
+        html += `<details class="res-cfg"${data.configs.length === 1 ? " open" : ""}>`;
+        html += `<summary>${this._esc(cfg.name)}</summary>`;
+        html += `<pre><code data-cfg="${index}"></code></pre>`;
+        html += `</details>`;
+      });
+      html += `</section>`;
+    }
+
+    if (data.other.length) {
+      html += `<section class="res-section"><h4 class="res-section__cap">Other files <span>${data.other.length}</span></h4><ul class="res-files">`;
+      data.other.forEach((file) => {
+        html += `<li><span>${this._esc(file.name)}</span><span>${this._size(file.size)}</span></li>`;
+      });
+      html += `</ul></section>`;
+    }
+
+    if (!data.markdown.length && !data.images.length && !data.animations.length && !data.configs.length && !data.other.length) {
+      html += `<div class="res-empty">This folder holds no files. Pick a subfolder on the left.</div>`;
     }
 
     this.detailEl.innerHTML = html;
-    this._finalizeReport(output);
-    this._bind(output);
+    this._fillMarkdown(data);
+    this._fillConfigs(data);
+    this._bindFigures();
   }
 
-  async _reportHtml(output) {
-    if (!window.marked) return null;
+  _fillMarkdown(data) {
+    this.detailEl.querySelectorAll(".res-md").forEach((body) => {
+      const md = data.markdown[Number(body.dataset.md)];
 
-    let text;
-    try {
-      const res = await fetch(output.report_url);
-      if (!res.ok) return null;
-      text = await res.text();
-    } catch (e) {
-      return null;
-    }
-
-    try {
-      return window.marked.parse(text);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  _finalizeReport(output) {
-    const body = this.detailEl.querySelector(".res-md");
-    if (!body || !output.report_url) return;
-
-    this._gridify(body);
-
-    const base = output.report_url.slice(0, output.report_url.lastIndexOf("/") + 1);
-
-    body.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src") || "";
-      if (!src.startsWith("/") && !src.startsWith("http") && !src.startsWith("data:")) {
-        img.src = base + src;
+      let parsed;
+      try {
+        parsed = window.marked ? window.marked.parse(md.text) : null;
+      } catch (e) {
+        parsed = null;
       }
-      img.loading = "lazy";
-      img.addEventListener("click", () => this._openLightbox(img.src, img.alt || ""));
+
+      if (parsed === null) {
+        body.innerHTML = `<pre>${this._esc(md.text)}</pre>`;
+        return;
+      }
+
+      body.innerHTML = parsed;
+      this._gridify(body);
+
+      body.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src") || "";
+        if (!src.startsWith("/") && !src.startsWith("http") && !src.startsWith("data:")) {
+          img.src = this._mediaUrl(data.abs, src);
+        }
+        img.loading = "lazy";
+      });
+
+      body.querySelectorAll("a").forEach((a) => {
+        const href = a.getAttribute("href") || "";
+        if (!href.startsWith("/") && !href.startsWith("http") && !href.startsWith("#")) {
+          a.href = this._mediaUrl(data.abs, href);
+        }
+        a.target = "_blank";
+        a.rel = "noopener";
+      });
     });
+  }
 
-    body.querySelectorAll("a").forEach((a) => {
-      const href = a.getAttribute("href") || "";
-      if (!href.startsWith("/") && !href.startsWith("http") && !href.startsWith("#")) {
-        a.href = base + href;
-      }
-      a.target = "_blank";
-      a.rel = "noopener";
+  _fillConfigs(data) {
+    this.detailEl.querySelectorAll("code[data-cfg]").forEach((code) => {
+      const cfg = data.configs[Number(code.dataset.cfg)];
+      code.textContent = cfg.kind === "json" ? this._prettyJson(cfg.text) : cfg.text;
+    });
+  }
+
+  _bindFigures() {
+    this.detailEl.querySelectorAll(".res-fig[data-url]").forEach((fig) => {
+      fig.addEventListener("click", () => this._openLightbox(fig.dataset.url, fig.dataset.name));
+    });
+    this.detailEl.querySelectorAll(".res-md img").forEach((img) => {
+      img.addEventListener("click", () => this._openLightbox(img.src, img.alt || ""));
     });
   }
 
@@ -202,19 +275,6 @@ class ResultsView {
       `<div class="res-grid${kind === "gif" ? " res-grid--gif" : ""}">${figs}</div>` +
       `</section>`
     );
-  }
-
-  _bind(output) {
-    this.detailEl.querySelectorAll(".res-stamp[data-stamp]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this.activeStamp = btn.dataset.stamp;
-        this._renderDetail();
-      });
-    });
-
-    this.detailEl.querySelectorAll(".res-fig").forEach((fig) => {
-      fig.addEventListener("click", () => this._openLightbox(fig.dataset.url, fig.dataset.name));
-    });
   }
 
   _gridify(body) {
@@ -256,6 +316,43 @@ class ResultsView {
 
       node = grid.nextElementSibling;
     }
+  }
+
+  _mediaUrl(folderAbs, relative) {
+    return "/resultsmedia?path=" + encodeURIComponent(folderAbs + "/" + decodeURIComponent(relative));
+  }
+
+  _prettyJson(text) {
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch (e) {
+      return text;
+    }
+  }
+
+  _recents() {
+    try {
+      return JSON.parse(localStorage.getItem("results-recents") || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _remember(path) {
+    const recents = [path, ...this._recents().filter((p) => p !== path)].slice(0, 8);
+    localStorage.setItem("results-recents", JSON.stringify(recents));
+  }
+
+  _shorten(path) {
+    const parts = path.replace(/\/+$/, "").split("/");
+    return parts.length > 3 ? "…/" + parts.slice(-3).join("/") : path;
+  }
+
+  _size(bytes) {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + " GB";
+    if (bytes >= 1048576)    return (bytes / 1048576).toFixed(1) + " MB";
+    if (bytes >= 1024)       return (bytes / 1024).toFixed(1) + " KB";
+    return bytes + " B";
   }
 
   _openLightbox(url, name) {

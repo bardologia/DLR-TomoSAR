@@ -173,14 +173,19 @@
   <!-- RESULTS -->
   <section class="page page--pad" data-page="results">
     <div class="page__head">
-      <h2 class="page__title">Inference results</h2>
+      <h2 class="page__title">Results</h2>
       <p class="page__lead">
-        Every figure and animation produced by an inference run, organized by kind.
-        Pick a run on the left, click any figure to inspect it at full size.
+        Open the output directory of any stage &mdash; preprocessing, parameter extraction,
+        training, inference or benchmark &mdash; and browse every plot, config and markdown
+        report inside it. Click any figure to inspect it at full size.
       </p>
     </div>
+    <form class="res-pathbar" id="results-path-form">
+      <input type="text" class="res-pathbar__input" id="results-path-input" placeholder="/absolute/path/to/run/directory" spellcheck="false" autocomplete="off" />
+      <button type="submit" class="btn btn--primary">Open</button>
+    </form>
     <div class="master master--results">
-      <aside class="master__list master__list--results" id="results-list" aria-label="Inference runs"></aside>
+      <aside class="master__list master__list--results" id="results-list" aria-label="Results browser"></aside>
       <div class="master__detail master__detail--results" id="results-detail"></div>
     </div>
   </section>
@@ -317,7 +322,7 @@
 <script src="/static/js/launch_widgets.js?v=20260613b"></script>
 <script src="/static/js/launch.js?v=20260613b"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
-<script src="/static/js/results.js?v=20260612g"></script>
+<script src="/static/js/results.js?v=20260615a"></script>
 <script src="/static/js/tomogram.js?v=20260614a"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
 <script src="/static/js/app.js?v=20260614a"></script>
