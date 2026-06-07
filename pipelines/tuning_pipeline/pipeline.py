@@ -50,7 +50,7 @@ class TuningOrchestrator:
         )
         from configuration.training_config import (
             LossCurriculumConfig, EarlyStoppingConfig, EMAConfig, GaussianConfig,
-            GradientClipperConfig, IOConfig, LossConfig, OptimizerConfig,
+            GeometryConfig, GradientClipperConfig, IOConfig, LossConfig, OptimizerConfig,
             SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,
         )
         from tools.regions import CropRegion
@@ -67,10 +67,14 @@ class TuningOrchestrator:
             test  = CropRegion(12400, 16000, global_crop.range_start, global_crop.range_end),
         )
 
+        secondary_labels = getattr(self.config.paths, "secondary_labels", None)
+        secondary_labels = tuple(secondary_labels) if secondary_labels else None
+
         dataset_config = DatasetConfiguration(
             preprocessing_run_directory = dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
+            secondary_labels            = secondary_labels,
             patch                       = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
             batch_size                  = self.config.batch_size,
             num_workers                 = self.config.num_workers,
@@ -80,6 +84,7 @@ class TuningOrchestrator:
 
         trainer_config = TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
+            geometry         = GeometryConfig().resolved(dataset_path, secondary_labels=secondary_labels),
             early_stopping   = EarlyStoppingConfig(patience=8, min_delta=0.0001, restore_best=True),
             warmup           = WarmupConfig(warmup_steps=self.config.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler        = SchedulerConfig(type="cosine_annealing", epochs=60, eta_min=self.config.eta_min),

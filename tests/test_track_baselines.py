@@ -165,6 +165,39 @@ class TestProfilePersistence:
         assert TrackProfiles.profiles_file(tmp_path) == tmp_path / "data" / TrackProfiles.FILENAME
 
 
+class TestProfileSubset:
+    def _profiles(self):
+        return TrackProfiles(
+            labels        = ["PS02", "PS04", "PS06", "PS08"],
+            horizontal    = np.arange(4 * 5, dtype=float).reshape(4, 5),
+            vertical      = np.arange(4 * 5, dtype=float).reshape(4, 5) + 100.0,
+            azimuth_start = 1000,
+            track_files   = ["a", "b", "c", "d"],
+        )
+
+    def test_none_returns_same_object(self):
+        profiles = self._profiles()
+
+        assert profiles.subset(None) is profiles
+
+    def test_subset_keeps_reference_and_selected_rows(self):
+        subset = self._profiles().subset(("PS04", "PS08"))
+
+        assert subset.labels == ["PS02", "PS04", "PS08"]
+        assert subset.horizontal == pytest.approx(self._profiles().horizontal[[0, 1, 3]])
+        assert subset.vertical   == pytest.approx(self._profiles().vertical[[0, 1, 3]])
+        assert subset.track_files == ["a", "b", "d"]
+        assert subset.azimuth_start == 1000
+
+    def test_selecting_reference_raises(self):
+        with pytest.raises(ValueError, match="reference"):
+            self._profiles().subset(("PS02",))
+
+    def test_unknown_label_raises(self):
+        with pytest.raises(ValueError, match="Unknown secondary labels"):
+            self._profiles().subset(("PS99",))
+
+
 class TestSubset:
     def _table(self):
         return TrackBaselines(

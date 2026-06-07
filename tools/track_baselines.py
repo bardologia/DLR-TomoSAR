@@ -161,6 +161,31 @@ class TrackProfiles:
         profiles = self.vertical if component == "vertical" else self.horizontal
         return profiles - profiles[0]
 
+    def subset(self, secondary_labels) -> "TrackProfiles":
+        if secondary_labels is None:
+            return self
+
+        primary     = self.labels[0]
+        secondaries = list(self.labels[1:])
+        requested   = [str(label) for label in secondary_labels]
+
+        if primary in requested:
+            raise ValueError(f"Pass {primary} is the reference and is always included; remove it from secondary_labels")
+
+        unknown = [label for label in requested if label not in secondaries]
+        if unknown:
+            raise ValueError(f"Unknown secondary labels {unknown}; profile secondaries are {secondaries}")
+
+        keep = [0] + [1 + index for index, label in enumerate(secondaries) if label in requested]
+
+        return TrackProfiles(
+            labels        = [self.labels[index] for index in keep],
+            horizontal    = self.horizontal[keep],
+            vertical      = self.vertical[keep],
+            azimuth_start = self.azimuth_start,
+            track_files   = [self.track_files[index] for index in keep] if self.track_files else [],
+        )
+
     def save(self, path: str | Path) -> Path:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
