@@ -29,6 +29,36 @@ class Result:
     azimuth_offset     : int
     range_offset       : int
 
+    reduced_curves         : Optional[np.ndarray] = None
+    pixel_mse_red          : Optional[np.ndarray] = None
+    pixel_mae_red          : Optional[np.ndarray] = None
+    pixel_r2_red           : Optional[np.ndarray] = None
+    pixel_cosine_red       : Optional[np.ndarray] = None
+    pixel_peak_err_idx_red : Optional[np.ndarray] = None
+
+    def attach_reduced(self, reduced_curves: np.ndarray) -> None:
+        maps = Metrics.curve_pixel_metrics(reduced_curves, self.gt_curves)
+
+        self.reduced_curves         = reduced_curves
+        self.pixel_mse_red          = maps["mse"]
+        self.pixel_mae_red          = maps["mae"]
+        self.pixel_r2_red           = maps["r2"]
+        self.pixel_cosine_red       = maps["cos"]
+        self.pixel_peak_err_idx_red = maps["peak"]
+
+    @property
+    def has_reduced(self) -> bool:
+        return self.reduced_curves is not None
+
+    @property
+    def pixel_improvement(self) -> Optional[np.ndarray]:
+        if not self.has_reduced:
+            return None
+
+        safe = np.where(self.pixel_mse_red > 1e-12, self.pixel_mse_red, np.nan)
+
+        return ((self.pixel_mse_red - self.pixel_mse) / safe).astype(np.float32)
+
 
 class Metrics:
     def __init__(
@@ -43,6 +73,23 @@ class Metrics:
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
         self.num_workers = min(os.cpu_count() or 1, 16)
+
+    @staticmethod
+    def curve_pixel_metrics(pred: np.ndarray, ref: np.ndarray) -> Dict[str, np.ndarray]:
+        diff   = pred - ref
+        mse    = (diff * diff).mean(axis=0).astype(np.float32)
+        mae    = np.abs(diff).mean(axis=0).astype(np.float32)
+        ss_res = (diff * diff).sum(axis=0)
+        rmean  = ref.mean(axis=0, keepdims=True)
+        ss_tot = ((ref - rmean) ** 2).sum(axis=0)
+        r2     = (1.0 - ss_res / (ss_tot + 1e-8)).astype(np.float32)
+        dot    = (pred * ref).sum(axis=0)
+        norm_p = np.sqrt((pred * pred).sum(axis=0)) + 1e-8
+        norm_r = np.sqrt((ref  * ref ).sum(axis=0)) + 1e-8
+        cos    = (dot / (norm_p * norm_r)).astype(np.float32)
+        peak   = np.abs(pred.argmax(axis=0) - ref.argmax(axis=0)).astype(np.int32)
+
+        return {"mse": mse, "mae": mae, "r2": r2, "cos": cos, "peak": peak}
 
     @staticmethod
     def _ssim_worker(args: tuple) -> tuple[str, float]:
@@ -142,7 +189,10 @@ class Metrics:
         axis   : int,
         label  : str,
     ) -> None:
-       
+
+        if indices is None:
+            return
+
         for i, idx in enumerate(indices):
             if axis == 0:
                 p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
@@ -182,7 +232,7 @@ class Metrics:
 
         return out
 
-    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, np.ndarray]:
+    def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray, suffix: str = "gt") -> Dict[str, np.ndarray]:
         P = pred.reshape(pred.shape[0], -1)
         G = gt  .reshape(gt  .shape[0], -1)
 
@@ -199,11 +249,78 @@ class Metrics:
         ce_gt     = -(gt_prob * log_pp).mean(axis=1, dtype=np.float64)
 
         return {
-            "elev_mae_gt"  : mae_gt,
-            "elev_rmse_gt" : rmse_gt,
-            "elev_r2_gt"   : r2_gt,
-            "elev_ce_gt"   : ce_gt,
+            f"elev_mae_{suffix}"  : mae_gt,
+            f"elev_rmse_{suffix}" : rmse_gt,
+            f"elev_r2_{suffix}"   : r2_gt,
+            f"elev_ce_{suffix}"   : ce_gt,
         }
+
+    def _reduced_metrics(self, pred : np.ndarray, gt : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray]) -> Dict[str, float]:
+        red = self.result.reduced_curves
+        out : Dict[str, float] = {}
+
+        diff_red       = red - gt
+        mse_red        = float((diff_red * diff_red).mean(dtype=np.float64))
+        mae_red        = float(np.abs(diff_red).mean(dtype=np.float64))
+        gt_mean        = float(gt.mean(dtype=np.float64))
+        overall_r2_red = 1.0 - float((diff_red * diff_red).sum(dtype=np.float64)) / (float(((gt - gt_mean) ** 2).sum(dtype=np.float64)) + 1e-12)
+
+        out["curve_mse_red"]  = mse_red
+        out["curve_mae_red"]  = mae_red
+        out["curve_rmse_red"] = float(np.sqrt(mse_red))
+        out["overall_r2_red"] = float(overall_r2_red)
+        out["psnr_db_red"]    = self._psnr(red, gt)
+        out["red_mean"]       = float(red.mean(dtype=np.float64))
+        out["red_std"]        = float(red.std(dtype=np.float64))
+        out["red_max"]        = float(red.max())
+
+        for tag, arr in (
+            ("pixel_mse_red",        self.result.pixel_mse_red),
+            ("pixel_mae_red",        self.result.pixel_mae_red),
+            ("pixel_r2_red",         self.result.pixel_r2_red),
+            ("pixel_cosine_red",     self.result.pixel_cosine_red),
+            ("pixel_peak_idx_d_red", self.result.pixel_peak_err_idx_red.astype(np.float32)),
+        ):
+            for k, v in self._basic_stats(arr).items():
+                out[f"{tag}_{k}"] = v
+            for k, v in self._percentiles(arr).items():
+                out[f"{tag}_{k}"] = v
+
+        for k, v in self._slice_ssim(red, gt, elev_indices, range_indices, az_indices, prefix="red").items():
+            out[k] = v
+
+        for metric_name, arr in self._elev_metrics(red, gt, suffix="red").items():
+            for i, v in enumerate(arr):
+                out[f"{metric_name}_{i}"] = float(v)
+
+            out[f"{metric_name}_mean"] = float(np.nanmean(arr))
+
+        diff_gt = pred - gt
+        mse_gt  = float((diff_gt * diff_gt).mean(dtype=np.float64))
+        mae_gt  = float(np.abs(diff_gt).mean(dtype=np.float64))
+
+        out["improvement_mse_rel"]  = self._relative_improvement(mse_red, mse_gt)
+        out["improvement_mae_rel"]  = self._relative_improvement(mae_red, mae_gt)
+        out["improvement_rmse_rel"] = self._relative_improvement(float(np.sqrt(mse_red)), float(np.sqrt(mse_gt)))
+
+        improvement = self.result.pixel_improvement
+        finite      = improvement[np.isfinite(improvement)]
+
+        if finite.size > 0:
+            out["pixel_improvement_mean"]          = float(finite.mean(dtype=np.float64))
+            out["pixel_improvement_median"]        = float(np.median(finite))
+            out["pixel_improvement_p5"]            = float(np.percentile(finite, 5))
+            out["pixel_improvement_p95"]           = float(np.percentile(finite, 95))
+            out["pixel_improvement_positive_frac"] = float((finite > 0.0).mean())
+
+        return out
+
+    @staticmethod
+    def _relative_improvement(baseline_error: float, model_error: float) -> float:
+        if baseline_error <= 0.0:
+            return float("nan")
+
+        return (baseline_error - model_error) / baseline_error
 
     def _mu_ordering_rate(self) -> float:
         pp  = self.result.params_pred
@@ -470,8 +587,12 @@ class Metrics:
         for metric_name, arr in self._elev_metrics(pred, gt).items():
             for i, v in enumerate(arr):
                 metrics[f"{metric_name}_{i}"] = float(v)
-            
+
             metrics[f"{metric_name}_mean"] = float(np.nanmean(arr))
+
+        if self.result.has_reduced:
+            for k, v in self._reduced_metrics(pred, gt, elev_indices, range_indices, az_indices).items():
+                metrics[k] = v
 
         # ── Per-Gaussian µ / σ errors (placeholder-masked, µ-sorted order) ──────────
         for k, v in self._gaussian_param_metrics().items():

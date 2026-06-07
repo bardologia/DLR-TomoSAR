@@ -36,24 +36,52 @@ class Animator:
         import numpy as np
         from io import BytesIO
 
-        frame_order, n_frames, g, p, vmin, vmax, emax_gt, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
+        frame_order, n_frames, g, p, r, vmin, vmax, emax_gt, emax_red, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
 
         eg = np.abs(p - g)
 
-        fig = plt.figure(figsize=(20, 6), constrained_layout=False)
-        gs  = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
-        axes = [fig.add_subplot(gs[0, k]) for k in range(3)]
-        pbar_ax = fig.add_subplot(gs[1, :])
+        if r is None:
+            fig     = plt.figure(figsize=(20, 6), constrained_layout=False)
+            gs      = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
+            axes    = [fig.add_subplot(gs[0, k]) for k in range(3)]
+            pbar_ax = fig.add_subplot(gs[1, :])
 
-        panels = [
-            (g,  "GT (Gaussian)", cmap,     vmin, vmax),
-            (p,  "Prediction",    cmap,     vmin, vmax),
-            (eg, "|Pred - GT|",   err_cmap, 0.0,  emax_gt),
-        ]
+            panels = [
+                (g,  "GT (Gaussian)", cmap,     vmin, vmax),
+                (p,  "Prediction",    cmap,     vmin, vmax),
+                (eg, "|Pred - GT|",   err_cmap, 0.0,  emax_gt),
+            ]
 
-        PlotTools._triple_panel(fig, axes, panels, x_label, "intensity", extent, origin=_origin)
+            PlotTools._triple_panel(fig, axes, panels, x_label, "intensity", extent, origin=_origin)
+            axes[0].set_ylabel(y_label)
 
-        axes[0].set_ylabel(y_label)
+        else:
+            er    = np.abs(r - g)
+            delta = er - eg
+            dmax  = max(emax_gt, emax_red)
+
+            fig     = plt.figure(figsize=(20, 11), constrained_layout=False)
+            gs      = fig.add_gridspec(3, 3, height_ratios=[1, 1, 0.03], hspace=0.40, wspace=0.35)
+            axes    = [fig.add_subplot(gs[row, col]) for row in range(2) for col in range(3)]
+            pbar_ax = fig.add_subplot(gs[2, :])
+
+            panels = [
+                (g,     "GT (Gaussian)",                 cmap,     vmin,  vmax),
+                (r,     "Capon (reduced)",               cmap,     vmin,  vmax),
+                (p,     "Prediction",                    cmap,     vmin,  vmax),
+                (er,    "|Capon - GT|",                  err_cmap, 0.0,   emax_red),
+                (eg,    "|Pred - GT|",                   err_cmap, 0.0,   emax_gt),
+                (delta, "|Capon-GT| - |Pred-GT|  (>0 = model better)", "RdYlGn", -dmax, dmax),
+            ]
+
+            for ax, (data, panel_title, panel_cmap, vlo, vhi) in zip(axes, panels):
+                im = ax.imshow(data, cmap=panel_cmap, vmin=vlo, vmax=vhi, extent=extent, aspect="auto", origin=_origin, interpolation="nearest")
+                ax.set_title(panel_title, fontsize=10)
+                ax.set_xlabel(x_label, fontsize=8)
+                fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+
+            axes[0].set_ylabel(y_label)
+            axes[3].set_ylabel(y_label)
 
         progress = (frame_order + 1) / max(1, n_frames)
         pbar_ax.barh(0, progress,        height=1, color="steelblue", left=0.0)
@@ -62,7 +90,7 @@ class Animator:
         pbar_ax.set_axis_off()
 
         fig.suptitle(title, fontsize=13, y=0.98)
-        fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08)
+        fig.subplots_adjust(left=0.06, right=0.97, top=0.88 if r is None else 0.92, bottom=0.08 if r is None else 0.05)
 
         buf = BytesIO()
         fig.savefig(buf, format="png", dpi=dpi)
@@ -99,25 +127,25 @@ class Animator:
         self.logger.subsection(f"CPU workers for rendering      : {num_workers if num_workers is not None else 'auto'} \n")
 
     @staticmethod
-    def _slice_elevation(pred_cube: np.ndarray, gt_cube: np.ndarray, i: int) -> tuple[np.ndarray, np.ndarray]:
-        return pred_cube[i], gt_cube[i]
+    def _slice_elevation(cubes: tuple, i: int) -> tuple:
+        return tuple(cube[i] if cube is not None else None for cube in cubes)
 
     @staticmethod
-    def _slice_range(pred_cube: np.ndarray, gt_cube: np.ndarray, sort_idx: np.ndarray | None, i: int) -> tuple[np.ndarray, np.ndarray]:
-        p, g = pred_cube[:, :, i], gt_cube[:, :, i]
+    def _slice_range(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
+        slices = tuple(cube[:, :, i] if cube is not None else None for cube in cubes)
         if sort_idx is not None:
-            p, g = p[sort_idx], g[sort_idx]
-        return p, g
+            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
+        return slices
 
     @staticmethod
-    def _slice_azimuth(pred_cube: np.ndarray, gt_cube: np.ndarray, sort_idx: np.ndarray | None, i: int) -> tuple[np.ndarray, np.ndarray]:
-        p, g = pred_cube[:, i, :], gt_cube[:, i, :]
+    def _slice_azimuth(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
+        slices = tuple(cube[:, i, :] if cube is not None else None for cube in cubes)
         if sort_idx is not None:
-            p, g = p[sort_idx], g[sort_idx]
-        return p, g
+            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
+        return slices
 
-    def _build_axis(self, axis: str, pred_cube: np.ndarray, gt_cube: np.ndarray, x_axis: np.ndarray, az_offset: int, rg_offset: int) -> dict:
-        N_elev, az, rg = pred_cube.shape
+    def _build_axis(self, axis: str, cubes: tuple, x_axis: np.ndarray, az_offset: int, rg_offset: int) -> dict:
+        N_elev, az, rg = cubes[0].shape
         sort_idx = None
 
         if axis in ("range", "azimuth"):
@@ -127,7 +155,7 @@ class Animator:
         if axis == "elevation":
             return dict(
                 n_total   = N_elev,
-                get_slice = lambda i: self._slice_elevation(pred_cube, gt_cube, i),
+                get_slice = lambda i: self._slice_elevation(cubes, i),
                 extent    = [rg_offset, rg_offset + rg, az_offset + az, az_offset],
                 x_label   = "range index",
                 y_label   = "azimuth index",
@@ -138,7 +166,7 @@ class Animator:
         if axis == "range":
             return dict(
                 n_total   = rg,
-                get_slice = lambda i: self._slice_range(pred_cube, gt_cube, sort_idx, i),
+                get_slice = lambda i: self._slice_range(cubes, sort_idx, i),
                 extent    = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])],
                 x_label   = "azimuth index",
                 y_label   = "elevation [m]",
@@ -149,7 +177,7 @@ class Animator:
         if axis == "azimuth":
             return dict(
                 n_total   = az,
-                get_slice = lambda i: self._slice_azimuth(pred_cube, gt_cube, sort_idx, i),
+                get_slice = lambda i: self._slice_azimuth(cubes, sort_idx, i),
                 extent    = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])],
                 x_label   = "range index",
                 y_label   = "elevation [m]",
@@ -175,46 +203,55 @@ class Animator:
 
     def walk_gif(
         self,
-        pred_cube  : np.ndarray,
-        gt_cube    : np.ndarray,
-        axis       : str,
-        out_path   : Path,
+        pred_cube    : np.ndarray,
+        gt_cube      : np.ndarray,
+        axis         : str,
+        out_path     : Path,
         *,
-        x_axis     : np.ndarray,
-        az_offset  : int,
-        rg_offset  : int,
+        x_axis       : np.ndarray,
+        az_offset    : int,
+        rg_offset    : int,
+        reduced_cube : np.ndarray | None = None,
     ) -> Path:
         import matplotlib.pyplot as _plt
         _plt.rcParams.update(Ploter.SCIENTIFIC_RC)
         _plt.rcParams["figure.dpi"]  = self.dpi
         _plt.rcParams["savefig.dpi"] = self.dpi
 
-        spec      = self._build_axis(axis, pred_cube, gt_cube, x_axis, az_offset, rg_offset)
+        spec      = self._build_axis(axis, (pred_cube, gt_cube, reduced_cube), x_axis, az_offset, rg_offset)
         n_total   = spec["n_total"]
         get_slice = spec["get_slice"]
 
         frame_indices = (np.linspace(0, n_total - 1, self.max_frames).round().astype(int) if n_total > self.max_frames else np.arange(n_total))
 
         sample_idx  = frame_indices[:: max(1, len(frame_indices) // 16)]
-        pred_sample = np.stack([get_slice(int(i))[0] for i in sample_idx])
-        gt_sample   = np.stack([get_slice(int(i))[1] for i in sample_idx])
+        samples     = [get_slice(int(i)) for i in sample_idx]
+        pred_sample = np.stack([s[0] for s in samples])
+        gt_sample   = np.stack([s[1] for s in samples])
         vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample)
         emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample), 99.0))
 
         if emax_gt <= 0.0:
             emax_gt = 1.0
 
+        emax_red = 1.0
+        if reduced_cube is not None:
+            red_sample = np.stack([s[2] for s in samples])
+            emax_red   = float(np.percentile(np.abs(red_sample - gt_sample), 99.0))
+            if emax_red <= 0.0:
+                emax_red = 1.0
+
         tasks: list[tuple[Any, ...]] = []
         n_frames = len(frame_indices)
         for frame_order, fi in enumerate(frame_indices):
-            i    = int(fi)
-            p, g = get_slice(i)
+            i       = int(fi)
+            p, g, r = get_slice(i)
             tasks.append((
                 frame_order,
                 n_frames,
-                g.copy(), p.copy(),
+                g.copy(), p.copy(), r.copy() if r is not None else None,
                 vmin, vmax,
-                emax_gt,
+                emax_gt, emax_red,
                 spec["extent"],
                 spec["x_label"], spec["y_label"],
                 self.cmap, self.err_cmap,
@@ -299,26 +336,35 @@ class FigureComposer:
 
         for tag, pixels in (("best", selected["best"]), ("worst", selected["worst"]), ("random", selected["random"])):
             figure_paths[f"profiles_{tag}"] = plotter.plot_profiles(
-                pred_curves   = result.pred_curves,
-                gt_curves     = result.gt_curves,
-                params_pred   = result.params_pred,
-                x_axis        = x_axis_np,
-                pixels        = pixels,
-                tag           = tag,
-                out_dir       = meta.figures_dir / "profiles",
-                n_gaussians   = run.n_gaussians,
-                pixel_metrics = pixel_metrics_for_plot,
-                az_offset     = result.azimuth_offset,
-                rg_offset     = result.range_offset,
+                pred_curves    = result.pred_curves,
+                gt_curves      = result.gt_curves,
+                params_pred    = result.params_pred,
+                x_axis         = x_axis_np,
+                pixels         = pixels,
+                tag            = tag,
+                out_dir        = meta.figures_dir / "profiles",
+                n_gaussians    = run.n_gaussians,
+                pixel_metrics  = pixel_metrics_for_plot,
+                az_offset      = result.azimuth_offset,
+                rg_offset      = result.range_offset,
+                reduced_curves = result.reduced_curves,
             )
 
             logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
 
-        for key, fname, data, title, label, extra in (
+        pixel_map_specs = [
             ("pixel_mse_map",  "mse",        result.pixel_mse,                             "Per-pixel curve MSE (denorm)",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
             ("pixel_r2_map",   "r2",         result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
             ("pixel_peak_map", "peak_error", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
-        ):
+        ]
+
+        if result.has_reduced:
+            pixel_map_specs += [
+                ("pixel_mse_capon_map", "mse_capon", result.pixel_mse_red, "Per-pixel curve MSE — Capon baseline vs GT", "MSE", {"cmap": cfg.cmap_error, "log": True}),
+                ("pixel_r2_capon_map",  "r2_capon",  result.pixel_r2_red,  "Per-pixel R² — Capon baseline vs GT",        "R²",  {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
+            ]
+
+        for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [plotter.plot_pixel_metric_map(
                 metric_map = data,
                 title      = title,
@@ -329,14 +375,29 @@ class FigureComposer:
                 **extra,
             )]
 
-        logger.subsection(f"Pixel maps : mse, r2, peak written to {meta.figures_dir / 'pixel_maps'}")
+        if result.has_reduced:
+            figure_paths["improvement_map"] = [plotter.plot_improvement_map(
+                improvement = result.pixel_improvement,
+                out_path    = meta.figures_dir / "pixel_maps" / "improvement_over_capon.png",
+                az_offset   = result.azimuth_offset,
+                rg_offset   = result.range_offset,
+            )]
+
+        logger.subsection(f"Pixel maps : mse, r2, peak{', capon baseline, improvement' if result.has_reduced else ''} written to {meta.figures_dir / 'pixel_maps'}")
+
+        histogram_arrays = {
+            "pixel_mse"    : result.pixel_mse,
+            "pixel_r2"     : result.pixel_r2,
+            "pixel_cosine" : result.pixel_cosine,
+        }
+
+        if result.has_reduced:
+            histogram_arrays["pixel_mse_capon"]   = result.pixel_mse_red
+            histogram_arrays["pixel_r2_capon"]    = result.pixel_r2_red
+            histogram_arrays["pixel_improvement"] = result.pixel_improvement
 
         figure_paths["metric_histograms"] = plotter.plot_metric_histograms(
-            {
-                "pixel_mse"    : result.pixel_mse,
-                "pixel_r2"     : result.pixel_r2,
-                "pixel_cosine" : result.pixel_cosine,
-            },
+            histogram_arrays,
             meta.figures_dir / "histograms",
         )
 
@@ -411,29 +472,31 @@ class FigureComposer:
         ):
             for s_idx, i in enumerate(indices_arr):
                 figure_paths[group] += plotter.plot_tomogram_slice(
-                    pred_cube  = result.pred_curves,
-                    gt_cube    = result.gt_curves,
-                    axis       = axis,
-                    index      = int(i),
-                    x_axis     = x_axis_np,
-                    out_dir    = meta.figures_dir / "slices",
-                    stem       = stem_fn(i),
-                    az_offset  = result.azimuth_offset,
-                    rg_offset  = result.range_offset,
-                    ssim_value = global_metrics.get(f"{metric_key}_{s_idx}"),
+                    pred_cube    = result.pred_curves,
+                    gt_cube      = result.gt_curves,
+                    axis         = axis,
+                    index        = int(i),
+                    x_axis       = x_axis_np,
+                    out_dir      = meta.figures_dir / "slices",
+                    stem         = stem_fn(i),
+                    az_offset    = result.azimuth_offset,
+                    rg_offset    = result.range_offset,
+                    ssim_value   = global_metrics.get(f"{metric_key}_{s_idx}"),
+                    reduced_cube = result.reduced_curves,
                 )
 
         for s_idx, i in enumerate(slice_elev_idx):
             figure_paths["slices_elev"] += plotter.plot_elevation_intensity_slice(
-                pred_cube  = result.pred_curves,
-                gt_cube    = result.gt_curves,
-                elev_idx   = int(i),
-                x_axis     = x_axis_np,
-                out_dir    = meta.figures_dir / "slices",
-                stem       = f"elev_idx_{int(i)}",
-                az_offset  = result.azimuth_offset,
-                rg_offset  = result.range_offset,
-                ssim_value = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
+                pred_cube    = result.pred_curves,
+                gt_cube      = result.gt_curves,
+                elev_idx     = int(i),
+                x_axis       = x_axis_np,
+                out_dir      = meta.figures_dir / "slices",
+                stem         = f"elev_idx_{int(i)}",
+                az_offset    = result.azimuth_offset,
+                rg_offset    = result.range_offset,
+                ssim_value   = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
+                reduced_cube = result.reduced_curves,
             )
 
         logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
@@ -484,13 +547,14 @@ class FigureComposer:
         for axis in cfg.gif_axes:
             logger.subsection(f"Generating walk GIF along {axis} axis")
             gif_paths[f"walk_{axis}"] = animator.walk_gif(
-                pred_cube = result.pred_curves,
-                gt_cube   = result.gt_curves,
-                axis      = axis,
-                out_path  = meta.animations_dir / f"walk_{axis}.gif",
-                x_axis    = x_axis_np,
-                az_offset = result.azimuth_offset,
-                rg_offset = result.range_offset,
+                pred_cube    = result.pred_curves,
+                gt_cube      = result.gt_curves,
+                axis         = axis,
+                out_path     = meta.animations_dir / f"walk_{axis}.gif",
+                x_axis       = x_axis_np,
+                az_offset    = result.azimuth_offset,
+                rg_offset    = result.range_offset,
+                reduced_cube = result.reduced_curves,
             )
 
         logger.subsection("")

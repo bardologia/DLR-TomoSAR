@@ -29,6 +29,7 @@ class ReportPayloadBuilder:
             "preprocessing_dir" : str(run.dataset_config.preprocessing_run_directory),
             "input_config"      : run.dataset_config.input_config.as_dict(),
             "used_ema"          : run.used_ema,
+            "secondary_labels"  : ", ".join(labels) if (labels := getattr(run, "secondary_labels", None)) else "all passes",
         }
 
     @staticmethod
@@ -135,11 +136,15 @@ class Report:
 
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:
-        for prefix in ("ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_"):
+        for prefix in (
+            "ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_",
+            "ssim_red_elev_", "ssim_red_range_", "ssim_red_azimuth_",
+        ):
             if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
                 return True
         for prefix in (
-            "elev_mae_gt_", "elev_rmse_gt_", "elev_r2_gt_", "elev_ce_gt_",
+            "elev_mae_gt_",  "elev_rmse_gt_",  "elev_r2_gt_",  "elev_ce_gt_",
+            "elev_mae_red_", "elev_rmse_red_", "elev_r2_red_", "elev_ce_red_",
         ):
             if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
                 return True
@@ -167,6 +172,7 @@ class Report:
             ("split",             rs.get("split")),
             ("split_region",      rs.get("split_region")),
             ("global_crop",       rs.get("global_crop")),
+            ("secondary_labels",  rs.get("secondary_labels")),
             ("patches",           rs.get("patches")),
             ("patch_size",        rs.get("patch_size")),
             ("patch_stride",      rs.get("patch_stride")),
@@ -261,6 +267,72 @@ class Report:
         ]))
         out.append("")
 
+        out += self._build_baseline_comparison()
+
+        return out
+
+    @staticmethod
+    def _improvement(baseline: Any, model: Any) -> str:
+        if not isinstance(baseline, (int, float)) or not isinstance(model, (int, float)):
+            return "n/a"
+        if not np.isfinite(baseline) or not np.isfinite(model) or baseline == 0.0:
+            return "n/a"
+        return f"{(baseline - model) / abs(baseline) * 100.0:+.1f}%"
+
+    def _build_baseline_comparison(self) -> List[str]:
+        gm = self.global_metrics
+        if gm.get("curve_mse_red") is None:
+            return []
+
+        out = ["\n### 2.5 Classical Capon baseline (passes used in training)\n"]
+        out.append(
+            "The reduced tomogram is re-synthesised at inference time with classical Capon beamforming "
+            "from exactly the passes this model was trained on, per-pixel max-normalised like the GT. "
+            "Relative improvement is (baseline \u2212 model) / baseline for error metrics; for scores "
+            "(R\u00b2, SSIM, cosine) the sign is flipped so positive always means the model is better.\n"
+        )
+
+        table = MarkdownTable(("Metric", "Pred vs GT", "Capon vs GT", "Model improvement"))
+
+        error_rows = [
+            ("Curve MSE",        gm.get("curve_mse_gt"),               gm.get("curve_mse_red")),
+            ("Curve MAE",        gm.get("curve_mae_gt"),               gm.get("curve_mae_red")),
+            ("Curve RMSE",       gm.get("curve_rmse_gt"),              gm.get("curve_rmse_red")),
+            ("Pixel MSE mean",   gm.get("pixel_mse_gt_mean"),          gm.get("pixel_mse_red_mean")),
+            ("Pixel MSE median", gm.get("pixel_mse_gt_median"),        gm.get("pixel_mse_red_median")),
+            ("Pixel MAE mean",   gm.get("pixel_mae_gt_mean"),          gm.get("pixel_mae_red_mean")),
+            ("Peak err mean",    gm.get("pixel_peak_idx_d_gt_mean"),   gm.get("pixel_peak_idx_d_red_mean")),
+        ]
+
+        score_rows = [
+            ("Overall R\u00b2",     gm.get("overall_r2_gt"),        gm.get("overall_r2_red")),
+            ("Pixel R\u00b2 mean",  gm.get("pixel_r2_gt_mean"),     gm.get("pixel_r2_red_mean")),
+            ("Cosine mean",         gm.get("pixel_cosine_gt_mean"), gm.get("pixel_cosine_red_mean")),
+            ("PSNR dB",             gm.get("psnr_db_gt"),           gm.get("psnr_db_red")),
+            ("SSIM elev mean",      gm.get("ssim_gt_elev_mean"),    gm.get("ssim_red_elev_mean")),
+            ("SSIM range mean",     gm.get("ssim_gt_range_mean"),   gm.get("ssim_red_range_mean")),
+            ("SSIM azimuth mean",   gm.get("ssim_gt_azimuth_mean"), gm.get("ssim_red_azimuth_mean")),
+        ]
+
+        for label, model_val, baseline_val in error_rows:
+            table.add_row(label, self._fmt(model_val), self._fmt(baseline_val), self._improvement(baseline_val, model_val))
+
+        for label, model_val, baseline_val in score_rows:
+            table.add_row(label, self._fmt(model_val), self._fmt(baseline_val), self._improvement(-baseline_val if isinstance(baseline_val, (int, float)) else baseline_val, -model_val if isinstance(model_val, (int, float)) else model_val))
+
+        out.append("\n".join(table.render()))
+        out.append("")
+
+        out.append(self._kv_table([
+            ("improvement_mse_rel",            gm.get("improvement_mse_rel")),
+            ("improvement_mae_rel",            gm.get("improvement_mae_rel")),
+            ("improvement_rmse_rel",           gm.get("improvement_rmse_rel")),
+            ("pixel_improvement_mean",          gm.get("pixel_improvement_mean")),
+            ("pixel_improvement_median",        gm.get("pixel_improvement_median")),
+            ("pixel_improvement_positive_frac", gm.get("pixel_improvement_positive_frac")),
+        ], header=("Improvement metric", "Value")))
+        out.append("")
+
         return out
 
     def _build_full_metrics(self) -> List[str]:
@@ -268,10 +340,11 @@ class Report:
         out = ["\n## 3. Full metric tables\n"]
 
         groups: Dict[str, Dict] = {
-            "3.1 Dataset statistics": {},
-            "3.2 Curve-level (GT)":   {},
-            "3.3 Per-pixel (GT)":     {},
-            "3.4 SSIM summaries":     {},
+            "3.1 Dataset statistics":             {},
+            "3.2 Curve-level (GT)":               {},
+            "3.3 Per-pixel (GT)":                 {},
+            "3.4 SSIM summaries":                 {},
+            "3.5 Capon baseline and improvement": {},
         }
 
         for k, v in sorted(gm.items()):
@@ -281,6 +354,8 @@ class Report:
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
+            elif "_red" in k or k.startswith(("improvement_", "pixel_improvement_", "red_")):
+                groups["3.5 Capon baseline and improvement"][k] = v
             elif k.startswith("pixel_"):
                 groups["3.3 Per-pixel (GT)"][k] = v
             elif k.startswith("ssim_"):
@@ -305,7 +380,8 @@ class Report:
         out.append("\n## 4. Profile reconstructions\n")
         out.append(
             "Each panel overlays the GT profile (black solid), "
-            "prediction (red dashed) and individual Gaussian components. "
+            "prediction (red dashed), the classical Capon baseline when available (blue dotted) "
+            "and individual Gaussian components. "
             "The shaded area shows the signed residual (pred \u2212 gt).\n"
         )
         for key, title in (
@@ -319,10 +395,13 @@ class Report:
 
         out.append("\n## 5. Per-pixel metric maps\n")
         for key, title in (
-            ("pixel_mse_map",     "5.1 MSE map (log scale, pred vs GT)"),
-            ("pixel_r2_map",      "5.2 R\u00b2 map (pred vs GT)"),
-            ("pixel_peak_map",    "5.3 Peak-location error map (|\u0394 peak index|)"),
-            ("metric_histograms", "5.4 Metric distributions"),
+            ("pixel_mse_map",       "5.1 MSE map (log scale, pred vs GT)"),
+            ("pixel_r2_map",        "5.2 R\u00b2 map (pred vs GT)"),
+            ("pixel_peak_map",      "5.3 Peak-location error map (|\u0394 peak index|)"),
+            ("pixel_mse_capon_map", "5.4 MSE map (log scale, Capon baseline vs GT)"),
+            ("pixel_r2_capon_map",  "5.5 R\u00b2 map (Capon baseline vs GT)"),
+            ("improvement_map",     "5.6 Relative MSE improvement over the Capon baseline"),
+            ("metric_histograms",   "5.7 Metric distributions"),
         ):
             if fp.get(key):
                 out.append(f"\n### {title}\n")
@@ -352,7 +431,8 @@ class Report:
         if slice_groups:
             out.append("\n## 7. Tomogram slices\n")
             out.append(
-                "GT and prediction share a colour scale; the error figure is clipped at p99 of that slice. "
+                "GT, prediction and (when available) the classical Capon baseline share a colour scale; "
+                "error figures are clipped at p99 of that slice. "
                 "SSIM (pred vs GT) is shown in the prediction title.\n"
             )
             for n, (key, title) in enumerate(slice_groups, start=1):

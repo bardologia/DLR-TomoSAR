@@ -444,11 +444,13 @@ class TestMetricsCompute:
         assert np.isclose(out["x_axis_max"], 10.0)
         assert np.isclose(out["x_axis_step"], 5.0)
 
-    def test_compute_none_indices_raises(self):
+    def test_compute_none_indices_skips_ssim(self):
         m, _ = self._metrics(n_elev=4)
 
-        with pytest.raises(TypeError):
-            m.compute()
+        metrics = m.compute()
+
+        assert "curve_mse_gt" in metrics
+        assert not any(key.startswith("ssim_") for key in metrics)
 
 
 class TestCubeStitcherWindows:
@@ -1184,25 +1186,36 @@ class TestAnimatorSlicing:
         pred = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
         gt   = pred + 1.0
 
-        p, g = Animator._slice_elevation(pred, gt, 1)
+        p, g, r = Animator._slice_elevation((pred, gt, None), 1)
 
         assert np.array_equal(p, pred[1])
         assert np.array_equal(g, gt[1])
+        assert r is None
+
+    def test_slice_elevation_with_reduced(self):
+        pred = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
+        gt   = pred + 1.0
+        red  = pred + 2.0
+
+        p, g, r = Animator._slice_elevation((pred, gt, red), 1)
+
+        assert np.array_equal(r, red[1])
 
     def test_slice_range_no_sort(self):
         pred = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
         gt   = pred + 1.0
 
-        p, g = Animator._slice_range(pred, gt, None, 2)
+        p, g, r = Animator._slice_range((pred, gt, None), None, 2)
 
         assert np.array_equal(p, pred[:, :, 2])
+        assert r is None
 
     def test_slice_range_with_sort(self):
         pred     = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
         gt       = pred + 1.0
         sort_idx = np.array([1, 0])
 
-        p, g = Animator._slice_range(pred, gt, sort_idx, 0)
+        p, g, r = Animator._slice_range((pred, gt, None), sort_idx, 0)
 
         assert np.array_equal(p, pred[:, :, 0][sort_idx])
 
@@ -1210,7 +1223,7 @@ class TestAnimatorSlicing:
         pred = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
         gt   = pred + 1.0
 
-        p, g = Animator._slice_azimuth(pred, gt, None, 1)
+        p, g, r = Animator._slice_azimuth((pred, gt, None), None, 1)
 
         assert np.array_equal(p, pred[:, 1, :])
 
@@ -1225,12 +1238,13 @@ class TestAnimatorBuildAxis:
         gt     = pred.copy()
         x_axis = np.linspace(-10.0, 10.0, 4)
 
-        spec = anim._build_axis("elevation", pred, gt, x_axis, az_offset=0, rg_offset=0)
+        spec = anim._build_axis("elevation", (pred, gt, None), x_axis, az_offset=0, rg_offset=0)
 
         assert spec["n_total"] == 4
         assert spec["origin"] == "upper"
-        p, g = spec["get_slice"](1)
+        p, g, r = spec["get_slice"](1)
         assert p.shape == (3, 5)
+        assert r is None
 
     def test_build_axis_range(self, tmp_path):
         anim   = self._animator(tmp_path)
@@ -1238,7 +1252,7 @@ class TestAnimatorBuildAxis:
         gt     = pred.copy()
         x_axis = np.linspace(-10.0, 10.0, 4)
 
-        spec = anim._build_axis("range", pred, gt, x_axis, az_offset=0, rg_offset=0)
+        spec = anim._build_axis("range", (pred, gt, None), x_axis, az_offset=0, rg_offset=0)
 
         assert spec["n_total"] == 5
         assert spec["origin"] == "lower"
@@ -1249,7 +1263,7 @@ class TestAnimatorBuildAxis:
         gt     = pred.copy()
         x_axis = np.linspace(-10.0, 10.0, 4)
 
-        spec = anim._build_axis("azimuth", pred, gt, x_axis, az_offset=0, rg_offset=0)
+        spec = anim._build_axis("azimuth", (pred, gt, None), x_axis, az_offset=0, rg_offset=0)
 
         assert spec["n_total"] == 3
 
@@ -1259,7 +1273,7 @@ class TestAnimatorBuildAxis:
         x_axis = np.linspace(-10.0, 10.0, 4)
 
         with pytest.raises(ValueError):
-            anim._build_axis("diagonal", pred, pred, x_axis, az_offset=0, rg_offset=0)
+            anim._build_axis("diagonal", (pred, pred, None), x_axis, az_offset=0, rg_offset=0)
 
 
 class TestAnimatorWalkGif:
