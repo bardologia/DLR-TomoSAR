@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from configuration.training_config import GeometryConfig
-from tools.track_baselines import BaselineExtractor, BaselineValidator, TrackBaselines, TrackFileResolver, TrackProfiles, TrackReader
+from tools.track_baselines import BaselineExtractor, BaselineValidator, DuplicatePassError, TrackBaselines, TrackFileResolver, TrackProfiles, TrackReader
 
 
 def _track(horizontal, vertical, n_samples=100):
@@ -439,6 +439,13 @@ class TestTrackFileResolver:
         mapped = TrackFileResolver().resolve_passes([first, second])
 
         assert list(mapped.keys()) == ["PS03", "PS07"]
+
+    def test_resolve_passes_duplicate_label_raises(self, tmp_path):
+        primary   = self._make_pass(tmp_path, "PS02", "T01L", "track_a.rat")
+        secondary = self._make_pass(tmp_path, "PS04", "T01L", "track_b.rat")
+
+        with pytest.raises(DuplicatePassError, match="duplicate labels PS02"):
+            TrackFileResolver().resolve_passes([primary, secondary, primary])
 
 
 class TestBaselineValidation:

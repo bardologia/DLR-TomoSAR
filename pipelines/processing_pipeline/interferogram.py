@@ -9,7 +9,7 @@ import numpy as np
 
 from configuration.processing_config import ProcessingConfiguration
 from tools.logger                    import Logger
-from tools.track_baselines           import BaselineExtractor, TrackBaselines, TrackProfiles
+from tools.track_baselines           import BaselineExtractor, DuplicatePassError, TrackBaselines, TrackProfiles
 
 
 class InterferogramBuilder:
@@ -63,6 +63,9 @@ class InterferogramBuilder:
 
             self.logger.kv_table(table.describe(), title="Track Baselines")
             return table, profiles
+
+        except DuplicatePassError:
+            raise
 
         except Exception as error:
             self.logger.subsection(f"[FSAR] Baseline extraction skipped: {error}")

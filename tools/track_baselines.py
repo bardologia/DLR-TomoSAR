@@ -9,6 +9,10 @@ from typing import Callable, ClassVar
 import numpy as np
 
 
+class DuplicatePassError(ValueError):
+    pass
+
+
 @dataclass
 class TrackBaselines:
     labels              : list
@@ -284,7 +288,21 @@ class TrackFileResolver:
         return path.name
 
     def resolve_passes(self, pass_directories: list) -> dict:
-        return {self.label(directory): self.resolve(directory) for directory in pass_directories}
+        resolved   = [(self.label(directory), self.resolve(directory)) for directory in pass_directories]
+        mapping    = {}
+        collisions = {}
+
+        for label, path in resolved:
+            if label in mapping:
+                collisions.setdefault(label, [mapping[label]]).append(path)
+            else:
+                mapping[label] = path
+
+        if collisions:
+            detail = "; ".join(f"{label} ← {', '.join(str(p) for p in paths)}" for label, paths in collisions.items())
+            raise DuplicatePassError(f"{len(pass_directories)} pass directories resolved to only {len(mapping)} unique labels; duplicate labels {detail}. Each pass must map to a unique label — check the secondary selection for a repeated pass (e.g. the primary also listed as a secondary).")
+
+        return mapping
 
 
 class BaselineValidator:
