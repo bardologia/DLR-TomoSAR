@@ -601,7 +601,11 @@ class TestStackPlotter:
             pass_labels         = ["PS02", "PS04", "PS06"],
         )
 
-        expected_keys = {"primary", "secondary_00", "secondary_01", "interferogram_00", "interferogram_01", "dem_full"}
+        expected_keys = {
+            "primary", "secondary_00", "secondary_01", "dem_full",
+            "interferogram_00_amplitude", "interferogram_00_phase",
+            "interferogram_01_amplitude", "interferogram_01_phase",
+        }
         assert set(saved.keys()) == expected_keys
         for path in saved.values():
             assert path.exists()
@@ -610,8 +614,10 @@ class TestStackPlotter:
         assert (images_dir / "slc" / "primary.png").exists()
         assert (images_dir / "slc" / "secondary_01_PS04.png").exists()
         assert (images_dir / "slc" / "secondary_02_PS06.png").exists()
-        assert (images_dir / "interferograms" / "interferogram_01_PS04.png").exists()
-        assert (images_dir / "interferograms" / "interferogram_02_PS06.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_01_PS04_amplitude.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_01_PS04_phase.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_02_PS06_amplitude.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_02_PS06_phase.png").exists()
         assert (images_dir / "dem" / "dem_full.png").exists()
 
     def test_run_without_labels_uses_pass_indices(self, tmp_path):
@@ -628,5 +634,6 @@ class TestStackPlotter:
 
         images_dir = config.paths.run_directory / "images"
         assert (images_dir / "slc" / "secondary_01_pass_01.png").exists()
-        assert (images_dir / "interferograms" / "interferogram_02_pass_02.png").exists()
-        assert len(saved) == 6
+        assert (images_dir / "interferograms" / "interferogram_02_pass_02_amplitude.png").exists()
+        assert (images_dir / "interferograms" / "interferogram_02_pass_02_phase.png").exists()
+        assert len(saved) == 8

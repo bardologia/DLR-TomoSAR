@@ -190,15 +190,28 @@ class TestStudyPlotter:
         return study
 
     def test_render_writes_core_plots(self, tmp_path):
-        plotter = StudyPlotter(RecordingLogger())
-        saved   = plotter.render(self._study(), tmp_path)
-        names   = {p.name for p in saved}
+        plotter  = StudyPlotter(RecordingLogger())
+        saved    = plotter.render(self._study(), tmp_path)
+        relative = {str(p.relative_to(tmp_path)) for p in saved}
 
-        assert "optimization_history.png" in names
-        assert "param_importances.png"    in names
-        assert "slice.png"                in names
-        assert "contour.png"              in names
+        assert "optimization_history.png" in relative
+        assert "param_importances.png"    in relative
         assert all(p.exists() for p in saved)
+
+    def test_render_writes_one_image_per_param_and_pair(self, tmp_path):
+        plotter  = StudyPlotter(RecordingLogger())
+        study    = self._study()
+        saved    = plotter.render(study, tmp_path)
+        relative = {str(p.relative_to(tmp_path)) for p in saved}
+        params   = sorted({p for t in study.trials for p in t.params})
+
+        for param in params:
+            assert f"slice/{param}.png" in relative
+            assert f"rank/{param}.png"  in relative
+
+        for i, p1 in enumerate(params):
+            for p2 in params[i + 1 :]:
+                assert f"contour/{p1}__{p2}.png" in relative
 
     def test_render_on_empty_study_does_not_raise(self, tmp_path):
         logger  = RecordingLogger()
@@ -217,7 +230,9 @@ class TestStudyPlotter:
         assert len(top) == 1
         assert len(logger.infos) == 1
 
-    def test_contour_params_uncapped_returns_none(self, tmp_path):
+    def test_contour_params_uncapped_returns_all(self, tmp_path):
         plotter = StudyPlotter(RecordingLogger())
+        study   = self._study()
+        params  = sorted({p for t in study.trials for p in t.params})
 
-        assert plotter._contour_params(self._study()) is None
+        assert plotter._contour_params(study) == params

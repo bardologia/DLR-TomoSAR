@@ -54,33 +54,30 @@ class StackPlotter(PlotBase):
 
         return self._save(fig, out_path)
 
-    def _plot_interferogram(self, interferogram: np.ndarray, title: str, out_path: Path) -> Path:
-        amplitude_db = self._amplitude_db(interferogram)
-        phase        = np.angle(interferogram).astype(np.float32)
-        Az, R        = phase.shape
-        vmin, vmax   = self._shared_clim(amplitude_db)
+    def _plot_phase(self, phase: np.ndarray, title: str, out_path: Path) -> Path:
+        Az, R = phase.shape
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-        ax = axes[0]
-        im = ax.imshow(amplitude_db, cmap="gray", vmin=vmin, vmax=vmax, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im      = ax.imshow(phase, cmap="twilight", vmin=-np.pi, vmax=np.pi, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
         ax.set_xlabel("range [px]")
         ax.set_ylabel("azimuth [px]")
-        ax.set_title("amplitude")
-        fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02).set_label("amplitude [dB]")
+        ax.set_title(title)
 
-        ax = axes[1]
-        im = ax.imshow(phase, cmap="twilight", vmin=-np.pi, vmax=np.pi, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
-        ax.set_xlabel("range [px]")
-        ax.set_title("flattened phase")
         cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02, ticks=self.PHASE_TICKS)
         cb.set_label("interferometric phase [rad]")
         cb.ax.set_yticklabels(self.PHASE_LABELS)
-
-        fig.suptitle(title, fontsize=13)
-        fig.tight_layout(rect=(0, 0, 1, 0.94))
+        fig.tight_layout()
 
         return self._save(fig, out_path)
+
+    def _plot_interferogram(self, interferogram: np.ndarray, title: str, out_dir: Path, stem: str) -> Dict[str, Path]:
+        amplitude_db = self._amplitude_db(interferogram)
+        phase        = np.angle(interferogram).astype(np.float32)
+
+        return {
+            "amplitude" : self._plot_amplitude(amplitude_db, f"{title} — amplitude",       out_dir / f"{stem}_amplitude.png"),
+            "phase"     : self._plot_phase(phase,            f"{title} — flattened phase", out_dir / f"{stem}_phase.png"),
+        }
 
     def _plot_dem(self, dem: np.ndarray, title: str, out_path: Path) -> Path:
         Az, R      = dem.shape
@@ -141,7 +138,8 @@ class StackPlotter(PlotBase):
             label = str(pass_labels[index + 1]) if pass_labels else f"pass_{index + 1:02d}"
 
             self.logger.subsection(f"Plotting interferogram {index + 1}/{n_interferograms} — {label}")
-            saved[f"interferogram_{index:02d}"] = self._plot_interferogram(np.asarray(interferograms[index]), f"Interferogram — {primary_label} / {label}", dirs["interferograms"] / f"interferogram_{index + 1:02d}_{label}.png")
+            for kind, path in self._plot_interferogram(np.asarray(interferograms[index]), f"Interferogram — {primary_label} / {label}", dirs["interferograms"], f"interferogram_{index + 1:02d}_{label}").items():
+                saved[f"interferogram_{index:02d}_{kind}"] = path
 
             gc.collect()
 
