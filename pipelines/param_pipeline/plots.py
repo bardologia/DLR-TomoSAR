@@ -17,10 +17,6 @@ from tools.gaussians           import GaussianMixture
 from tools.logger              import Logger
 
 
-_TIER_COLOR  = {"low": "#d62728", "mid": "#ff7f0e", "high": "#2ca02c"}
-_TIER_LABEL  = {"low": r"Low $R^2$  ($\leq p_{25}$)", "mid": r"Mid $R^2$  ($p_{40}$–$p_{60}$)", "high": r"High $R^2$ ($\geq p_{75}$)"}
-
-
 class FittingResultPlotter(PlotBase):
     def __init__(
         self,
@@ -29,7 +25,7 @@ class FittingResultPlotter(PlotBase):
         logger           : Logger,
         fig_dpi          : int   = 150,
         save_dpi         : int   = 300,
-        n_fits_per_tier  : int   = 5,
+        n_fits_per_k     : int   = 5,
         amp_threshold    : float = 1e-3,
     ) -> None:
         self.output_directory = Path(output_directory)
@@ -37,7 +33,7 @@ class FittingResultPlotter(PlotBase):
         self.logger           = logger
         self.fig_dpi          = fig_dpi
         self.save_dpi         = save_dpi
-        self.n_fits_per_tier  = n_fits_per_tier
+        self.n_fits_per_k     = n_fits_per_k
         self.amp_threshold    = amp_threshold
         self._images_dir      = self.output_directory / "images"
 
@@ -52,27 +48,26 @@ class FittingResultPlotter(PlotBase):
             d.mkdir(parents=True, exist_ok=True)
         return dirs
 
-    def _select_pixels_by_r2_tiers(self, r2_map : np.ndarray, seed : int = 42) -> Dict[str, np.ndarray]:
-        rng   = np.random.default_rng(seed)
-        flat  = r2_map.reshape(-1)
-        H, W  = r2_map.shape
-        valid = np.where(np.isfinite(flat))[0]
-        r2_v  = flat[valid]
+    def _select_pixels_by_k(self, best_k_map : np.ndarray, r2_map : np.ndarray, seed : int = 42) -> Dict[int, np.ndarray]:
+        rng    = np.random.default_rng(seed)
+        flat_k = best_k_map.reshape(-1)
+        flat_r = r2_map.reshape(-1)
+        H, W   = best_k_map.shape
+        finite = np.isfinite(flat_r)
 
-        p25, p40, p60, p75 = np.percentile(r2_v, [25, 40, 60, 75])
+        groups : Dict[int, np.ndarray] = {}
 
-        def _sample(mask: np.ndarray, n: int) -> np.ndarray:
-            idx = valid[mask]
+        for K in range(1, self.n_gaussians + 1):
+            idx = np.where(finite & (flat_k == K))[0]
+
             if idx.size == 0:
-                return np.empty((0, 2), dtype=np.int32)
-            chosen = rng.choice(idx, size=min(n, idx.size), replace=False)
-            return np.stack([(chosen // W).astype(np.int32), (chosen % W).astype(np.int32)], axis=1)
+                groups[K] = np.empty((0, 2), dtype=np.int32)
+                continue
 
-        return {
-            "low"  : _sample(r2_v <= p25,                          self.n_fits_per_tier),
-            "mid"  : _sample((r2_v >= p40) & (r2_v <= p60),        self.n_fits_per_tier),
-            "high" : _sample(r2_v >= p75,                          self.n_fits_per_tier),
-        }
+            chosen    = rng.choice(idx, size=min(self.n_fits_per_k, idx.size), replace=False)
+            groups[K] = np.stack([(chosen // W).astype(np.int32), (chosen % W).astype(np.int32)], axis=1)
+
+        return groups
 
     def _reconstruct_pixel(self, params : np.ndarray, height_axis : np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
         return GaussianMixture.evaluate_pixel(params, height_axis, self.n_gaussians)
@@ -196,22 +191,24 @@ class FittingResultPlotter(PlotBase):
 
     def _plot_example_fits(
         self,
-        parameters_array : np.ndarray,                                              
-        pixel_profiles   : Dict[Tuple[int, int], np.ndarray],                      
-        height_axis      : np.ndarray,                                              
-        pixels_by_tier   : Dict[str, np.ndarray],                                  
-        r2_map           : np.ndarray,                                             
+        parameters_array : np.ndarray,
+        pixel_profiles   : Dict[Tuple[int, int], np.ndarray],
+        height_axis      : np.ndarray,
+        pixels_by_k      : Dict[int, np.ndarray],
+        r2_map           : np.ndarray,
         out_dir          : Path,
     ) -> Dict[str, Path]:
         comp_colors = [cm.tab10(i) for i in range(self.n_gaussians)]
         saved       : Dict[str, Path] = {}
 
-        for tier, pixels in pixels_by_tier.items():
+        for K, pixels in pixels_by_k.items():
             if pixels.shape[0] == 0:
                 continue
 
-            tier_dir = out_dir / f"tier_{tier}"
-            tier_dir.mkdir(parents=True, exist_ok=True)
+            k_color = cm.tab10((K - 1) % 10)
+            k_label = rf"$K^*={K}$  ({K} Gaussian{'s' if K > 1 else ''})"
+            k_dir   = out_dir / f"k{K}"
+            k_dir.mkdir(parents=True, exist_ok=True)
 
             for az, rg in pixels.tolist():
                 profile = pixel_profiles.get((az, rg))
@@ -225,22 +222,22 @@ class FittingResultPlotter(PlotBase):
                 r2_val       = float(r2_map[az, rg]) if np.isfinite(r2_map[az, rg]) else float("nan")
 
                 fig, ax = plt.subplots(figsize=(5.6, 4.4))
-                ax.plot(height_axis, profile, color="black",           lw=1.5, label="data", zorder=4)
-                ax.plot(height_axis, total,   color=_TIER_COLOR[tier], lw=1.4, ls="--", label="fit", zorder=5)
+                ax.plot(height_axis, profile, color="black",   lw=1.5, label="data", zorder=4)
+                ax.plot(height_axis, total,   color=k_color,   lw=1.4, ls="--", label="fit", zorder=5)
 
                 for k, comp in enumerate(comps):
                     if float(params[3 * k]) >= self.amp_threshold:
                         ax.fill_between(height_axis, comp, alpha=0.20, color=comp_colors[k], zorder=2)
                         ax.plot(height_axis, comp, color=comp_colors[k], lw=0.9, alpha=0.85, label=f"$g_{{{k + 1}}}$")
 
-                ax.set_title(f"Example fit — {_TIER_LABEL[tier]}\naz={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
+                ax.set_title(f"Example fit — {k_label}\naz={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
                 ax.set_xlabel(r"height $h$ [m]")
                 ax.set_ylabel(r"backscatter intensity")
                 ax.grid(True, which="major", lw=0.25, alpha=0.40)
                 ax.legend(fontsize=8, framealpha=0.90, ncol=2)
                 fig.tight_layout()
 
-                saved[f"{tier}_az{az}_rg{rg}_fit"] = self._save(fig, tier_dir / f"az{az}_rg{rg}_fit.png")
+                saved[f"k{K}_az{az}_rg{rg}_fit"] = self._save(fig, k_dir / f"az{az}_rg{rg}_fit.png")
 
                 fig, ax = plt.subplots(figsize=(5.6, 2.8))
                 ax.plot(height_axis, residual, color="0.35", lw=0.9, zorder=3)
@@ -254,7 +251,7 @@ class FittingResultPlotter(PlotBase):
                 ax.grid(True, which="major", lw=0.25, alpha=0.40)
                 fig.tight_layout()
 
-                saved[f"{tier}_az{az}_rg{rg}_residual"] = self._save(fig, tier_dir / f"az{az}_rg{rg}_residual.png")
+                saved[f"k{K}_az{az}_rg{rg}_residual"] = self._save(fig, k_dir / f"az{az}_rg{rg}_residual.png")
 
         return saved
 
@@ -792,23 +789,27 @@ class FittingResultPlotter(PlotBase):
                 dirs["metrics"],
             ))
 
-        self.logger.subsection("Loading tomogram for example fit plots (memory-mapped)")
-        tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r")                 # (n_elev, Az, R)
+        if "best_k_map" not in metrics_dict:
+            self.logger.warning("Example fit plots skipped: best_k_map unavailable")
+        else:
+            self.logger.subsection("Loading tomogram for example fit plots (memory-mapped)")
+            tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r")                 # (n_elev, Az, R)
 
-        pixels_by_tier = self._select_pixels_by_r2_tiers(r2_map)
-        all_pixels     = np.concatenate([px for px in pixels_by_tier.values() if px.shape[0] > 0], axis=0)
+            pixels_by_k = self._select_pixels_by_k(metrics_dict["best_k_map"], r2_map)
+            non_empty   = [px for px in pixels_by_k.values() if px.shape[0] > 0]
+            all_pixels  = np.concatenate(non_empty, axis=0) if non_empty else np.empty((0, 2), dtype=np.int32)
 
-        self.logger.subsection(f"Extracting {all_pixels.shape[0]} pixel profiles for example fits")
-        pixel_profiles: Dict[Tuple[int, int], np.ndarray] = {}
-        for az, rg in all_pixels.tolist():
-            pixel_profiles[(az, rg)] = np.abs(np.array(tomogram_mmap[:, az, rg])).astype(np.float32)
+            self.logger.subsection(f"Extracting {all_pixels.shape[0]} pixel profiles for example fits")
+            pixel_profiles: Dict[Tuple[int, int], np.ndarray] = {}
+            for az, rg in all_pixels.tolist():
+                pixel_profiles[(az, rg)] = np.abs(np.array(tomogram_mmap[:, az, rg])).astype(np.float32)
 
-        del tomogram_mmap
-        gc.collect()
+            del tomogram_mmap
+            gc.collect()
 
-        self.logger.subsection(f"Plotting example fits  ({self.n_fits_per_tier} pixels × 3 tiers)")
-        for key, path in self._plot_example_fits(parameters_array, pixel_profiles, height_axis, pixels_by_tier, r2_map, dirs["example_fits"]).items():
-            saved[f"example_fit_{key}"] = path
+            self.logger.subsection(f"Plotting example fits  ({self.n_fits_per_k} pixels × up to {self.n_gaussians} K groups)")
+            for key, path in self._plot_example_fits(parameters_array, pixel_profiles, height_axis, pixels_by_k, r2_map, dirs["example_fits"]).items():
+                saved[f"example_fit_{key}"] = path
 
         self.logger.subsection(f"Saved {len(saved)} figures \u2192 {self._images_dir}")
         return saved
