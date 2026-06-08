@@ -600,14 +600,20 @@ class TestParamExtractionConfig:
     def test_output_suffix_value_derived(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data")
 
-        assert cfg.output_suffix_value == "ampsigma_k5_sig4"
-        assert cfg.output_subdir_name  == "params_ampsigma_k5_sig4"
+        assert cfg.output_suffix_value == "ampsigma_k5_sig4_lam0p003"
+        assert cfg.output_subdir_name  == "params_ampsigma_k5_sig4_lam0p003"
 
     def test_output_suffix_value_encodes_sigma_divisor(self):
         fit = FitSettings(fit_config=FitMode.AmpSigma(k_max=3, sigma_init_divisor=2.5))
         cfg = ExtractionConfig(processed_data_path="/tmp/data", fit_settings=fit)
 
-        assert cfg.output_suffix_value == "ampsigma_k3_sig2p5"
+        assert cfg.output_suffix_value == "ampsigma_k3_sig2p5_lam0p003"
+
+    def test_output_suffix_value_encodes_penalty_weight(self):
+        fit = FitSettings(fit_config=FitMode.AmpSigma(lambda_k=1e-2))
+        cfg = ExtractionConfig(processed_data_path="/tmp/data", fit_settings=fit)
+
+        assert cfg.output_suffix_value == "ampsigma_k5_sig4_lam0p01"
 
     def test_output_suffix_value_explicit_override(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data", output_suffix="custom")
@@ -619,7 +625,7 @@ class TestParamExtractionConfig:
 
         assert cfg.data_directory     == tmp_path / "data"
         assert cfg.metadata_directory == tmp_path / "meta"
-        assert cfg.output_directory   == tmp_path / "params" / "params_ampsigma_k5_sig4"
+        assert cfg.output_directory   == tmp_path / "params" / "params_ampsigma_k5_sig4_lam0p003"
         assert cfg.parameters_npy_path.name == "parameters.npy"
 
     def test_discover_tomogram_path_raises_when_missing(self, tmp_path):

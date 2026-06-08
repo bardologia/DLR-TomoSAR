@@ -74,11 +74,13 @@ class ExtractionConfig:
         method = fs.fitting_method
 
         if method.startswith("amp_sigma"):
-            cfg     = fs.fit_config
-            k_max   = getattr(cfg, "k_max", fs.number_of_gaussians)
-            divisor = getattr(cfg, "sigma_init_divisor", 1.0)
-            div_tag = f"{divisor:g}".replace(".", "p")
-            return f"ampsigma_k{k_max}_sig{div_tag}"
+            cfg      = fs.fit_config
+            k_max    = getattr(cfg, "k_max", fs.number_of_gaussians)
+            divisor  = getattr(cfg, "sigma_init_divisor", 1.0)
+            lambda_k = getattr(cfg, "lambda_k", 0.0)
+            div_tag  = f"{divisor:g}".replace(".", "p")
+            lam_tag  = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
+            return f"ampsigma_k{k_max}_sig{div_tag}_lam{lam_tag}"
 
         return f"Ng{fs.number_of_gaussians}_filt"
 
