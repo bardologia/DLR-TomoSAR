@@ -197,21 +197,27 @@ class PeakInitialiser:
         self._pool.shutdown(wait=False, cancel_futures=True)
 
     @staticmethod
-    def _prominence_worker(smoothed_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        chunk_N, H = smoothed_chunk.shape
-        amps = np.zeros((chunk_N, K), dtype=np.float32)
-        mus  = np.zeros((chunk_N, K), dtype=np.float32)
-        sigs = np.full ((chunk_N, K), sigma_guess, dtype=np.float32)
+    def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        chunk_N, H = raw_chunk.shape
+        smoothed   = uniform_filter1d(raw_chunk, size=5, mode="nearest", axis=1)
+        amps       = np.zeros((chunk_N, K), dtype=np.float32)
+        mus        = np.zeros((chunk_N, K), dtype=np.float32)
+        sigs       = np.full ((chunk_N, K), sigma_guess, dtype=np.float32)
 
         for n in range(chunk_N):
-            smo  = smoothed_chunk[n]
+            raw  = raw_chunk[n]
+            smo  = smoothed[n]
             pmax = smo.max()
             if pmax < 1e-10:
                 idxs = np.linspace(0, H - 1, K, dtype=int)
             else:
                 peaks, props = find_peaks(smo, prominence=pmax * prominence_frac, distance=min_dist)
+
+                if len(peaks) > 0:
+                    peaks = peaks[np.argsort(props["prominences"])[::-1]]
+
                 if len(peaks) >= K:
-                    idxs = peaks[np.argsort(props["prominences"])[::-1][:K]]
+                    idxs = peaks[:K]
 
                 elif len(peaks) > 0:
                     residual = smo.copy()
@@ -234,9 +240,18 @@ class PeakInitialiser:
                 else:
                     idxs = np.linspace(0, H - 1, K, dtype=int)
 
+            claimed = np.zeros(H, dtype=bool)
+
             for g, idx in enumerate(idxs[:K]):
-                amps[n, g] = max(float(smo[idx]), 1e-10)
-                mus [n, g] = float(height_axis[idx])
+                lo     = max(0, idx - min_dist)
+                hi     = min(H, idx + min_dist + 1)
+                window = raw[lo:hi].copy()
+                window[claimed[lo:hi]] = -1.0
+                r_idx  = lo + int(np.argmax(window))
+
+                claimed[max(0, r_idx - 1):min(H, r_idx + 2)] = True
+                amps[n, g] = max(float(raw[r_idx]), 1e-10)
+                mus [n, g] = float(height_axis[r_idx])
 
         return amps, mus, sigs
 
@@ -247,10 +262,10 @@ class PeakInitialiser:
         sigma_base  = max(2.0 * dh, h_span / (8.0 * K))
         sigma_guess = sigma_base / max(float(sigma_divisor), 1e-6)
         min_dist    = max(1, int(sigma_base / dh))
-        smoothed    = uniform_filter1d(prof_raw.astype(np.float32), size=5, mode="nearest", axis=1).copy()
+        raw         = prof_raw.astype(np.float32, copy=False)
 
         chunk_size = max(1, -(-N // (self.n_workers * 2)))
-        chunks     = [smoothed[i:i + chunk_size] for i in range(0, N, chunk_size)]
+        chunks     = [raw[i:i + chunk_size] for i in range(0, N, chunk_size)]
 
         worker_fn  = partial(
             self._prominence_worker,
