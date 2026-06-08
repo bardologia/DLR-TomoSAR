@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from scipy.ndimage import uniform_filter1d
 from scipy.signal import find_peaks
 
 import jax
@@ -39,7 +38,7 @@ class SigmaScan:
         sigmas_init  : jnp.ndarray,
         height_axis  : jnp.ndarray,
         profiles     : jnp.ndarray,
-        amps_init    : jnp.ndarray,
+        amps         : jnp.ndarray,
         mus          : jnp.ndarray,
         sigma_lower  : jnp.ndarray,
         sigma_upper  : jnp.ndarray,
@@ -47,45 +46,33 @@ class SigmaScan:
         lr           : float,
         b1           : float,
         b2           : float,
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> jnp.ndarray:
         b1_ = jnp.float32(b1)
         b2_ = jnp.float32(b2)
         eps = jnp.float32(1e-8)
         lr_ = jnp.float32(lr)
-
         s   = jnp.clip(sigmas_init.astype(jnp.float32), sigma_lower, sigma_upper)
-        a   = jnp.maximum(amps_init.astype(jnp.float32), 0.0)
-        m_s = jnp.zeros_like(s)
-        v_s = jnp.zeros_like(s)
-        m_a = jnp.zeros_like(a)
-        v_a = jnp.zeros_like(a)
+        m   = jnp.zeros_like(s)
+        v   = jnp.zeros_like(s)
 
         def _step(carry, t):
-            s_, a_, m_s_, v_s_, m_a_, v_a_ = carry
-
-            _, (g_s, g_a) = batched_vg(s_, height_axis, profiles, a_, mus)
-            tf            = t.astype(jnp.float32) + 1.0
-
-            m_s_ = b1_ * m_s_ + (1.0 - b1_) * g_s
-            v_s_ = b2_ * v_s_ + (1.0 - b2_) * g_s * g_s
-            s_   = s_ - lr_ * (m_s_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_s_ / (1.0 - b2_ ** tf)) + eps)
+            s_, m_, v_ = carry
+            _, g = batched_vg(s_, height_axis, profiles, amps, mus)
+            m_   = b1_ * m_ + (1.0 - b1_) * g
+            v_   = b2_ * v_ + (1.0 - b2_) * g * g
+            tf   = t.astype(jnp.float32) + 1.0
+            s_   = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
             s_   = jnp.clip(s_, sigma_lower, sigma_upper)
+            return (s_, m_, v_), None
 
-            m_a_ = b1_ * m_a_ + (1.0 - b1_) * g_a
-            v_a_ = b2_ * v_a_ + (1.0 - b2_) * g_a * g_a
-            a_   = a_ - lr_ * (m_a_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_a_ / (1.0 - b2_ ** tf)) + eps)
-            a_   = jnp.maximum(a_, 0.0)
+        (s_final, _, _), _ = jax.lax.scan(_step, (s, m, v), jnp.arange(n_steps))
 
-            return (s_, a_, m_s_, v_s_, m_a_, v_a_), None
-
-        (s_final, a_final, _, _, _, _), _ = jax.lax.scan(_step, (s, a, m_s, v_s, m_a, v_a), jnp.arange(n_steps))
-
-        return s_final, a_final
+        return s_final
 
 
 class SigmaAdamKernel:
     def __init__(self) -> None:
-        batched_vg = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss, argnums=(0, 3)), in_axes=(0, None, 0, 0, 0))
+        batched_vg = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss), in_axes=(0, None, 0, 0, 0))
         self._run  = self._build(batched_vg)
 
     @staticmethod
@@ -103,7 +90,7 @@ class SigmaAdamKernel:
             lr          : float = 1e-2,
             b1          : float = 0.9,
             b2          : float = 0.999,
-        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        ) -> jnp.ndarray:
             return SigmaScan.adam_scan(batched_vg, sigmas_init, height_axis, profiles, amps, mus, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
         return _run
 
@@ -124,7 +111,7 @@ class PmapSigmaAdamKernel:
     def __init__(self, devices: list) -> None:
         self._devices   = devices
         self._n_devices = len(devices)
-        batched_vg      = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss, argnums=(0, 3)), in_axes=(0, None, 0, 0, 0))
+        batched_vg      = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss), in_axes=(0, None, 0, 0, 0))
         self._run       = self._build(batched_vg, devices)
 
     @staticmethod
@@ -141,7 +128,7 @@ class PmapSigmaAdamKernel:
             lr          : float = 1e-2,
             b1          : float = 0.9,
             b2          : float = 0.999,
-        ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        ) -> jnp.ndarray:
             return SigmaScan.adam_scan(batched_vg, sigmas_init, height_axis, profiles, amps, mus, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
 
         return jax.pmap(
@@ -173,7 +160,7 @@ class PmapSigmaAdamKernel:
         n_pad = n + pad
         shard = n_pad // D
 
-        out_s, out_a = self._run(
+        out_s = self._run(
             sigmas_init.reshape(D, shard, K),
             height_axis,
             profiles   .reshape(D, shard, H),
@@ -184,7 +171,7 @@ class PmapSigmaAdamKernel:
             n_steps, lr, b1, b2,
         )
 
-        return out_s.reshape(n_pad, K)[:n], out_a.reshape(n_pad, K)[:n]
+        return out_s.reshape(n_pad, K)[:n]
 
 
 class PeakInitialiser:
@@ -199,19 +186,17 @@ class PeakInitialiser:
     @staticmethod
     def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         chunk_N, H = raw_chunk.shape
-        smoothed   = uniform_filter1d(raw_chunk, size=5, mode="nearest", axis=1)
         amps       = np.zeros((chunk_N, K), dtype=np.float32)
         mus        = np.zeros((chunk_N, K), dtype=np.float32)
         sigs       = np.full ((chunk_N, K), sigma_guess, dtype=np.float32)
 
         for n in range(chunk_N):
             raw  = raw_chunk[n]
-            smo  = smoothed[n]
-            pmax = smo.max()
+            pmax = raw.max()
             if pmax < 1e-10:
                 idxs = np.linspace(0, H - 1, K, dtype=int)
             else:
-                peaks, props = find_peaks(smo, prominence=pmax * prominence_frac, distance=min_dist)
+                peaks, props = find_peaks(raw, prominence=pmax * prominence_frac, distance=min_dist)
 
                 if len(peaks) > 0:
                     peaks = peaks[np.argsort(props["prominences"])[::-1]]
@@ -220,7 +205,7 @@ class PeakInitialiser:
                     idxs = peaks[:K]
 
                 elif len(peaks) > 0:
-                    residual = smo.copy()
+                    residual = raw.copy()
                     extra    = []
 
                     for p in peaks:
@@ -240,18 +225,9 @@ class PeakInitialiser:
                 else:
                     idxs = np.linspace(0, H - 1, K, dtype=int)
 
-            claimed = np.zeros(H, dtype=bool)
-
             for g, idx in enumerate(idxs[:K]):
-                lo     = max(0, idx - min_dist)
-                hi     = min(H, idx + min_dist + 1)
-                window = raw[lo:hi].copy()
-                window[claimed[lo:hi]] = -1.0
-                r_idx  = lo + int(np.argmax(window))
-
-                claimed[max(0, r_idx - 1):min(H, r_idx + 2)] = True
-                amps[n, g] = max(float(raw[r_idx]), 1e-10)
-                mus [n, g] = float(height_axis[r_idx])
+                amps[n, g] = max(float(raw[idx]), 1e-10)
+                mus [n, g] = float(height_axis[idx])
 
         return amps, mus, sigs
 
@@ -459,7 +435,7 @@ class SigmaFittingExtractor:
     ) -> None:
 
         self.logger.section("[Kernel Compilation]")
-        self.logger.subsection(f"Compiling amp+sigma JAX kernel for K={self.k_max}")
+        self.logger.subsection(f"Compiling sigma-only JAX kernel for K={self.k_max}")
 
         N_warm  = self._n_devices * max(1, 4 // self._n_devices)
         K       = self.k_max
@@ -530,18 +506,17 @@ class SigmaFittingExtractor:
 
         for K in range(1, self.k_max + 1):
             amps_raw, mus, sigs_init = inits[K]
-            amps_init  = amps_raw / scale_all[:, None]
+            amps_norm  = amps_raw / scale_all[:, None]
             final_sigs = np.empty((N_act, K), dtype=np.float32)
-            final_amps = np.empty((N_act, K), dtype=np.float32)
 
             for i_start in range(0, N_act, B):
-                i_end          = min(i_start + B, N_act)
-                n_chunk        = i_end - i_start
-                out_s, out_a   = self._kernel(
+                i_end   = min(i_start + B, N_act)
+                n_chunk = i_end - i_start
+                out_s   = self._kernel(
                     jnp.array(self._pad_rows(sigs_init    [i_start:i_end], B)),
                     height_ax_j,
                     jnp.array(self._pad_rows(prof_norm_all[i_start:i_end], B)),
-                    jnp.array(self._pad_rows(amps_init    [i_start:i_end], B)),
+                    jnp.array(self._pad_rows(amps_norm    [i_start:i_end], B)),
                     jnp.array(self._pad_rows(mus          [i_start:i_end], B)),
                     sigma_lower_j,
                     sigma_upper_j,
@@ -552,10 +527,9 @@ class SigmaFittingExtractor:
                 )
 
                 final_sigs[i_start:i_end] = np.array(out_s[:n_chunk], dtype=np.float32)
-                final_amps[i_start:i_end] = np.array(out_a[:n_chunk], dtype=np.float32)
-                del out_s, out_a
+                del out_s
 
-            gpu_results[K] = (final_amps, mus, final_sigs)
+            gpu_results[K] = (amps_norm, mus, final_sigs)
             self.logger.subsection(f"K={K} done")
 
         gc.collect()

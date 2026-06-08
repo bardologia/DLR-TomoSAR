@@ -587,10 +587,10 @@ class TestParamExtractionConfig:
 
         assert fs.number_of_gaussians    == fs.fit_config.k_max
         assert fs.parameters_per_profile == 3 * fs.fit_config.k_max
-        assert fs.fitting_method         == "amp_sigma_adam"
+        assert fs.fitting_method         == "sigma_only_adam"
 
-    def test_fit_mode_amp_sigma_defaults(self):
-        sigma = FitMode.AmpSigma()
+    def test_fit_mode_sigma_only_defaults(self):
+        sigma = FitMode.SigmaOnly()
 
         assert sigma.k_max              == 5
         assert sigma.lambda_k           > 0.0
@@ -600,20 +600,20 @@ class TestParamExtractionConfig:
     def test_output_suffix_value_derived(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data")
 
-        assert cfg.output_suffix_value == "ampsigma_k5_sig4_lam0p003"
-        assert cfg.output_subdir_name  == "params_ampsigma_k5_sig4_lam0p003"
+        assert cfg.output_suffix_value == "sigmaonly_k5_sig4_lam0p003"
+        assert cfg.output_subdir_name  == "params_sigmaonly_k5_sig4_lam0p003"
 
     def test_output_suffix_value_encodes_sigma_divisor(self):
-        fit = FitSettings(fit_config=FitMode.AmpSigma(k_max=3, sigma_init_divisor=2.5))
+        fit = FitSettings(fit_config=FitMode.SigmaOnly(k_max=3, sigma_init_divisor=2.5))
         cfg = ExtractionConfig(processed_data_path="/tmp/data", fit_settings=fit)
 
-        assert cfg.output_suffix_value == "ampsigma_k3_sig2p5_lam0p003"
+        assert cfg.output_suffix_value == "sigmaonly_k3_sig2p5_lam0p003"
 
     def test_output_suffix_value_encodes_penalty_weight(self):
-        fit = FitSettings(fit_config=FitMode.AmpSigma(lambda_k=1e-2))
+        fit = FitSettings(fit_config=FitMode.SigmaOnly(lambda_k=1e-2))
         cfg = ExtractionConfig(processed_data_path="/tmp/data", fit_settings=fit)
 
-        assert cfg.output_suffix_value == "ampsigma_k5_sig4_lam0p01"
+        assert cfg.output_suffix_value == "sigmaonly_k5_sig4_lam0p01"
 
     def test_output_suffix_value_explicit_override(self):
         cfg = ExtractionConfig(processed_data_path="/tmp/data", output_suffix="custom")
@@ -625,7 +625,7 @@ class TestParamExtractionConfig:
 
         assert cfg.data_directory     == tmp_path / "data"
         assert cfg.metadata_directory == tmp_path / "meta"
-        assert cfg.output_directory   == tmp_path / "params" / "params_ampsigma_k5_sig4_lam0p003"
+        assert cfg.output_directory   == tmp_path / "params" / "params_sigmaonly_k5_sig4_lam0p003"
         assert cfg.parameters_npy_path.name == "parameters.npy"
 
     def test_discover_tomogram_path_raises_when_missing(self, tmp_path):

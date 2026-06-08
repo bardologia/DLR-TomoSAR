@@ -44,7 +44,7 @@ class PhysicsQuantitiesCheck:
             height_range        = cfg.height_range,
             output_prefix       = cfg.output_prefix,
             output_suffix       = cfg.output_suffix,
-            fit_settings        = FitSettings(fit_config=FitMode.AmpSigma(k_max=cfg.fit_k_max)),
+            fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(k_max=cfg.fit_k_max)),
         )
 
         tomogram_path   = extraction.discover_tomogram_path()
