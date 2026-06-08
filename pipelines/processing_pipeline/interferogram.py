@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import gc
-import sys
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 
-from configuration.processing_config import ProcessingConfiguration
-from tools.logger                    import Logger
-from tools.track_baselines           import BaselineExtractor, DuplicatePassError, TrackBaselines, TrackProfiles
+from configuration.processing_config         import ProcessingConfiguration
+from pipelines.processing_pipeline.pyrat_env import PyRatEnvironment
+from pipelines.shared                        import FileIO
+from tools.logger                            import Logger
+from tools.track_baselines                   import BaselineExtractor, TrackBaselines, TrackProfiles
 
 
 class InterferogramBuilder:
@@ -23,9 +24,7 @@ class InterferogramBuilder:
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
         self.logger.subsection(f"PyRat Threads : {self.config.parallel.interferogram_threads()}")
 
-        pyrat_root = str(self.config.paths.pyrat_directory)
-        if pyrat_root not in sys.path:
-            sys.path.insert(0, pyrat_root)
+        PyRatEnvironment.ensure_root_on_sys_path(str(self.config.paths.pyrat_directory))
 
     def _build_from_fsar(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         from pyrat import pyrat_init, tomo
@@ -45,7 +44,7 @@ class InterferogramBuilder:
 
         self.logger.subsection(f"[FSAR] Master: {tomography_object.master}")
         self.logger.subsection(f"[FSAR] Slaves ({len(tomography_object.slaves)}):")
-        
+
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 
@@ -55,21 +54,13 @@ class InterferogramBuilder:
         self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
         return primary, secondaries, interferograms
 
-    def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
-        try:
-            azimuth_window  = (crop_tuple[0], crop_tuple[1])
-            extractor       = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
-            table, profiles = extractor.extract_with_profiles()
+    def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> Tuple[TrackBaselines, TrackProfiles]:
+        azimuth_window  = (crop_tuple[0], crop_tuple[1])
+        extractor       = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
+        table, profiles = extractor.extract_with_profiles()
 
-            self.logger.kv_table(table.describe(), title="Track Baselines")
-            return table, profiles
-
-        except DuplicatePassError:
-            raise
-
-        except Exception as error:
-            self.logger.subsection(f"[FSAR] Baseline extraction skipped: {error}")
-            return None, None
+        self.logger.kv_table(table.describe(), title="Track Baselines")
+        return table, profiles
 
     def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         import pyrat as pyrat_module
@@ -78,7 +69,11 @@ class InterferogramBuilder:
         raw_options  = tomography_object.project.get("options", "")
         options_list = [opt.split("=") for opt in raw_options.split(",") if opt]
         options      = {opt[0].lower().strip(): True if len(opt) == 1 else opt[1].strip() for opt in options_list}
-        suffix       = options.get("suffix", "")
+
+        if "suffix" not in options:
+            raise KeyError("FuSAR project options string does not declare a 'suffix' entry")
+
+        suffix = options["suffix"]
 
         self.logger.subsection("[FSAR] Loading primary SLC")
         primary_slc  = getdata(
@@ -144,7 +139,7 @@ class InterferogramBuilder:
         primary, secondaries, interferograms = self._build_from_fsar(crop_tuple)
 
         gc.collect()
-        
+
         return primary, secondaries, interferograms
 
     def run(
@@ -154,11 +149,9 @@ class InterferogramBuilder:
         secondaries_path     : Path,
         interferograms_path  : Path,
     ) -> Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]:
-        
         primary, secondaries, interferograms = self.build(crop_tuple)
 
-        for path in (primary_path, secondaries_path, interferograms_path):
-            path.parent.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dirs(primary_path.parent, secondaries_path.parent, interferograms_path.parent)
 
         np.save(str(primary_path),        primary,        allow_pickle=False)
         np.save(str(secondaries_path),    secondaries,    allow_pickle=False)
@@ -171,5 +164,5 @@ class InterferogramBuilder:
         shapes = tuple(primary.shape), tuple(secondaries.shape), tuple(interferograms.shape)
         del primary, secondaries, interferograms
         gc.collect()
-       
+
         return shapes

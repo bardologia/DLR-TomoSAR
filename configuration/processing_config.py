@@ -9,8 +9,6 @@ from typing import ClassVar, Dict, List, Optional, Tuple
 
 from tools.regions import CropRegion
 
-__all__ = ["CropRegion"]
-
 
 @dataclass
 class TomogramConfiguration:
@@ -76,7 +74,7 @@ class ParallelConfiguration:
             threads = max(1, min(self.THREAD_CAP, budget // workers))
             waves   = math.ceil(subsection_count / workers)
 
-            if best_plan is None or waves * best_plan[1] <= best_waves * threads:
+            if best_plan is None or waves < best_waves or (waves == best_waves and threads > best_plan[1]):
                 best_plan, best_waves = (workers, threads), waves
 
         return best_plan

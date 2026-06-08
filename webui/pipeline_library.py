@@ -30,7 +30,7 @@ class PipelineLibrary:
                 "key"    : "training",
                 "name"   : "Training",
                 "script" : "train",
-                "blurb"  : "Supervised loop with AdamW, EMA, warmup, cosine annealing, and curriculum loss.",
+                "blurb"  : "Supervised loop with AdamW, warmup, cosine annealing, and curriculum loss.",
                 "stages" : ["Curve reconstruction", "Loss", "Optimiser step", "Eval and checkpoint"],
             },
             {

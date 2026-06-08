@@ -60,9 +60,9 @@ class ExtractionMetadataManager:
             "output_suffix"       : self.config.output_suffix_value,
             "parameters_npy"      : npy_path.name,
             "diagnostics_npz"     : diagnostics_path.name,
-            "number_of_gaussians" : ext.fit_config.k_max,
+            "k_max"               : ext.fit_config.k_max,
             "lambda_k"            : ext.fit_config.lambda_k,
-            "sigma_init_divisor"  : getattr(ext.fit_config, "sigma_init_divisor", 1.0),
+            "sigma_init_divisor"  : ext.fit_config.sigma_init_divisor,
         }
 
         FileIO.save_json(payload, meta_path)
@@ -138,7 +138,7 @@ class ParameterExtractor:
         k_max              = fit_cfg.k_max
         lambda_k           = fit_cfg.lambda_k
         prominence_frac    = fit_cfg.prominence_frac
-        sigma_init_divisor = getattr(fit_cfg, "sigma_init_divisor", 1.0)
+        sigma_init_divisor = fit_cfg.sigma_init_divisor
 
         self._gpu_extractor = SigmaFittingExtractor(
             fit_settings         = parameter_extraction,
@@ -158,7 +158,7 @@ class ParameterExtractor:
         )
 
         self.logger.section("[Parameter Extractor Initialized]")
-        self.logger.subsection(f"Backend : JAX GPU (Sigma Only)")
+        self.logger.subsection("Backend : JAX GPU (Sigma Only)")
         self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
 
     @staticmethod
@@ -213,23 +213,29 @@ class ParamExtractionPipeline:
         self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
         self.parameter_io       = ParameterIO(logger=self.logger)
 
-        n_K = getattr(config.fit_settings.fit_config, "k_max", config.fit_settings.number_of_gaussians)
+        n_K              = config.fit_settings.fit_config.k_max
+        threshold_factor = float(config.fit_settings.fit_config.threshold_factor)
+        truncation_index = int(  config.fit_settings.fit_config.truncation_index)
 
         self.metrics_calculator = FittingMetricsCalculator(
-            n_gaussians = n_K,
-            logger      = self.logger,
+            n_gaussians      = n_K,
+            logger           = self.logger,
+            threshold_factor = threshold_factor,
+            truncation_index = truncation_index,
         )
         self.result_plotter     = FittingResultPlotter(
             output_directory = self.output_directory,
             n_gaussians      = n_K,
             logger           = self.logger,
+            threshold_factor = threshold_factor,
+            truncation_index = truncation_index,
         )
 
         self.logger.section("[Param Extraction Pipeline Initialized]")
         self.logger.subsection(f"Source tomogram   : {self.tomogram_path}")
         self.logger.subsection(f"Height range      : {self.height_range}")
         self.logger.subsection(f"Output directory  : {self.output_directory}")
-        self.logger.subsection(f"N gaussians       : {config.fit_settings.number_of_gaussians}")
+        self.logger.subsection(f"k_max             : {config.fit_settings.fit_config.k_max}")
         self.logger.subsection(f"Fit method        : {config.fit_settings.fitting_method}")
 
     def _stage_extract(self) -> Tuple[np.ndarray, dict]:

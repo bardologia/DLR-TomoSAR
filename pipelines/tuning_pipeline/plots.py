@@ -18,8 +18,39 @@ class StudyPlotter(PlotBase):
 
     CONTOUR_MAX_PARAMS = 8
 
+    OBJECTIVE_NAME = "best validation loss (normalised params, lower is better)"
+
     def __init__(self, logger) -> None:
         self.logger = logger
+
+    @staticmethod
+    def _readable_param(name: str) -> str:
+        return f"{name[:-5]} (choice index)" if name.endswith("__idx") else name
+
+    @classmethod
+    def _relabel_text(cls, text: str) -> str:
+        if text == "Objective Value":
+            return cls.OBJECTIVE_NAME
+        if text.endswith("__idx"):
+            return cls._readable_param(text)
+        return text
+
+    @classmethod
+    def _relabel_figure(cls, fig) -> None:
+        for ax in fig.axes:
+            ax.set_xlabel(cls._relabel_text(ax.get_xlabel()))
+            ax.set_ylabel(cls._relabel_text(ax.get_ylabel()))
+            ax.set_title(cls._relabel_text(ax.get_title()))
+
+            for setter, getter in ((ax.set_xticklabels, ax.get_xticklabels), (ax.set_yticklabels, ax.get_yticklabels)):
+                labels  = getter()
+                relabel = [cls._relabel_text(t.get_text()) for t in labels]
+                if any(new != old.get_text() for new, old in zip(relabel, labels)):
+                    setter(relabel)
+
+    def _save_study_figure(self, fig, path: Path) -> Path:
+        self._relabel_figure(fig)
+        return self._save(fig, path)
 
     def render(self, study: optuna.Study, out_dir: Path) -> list[Path]:
         self._apply_style()
@@ -39,7 +70,7 @@ class StudyPlotter(PlotBase):
         for name, plotter in self._plotters(study).items():
             try:
                 axes = plotter()
-                saved.append(self._save(axes.figure, out_dir / f"{name}.png"))
+                saved.append(self._save_study_figure(axes.figure, out_dir / f"{name}.png"))
             except Exception as exc:
                 self.logger.warning(f"Study plot '{name}' skipped: {exc}")
                 plt.close("all")
@@ -54,7 +85,7 @@ class StudyPlotter(PlotBase):
             for param in params:
                 try:
                     axes = plotter(study, params=[param])
-                    saved.append(self._save(axes.figure, out_dir / name / f"{param}.png"))
+                    saved.append(self._save_study_figure(axes.figure, out_dir / name / f"{param}.png"))
                 except Exception as exc:
                     self.logger.warning(f"Study plot '{name}/{param}' skipped: {exc}")
                     plt.close("all")
@@ -68,7 +99,7 @@ class StudyPlotter(PlotBase):
         for p1, p2 in combinations(params, 2):
             try:
                 axes = ovm.plot_contour(study, params=[p1, p2])
-                saved.append(self._save(axes.figure, out_dir / "contour" / f"{p1}__{p2}.png"))
+                saved.append(self._save_study_figure(axes.figure, out_dir / "contour" / f"{p1}__{p2}.png"))
             except Exception as exc:
                 self.logger.warning(f"Study plot 'contour/{p1}__{p2}' skipped: {exc}")
                 plt.close("all")
@@ -77,11 +108,11 @@ class StudyPlotter(PlotBase):
 
     def _plotters(self, study: optuna.Study) -> dict:
         return {
-            "optimization_history" : lambda: ovm.plot_optimization_history(study),
+            "optimization_history" : lambda: ovm.plot_optimization_history(study, target_name=self.OBJECTIVE_NAME),
             "intermediate_values"  : lambda: ovm.plot_intermediate_values(study),
-            "parallel_coordinate"  : lambda: ovm.plot_parallel_coordinate(study),
-            "param_importances"    : lambda: ovm.plot_param_importances(study),
-            "duration_importances" : lambda: ovm.plot_param_importances(study, target=lambda t: t.duration.total_seconds(), target_name="duration"),
+            "parallel_coordinate"  : lambda: ovm.plot_parallel_coordinate(study, target_name=self.OBJECTIVE_NAME),
+            "param_importances"    : lambda: ovm.plot_param_importances(study, target_name=self.OBJECTIVE_NAME),
+            "duration_importances" : lambda: ovm.plot_param_importances(study, target=lambda t: t.duration.total_seconds(), target_name="trial duration [s]"),
             "edf"                  : lambda: ovm.plot_edf(study),
             "timeline"             : lambda: ovm.plot_timeline(study),
         }

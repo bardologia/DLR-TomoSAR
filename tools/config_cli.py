@@ -68,6 +68,19 @@ class Detacher:
 
 
 class ConfigCli:
+
+    BOOTSTRAP_FLAGS = (
+        "-h", "--help",
+        "--help-config",
+        "--detach", "--nohup",
+        "--gpu",
+        "--trial", "--worker", "--resume",
+        "--model",
+        "--n-trials", "--study-name", "--storage-url",
+        "--run-tag", "--run-dir",
+        "--fold", "--split",
+    )
+
     def __init__(self, config, description: str | None = None) -> None:
         self.config    = config
         self.overrides : dict = {}
@@ -88,7 +101,9 @@ class ConfigCli:
             self.parser.add_argument(*options, dest=path, type=str, default=None)
 
     def apply(self, argv: list[str] | None = None):
-        args, _ = self.parser.parse_known_args(argv)
+        args, leftover = self.parser.parse_known_args(argv)
+
+        self._reject_unknown_options(leftover)
 
         if getattr(args, "_help_config", False):
             self._print_config_help()
@@ -107,6 +122,23 @@ class ConfigCli:
             self.overrides[path] = value
 
         return self.config
+
+    def _reject_unknown_options(self, leftover: list[str]) -> None:
+        offenders = []
+
+        for token in leftover:
+            if not token.startswith("--") and not token.startswith("-"):
+                continue
+
+            name = token.split("=", 1)[0]
+            if name in self.BOOTSTRAP_FLAGS:
+                continue
+
+            offenders.append(name)
+
+        if offenders:
+            keys = ", ".join(sorted(set(offenders)))
+            raise ValueError(f"Unrecognized override option(s): {keys}. Known overrides: --<path> from {type(self.config).__name__}; bootstrap flags: {', '.join(self.BOOTSTRAP_FLAGS)}")
 
     @classmethod
     def _leaves(cls, config, prefix: str = ""):
@@ -206,6 +238,11 @@ class ConfigCli:
 
         with open(path, "r", encoding="utf-8") as f:
             mapping = json.load(f)
+
+        known   = {leaf for leaf, _ in cls._leaves(config)}
+        unknown = sorted(key for key in mapping if key not in known)
+        if unknown:
+            raise KeyError(f"Unknown key(s) in resolved config {path}: {', '.join(unknown)}. Known keys belong to {type(config).__name__}")
 
         for leaf, current in list(cls._leaves(config)):
             if leaf not in mapping:

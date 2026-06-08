@@ -24,7 +24,7 @@ class SpatialAugmenter:
                 "Flip Horizontal" : self.config.p_flip_h,
                 "Flip Vertical"   : self.config.p_flip_v,
                 "Rotate 90°"      : self.config.p_rot90,
-                "Noise"           : f"std={self.config.noise_std} p={self.config.p_noise}",
+                "Noise"           : f"std={self.config.noise_std} (normalized units) p={self.config.p_noise}",
             },
             title="Augmentation Config",
         )
@@ -35,7 +35,6 @@ class SpatialAugmenter:
         flip_v  = self._rng.random() < self.config.p_flip_v
         rotate  = self.config.p_rot90 > 0.0 and self._rng.random() < self.config.p_rot90
         k       = int(self._rng.integers(1, 4)) if rotate else 0
-        noise   = self._rng.random() < self.config.p_noise
 
         sl_h    = slice(None, None, -1) if flip_h else slice(None)
         sl_v    = slice(None, None, -1) if flip_v else slice(None)
@@ -51,10 +50,15 @@ class SpatialAugmenter:
         input_tensor = np.ascontiguousarray(input_view)
         gt_params    = np.ascontiguousarray(gt_view)
 
-        if noise:
-            input_tensor += self._rng.normal(0.0, self.config.noise_std, input_tensor.shape).astype(input_tensor.dtype)
-
         return input_tensor, gt_params
+
+    def add_noise(self, normalized_input: np.ndarray) -> np.ndarray:
+        if self._rng.random() >= self.config.p_noise:
+            return normalized_input
+
+        noise = self._rng.normal(0.0, self.config.noise_std, normalized_input.shape).astype(normalized_input.dtype)
+
+        return normalized_input + noise
 
 
 class PatchDataset(Dataset):
@@ -90,7 +94,6 @@ class PatchDataset(Dataset):
 
         self.n_secondaries    = n_secondaries
         self.n_interferograms = n_interferograms
-        self.n_slaves         = n_secondaries
 
         expected_layers = 1 + n_secondaries + n_interferograms
         if expected_layers != self.input_layers:
@@ -172,6 +175,9 @@ class PatchDataset(Dataset):
         input_tensor = self._normalize_input_tensor(input_tensor)
         gt_params    = self._normalize_gt_params(gt_params)
 
+        if self.augmenter is not None and self.split_name == "train":
+            input_tensor = self.augmenter.add_noise(input_tensor)
+
         return input_tensor, gt_params
 
 
@@ -199,7 +205,6 @@ class MultiRegionDataset(Dataset):
         self.input_layers           = first.input_layers
         self.n_secondaries          = first.n_secondaries
         self.n_interferograms       = first.n_interferograms
-        self.n_slaves               = first.n_slaves
         self.input_channels         = first.input_channels
         self.output_channel_indices = first.output_channel_indices
         self.gt_channels            = first.gt_channels
@@ -256,9 +261,9 @@ class Loader:
             prefetch_factor    = 8 if num_workers > 0 else None,
         )
 
-        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last  = True, **_base,)
-        val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last  = False, **_base,)
-        test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last  = False, **_base,)
+        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last = True,  **_base)
+        val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last = False, **_base)
+        test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last = False, **_base)
 
         logger.kv_table({
             "Train batches": len(train_loader),

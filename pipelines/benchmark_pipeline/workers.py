@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 import traceback
 from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
+from pipelines.shared.io import FileIO
 from pipelines.training_pipeline.docs import LossScaleProbeConfig
 
 
@@ -33,7 +33,6 @@ class OverfitWorker(BenchmarkWorker):
 
         stage_dir   = self.run_dir / "overfit"
         result_path = stage_dir / model_name / "overfit_result.json"
-        result_path.parent.mkdir(parents=True, exist_ok=True)
 
         threshold    = self.config.overfit.stop_threshold
         model_config = self.factory.prepare_overfit_model_config(CONFIG_REGISTRY[model_name]())
@@ -63,6 +62,7 @@ class OverfitWorker(BenchmarkWorker):
             result["final_loss"] = self._final_loss(outputs)
         except SystemExit:
             result["status"] = "PASS"
+            result["error"]  = "worker exited via SystemExit before reporting a final loss"
         except Exception:
             result["status"] = "FAIL"
             result["error"]  = traceback.format_exc()
@@ -70,12 +70,15 @@ class OverfitWorker(BenchmarkWorker):
         if result["final_loss"] is not None:
             result["converged"] = bool(result["final_loss"] <= threshold)
 
-        if result["status"] == "PASS" and self.config.overfit.require_convergence and result["converged"] is False:
+        if result["status"] == "PASS" and result["final_loss"] is None:
+            result["status"] = "FAIL"
+            result["error"]  = result["error"] or "overfit gate produced no final loss to evaluate"
+
+        if result["status"] == "PASS" and self.config.overfit.require_convergence and result["converged"] is not True:
             result["status"] = "FAIL"
             result["error"]  = f"final loss {result['final_loss']:.3e} above stop threshold {threshold:.0e}"
 
-        with open(result_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2)
+        FileIO.save_json(result, result_path, indent=2)
 
         if result["status"] == "FAIL":
             raise SystemExit(1)
@@ -118,8 +121,7 @@ class TrainingWorker(BenchmarkWorker):
         if not size_match_path.exists():
             return {}
 
-        with open(size_match_path, "r", encoding="utf-8") as f:
-            records = json.load(f)
+        records = FileIO.load_json(size_match_path)
 
         entry = records.get(model_name, {})
         return entry.get("overrides", {})

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 
 from configuration.cross_validation_config import CrossValidationConfig
 from tools.config_cli import ConfigCli
-from pipelines.cross_validation_pipeline.folds import FoldConfigFactory
+from pipelines.cross_validation_pipeline.folds import FoldConfigFactory, FoldPlanner
 from pipelines.cross_validation_pipeline.stages import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
+from pipelines.shared.io import FileIO
 from tools.logger import Logger
 
 
@@ -21,7 +21,7 @@ class CrossValidationPipeline:
         self.pipeline_dir = self.run_dir / "pipeline"
         self.state_path   = self.pipeline_dir / "state.json"
 
-        self.pipeline_dir.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dir(self.pipeline_dir)
         ConfigCli.save_resolved(config, self.pipeline_dir / "resolved_config.json")
 
         self.logger  = Logger(log_dir=str(self.pipeline_dir), name="cross_validation_pipeline")
@@ -81,7 +81,7 @@ class CrossValidationPipeline:
         self._mark_stage("training", "completed" if not failed else "partial")
         return results
 
-    def _run_inference(self, planner) -> list[dict]:
+    def _run_inference(self, planner: FoldPlanner) -> list[dict]:
         stage   = FoldInferenceStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, planner=planner, logger=self.logger)
         results = stage.run()
 
@@ -89,7 +89,7 @@ class CrossValidationPipeline:
         self._mark_stage("inference", "completed" if not failed else "partial")
         return results
 
-    def _run_reports(self, planner) -> Path:
+    def _run_reports(self, planner: FoldPlanner) -> Path:
         stage   = CrossValidationReportStage(config=self.config, run_tag=self.run_tag, planner=planner, logger=self.logger)
         out_dir = stage.run()
 
@@ -102,5 +102,4 @@ class CrossValidationPipeline:
             "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        with open(self.state_path, "w", encoding="utf-8") as f:
-            json.dump(self.state, f, indent=2)
+        FileIO.save_json(self.state, self.state_path, indent=2)

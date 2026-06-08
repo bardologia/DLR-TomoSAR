@@ -49,7 +49,6 @@ class ASPP(nn.Module):
         for rate in atrous_rates:
             self.branches.append(ConvNormAct(input_channels, output_channels, kernel_size=3, dilation=rate, activation=activation, normalization=normalization, bias=bias))
 
-        # group norm here: batch norm over a post-GAP [N, C, 1, 1] map is degenerate at batch size 1
         self.pool_branch = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(input_channels, output_channels, kernel_size=1, bias=bias),

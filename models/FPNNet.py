@@ -15,7 +15,6 @@ class SegmentationBlock(nn.Module):
 
         layers = []
 
-        # shallowest level (n_stages == 0): a single conv -> norm -> act, no upsample
         if n_stages == 0:
             for _ in range(convs_per_stage):
                 layers += [
@@ -24,7 +23,6 @@ class SegmentationBlock(nn.Module):
                     build_activation(activation),
                 ]
 
-        # deeper levels: n_stages of (conv -> norm -> act -> 2x bilinear upsample)
         for _ in range(n_stages):
             for _ in range(convs_per_stage):
                 layers += [
@@ -73,7 +71,6 @@ class FPNNet(nn.Module):
         self.lateral_convs = nn.ModuleList([nn.Conv2d(feature_size, pyramid_channels, kernel_size=1) for feature_size in feature_sizes])
         self.smooth_convs  = nn.ModuleList([nn.Conv2d(pyramid_channels, pyramid_channels, kernel_size=3, padding=1, bias=config.conv_bias) for _ in feature_sizes])
 
-        # level i has stride 2^i, target is level 0; stages per level N = log2(stride_i / stride_target) = i
         self.segmentation_blocks = nn.ModuleList([
             SegmentationBlock(pyramid_channels, index, config.segmentation_convs, config.activation, config.normalization, config.conv_bias)
             for index in range(len(feature_sizes))
@@ -110,7 +107,6 @@ class FPNNet(nn.Module):
         for segmentation_block, level in zip(self.segmentation_blocks, pyramid):
             out = segmentation_block(level)
 
-            # the staged 2x upsamples reach target up to floor-rounding of odd encoder strides; correct any residual mismatch
             if out.shape[2:] != target_size:
                 out = functional.interpolate(out, size=target_size, mode="bilinear", align_corners=False)
 

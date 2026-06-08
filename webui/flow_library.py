@@ -382,8 +382,7 @@ class FlowLibrary:
             {"id": "y",      "tex": r"y",                       "role": "measured",     "kind": "vector", "shape": "B x N x P x P",    "desc": "ground-truth (experimental) curve",          "sample": ["0.06", "0.70", "0.35", "..."]},
             {"id": "loss",   "tex": r"\mathcal{L}",             "role": "calculated",   "kind": "scalar", "shape": "1",                "desc": "normalised weighted total loss",             "sample": "4.1e-2"},
             {"id": "grad",   "tex": r"\mathbf{g}",              "role": "intermediate", "kind": "vector", "shape": "|theta|",          "desc": "clipped parameter gradient",                 "sample": ["1.2e-2", "-4e-3", "..."]},
-            {"id": "w",      "tex": r"\theta",                  "role": "intermediate", "kind": "vector", "shape": "|theta|",          "desc": "model weights",                              "sample": ["0.31", "-0.08", "..."]},
-            {"id": "wema",   "tex": r"\tilde{\theta}",          "role": "final",        "kind": "vector", "shape": "|theta|",          "desc": "EMA shadow weights used for eval / checkpoint", "sample": ["0.30", "-0.08", "..."]},
+            {"id": "w",      "tex": r"\theta",                  "role": "final",        "kind": "vector", "shape": "|theta|",          "desc": "trained model weights (best epoch checkpointed)", "sample": ["0.31", "-0.08", "..."]},
         ]
         steps = [
             {
@@ -428,15 +427,15 @@ class FlowLibrary:
                 "lines": [[{"id": "w", "tex": r"\theta_{t+1}", "role": "intermediate"}, {"tex": "="}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\ -\ \eta\Big(\tfrac{\hat{m}_t}{\sqrt{\hat{v}_t}+\epsilon} + \lambda\theta_t\Big)"}]],
             },
             {
-                "id": "emaeval", "title": "EMA shadow and checkpoint", "phase": "Eval and checkpoint",
-                "note": "Shadow weights track the model and replace it for validation and checkpointing; early stopping reverts to the best epoch when validation stagnates.",
-                "inputs": ["w"], "outputs": ["wema"],
-                "lines": [[{"id": "wema", "tex": r"\tilde{\theta}_t", "role": "final"}, {"tex": "="}, {"tex": r"\gamma\,\tilde{\theta}_{t-1} + (1-\gamma)\,"}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}]],
+                "id": "checkpoint", "title": "Validation and checkpoint", "phase": "Eval and checkpoint",
+                "note": "The model is evaluated on the validation split; the best epoch is checkpointed and early stopping reverts to it when validation stagnates.",
+                "inputs": ["w"], "outputs": ["w"],
+                "lines": [[{"id": "w", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\arg\min_{t}\ \mathcal{L}_{\mathrm{val}}(\theta_t)"}]],
             },
         ]
         return {
             "key": "training", "name": "Training (Supervised)",
-            "blurb": "One forward pass predicts all Gaussian parameters; the composite loss over curve and parameter space is backpropagated through AdamW with EMA, warmup, scheduling, and early stopping.",
+            "blurb": "One forward pass predicts all Gaussian parameters; the composite loss over curve and parameter space is backpropagated through AdamW with warmup, scheduling, and early stopping.",
             "nodes": nodes, "steps": steps,
         }
 
@@ -453,9 +452,9 @@ class FlowLibrary:
         steps = [
             {
                 "id": "predict", "title": "Windowed prediction", "phase": "Windowed predict",
-                "note": "The trained EMA model predicts parameters for every patch of the sliding-window grid over the full scene.",
+                "note": "The trained model predicts parameters for every patch of the sliding-window grid over the full scene.",
                 "inputs": ["xhat"], "outputs": ["th"],
-                "lines": [[{"id": "th", "tex": r"\hat{\theta}", "role": "calculated"}, {"tex": "="}, {"tex": r"f_{\tilde{\theta}}\!\big("}, {"id": "xhat", "tex": r"\hat{\mathbf{x}}", "role": "measured"}, {"tex": r"\big)"}]],
+                "lines": [[{"id": "th", "tex": r"\hat{\theta}", "role": "calculated"}, {"tex": "="}, {"tex": r"f_{\theta}\!\big("}, {"id": "xhat", "tex": r"\hat{\mathbf{x}}", "role": "measured"}, {"tex": r"\big)"}]],
             },
             {
                 "id": "recon", "title": "Curve reconstruction", "phase": "Windowed predict",

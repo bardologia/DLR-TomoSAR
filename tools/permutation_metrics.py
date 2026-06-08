@@ -144,25 +144,18 @@ class PermutationMetrics:
         ppg: int,
         amp_threshold: float = 1e-3,
     ) -> dict[str, float]:
-        """Compare the number of active slots predicted vs. ground truth per pixel.
-
-        Tracks mean absolute error in predicted cardinality and a per-(gt_count,
-        pred_count) confusion matrix expressed as fractions, which reveals
-        systematic over- or under-activation.
-        """
         B, C, H, W = pred_params.shape
         G          = C // ppg
         p          = pred_params.reshape(B, G, ppg, H, W)
         g          = gt_params.reshape(  B, G, ppg, H, W)
 
-        pred_n = (p[:, :, 0] > amp_threshold).sum(dim=1).float()   # (B, H, W)
-        gt_n   = (g[:, :, 0] > amp_threshold).sum(dim=1).float()   # (B, H, W)
+        pred_n = (p[:, :, 0] > amp_threshold).sum(dim=1).float()
+        gt_n   = (g[:, :, 0] > amp_threshold).sum(dim=1).float()
 
         out: dict[str, float] = {}
         out["count/mae"] = (pred_n - gt_n).abs().mean().item()
-        out["count/bias"] = (pred_n - gt_n).mean().item()          # signed: >0 → over-counting
+        out["count/bias"] = (pred_n - gt_n).mean().item()
 
-        # confusion matrix: fraction of pixels for each (gt_k, pred_k) pair
         for k_gt in range(G + 1):
             mask = (gt_n == k_gt)
             if mask.sum() == 0:
@@ -180,12 +173,6 @@ class PermutationMetrics:
         gt_params: torch.Tensor,
         ppg: int,
     ) -> dict[str, float]:
-        """Fraction of pixels that agree on the same best-match permutation.
-
-        High consensus means slots have learnt stable, globally consistent
-        roles across the image.  Low consensus means slots are interchangeable
-        and the model has no inner organization.
-        """
         B, C, H, W = pred_params.shape
         G          = C // ppg
 
@@ -199,11 +186,10 @@ class PermutationMetrics:
         perm_mask  = torch.nn.functional.one_hot(perms, num_classes=G).to(cost_mat.dtype)
         perm_costs = torch.einsum("bsij,pij->bsp", cost_mat, perm_mask)
 
-        best_perm_idx = perm_costs.argmin(dim=-1)   # (B, H*W)
+        best_perm_idx = perm_costs.argmin(dim=-1)
 
         out: dict[str, float] = {}
 
-        # consensus within each sample, then averaged
         consensus_per_sample = []
         for b in range(B):
             counts = torch.bincount(best_perm_idx[b], minlength=len(perms)).float()
@@ -211,7 +197,6 @@ class PermutationMetrics:
         out["consensus/mean"] = float(torch.tensor(consensus_per_sample).mean().item())
         out["consensus/min"]  = float(torch.tensor(consensus_per_sample).min().item())
 
-        # global dominant permutation fraction across the whole batch
         all_idx   = best_perm_idx.reshape(-1)
         counts_g  = torch.bincount(all_idx, minlength=len(perms)).float()
         out["consensus/global_dominant_frac"] = (counts_g.max() / counts_g.sum()).item()
@@ -225,18 +210,12 @@ class PermutationMetrics:
         ppg: int,
         amp_threshold: float = 1e-3,
     ) -> dict[str, float]:
-        """Mean predicted amplitude conditioned on whether the GT slot is active.
-
-        Ideally: high pred_amp when gt_active=True, low when gt_active=False.
-        The gap between the two (calibration_gap) summarises how well the model
-        has learnt to separate active from placeholder slots in amplitude space.
-        """
         B, C, H, W = pred_params.shape
         G          = C // ppg
         p          = pred_params.reshape(B, G, ppg, H, W)
         g          = gt_params.reshape(  B, G, ppg, H, W)
 
-        pred_amp = p[:, :, 0]   # (B, G, H, W)
+        pred_amp = p[:, :, 0]
         gt_active = g[:, :, 0] > amp_threshold
 
         out: dict[str, float] = {}
@@ -262,7 +241,7 @@ class PermutationMetrics:
             mean_ina = float(torch.tensor(overall_inactive_amp).mean().item())
             out["amp_cal/active_gt"]    = mean_act
             out["amp_cal/inactive_gt"]  = mean_ina
-            out["amp_cal/gap"]          = mean_act - mean_ina   # larger is better
+            out["amp_cal/gap"]          = mean_act - mean_ina
 
         return out
 
@@ -273,11 +252,6 @@ class PermutationMetrics:
         ppg: int,
         amp_threshold: float = 1e-3,
     ) -> dict[str, float]:
-        """Monitor sigma (width) stats on placeholder vs. active slots (requires ppg >= 3).
-
-        Placeholder slots that blow up or collapse sigma indicate training
-        instability or the model using sigma as a secondary "kill switch".
-        """
         if ppg < 3:
             return {}
 
@@ -286,7 +260,7 @@ class PermutationMetrics:
         p          = pred_params.reshape(B, G, ppg, H, W)
         g          = gt_params.reshape(  B, G, ppg, H, W)
 
-        pred_sigma = p[:, :, 2]                        # (B, G, H, W)
+        pred_sigma = p[:, :, 2]
         gt_active  = g[:, :, 0] > amp_threshold
 
         out: dict[str, float] = {}
@@ -304,7 +278,6 @@ class PermutationMetrics:
                 out[f"sigma/inactive_gt/mean/slot_{i}"] = s.mean().item()
                 out[f"sigma/inactive_gt/std/slot_{i}"]  = s.std().item()
 
-        # overall gap: do placeholder slots get different sigma than active ones?
         act_s  = pred_sigma[gt_active]
         ina_s  = pred_sigma[~gt_active]
         if act_s.numel() > 0:

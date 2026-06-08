@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import gc
-import multiprocessing as mp
 import shutil
 import sys
 import tempfile
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Tuple
 
 import h5py
 import numpy as np
 
-from configuration.processing_config                   import ProcessingConfiguration, TomogramConfiguration
-from pipelines.processing_pipeline.tomogram_worker      import PyRatJob, run_pyrat
-from tools.logger                                       import Logger
+from configuration.processing_config              import ProcessingConfiguration, TomogramConfiguration
+from pipelines.processing_pipeline.pyrat_env      import PyRatEnvironment
+from pipelines.processing_pipeline.tomogram_worker import PyRatJob, run_pyrat_job
+from pipelines.shared                             import FileIO, ProcessPoolRunner
+from tools.logger                                 import Logger
 
 
 class TomogramProcessor:
@@ -30,7 +30,7 @@ class TomogramProcessor:
 
     def _create_temp(self) -> Path:
         parent = self.config.paths.temporary_directory
-        parent.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dir(parent)
         temporary_directory = Path(tempfile.mkdtemp(prefix="tomo_", dir=str(parent)))
         return temporary_directory
 
@@ -59,12 +59,7 @@ class TomogramProcessor:
         tomogram_config     : TomogramConfiguration,
         temporary_directory : Path,
     ) -> None:
-        import os as _os
-
-        _conda_lib = _os.path.join(sys.prefix, "lib")
-        _ldpath    = _os.environ.get("LD_LIBRARY_PATH", "")
-        if _conda_lib not in _ldpath.split(":"):
-            _os.environ["LD_LIBRARY_PATH"] = _conda_lib + (":" + _ldpath if _ldpath else "")
+        PyRatEnvironment.ensure_conda_lib_on_ld_path()
 
         parallel_config = self.config.parallel
         tasks           = []
@@ -97,20 +92,16 @@ class TomogramProcessor:
 
         self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({worker_threads} threads each, budget {parallel_config.core_budget()} of {parallel_config.available_cores()} cores)")
 
-        with ProcessPoolExecutor(max_workers=resolved_workers, mp_context=mp.get_context("spawn")) as executor:
-            futures = [executor.submit(run_pyrat, task) for task in tasks]
-            try:
-                for future in as_completed(futures):
-                    future.result()
-            except Exception:
-                for f in futures:
-                    f.cancel()
-                raise
+        runner    = ProcessPoolRunner(logger=self.logger, max_workers=resolved_workers)
+        completed = runner.run(tasks, run_pyrat_job)
+
+        for job, _ in completed:
+            self.logger.subsection(f"PyRat job completed: subsection {job.suffix}")
 
     def _concatenate(self, temporary_directory: Path) -> Tuple[np.ndarray, np.ndarray]:
         partial_files_directory = temporary_directory / "TOMO" / "TOMO-SR"
         partial_file_paths      = sorted(partial_files_directory.iterdir())
-   
+
         self.logger.subsection(f"[Concatenation] Merging {len(partial_file_paths)} subsection artifacts")
 
         dem_shapes      : list[Tuple[int, ...]] = []
@@ -125,8 +116,10 @@ class TomogramProcessor:
                 dem_dtype      = hdf5_file["DEM"].dtype
                 tomogram_dtype = hdf5_file["tomogram"].dtype
 
+        AZIMUTH_AXIS = 1
+
         combined_dem_shape      = (sum(shape[0] for shape in dem_shapes),) + dem_shapes[0][1:]
-        combined_tomogram_shape = tomogram_shapes[0][:1] + (sum(shape[1] for shape in tomogram_shapes),) + tomogram_shapes[0][2:]
+        combined_tomogram_shape = tomogram_shapes[0][:AZIMUTH_AXIS] + (sum(shape[AZIMUTH_AXIS] for shape in tomogram_shapes),) + tomogram_shapes[0][AZIMUTH_AXIS + 1:]
 
         combined_dem      = np.empty(combined_dem_shape,      dtype=dem_dtype)
         combined_tomogram = np.empty(combined_tomogram_shape, dtype=tomogram_dtype)
@@ -152,11 +145,11 @@ class TomogramProcessor:
 
         self.logger.subsection(f"Combined DEM shape      : {combined_dem.shape}")
         self.logger.subsection(f"Combined Tomogram shape : {combined_tomogram.shape}")
-      
+
         return combined_dem, combined_tomogram
 
     def _save(self, tomogram_path: Path, dem_path: Path, tomogram_array: np.ndarray, dem_array: np.ndarray) -> None:
-        tomogram_path.parent.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dir(tomogram_path.parent)
         np.save(str(tomogram_path), tomogram_array, allow_pickle=False)
         np.save(str(dem_path),      dem_array,      allow_pickle=False)
 
@@ -165,9 +158,9 @@ class TomogramProcessor:
             shutil.rmtree(temporary_directory, ignore_errors=True)
 
     def run(self, tomogram_path: Path, dem_path: Path, stack_identifier: str, tomogram_config: TomogramConfiguration) -> Tuple[Path, Path]:
-        self.logger.section(f"[Generating Tomogram]")
+        self.logger.section("[Generating Tomogram]")
         self.logger.subsection(f"Target: {tomogram_path.name}")
-        
+
         temporary_directory = self._create_temp()
 
         try:
@@ -175,7 +168,7 @@ class TomogramProcessor:
             self._dispatch_workers(subsections, stack_identifier, tomogram_config, temporary_directory)
             combined_dem, combined_tomogram = self._concatenate(temporary_directory)
             self._save(tomogram_path, dem_path, combined_tomogram, combined_dem)
-            
+
             self.logger.subsection(f"Tomogram saved : {tomogram_path}")
             self.logger.subsection(f"DEM saved      : {dem_path}")
         finally:

@@ -4,6 +4,26 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
 
+class ScalarFormatter:
+
+    EMPTY = "—"
+
+    @staticmethod
+    def format_scalar(value: Any, precision: int = 5, adaptive: bool = False, empty: str = EMPTY) -> str:
+        if value is None:
+            return empty
+
+        if isinstance(value, float):
+            if adaptive and (abs(value) >= 1e4 or 0 < abs(value) < 1e-3):
+                return f"{value:.4e}"
+            return f"{value:.{precision}g}"
+
+        if isinstance(value, (list, tuple)):
+            return ", ".join(str(x) for x in value)
+
+        return str(value)
+
+
 class MarkdownTable:
 
     EMPTY = "—"

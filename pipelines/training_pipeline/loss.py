@@ -1,14 +1,35 @@
 from __future__ import annotations
 
-from functools import lru_cache
+from collections import namedtuple
+from functools   import lru_cache
 
 import torch
 import torch.nn.functional as F
 
-from configuration.training_config import GeometryConfig, LossConfig
-from tools.gaussians                import GaussianClamp
-from tools.logger                   import Logger
-from tools.tomo_geometry            import TomoGeometry
+from tools.gaussians     import GaussianClamp
+from tools.logger        import Logger
+from tools.tomo_geometry import TomoGeometry
+
+
+LossTerm = namedtuple("LossTerm", ["name", "use_flag", "weight_key", "space"])
+
+LOSS_TERMS = (
+    LossTerm("mse_curve",          "use_mse_curve",          "weight_mse_curve",          "denorm"),
+    LossTerm("l1_curve",           "use_l1_curve",           "weight_l1_curve",           "denorm"),
+    LossTerm("huber_curve",        "use_huber_curve",        "weight_huber_curve",        "denorm"),
+    LossTerm("charbonnier_curve",  "use_charbonnier_curve",  "weight_charbonnier_curve",  "denorm"),
+    LossTerm("cosine_curve",       "use_cosine_curve",       "weight_cosine_curve",       "denorm"),
+    LossTerm("spectral_coh",       "use_spectral_coherence", "weight_spectral_coh",       "denorm"),
+    LossTerm("ssim_curve",         "use_ssim_curve",         "weight_ssim_curve",         "denorm"),
+    LossTerm("total_power_relerr", "use_total_power",        "weight_total_power",        "denorm"),
+    LossTerm("moments",            "use_moments",            "weight_moments",            "denorm"),
+    LossTerm("coherence_resyn",    "use_coherence_resyn",    "weight_coherence_resyn",    "denorm"),
+    LossTerm("covariance_match",   "use_covariance_match",   "weight_covariance_match",   "denorm"),
+    LossTerm("capon_cycle",        "use_capon_cycle",        "weight_capon_cycle",        "denorm"),
+    LossTerm("param_huber",        "use_param_huber",        "weight_param_huber",        "norm"),
+    LossTerm("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv",      "norm"),
+    LossTerm("param_l1",           "use_param_l1",           "weight_param_l1",           "norm"),
+)
 
 
 class ParamMatcher:
@@ -59,35 +80,18 @@ class LossComponents:
         return kernel[None, None, :, :].contiguous()
 
     @staticmethod
-    def mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        return F.mse_loss(pred, target, reduction="mean")
-
-    @staticmethod
     def mse_diff(diff: torch.Tensor) -> torch.Tensor:
         return (diff * diff).mean()
-
-    @staticmethod
-    def l1(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        return F.l1_loss(pred, target, reduction="mean")
 
     @staticmethod
     def l1_diff(diff: torch.Tensor) -> torch.Tensor:
         return diff.abs().mean()
 
     @staticmethod
-    def huber(pred: torch.Tensor, target: torch.Tensor, delta: float) -> torch.Tensor:
-        return F.huber_loss(pred, target, reduction="mean", delta=delta)
-
-    @staticmethod
     def huber_diff(diff: torch.Tensor, delta: float) -> torch.Tensor:
         abs_diff = diff.abs()
         val      = torch.where(abs_diff <= delta, 0.5 * diff * diff, delta * (abs_diff - 0.5 * delta))
         return val.mean()
-
-    @staticmethod
-    def charbonnier(pred: torch.Tensor, target: torch.Tensor, eps: float) -> torch.Tensor:
-        diff = pred - target
-        return LossComponents.charbonnier_diff(diff, eps)
 
     @staticmethod
     def charbonnier_diff(diff: torch.Tensor, eps: float) -> torch.Tensor:
@@ -326,38 +330,21 @@ class PhysicsComponents:
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg=None, norm_stats=None, geometry_cfg=None, log_all_losses=False):
-        self.x_axis         = x_axis
-        self.logger         = logger
-        self.tracker        = tracker
-        self.gaussian_cfg   = gaussian_cfg
-        self.reconstruct    = self.reconstruct_gaussians
-        self.loss_cfg       = loss_cfg if loss_cfg is not None else LossConfig()
-        self.norm_stats     = norm_stats
-        self.geometry_cfg   = geometry_cfg if geometry_cfg is not None else GeometryConfig()
-        self.geometry       = TomoGeometry(self.geometry_cfg, x_axis)
-        self.dx             = float(x_axis[1] - x_axis[0])
-        self.log_all_losses = log_all_losses
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg, norm_stats, geometry_cfg, log_all_losses=False):
+        self.x_axis          = x_axis
+        self.logger          = logger
+        self.tracker         = tracker
+        self.gaussian_cfg    = gaussian_cfg
+        self.reconstruct     = self.reconstruct_gaussians
+        self.loss_cfg        = loss_cfg
+        self.norm_stats      = norm_stats
+        self.geometry_cfg    = geometry_cfg
+        self.geometry        = TomoGeometry(self.geometry_cfg, x_axis)
+        self.dx              = float(x_axis[1] - x_axis[0])
+        self.log_all_losses  = log_all_losses
+        self.loss_generation = 0
 
         cfg = self.loss_cfg
-
-        active_terms = [
-            ("mse_curve",         cfg.use_mse_curve,          cfg.weight_mse_curve,          "weight_mse_curve"),
-            ("l1_curve",          cfg.use_l1_curve,           cfg.weight_l1_curve,           "weight_l1_curve"),
-            ("huber_curve",       cfg.use_huber_curve,        cfg.weight_huber_curve,        "weight_huber_curve"),
-            ("charbonnier_curve", cfg.use_charbonnier_curve,  cfg.weight_charbonnier_curve,  "weight_charbonnier_curve"),
-            ("cosine_curve",      cfg.use_cosine_curve,       cfg.weight_cosine_curve,       "weight_cosine_curve"),
-            ("spectral_coh",      cfg.use_spectral_coherence, cfg.weight_spectral_coh,       "weight_spectral_coh"),
-            ("ssim_curve",        cfg.use_ssim_curve,         cfg.weight_ssim_curve,         "weight_ssim_curve"),
-            ("param_l1",          cfg.use_param_l1,           cfg.weight_param_l1,           "weight_param_l1"),
-            ("param_huber",       cfg.use_param_huber,        cfg.weight_param_huber,        "weight_param_huber"),
-            ("smoothness_tv",     cfg.use_smoothness_tv,      cfg.weight_smoothness_tv,      "weight_smoothness_tv"),
-            ("total_power",       cfg.use_total_power,        cfg.weight_total_power,        "weight_total_power"),
-            ("moments",           cfg.use_moments,            cfg.weight_moments,            "weight_moments"),
-            ("coherence_resyn",   cfg.use_coherence_resyn,    cfg.weight_coherence_resyn,    "weight_coherence_resyn"),
-            ("covariance_match",  cfg.use_covariance_match,   cfg.weight_covariance_match,   "weight_covariance_match"),
-            ("capon_cycle",       cfg.use_capon_cycle,        cfg.weight_capon_cycle,        "weight_capon_cycle"),
-        ]
 
         self.logger.section("[Loss Function]")
         self.logger.kv_table({
@@ -367,29 +354,40 @@ class Loss:
         })
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
 
-        active_rows = []
-        for name, is_used, alpha, w_key in active_terms:
-            if is_used:
-                eff    = cfg.eff(w_key)
-                factor = getattr(cfg.norm, w_key.removeprefix("weight_"), 1.0)
-                extra  = f"  [axis={cfg.ssim_axis}]" if name == "ssim_curve" else ""
-                active_rows.append({"Term": name, "Alpha": f"{alpha:g}", "Norm": f"{factor:g}", "Eff": f"{eff:g}{extra}"})
-
-        self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title="Active Terms")
+        self.log_active_terms(cfg, title="Active Terms")
 
         self.matcher = ParamMatcher(
             strategy = cfg.param_match,
             logger   = self.logger,
         )
 
+    def log_active_terms(self, cfg, title: str) -> None:
+        active_rows = []
+
+        for term in LOSS_TERMS:
+            if getattr(cfg, term.use_flag):
+                alpha  = getattr(cfg, term.weight_key)
+                eff    = cfg.eff(term.weight_key)
+                factor = getattr(cfg.norm, term.weight_key.removeprefix("weight_"), 1.0)
+                extra  = f"  [axis={cfg.ssim_axis}]" if term.name == "ssim_curve" else ""
+                active_rows.append({"Term": term.name, "Alpha": f"{alpha:g}", "Norm": f"{factor:g}", "Eff": f"{eff:g}{extra}"})
+
+        self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title=title)
+
     def set_curriculum(self, complete_cfg) -> None:
         self.loss_cfg         = complete_cfg
         self.matcher.strategy = complete_cfg.param_match
+        self.loss_generation += 1
+
+        self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
+        self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         B, C, H, W = params.shape
         ppg        = self.gaussian_cfg.params_per_gaussian
-        assert C % ppg == 0, (f"Gaussian param channels ({C}) must be divisible by {ppg}")
+
+        if C % ppg != 0:
+            raise ValueError(f"Gaussian param channels ({C}) must be divisible by {ppg}")
 
         n_gaussians = C // ppg
         p           = params.reshape(B, n_gaussians, ppg, H, W)
@@ -460,8 +458,6 @@ class Loss:
 
     def __call__(self, pred_params, gt_params):
         cfg = self.loss_cfg
-        ppg = self.gaussian_cfg.params_per_gaussian
-        C   = pred_params.shape[1]
 
         pred_params_phys = GaussianClamp.apply(
             self.norm_stats.denormalize_output(pred_params.float()),
@@ -486,52 +482,65 @@ class Loss:
         needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
         diff       = (pred_curves - exp_curves) if needs_diff else None
 
-        per_param_l1: dict = {}
+        computes = {
+            "mse_curve":          lambda: lc.mse_diff(diff),
+            "l1_curve":           lambda: lc.l1_diff(diff),
+            "huber_curve":        lambda: lc.huber_diff(diff, cfg.huber_delta),
+            "charbonnier_curve":  lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps),
+            "cosine_curve":       lambda: lc.cosine(pred_curves, exp_curves, axis=1),
+            "spectral_coh":       lambda: lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window),
+            "ssim_curve":         lambda: lc.ssim(pred_curves, exp_curves, cfg),
+            "total_power_relerr": lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor),
+            "moments":            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights),
+            "coherence_resyn":    lambda: pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor),
+            "covariance_match":   lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor),
+            "capon_cycle":        lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor),
+            "param_huber":        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0],
+            "smoothness_tv":      lambda: lc.tv(pred_params_norm),
+        }
 
-        def param_l1_term():
-            val, per_param = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
-            per_param_l1.update(per_param)
-            return val
+        components:    dict  = {}
+        weighted:      dict  = {}
+        monitor:       dict  = {}
+        total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
+        weight_sum:    float  = 0.0
 
-        terms = [
-            ("mse_curve",         "denorm", cfg.use_mse_curve,          "weight_mse_curve",          lambda: lc.mse_diff(diff)),
-            ("l1_curve",          "denorm", cfg.use_l1_curve,           "weight_l1_curve",           lambda: lc.l1_diff(diff)),
-            ("huber_curve",       "denorm", cfg.use_huber_curve,        "weight_huber_curve",        lambda: lc.huber_diff(diff, cfg.huber_delta)),
-            ("charbonnier_curve", "denorm", cfg.use_charbonnier_curve,  "weight_charbonnier_curve",  lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps)),
-            ("cosine_curve",      "denorm", cfg.use_cosine_curve,       "weight_cosine_curve",       lambda: lc.cosine(pred_curves, exp_curves, axis=1)),
-            ("spectral_coh",      "denorm", cfg.use_spectral_coherence, "weight_spectral_coh",       lambda: lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window)),
-            ("ssim_curve",        "denorm", cfg.use_ssim_curve,         "weight_ssim_curve",         lambda: lc.ssim(pred_curves, exp_curves, cfg)),
-            ("total_power",       "denorm", cfg.use_total_power,        "weight_total_power",        lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor)),
-            ("moments",           "denorm", cfg.use_moments,            "weight_moments",            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights)),
-            ("coherence_resyn",   "denorm", cfg.use_coherence_resyn,    "weight_coherence_resyn",    lambda: pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor)),
-            ("covariance_match",  "denorm", cfg.use_covariance_match,   "weight_covariance_match",   lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor)),
-            ("capon_cycle",       "denorm", cfg.use_capon_cycle,        "weight_capon_cycle",        lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor)),
-            ("param_huber",       "norm",   cfg.use_param_huber,        "weight_param_huber",        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0]),
-            ("smoothness_tv",     "norm",   cfg.use_smoothness_tv,      "weight_smoothness_tv",      lambda: lc.tv(pred_params_norm)),
-            ("param_l1",          "norm",   cfg.use_param_l1,           "weight_param_l1",           param_l1_term),
-        ]
+        per_param_l1:  dict   = {}
 
-        components:  dict  = {}
-        weighted:    dict  = {}
-        monitor:     dict  = {}
-        total_loss         = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
-        weight_sum:  float = 0.0
+        for term in LOSS_TERMS:
+            is_used = getattr(cfg, term.use_flag)
 
-        for name, space, is_used, weight_key, compute in terms:
+            if term.name == "param_l1":
+                if is_used:
+                    val, per_param_l1 = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                elif self.log_all_losses:
+                    with torch.no_grad():
+                        val, per_param_l1 = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                else:
+                    continue
+            else:
+                compute = computes[term.name]
+
+                if is_used:
+                    val = compute()
+                elif self.log_all_losses:
+                    with torch.no_grad():
+                        val = compute()
+                else:
+                    continue
+
             if is_used:
-                eff_w             = cfg.eff(weight_key)
-                val               = compute()
-                components[name]  = val
-                weighted[name]    = eff_w * val
-                total_loss        = total_loss + weighted[name]
-                weight_sum       += eff_w
+                eff_w                  = cfg.eff(term.weight_key)
+                components[term.name]  = val
+                weighted[term.name]    = eff_w * val
+                total_loss             = total_loss + weighted[term.name]
+                weight_sum            += eff_w
 
                 if self.log_all_losses:
-                    monitor[f"{name}_{space}"] = val
+                    monitor[f"{term.name}_{term.space}"] = val
 
-            elif self.log_all_losses:
-                with torch.no_grad():
-                    monitor[f"{name}_{space}"] = compute()
+            else:
+                monitor[f"{term.name}_{term.space}"] = val
 
         if cfg.use_param_l1:
             eff_w = cfg.eff("weight_param_l1")

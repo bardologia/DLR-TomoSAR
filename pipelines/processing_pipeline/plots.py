@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy             as np
 
 from configuration.processing_config import ProcessingConfiguration
+from pipelines.shared.io             import FileIO
 from pipelines.shared.plotting       import PlotBase
 from tools.logger                    import Logger
 
@@ -31,8 +32,7 @@ class StackPlotter(PlotBase):
             "interferograms" : self.images_directory / "interferograms",
             "dem"            : self.images_directory / "dem",
         }
-        for directory in dirs.values():
-            directory.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dirs(*dirs.values())
         return dirs
 
     @staticmethod
@@ -54,6 +54,20 @@ class StackPlotter(PlotBase):
 
         return self._save(fig, out_path)
 
+    def _plot_linear_amplitude(self, amplitude: np.ndarray, title: str, cbar_label: str, out_path: Path) -> Path:
+        Az, R      = amplitude.shape
+        vmin, vmax = self._shared_clim(amplitude)
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im      = ax.imshow(amplitude, cmap="gray", vmin=vmin, vmax=vmax, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
+        ax.set_xlabel("range [px]")
+        ax.set_ylabel("azimuth [px]")
+        ax.set_title(title)
+        fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02).set_label(cbar_label)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
     def _plot_phase(self, phase: np.ndarray, title: str, out_path: Path) -> Path:
         Az, R = phase.shape
 
@@ -71,12 +85,13 @@ class StackPlotter(PlotBase):
         return self._save(fig, out_path)
 
     def _plot_interferogram(self, interferogram: np.ndarray, title: str, out_dir: Path, stem: str) -> Dict[str, Path]:
-        amplitude_db = self._amplitude_db(interferogram)
-        phase        = np.angle(interferogram).astype(np.float32)
+        clip      = float(self.config.tomogram_config.max_amplitude_clip)
+        amplitude = np.abs(interferogram).astype(np.float32)
+        phase     = np.angle(interferogram).astype(np.float32)
 
         return {
-            "amplitude" : self._plot_amplitude(amplitude_db, f"{title} — amplitude",       out_dir / f"{stem}_amplitude.png"),
-            "phase"     : self._plot_phase(phase,            f"{title} — flattened phase", out_dir / f"{stem}_phase.png"),
+            "amplitude" : self._plot_linear_amplitude(amplitude, f"{title} — secondary SLC amplitude (clipped at {clip:g})", f"secondary SLC amplitude (clipped at {clip:g})", out_dir / f"{stem}_amplitude.png"),
+            "phase"     : self._plot_phase(phase,                f"{title} — flattened phase",                              out_dir / f"{stem}_phase.png"),
         }
 
     def _plot_dem(self, dem: np.ndarray, title: str, out_path: Path) -> Path:
@@ -138,7 +153,10 @@ class StackPlotter(PlotBase):
             label = str(pass_labels[index + 1]) if pass_labels else f"pass_{index + 1:02d}"
 
             self.logger.subsection(f"Plotting interferogram {index + 1}/{n_interferograms} — {label}")
-            for kind, path in self._plot_interferogram(np.asarray(interferograms[index]), f"Interferogram — {primary_label} / {label}", dirs["interferograms"], f"interferogram_{index + 1:02d}_{label}").items():
+
+            outputs = self._plot_interferogram(np.asarray(interferograms[index]), f"Interferogram — {primary_label} / {label}", dirs["interferograms"], f"interferogram_{index + 1:02d}_{label}")
+
+            for kind, path in outputs.items():
                 saved[f"interferogram_{index:02d}_{kind}"] = path
 
             gc.collect()

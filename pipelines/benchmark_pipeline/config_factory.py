@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from configuration.inference_config import InferenceConfig
+from pipelines.shared.io        import FileIO
 from tools.regions              import CropRegion
 
 from configuration.dataset_config import (
@@ -19,7 +19,6 @@ from configuration.dataset_config import (
 from configuration.training_config import (
     LossCurriculumConfig,
     EarlyStoppingConfig,
-    EMAConfig,
     GaussianConfig,
     GeometryConfig,
     GradientClipperConfig,
@@ -44,9 +43,7 @@ class ConfigFactory:
 
     def global_crop(self) -> CropRegion:
         layout_path = Path(self.config.paths.dataset_path) / "data" / "dataset.json"
-
-        with open(layout_path, "r", encoding="utf-8") as f:
-            layout = json.load(f)
+        layout      = FileIO.load_json(layout_path)
 
         return CropRegion(*layout["global_crop"])
 
@@ -110,30 +107,31 @@ class ConfigFactory:
             ),
         )
 
+    def _base_trainer_kwargs(self, logdir: Path) -> dict:
+        return {
+            "gaussian"         : GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
+            "geometry"         : GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
+            "gradient_clipper" : GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
+            "io"               : IOConfig(logdir=str(logdir)),
+        }
+
     def training_trainer_config(self, logdir: Path) -> TrainerConfig:
         training         = self.config.training
         scheduler_epochs = training.scheduler_epochs if training.scheduler_epochs is not None else training.epochs
 
         return TrainerConfig(
-            gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
-            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
-            early_stopping   = EarlyStoppingConfig(patience=training.early_stop_patience, min_delta=training.early_stop_min_delta, restore_best=True),
-            warmup           = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
-            scheduler        = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
-            ema              = EMAConfig(use_ema=False, ema_decay=0.999),
-            optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
-            gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
+            **self._base_trainer_kwargs(logdir),
 
-            io = IOConfig(logdir=str(logdir)),
+            early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, min_delta=training.early_stop_min_delta, restore_best=True),
+            warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
+            scheduler      = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
+            optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
 
             training = TrainingConfigInner(
-                device                      = "gpu",
                 epochs                      = training.epochs,
                 validation_frequency        = training.validation_frequency,
                 use_amp                     = False,
                 gradient_accumulation_steps = 1,
-                max_grad_norm               = None,
-                verbose                     = True,
                 log_all_losses              = training.log_all_losses,
             ),
 
@@ -150,16 +148,12 @@ class ConfigFactory:
         overfit = self.config.overfit
 
         return TrainerConfig(
-            gaussian         = GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
-            geometry         = GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
-            early_stopping   = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
-            warmup           = WarmupConfig(warmup_enabled=False),
-            scheduler        = SchedulerConfig(type="constant"),
-            ema              = EMAConfig(use_ema=False, ema_decay=0.999),
-            optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
-            gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
+            **self._base_trainer_kwargs(logdir),
 
-            io = IOConfig(logdir=str(logdir)),
+            early_stopping = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
+            warmup         = WarmupConfig(warmup_enabled=False),
+            scheduler      = SchedulerConfig(type="constant"),
+            optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
 
             training = TrainingConfigInner(
                 device               = "gpu",
@@ -182,6 +176,12 @@ class ConfigFactory:
         )
 
     def prepare_overfit_model_config(self, model_config):
+        self._disable_regularization(model_config)
+        self._boost_learning_rates(model_config)
+
+        return model_config
+
+    def _disable_regularization(self, model_config) -> None:
         for attribute in ("dropout", "attention_dropout", "stochastic_depth_rate"):
             if hasattr(model_config, attribute):
                 setattr(model_config, attribute, 0.0)
@@ -190,10 +190,10 @@ class ConfigFactory:
             if attribute.endswith("_wd"):
                 setattr(model_config, attribute, 0.0)
 
+    def _boost_learning_rates(self, model_config) -> None:
+        for attribute in vars(model_config):
             if attribute.endswith("_lr"):
                 setattr(model_config, attribute, getattr(model_config, attribute) * 10.0)
-
-        return model_config
 
     def inference_config(self, run_directory: Path) -> InferenceConfig:
         inference = self.config.inference
@@ -202,7 +202,6 @@ class ConfigFactory:
             run_directory      = run_directory,
             output_subdir      = None,
             device             = "cuda",
-            use_ema            = inference.use_ema,
             checkpoint_name    = inference.checkpoint_name,
             split              = inference.split,
             batch_size         = inference.batch_size,

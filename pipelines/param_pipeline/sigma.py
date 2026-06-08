@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import gc
 import os
-import warnings
-
-warnings.filterwarnings("ignore", message=".*pynvml.*", category=FutureWarning)
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
@@ -17,6 +14,7 @@ import jax
 import jax.numpy as jnp
 
 from configuration.param_extraction_config import FitSettings
+from pipelines.shared.preprocessing         import ProfilePreprocessor
 from tools.gaussians                        import GaussianMixture
 from tools.logger                           import Logger
 
@@ -326,6 +324,26 @@ class BestKSelector:
         return best_params, mse_all.astype(np.float32), penalised_all.astype(np.float32), best_K_idx.astype(np.int16)
 
 
+class KernelBackendSelector:
+    def __init__(self, gpu_device_ids : Optional[List[int]] = None) -> None:
+        self.gpu_device_ids = gpu_device_ids
+
+    def select(self) -> Tuple[object, int, str, list]:
+        all_gpu_devices = [d for d in jax.devices() if d.platform in ("gpu", "cuda")]
+        active_devices  = ([all_gpu_devices[i] for i in self.gpu_device_ids] if self.gpu_device_ids else all_gpu_devices) if all_gpu_devices else jax.devices()
+
+        if len(active_devices) > 1:
+            kernel    = PmapSigmaAdamKernel(active_devices)
+            n_devices = len(active_devices)
+            backend   = f"pmap  ({n_devices} GPUs)"
+        else:
+            kernel    = SigmaAdamKernel()
+            n_devices = 1
+            backend   = "jit  (1 GPU)"
+
+        return kernel, n_devices, backend, active_devices
+
+
 class SigmaFittingExtractor:
     def __init__(
         self,
@@ -362,17 +380,10 @@ class SigmaFittingExtractor:
         self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
         self._best_k_selector  = BestKSelector(k_max=k_max, lambda_k=lambda_k, logger=logger)
 
-        all_gpu_devices = [d for d in jax.devices() if d.platform in ("gpu", "cuda")]
-        active_devices  = ([all_gpu_devices[i] for i in gpu_device_ids] if gpu_device_ids else all_gpu_devices) if all_gpu_devices else jax.devices()
+        kernel, n_devices, backend, active_devices = KernelBackendSelector(gpu_device_ids).select()
 
-        if len(active_devices) > 1:
-            self._kernel    = PmapSigmaAdamKernel(active_devices)
-            self._n_devices = len(active_devices)
-            backend         = f"pmap  ({self._n_devices} GPUs)"
-        else:
-            self._kernel    = SigmaAdamKernel()
-            self._n_devices = 1
-            backend         = "jit  (1 GPU)"
+        self._kernel    = kernel
+        self._n_devices = n_devices
 
         self.logger.section("[GPU Parameter Extractor]")
         self.logger.subsection(f"JAX active devices : {active_devices}")
@@ -407,8 +418,8 @@ class SigmaFittingExtractor:
         sigma_lower_j = jnp.float32(dh)
         sigma_upper_j = jnp.float32(h_span / 2.0)
 
-        threshold_factor = float(getattr(fit_cfg, "threshold_factor", 0.0))
-        truncation_index = int(  getattr(fit_cfg, "truncation_index", H))
+        threshold_factor = float(fit_cfg.threshold_factor)
+        truncation_index = int(  fit_cfg.truncation_index)
 
         self.logger.section("[Data Preparation]")
         self.logger.subsection(f"H            : {H}")
@@ -463,12 +474,7 @@ class SigmaFittingExtractor:
         r_end = min(r_start + self.range_batch_size, R)
         r_c   = r_end - r_start
         raw   = np.abs(np.array(tomogram_mmap[:, :, r_start:r_end])).astype(np.float32)
-
-        if threshold_factor > 0.0:
-            raw = np.where(raw > raw.max(axis=0, keepdims=True) * threshold_factor, raw, 0.0)
-
-        if truncation_index < H:
-            raw[truncation_index:, :, :] = 0.0
+        raw   = ProfilePreprocessor.apply(raw, threshold_factor, truncation_index)
 
         pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H).copy()
         active = pf.max(axis=1) > 1e-3
@@ -609,7 +615,7 @@ class SigmaFittingExtractor:
         n_batches = -(-R // self.range_batch_size)
 
         self.logger.section("[Range Bin Loading]")
-        self.logger.subsection(f"Streaming range batches (load fused with fitting)")
+        self.logger.subsection("Streaming range batches (load fused with fitting)")
         self.logger.subsection(f"Range batches : {n_batches} x {self.range_batch_size} bins, phases 1-3 repeat once per batch")
 
         total_attempted = 0

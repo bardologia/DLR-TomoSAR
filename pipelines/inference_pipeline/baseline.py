@@ -154,6 +154,12 @@ class ClassicalBaseline:
         stack[0]  = np.abs(complex_inputs[0]).astype(np.float32)
         stack[1:] = complex_inputs[1 + n_secondaries:1 + 2 * n_secondaries]
 
+        self.logger.subsection("Covariance      : NON-STANDARD assumption")
+        self.logger.subsection("                  channel 0 is the primary AMPLITUDE (phase discarded)")
+        self.logger.subsection("                  channels 1.. are the precomputed interferograms, not the coregistered secondary SLCs")
+        self.logger.subsection(f"                  coregistered secondary SLCs at complex_inputs[1:{1 + n_secondaries}] are NOT used")
+        self.logger.subsection("                  the boxcar sample covariance therefore differs from the SLC covariance the steering vector assumes")
+
         return stack
 
     @staticmethod
@@ -175,6 +181,10 @@ class ClassicalBaseline:
             "Phase sign"  : self.phase_sign,
             "Elevations"  : int(np.asarray(x_axis).size),
         })
+
+        self.logger.subsection(f"Steering sign   : phase_sign = {self.phase_sign:+.1f} is an UNVALIDATED convention assumption")
+        self.logger.subsection("                  it sets whether the Capon spectrum peaks at +elevation or -elevation")
+        self.logger.subsection("                  a wrong sign flips the Capon tomogram in elevation; it is not asserted against GT here")
 
         kz = self.geometry.load_kz()
         if kz.size != 1 + n_secondaries:

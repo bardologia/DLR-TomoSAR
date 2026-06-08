@@ -43,7 +43,7 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
     )
     from tools.regions import CropRegion
     from configuration.training_config import (
-        EarlyStoppingConfig, EMAConfig, GaussianConfig, IOConfig, LossConfig,
+        EarlyStoppingConfig, GaussianConfig, IOConfig, LossConfig,
         OptimizerConfig, OverfitConfig, SchedulerConfig, TrainerConfig, TrainingConfigInner, WarmupConfig,
     )
     from pipelines.training_pipeline.pipeline import TrainingPipeline
@@ -87,19 +87,13 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
         early_stopping = EarlyStoppingConfig(patience=15, min_delta=0.0001, restore_best=True),
         warmup         = WarmupConfig(warmup_steps=50, warmup_start_factor=0.1, warmup_enabled=True),
         scheduler      = SchedulerConfig(epochs=150, eta_min=1e-6),
-        ema            = EMAConfig(use_ema=False, ema_decay=0.999),
         optimizer      = OptimizerConfig(lr=3e-4, betas=(0.9, 0.999), eps=1e-8),
         io             = IOConfig(logdir=logdir),
         training = TrainingConfigInner(
-            device                      = "gpu",
             epochs                      = 150,
             validation_frequency        = 5,
             use_amp                     = False,
             gradient_accumulation_steps = 1,
-            max_grad_norm               = None,
-            verbose                     = True,
-            deep_validation             = False,
-            eval_train_split            = False,
         ),
         loss = LossConfig(
             use_ssim_curve    = False,

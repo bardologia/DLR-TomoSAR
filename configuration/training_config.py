@@ -161,20 +161,12 @@ class GaussianConfig:
         meta_dir     = Path(dataset_dir) / "meta"
         cfg          = json.loads((meta_dir / "config_state.json").read_text())
         height_range = cfg["tomogram_config"]["height_range"]
-        
+
         return cls(
             n_default_gaussians = n_gaussians,
             x_min               = float(height_range[0]),
             x_max               = float(height_range[1]),
         )
-
-    def make_param_names(self, n_gaussians: int | None = None) -> list[str]:
-        k = n_gaussians
-        return [f"{prefix}{i + 1}" for i in range(k) for prefix in ("a", "mu", "sig")]
-
-    @property
-    def default_param_names(self) -> list[str]:
-        return self.make_param_names(self.n_default_gaussians)
 
 
 @dataclass
@@ -195,36 +187,14 @@ class WarmupConfig:
 
 @dataclass
 class SchedulerConfig:
-    type         : str   = "cosine_annealing"
-    epochs       : int   = 100
-    eta_min      : float = 1e-6
-    step_size    : int   = 30
-    gamma        : float = 0.1
-    milestones   : list  = field(default_factory=lambda: [30, 60, 90])
-    start_factor : float = 1.0
-    end_factor   : float = 0.1
-    total_iters  : int   = 100
-    power        : float = 1.0
-    factor       : float = 0.1
-    patience     : int   = 10
-    threshold    : float = 1e-4
-    T_0          : int   = 10
-    T_mult       : float = 1.0
-
-
-@dataclass
-class EMAConfig:
-    use_ema               : bool  = True
-    ema_decay             : float = 0.999
-    update_every_n_steps  : int   = 10
+    type    : str   = "cosine_annealing"
+    epochs  : int   = 100
+    eta_min : float = 1e-6
 
 
 @dataclass
 class IOConfig:
     logdir     : str = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
-    tb_dir     : str = ""
-    docs_dir   : str = ""
-    logs_dir   : str = ""
     writer = None
 
 
@@ -246,25 +216,19 @@ class OverfitConfig:
 
 @dataclass
 class TrainingConfigInner:
-    device                      : str   = "cuda" if torch.cuda.is_available() else "cpu"
     epochs                      : int   = 3
     validation_frequency        : int   = 5
     use_amp                     : bool  = False
     gradient_accumulation_steps : int   = 1
-    max_grad_norm               : float = None
-    verbose                     : bool  = True
     log_debug                   : bool  = True
     log_all_losses              : bool  = False
 
 
 @dataclass
 class MemoryConfig:
-    streaming_eval            : bool = True   
-    eval_keep_pixel_arrays    : bool = True   
-    eval_pixel_subsample      : int  = 0      
-    clear_cache_every_n_steps : int  = 0      
-    clear_cache_after_eval    : bool = False  
-    clear_cache_after_epoch   : bool = False 
+    clear_cache_every_n_steps : int  = 0
+    clear_cache_after_eval    : bool = False
+    clear_cache_after_epoch   : bool = False
 
 
 @dataclass
@@ -272,9 +236,6 @@ class ResourceConfig:
     enabled            : bool  = True
     poll_interval_sec  : float = 5.0
     log_to_tensorboard : bool  = True
-    log_to_csv         : bool  = True
-    csv_path           : str   = ""        
-    logs_dir           : str   = ""       
     warn_ram_pct       : float = 90.0
     warn_vram_pct      : float = 90.0
     warn_swap_pct      : float = 50.0
@@ -284,7 +245,7 @@ class ResourceConfig:
 
 @dataclass
 class GradientClipperConfig:
-    clip_mode            : str   = "fixed"   # disabled | fixed | adaptive_percentile | adaptive_mean_std
+    clip_mode            : str   = "fixed"
     max_grad_norm        : float = 1.0        
     adaptive_window      : int   = 200        
     adaptive_percentile  : float = 95.0      
@@ -295,9 +256,8 @@ class GradientClipperConfig:
 
 @dataclass
 class PermutationMetricsConfig:
-    enabled          : bool  = True
-    amp_threshold    : float = 1e-3
-    max_G_for_margin : int   = 8
+    enabled       : bool  = True
+    amp_threshold : float = 1e-3
 
 
 @dataclass
@@ -307,7 +267,6 @@ class TrainerConfig:
     early_stopping      : EarlyStoppingConfig      = field(default_factory=EarlyStoppingConfig)
     warmup              : WarmupConfig             = field(default_factory=WarmupConfig)
     scheduler           : SchedulerConfig          = field(default_factory=SchedulerConfig)
-    ema                 : EMAConfig                = field(default_factory=EMAConfig)
     io                  : IOConfig                 = field(default_factory=IOConfig)
     optimizer           : OptimizerConfig          = field(default_factory=OptimizerConfig)
     training            : TrainingConfigInner      = field(default_factory=TrainingConfigInner)

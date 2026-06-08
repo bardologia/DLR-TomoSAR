@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 
@@ -16,12 +17,16 @@ class FileIO:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def save_json(payload: dict, path: Path, indent: int = 4) -> Path:
+    def save_json(payload: dict, path: Path, indent: int = 4, atomic: bool = False) -> Path:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
+        target = path.with_name(path.name + ".tmp") if atomic else path
+        with open(target, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=indent, default=str)
+
+        if atomic:
+            os.replace(target, path)
 
         return path
 

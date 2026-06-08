@@ -4,6 +4,7 @@ import gc
 from dataclasses import dataclass, field
 
 from configuration.benchmark_config import BenchmarkConfig
+from configuration.training_config  import GaussianConfig
 from models import CONFIG_REGISTRY, get_model
 from tools.logger import Logger
 
@@ -93,7 +94,9 @@ class SizeMatcher:
         self.scaler       = WidthScaler()
         self.image_size   = config.training.patch_size[0]
         self.in_channels  = config.size_match.in_channels
-        self.out_channels = config.n_gaussians * 3
+
+        gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
+        self.out_channels = gaussian_cfg.params_per_gaussian * config.n_gaussians
 
     def reference_count(self) -> int:
         reference = self.config.size_match.reference_model

@@ -104,7 +104,7 @@ class OutputConfig:
     })
 
     def strategy_for(self, role_key: str) -> ChannelStrategy:
-        return self.output_strategies.get(role_key, ChannelStrategy.from_slot(role_key))
+        return self.output_strategies[role_key]
 
     @property
     def role_names(self) -> list[str]:

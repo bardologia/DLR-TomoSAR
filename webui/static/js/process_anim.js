@@ -3811,17 +3811,6 @@ class ProcessAnimator {
       }
     }
 
-    const emaW = [], emaS = [];
-    {
-      let sh = 0.40;
-      for (let s = 0; s <= 4000; s += 10) {
-        let wv = 0.66 - 0.26 * Math.exp(-s / 750) + 0.045 * Math.sin(s * 0.011) + 0.032 * Math.sin(s * 0.027 + 1.2) + 0.018 * Math.sin(s * 0.061 + 0.4);
-        wv += 0.16 * Math.exp(-(((s - 2600) / 55) ** 2));
-        sh += 0.035 * (wv - sh);
-        emaW.push(wv); emaS.push(sh);
-      }
-    }
-
     const regG = (x) => 0.55 + 0.25 * Math.sin(6.0 * x - 1.2);
     const regPts = [];
     for (let i = 0; i < 12; i++) {
@@ -3830,24 +3819,23 @@ class ProcessAnimator {
       regPts.push({ x, n, y: regG(x) + n });
     }
 
-    this._tr = { target, predRaw, mix, norms, p95, BASE, ETA, E, SPE, WS, cosF, warmF, lrAt, lossAt, trainL, valL, patAt, esBestE, esBestV, esStopE, ES_E, emaW, emaS, regG, regPts };
+    this._tr = { target, predRaw, mix, norms, p95, BASE, ETA, E, SPE, WS, cosF, warmF, lrAt, lossAt, trainL, valL, patAt, esBestE, esBestV, esStopE, ES_E, regG, regPts };
     return this._tr;
   }
 
   _training() {
     const d = this._trSetup();
-    const T = 210, tt = this.t % T;
+    const T = 199, tt = this.t % T;
     if (tt < 36) this._trIntro(tt, d);
     else if (tt < 66) this._trStep(tt - 36, d);
     else if (tt < 90) this._trSched(tt - 66, d);
     else if (tt < 115) this._trCurr(tt - 90, d);
     else if (tt < 129) this._trClip(tt - 115, d);
     else if (tt < 146) this._trMatch(tt - 129, d);
-    else if (tt < 157) this._trEma(tt - 146, d);
-    else if (tt < 169) this._trReg(tt - 157, d);
-    else if (tt < 181) this._trDrop(tt - 169, d);
-    else if (tt < 193) this._trStop(tt - 181, d);
-    else this._trEnd(tt - 193, d);
+    else if (tt < 158) this._trReg(tt - 146, d);
+    else if (tt < 170) this._trDrop(tt - 158, d);
+    else if (tt < 182) this._trStop(tt - 170, d);
+    else this._trEnd(tt - 182, d);
   }
 
   _trTag(txt) {
@@ -4414,9 +4402,9 @@ class ProcessAnimator {
 
     const dockY = Math.round(h * 0.60);
     const dockNodes = ["unscale_", "clip", "scaler.step", "scaler.update", "zero_grad"];
-    const dockW = Math.min(118, (w - 70 - 5 * 16) / 6);
+    const dockW = Math.min(118, (w - 70 - 4 * 16) / 5);
     const dockH = 34;
-    const dockX0 = (w - (6 * dockW + 5 * 16)) / 2;
+    const dockX0 = (w - (5 * dockW + 4 * 16)) / 2;
     const dockX = (i) => dockX0 + i * (dockW + 16);
 
     let batchIdx = 1, gstep = 0;
@@ -4516,18 +4504,11 @@ class ProcessAnimator {
         this._trChip(dockX(i), dockY - yOff, dockW, dockH, nm, { active: lit, color: i === 1 ? "#ffcf6b" : "#7cff9b", alpha: dockOpen });
       });
 
-      const emaHit = ts >= 22.0;
-      const emaActive = emaHit && (Math.floor(ts) % 2 === 0);
-      this._trChip(dockX(5), dockY - yOff, dockW, dockH, "EMA", { active: emaActive, color: "#7cff9b", alpha: dockOpen * (emaHit ? 1 : 0.35) });
-      if (emaHit) {
-        ctx.font = "10px 'IBM Plex Mono', monospace"; ctx.fillStyle = emaActive ? "#7cff9b" : "#5e7280";
-        ctx.fillText("global_step % 10 == 0", dockX(5) - 4, dockY - yOff + dockH + 12);
-      }
       ctx.restore();
     } else {
       ctx.save(); ctx.globalAlpha = 0.4;
       ctx.strokeStyle = "rgba(120,200,220,0.18)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 5; i++) {
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(dockX(i), dockY, dockW, dockH, 7); else ctx.rect(dockX(i), dockY, dockW, dockH);
         ctx.stroke();
@@ -4603,8 +4584,7 @@ class ProcessAnimator {
     else if (ts < 11.0) this._cap("loss = criterion(pred, gt)  ·  then loss /= accumulation_steps  ·  grads shrink so A batches sum to one true step");
     else if (ts < 14.5) this._cap("scaler.scale(loss).backward()  ·  on a non-boundary batch the step ENDS here — grads just accumulate");
     else if (ts < 18.0) this._cap("Boundary reached: (batch_idx + 1) % A == 0 (or last batch)  ·  now the real update fires");
-    else if (ts < 22.0) this._cap("unscale_ -> clip (max_grad_norm = 1.0) -> scaler.step -> scaler.update -> zero_grad  ·  clip sees TRUE-scale grads");
-    else if (ts < 25.0) this._cap("EMA update — but only when global_step % 10 == 0  ·  the shadow moves on a fraction of steps");
+    else if (ts < 25.0) this._cap("unscale_ -> clip (max_grad_norm = 1.0) -> scaler.step -> scaler.update -> zero_grad  ·  clip sees TRUE-scale grads");
     else if (ts < 28.0) this._cap("Two clocks: warmup steps every mini-batch  ·  the LR scheduler steps once per epoch");
     else this._cap("That is one step  ·  repeat per batch, then validate every 5 epochs  ·  next: the schedules these clocks drive");
   }
@@ -4719,7 +4699,7 @@ class ProcessAnimator {
       ctx.beginPath(); ctx.moveTo(pad.l, yE); ctx.lineTo(w - pad.r, yE); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = "rgba(255,207,107,0.9)"; ctx.font = "11px 'IBM Plex Mono', monospace";
       ctx.fillText("eta_min = 1e-6", w - pad.r - 108, yE - 8);
-      cap = "Anneals to eta_min = 1e-6 over T_max = 100 epochs  ·  scheduler + warmup state saved in every checkpoint";
+      cap = "Anneals to eta_min = 1e-6 over T_max = 100 epochs  ·  the best epoch's weights are saved to the checkpoint";
     }
 
     if (ts >= 2.8 && ts < 8.4) {
@@ -5283,117 +5263,6 @@ class ProcessAnimator {
     else this._cap("The fixed target order induces ordered predictions  ·  each output channel specialises in one height layer");
   }
 
-  _trEma(ts, d) {
-    const { ctx, w, h } = this;
-    this._trTag("EMA");
-    const pad = { l: 52, r: 16, t: 18, b: 30 };
-    this._axes(pad, "step", "weight");
-    const N = d.emaW.length - 1;
-    const pxS = (i) => pad.l + (i / N) * (w - pad.l - pad.r);
-    const pyW = (v) => pad.t + (1 - Math.min(1, Math.max(0, (v - 0.2) / 0.6))) * (h - pad.t - pad.b);
-
-    const prog = Math.min(1, ts / 4.5);
-    const upTo = Math.round(N * prog);
-
-    ctx.beginPath();
-    for (let i = 0; i <= upTo; i++) {
-      const X = pxS(i), Y = pyW(d.emaW[i]);
-      i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
-    }
-    ctx.strokeStyle = "rgba(53,230,208,0.65)"; ctx.lineWidth = 1.4; ctx.stroke();
-
-    ctx.beginPath();
-    for (let i = 0; i <= upTo; i++) {
-      const X = pxS(i), Y = pyW(d.emaS[i]);
-      i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
-    }
-    ctx.strokeStyle = "#7cff9b"; ctx.lineWidth = 2.6; ctx.shadowColor = "rgba(124,255,155,0.5)"; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0;
-
-    if (prog < 1) {
-      ctx.fillStyle = "#35e6d0"; ctx.beginPath(); ctx.arc(pxS(upTo), pyW(d.emaW[upTo]), 3.5, 0, 7); ctx.fill();
-      ctx.fillStyle = "#7cff9b"; ctx.beginPath(); ctx.arc(pxS(upTo), pyW(d.emaS[upTo]), 4.5, 0, 7); ctx.fill();
-    }
-
-    ctx.font = "11px 'IBM Plex Mono', monospace"; ctx.fillStyle = "#5e7280";
-    ctx.fillText("illustrative", w - pad.r - ctx.measureText("illustrative").width, pad.t + 12);
-
-    ctx.save();
-    ctx.fillStyle = "rgba(4,7,10,0.85)";
-    ctx.fillRect(pad.l + 6, pad.t + 4, 156, 42);
-    ctx.font = "13px 'IBM Plex Mono', monospace";
-    ctx.fillStyle = "rgba(53,230,208,0.95)"; ctx.fillText("online weight w", pad.l + 14, pad.t + 20);
-    ctx.fillStyle = "#7cff9b"; ctx.fillText("EMA shadow", pad.l + 14, pad.t + 38);
-    ctx.restore();
-
-    {
-      const emaTex = "\\bar{\\theta}\\leftarrow\\beta\\,\\bar{\\theta}+(1-\\beta)\\,\\theta";
-      const ea = 1 - this._ease(Math.min(1, Math.max(0, (ts - 7.6) / 0.6)));
-      const te = this._tex(emaTex, 16, "rgba(230,247,243,0.95)");
-      if (te.ready && ea > 0) {
-        const ex = pad.l + 14, eyTop = h - pad.b - 12 - te.h;
-        ctx.save();
-        ctx.globalAlpha = ea;
-        ctx.fillStyle = "rgba(4,7,10,0.85)";
-        ctx.fillRect(ex - 8, eyTop - 5, te.w + 116, te.h + 12);
-        ctx.restore();
-        this._texDraw(emaTex, ex, eyTop, 16, { alpha: ea, color: "rgba(230,247,243,0.95)" });
-        ctx.save();
-        ctx.globalAlpha = ea;
-        ctx.font = "11px 'IBM Plex Mono', monospace"; ctx.fillStyle = "#5e7280";
-        ctx.fillText("β = 0.999", ex + te.w + 14, eyTop + te.h - 3);
-        ctx.restore();
-      }
-    }
-
-    if (ts >= 5.0 && ts < 8.0) {
-      const sx = pxS(260);
-      const ha = Math.min(1, (ts - 5.0) / 0.6);
-      ctx.save(); ctx.globalAlpha = ha;
-      ctx.strokeStyle = "rgba(255,207,107,0.8)"; ctx.lineWidth = 1.3;
-      ctx.beginPath(); ctx.moveTo(sx, pad.t); ctx.lineTo(sx, h - pad.b); ctx.stroke();
-      ctx.strokeStyle = "#ff6b7d"; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.arc(sx, pyW(d.emaW[260]), 10 + Math.sin(this.t * 5) * 1.5, 0, 7); ctx.stroke();
-      ctx.fillStyle = "rgba(4,7,10,0.88)";
-      ctx.fillRect(sx + 12, h - pad.b - 92, 222, 44);
-      ctx.font = "13px 'IBM Plex Mono', monospace";
-      ctx.fillStyle = "#ff6b7d";
-      ctx.fillText("spike in w", sx + 22, h - pad.b - 75);
-      ctx.fillStyle = "#7cff9b";
-      ctx.fillText("the shadow barely moves", sx + 22, h - pad.b - 56);
-      ctx.restore();
-    }
-
-    if (ts >= 8.0) {
-      const chips = ["EMA.apply_to(model)", "validate", "EMA.restore(model)"];
-      ctx.font = "12px 'IBM Plex Mono', monospace";
-      const widths = chips.map((c) => ctx.measureText(c).width + 22);
-      const totW = widths.reduce((s, v) => s + v, 0) + 2 * 40;
-      let cx0 = (w - totW) / 2;
-      const cy = h - pad.b - 26;
-      chips.forEach((c, i) => {
-        const ca = Math.min(1, Math.max(0, (ts - 8.2 - i * 0.5) / 0.5));
-        if (ca > 0) {
-          ctx.save(); ctx.globalAlpha = ca;
-          ctx.fillStyle = "rgba(7,12,17,0.95)";
-          ctx.strokeStyle = i === 1 ? "#ffcf6b" : "#7cff9b"; ctx.lineWidth = 1.4;
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(cx0, cy - 17, widths[i], 26, 7); else ctx.rect(cx0, cy - 17, widths[i], 26);
-          ctx.fill(); ctx.stroke();
-          ctx.fillStyle = i === 1 ? "#ffcf6b" : "#7cff9b";
-          ctx.fillText(c, cx0 + 11, cy);
-          if (i < 2) { ctx.fillStyle = "rgba(143,176,170,0.8)"; ctx.fillText("->", cx0 + widths[i] + 12, cy); }
-          ctx.restore();
-        }
-        cx0 += widths[i] + 40;
-      });
-    }
-
-    if (ts < 2.5) this._cap("EMA  ·  every 10 optimizer steps the shadow absorbs a sliver of the online weights  ·  decay = 0.999");
-    else if (ts < 5.0) this._cap("Long memory: the noisy per-step weights average out  ·  the shadow tracks the trend, not the jitter");
-    else if (ts < 8.0) this._cap("A bad batch jolts w  ·  the shadow takes 0.1% of it and stays calm");
-    else this._cap("Every 5 epochs validation swaps the shadow in, scores it, swaps back  ·  the smoothed weights are what gets evaluated and shipped");
-  }
-
   _trReg(ts, d) {
     const { ctx, w, h } = this;
     this._trTag("WEIGHT DECAY");
@@ -5819,7 +5688,7 @@ class ProcessAnimator {
       else this._cap(`Training replay  ·  epoch ${Math.floor(eP)}/100  ·  complete loss: amp & sigma snap onto the target`);
     }
     else if (ts < 17.0) this._cap("The ordering rate hits 100% right at the curriculum swap — the sorted targets taught the net its output order");
-    else this._cap("Best EMA checkpoint ships: model + scheduler + warmup + EMA state  ·  next stop: the inference pipeline");
+    else this._cap("Best checkpoint ships: model weights + the elevation axis  ·  next stop: the inference pipeline");
   }
 
   /* ---------- inference: sliding window + stitch ---------- */
@@ -5984,7 +5853,7 @@ class ProcessAnimator {
 
   _infLoad(ts, d) {
     const { ctx, w, h } = this;
-    this._trTag("LOAD · EMA");
+    this._trTag("LOAD");
     const c01 = d.c01;
     const dim = ts > 13.0 ? this._lerp(1, 0.3, this._ease(c01((ts - 13.0) / 1.0))) : 1;
     ctx.save(); ctx.globalAlpha = dim;
@@ -6021,8 +5890,8 @@ class ProcessAnimator {
     const netX = w * 0.74, netY = h / 2 - 8;
     const na = this._ease(c01((ts - 2.0) / 1.2));
     const sweepX = ts >= 4.0 ? this._lerp(netX - 60, netX + 60, this._ease(c01((ts - 4.0) / 4.0))) : -1e9;
-    const emaActive = ts >= 4.0 && ts < 9.0;
-    this._infNet(netX, netY, 1.25, na * dim, emaActive ? 1 : null, ts >= 4.0 ? sweepX : null);
+    const loadActive = ts >= 4.0 && ts < 9.0;
+    this._infNet(netX, netY, 1.25, na * dim, loadActive ? 1 : null, ts >= 4.0 ? sweepX : null);
 
     if (na > 0 && ts < 9.0) {
       const la = this._ease(c01((ts - 2.4) / 0.8));
@@ -6034,8 +5903,8 @@ class ProcessAnimator {
       const cnt = Math.round(this._ease(c01((ts - 4.0) / 4.0)) * 128);
       const ea = this._ease(c01((ts - 4.0) / 0.6));
       ctx.save(); ctx.globalAlpha = ea * dim;
-      this._infText(`ema_shadow.shadow`, netX - 70, netY + 70, "#ffcf6b", 12);
-      this._infText(`EMA : applied to ${cnt} parameters`, netX - 70, netY + 88, "#ffcf6b", 13);
+      this._infText(`params  ->  layers`, netX - 70, netY + 70, "rgba(53,230,208,0.9)", 12);
+      this._infText(`${cnt} parameter tensors restored`, netX - 70, netY + 88, "rgba(53,230,208,0.9)", 13);
       ctx.restore();
     }
 
@@ -6058,8 +5927,8 @@ class ProcessAnimator {
 
     if (ts < 2.0) this._cap("Inference loads a finished training run  ·  best_model.pt");
     else if (ts < 4.0) this._cap("Rebuild the architecture  ·  load_state_dict restores the trained weights");
-    else if (ts < 9.0) this._cap("use_ema = True  ·  trainable weights are overwritten by the EMA shadow");
-    else if (ts < 11.5) this._cap("EMA : applied to 128 parameters  ·  the smoothed weights generalise better");
+    else if (ts < 9.0) this._cap("Weights stream into every layer  ·  128 parameter tensors restored");
+    else if (ts < 11.5) this._cap("The trained model is rebuilt, ready to score");
     else this._cap("model.eval()  ·  wrapped to denormalize + clamp every prediction");
   }
 

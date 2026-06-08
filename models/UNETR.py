@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 from configuration.models_config import UNETRConfig
-from .blocks import ConvBlock, DropPath, build_activation, build_norm2d, initialize_weights, match_spatial_size
+from .blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
 
-# Projects transformer tokens to CNN feature space with progressive ConvTranspose upsampling
+
 class ProgressiveProjectionHead(nn.Module):
     def __init__(
         self,
@@ -18,7 +18,6 @@ class ProgressiveProjectionHead(nn.Module):
         bias:            bool  = False,
     ):
         super().__init__()
-        # Front projection: 3x3 conv -> Norm -> Act (paper's consecutive 3x3 projection)
         layers = [
             nn.Conv2d(
                 in_channels  = input_channels,
@@ -30,7 +29,6 @@ class ProgressiveProjectionHead(nn.Module):
             build_norm2d(normalization, output_channels),
             build_activation(activation),
         ]
-        # Blue block per Fig. 2: Deconv 2x2 -> Conv 3x3 -> Norm -> Act
         for _ in range(upsample_steps):
             layers.extend([
                 nn.ConvTranspose2d(
@@ -56,117 +54,6 @@ class ProgressiveProjectionHead(nn.Module):
         return self.layers(x)
 
 
-# Standard multi-head self-attention with scaled dot-product (Vaswani et al., 2017)
-class MultiHeadSelfAttention(nn.Module):
-    def __init__(
-        self,
-        embedding_dim:     int,
-        num_heads:         int,
-        dropout:           float = 0.0,
-        attention_dropout: float = 0.0,
-    ):
-        super().__init__()
-        if embedding_dim % num_heads != 0:
-            raise ValueError(f"embedding_dim ({embedding_dim}) must be divisible by num_heads ({num_heads})")
-        
-        self.num_heads = num_heads
-        self.head_dim  = embedding_dim // num_heads
-        self.scale     = self.head_dim ** -0.5
-
-        self.query_key_value   = nn.Linear(embedding_dim, embedding_dim * 3)
-        self.output_projection = nn.Linear(embedding_dim, embedding_dim)
-        self.attention_dropout = nn.Dropout(attention_dropout)
-        self.output_dropout    = nn.Dropout(dropout)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        batch_size, sequence_length, embedding_dim = x.shape
-        qkv = self.query_key_value(x)
-        qkv = qkv.reshape(batch_size, sequence_length, 3, self.num_heads, self.head_dim)
-        qkv = qkv.permute(2, 0, 3, 1, 4)
-        query, key, value = qkv.unbind(0)
-
-        attention_weights = (query @ key.transpose(-2, -1)) * self.scale
-        attention_weights = attention_weights.softmax(dim=-1)
-        attention_weights = self.attention_dropout(attention_weights)
-
-        attended  = (attention_weights @ value).transpose(1, 2)
-        attended  = attended.reshape(batch_size, sequence_length, embedding_dim)
-        projected = self.output_projection(attended)
-        return self.output_dropout(projected)
-
-
-# Transformer block: LayerNorm -> MHSA -> DropPath -> LayerNorm -> FFN -> DropPath
-class TransformerBlock(nn.Module):
-    def __init__(
-        self,
-        embedding_dim:     int,
-        num_heads:         int,
-        mlp_ratio:         float = 4.0,
-        dropout:           float = 0.0,
-        attention_dropout: float = 0.0,
-        ffn_activation:    str   = "gelu",
-        drop_path_rate:    float = 0.0,
-    ):
-        super().__init__()
-        self.norm_1    = nn.LayerNorm(embedding_dim)
-        self.attention = MultiHeadSelfAttention(
-            embedding_dim     = embedding_dim,
-            num_heads         = num_heads,
-            dropout           = dropout,
-            attention_dropout = attention_dropout,
-        )
-        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
-        self.norm_2    = nn.LayerNorm(embedding_dim)
-        
-        hidden_dim = int(embedding_dim * mlp_ratio)
-        self.feed_forward = nn.Sequential(
-            nn.Linear(embedding_dim, hidden_dim),
-            build_activation(ffn_activation),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, embedding_dim),
-            nn.Dropout(dropout),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        normalized = self.norm_1(x)
-        x = x + self.drop_path(self.attention(normalized))
-        normalized = self.norm_2(x)
-        x = x + self.drop_path(self.feed_forward(normalized))
-        return x
-
-
-# Splits input image into non-overlapping patches and projects them to token embeddings
-class PatchEmbedding(nn.Module):
-    def __init__(
-        self,
-        in_channels:   int,
-        embedding_dim: int,
-        patch_size:    int,
-    ):
-        super().__init__()
-        self.patch_size = patch_size
-        self.projection = nn.Conv2d(
-            in_channels  = in_channels, 
-            out_channels = embedding_dim,
-            kernel_size  = patch_size, 
-            stride       = patch_size,
-        )
-        self.norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, int, int]:
-        x = self.projection(x)
-        grid_height, grid_width = x.shape[2], x.shape[3]
-        x = x.flatten(2).transpose(1, 2)
-        x = self.norm(x)
-        return x, grid_height, grid_width
-
-# Reshapes flat token sequence back into a 2D feature map (B, C, H, W)
-def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    batch_size, _, channels = tokens.shape
-    return tokens.transpose(1, 2).view(batch_size, channels, height, width)
-
-
-# UNETR: pure-transformer encoder with CNN decoder and multi-scale skip connections (Hatamizadeh et al., 2022)
 class UNETR(nn.Module):
     def __init__(self, config: UNETRConfig | None = None):
         super().__init__()
@@ -206,7 +93,6 @@ class UNETR(nn.Module):
         ])
         self.transformer_norm = nn.LayerNorm(config.embedding_dim)
 
-        # Indices of transformer layers from which to extract skip connections (evenly spaced)
         total_layers = config.transformer_layers
         self.skip_layer_indices = [
             total_layers // 4 - 1,
@@ -216,7 +102,6 @@ class UNETR(nn.Module):
         ]
 
         decoder_features      = config.decoder_features
-        # Projection heads: progressively upsample intermediate transformer features to match decoder scales
         self.transformer_skip_heads = nn.ModuleList([
             ProgressiveProjectionHead(
                 input_channels  = config.embedding_dim,
@@ -252,7 +137,6 @@ class UNETR(nn.Module):
             bias            = config.conv_bias,
         )
 
-        # Separate conv to process original input as the finest-resolution skip connection
         self.input_skip_conv = ConvBlock(
             input_channels  = config.in_channels,
             output_channels = decoder_features[-1],
@@ -312,11 +196,9 @@ class UNETR(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
 
-        # Tokenize input image into patch embeddings + add positional encoding
         tokens, grid_height, grid_width = self.patch_embedding(x)
         tokens = tokens + self.positional_embedding[:, :tokens.shape[1], :]
 
-        # Transformer encoder: collect intermediate skip features at evenly spaced layers
         transformer_skip_maps = []
         for layer_index, transformer_block in enumerate(self.transformer_blocks):
             tokens = transformer_block(tokens)
@@ -324,17 +206,14 @@ class UNETR(nn.Module):
                 skip_tokens = self.transformer_norm(tokens) if layer_index == len(self.transformer_blocks) - 1 else tokens
                 transformer_skip_maps.append(tokens_to_feature_map(skip_tokens, grid_height, grid_width))
 
-        # Progressively upsample intermediate skip maps to match decoder resolution levels
         progressively_upsampled_skips = [
             skip_head(feature_map)
             for skip_head, feature_map in zip(self.transformer_skip_heads, transformer_skip_maps[:-1])
         ]
         progressively_upsampled_skips = progressively_upsampled_skips[::-1]
 
-        # Project bottleneck (deepest transformer output) to decoder feature space
         x = self.bottleneck_projection(transformer_skip_maps[-1])
 
-        # CNN decoder: upsample -> concat with skip -> ConvBlock at each level
         for index in range(len(self.upsample_layers)):
             x = self.upsample_layers[index](x)
 

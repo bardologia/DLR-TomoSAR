@@ -5,10 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.models_config import SwinUNetConfig
-from .blocks import DropPath, build_activation, initialize_weights, match_spatial_size
+from .blocks import DropPath, build_activation, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
-# Multi-head self-attention within local windows, with learned relative position bias
 class WindowAttention(nn.Module):
     def __init__(
         self,
@@ -31,7 +30,6 @@ class WindowAttention(nn.Module):
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.output_dropout = nn.Dropout(dropout)
 
-        # Learnable relative position bias table for spatial awareness within windows
         self.relative_position_bias_table = nn.Parameter(
             torch.zeros((2 * window_size - 1) * (2 * window_size - 1), num_heads)
         )
@@ -50,7 +48,6 @@ class WindowAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         batch_windows, sequence_length, embedding_dim = x.shape
-        # Compute Q, K, V projections and reshape for multi-head attention
         qkv = self.query_key_value(x)
         qkv = qkv.reshape(batch_windows, sequence_length, 3, self.num_heads, self.head_dim)
         qkv = qkv.permute(2, 0, 3, 1, 4)
@@ -81,7 +78,6 @@ class WindowAttention(nn.Module):
         return self.output_dropout(projected)
 
 
-# Swin Transformer block: window attention (optionally shifted) + FFN with residual connections
 class SwinTransformerBlock(nn.Module):
     def __init__(
         self,
@@ -119,7 +115,6 @@ class SwinTransformerBlock(nn.Module):
             nn.Dropout(dropout),
         )
 
-    # Creates mask for shifted window attention to prevent cross-region attention
     def _create_attention_mask(self, height, width, device):
         if self.shift_size == 0:
             return None
@@ -207,13 +202,6 @@ class SwinTransformerBlock(nn.Module):
         x = x + self.drop_path(self.feed_forward(normalized))
         return x
 
-# Reshapes flat token sequence back into a 2D feature map (B, C, H, W)
-def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    batch_size, _, channels = tokens.shape
-    return tokens.transpose(1, 2).view(batch_size, channels, height, width)
-
-
-# Patch Merging: reduces spatial resolution by 2x while doubling channels (like downsampling)
 class PatchMerging(nn.Module):
     def __init__(self, input_dim: int, output_dim: int):
         super().__init__()
@@ -241,7 +229,6 @@ class PatchMerging(nn.Module):
         return x, height // 2, width // 2
 
 
-# Patch Expanding: doubles spatial resolution while halving channels (like upsampling)
 class PatchExpanding(nn.Module):
     def __init__(self, input_dim: int, output_dim: int):
         super().__init__()
@@ -261,8 +248,7 @@ class PatchExpanding(nn.Module):
         return x, height * 2, width * 2
 
 
-# Encoder stage: sequence of Swin Transformer blocks (alternating regular and shifted windows)
-class SwinEncoderStage(nn.Module):
+class SwinStage(nn.Module):
     def __init__(
         self,
         embedding_dim:     int,
@@ -300,46 +286,6 @@ class SwinEncoderStage(nn.Module):
         return x
 
 
-# Decoder stage: symmetric to encoder, refines features at each resolution level
-class SwinDecoderStage(nn.Module):
-    def __init__(
-        self,
-        embedding_dim:     int,
-        depth:             int,
-        num_heads:         int,
-        window_size:       int,
-        mlp_ratio:         float,
-        dropout:           float,
-        attention_dropout: float              = 0.0,
-        ffn_activation:    str                = "gelu",
-        drop_path_rates:   list[float] | None = None,
-    ):
-        super().__init__()
-        self.blocks = nn.ModuleList()
-        for block_index in range(depth):
-            shift = 0 if block_index % 2 == 0 else window_size // 2
-            dpr = drop_path_rates[block_index] if drop_path_rates else 0.0
-            self.blocks.append(
-                SwinTransformerBlock(
-                    embedding_dim     = embedding_dim,
-                    num_heads         = num_heads,
-                    window_size       = window_size,
-                    shift_size        = shift,
-                    mlp_ratio         = mlp_ratio,
-                    dropout           = dropout,
-                    attention_dropout = attention_dropout,
-                    ffn_activation    = ffn_activation,
-                    drop_path_rate    = dpr,
-                )
-            )
-
-    def forward(self, x: torch.Tensor, height: int, width: int) -> torch.Tensor:
-        for block in self.blocks:
-            x = block(x, height, width)
-        return x
-
-
-# Swin-UNet: pure transformer U-shaped architecture using Swin Transformer (Cao et al., 2022)
 class SwinUNet(nn.Module):
     def __init__(self, config: SwinUNetConfig | None = None):
         super().__init__()
@@ -374,7 +320,6 @@ class SwinUNet(nn.Module):
                     f"Stage {stage_index}: embedding dim ({dim}) must be divisible by num_heads ({heads})"
                 )
 
-        # Compute linearly increasing drop path rates per block
         total_depth = sum(config.depths)
         dpr = [x.item() for x in torch.linspace(0, config.stochastic_depth_rate, total_depth)]
         dpr_splits = []
@@ -387,7 +332,7 @@ class SwinUNet(nn.Module):
         self.downsample_layers = nn.ModuleList()
         for stage_index in range(num_stages):
             self.encoder_stages.append(
-                SwinEncoderStage(
+                SwinStage(
                     embedding_dim     = dims[stage_index],
                     depth             = config.depths[stage_index],
                     num_heads         = config.num_heads[stage_index],
@@ -421,7 +366,7 @@ class SwinUNet(nn.Module):
             ))
             self.skip_projections.append(nn.Linear(dims[decoder_index] * 2, dims[decoder_index]))
             self.decoder_stages.append(
-                SwinDecoderStage(
+                SwinStage(
                     embedding_dim     = dims[decoder_index],
                     depth             = config.depths[decoder_index],
                     num_heads         = config.num_heads[decoder_index],
@@ -450,13 +395,11 @@ class SwinUNet(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
-        # Patch embedding: split image into non-overlapping patches and project to tokens
         x = self.patch_embed(x)
         batch_size, channels, grid_height, grid_width = x.shape
         x = x.flatten(2).transpose(1, 2)
         x = self.patch_norm(x)
 
-        # Encoder: Swin Transformer stages with patch merging (downsampling)
         encoder_outputs = []
         height, width = grid_height, grid_width
         for stage_index, (encoder_stage, downsample) in enumerate(
@@ -469,7 +412,6 @@ class SwinUNet(nn.Module):
 
         x = self.bottleneck_norm(x)
 
-        # Decoder: patch expanding (upsample) -> concat skip tokens -> project -> Swin blocks
         for stage_index, (upsample, skip_projection, decoder_stage) in enumerate(
             zip(self.upsample_layers, self.skip_projections, self.decoder_stages)
         ):
@@ -487,7 +429,6 @@ class SwinUNet(nn.Module):
             x = skip_projection(x)
             x = decoder_stage(x, height, width)
 
-        # Upsample from patch resolution back to original image resolution
         feature_map = tokens_to_feature_map(x, height, width)
         feature_map = self.final_upsample(feature_map)
         feature_map = match_spatial_size(source=feature_map, reference=original_input)

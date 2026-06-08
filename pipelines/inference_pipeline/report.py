@@ -6,7 +6,9 @@ from typing   import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from tools.markdown import MarkdownTable
+from pipelines.shared.reporting import ReportAssets
+from pipelines.shared.scoring   import MetricOrientation, RelativeImprovement
+from tools.markdown             import MarkdownTable, ScalarFormatter
 
 
 class ReportPayloadBuilder:
@@ -28,7 +30,6 @@ class ReportPayloadBuilder:
             "patch_stride"      : run.grid.stride,
             "preprocessing_dir" : str(run.dataset_config.preprocessing_run_directory),
             "input_config"      : run.dataset_config.input_config.as_dict(),
-            "used_ema"          : run.used_ema,
             "secondary_labels"  : ", ".join(run.secondary_labels) if run.secondary_labels else "all passes",
         }
 
@@ -84,16 +85,11 @@ class Report:
         self.figure_paths     = figure_paths
         self.gif_paths        = gif_paths
         self.extra_sections   = extra_sections or []
+        self.assets           = ReportAssets(self.output_dir)
 
     @staticmethod
     def _fmt(v: Any) -> str:
-        if isinstance(v, float):
-            if abs(v) >= 1e4 or (0 < abs(v) < 1e-3):
-                return f"{v:.4e}"
-            return f"{v:.6g}"
-        if isinstance(v, (list, tuple)):
-            return ", ".join(str(x) for x in v)
-        return str(v)
+        return ScalarFormatter.format_scalar(v, precision=6, adaptive=True)
 
     @staticmethod
     def _kv_table(rows: List[Tuple[str, Any]], header: Tuple[str, str] = ("Key", "Value")) -> str:
@@ -116,23 +112,10 @@ class Report:
             table.add_row(label, Report._fmt(gt_val), desc)
         return "\n".join(table.render())
 
-    def _rel(self, p: Path) -> str:
-        try:
-            return str(Path(p).resolve().relative_to(self.output_dir.resolve()))
-        except ValueError:
-            return str(p)
-
-    def _img(self, key: str, path: Path) -> List[str]:
-        return [f"![{key}]({self._rel(path)})", ""]
-
-    def _imgs(self, key: str, paths) -> List[str]:
-        if isinstance(paths, (str, Path)):
-            return self._img(key, Path(paths))
-
-        out: List[str] = []
-        for path in paths:
-            out += self._img(Path(path).stem, Path(path))
-        return out
+    @staticmethod
+    def _padded_column(payload: Dict[str, Any], key: str, n_tracks: int) -> list:
+        values = payload[key]
+        return values if len(values) == n_tracks else [float("nan")] * n_tracks
 
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:
@@ -158,62 +141,60 @@ class Report:
 
         out.append("\n### 1.1 Model\n")
         out.append(self._kv_table([
-            ("model_name",     rs.get("model_name")),
-            ("in_channels",    rs.get("in_channels")),
-            ("out_channels",   rs.get("out_channels")),
-            ("n_gaussians",    rs.get("n_gaussians")),
-            ("has_noise_head", rs.get("has_noise_head")),
-            ("used_ema",       rs.get("used_ema")),
+            ("model_name",     rs["model_name"]),
+            ("in_channels",    rs["in_channels"]),
+            ("out_channels",   rs["out_channels"]),
+            ("n_gaussians",    rs["n_gaussians"]),
         ]))
         out.append("")
 
         out.append("\n### 1.2 Dataset & patch grid\n")
         out.append(self._kv_table([
-            ("split",             rs.get("split")),
-            ("split_region",      rs.get("split_region")),
-            ("global_crop",       rs.get("global_crop")),
-            ("secondary_labels",  rs.get("secondary_labels")),
-            ("patches",           rs.get("patches")),
-            ("patch_size",        rs.get("patch_size")),
-            ("patch_stride",      rs.get("patch_stride")),
-            ("preprocessing_dir", rs.get("preprocessing_dir")),
-            ("x_axis_length",     rs.get("x_axis_length")),
-            ("x_axis_min",        rs.get("x_axis_min")),
-            ("x_axis_max",        rs.get("x_axis_max")),
+            ("split",             rs["split"]),
+            ("split_region",      rs["split_region"]),
+            ("global_crop",       rs["global_crop"]),
+            ("secondary_labels",  rs["secondary_labels"]),
+            ("patches",           rs["patches"]),
+            ("patch_size",        rs["patch_size"]),
+            ("patch_stride",      rs["patch_stride"]),
+            ("preprocessing_dir", rs["preprocessing_dir"]),
+            ("x_axis_length",     rs["x_axis_length"]),
+            ("x_axis_min",        rs["x_axis_min"]),
+            ("x_axis_max",        rs["x_axis_max"]),
         ]))
         out.append("")
 
-        input_cfg = rs.get("input_config", {})
-        if isinstance(input_cfg, dict) and input_cfg:
+        input_cfg = rs["input_config"]
+        if input_cfg:
             out.append("\n### 1.3 Input configuration\n")
             out.append(self._kv_table(list(input_cfg.items())))
             out.append("")
 
         out.append("\n### 1.4 Checkpoint\n")
         out.append(self._kv_table([
-            ("epoch",         ck.get("epoch")),
-            ("best_epoch",    ck.get("best_epoch")),
-            ("best_val_loss", ck.get("best_val_loss")),
+            ("epoch",         ck["epoch"]),
+            ("best_epoch",    ck["best_epoch"]),
+            ("best_val_loss", ck["best_val_loss"]),
         ]))
         out.append("")
 
         out.append("\n### 1.5 Inference configuration\n")
         out.append(self._kv_table([
-            ("device",             cfg.get("device")),
-            ("batch_size",         cfg.get("batch_size")),
-            ("num_workers",        cfg.get("num_workers")),
-            ("stitch_window",      cfg.get("stitch_window")),
-            ("cube_dtype",         cfg.get("cube_dtype")),
-            ("save_cubes",         cfg.get("save_cubes")),
-            ("n_best_profiles",    cfg.get("n_best_profiles")),
-            ("n_worst_profiles",   cfg.get("n_worst_profiles")),
-            ("n_random_profiles",  cfg.get("n_random_profiles")),
-            ("n_range_slices",     cfg.get("n_range_slices")),
-            ("n_azimuth_slices",   cfg.get("n_azimuth_slices")),
-            ("n_elevation_slices", cfg.get("n_elevation_slices")),
-            ("gif_axes",           cfg.get("gif_axes")),
-            ("gif_fps",            cfg.get("gif_fps")),
-            ("gif_max_frames",     cfg.get("gif_max_frames")),
+            ("device",             cfg["device"]),
+            ("batch_size",         cfg["batch_size"]),
+            ("num_workers",        cfg["num_workers"]),
+            ("stitch_window",      cfg["stitch_window"]),
+            ("cube_dtype",         cfg["cube_dtype"]),
+            ("save_cubes",         cfg["save_cubes"]),
+            ("n_best_profiles",    cfg["n_best_profiles"]),
+            ("n_worst_profiles",   cfg["n_worst_profiles"]),
+            ("n_random_profiles",  cfg["n_random_profiles"]),
+            ("n_range_slices",     cfg["n_range_slices"]),
+            ("n_azimuth_slices",   cfg["n_azimuth_slices"]),
+            ("n_elevation_slices", cfg["n_elevation_slices"]),
+            ("gif_axes",           cfg["gif_axes"]),
+            ("gif_fps",            cfg["gif_fps"]),
+            ("gif_max_frames",     cfg["gif_max_frames"]),
         ]))
         out.append("")
 
@@ -225,45 +206,45 @@ class Report:
 
         out.append("**Curve-level** (aggregated over the full stitched test cube)\n")
         out.append(self._three_col_table([
-            ("MSE",     gm.get("curve_mse_gt"),   "Mean squared error over all (elev, az, rg)"),
-            ("MAE",     gm.get("curve_mae_gt"),   "Mean absolute error"),
-            ("RMSE",    gm.get("curve_rmse_gt"),  "Root mean squared error"),
-            ("R\u00b2", gm.get("overall_r2_gt"),  "Global coefficient of determination"),
-            ("PSNR dB", gm.get("psnr_db_gt"),     "Peak signal-to-noise ratio"),
+            ("MSE",     gm["curve_mse_gt"],   "Mean squared error over all (elev, az, rg)"),
+            ("MAE",     gm["curve_mae_gt"],   "Mean absolute error"),
+            ("RMSE",    gm["curve_rmse_gt"],  "Root mean squared error"),
+            ("R\u00b2", gm["overall_r2_gt"],  "Global coefficient of determination"),
+            ("PSNR dB", gm["psnr_db_gt"],     "Peak signal-to-noise ratio"),
         ]))
         out.append("")
 
         out.append("**Per-pixel** (computed per (az, rg) pixel over the elevation axis)\n")
         out.append(self._three_col_table([
-            ("MSE mean",        gm.get("pixel_mse_gt_mean"),              "Mean of per-pixel MSE"),
-            ("MSE median",      gm.get("pixel_mse_gt_median"),            "Median of per-pixel MSE"),
-            ("MSE p95",         gm.get("pixel_mse_gt_p95"),               "95th percentile"),
-            ("MAE mean",        gm.get("pixel_mae_gt_mean"),              "Mean of per-pixel MAE"),
-            ("R\u00b2 mean",    gm.get("pixel_r2_gt_mean"),               "Mean of per-pixel R\u00b2"),
-            ("R\u00b2 median",  gm.get("pixel_r2_gt_median"),             "Median of per-pixel R\u00b2"),
-            ("R\u00b2 p5",      gm.get("pixel_r2_gt_p5"),                 "5th percentile (worst tail)"),
-            ("Cosine mean",     gm.get("pixel_cosine_gt_mean"),           "Mean cosine similarity"),
-            ("Cosine median",   gm.get("pixel_cosine_gt_median"),         "Median cosine similarity"),
-            ("Peak err mean",   gm.get("pixel_peak_err_units_mean_gt"),   "|\u0394 peak| in elevation units"),
-            ("Peak err median", gm.get("pixel_peak_err_units_median_gt"), "Median"),
-            ("Peak err p95",    gm.get("pixel_peak_err_units_p95_gt"),    "95th percentile"),
+            ("MSE mean",        gm["pixel_mse_gt_mean"],              "Mean of per-pixel MSE"),
+            ("MSE median",      gm["pixel_mse_gt_median"],            "Median of per-pixel MSE"),
+            ("MSE p95",         gm["pixel_mse_gt_p95"],               "95th percentile"),
+            ("MAE mean",        gm["pixel_mae_gt_mean"],              "Mean of per-pixel MAE"),
+            ("R\u00b2 mean",    gm["pixel_r2_gt_mean"],               "Mean of per-pixel R\u00b2"),
+            ("R\u00b2 median",  gm["pixel_r2_gt_median"],             "Median of per-pixel R\u00b2"),
+            ("R\u00b2 p5",      gm["pixel_r2_gt_p5"],                 "5th percentile (worst tail)"),
+            ("Cosine mean",     gm["pixel_cosine_gt_mean"],           "Mean cosine similarity"),
+            ("Cosine median",   gm["pixel_cosine_gt_median"],         "Median cosine similarity"),
+            ("Peak err mean",   gm["pixel_peak_err_units_mean_gt"],   "|\u0394 peak| in elevation units"),
+            ("Peak err median", gm["pixel_peak_err_units_median_gt"], "Median"),
+            ("Peak err p95",    gm["pixel_peak_err_units_p95_gt"],    "95th percentile"),
         ]))
         out.append("")
 
         out.append("**SSIM** (mean over all slices of that axis)\n")
         out.append(self._three_col_table([
-            ("SSIM elev mean",    gm.get("ssim_gt_elev_mean"),    "H\u00d7W intensity-at-elevation-bin planes"),
-            ("SSIM range mean",   gm.get("ssim_gt_range_mean"),   "n_elev\u00d7H cross-sectional planes"),
-            ("SSIM azimuth mean", gm.get("ssim_gt_azimuth_mean"), "n_elev\u00d7W cross-sectional planes"),
+            ("SSIM elev mean",    gm["ssim_gt_elev_mean"],    "H\u00d7W intensity-at-elevation-bin planes"),
+            ("SSIM range mean",   gm["ssim_gt_range_mean"],   "n_elev\u00d7H cross-sectional planes"),
+            ("SSIM azimuth mean", gm["ssim_gt_azimuth_mean"], "n_elev\u00d7W cross-sectional planes"),
         ]))
         out.append("")
 
         out.append("**Per-elevation-bin** (mean over all elevation bins)\n")
         out.append(self._three_col_table([
-            ("MAE mean",           gm.get("elev_mae_gt_mean"),   "Mean absolute error averaged over elevation"),
-            ("RMSE mean",          gm.get("elev_rmse_gt_mean"),  "Root mean squared error averaged over elevation"),
-            ("R\u00b2 mean",       gm.get("elev_r2_gt_mean"),    "Coefficient of determination averaged over elevation"),
-            ("Cross-entropy mean", gm.get("elev_ce_gt_mean"),    "Cross-entropy (normalised profiles) averaged over elevation"),
+            ("MAE mean",           gm["elev_mae_gt_mean"],   "Mean absolute error averaged over elevation"),
+            ("RMSE mean",          gm["elev_rmse_gt_mean"],  "Root mean squared error averaged over elevation"),
+            ("R\u00b2 mean",       gm["elev_r2_gt_mean"],    "Coefficient of determination averaged over elevation"),
+            ("Cross-entropy mean", gm["elev_ce_gt_mean"],    "Cross-entropy (normalised profiles) averaged over elevation"),
         ]))
         out.append("")
 
@@ -287,12 +268,16 @@ class Report:
         labels   = tracks["labels"]
         n_tracks = len(labels)
 
-        def column(key: str) -> list:
-            values = tracks[key]
-            return values if len(values) == n_tracks else [float("nan")] * n_tracks
-
         table = MarkdownTable(("Pass", "Horizontal [m]", "Vertical [m]", "H std [m]", "V std [m]", "H absolute [m]", "V absolute [m]"))
-        for row in zip(labels, column("horizontal"), column("vertical"), column("horizontal_std"), column("vertical_std"), column("horizontal_absolute"), column("vertical_absolute")):
+        for row in zip(
+            labels,
+            self._padded_column(tracks, "horizontal",          n_tracks),
+            self._padded_column(tracks, "vertical",            n_tracks),
+            self._padded_column(tracks, "horizontal_std",      n_tracks),
+            self._padded_column(tracks, "vertical_std",        n_tracks),
+            self._padded_column(tracks, "horizontal_absolute", n_tracks),
+            self._padded_column(tracks, "vertical_absolute",   n_tracks),
+        ):
             table.add_row(row[0], *(self._fmt(value) for value in row[1:]))
 
         out.append("\n".join(table.render()))
@@ -316,26 +301,22 @@ class Report:
         labels   = positions["labels"]
         n_tracks = len(labels)
 
-        def column(key: str) -> list:
-            values = positions[key]
-            return values if len(values) == n_tracks else [float("nan")] * n_tracks
-
         table = MarkdownTable(("Pass", "H mean [m]", "V mean [m]", "H span [m]", "V span [m]", "Planar dev RMS [m]", "Planar dev max [m]"))
-        for row in zip(labels, column("horizontal_mean"), column("vertical_mean"), column("horizontal_span"), column("vertical_span"), column("deviation_rms"), column("deviation_max")):
+        for row in zip(
+            labels,
+            self._padded_column(positions, "horizontal_mean", n_tracks),
+            self._padded_column(positions, "vertical_mean",   n_tracks),
+            self._padded_column(positions, "horizontal_span", n_tracks),
+            self._padded_column(positions, "vertical_span",   n_tracks),
+            self._padded_column(positions, "deviation_rms",   n_tracks),
+            self._padded_column(positions, "deviation_max",   n_tracks),
+        ):
             table.add_row(row[0], *(self._fmt(value) for value in row[1:]))
 
         out.append("\n".join(table.render()))
         out.append("")
 
         return out
-
-    @staticmethod
-    def _improvement(baseline: Any, model: Any) -> str:
-        if not isinstance(baseline, (int, float)) or not isinstance(model, (int, float)):
-            return "n/a"
-        if not np.isfinite(baseline) or not np.isfinite(model) or baseline == 0.0:
-            return "n/a"
-        return f"{(baseline - model) / abs(baseline) * 100.0:+.1f}%"
 
     def _build_baseline_comparison(self) -> List[str]:
         gm = self.global_metrics
@@ -352,42 +333,39 @@ class Report:
 
         table = MarkdownTable(("Metric", "Pred vs GT", "Capon vs GT", "Model improvement"))
 
-        error_rows = [
-            ("Curve MSE",        gm.get("curve_mse_gt"),               gm.get("curve_mse_red")),
-            ("Curve MAE",        gm.get("curve_mae_gt"),               gm.get("curve_mae_red")),
-            ("Curve RMSE",       gm.get("curve_rmse_gt"),              gm.get("curve_rmse_red")),
-            ("Pixel MSE mean",   gm.get("pixel_mse_gt_mean"),          gm.get("pixel_mse_red_mean")),
-            ("Pixel MSE median", gm.get("pixel_mse_gt_median"),        gm.get("pixel_mse_red_median")),
-            ("Pixel MAE mean",   gm.get("pixel_mae_gt_mean"),          gm.get("pixel_mae_red_mean")),
-            ("Peak err mean",    gm.get("pixel_peak_idx_d_gt_mean"),   gm.get("pixel_peak_idx_d_red_mean")),
+        rows = [
+            ("Curve MSE",        "curve_mse_gt",             "curve_mse_red"),
+            ("Curve MAE",        "curve_mae_gt",             "curve_mae_red"),
+            ("Curve RMSE",       "curve_rmse_gt",            "curve_rmse_red"),
+            ("Pixel MSE mean",   "pixel_mse_gt_mean",        "pixel_mse_red_mean"),
+            ("Pixel MSE median", "pixel_mse_gt_median",      "pixel_mse_red_median"),
+            ("Pixel MAE mean",   "pixel_mae_gt_mean",        "pixel_mae_red_mean"),
+            ("Peak err mean",    "pixel_peak_idx_d_gt_mean", "pixel_peak_idx_d_red_mean"),
+            ("Overall R\u00b2",       "overall_r2_gt",            "overall_r2_red"),
+            ("Pixel R\u00b2 mean",    "pixel_r2_gt_mean",         "pixel_r2_red_mean"),
+            ("Cosine mean",      "pixel_cosine_gt_mean",     "pixel_cosine_red_mean"),
+            ("PSNR dB",          "psnr_db_gt",               "psnr_db_red"),
+            ("SSIM elev mean",   "ssim_gt_elev_mean",        "ssim_red_elev_mean"),
+            ("SSIM range mean",  "ssim_gt_range_mean",       "ssim_red_range_mean"),
+            ("SSIM azimuth mean","ssim_gt_azimuth_mean",     "ssim_red_azimuth_mean"),
         ]
 
-        score_rows = [
-            ("Overall R\u00b2",     gm.get("overall_r2_gt"),        gm.get("overall_r2_red")),
-            ("Pixel R\u00b2 mean",  gm.get("pixel_r2_gt_mean"),     gm.get("pixel_r2_red_mean")),
-            ("Cosine mean",         gm.get("pixel_cosine_gt_mean"), gm.get("pixel_cosine_red_mean")),
-            ("PSNR dB",             gm.get("psnr_db_gt"),           gm.get("psnr_db_red")),
-            ("SSIM elev mean",      gm.get("ssim_gt_elev_mean"),    gm.get("ssim_red_elev_mean")),
-            ("SSIM range mean",     gm.get("ssim_gt_range_mean"),   gm.get("ssim_red_range_mean")),
-            ("SSIM azimuth mean",   gm.get("ssim_gt_azimuth_mean"), gm.get("ssim_red_azimuth_mean")),
-        ]
-
-        for label, model_val, baseline_val in error_rows:
-            table.add_row(label, self._fmt(model_val), self._fmt(baseline_val), self._improvement(baseline_val, model_val))
-
-        for label, model_val, baseline_val in score_rows:
-            table.add_row(label, self._fmt(model_val), self._fmt(baseline_val), self._improvement(-baseline_val if isinstance(baseline_val, (int, float)) else baseline_val, -model_val if isinstance(model_val, (int, float)) else model_val))
+        for label, model_key, baseline_key in rows:
+            model_val        = gm[model_key]
+            baseline_val     = gm[baseline_key]
+            higher_is_better = bool(MetricOrientation.higher_is_better(model_key))
+            table.add_row(label, self._fmt(model_val), self._fmt(baseline_val), RelativeImprovement.percent(baseline_val, model_val, higher_is_better=higher_is_better))
 
         out.append("\n".join(table.render()))
         out.append("")
 
         out.append(self._kv_table([
-            ("improvement_mse_rel",            gm.get("improvement_mse_rel")),
-            ("improvement_mae_rel",            gm.get("improvement_mae_rel")),
-            ("improvement_rmse_rel",           gm.get("improvement_rmse_rel")),
-            ("pixel_improvement_mean",          gm.get("pixel_improvement_mean")),
-            ("pixel_improvement_median",        gm.get("pixel_improvement_median")),
-            ("pixel_improvement_positive_frac", gm.get("pixel_improvement_positive_frac")),
+            ("improvement_mse_rel",             gm["improvement_mse_rel"]),
+            ("improvement_mae_rel",             gm["improvement_mae_rel"]),
+            ("improvement_rmse_rel",            gm["improvement_rmse_rel"]),
+            ("pixel_improvement_mean",          gm["pixel_improvement_mean"]),
+            ("pixel_improvement_median",        gm["pixel_improvement_median"]),
+            ("pixel_improvement_positive_frac", gm["pixel_improvement_positive_frac"]),
         ], header=("Improvement metric", "Value")))
         out.append("")
 
@@ -430,6 +408,22 @@ class Report:
 
         return out
 
+    def _section(self, out: List[str], groups) -> None:
+        fp = self.figure_paths
+
+        for key, title in groups:
+            if fp.get(key):
+                out.append(f"\n### {title}\n")
+                out += self.assets.images(key, fp[key])
+
+    def _numbered_section(self, out: List[str], prefix: str, groups) -> None:
+        fp        = self.figure_paths
+        available = [(key, title) for key, title in groups if fp.get(key)]
+
+        for n, (key, title) in enumerate(available, start=1):
+            out.append(f"\n### {prefix}{n} {title}\n")
+            out += self.assets.images(key, fp[key])
+
     def _build_figures(self) -> List[str]:
         fp  = self.figure_paths
         gp  = self.gif_paths
@@ -448,9 +442,7 @@ class Report:
                 "The model inputs for this run: the primary, the selected secondary passes and "
                 "their interferograms against the primary.\n"
             )
-            for n, (key, title) in enumerate(track_groups, start=1):
-                out.append(f"\n### 3b.{n} {title}\n")
-                out += self._imgs(key, fp[key])
+            self._numbered_section(out, "3b.", track_groups)
 
         out.append("\n## 4. Profile reconstructions\n")
         out.append(
@@ -459,17 +451,14 @@ class Report:
             "and individual Gaussian components. "
             "The shaded area shows the signed residual (pred \u2212 gt).\n"
         )
-        for key, title in (
+        self._section(out, (
             ("profiles_best",   "4.1 Best-fit profiles (lowest MSE)"),
             ("profiles_worst",  "4.2 Worst-fit profiles (highest MSE)"),
             ("profiles_random", "4.3 Random profiles"),
-        ):
-            if fp.get(key):
-                out.append(f"\n### {title}\n")
-                out += self._imgs(key, fp[key])
+        ))
 
         out.append("\n## 5. Per-pixel metric maps\n")
-        for key, title in (
+        self._section(out, (
             ("pixel_mse_map",       "5.1 MSE map (log scale, pred vs GT)"),
             ("pixel_r2_map",        "5.2 R\u00b2 map (pred vs GT)"),
             ("pixel_peak_map",      "5.3 Peak-location error map (|\u0394 peak index|)"),
@@ -477,13 +466,10 @@ class Report:
             ("pixel_r2_capon_map",  "5.5 R\u00b2 map (Capon baseline vs GT)"),
             ("improvement_map",     "5.6 Relative MSE improvement over the Capon baseline"),
             ("metric_histograms",   "5.7 Metric distributions"),
-        ):
-            if fp.get(key):
-                out.append(f"\n### {title}\n")
-                out += self._imgs(key, fp[key])
+        ))
 
         out.append("\n## 6. Gaussian parameter analysis\n")
-        for key, title in (
+        self._section(out, (
             ("param_maps",             "6.1 Parameter spatial maps (pred vs GT)"),
             ("param_distributions",    "6.2 Parameter distributions (GT vs Pred)"),
             ("param_scatter",          "6.3 Parameter scatter plots (GT vs Pred, with R²)"),
@@ -492,10 +478,7 @@ class Report:
             ("placeholder_detection",  "6.6 Placeholder detection (precision / recall per slot)"),
             ("slot_ordering_summary",  "6.7 Slot ordering summary"),
             ("active_count_map",       "6.8 Active Gaussian count map"),
-        ):
-            if fp.get(key):
-                out.append(f"\n### {title}\n")
-                out += self._imgs(key, fp[key])
+        ))
 
         slice_groups = [(key, title) for key, title in (
             ("slices_range",   "Range cuts"),
@@ -510,20 +493,15 @@ class Report:
                 "error figures are clipped at p99 of that slice. "
                 "SSIM (pred vs GT) is shown in the prediction title.\n"
             )
-            for n, (key, title) in enumerate(slice_groups, start=1):
-                out.append(f"\n### 7.{n} {title}\n")
-                out += self._imgs(key, fp[key])
+            self._numbered_section(out, "7.", slice_groups)
 
         out.append("\n## 8. SSIM curves\n")
         out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT.\n")
-        for key, title in (
+        self._section(out, (
             ("ssim_range",   "8.1 SSIM along range axis"),
             ("ssim_azimuth", "8.2 SSIM along azimuth axis"),
             ("ssim_elev",    "8.3 SSIM along elevation axis"),
-        ):
-            if fp.get(key):
-                out.append(f"\n### {title}\n")
-                out += self._imgs(key, fp[key])
+        ))
 
         if fp.get("elev_metric_curves"):
             out.append("\n### 8.4 Per-elevation-bin metrics (MAE, RMSE, R\u00b2, cross-entropy)\n")
@@ -532,7 +510,7 @@ class Report:
                 "elevation bin (pred vs GT). "
                 "Dashed lines mark the mean over all bins.\n"
             )
-            out += self._imgs("elev_metric_curves", fp["elev_metric_curves"])
+            out += self.assets.images("elev_metric_curves", fp["elev_metric_curves"])
 
         if gp:
             out.append("\n## 9. Animations\n")
@@ -542,7 +520,7 @@ class Report:
             )
             for n, (name, path) in enumerate(sorted(gp.items()), start=1):
                 out.append(f"\n### 9.{n} `{name}`\n")
-                out += self._img(name, path)
+                out += self.assets.image(name, path)
 
         return out
 

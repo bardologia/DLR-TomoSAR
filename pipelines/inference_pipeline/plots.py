@@ -9,6 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.cm        as cm
 import matplotlib.pyplot    as plt
 import numpy                as np
+from matplotlib.patches     import Patch
 
 from pipelines.shared.plotting import PlotBase
 from tools.gaussians           import GaussianReconstructor
@@ -18,12 +19,6 @@ class PlotTools(PlotBase):
     PARAM_LABELS = (("a", "amplitude (a)"), ("mu", "mean (μ)"), ("sigma", "std-dev (σ)"))
     PARAM_SHORT  = ("a", "μ", "σ")
 
-    @staticmethod
-    def _gaussian_components(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> List[np.ndarray]:
-        return GaussianReconstructor.components(params, x_axis, n_gaussians)
-
-
-class Ploter(PlotTools):
     def __init__(
         self,
         cmap     : str  = "jet",
@@ -40,16 +35,32 @@ class Ploter(PlotTools):
         self.save_dpi   = save_dpi
         self._apply_style()
 
-    def _maybe_normalize(self, *arrays: np.ndarray) -> Tuple[np.ndarray, ...]:
-        if self.normalize:
-            return tuple(self._normalize_01(a) for a in arrays)
-        return arrays
+    @staticmethod
+    def _gaussian_components(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> List[np.ndarray]:
+        return GaussianReconstructor.components(params, x_axis, n_gaussians)
+
+    def _intensity_scale(self, reference: np.ndarray) -> float:
+        if not self.normalize:
+            return 1.0
+
+        ref   = reference[np.isfinite(reference)]
+        scale = float(ref.max()) if ref.size else 0.0
+
+        return scale if scale > 1e-12 else 1.0
+
+    @staticmethod
+    def _rescale(arr: np.ndarray, scale: float) -> np.ndarray:
+        return (arr / scale).astype(np.float32)
 
     @property
     def _int_label(self) -> str:
-        return "intensity [0-1]" if self.normalize else "intensity"
+        return "intensity (GT-peak normalised)" if self.normalize else "intensity"
 
-    def _imshow_figure(
+    @property
+    def _err_label(self) -> str:
+        return "|error| (GT-peak normalised)" if self.normalize else "|error| (intensity)"
+
+    def _imshow_panel(
         self,
         data       : np.ndarray,
         title      : str,
@@ -65,16 +76,23 @@ class Ploter(PlotTools):
         figsize    : Tuple[float, float] = (6.2, 4.4),
     ) -> Path:
 
-        fig, ax = plt.subplots(figsize=figsize)
-        im      = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, extent=extent, aspect="auto", origin=origin, interpolation="nearest")
-        ax.set_title(title)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02).set_label(cbar_label)
-        fig.tight_layout()
+        return self._imshow_figure(
+            data,
+            x_label        = x_label,
+            y_label        = y_label,
+            title          = title,
+            cmap           = cmap,
+            vmin           = vmin,
+            vmax           = vmax,
+            extent         = extent,
+            origin         = origin,
+            colorbar_label = cbar_label,
+            figsize        = figsize,
+            path           = path,
+        )
 
-        return self._save(fig, path)
 
+class SlicePlotter(PlotTools):
     def plot_profiles(
         self,
         pred_curves    : np.ndarray,
@@ -149,7 +167,7 @@ class Ploter(PlotTools):
 
         vmin, vmax = self._shared_clim(data, q_low=q_low, q_high=q_high)
 
-        return self._imshow_figure(
+        return self._imshow_panel(
             data       = data,
             title      = title,
             x_label    = "range index",
@@ -163,82 +181,6 @@ class Ploter(PlotTools):
             path       = out_path,
             figsize    = (7, 5),
         )
-
-    def plot_track_geometry(self, baselines, out_path: Path) -> Path:
-        fig, ax = plt.subplots(figsize=(5.4, 4.6))
-
-        for index, label in enumerate(baselines.labels):
-            color  = "black" if index == 0 else f"C{(index - 1) % 10}"
-            marker = "*" if index == 0 else "o"
-            size   = 140 if index == 0 else 60
-            ax.scatter(baselines.horizontal[index], baselines.vertical[index], s=size, marker=marker, color=color, zorder=3)
-            ax.annotate(label, (baselines.horizontal[index], baselines.vertical[index]), textcoords="offset points", xytext=(7, 5), fontsize=9)
-            ax.errorbar(baselines.horizontal[index], baselines.vertical[index], xerr=baselines.horizontal_std[index], yerr=baselines.vertical_std[index], fmt="none", ecolor=color, elinewidth=0.7, capsize=2, alpha=0.6)
-
-        ax.set_xlabel(r"horizontal baseline $b_{\perp,\mathrm{h}}$ [m]")
-        ax.set_ylabel(r"vertical baseline $b_{\perp,\mathrm{v}}$ [m]")
-        ax.set_title(f"Passes used  (reference {baselines.reference}, mean over azimuth window)")
-        ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
-        fig.tight_layout()
-
-        return self._save(fig, out_path)
-
-    def plot_track_profiles(self, profiles, out_dir: Path, split_azimuth: Optional[Tuple[int, int]] = None) -> List[Path]:
-        azimuth = profiles.azimuth_axis
-        paths   = []
-
-        for component, data, symbol in (
-            ("horizontal", profiles.relative_to_reference("horizontal"), r"$b_{\perp,\mathrm{h}}$"),
-            ("vertical",   profiles.relative_to_reference("vertical"),   r"$b_{\perp,\mathrm{v}}$"),
-        ):
-            fig, ax = plt.subplots(figsize=(7.2, 3.6))
-
-            for index, label in enumerate(profiles.labels):
-                color = "black" if index == 0 else f"C{(index - 1) % 10}"
-                ax.plot(azimuth, data[index], color=color, linewidth=1.0, label=label)
-
-            if split_azimuth is not None:
-                ax.axvspan(split_azimuth[0], split_azimuth[1], color="C7", alpha=0.18, label="inference split")
-
-            ax.set_xlabel("azimuth sample index")
-            ax.set_ylabel(f"{symbol} relative to {profiles.labels[0]} [m]")
-            ax.set_title(f"Per-azimuth {component} baselines of the passes used")
-            ax.legend(framealpha=0.9, fontsize=8, ncol=2)
-            ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
-            fig.tight_layout()
-
-            paths.append(self._save(fig, out_dir / f"baseline_profiles_{component}.png"))
-
-        return paths
-
-    def plot_track_flight_3d(self, profiles, out_path: Path, elev: float = 28.0, azim: float = -55.0) -> Path:
-        azimuth = profiles.azimuth_axis
-        radii   = profiles.deviation_radii()
-        h_mean  = np.nanmean(profiles.horizontal, axis=1)
-        v_mean  = np.nanmean(profiles.vertical,   axis=1)
-
-        step             = max(1, len(azimuth) // 200)
-        theta            = np.linspace(0.0, 2.0 * np.pi, 36)
-        az_grid, th_grid = np.meshgrid(azimuth[::step], theta)
-
-        fig = plt.figure(figsize=(12.0, 7.0))
-        ax  = fig.add_axes([0.12, 0.08, 0.70, 0.84], projection="3d")
-
-        for index, label in enumerate(profiles.labels):
-            color = "black" if index == 0 else f"C{(index - 1) % 10}"
-
-            ax.plot(azimuth, profiles.horizontal[index], profiles.vertical[index], color=color, linewidth=1.3, label=f"{label}  (RMS dev {radii[index]:.2f} m)", zorder=3)
-            ax.plot_surface(az_grid, h_mean[index] + radii[index] * np.cos(th_grid), v_mean[index] + radii[index] * np.sin(th_grid), color=color, alpha=0.16, linewidth=0, antialiased=False, shade=False)
-
-        ax.view_init(elev=elev, azim=azim)
-        ax.set_xlabel("azimuth sample index", labelpad=14)
-        ax.set_ylabel(r"horizontal baseline $b_{\perp,\mathrm{h}}$ [m]", labelpad=14)
-        ax.set_zlabel(r"vertical baseline $b_{\perp,\mathrm{v}}$ [m]",   labelpad=18)
-        ax.tick_params(axis="z", pad=8)
-        ax.set_title("Flight tracks of the passes used  (tube radius = RMS planar deviation over azimuth)")
-        ax.legend(loc="upper left", framealpha=0.9, fontsize=8)
-
-        return self._save(fig, out_path)
 
     def plot_input_channels(
         self,
@@ -256,34 +198,15 @@ class Ploter(PlotTools):
         names  = list(labels) if labels else [f"secondary {i + 1}" for i in range(n_secondaries)]
         paths  = []
 
-        def _amplitude_panel(channel: np.ndarray, title: str, filename: str) -> Path:
-            amplitude = np.abs(channel).astype(np.float32)
-            vmax      = float(np.percentile(amplitude, 99.0))
-
-            return self._imshow_figure(
-                data       = amplitude,
-                title      = title,
-                x_label    = "range index",
-                y_label    = "azimuth index",
-                cbar_label = "amplitude",
-                extent     = extent,
-                cmap       = "gray",
-                vmin       = 0.0,
-                vmax       = max(vmax, 1e-6),
-                origin     = "upper",
-                path       = out_dir / filename,
-                figsize    = (7, 5),
-            )
-
-        paths.append(_amplitude_panel(complex_inputs[0], f"Primary {primary_label} — amplitude", "pass_primary_amplitude.png"))
+        paths.append(self._amplitude_panel(complex_inputs[0], f"Primary {primary_label} — amplitude", out_dir / "pass_primary_amplitude.png", extent))
 
         for i in range(n_secondaries):
-            paths.append(_amplitude_panel(complex_inputs[1 + i], f"Secondary {names[i]} — amplitude", f"pass_{names[i]}_amplitude.png"))
+            paths.append(self._amplitude_panel(complex_inputs[1 + i], f"Secondary {names[i]} — amplitude", out_dir / f"pass_{names[i]}_amplitude.png", extent))
 
         for i in range(n_secondaries):
             phase = np.angle(complex_inputs[1 + n_secondaries + i]).astype(np.float32)
 
-            paths.append(self._imshow_figure(
+            paths.append(self._imshow_panel(
                 data       = phase,
                 title      = f"Interferogram {primary_label} × {names[i]} — phase",
                 x_label    = "range index",
@@ -298,6 +221,25 @@ class Ploter(PlotTools):
             ))
 
         return paths
+
+    def _amplitude_panel(self, channel: np.ndarray, title: str, path: Path, extent: list) -> Path:
+        amplitude = np.abs(channel).astype(np.float32)
+        vmax      = float(np.percentile(amplitude, 99.0))
+
+        return self._imshow_panel(
+            data       = amplitude,
+            title      = title,
+            x_label    = "range index",
+            y_label    = "azimuth index",
+            cbar_label = "amplitude",
+            extent     = extent,
+            cmap       = "gray",
+            vmin       = 0.0,
+            vmax       = max(vmax, 1e-6),
+            origin     = "upper",
+            path       = path,
+            figsize    = (7, 5),
+        )
 
     def plot_improvement_map(
         self,
@@ -315,7 +257,7 @@ class Ploter(PlotTools):
         vmax   = max(vmax, 1e-6)
         frac   = float((finite > 0.0).mean()) if finite.size else float("nan")
 
-        return self._imshow_figure(
+        return self._imshow_panel(
             data       = np.nan_to_num(improvement, nan=0.0),
             title      = f"Relative MSE improvement over Capon baseline  (positive = model better, {frac * 100:.1f}% of pixels)",
             x_label    = "range index",
@@ -329,6 +271,66 @@ class Ploter(PlotTools):
             path       = out_path,
             figsize    = (7, 5),
         )
+
+    def _render_slice_panels(
+        self,
+        pred_slice    : np.ndarray,
+        gt_slice      : np.ndarray,
+        red_slice     : Optional[np.ndarray],
+        extent        : list,
+        x_label       : str,
+        y_label       : str,
+        origin        : str,
+        title_pos     : str,
+        ssim_value    : Optional[float],
+        out_dir       : Path,
+        stem          : str,
+    ) -> List[Path]:
+
+        err_gt_slice  = np.abs(pred_slice - gt_slice)
+        err_red_slice = np.abs(red_slice - gt_slice) if red_slice is not None else None
+
+        scale        = self._intensity_scale(gt_slice)
+        gt_slice     = self._rescale(gt_slice,     scale)
+        pred_slice   = self._rescale(pred_slice,   scale)
+        err_gt_slice = self._rescale(err_gt_slice, scale)
+
+        vmin, vmax = self._shared_clim(gt_slice, pred_slice)
+        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
+        ssim_str   = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
+
+        panels = [
+            (gt_slice,     f"GT (Gaussian) — {title_pos}",         self.cmap,     vmin, vmax,    self._int_label, "gt"),
+            (pred_slice,   f"Prediction — {title_pos}{ssim_str}",  self.cmap,     vmin, vmax,    self._int_label, "pred"),
+            (err_gt_slice, f"|Pred − GT| — {title_pos}",           self.err_cmap, 0.0,  emax_gt, self._err_label, "error"),
+        ]
+
+        if red_slice is not None:
+            red_slice     = self._rescale(red_slice,     scale)
+            err_red_slice = self._rescale(err_red_slice, scale)
+            emax_red      = float(np.percentile(err_red_slice, 99.0))
+
+            panels += [
+                (red_slice,     f"Capon (reduced) — {title_pos}", self.cmap,     vmin, vmax,     self._int_label, "capon"),
+                (err_red_slice, f"|Capon − GT| — {title_pos}",    self.err_cmap, 0.0,  emax_red, self._err_label, "capon_error"),
+            ]
+
+        return [
+            self._imshow_panel(
+                data       = data,
+                title      = title,
+                x_label    = x_label,
+                y_label    = y_label,
+                cbar_label = cbar,
+                extent     = extent,
+                cmap       = cmap_used,
+                vmin       = vlo,
+                vmax       = vhi,
+                origin     = origin,
+                path       = out_dir / f"{stem}_{kind}.png",
+            )
+            for data, title, cmap_used, vlo, vhi, cbar, kind in panels
+        ]
 
     def plot_tomogram_slice(
         self,
@@ -364,56 +366,27 @@ class Ploter(PlotTools):
         else:
             raise ValueError(f"axis must be 'range' or 'azimuth', got {axis!r}")
 
-        err_gt_slice  = np.abs(pred_slice - gt_slice)
-        err_red_slice = np.abs(red_slice - gt_slice) if red_slice is not None else None
-
         sort_idx      = np.argsort(x_axis)
         x_axis_sorted = x_axis[sort_idx]
-        pred_slice    = pred_slice  [sort_idx]
-        gt_slice      = gt_slice    [sort_idx]
-        err_gt_slice  = err_gt_slice[sort_idx]
+        pred_slice    = pred_slice[sort_idx]
+        gt_slice      = gt_slice  [sort_idx]
+        red_slice     = red_slice[sort_idx] if red_slice is not None else None
 
         extent = [x_extent_lo, x_extent_hi, float(x_axis_sorted[0]), float(x_axis_sorted[-1])]
 
-        pred_slice, gt_slice, err_gt_slice = self._maybe_normalize(pred_slice, gt_slice, err_gt_slice)
-
-        vmin, vmax = self._shared_clim(gt_slice, pred_slice)
-        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
-        ssim_str   = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
-
-        panels = [
-            (gt_slice,     f"GT (Gaussian) — {title_pos}",         self.cmap,     vmin, vmax,    self._int_label, "gt"),
-            (pred_slice,   f"Prediction — {title_pos}{ssim_str}",  self.cmap,     vmin, vmax,    self._int_label, "pred"),
-            (err_gt_slice, f"|Pred − GT| — {title_pos}",           self.err_cmap, 0.0,  emax_gt, "|error|",       "error"),
-        ]
-
-        if red_slice is not None:
-            red_slice     = red_slice    [sort_idx]
-            err_red_slice = err_red_slice[sort_idx]
-            red_slice, err_red_slice = self._maybe_normalize(red_slice, err_red_slice)
-            emax_red      = float(np.percentile(err_red_slice, 99.0))
-
-            panels += [
-                (red_slice,     f"Capon (reduced) — {title_pos}", self.cmap,     vmin, vmax,     self._int_label, "capon"),
-                (err_red_slice, f"|Capon − GT| — {title_pos}",    self.err_cmap, 0.0,  emax_red, "|error|",       "capon_error"),
-            ]
-
-        return [
-            self._imshow_figure(
-                data       = data,
-                title      = title,
-                x_label    = x_label,
-                y_label    = "elevation [m]",
-                cbar_label = cbar,
-                extent     = extent,
-                cmap       = cmap_used,
-                vmin       = vlo,
-                vmax       = vhi,
-                origin     = "lower",
-                path       = out_dir / f"{stem}_{kind}.png",
-            )
-            for data, title, cmap_used, vlo, vhi, cbar, kind in panels
-        ]
+        return self._render_slice_panels(
+            pred_slice = pred_slice,
+            gt_slice   = gt_slice,
+            red_slice  = red_slice,
+            extent     = extent,
+            x_label    = x_label,
+            y_label    = "elevation [m]",
+            origin     = "lower",
+            title_pos  = title_pos,
+            ssim_value = ssim_value,
+            out_dir    = out_dir,
+            stem       = stem,
+        )
 
     def plot_elevation_intensity_slice(
         self,
@@ -429,54 +402,27 @@ class Ploter(PlotTools):
         reduced_cube : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
-        pred_slice   = pred_cube[elev_idx]
-        gt_slice     = gt_cube  [elev_idx]
-        err_gt_slice = np.abs(pred_slice - gt_slice)
+        pred_slice = pred_cube[elev_idx]
+        gt_slice   = gt_cube  [elev_idx]
+        red_slice  = reduced_cube[elev_idx] if reduced_cube is not None else None
 
-        red_slice     = reduced_cube[elev_idx] if reduced_cube is not None else None
-        err_red_slice = np.abs(red_slice - gt_slice) if red_slice is not None else None
-
-        pred_slice, gt_slice, err_gt_slice = self._maybe_normalize(pred_slice, gt_slice, err_gt_slice)
-
-        H, W       = pred_slice.shape
-        extent     = [rg_offset, rg_offset + W, az_offset + H, az_offset]
-        vmin, vmax = self._shared_clim(gt_slice, pred_slice)
-        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
-
+        H, W      = pred_slice.shape
+        extent    = [rg_offset, rg_offset + W, az_offset + H, az_offset]
         title_pos = f"elev = {x_axis[elev_idx]:.2f} m (idx {elev_idx})"
-        ssim_str  = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
 
-        panels = [
-            (gt_slice,     f"GT (Gaussian) — {title_pos}",        self.cmap,     vmin, vmax,    self._int_label, "gt"),
-            (pred_slice,   f"Prediction — {title_pos}{ssim_str}", self.cmap,     vmin, vmax,    self._int_label, "pred"),
-            (err_gt_slice, f"|Pred − GT| — {title_pos}",          self.err_cmap, 0.0,  emax_gt, "|error|",       "error"),
-        ]
-
-        if red_slice is not None:
-            red_slice, err_red_slice = self._maybe_normalize(red_slice, err_red_slice)
-            emax_red = float(np.percentile(err_red_slice, 99.0))
-
-            panels += [
-                (red_slice,     f"Capon (reduced) — {title_pos}", self.cmap,     vmin, vmax,     self._int_label, "capon"),
-                (err_red_slice, f"|Capon − GT| — {title_pos}",    self.err_cmap, 0.0,  emax_red, "|error|",       "capon_error"),
-            ]
-
-        return [
-            self._imshow_figure(
-                data       = data,
-                title      = title,
-                x_label    = "range index",
-                y_label    = "azimuth index",
-                cbar_label = cbar,
-                extent     = extent,
-                cmap       = cmap_used,
-                vmin       = vlo,
-                vmax       = vhi,
-                origin     = "upper",
-                path       = out_dir / f"{stem}_{kind}.png",
-            )
-            for data, title, cmap_used, vlo, vhi, cbar, kind in panels
-        ]
+        return self._render_slice_panels(
+            pred_slice = pred_slice,
+            gt_slice   = gt_slice,
+            red_slice  = red_slice,
+            extent     = extent,
+            x_label    = "range index",
+            y_label    = "azimuth index",
+            origin     = "upper",
+            title_pos  = title_pos,
+            ssim_value = ssim_value,
+            out_dir    = out_dir,
+            stem       = stem,
+        )
 
     def plot_metric_histograms(self, metric_arrays: Dict[str, np.ndarray], out_dir: Path) -> List[Path]:
         paths = []
@@ -487,11 +433,13 @@ class Ploter(PlotTools):
             if flat.size == 0:
                 continue
 
-            lo, hi  = np.percentile(flat, [0.5, 99.5])
-            fig, ax = plt.subplots(figsize=(4.8, 3.4))
-            ax.hist(flat, bins=80, range=(lo, hi), color="C0", edgecolor="white", linewidth=0.3)
+            lo, hi    = np.percentile(flat, [0.5, 99.5])
+            clipped   = np.clip(flat, lo, hi)
+            n_outside = int(np.count_nonzero((flat < lo) | (flat > hi)))
+            fig, ax   = plt.subplots(figsize=(4.8, 3.4))
+            ax.hist(clipped, bins=80, color="C0", edgecolor="white", linewidth=0.3)
             ax.axvline(float(np.median(flat)), color="black", linestyle="--", linewidth=1.0, label=f"median={np.median(flat):.3g}")
-            ax.set_title(f"{name} (denorm)")
+            ax.set_title(f"{name} (denorm)  [{n_outside} of {flat.size} outliers piled at edges]", fontsize=8)
             ax.set_xlabel(name)
             ax.set_ylabel("count")
             ax.set_yscale("log")
@@ -513,18 +461,18 @@ class Ploter(PlotTools):
         ax_offset      : int = 0,
     ) -> Path:
 
-        vals_gt = np.array([global_metrics.get(f"ssim_gt_{axis}_{i}",  float("nan")) for i in range(n_slices)], dtype=np.float64)
+        vals_gt = np.array([global_metrics[f"ssim_gt_{axis}_{i}"]  for i in range(n_slices)], dtype=np.float64)
         vals_rd = np.array([global_metrics.get(f"ssim_red_{axis}_{i}", float("nan")) for i in range(n_slices)], dtype=np.float64)
         x_phys  = slice_indices.astype(np.float64) + ax_offset
 
-        mean_gt = float(np.nanmean(vals_gt))
+        mean_gt = float(global_metrics[f"ssim_gt_{axis}_mean"])
 
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
         ax.plot(x_phys, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
         ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4f}")
 
         if np.isfinite(vals_rd).any():
-            mean_rd = float(np.nanmean(vals_rd))
+            mean_rd = float(global_metrics[f"ssim_red_{axis}_mean"])
             ax.plot(x_phys, vals_rd, color="C2", linewidth=0.9, label="Capon (reduced) × GT", alpha=0.9)
             ax.axhline(mean_rd, color="C2", linestyle=":", linewidth=1.0, label=f"mean = {mean_rd:.4f}")
 
@@ -558,16 +506,16 @@ class Ploter(PlotTools):
 
         paths = []
         for key, fname, ylabel, desc in metric_specs:
-            vals_gt = np.array([global_metrics.get(f"{key}_gt_{i}",  float("nan")) for i in range(n_elev)], dtype=np.float64)
+            vals_gt = np.array([global_metrics[f"{key}_gt_{i}"]  for i in range(n_elev)], dtype=np.float64)
             vals_rd = np.array([global_metrics.get(f"{key}_red_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
-            mean_gt = float(np.nanmean(vals_gt))
+            mean_gt = float(global_metrics[f"{key}_gt_mean"])
 
             fig, ax = plt.subplots(figsize=(5.8, 3.6))
             ax.plot(x_axis, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
             ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4g}")
 
             if np.isfinite(vals_rd).any():
-                mean_rd = float(np.nanmean(vals_rd))
+                mean_rd = float(global_metrics[f"{key}_red_mean"])
                 ax.plot(x_axis, vals_rd, color="C2", linewidth=0.9, label="Capon (reduced) × GT", alpha=0.9)
                 ax.axhline(mean_rd, color="C2", linestyle=":", linewidth=1.0, label=f"mean = {mean_rd:.4g}")
 
@@ -582,6 +530,8 @@ class Ploter(PlotTools):
 
         return paths
 
+
+class ParamPlotter(PlotTools):
     def plot_param_maps(
         self,
         params_pred : np.ndarray,
@@ -602,7 +552,7 @@ class Ploter(PlotTools):
                 arr_pred   = params_pred[ch]
                 vmin, vmax = self._shared_clim(arr_pred if params_gt is None else np.stack([arr_pred, params_gt[ch]]))
 
-                paths.append(self._imshow_figure(
+                paths.append(self._imshow_panel(
                     data       = arr_pred,
                     title      = f"Pred {short} — g{k + 1}",
                     x_label    = "range index",
@@ -617,7 +567,7 @@ class Ploter(PlotTools):
                 ))
 
                 if params_gt is not None and ch < params_gt.shape[0]:
-                    paths.append(self._imshow_figure(
+                    paths.append(self._imshow_panel(
                         data       = params_gt[ch],
                         title      = f"GT {short} — g{k + 1}",
                         x_label    = "range index",
@@ -714,6 +664,18 @@ class Ploter(PlotTools):
 
         return paths
 
+    def _scatter_panel(self, ax, gt: np.ndarray, pred: np.ndarray, label: str) -> None:
+        r2 = self._r2_value(gt, pred)
+
+        ax.scatter(gt, pred, s=2, alpha=0.25, color="C0", rasterized=True, label=f"{label}  R²={r2:.3f}")
+
+    @staticmethod
+    def _identity_line(ax, *arrays: np.ndarray) -> None:
+        lo = min(float(arr.min()) for arr in arrays)
+        hi = max(float(arr.max()) for arr in arrays)
+
+        ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
+
     def plot_param_scatter(
         self,
         params_pred : np.ndarray,
@@ -724,7 +686,6 @@ class Ploter(PlotTools):
         seed        : int = 0,
     ) -> List[Path]:
 
-        rng   = np.random.default_rng(seed)
         paths = []
 
         for k in range(n_gaussians):
@@ -746,59 +707,33 @@ class Ploter(PlotTools):
                 fig, ax = plt.subplots(figsize=(4.6, 4.2))
 
                 if j == 0:
-                    def _subsample(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-                        m = mask & np.isfinite(gt_all) & np.isfinite(pred_all)
-                        g, p = gt_all[m], pred_all[m]
-                        if g.size > max_points:
-                            idx  = rng.choice(g.size, max_points, replace=False)
-                            g, p = g[idx], p[idx]
-                        return g, p
-
-                    g_act,  p_act  = _subsample(is_active)
-                    g_phld, p_phld = _subsample(is_placeholder)
+                    g_act,  p_act  = self._paired_subsample([gt_all[is_active],      pred_all[is_active]],      max_points, seed)
+                    g_phld, p_phld = self._paired_subsample([gt_all[is_placeholder], pred_all[is_placeholder]], max_points, seed)
 
                     if g_act.size == 0 and g_phld.size == 0:
                         plt.close(fig)
                         continue
 
-                    all_g = np.concatenate([g_act, g_phld]) if g_phld.size else g_act
-                    all_p = np.concatenate([p_act, p_phld]) if p_phld.size else p_act
-                    lo    = min(float(all_g.min()), float(all_p.min()))
-                    hi    = max(float(all_g.max()), float(all_p.max()))
-
                     if g_act.size > 0:
-                        ss_res = float(np.sum((g_act - p_act) ** 2))
-                        ss_tot = float(np.sum((g_act - np.mean(g_act)) ** 2))
-                        r2_act = 1.0 - ss_res / (ss_tot + 1e-12)
-                        ax.scatter(g_act, p_act, s=2, alpha=0.25, color="C0", rasterized=True, label=f"active (R²={r2_act:.3f})")
+                        self._scatter_panel(ax, g_act, p_act, "active")
 
                     if g_phld.size > 0:
                         ax.scatter(g_phld, p_phld, s=2, alpha=0.35, color="C1", rasterized=True, label=f"placeholder (n={g_phld.size})")
 
-                    ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
+                    self._identity_line(ax, np.concatenate([g_act, g_phld]), np.concatenate([p_act, p_phld]))
                     ax.set_title(f"g{k + 1} — {lbl}", fontsize=10)
 
                 else:
-                    mask     = is_active & np.isfinite(gt_all) & np.isfinite(pred_all)
-                    gt, pred = gt_all[mask], pred_all[mask]
+                    gt, pred = self._paired_subsample([gt_all[is_active], pred_all[is_active]], max_points, seed)
 
                     if gt.size == 0:
                         plt.close(fig)
                         continue
 
-                    if gt.size > max_points:
-                        idx      = rng.choice(gt.size, max_points, replace=False)
-                        gt, pred = gt[idx], pred[idx]
-
-                    ss_res = float(np.sum((gt - pred) ** 2))
-                    ss_tot = float(np.sum((gt - np.mean(gt)) ** 2))
-                    r2     = 1.0 - ss_res / (ss_tot + 1e-12)
-                    lo     = min(float(gt.min()), float(pred.min()))
-                    hi     = max(float(gt.max()), float(pred.max()))
-
-                    ax.scatter(gt, pred, s=2, alpha=0.25, color="C0", rasterized=True, label=f"active  R²={r2:.3f}")
-                    ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
-                    ax.set_title(f"g{k + 1} — {lbl}  (R²={r2:.3f}, active only)", fontsize=10)
+                    self._scatter_panel(ax, gt, pred, "active")
+                    self._identity_line(ax, gt, pred)
+                    r2_str = self._r2_value(gt, pred)
+                    ax.set_title(f"g{k + 1} — {lbl}  (R²={r2_str:.3f}, active only)", fontsize=10)
 
                 ax.set_xlabel(f"GT {short}")
                 ax.set_ylabel(f"Pred {short}")
@@ -809,6 +744,13 @@ class Ploter(PlotTools):
                 paths.append(self._save(fig, out_dir / f"g{k + 1}_{fname}.png"))
 
         return paths
+
+    @staticmethod
+    def _r2_value(gt: np.ndarray, pred: np.ndarray) -> float:
+        ss_res = float(np.sum((gt - pred) ** 2))
+        ss_tot = float(np.sum((gt - np.mean(gt)) ** 2))
+
+        return 1.0 - ss_res / (ss_tot + 1e-12)
 
     def plot_param_error_maps(
         self,
@@ -839,7 +781,7 @@ class Ploter(PlotTools):
 
                 vmax = float(np.percentile(valid_err, 99.0))
 
-                paths.append(self._imshow_figure(
+                paths.append(self._imshow_panel(
                     data       = err,
                     title      = f"|Δ{short}| — g{k + 1}  (p99={vmax:.3g})",
                     x_label    = "range index",
@@ -855,6 +797,8 @@ class Ploter(PlotTools):
 
         return paths
 
+
+class SlotPlotter(PlotTools):
     def plot_slot_mu_distributions(
         self,
         global_metrics : dict,
@@ -866,10 +810,10 @@ class Ploter(PlotTools):
         x     = np.arange(n_gaussians)
         width = 0.35
 
-        pred_means = np.array([global_metrics.get(f"slot_{k}_mu_pred_mean", np.nan) for k in slots])
-        pred_stds  = np.array([global_metrics.get(f"slot_{k}_mu_pred_std",  np.nan) for k in slots])
-        gt_means   = np.array([global_metrics.get(f"slot_{k}_mu_gt_mean",   np.nan) for k in slots])
-        gt_stds    = np.array([global_metrics.get(f"slot_{k}_mu_gt_std",    np.nan) for k in slots])
+        pred_means = np.array([global_metrics[f"slot_{k}_mu_pred_mean"] for k in slots])
+        pred_stds  = np.array([global_metrics[f"slot_{k}_mu_pred_std"]  for k in slots])
+        gt_means   = np.array([global_metrics[f"slot_{k}_mu_gt_mean"]   for k in slots])
+        gt_stds    = np.array([global_metrics[f"slot_{k}_mu_gt_std"]    for k in slots])
 
         paths = []
 
@@ -913,13 +857,10 @@ class Ploter(PlotTools):
         x      = np.arange(len(labels))
         width  = 0.25
 
-        def _get(key: str) -> float:
-            return float(global_metrics.get(key, np.nan))
-
-        precisions = [_get(f"slot_{k}_placeholder_precision") for k in slots] + [_get("placeholder_precision")]
-        recalls    = [_get(f"slot_{k}_placeholder_recall")    for k in slots] + [_get("placeholder_recall")]
-        f1s        = [_get(f"slot_{k}_placeholder_f1")        for k in slots] + [_get("placeholder_f1")]
-        gt_rates   = [_get(f"slot_{k}_placeholder_gt_rate")   for k in slots] + [_get("placeholder_gt_rate") if "placeholder_gt_rate" in global_metrics else np.nan]
+        precisions = [global_metrics[f"slot_{k}_placeholder_precision"] for k in slots] + [global_metrics["placeholder_precision"]]
+        recalls    = [global_metrics[f"slot_{k}_placeholder_recall"]    for k in slots] + [global_metrics["placeholder_recall"]]
+        f1s        = [global_metrics[f"slot_{k}_placeholder_f1"]        for k in slots] + [global_metrics["placeholder_f1"]]
+        gt_rates   = [global_metrics[f"slot_{k}_placeholder_gt_rate"]   for k in slots] + [global_metrics.get("placeholder_gt_rate", np.nan)]
 
         paths = []
 
@@ -967,12 +908,12 @@ class Ploter(PlotTools):
         out_dir        : Path,
     ) -> List[Path]:
 
-        ordering_rate = float(global_metrics.get("mu_ordering_rate",                    np.nan))
-        dominant_frac = float(global_metrics.get("permutation_consensus_dominant_frac", np.nan))
-        identity_frac = float(global_metrics.get("permutation_consensus_identity_frac", np.nan))
+        ordering_rate = float(global_metrics["mu_ordering_rate"])
+        dominant_frac = float(global_metrics["permutation_consensus_dominant_frac"])
+        identity_frac = float(global_metrics["permutation_consensus_identity_frac"])
 
         slots        = list(range(n_gaussians))
-        active_rates = [1.0 - float(global_metrics.get(f"slot_{k}_placeholder_gt_rate", np.nan)) for k in slots]
+        active_rates = [1.0 - float(global_metrics[f"slot_{k}_placeholder_gt_rate"]) for k in slots]
 
         paths = []
 
@@ -1008,10 +949,10 @@ class Ploter(PlotTools):
         paths.append(self._save(fig, out_dir / "activation_rate.png"))
 
         fig, ax = plt.subplots(figsize=(5.2, 3.4))
-        pred_means = np.array([global_metrics.get(f"slot_{k}_mu_pred_mean", np.nan) for k in slots])
-        gt_means   = np.array([global_metrics.get(f"slot_{k}_mu_gt_mean",   np.nan) for k in slots])
-        pred_stds  = np.array([global_metrics.get(f"slot_{k}_mu_pred_std",  np.nan) for k in slots])
-        gt_stds    = np.array([global_metrics.get(f"slot_{k}_mu_gt_std",    np.nan) for k in slots])
+        pred_means = np.array([global_metrics[f"slot_{k}_mu_pred_mean"] for k in slots])
+        gt_means   = np.array([global_metrics[f"slot_{k}_mu_gt_mean"]   for k in slots])
+        pred_stds  = np.array([global_metrics[f"slot_{k}_mu_pred_std"]  for k in slots])
+        gt_stds    = np.array([global_metrics[f"slot_{k}_mu_gt_std"]    for k in slots])
 
         ax.errorbar(slots, gt_means,   yerr=gt_stds,   fmt="o-",  color="C0", capsize=5, linewidth=1.2, label="GT",   markersize=6)
         ax.errorbar(slots, pred_means, yerr=pred_stds, fmt="s--", color="C3", capsize=5, linewidth=1.2, label="Pred", markersize=6)
@@ -1068,7 +1009,6 @@ class Ploter(PlotTools):
         ax.set_ylabel("azimuth index")
         ax.set_title("Active-count agreement per pixel")
 
-        from matplotlib.patches import Patch
         legend_els = [
             Patch(facecolor=[0.20, 0.75, 0.20], label=f"correct  ({n_correct / n_total * 100:.1f}%)"),
             Patch(facecolor=[0.20, 0.45, 0.90], label=f"under    ({n_under   / n_total * 100:.1f}%)"),
@@ -1091,3 +1031,99 @@ class Ploter(PlotTools):
         paths.append(self._save(fig, out_dir / "active_count_difference.png"))
 
         return paths
+
+
+class TrackPlotter(PlotTools):
+    def plot_track_geometry(self, baselines, out_path: Path) -> Path:
+        fig, ax = plt.subplots(figsize=(5.4, 4.6))
+
+        for index, label in enumerate(baselines.labels):
+            color  = "black" if index == 0 else f"C{(index - 1) % 10}"
+            marker = "*" if index == 0 else "o"
+            size   = 140 if index == 0 else 60
+            ax.scatter(baselines.horizontal[index], baselines.vertical[index], s=size, marker=marker, color=color, zorder=3)
+            ax.annotate(label, (baselines.horizontal[index], baselines.vertical[index]), textcoords="offset points", xytext=(7, 5), fontsize=9)
+            ax.errorbar(baselines.horizontal[index], baselines.vertical[index], xerr=baselines.horizontal_std[index], yerr=baselines.vertical_std[index], fmt="none", ecolor=color, elinewidth=0.7, capsize=2, alpha=0.6)
+
+        ax.set_xlabel(r"horizontal baseline $b_{\perp,\mathrm{h}}$ [m]")
+        ax.set_ylabel(r"vertical baseline $b_{\perp,\mathrm{v}}$ [m]")
+        ax.set_title(f"Passes used  (reference {baselines.reference}, mean over azimuth window)")
+        ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
+    def plot_track_profiles(self, profiles, out_dir: Path, split_azimuth: Optional[Tuple[int, int]] = None) -> List[Path]:
+        azimuth = profiles.azimuth_axis
+        paths   = []
+
+        for component, data, symbol in (
+            ("horizontal", profiles.relative_to_reference("horizontal"), r"$b_{\perp,\mathrm{h}}$"),
+            ("vertical",   profiles.relative_to_reference("vertical"),   r"$b_{\perp,\mathrm{v}}$"),
+        ):
+            fig, ax = plt.subplots(figsize=(7.2, 3.6))
+
+            for index, label in enumerate(profiles.labels):
+                color = "black" if index == 0 else f"C{(index - 1) % 10}"
+                ax.plot(azimuth, data[index], color=color, linewidth=1.0, label=label)
+
+            if split_azimuth is not None:
+                ax.axvspan(split_azimuth[0], split_azimuth[1], color="C7", alpha=0.18, label="inference split")
+
+            ax.set_xlabel("azimuth sample index")
+            ax.set_ylabel(f"{symbol} relative to {profiles.labels[0]} [m]")
+            ax.set_title(f"Per-azimuth {component} baselines of the passes used")
+            ax.legend(framealpha=0.9, fontsize=8, ncol=2)
+            ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
+            fig.tight_layout()
+
+            paths.append(self._save(fig, out_dir / f"baseline_profiles_{component}.png"))
+
+        return paths
+
+    def plot_track_flight_3d(self, profiles, out_path: Path, elev: float = 28.0, azim: float = -55.0) -> Path:
+        azimuth = profiles.azimuth_axis
+        radii   = profiles.deviation_radii()
+        h_mean  = np.nanmean(profiles.horizontal, axis=1)
+        v_mean  = np.nanmean(profiles.vertical,   axis=1)
+
+        step             = max(1, len(azimuth) // 200)
+        theta            = np.linspace(0.0, 2.0 * np.pi, 36)
+        az_grid, th_grid = np.meshgrid(azimuth[::step], theta)
+
+        fig = plt.figure(figsize=(12.0, 7.0))
+        ax  = fig.add_axes([0.12, 0.08, 0.70, 0.84], projection="3d")
+
+        for index, label in enumerate(profiles.labels):
+            color = "black" if index == 0 else f"C{(index - 1) % 10}"
+
+            ax.plot(azimuth, profiles.horizontal[index], profiles.vertical[index], color=color, linewidth=1.3, label=f"{label}  (RMS dev {radii[index]:.2f} m)", zorder=3)
+            ax.plot_surface(az_grid, h_mean[index] + radii[index] * np.cos(th_grid), v_mean[index] + radii[index] * np.sin(th_grid), color=color, alpha=0.16, linewidth=0, antialiased=False, shade=False)
+
+        ax.view_init(elev=elev, azim=azim)
+        ax.set_xlabel("azimuth sample index", labelpad=14)
+        ax.set_ylabel(r"horizontal baseline $b_{\perp,\mathrm{h}}$ [m]", labelpad=14)
+        ax.set_zlabel(r"vertical baseline $b_{\perp,\mathrm{v}}$ [m]",   labelpad=18)
+        ax.tick_params(axis="z", pad=8)
+        ax.set_title("Flight tracks of the passes used  (tube radius = RMS planar deviation over azimuth)")
+        ax.legend(loc="upper left", framealpha=0.9, fontsize=8)
+
+        return self._save(fig, out_path)
+
+
+class Ploter(PlotTools):
+    def __init__(
+        self,
+        cmap     : str  = "jet",
+        err_cmap : str  = "magma",
+        normalize: bool = False,
+        fig_dpi  : int  = 150,
+        save_dpi : int  = 150,
+    ) -> None:
+
+        super().__init__(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
+
+        self.slice = SlicePlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
+        self.param = ParamPlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
+        self.slot  = SlotPlotter( cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
+        self.track = TrackPlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)

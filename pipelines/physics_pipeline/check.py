@@ -7,9 +7,18 @@ from configuration.param_extraction_config import ExtractionConfig, FitMode, Fit
 from pipelines.training_pipeline.loss       import PhysicsComponents
 from tools.gaussians                        import GaussianMixture
 from tools.tomo_geometry                    import TomoGeometry
+from tools.track_baselines                  import TrackBaselines
 
 
 class PhysicsQuantitiesCheck:
+    LOSS_KINDS = {
+        "total_power":      "masked relative L1 error",
+        "moments":          "weighted normalised blend",
+        "coherence_resyn":  "mean squared complex-coherence diff",
+        "covariance_match": "normalised squared-Frobenius ratio",
+        "capon_cycle":      "normalised spectrum MSE",
+    }
+
     def __init__(self, config, logger):
         self.config = config
         self.logger = logger
@@ -30,9 +39,9 @@ class PhysicsQuantitiesCheck:
         moments   = self._moment_agreement(gauss_t, capon_t, x_t, dx)
         coherence = self._coherence_agreement(gauss_t, capon_t, dx, geometry)
 
-        self.logger.metrics_table(losses,    ["Term", "Gauss vs Capon"],                          title="Physics Loss Terms on Ground-Truth Pairs")
-        self.logger.metrics_table(moments,   ["Quantity", "MAE", "Pearson r", "Signed mean rel"], title="Per-Pixel Moment Agreement")
-        self.logger.metrics_table(coherence, ["Track", "kz [rad/m]", "Mean |dGamma|"],            title="Per-Baseline Coherence Agreement")
+        self.logger.metrics_table(losses,    ["Term", "Kind", "Gauss vs Capon"],                                       title="Physics Loss Terms on Ground-Truth Pairs")
+        self.logger.metrics_table(moments,   ["Quantity", "Unit", "MAE", "Rel MAE [%]", "Pearson r", "Signed bias"],   title="Per-Pixel Moment Agreement")
+        self.logger.metrics_table(coherence, ["Track", "Role", "kz [rad/m]", "Mean |dGamma|"],                         title="Per-Baseline Coherence Agreement")
 
         return {"losses": losses, "moments": moments, "coherence": coherence}
 
@@ -105,10 +114,24 @@ class PhysicsQuantitiesCheck:
             "capon_cycle":      pc.capon_cycle(          gauss_t, capon_t, geometry.steering, geometry.outer, dx, cfg.capon_loading, cfg.physics_floor),
         }
 
-        return [{"Term": name, "Gauss vs Capon": f"{float(val):.6f}"} for name, val in values.items()]
+        return [{"Term": name, "Kind": self.LOSS_KINDS[name], "Gauss vs Capon": f"{float(val):.6f}"} for name, val in values.items()]
+
+    def _pearson(self, gv: np.ndarray, cv: np.ndarray) -> str:
+        if gv.std() == 0.0 or cv.std() == 0.0:
+            self.logger.warning("Pearson r undefined: zero variance in one moment array; reporting 'degenerate'")
+            return "degenerate"
+
+        r = float(np.corrcoef(gv, cv)[0, 1])
+
+        if not np.isfinite(r):
+            self.logger.warning("Pearson r undefined: corrcoef returned a non-finite value; reporting 'degenerate'")
+            return "degenerate"
+
+        return f"{r:.4f}"
 
     def _moment_agreement(self, gauss_t, capon_t, x_t, dx) -> list:
-        floor = self.config.physics_floor
+        floor       = self.config.physics_floor
+        height_span = float(x_t.max() - x_t.min())
 
         g0, g1, g2 = PhysicsComponents.moment_sums(gauss_t, x_t, dx)
         c0, c1, c2 = PhysicsComponents.moment_sums(capon_t, x_t, dx)
@@ -119,27 +142,49 @@ class PhysicsQuantitiesCheck:
         g_spread = torch.sqrt((g2 / g0.clamp(min=floor) - g_mean ** 2).clamp(min=0.0))
         c_spread = torch.sqrt((c2 / c0.clamp(min=floor) - c_mean ** 2).clamp(min=0.0))
 
-        rows  = []
-        pairs = [
-            ("mass m0",          g0,       c0),
-            ("mean elevation",   g_mean,   c_mean),
-            ("vertical spread",  g_spread, c_spread),
+        specs = [
+            ("mass m0",         "power*m", g0,       c0,       float(np.abs(c0.flatten().cpu().numpy()).mean())),
+            ("mean elevation",  "m",       g_mean,   c_mean,   height_span),
+            ("vertical spread", "m",       g_spread, c_spread, float(c_spread.flatten().cpu().numpy().mean())),
         ]
 
-        for name, g, c in pairs:
+        rows = []
+
+        for name, unit, g, c, rel_scale in specs:
             gv = g.flatten().cpu().numpy()
             cv = c.flatten().cpu().numpy()
 
             mae    = float(np.abs(gv - cv).mean())
-            r      = float(np.corrcoef(gv, cv)[0, 1])
-            signed = float(((gv - cv) / np.clip(np.abs(cv), floor, None)).mean())
+            signed = float((gv - cv).mean())
+            rel    = 100.0 * mae / max(rel_scale, floor)
+            pear   = self._pearson(gv, cv)
 
-            rows.append({"Quantity": name, "MAE": f"{mae:.4f}", "Pearson r": f"{r:.4f}", "Signed mean rel": f"{signed:+.4f}"})
+            rows.append({
+                "Quantity":    name,
+                "Unit":        unit,
+                "MAE":         f"{mae:.4f}",
+                "Rel MAE [%]": f"{rel:.2f}",
+                "Pearson r":   pear,
+                "Signed bias": f"{signed:+.4f}",
+            })
 
         return rows
 
+    def _track_labels(self, geometry) -> list | None:
+        cfg = self.config.geometry
+
+        if cfg.baselines_source == "manual" or len(cfg.kz_values) > 0:
+            return None
+
+        path = cfg.baselines_file(self.config.dataset_path)
+        if not path.exists():
+            return None
+
+        return list(TrackBaselines.load(path).subset(self.config.secondary_labels).labels)
+
     def _coherence_agreement(self, gauss_t, capon_t, dx, geometry) -> list:
-        floor = self.config.physics_floor
+        floor  = self.config.physics_floor
+        labels = self._track_labels(geometry)
 
         g0 = gauss_t.sum(dim=1) * dx
         c0 = capon_t.sum(dim=1) * dx
@@ -152,7 +197,18 @@ class PhysicsQuantitiesCheck:
 
         diff = (gg - gc).abs().mean(dim=(0, 2, 3))
 
-        return [
-            {"Track": str(n), "kz [rad/m]": f"{float(geometry.kz[n]):.4f}", "Mean |dGamma|": f"{float(diff[n]):.4f}"}
-            for n in range(geometry.n_tracks)
-        ]
+        rows = []
+
+        for n in range(geometry.n_tracks):
+            track = labels[n] if labels is not None else f"index {n}"
+            kz    = float(geometry.kz[n])
+            role  = "kz=0 reference" if kz == 0.0 else "secondary"
+
+            rows.append({
+                "Track":         track,
+                "Role":          role,
+                "kz [rad/m]":    f"{kz:.4f}",
+                "Mean |dGamma|": f"{float(diff[n]):.4f}",
+            })
+
+        return rows

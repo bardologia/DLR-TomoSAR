@@ -854,7 +854,7 @@ class EquationLibrary:
     def _training_optim(self) -> dict:
         return {
             "group" : "Training · Optim",
-            "blurb" : "Everything that moves the weights: parameter groups, AdamW, four warmup modes, nine schedulers, EMA, three clipping modes, stopping rules.",
+            "blurb" : "Everything that moves the weights: parameter groups, AdamW, four warmup modes, nine schedulers, three clipping modes, stopping rules.",
             "items" : [
                 {
                     "title" : "Parameter group rates",
@@ -922,63 +922,12 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Scheduler — warm restarts (equal periods)",
-                    "tex"   : r"F(t) = r + \frac{1}{2}(1 - r)\left(1 + \cos\!\left(\frac{\pi\,(t \bmod T_0)}{T_0}\right)\right) \qquad (M = 1)",
-                    "note"  : "With the default multiplier of 1 the cosine simply restarts every T_0 epochs.",
+                    "title" : "Scheduler — constant",
+                    "tex"   : r"F(t) = 1",
+                    "note"  : "The benchmark baseline mode: the scheduler factor stays at 1 so the learning rate is driven by warmup alone; like cosine it evaluates at t minus the curriculum epoch offset.",
                     "vars"  : [
                         {"sym": r"F(t)", "desc": "multiplicative LR factor at epoch t"},
-                        {"sym": r"T_0",  "desc": "first period length, default 10"},
-                        {"sym": r"M",    "desc": "period multiplier T_mult, default 1"},
-                        {"sym": r"r",    "desc": "minimum-rate ratio η_min/η_0"},
-                    ],
-                },
-                {
-                    "title" : "Scheduler — warm restarts (growing periods)",
-                    "tex"   : r"n = \left\lfloor \log_M\!\left(1 - \frac{t}{T_0}(1 - M)\right) \right\rfloor, \qquad T_i = T_0 M^n, \qquad T_{\mathrm{cur}} = t - T_0\,\frac{M^n - 1}{M - 1}",
-                    "note"  : "For M ≠ 1 the period index, period length, and in-period position follow the geometric-series inversion in scheduler.py; the cosine factor then uses T_cur / T_i.",
-                    "vars"  : [
-                        {"sym": r"n",                "desc": "index of the current restart period (0 before T_0)"},
-                        {"sym": r"t",                "desc": "epoch index"},
-                        {"sym": r"T_0",              "desc": "first period length"},
-                        {"sym": r"M",                "desc": "period multiplier T_mult"},
-                        {"sym": r"T_i",              "desc": "length of the current period"},
-                        {"sym": r"T_{\mathrm{cur}}", "desc": "epoch position within the current period"},
-                    ],
-                },
-                {
-                    "title" : "Scheduler — step, multi-step, exponential",
-                    "tex"   : r"F(t) = \gamma^{\lfloor t/\Delta \rfloor}, \qquad F(t) = \gamma^{\,\left|\{m \in M\,:\,t \geq m\}\right|}, \qquad F(t) = \gamma^{\,t}",
-                    "note"  : "Piecewise-constant and geometric decay; multi-step counts the milestones passed.",
-                    "vars"  : [
-                        {"sym": r"F(t)",   "desc": "multiplicative LR factor at epoch t"},
-                        {"sym": r"\gamma", "desc": "decay factor, default 0.1"},
-                        {"sym": r"\Delta", "desc": "step_size = 30"},
-                        {"sym": r"M",      "desc": "milestone set, default [30, 60, 90]"},
-                        {"sym": r"|\{m \in M : t \geq m\}|", "desc": "milestones already passed"},
-                    ],
-                },
-                {
-                    "title" : "Scheduler — linear, polynomial, constant",
-                    "tex"   : r"F(t) = \alpha_{\mathrm{s}} + (\alpha_{\mathrm{e}} - \alpha_{\mathrm{s}})\,\frac{t}{T}, \qquad F(t) = \left(1 - \frac{t}{T}\right)^{p}, \qquad F(t) = 1",
-                    "note"  : "The remaining factor-based modes; the progress t/T is capped at 1, and all schedulers evaluate at t minus the curriculum epoch offset.",
-                    "vars"  : [
-                        {"sym": r"F(t)",                                     "desc": "multiplicative LR factor at epoch t"},
-                        {"sym": r"\alpha_{\mathrm{s}}, \alpha_{\mathrm{e}}", "desc": "start_factor = 1.0, end_factor = 0.1"},
-                        {"sym": r"T",                                        "desc": "total_iters = 100"},
-                        {"sym": r"p",                                        "desc": "polynomial power, default 1.0"},
-                    ],
-                },
-                {
-                    "title" : "Scheduler — reduce on plateau",
-                    "tex"   : r"\text{improved} \iff m < m^{*} - \tau_{\mathrm{thr}}, \qquad \eta \leftarrow 0.1\,\eta \ \ \text{after } P_{\mathrm{plateau}} \text{ stagnant evaluations}",
-                    "note"  : "The only stateful scheduler: it multiplies the current rates instead of re-deriving them from the base rates each epoch.",
-                    "vars"  : [
-                        {"sym": r"m",                    "desc": "monitored validation loss"},
-                        {"sym": r"m^{*}",                "desc": "best monitored value so far"},
-                        {"sym": r"\tau_{\mathrm{thr}}",  "desc": "threshold = 1e-4"},
-                        {"sym": r"0.1",                  "desc": "reduction factor"},
-                        {"sym": r"P_{\mathrm{plateau}}", "desc": "patience = 10"},
-                        {"sym": r"\eta",                 "desc": "current learning rate"},
+                        {"sym": r"t",    "desc": "epoch index (minus the curriculum offset)"},
                     ],
                 },
                 {
@@ -1057,17 +1006,6 @@ class EquationLibrary:
                         {"sym": r"\beta_1^t, \beta_2^t", "desc": "decay factors to the power t"},
                         {"sym": r"\lambda",              "desc": "weight decay of the parameter group"},
                         {"sym": r"\epsilon",             "desc": "optimizer.eps stability constant"},
-                    ],
-                },
-                {
-                    "title" : "EMA shadow update",
-                    "tex"   : r"\tilde{\theta}^{(i)}_t = \gamma\,\tilde{\theta}^{(i)}_{t-1} + (1 - \gamma)\,\theta^{(i)}_t",
-                    "note"  : "Shadow weights track the model once every 10 optimiser steps and replace it for validation and checkpointing; the summed L2 shadow-model divergence is logged in debug mode.",
-                    "vars"  : [
-                        {"sym": r"\tilde{\theta}^{(i)}_t", "desc": "EMA shadow of parameter tensor i"},
-                        {"sym": r"\theta^{(i)}_t",         "desc": "live parameter tensor i"},
-                        {"sym": r"\gamma",                 "desc": "ema_decay = 0.999"},
-                        {"sym": r"t",                      "desc": "EMA update index (every 10 steps)"},
                     ],
                 },
                 {

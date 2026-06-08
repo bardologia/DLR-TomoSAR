@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import sys
 from dataclasses import asdict, replace
 from datetime    import datetime
@@ -14,8 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 from configuration.dataset_config            import DatasetConfiguration
 from configuration.training_config           import TrainerConfig
 from pipelines.dataset_pipeline.pipeline     import DatasetPipeline
+from pipelines.inference_pipeline.pipeline   import InferencePipeline
 from pipelines.shared.io                     import FileIO
-from pipelines.shared.orchestration          import GpuJob, GpuQueue
+from pipelines.shared.orchestration          import ExperimentStage, GpuJob
 from pipelines.training_pipeline.docs        import LossScaleProbeConfig
 from pipelines.training_pipeline.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
 from pipelines.training_pipeline.trainer     import Trainer
@@ -50,13 +52,7 @@ class TrainingRunMetadata:
         self.writer = SummaryWriter(log_dir=str(self.tensorboard_dir))
 
         trainer_config.io.logdir     = str(self.run_directory)
-        trainer_config.io.tb_dir     = str(self.tensorboard_dir)
-        trainer_config.io.docs_dir   = str(self.docs_directory)
-        trainer_config.io.logs_dir   = str(self.logs_directory)
         trainer_config.io.writer     = self.writer
-
-        if hasattr(trainer_config, "resources"):
-            trainer_config.resources.logs_dir = str(self.logs_directory)
 
         self.logger = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
 
@@ -193,7 +189,7 @@ class TrainingPipeline:
             param_match   = self.trainer_config.curriculum.warmup.param_match,
         )
 
-        trainer = self._make_trainer(model, model_cfg, x_axis, getattr(train_dataset, "normalizer", None))
+        trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)
 
         try:
             trainer.maybe_run_loss_probe(train_loader, probe_config)
@@ -252,10 +248,6 @@ class SingleTrainRunner:
         return results
 
     def _run_inference(self, run_directory: Path):
-        import gc
-
-        from pipelines.inference_pipeline.pipeline import InferencePipeline
-
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -282,10 +274,12 @@ class TrainScheduler:
         self.config       = config
         self.entry_script = Path(entry_script)
         self.log_dir      = Path(config.logdir) / "batch_train_logs"
+        self.results_path = self.log_dir / "train_scheduler_results.json"
 
         self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
 
         self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
+        self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script)
 
     def planner(self):
         mode = self.config.trials_mode
@@ -315,12 +309,18 @@ class TrainScheduler:
             "Log dir"       : str(self.log_dir),
         }, title="Configuration")
 
-        queue   = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s)
-        results = queue.run([self._job(run_name, overrides) for run_name, overrides in experiments])
+        jobs    = [self._job(run_name, overrides) for run_name, overrides in experiments]
+        names   = [run_name for run_name, overrides in experiments]
+        results = self.stage._order_results(self.stage._run_queue(jobs), names)
+
+        self.stage._write_results(results, self.results_path)
 
         self.logger.section("Summary")
-        rows = [{"Trial": r.name, "Status": r.status, "Duration": f"{r.duration_s / 60:.1f} min"} for r in results]
+        rows = [{"Trial": r["name"], "Status": r["status"], "Duration": f"{r['duration_s'] / 60:.1f} min"} for r in results]
         self.logger.metrics_table(rows, columns=["Trial", "Status", "Duration"])
+
+        failed = [r for r in results if r["status"] != "DONE"]
+        self.stage._log_failures(failed)
 
         self.logger.close()
 

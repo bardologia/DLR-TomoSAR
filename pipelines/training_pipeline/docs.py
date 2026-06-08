@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from torch.utils.data import DataLoader
 
 from tools import NullLogger, NullTracker
 from tools.markdown import MarkdownDoc, MarkdownTable
+from pipelines.training_pipeline.loss import LOSS_TERMS
 
 
 class LayerRecord:
@@ -190,7 +192,7 @@ class TrainingDocs:
             model         = self.model,
             logger        = self.logger,
             docs_dir      = self.run_dir / "docs",
-            include_types = getattr(self.model_cfg, "shape_logger_types", None),
+            include_types = self.model_cfg.shape_logger_types,
         )
 
         batch  = next(iter(data_loader))
@@ -212,56 +214,21 @@ class LossScaleProbeConfig:
 
 class LossScaleProbe:
 
-    _ALL_USE_FLAGS = [
-        "use_mse_curve",
-        "use_l1_curve",
-        "use_huber_curve",
-        "use_charbonnier_curve",
-        "use_cosine_curve",
-        "use_spectral_coherence",
-        "use_ssim_curve",
-        "use_param_l1",
-        "use_param_huber",
-        "use_smoothness_tv",
-        "use_total_power",
-        "use_moments",
-        "use_coherence_resyn",
-        "use_covariance_match",
-        "use_capon_cycle",
-    ]
-
-    _FLAG_TO_WEIGHT = {
-        "use_mse_curve":          "weight_mse_curve",
-        "use_l1_curve":           "weight_l1_curve",
-        "use_huber_curve":        "weight_huber_curve",
-        "use_charbonnier_curve":  "weight_charbonnier_curve",
-        "use_cosine_curve":       "weight_cosine_curve",
-        "use_spectral_coherence": "weight_spectral_coh",
-        "use_ssim_curve":         "weight_ssim_curve",
-        "use_param_l1":           "weight_param_l1",
-        "use_param_huber":        "weight_param_huber",
-        "use_smoothness_tv":      "weight_smoothness_tv",
-        "use_total_power":        "weight_total_power",
-        "use_moments":            "weight_moments",
-        "use_coherence_resyn":    "weight_coherence_resyn",
-        "use_covariance_match":   "weight_covariance_match",
-        "use_capon_cycle":        "weight_capon_cycle",
-    }
-
-    def __init__(self, probe_cfg, loss_cfg, gaussian_cfg, norm_stats=None, logger=None):
+    def __init__(self, probe_cfg, loss_cfg, gaussian_cfg, geometry_cfg, norm_stats=None, logger=None):
         self.probe_cfg    = probe_cfg
         self.gaussian_cfg = gaussian_cfg
+        self.geometry_cfg = geometry_cfg
         self.norm_stats   = norm_stats
         self.logger       = logger
         self.loss_cfg     = copy.deepcopy(loss_cfg)
 
-        for flag in self._ALL_USE_FLAGS:
-            override = probe_cfg.enabled_losses.get(flag)
-            setattr(self.loss_cfg, flag, override if override is not None else True)
+        for term in LOSS_TERMS:
+            override = probe_cfg.enabled_losses.get(term.use_flag)
+            setattr(self.loss_cfg, term.use_flag, override if override is not None else True)
 
-        for flag, w_key in self._FLAG_TO_WEIGHT.items():
-            if getattr(self.loss_cfg, flag, False):
-                setattr(self.loss_cfg, w_key, 1.0)
+        for term in LOSS_TERMS:
+            if getattr(self.loss_cfg, term.use_flag, False):
+                setattr(self.loss_cfg, term.weight_key, 1.0)
 
     @staticmethod
     def _iqr_filter(values: list[float], k: float = 3.0) -> list[float]:
@@ -276,24 +243,20 @@ class LossScaleProbe:
         filtered = [v for v in values if lo <= v <= hi]
         return filtered if len(filtered) >= 3 else values
 
-    def run(self, train_loader, model, device, x_axis: torch.Tensor) -> dict[str, float]:
-        if not self.probe_cfg.enabled:
-            return {}
-
+    def _build_criterion(self, x_axis: torch.Tensor):
         from pipelines.training_pipeline.loss import Loss
 
-        criterion = Loss(
+        return Loss(
             x_axis       = x_axis,
             logger       = NullLogger(),
             tracker      = NullTracker(),
             gaussian_cfg = self.gaussian_cfg,
             loss_cfg     = self.loss_cfg,
             norm_stats   = self.norm_stats,
+            geometry_cfg = self.geometry_cfg,
         )
 
-        self.logger.section("[Loss Scale Probe]")
-        self.logger.subsection(f"Averaging over {self.probe_cfg.n_batches} batches — all weights forced to 1.0")
-
+    def _collect(self, criterion, train_loader, model, device) -> dict[str, list[float]]:
         model.eval()
         accum: dict[str, list[float]] = defaultdict(list)
 
@@ -301,19 +264,21 @@ class LossScaleProbe:
             for i, batch in enumerate(train_loader):
                 if i >= self.probe_cfg.n_batches:
                     break
+
                 inputs, targets = batch[0].to(device), batch[1].to(device)
-                result = criterion(model(inputs), targets)
+                result          = criterion(model(inputs), targets)
+
                 for name, val in result["components"].items():
                     if "/" not in name:
                         accum[name].append(float(val))
 
-        if not accum:
-            self.logger.warning("No loss components recorded — check model outputs.")
-            return {}
+        model.train()
 
+        return accum
+
+    def _suggest(self, accum: dict[str, list[float]]) -> dict:
         filtered = {k: self._iqr_filter(v) for k, v in accum.items()}
         means    = {k: sum(v) / len(v) for k, v in filtered.items()}
-        n_total  = self.probe_cfg.n_batches
 
         ref     = self.probe_cfg.reference
         ref_val = means.get(ref) if ref is not None else None
@@ -323,12 +288,34 @@ class LossScaleProbe:
             for name, raw in means.items()
         }
 
+        return {
+            "accum"     : accum,
+            "filtered"  : filtered,
+            "means"     : means,
+            "ref"       : ref,
+            "ref_val"   : ref_val,
+            "suggested" : suggested,
+        }
+
+    def _emit_report(self, report: dict) -> None:
+        accum     = report["accum"]
+        filtered  = report["filtered"]
+        means     = report["means"]
+        ref       = report["ref"]
+        ref_val   = report["ref_val"]
+        suggested = report["suggested"]
+
+        skipped = [name for name, weight in suggested.items() if not math.isfinite(weight)]
+
+        for name in sorted(skipped):
+            self.logger.warning(f"Probe term '{name}' has raw mean <= 0 (raw={means[name]:.6f}); no usable suggested weight — do not copy into LossNormalizationConfig.")
+
         rows = [
             {
                 "Term"             : name,
                 "Raw value"        : f"{means[name]:.6f}",
                 "Kept"             : f"{len(filtered[name])}/{len(accum[name])}",
-                "Suggested weight" : f"{suggested[name]:.6f}" + ("  ← reference" if name == ref else ""),
+                "Suggested weight" : self._weight_cell(name, suggested[name], ref),
             }
             for name in sorted(means)
         ]
@@ -341,9 +328,32 @@ class LossScaleProbe:
         if ref is not None and ref not in means:
             self.logger.warning(f"Reference term '{ref}' not found — each term normalised to 1.0 independently.")
 
-        model.train()
+    @staticmethod
+    def _weight_cell(name: str, weight: float, ref) -> str:
+        if not math.isfinite(weight):
+            return "skipped: raw<=0"
+
+        return f"{weight:.6f}" + ("  ← reference" if name == ref else "")
+
+    def run(self, train_loader, model, device, x_axis: torch.Tensor) -> dict[str, float]:
+        if not self.probe_cfg.enabled:
+            return {}
+
+        criterion = self._build_criterion(x_axis)
+
+        self.logger.section("[Loss Scale Probe]")
+        self.logger.subsection(f"Averaging over {self.probe_cfg.n_batches} batches — all weights forced to 1.0")
+
+        accum = self._collect(criterion, train_loader, model, device)
+
+        if not accum:
+            self.logger.warning("No loss components recorded — check model outputs.")
+            return {}
+
+        report = self._suggest(accum)
+        self._emit_report(report)
 
         if self.probe_cfg.exit_after:
             sys.exit(0)
 
-        return suggested
+        return report["suggested"]

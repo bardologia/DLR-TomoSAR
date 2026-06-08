@@ -7,7 +7,6 @@ import torch.nn.functional as functional
 from configuration.models_config import AttentionUNetConfig
 from .blocks import ConvBlock, build_norm2d, build_upsample, initialize_weights, match_spatial_size
 
-# Attention Gate: learns to suppress irrelevant skip features using gate signal from decoder
 class AttentionGate(nn.Module):
     def __init__(
         self,
@@ -58,7 +57,6 @@ class AttentionGate(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, gate_signal: torch.Tensor, skip_connection: torch.Tensor) -> torch.Tensor:
-        # Project coarse gate and stride-2 downsampled skip into shared intermediate space at the coarse grid
         projected_gate = self.gate_projection(gate_signal)
         projected_skip = self.skip_projection(skip_connection)
 
@@ -70,7 +68,6 @@ class AttentionGate(nn.Module):
                 align_corners = False,
             )
 
-        # Compute attention coefficients at the coarse grid, resample to skip resolution, reweight, and recombine channels
         attention_weights = self.attention_score(self.relu(projected_gate + projected_skip))
         attention_weights = functional.interpolate(
             input         = attention_weights,
@@ -80,7 +77,6 @@ class AttentionGate(nn.Module):
         )
         return self.output_transform(skip_connection * attention_weights)
 
-# Attention U-Net: U-Net with attention gates on skip connections (Oktay et al., 2018)
 class AttentionUNet(nn.Module):
     def __init__(self, config: AttentionUNetConfig | None = None):
         super().__init__()
@@ -170,16 +166,13 @@ class AttentionUNet(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
         skip_connections: list[torch.Tensor] = []
-        # Encoder: extract multi-scale features
         for encoder_block, downsample in zip(self.encoder_blocks, self.downsample_layers):
             x = encoder_block(x)
             skip_connections.append(x)
             x = downsample(x)
 
-        # Bottleneck
         x = self.bottleneck(x)
 
-        # Decoder: gate skip with the coarse decoder feature, then upsample, concat, and refine
         for upsample, attention_gate, decoder_block, skip in zip(
             self.upsample_layers,
             self.attention_gates,

@@ -218,7 +218,6 @@ def write_training_comparison(trials: list[dict], out_dir: Path) -> Path:
         ("Max epochs",     lambda t: cfg_val(t, "scheduler", "epochs")),
         ("η_min",          lambda t: cfg_val(t, "scheduler", "eta_min")),
         ("Warmup",         lambda t: cfg_val(t, "warmup", "warmup_enabled")),
-        ("EMA",            lambda t: cfg_val(t, "ema", "use_ema")),
         ("AMP",            lambda t: cfg_val(t, "training", "use_amp")),
     ]
     CKPT_COLS: list[tuple[str, callable]] = [

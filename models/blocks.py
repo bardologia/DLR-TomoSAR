@@ -226,6 +226,42 @@ class PixelMLP(nn.Module):
         return self.mlp(x)
 
 
+class GaussianHeadsMixin:
+    def _resolve_gaussian_layout(self) -> None:
+        n_params = self.config.params_per_gaussian
+        if self.config.out_channels % n_params != 0:
+            raise ValueError(f"out_channels ({self.config.out_channels}) must be divisible by params_per_gaussian ({n_params})")
+        self.n_gaussians = self.config.out_channels // n_params
+        self.n_params    = n_params
+
+    def _build_triple_heads(self) -> None:
+        self.head_amp   = PixelMLP(self.embedding_channels, self.hidden_channels, self.n_gaussians, self.config.activation)
+        self.head_mu    = PixelMLP(self.embedding_channels, self.hidden_channels, self.n_gaussians, self.config.activation)
+        self.head_sigma = PixelMLP(self.embedding_channels, self.hidden_channels, self.n_gaussians, self.config.activation)
+
+    def _triple_head_forward(self, embedding: torch.Tensor) -> torch.Tensor:
+        amp   = self.head_amp(embedding)
+        mu    = self.head_mu(embedding)
+        sigma = self.head_sigma(embedding)
+
+        B, K, H, W = amp.shape
+        out = torch.stack([amp, mu, sigma], dim=2)
+        return out.view(B, K * 3, H, W)
+
+    def _build_per_gaussian_heads(self) -> None:
+        self.gaussian_heads = nn.ModuleList([
+            PixelMLP(self.embedding_channels, self.hidden_channels, self.n_params, self.config.activation)
+            for _ in range(self.n_gaussians)
+        ])
+
+    def _per_gaussian_forward(self, embedding: torch.Tensor) -> torch.Tensor:
+        head_outputs = [head(embedding) for head in self.gaussian_heads]
+
+        B, _, H, W = head_outputs[0].shape
+        out = torch.stack(head_outputs, dim=1)
+        return out.view(B, self.n_gaussians * self.n_params, H, W)
+
+
 class Encoder(nn.Module):
     def __init__(
         self,
@@ -302,3 +338,109 @@ class Decoder(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = conv_block(x)
         return x
+
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(
+        self,
+        embedding_dim:     int,
+        num_heads:         int,
+        dropout:           float = 0.0,
+        attention_dropout: float = 0.0,
+    ):
+        super().__init__()
+        if embedding_dim % num_heads != 0:
+            raise ValueError(f"embedding_dim ({embedding_dim}) must be divisible by num_heads ({num_heads})")
+        self.num_heads = num_heads
+        self.head_dim  = embedding_dim // num_heads
+        self.scale     = self.head_dim ** -0.5
+
+        self.query_key_value   = nn.Linear(embedding_dim, embedding_dim * 3)
+        self.output_projection = nn.Linear(embedding_dim, embedding_dim)
+        self.attention_dropout = nn.Dropout(attention_dropout)
+        self.output_dropout    = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch_size, sequence_length, embedding_dim = x.shape
+        qkv = self.query_key_value(x)
+        qkv = qkv.reshape(batch_size, sequence_length, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)
+        query, key, value = qkv.unbind(0)
+
+        attention_weights = (query @ key.transpose(-2, -1)) * self.scale
+        attention_weights = attention_weights.softmax(dim=-1)
+        attention_weights = self.attention_dropout(attention_weights)
+
+        attended  = (attention_weights @ value).transpose(1, 2)
+        attended  = attended.reshape(batch_size, sequence_length, embedding_dim)
+        projected = self.output_projection(attended)
+        return self.output_dropout(projected)
+
+
+class TransformerBlock(nn.Module):
+    def __init__(
+        self,
+        embedding_dim:     int,
+        num_heads:         int,
+        mlp_ratio:         float = 4.0,
+        dropout:           float = 0.0,
+        attention_dropout: float = 0.0,
+        ffn_activation:    str   = "gelu",
+        drop_path_rate:    float = 0.0,
+    ):
+        super().__init__()
+        self.norm_1    = nn.LayerNorm(embedding_dim)
+        self.attention = MultiHeadSelfAttention(
+            embedding_dim     = embedding_dim,
+            num_heads         = num_heads,
+            dropout           = dropout,
+            attention_dropout = attention_dropout,
+        )
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
+        self.norm_2    = nn.LayerNorm(embedding_dim)
+
+        hidden_dim = int(embedding_dim * mlp_ratio)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(embedding_dim, hidden_dim),
+            build_activation(ffn_activation),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, embedding_dim),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        normalized = self.norm_1(x)
+        x = x + self.drop_path(self.attention(normalized))
+        normalized = self.norm_2(x)
+        x = x + self.drop_path(self.feed_forward(normalized))
+        return x
+
+
+class PatchEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels:   int,
+        embedding_dim: int,
+        patch_size:    int,
+    ):
+        super().__init__()
+        self.patch_size = patch_size
+        self.projection = nn.Conv2d(
+            in_channels  = in_channels,
+            out_channels = embedding_dim,
+            kernel_size  = patch_size,
+            stride       = patch_size,
+        )
+        self.norm = nn.LayerNorm(embedding_dim)
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, int, int]:
+        x = self.projection(x)
+        grid_height, grid_width = x.shape[2], x.shape[3]
+        x = x.flatten(2).transpose(1, 2)
+        x = self.norm(x)
+        return x, grid_height, grid_width
+
+
+def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    batch_size, _, channels = tokens.shape
+    return tokens.transpose(1, 2).view(batch_size, channels, height, width)

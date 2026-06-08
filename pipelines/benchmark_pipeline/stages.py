@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import asdict
 from datetime import datetime
@@ -9,7 +8,8 @@ from pathlib import Path
 from configuration.benchmark_config              import BenchmarkConfig
 from pipelines.benchmark_pipeline.results        import ComparisonReport, TrialCollector
 from pipelines.benchmark_pipeline.sizing         import SizeMatcher, SizeMatchResult
-from pipelines.shared.orchestration              import ExperimentStage, GpuJob
+from pipelines.shared.orchestration              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
+from pipelines.shared.io                         import FileIO
 from tools.logger                                import Logger
 
 
@@ -68,18 +68,17 @@ class OverfitStage(ExperimentStage):
     def _load_result(self, model_name: str) -> dict:
         path = self._result_path(model_name)
 
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
+        if not path.exists():
             return {
                 "model"      : model_name,
                 "status"     : "FAIL",
                 "final_loss" : None,
                 "converged"  : None,
                 "threshold"  : self.config.overfit.stop_threshold,
-                "error"      : f"missing or unreadable result file: {path}",
+                "error"      : f"missing result file: {path}",
             }
+
+        return FileIO.load_json(path)
 
     def _write_report(self, results: list[dict]) -> None:
         passed = [r for r in results if r["status"] == "PASS"]
@@ -189,11 +188,7 @@ class SizeMatchStage(ExperimentStage):
         if not self.config.resume or not self.records_path.exists():
             return None
 
-        try:
-            with open(self.records_path, "r", encoding="utf-8") as f:
-                records = json.load(f)
-        except Exception:
-            return None
+        records = FileIO.load_json(self.records_path)
 
         if all(m in records for m in self.models):
             return records
@@ -222,166 +217,14 @@ class SizeMatchStage(ExperimentStage):
         self.logger.info(f"Report written to: {self.report_path}")
 
 
-class TrainingStage(ExperimentStage):
+class TrainingStage(QueuedTrainingStage):
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
-        super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
-        self.models       = models
-        self.stage_dir    = self.run_dir / "training"
-        self.results_path = self.run_dir / "pipeline" / "training_results.json"
-
-    def run(self) -> list[dict]:
-        self.logger.section("Training queue")
-        self.logger.kv_table({
-            "Models"     : len(self.models),
-            "Epochs"     : self.config.training.epochs,
-            "Batch size" : self.config.training.batch_size,
-            "GPUs"       : self.config.gpus,
-            "Stage dir"  : str(self.stage_dir),
-        }, title="Configuration")
-
-        cached  = [m for m in self.models if self._has_checkpoint(m)]
-        pending = [m for m in self.models if m not in cached]
-
-        for model_name in cached:
-            self.logger.info(f"{model_name}: existing checkpoint reused")
-
-        ran = []
-        if pending:
-            ran = self._run_queue([self._job(m) for m in pending])
-
-        results = self._order_results(ran + [self._cached_result(m) for m in cached], self.models)
-
-        self._write_results(results, self.results_path)
-        self._log_summary(results)
-
-        return results
-
-    def _job(self, model_name: str) -> GpuJob:
-        return GpuJob(
-            name     = model_name,
-            command  = [sys.executable, str(self.entry_script), "--worker", "train", "--model", model_name, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.stage_dir / model_name / "worker.log",
-        )
-
-    def _has_checkpoint(self, model_name: str) -> bool:
-        if not self.config.resume:
-            return False
-
-        model_dir = self.stage_dir / model_name
-        if not model_dir.is_dir():
-            return False
-
-        return next(model_dir.rglob(self.config.inference.checkpoint_name), None) is not None
-
-    def _cached_result(self, model_name: str) -> dict:
-        return {
-            "name"       : model_name,
-            "gpu"        : None,
-            "status"     : "DONE",
-            "returncode" : 0,
-            "duration_s" : None,
-            "log_file"   : str(self.stage_dir / model_name / "worker.log"),
-        }
-
-    def _log_summary(self, results: list[dict]) -> None:
-        done   = [r for r in results if r["status"] == "DONE"]
-        failed = [r for r in results if r["status"] != "DONE"]
-
-        self.logger.subsection("Training summary")
-        self.logger.kv_table({
-            "Total"  : len(results),
-            "Done"   : len(done),
-            "Failed" : len(failed),
-        }, title=f"{len(done)}/{len(results)} finished")
-
-        self._log_failures(failed)
+        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=models, logger=logger)
 
 
-class InferenceStage(ExperimentStage):
+class InferenceStage(QueuedInferenceStage):
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
-        super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
-        self.models       = models
-        self.training_dir = self.run_dir / "training"
-        self.results_path = self.run_dir / "pipeline" / "inference_results.json"
-
-    def run(self) -> list[dict]:
-        self.logger.section("Batch inference")
-        self.logger.kv_table({
-            "Models" : len(self.models),
-            "Split"  : self.config.inference.split,
-            "EMA"    : self.config.inference.use_ema,
-            "GPUs"   : self.config.gpus,
-        }, title="Configuration")
-
-        skipped = [m for m in self.models if not self._has_checkpoint(m)]
-        cached  = [m for m in self.models if m not in skipped and self._has_inference(m)]
-        pending = [m for m in self.models if m not in skipped and m not in cached]
-
-        for model_name in skipped:
-            self.logger.warning(f"{model_name}: no checkpoint, inference skipped")
-
-        for model_name in cached:
-            self.logger.info(f"{model_name}: existing inference reused")
-
-        ran = []
-        if pending:
-            ran = self._run_queue([self._job(m) for m in pending])
-
-        results = ran + [self._static_result(m, "DONE") for m in cached] + [self._static_result(m, "SKIPPED") for m in skipped]
-        results = self._order_results(results, self.models)
-
-        self._write_results(results, self.results_path)
-        self._log_summary(results)
-
-        return results
-
-    def _job(self, model_name: str) -> GpuJob:
-        return GpuJob(
-            name     = model_name,
-            command  = [sys.executable, str(self.entry_script), "--worker", "infer", "--model", model_name, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.training_dir / model_name / "inference_worker.log",
-        )
-
-    def _has_checkpoint(self, model_name: str) -> bool:
-        model_dir = self.training_dir / model_name
-        if not model_dir.is_dir():
-            return False
-
-        return next(model_dir.rglob(self.config.inference.checkpoint_name), None) is not None
-
-    def _has_inference(self, model_name: str) -> bool:
-        if not self.config.resume:
-            return False
-
-        inference_dir = self.training_dir / model_name / "inference"
-        if not inference_dir.is_dir():
-            return False
-
-        return next(inference_dir.glob("*/metrics.json"), None) is not None
-
-    def _static_result(self, model_name: str, status: str) -> dict:
-        return {
-            "name"       : model_name,
-            "gpu"        : None,
-            "status"     : status,
-            "returncode" : 0 if status == "DONE" else None,
-            "duration_s" : None,
-            "log_file"   : str(self.training_dir / model_name / "inference_worker.log"),
-        }
-
-    def _log_summary(self, results: list[dict]) -> None:
-        done   = [r for r in results if r["status"] == "DONE"]
-        failed = [r for r in results if r["status"] == "FAILED"]
-
-        self.logger.subsection("Inference summary")
-        self.logger.kv_table({
-            "Total"   : len(results),
-            "Done"    : len(done),
-            "Failed"  : len(failed),
-            "Skipped" : len(results) - len(done) - len(failed),
-        }, title=f"{len(done)}/{len(results)} finished")
-
-        self._log_failures(failed)
+        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=models, logger=logger)
 
 
 class ComparisonStage(ExperimentStage):

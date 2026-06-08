@@ -5,10 +5,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing             import List, Optional, Tuple
 
 import numpy as np
+import torch
 
 from pipelines.dataset_pipeline.spatial     import GridInfo
 from pipelines.inference_pipeline.loader    import InferenceMetadata, Run
-from pipelines.inference_pipeline.metrics   import Result
+from pipelines.inference_pipeline.metrics   import Metrics, Result
 from tools.gaussians                        import GaussianReconstructor
 from tools.logger                           import Logger
 
@@ -112,11 +113,10 @@ class Predictor:
 
     @staticmethod
     def _cpu_worker(args: tuple) -> tuple:
-        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, out_ch, norm_loc, norm_scale = args
+        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians = args
 
         x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
         B, _, H, W = pred_params_chunk.shape
-        n_elev     = x.shape[2]
 
         n_K         = n_gaussians
         pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
@@ -134,26 +134,11 @@ class Predictor:
         pred_curves = GaussianReconstructor.reconstruct_batch(pred_gauss,       x)
         gt_curves   = GaussianReconstructor.reconstruct_batch(gt_gauss_matched, x)
 
-        diff   = pred_curves - gt_curves
-        mse    = (diff * diff).mean(axis=1)
-        mae    = np.abs(diff).mean(axis=1)
-        ss_res = (diff * diff).sum(axis=1)
-        gmean  = gt_curves.mean(axis=1, keepdims=True)
-        ss_tot = ((gt_curves - gmean) ** 2).sum(axis=1)
-        r2     = 1.0 - ss_res / (ss_tot + 1e-8)
-        dot    = (pred_curves * gt_curves).sum(axis=1)
-        norm_p = np.sqrt((pred_curves * pred_curves).sum(axis=1)) + 1e-8
-        norm_g = np.sqrt((gt_curves   * gt_curves  ).sum(axis=1)) + 1e-8
-        cos    = dot / (norm_p * norm_g)
-        peak   = np.abs(pred_curves.argmax(axis=1) - gt_curves.argmax(axis=1)).astype(np.float32)
-
         return (
             pred_curves,
             gt_curves,
             pred_gauss_flat,
             gt_gauss_flat,
-            {"mse": mse, "mae": mae, "r2": r2, "cos": cos},
-            peak,
         )
 
     def _create_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
@@ -197,13 +182,8 @@ class Predictor:
     def _compute_metrics(self, all_pred_params : List[np.ndarray], all_gt_params : List[np.ndarray]) -> List[tuple]:
         run    = self.run
         n_K    = run.n_gaussians
-        out_ch = run.out_channels
 
-        ns = run.dataset.normalizer
-        norm_loc   = np.array(ns.stats.output_stats.loc,   dtype=np.float32)
-        norm_scale = np.array(ns.stats.output_stats.scale, dtype=np.float32)
-
-        tasks = [(pred, gt, run.x_axis, n_K, out_ch, norm_loc, norm_scale) for pred, gt in zip(all_pred_params, all_gt_params)]
+        tasks = [(pred, gt, run.x_axis, n_K) for pred, gt in zip(all_pred_params, all_gt_params)]
         results: List[tuple | None] = [None] * len(tasks)
 
         with self.logger.track(transient=True) as prog:
@@ -222,44 +202,22 @@ class Predictor:
         n_K    = run.n_gaussians
         out_ch = run.out_channels
         n_elev = run.x_axis_length
-        H, W   = run.grid.spatial_size
-        ph, pw = run.grid.patch_size
 
         pred_curve_stitcher = self._create_stitcher(n_elev,  "pred_curves")
         gt_curve_stitcher   = self._create_stitcher(n_elev,  "gt_curves")
         param_pred_stitcher = self._create_stitcher(out_ch,  "params_pred")
         gt_param_stitcher   = self._create_stitcher(n_K * 3, "params_gt")
 
-        pixel_maps = np.zeros((5, H, W), dtype=np.float32)
-        pixel_w    = np.zeros((H, W),    dtype=np.float32)
-
-        win2d = CubeStitcher.make_patch_window(run.grid.patch_size, kind=self.window_kind)
-
-        for batch_indices, (pred_curves, gt_curves, pred_params, gt_params, mets, peak_np) in zip(all_indices, cpu_results):
-            patch_maps = np.stack([mets["mse"], mets["mae"], mets["r2"], mets["cos"], peak_np], axis=1)
-
+        for batch_indices, (pred_curves, gt_curves, pred_params, gt_params) in zip(all_indices, cpu_results):
             for b, idx in enumerate(batch_indices):
                 pred_curve_stitcher.add_patch(idx, pred_curves[b].astype(self.cube_dtype))
                 gt_curve_stitcher.add_patch(  idx, gt_curves  [b].astype(self.cube_dtype))
                 param_pred_stitcher.add_patch(idx, pred_params [b].astype(self.cube_dtype))
                 gt_param_stitcher.add_patch(  idx, gt_params   [b].astype(self.cube_dtype))
 
-                iv, ih   = divmod(idx, run.grid.n_h)
-                v0       = iv * run.grid.stride - run.grid.pad_top
-                h0       = ih * run.grid.stride - run.grid.pad_left
-                v0c, h0c = max(0, v0), max(0, h0)
-                v1c, h1c = min(H, v0 + ph), min(W, h0 + pw)
-                pv0, ph0 = v0c - v0, h0c - h0
-                pv1, ph1 = pv0 + (v1c - v0c), ph0 + (h1c - h0c)
-                w_local  = win2d[pv0:pv1, ph0:ph1]
-
-                pixel_maps[:, v0c:v1c, h0c:h1c] += w_local * patch_maps[b, :, pv0:pv1, ph0:ph1]
-                pixel_w   [   v0c:v1c, h0c:h1c] += w_local
-
         return self._finalize_results(
             pred_curve_stitcher, gt_curve_stitcher,
             param_pred_stitcher, gt_param_stitcher,
-            pixel_maps[0], pixel_maps[1], pixel_maps[2], pixel_maps[3], pixel_maps[4], pixel_w,
         )
 
     def _finalize_results(
@@ -268,12 +226,6 @@ class Predictor:
         gt_curve_stitcher   : CubeStitcher,
         param_pred_stitcher : CubeStitcher,
         gt_param_stitcher   : CubeStitcher,
-        pixel_mse  : np.ndarray,
-        pixel_mae  : np.ndarray,
-        pixel_r2   : np.ndarray,
-        pixel_cos  : np.ndarray,
-        pixel_peak : np.ndarray,
-        pixel_w    : np.ndarray,
     ) -> Result:
 
         pred_curves_cube = pred_curve_stitcher.finalize_cube()
@@ -288,12 +240,12 @@ class Predictor:
             params_gt_cube[3 * k + 1][mask_gt] = np.nan
             params_gt_cube[3 * k + 2][mask_gt] = np.nan
 
-        w_safe         = np.where(pixel_w > 0, pixel_w, 1.0)
-        pixel_mse      = (pixel_mse         / w_safe).astype(np.float32)
-        pixel_mae      = (pixel_mae         / w_safe).astype(np.float32)
-        pixel_r2       = (pixel_r2          / w_safe).astype(np.float32)
-        pixel_cos      = (pixel_cos         / w_safe).astype(np.float32)
-        pixel_peak_idx = np.rint(pixel_peak / w_safe).astype(np.int32)
+        pixel_maps     = Metrics.curve_pixel_metrics(pred_curves_cube, gt_curves_cube)
+        pixel_mse      = pixel_maps["mse"]
+        pixel_mae      = pixel_maps["mae"]
+        pixel_r2       = pixel_maps["r2"]
+        pixel_cos      = pixel_maps["cos"]
+        pixel_peak_idx = pixel_maps["peak"].astype(np.int32)
 
         if self.save_cubes:
             np.save(self.cube_dir / "pred_curves.npy", pred_curves_cube)
@@ -336,7 +288,6 @@ class Predictor:
         )
 
     def run_inference(self) -> Result:
-        import torch
         backend = "cuda" if torch.cuda.is_available() else "cpu"
         self.logger.section("[Inference: Predict]")
         self.logger.kv_table({

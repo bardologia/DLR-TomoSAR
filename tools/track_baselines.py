@@ -13,6 +13,23 @@ class DuplicatePassError(ValueError):
     pass
 
 
+class SecondarySelection:
+    @staticmethod
+    def indices(labels: list, secondary_labels) -> list:
+        primary     = labels[0]
+        secondaries = list(labels[1:])
+        requested   = [str(label) for label in secondary_labels]
+
+        if primary in requested:
+            raise ValueError(f"Pass {primary} is the reference and is always included; remove it from secondary_labels")
+
+        unknown = [label for label in requested if label not in secondaries]
+        if unknown:
+            raise ValueError(f"Unknown secondary labels {unknown}; secondaries are {secondaries}")
+
+        return [index for index, label in enumerate(secondaries) if label in requested]
+
+
 @dataclass
 class TrackBaselines:
     labels              : list
@@ -39,18 +56,7 @@ class TrackBaselines:
         if secondary_labels is None:
             return self
 
-        primary     = self.labels[0]
-        secondaries = list(self.labels[1:])
-        requested   = [str(label) for label in secondary_labels]
-
-        if primary in requested:
-            raise ValueError(f"Pass {primary} is the reference and is always included; remove it from secondary_labels")
-
-        unknown = [label for label in requested if label not in secondaries]
-        if unknown:
-            raise ValueError(f"Unknown secondary labels {unknown}; table secondaries are {secondaries}")
-
-        keep = [0] + [1 + index for index, label in enumerate(secondaries) if label in requested]
+        keep = [0] + [1 + index for index in SecondarySelection.indices(self.labels, secondary_labels)]
 
         def pick(values: list) -> list:
             return [values[index] for index in keep] if values else list(values)
@@ -192,18 +198,7 @@ class TrackProfiles:
         if secondary_labels is None:
             return self
 
-        primary     = self.labels[0]
-        secondaries = list(self.labels[1:])
-        requested   = [str(label) for label in secondary_labels]
-
-        if primary in requested:
-            raise ValueError(f"Pass {primary} is the reference and is always included; remove it from secondary_labels")
-
-        unknown = [label for label in requested if label not in secondaries]
-        if unknown:
-            raise ValueError(f"Unknown secondary labels {unknown}; profile secondaries are {secondaries}")
-
-        keep = [0] + [1 + index for index, label in enumerate(secondaries) if label in requested]
+        keep = [0] + [1 + index for index in SecondarySelection.indices(self.labels, secondary_labels)]
 
         return TrackProfiles(
             labels        = [self.labels[index] for index in keep],

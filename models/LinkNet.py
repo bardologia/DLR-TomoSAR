@@ -6,7 +6,6 @@ import torch.nn as nn
 from configuration.models_config import LinkNetConfig
 from .blocks import build_activation, build_norm2d, initialize_weights, match_spatial_size
 
-# Encoder block with stride-2 conv for downsampling and a residual shortcut path
 class ResidualEncoderBlock(nn.Module):
     def __init__(
         self,
@@ -55,11 +54,9 @@ class ResidualEncoderBlock(nn.Module):
         self.activation = build_activation(activation)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Add main path and shortcut (residual connection)
         return self.activation(self.main_path(x) + self.shortcut_path(x))
 
 
-# Decoder block: 1x1 compress -> ConvTranspose2d upsample -> 1x1 expand (bottleneck design)
 class BottleneckDecoderBlock(nn.Module):
     def __init__(
         self,
@@ -106,7 +103,6 @@ class BottleneckDecoderBlock(nn.Module):
         return self.layers(x)
 
 
-# LinkNet: lightweight architecture with additive skip connections (Chaurasia & Culurciello, 2017)
 class LinkNet(nn.Module):
     def __init__(self, config: LinkNetConfig | None = None):
         super().__init__()
@@ -186,16 +182,13 @@ class LinkNet(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
-        # Initial feature extraction
         x = self.initial_conv(x)
 
-        # Encoder: residual blocks with stride-2 downsampling
         encoder_outputs: list[torch.Tensor] = []
         for encoder_stage in self.encoder_stages:
             x = encoder_stage(x)
             encoder_outputs.append(x)
 
-        # Decoder: bottleneck upsample + element-wise addition of encoder features
         for stage_index, decoder_stage in enumerate(self.decoder_stages):
             current_skip = encoder_outputs[-(stage_index + 1)]
             decoder_input = current_skip if stage_index == 0 else x

@@ -7,7 +7,7 @@ from typing      import Optional, Tuple
 from torch.utils.data import DataLoader
 
 from configuration.dataset_config             import DatasetConfiguration
-from configuration.processing_config          import CropRegion
+from tools.regions                            import CropRegion
 from pipelines.dataset_pipeline.datasets      import Loader, MultiRegionDataset, PatchDataset, SpatialAugmenter
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats, StatsComputer
 from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
@@ -147,7 +147,6 @@ class DatasetPipeline:
 
         norm_stats = StatsComputer.compute(
             dataset          = train_ds,
-            params_path      = self.config.parameters_path,
             logger           = self.logger,
             input_config     = self.config.input_config,
             output_config    = self.config.output_config,

@@ -7,20 +7,22 @@ from typing  import Dict, Optional, Tuple
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 
-from tools.gaussians import GaussianMixture
-from tools.logger    import Logger
+from pipelines.shared.preprocessing import ProfilePreprocessor
+from pipelines.shared.scoring        import R2
+from tools.gaussians                 import GaussianMixture
+from tools.logger                    import Logger
 
 
 class SnrEstimator:
-    def __init__(self, logger : Logger, noise_fraction : float = 0.25, range_chunk : int = 512) -> None:
+    def __init__(self, logger : Logger, floor_fraction : float = 0.25, range_chunk : int = 512) -> None:
         self.logger         = logger
-        self.noise_fraction = noise_fraction
+        self.floor_fraction = floor_fraction
         self.range_chunk    = range_chunk
 
     def run(self, tomogram : np.ndarray) -> np.ndarray:
-        H, Az, R = tomogram.shape
-        n_floor  = max(1, int(round(H * self.noise_fraction)))
-        snr_db   = np.full((Az, R), np.nan, dtype=np.float32)
+        H, Az, R    = tomogram.shape
+        n_floor     = max(1, int(round(H * self.floor_fraction)))
+        contrast_db = np.full((Az, R), np.nan, dtype=np.float32)
 
         for r_start in range(0, R, self.range_chunk):
             r_end = min(r_start + self.range_chunk, R)
@@ -30,12 +32,12 @@ class SnrEstimator:
             floor = np.partition(amp, n_floor - 1, axis=0)[:n_floor].mean(axis=0)
             valid = (peak > 0.0) & (floor > 0.0)
 
-            ratio                    = np.maximum(peak, 1e-12) / np.maximum(floor, 1e-12)
-            snr_db[:, r_start:r_end] = np.where(valid, 10.0 * np.log10(ratio), np.nan).astype(np.float32)
+            ratio                         = np.maximum(peak, 1e-12) / np.maximum(floor, 1e-12)
+            contrast_db[:, r_start:r_end] = np.where(valid, 10.0 * np.log10(ratio), np.nan).astype(np.float32)
 
             del amp
 
-        return snr_db
+        return contrast_db
 
 
 class KSelectionDiagnostics:
@@ -127,10 +129,12 @@ class KSelectionDiagnostics:
 
 
 class FittingMetricsCalculator:
-    def __init__(self, n_gaussians : int, logger : Logger, amp_threshold : float = 1e-3) -> None:
-        self.n_gaussians   = n_gaussians
-        self.logger        = logger
-        self.amp_threshold = amp_threshold
+    def __init__(self, n_gaussians : int, logger : Logger, threshold_factor : float, truncation_index : int, amp_threshold : float = 1e-3) -> None:
+        self.n_gaussians      = n_gaussians
+        self.logger           = logger
+        self.threshold_factor = threshold_factor
+        self.truncation_index = truncation_index
+        self.amp_threshold    = amp_threshold
 
         self.snr_estimator = SnrEstimator(logger=logger)
         self.k_diagnostics = KSelectionDiagnostics(k_max=n_gaussians, logger=logger)
@@ -148,22 +152,13 @@ class FittingMetricsCalculator:
 
     def _compute_r2_map(self, tomogram : np.ndarray, parameters_array : np.ndarray, height_axis : np.ndarray) -> np.ndarray:
         n_elev = height_axis.size
-        Az, R  = tomogram.shape[1:]
 
-        tom_mean = tomogram.mean(axis=0, dtype=np.float64)
-
-        ss_res = np.zeros((Az, R), dtype=np.float64)
-        ss_tot = np.zeros((Az, R), dtype=np.float64)
+        pred = np.empty_like(tomogram, dtype=np.float32)
 
         for j in range(n_elev):
-            tom_h = tomogram[j].astype(np.float64)
-            rec_h = self._reconstruct_slice(parameters_array, float(height_axis[j])).astype(np.float64)
-            ss_res += (rec_h - tom_h) ** 2
-            ss_tot += (tom_h - tom_mean) ** 2
+            pred[j] = self._reconstruct_slice(parameters_array, float(height_axis[j]))
 
-        ss_tot += 1e-12
-
-        return (1.0 - ss_res / ss_tot).astype(np.float32)
+        return R2.pixel_map(pred, tomogram, axis=0)
 
     def _compute_activity_map(self, parameters_array: np.ndarray) -> np.ndarray:
         active = np.zeros(parameters_array.shape[1:], dtype=np.int32)
@@ -199,16 +194,18 @@ class FittingMetricsCalculator:
         return maps
 
     def _compute_global_summary(self, r2_map : np.ndarray, activity_map : np.ndarray) -> Dict[str, float]:
-        r2_flat  = r2_map.reshape(-1).astype(np.float64)
-        r2_valid = r2_flat[np.isfinite(r2_flat)]
-        n_total  = int(r2_map.size)
-        act_flat = activity_map.reshape(-1)
+        r2_flat   = r2_map.reshape(-1).astype(np.float64)
+        r2_valid  = r2_flat[np.isfinite(r2_flat)]
+        n_total   = int(r2_map.size)
+        act_flat  = activity_map.reshape(-1)
+        n_fitted  = int((act_flat > 0).sum())
 
         def _pct(q: float) -> float:
             return float(np.percentile(r2_valid, q)) if r2_valid.size > 0 else float("nan")
 
         summary: Dict[str, float] = {
             "n_pixels"    : float(n_total),
+            "n_fitted"    : float(n_fitted),
             "n_gaussians" : float(self.n_gaussians),
             "r2_mean"     : float(r2_valid.mean())      if r2_valid.size > 0 else float("nan"),
             "r2_median"   : float(np.median(r2_valid))  if r2_valid.size > 0 else float("nan"),
@@ -224,6 +221,10 @@ class FittingMetricsCalculator:
         for k in range(self.n_gaussians + 1):
             n_k = int((act_flat == k).sum())
             summary[f"frac_{k}_active"] = float(n_k) / n_total if n_total > 0 else float("nan")
+
+        for k in range(1, self.n_gaussians + 1):
+            n_k = int((act_flat == k).sum())
+            summary[f"frac_{k}_fitted"] = float(n_k) / n_fitted if n_fitted > 0 else float("nan")
 
         return summary
 
@@ -241,24 +242,24 @@ class FittingMetricsCalculator:
         r = r2 [idx]
 
         summary: Dict[str, float] = {
-            "snr_db_mean"   : float(s.mean())             if s.size > 0 else float("nan"),
-            "snr_db_median" : float(np.median(s))         if s.size > 0 else float("nan"),
-            "snr_db_p10"    : float(np.percentile(s, 10)) if s.size > 0 else float("nan"),
-            "snr_db_p90"    : float(np.percentile(s, 90)) if s.size > 0 else float("nan"),
+            "contrast_db_mean"   : float(s.mean())             if s.size > 0 else float("nan"),
+            "contrast_db_median" : float(np.median(s))         if s.size > 0 else float("nan"),
+            "contrast_db_p10"    : float(np.percentile(s, 10)) if s.size > 0 else float("nan"),
+            "contrast_db_p90"    : float(np.percentile(s, 90)) if s.size > 0 else float("nan"),
         }
 
         if s.size > 2 and s.std() > 0.0 and r.std() > 0.0:
-            summary["snr_r2_pearson"]  = float(pearsonr (s, r)[0])
-            summary["snr_r2_spearman"] = float(spearmanr(s, r)[0])
+            summary["contrast_r2_pearson"]  = float(pearsonr (s, r)[0])
+            summary["contrast_r2_spearman"] = float(spearmanr(s, r)[0])
         else:
-            summary["snr_r2_pearson"]  = float("nan")
-            summary["snr_r2_spearman"] = float("nan")
+            summary["contrast_r2_pearson"]  = float("nan")
+            summary["contrast_r2_spearman"] = float("nan")
 
         if best_k_map is not None:
-            snr_full = snr_db_map.astype(np.float64)
+            contrast_full = snr_db_map.astype(np.float64)
             for k in range(1, self.n_gaussians + 1):
-                vals = snr_full[(best_k_map == k) & np.isfinite(snr_db_map)]
-                summary[f"snr_db_median_k{k}"] = float(np.median(vals)) if vals.size > 0 else float("nan")
+                vals = contrast_full[(best_k_map == k) & np.isfinite(snr_db_map)]
+                summary[f"contrast_db_median_k{k}"] = float(np.median(vals)) if vals.size > 0 else float("nan")
 
         return summary
 
@@ -272,11 +273,15 @@ class FittingMetricsCalculator:
 
         self.logger.subsection(f"Tomogram shape  : {tomogram.shape}")
         self.logger.subsection(f"Height range    : [{height_range[0]:.1f}, {height_range[1]:.1f}] m")
-        self.logger.subsection("Computing per-pixel R² map (single-pass, float32)")
-        r2_map = self._compute_r2_map(tomogram, parameters_array, height_axis)
 
-        self.logger.subsection("Computing per-pixel SNR map (peak vs lowest-quartile noise floor)")
+        self.logger.subsection("Computing per-pixel peak-to-floor contrast map (peak over lowest-quartile profile amplitude, uncalibrated proxy)")
         snr_db_map = self.snr_estimator.run(tomogram)
+
+        self.logger.subsection(f"Applying fitter preprocessing for R² (threshold_factor={self.threshold_factor}, truncation_index={self.truncation_index})")
+        tomogram = ProfilePreprocessor.apply(tomogram, self.threshold_factor, self.truncation_index)
+
+        self.logger.subsection("Computing per-pixel R² map against thresholded/truncated profile (single-pass, float32)")
+        r2_map = self._compute_r2_map(tomogram, parameters_array, height_axis)
 
         del tomogram
         gc.collect()
@@ -294,11 +299,13 @@ class FittingMetricsCalculator:
             self.logger.subsection("Computing model-order selection diagnostics")
             k_maps, k_summary = self.k_diagnostics.run(diagnostics)
 
-        self.logger.subsection("Computing SNR statistics and SNR-to-fit-quality relation")
-        snr_summary = self._compute_snr_summary(snr_db_map, r2_map, k_maps.get("best_k_map"))
+        best_k_map = k_maps["best_k_map"] if "best_k_map" in k_maps else None
+
+        self.logger.subsection("Computing peak-to-floor contrast statistics and contrast-to-fit-quality relation")
+        snr_summary = self._compute_snr_summary(snr_db_map, r2_map, best_k_map)
 
         self.logger.subsection(f"R² — mean={summary['r2_mean']:.4f} median={summary['r2_median']:.4f} neg_frac={summary['r2_neg_frac']:.4f}")
-        self.logger.subsection(f"SNR — median={snr_summary['snr_db_median']:.2f} dB, Spearman(SNR, R²)={snr_summary['snr_r2_spearman']:.3f}")
+        self.logger.subsection(f"Peak-to-floor contrast — median={snr_summary['contrast_db_median']:.2f} dB, Spearman(contrast, R²)={snr_summary['contrast_r2_spearman']:.3f}")
 
         if k_summary:
             self.logger.subsection(f"K selection — median relative margin={k_summary['k_relative_margin_median']:.4f}, ambiguous fraction={k_summary['k_ambiguous_fraction']:.4f}")

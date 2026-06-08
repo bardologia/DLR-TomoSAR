@@ -7,13 +7,24 @@ import torch
 
 class Checkpoint:
     def __init__(self, logger, tracker, save_path: str):
-        self.logger        = logger
-        self.tracker       = tracker
-        self.save_path     = save_path
-        self.best_val_loss = float("inf")
-        self.best_epoch    = -1
+        self.logger          = logger
+        self.tracker         = tracker
+        self.save_path       = save_path
+        self.best_val_loss   = float("inf")
+        self.best_epoch      = -1
+        self.loss_generation = 0
+
+    def reset_baseline(self, loss_generation: int, epoch: int) -> None:
+        self.best_val_loss   = float("inf")
+        self.best_epoch      = -1
+        self.loss_generation = int(loss_generation)
+        self.logger.warning(f"Checkpoint baseline reset at epoch {epoch}: loss composition changed (generation {loss_generation}); best_val_loss is not comparable across the swap and tracking restarts on the new scale.")
 
     def step(self, val_loss: float, epoch: int, trainer) -> bool:
+        loss_generation = int(trainer.criterion.loss_generation)
+        if loss_generation != self.loss_generation:
+            self.reset_baseline(loss_generation, epoch)
+
         if val_loss < self.best_val_loss:
             self.best_val_loss = float(val_loss)
             self.best_epoch    = int(epoch)
@@ -32,18 +43,6 @@ class Checkpoint:
         self.logger.info(f"Saving checkpoint at epoch {epoch} to {path}")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(checkpoint, path)
-
-    def load(self, trainer, path: str) -> int:
-        self.logger.info(f"Loading checkpoint from {path}")
-        checkpoint = torch.load(path, weights_only=False)
-
-        self.best_val_loss = checkpoint["best_val_loss"]
-        self.best_epoch    = checkpoint["best_epoch"]
-
-        epoch = trainer.restore_state(checkpoint)
-        self.logger.info(f"Checkpoint loaded successfully. Resuming from epoch {epoch}")
-
-        return epoch
 
 
 class OverfitManager:

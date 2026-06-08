@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses        import dataclass
+from itertools          import permutations
 from pathlib            import Path
 from typing             import Dict, Optional, Tuple
 
 import numpy         as np
+from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
+
+from pipelines.shared.io      import FileIO
+from pipelines.shared.scoring import R2, RelativeImprovement
 
 
 @dataclass
@@ -79,10 +83,7 @@ class Metrics:
         diff   = pred - ref
         mse    = (diff * diff).mean(axis=0).astype(np.float32)
         mae    = np.abs(diff).mean(axis=0).astype(np.float32)
-        ss_res = (diff * diff).sum(axis=0)
-        rmean  = ref.mean(axis=0, keepdims=True)
-        ss_tot = ((ref - rmean) ** 2).sum(axis=0)
-        r2     = (1.0 - ss_res / (ss_tot + 1e-8)).astype(np.float32)
+        r2     = R2.pixel_map(pred, ref, axis=0)
         dot    = (pred * ref).sum(axis=0)
         norm_p = np.sqrt((pred * pred).sum(axis=0)) + 1e-8
         norm_r = np.sqrt((ref  * ref ).sum(axis=0)) + 1e-8
@@ -103,12 +104,7 @@ class Metrics:
 
     @staticmethod
     def write_json(metrics: Dict[str, object], path: Path) -> Path:
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(metrics, f, indent=4, default=str)
-
-        return path
+        return FileIO.save_json(metrics, path, indent=4)
 
     @staticmethod
     def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
@@ -170,14 +166,15 @@ class Metrics:
         n_random   = min(n_random, pool.size)
         rand_flat  = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
 
-        def _to_yx(flat_idx: np.ndarray) -> np.ndarray:
-            return np.stack([(flat_idx // W).astype(np.int32), (flat_idx % W).astype(np.int32)], axis=1)
-
         return {
-            "best"   : _to_yx(best_flat),
-            "worst"  : _to_yx(worst_flat),
-            "random" : _to_yx(rand_flat),
+            "best"   : Metrics._flat_to_yx(best_flat,  W),
+            "worst"  : Metrics._flat_to_yx(worst_flat, W),
+            "random" : Metrics._flat_to_yx(rand_flat,  W),
         }
+
+    @staticmethod
+    def _flat_to_yx(flat_idx: np.ndarray, width: int) -> np.ndarray:
+        return np.stack([(flat_idx // width).astype(np.int32), (flat_idx % width).astype(np.int32)], axis=1)
 
     @staticmethod
     def _enqueue_tasks(
@@ -255,45 +252,61 @@ class Metrics:
             f"elev_ce_{suffix}"   : ce_gt,
         }
 
+    def _curve_scalar_metrics(self, pred: np.ndarray, ref: np.ndarray, suffix: str) -> Dict[str, float]:
+        diff       = pred - ref
+        mse        = float((diff * diff).mean(dtype=np.float64))
+        mae        = float(np.abs(diff).mean(dtype=np.float64))
+        ref_mean   = float(ref.mean(dtype=np.float64))
+        overall_r2 = 1.0 - float((diff * diff).sum(dtype=np.float64)) / (float(((ref - ref_mean) ** 2).sum(dtype=np.float64)) + 1e-12)
+
+        return {
+            f"curve_mse_{suffix}"  : mse,
+            f"curve_mae_{suffix}"  : mae,
+            f"curve_rmse_{suffix}" : float(np.sqrt(mse)),
+            f"overall_r2_{suffix}" : float(overall_r2),
+            f"psnr_db_{suffix}"    : self._psnr(pred, ref),
+        }
+
+    def _expand_pixel_stats(self, tagged_arrays: Tuple[Tuple[str, np.ndarray], ...]) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+
+        for tag, arr in tagged_arrays:
+            out.update({f"{tag}_{k}": v for k, v in self._basic_stats(arr).items()})
+            out.update({f"{tag}_{k}": v for k, v in self._percentiles(arr).items()})
+
+        return out
+
+    def _expand_elev(self, pred: np.ndarray, gt: np.ndarray, suffix: str) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+
+        for metric_name, arr in self._elev_metrics(pred, gt, suffix=suffix).items():
+            out.update({f"{metric_name}_{i}": float(v) for i, v in enumerate(arr)})
+            out[f"{metric_name}_mean"] = float(np.nanmean(arr))
+
+        return out
+
     def _reduced_metrics(self, pred : np.ndarray, gt : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray]) -> Dict[str, float]:
         red = self.result.reduced_curves
         out : Dict[str, float] = {}
 
-        diff_red       = red - gt
-        mse_red        = float((diff_red * diff_red).mean(dtype=np.float64))
-        mae_red        = float(np.abs(diff_red).mean(dtype=np.float64))
-        gt_mean        = float(gt.mean(dtype=np.float64))
-        overall_r2_red = 1.0 - float((diff_red * diff_red).sum(dtype=np.float64)) / (float(((gt - gt_mean) ** 2).sum(dtype=np.float64)) + 1e-12)
+        out.update(self._curve_scalar_metrics(red, gt, suffix="red"))
+        out["red_mean"] = float(red.mean(dtype=np.float64))
+        out["red_std"]  = float(red.std(dtype=np.float64))
+        out["red_max"]  = float(red.max())
 
-        out["curve_mse_red"]  = mse_red
-        out["curve_mae_red"]  = mae_red
-        out["curve_rmse_red"] = float(np.sqrt(mse_red))
-        out["overall_r2_red"] = float(overall_r2_red)
-        out["psnr_db_red"]    = self._psnr(red, gt)
-        out["red_mean"]       = float(red.mean(dtype=np.float64))
-        out["red_std"]        = float(red.std(dtype=np.float64))
-        out["red_max"]        = float(red.max())
-
-        for tag, arr in (
+        out.update(self._expand_pixel_stats((
             ("pixel_mse_red",        self.result.pixel_mse_red),
             ("pixel_mae_red",        self.result.pixel_mae_red),
             ("pixel_r2_red",         self.result.pixel_r2_red),
             ("pixel_cosine_red",     self.result.pixel_cosine_red),
             ("pixel_peak_idx_d_red", self.result.pixel_peak_err_idx_red.astype(np.float32)),
-        ):
-            for k, v in self._basic_stats(arr).items():
-                out[f"{tag}_{k}"] = v
-            for k, v in self._percentiles(arr).items():
-                out[f"{tag}_{k}"] = v
+        )))
 
-        for k, v in self._slice_ssim(red, gt, elev_indices, range_indices, az_indices, prefix="red").items():
-            out[k] = v
+        out.update(self._slice_ssim(red, gt, elev_indices, range_indices, az_indices, prefix="red"))
+        out.update(self._expand_elev(red, gt, suffix="red"))
 
-        for metric_name, arr in self._elev_metrics(red, gt, suffix="red").items():
-            for i, v in enumerate(arr):
-                out[f"{metric_name}_{i}"] = float(v)
-
-            out[f"{metric_name}_mean"] = float(np.nanmean(arr))
+        mse_red = out["curve_mse_red"]
+        mae_red = out["curve_mae_red"]
 
         diff_gt = pred - gt
         mse_gt  = float((diff_gt * diff_gt).mean(dtype=np.float64))
@@ -317,10 +330,7 @@ class Metrics:
 
     @staticmethod
     def _relative_improvement(baseline_error: float, model_error: float) -> float:
-        if baseline_error <= 0.0:
-            return float("nan")
-
-        return (baseline_error - model_error) / baseline_error
+        return RelativeImprovement.fraction(baseline_error, model_error, higher_is_better=False)
 
     def _mu_ordering_rate(self) -> float:
         pp  = self.result.params_pred
@@ -329,15 +339,15 @@ class Metrics:
         if n_K < 2:
             return float("nan")
 
-        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)  # (G, H, W)
-        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)  # (G, H, W)
-        active = amps >= 1e-3                                             # (G, H, W)
+        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)
+        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)
+        active = amps >= 1e-3
 
-        ordered       = mus[:-1] < mus[1:]                               # (G-1, H, W)
+        ordered       = mus[:-1] < mus[1:]
         both_active   = active[:-1] & active[1:]
-        has_violation = ((~ordered) & both_active).any(axis=0)           # (H, W)
+        has_violation = ((~ordered) & both_active).any(axis=0)
 
-        n_active     = active.sum(axis=0)                                 # (H, W)
+        n_active     = active.sum(axis=0)
         multi_active = n_active >= 2
         denom        = int(multi_active.sum())
         
@@ -347,7 +357,6 @@ class Metrics:
         return float((~has_violation & multi_active).sum() / denom)
 
     def _slot_mu_stats(self) -> Dict[str, float]:
-        """Mean and std of µ (pred and GT) per Gaussian slot, restricted to active pixels."""
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
@@ -370,7 +379,6 @@ class Metrics:
         return out
 
     def _placeholder_detection(self) -> Dict[str, float]:
-        """Precision / recall / F1 for inactive-slot detection, per slot and overall."""
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
@@ -418,13 +426,6 @@ class Metrics:
         return out
 
     def _permutation_consensus(self) -> Dict[str, float]:
-        """Fraction of pixels that prefer the same pred→GT permutation (by µ distance).
-
-        A high dominant-fraction means the model has learnt stable slot roles.
-        identity_frac specifically measures how often the identity permutation
-        (slot k matched to GT slot k) is optimal, which is expected when both
-        pred and GT are µ-sorted.
-        """
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
@@ -432,8 +433,6 @@ class Metrics:
         if n_K == 1:
             return {"permutation_consensus_dominant_frac": 1.0,
                     "permutation_consensus_identity_frac":  1.0}
-
-        from itertools import permutations as _perms
 
         pred_mu = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
         gt_mu   = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
@@ -443,7 +442,7 @@ class Metrics:
 
         cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])
 
-        all_perms   = list(_perms(range(n_K)))
+        all_perms   = list(permutations(range(n_K)))
         identity_idx = all_perms.index(tuple(range(n_K)))
 
         if n_K <= 4:
@@ -473,8 +472,6 @@ class Metrics:
 
     @staticmethod
     def _best_perm_assignment(cost_mat: np.ndarray, all_perms: list) -> np.ndarray:
-        from scipy.optimize import linear_sum_assignment
-
         perm_to_idx = {p: i for i, p in enumerate(all_perms)}
         best_idx    = np.empty(cost_mat.shape[0], dtype=np.int64)
 
@@ -494,7 +491,7 @@ class Metrics:
         all_sig_ae : list[np.ndarray] = []
 
         for k in range(n_K):
-            gt_amp  = pg[3 * k]                      # (H, W)
+            gt_amp  = pg[3 * k]
             valid   = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
 
             mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
@@ -537,81 +534,47 @@ class Metrics:
     def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None) -> Dict[str, float]:
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
-    
-        diff_gt        = pred - gt
-        mse_gt         = float((diff_gt * diff_gt).mean(dtype=np.float64))
-        mae_gt         = float(np.abs(diff_gt).mean(dtype=np.float64))
-        gt_mean        = float(gt.mean(dtype=np.float64))
-        overall_r2_gt  = 1.0 - float((diff_gt * diff_gt).sum(dtype=np.float64)) / (float(((gt  - gt_mean)  ** 2).sum(dtype=np.float64)) + 1e-12)
 
         metrics: Dict[str, float] = {
-            "n_pixels"       : int(self.result.pixel_mse.size),
-            "n_elevation"    : int(pred.shape[0]),
-            "x_axis_min"     : float(self.x_axis.min()),
-            "x_axis_max"     : float(self.x_axis.max()),
-            "x_axis_step"    : self.x_step,
+            "n_pixels"    : int(self.result.pixel_mse.size),
+            "n_elevation" : int(pred.shape[0]),
+            "x_axis_min"  : float(self.x_axis.min()),
+            "x_axis_max"  : float(self.x_axis.max()),
+            "x_axis_step" : self.x_step,
 
-            "curve_mse_gt"   : mse_gt,
-            "curve_mae_gt"   : mae_gt,
-            "curve_rmse_gt"  : float(np.sqrt(mse_gt)),
-            "overall_r2_gt"  : float(overall_r2_gt),
-            "psnr_db_gt"     : self._psnr(pred, gt),
-
-            "gt_mean"        : gt_mean,
-            "gt_std"         : float(gt.std(dtype=np.float64)),
-            "gt_max"         : float(gt.max()),
-            "pred_mean"      : float(pred.mean(dtype=np.float64)),
-            "pred_std"       : float(pred.std(dtype=np.float64)),
-            "pred_max"       : float(pred.max()),
+            "gt_mean"     : float(gt.mean(dtype=np.float64)),
+            "gt_std"      : float(gt.std(dtype=np.float64)),
+            "gt_max"      : float(gt.max()),
+            "pred_mean"   : float(pred.mean(dtype=np.float64)),
+            "pred_std"    : float(pred.std(dtype=np.float64)),
+            "pred_max"    : float(pred.max()),
         }
 
-        for tag, arr in (
+        metrics.update(self._curve_scalar_metrics(pred, gt, suffix="gt"))
+
+        metrics.update(self._expand_pixel_stats((
             ("pixel_mse_gt",        self.result.pixel_mse),
             ("pixel_mae_gt",        self.result.pixel_mae),
             ("pixel_r2_gt",         self.result.pixel_r2),
             ("pixel_cosine_gt",     self.result.pixel_cosine),
             ("pixel_peak_idx_d_gt", self.result.pixel_peak_err_idx.astype(np.float32)),
-        ):
-            for k, v in self._basic_stats(arr).items():
-                metrics[f"{tag}_{k}"] = v
-            for k, v in self._percentiles(arr).items():
-                metrics[f"{tag}_{k}"] = v
+        )))
 
         metrics["pixel_peak_err_units_mean_gt"]   = float(self.result.pixel_peak_err_idx.mean())              * self.x_step
         metrics["pixel_peak_err_units_median_gt"] = float(np.median(self.result.pixel_peak_err_idx))          * self.x_step
         metrics["pixel_peak_err_units_p95_gt"]    = float(np.percentile(self.result.pixel_peak_err_idx, 95))  * self.x_step
 
-        for k, v in self._slice_ssim(pred, gt, elev_indices, range_indices, az_indices, prefix="gt").items():
-            metrics[k] = v
-
-        for metric_name, arr in self._elev_metrics(pred, gt).items():
-            for i, v in enumerate(arr):
-                metrics[f"{metric_name}_{i}"] = float(v)
-
-            metrics[f"{metric_name}_mean"] = float(np.nanmean(arr))
+        metrics.update(self._slice_ssim(pred, gt, elev_indices, range_indices, az_indices, prefix="gt"))
+        metrics.update(self._expand_elev(pred, gt, suffix="gt"))
 
         if self.result.has_reduced:
-            for k, v in self._reduced_metrics(pred, gt, elev_indices, range_indices, az_indices).items():
-                metrics[k] = v
+            metrics.update(self._reduced_metrics(pred, gt, elev_indices, range_indices, az_indices))
 
-        # ── Per-Gaussian µ / σ errors (placeholder-masked, µ-sorted order) ──────────
-        for k, v in self._gaussian_param_metrics().items():
-            metrics[k] = v
+        metrics.update(self._gaussian_param_metrics())
+        metrics.update(self._slot_mu_stats())
+        metrics.update(self._placeholder_detection())
 
-        # ── Slot µ statistics (mean & std per slot, active pixels only) ─────────────
-        for k, v in self._slot_mu_stats().items():
-            metrics[k] = v
-
-        # ── Inactive-Gaussian detection (precision / recall / F1) ───────────────────
-        for k, v in self._placeholder_detection().items():
-            metrics[k] = v
-
-        # ── µ ordering rate & permutation consensus ──────────────────────────────────
         metrics["mu_ordering_rate"] = self._mu_ordering_rate()
-        for k, v in self._permutation_consensus().items():
-            metrics[k] = v
+        metrics.update(self._permutation_consensus())
 
         return metrics
-
- 
-

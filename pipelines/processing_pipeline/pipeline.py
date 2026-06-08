@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import gc
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing  import Tuple
 
@@ -11,23 +9,20 @@ from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, Metada
 from pipelines.processing_pipeline.interferogram import InterferogramBuilder
 from pipelines.processing_pipeline.plots         import StackPlotter
 from pipelines.processing_pipeline.tomogram      import TomogramProcessor
+from pipelines.shared                            import FileIO, ProcessPoolRunner
 from tools.logger                                import Logger
 
 
 class ProcessingPipeline:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger | None = None) -> None:
+    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config = config
-        run_dir     = Path(config.paths.run_directory)
-        run_dir.mkdir(parents=True, exist_ok=True)
-        log_dir     = run_dir / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = logger
 
-        self.logger                = logger or Logger(log_dir = str(log_dir), name = "preprocessing", level = "INFO")
-        self.artifact_registry     = ArtifactRegistry (config,   logger=self.logger)
-        self.metadata_manager      = MetadataManager  (config,    logger=self.logger)
-        self.tomogram_processor    = TomogramProcessor (config,   logger=self.logger)
+        self.artifact_registry     = ArtifactRegistry   (config, logger=self.logger)
+        self.metadata_manager      = MetadataManager    (config, logger=self.logger)
+        self.tomogram_processor    = TomogramProcessor  (config, logger=self.logger)
         self.interferogram_builder = InterferogramBuilder(config, logger=self.logger)
-        self.stack_plotter         = StackPlotter     (config,    logger=self.logger)
+        self.stack_plotter         = StackPlotter       (config, logger=self.logger)
 
         self.logger.section("[Pre-Processing Pipeline Initialized]")
         self.logger.subsection(f"Stack ID : {config.stack_identifier}")
@@ -131,7 +126,18 @@ class PreProcessSession:
         self.config       = config
 
     def execute(self) -> dict[str, Path]:
-        return ProcessingPipeline(self.config).run()
+        run_dir = Path(self.config.paths.run_directory)
+        log_dir = run_dir / "logs"
+
+        FileIO.ensure_dirs(run_dir, log_dir)
+
+        logger = Logger(log_dir=str(log_dir), name="preprocessing", level="INFO")
+
+        return ProcessingPipeline(self.config, logger=logger).run()
+
+
+def run_preprocess_session(session: PreProcessSession) -> dict[str, Path]:
+    return session.execute()
 
 
 class PreProcessScheduler:
@@ -146,24 +152,16 @@ class PreProcessScheduler:
 
         self.logger.subsection(f"Dispatching {len(self.sessions)} sessions across {slots} concurrent slots")
 
-        with ProcessPoolExecutor(max_workers=slots, mp_context=mp.get_context("spawn")) as executor:
-            futures = {executor.submit(session.execute): session for session in self.sessions}
+        runner    = ProcessPoolRunner(logger=self.logger, max_workers=slots)
+        completed = runner.run(self.sessions, run_preprocess_session)
 
-            try:
-                for future in as_completed(futures):
-                    session = futures[future]
-                    outputs = future.result()
+        for session, outputs in completed:
+            results[session.dataset_name] = outputs
 
-                    results[session.dataset_name] = outputs
-
-                    self.logger.section(f"[Session {session.index + 1}/{session.total}] {session.dataset_name} completed")
-                    self.logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
-
-            except Exception:
-                for future in futures:
-                    future.cancel()
-                raise
+            self.logger.section(f"[Session {session.index + 1}/{session.total}] {session.dataset_name} completed")
+            self.logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
 
         return results
+
 
 

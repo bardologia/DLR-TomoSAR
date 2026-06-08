@@ -52,8 +52,8 @@ class ChannelStrategy:
     @classmethod
     def from_dict(cls, d: dict) -> "ChannelStrategy":
         return cls(
-            norm_method = NormMethod(d.get("norm_method", d.get("strategy", NormMethod.ZSCORE.value))),
-            apply_log1p = bool(d.get("apply_log1p", False)),
+            norm_method = NormMethod(d["norm_method"]),
+            apply_log1p = bool(d["apply_log1p"]),
         )
 
     @classmethod
@@ -119,9 +119,9 @@ class ChannelStats:
         strategies = [ChannelStrategy.from_dict(e) for e in entries]
       
         return cls(
-            loc            = [e.get("loc",   e.get("mean")) for e in entries],
-            scale          = [e.get("scale", e.get("std"))  for e in entries],
-            names          = [e["name"] for e in entries],
+            loc            = [e["loc"]   for e in entries],
+            scale          = [e["scale"] for e in entries],
+            names          = [e["name"]  for e in entries],
             strategies     = strategies,
-            log1p_channels = payload.get("log1p_channels", []),
+            log1p_channels = payload["log1p_channels"],
         )

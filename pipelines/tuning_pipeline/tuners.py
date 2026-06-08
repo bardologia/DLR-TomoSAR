@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import copy
-import json
-import os
 from pathlib import Path
 
 import optuna
+
+from pipelines.shared.io import FileIO
 
 
 class ParamSampler:
@@ -65,11 +65,7 @@ class BestConfigWriter:
             "params"   : self.sampler.decode(dict(best.params), self.space),
         }
 
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.path.with_name(self.path.name + ".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        os.replace(tmp_path, self.path)
+        FileIO.save_json(payload, self.path, indent=2, atomic=True)
 
         return payload
 
@@ -123,19 +119,13 @@ class Tuner:
             dataset_config = dataset_cfg,
             model_name     = self.model_name,
             model_config   = model_config,
-            seed           = trial.number,
+            seed           = self.tune_cfg.base_seed + trial.number,
             run_name       = f"trial_{trial.number:04d}",
             trial          = trial,
             emit_docs      = self.emit_trial_docs,
         )
 
-        try:
-            _, _, best_val_loss = pipeline.run()
-        except optuna.exceptions.TrialPruned:
-            raise
-        except Exception as exc:
-            self.logger.error(f"Trial {trial.number} raised: {exc}")
-            raise optuna.exceptions.TrialPruned()
+        _, _, best_val_loss = pipeline.run()
 
         return best_val_loss
 

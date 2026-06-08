@@ -96,6 +96,16 @@ class FoldPlanner:
         return CropRegion(azimuth_start, azimuth_end, self.range_start, self.range_end)
 
 
+class FoldNaming:
+    @staticmethod
+    def name(index: int) -> str:
+        return f"fold_{index}"
+
+    @staticmethod
+    def index(name: str) -> int:
+        return int(name.split("_")[-1])
+
+
 class FoldConfigFactory(ConfigFactory):
     def __init__(self, config: CrossValidationConfig) -> None:
         super().__init__(config)
@@ -143,19 +153,18 @@ class FoldCollector(TrialCollector):
         if not (inference_dir / "metrics.json").exists():
             return replace(record, inference_dir=None, metrics={}, figures=[], animations=[], report_path=None)
 
-        metrics     = self._load_json(inference_dir / "metrics.json") or {}
-        figures     = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
-        animations  = sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else []
+        return replace(record, **self._inference_fields(inference_dir))
+
+    def _inference_fields(self, inference_dir: Path) -> dict:
         report_path = inference_dir / "report.md"
 
-        return replace(
-            record,
-            inference_dir = inference_dir,
-            metrics       = metrics,
-            figures       = figures,
-            animations    = animations,
-            report_path   = report_path if report_path.exists() else None,
-        )
+        return {
+            "inference_dir" : inference_dir,
+            "metrics"       : self._load_json(inference_dir / "metrics.json"),
+            "figures"       : sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else [],
+            "animations"    : sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else [],
+            "report_path"   : report_path if report_path.exists() else None,
+        }
 
 
 class CrossValidationWorker(BenchmarkWorker):
@@ -164,7 +173,7 @@ class CrossValidationWorker(BenchmarkWorker):
         self.factory = FoldConfigFactory(config)
 
     def fold_name(self, fold_index: int) -> str:
-        return f"fold_{fold_index}"
+        return FoldNaming.name(fold_index)
 
 
 class FoldTrainingWorker(CrossValidationWorker):

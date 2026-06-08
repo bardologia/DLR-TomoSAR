@@ -410,7 +410,6 @@ class UNetPlusPlusConfig:
     features              : list[int] = field(default_factory=lambda: [56, 112, 216, 440])
     bottleneck_factor     : int       = 2
     dropout               : float     = 0.15
-    deep_supervision      : bool      = False
     activation            : str       = "relu"
     normalization         : str       = "batch"
     upsample_mode         : str       = "convtranspose"
@@ -448,7 +447,6 @@ class UNetPlusPlusConfig:
         return {
             "features"          : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
             "bottleneck_factor" : {"type": "categorical",         "choices": [1, 2, 4]},
-            "deep_supervision"  : {"type": "categorical",         "choices": [True, False]},
             "activation"        : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization"     : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
             "upsample_mode"     : {"type": "categorical",         "choices": ["convtranspose", "bilinear"]},

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Callable, Sequence
 
+import inspect
 import math
 import numpy as np
 import scipy.stats as st
@@ -266,16 +267,14 @@ class TomoSARSimulator:
 
     def focus(self, method: str | Callable = "CLS", *args, **kwargs) -> np.ndarray:
         if callable(method):
-            # Caller is responsible for passing the right signature.
-            # Try (steering, cov, avg_signal); fall back to (steering, cov).
-            try:
-                self.spectrum = np.abs(
-                    method(self.steering, self.covariance, self.avg_signal, *args, **kwargs)
-                )
-            except TypeError:
-                self.spectrum = np.abs(
-                    method(self.steering, self.covariance, *args, **kwargs)
-                )
+            positional = [
+                p for p in inspect.signature(method).parameters.values()
+                if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+            ]
+            if len(positional) >= 3:
+                self.spectrum = np.abs(method(self.steering, self.covariance, self.avg_signal, *args, **kwargs))
+            else:
+                self.spectrum = np.abs(method(self.steering, self.covariance, *args, **kwargs))
             return self.spectrum
 
         if method == "Fourier":

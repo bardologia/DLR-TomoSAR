@@ -2,22 +2,45 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses        import dataclass
 from io                 import BytesIO
 from pathlib            import Path
-from typing             import Any, Dict, List
+from typing             import Dict, List
 
 import matplotlib
 
 matplotlib.use("Agg")
-import numpy as np
-from PIL     import Image
-from tqdm    import tqdm
+import matplotlib.pyplot as plt
+import numpy             as np
+from PIL                 import Image
+from tqdm                import tqdm
 
 from configuration.inference_config       import InferenceConfig
 from pipelines.inference_pipeline.loader  import InferenceMetadata
 from pipelines.inference_pipeline.metrics import Metrics, Result
 from pipelines.inference_pipeline.plots   import PlotTools, Ploter
 from tools.logger                         import Logger
+
+
+@dataclass
+class FrameSpec:
+    frame_order : int
+    n_frames    : int
+    gt          : np.ndarray
+    pred        : np.ndarray
+    reduced     : np.ndarray | None
+    vmin        : float
+    vmax        : float
+    emax_gt     : float
+    emax_red    : float
+    extent      : list
+    x_label     : str
+    y_label     : str
+    cmap        : str
+    err_cmap    : str
+    dpi         : int
+    origin      : str
+    title       : str
 
 
 class Animator:
@@ -31,14 +54,13 @@ class Animator:
         import io
 
     @staticmethod
-    def _render_frame(args: tuple) -> tuple[int, bytes]:
+    def _render_frame(spec: FrameSpec) -> tuple[int, bytes]:
         import matplotlib.pyplot as plt
         import numpy as np
         from io import BytesIO
 
-        frame_order, n_frames, g, p, r, vmin, vmax, emax_gt, emax_red, extent, x_label, y_label, cmap, err_cmap, dpi, _origin, title = args
-
-        eg = np.abs(p - g)
+        g, p, r = spec.gt, spec.pred, spec.reduced
+        eg      = np.abs(p - g)
 
         if r is None:
             fig     = plt.figure(figsize=(20, 6), constrained_layout=False)
@@ -47,18 +69,18 @@ class Animator:
             pbar_ax = fig.add_subplot(gs[1, :])
 
             panels = [
-                (g,  "GT (Gaussian)", cmap,     vmin, vmax),
-                (p,  "Prediction",    cmap,     vmin, vmax),
-                (eg, "|Pred - GT|",   err_cmap, 0.0,  emax_gt),
+                (g,  "GT (Gaussian)", spec.cmap,     spec.vmin, spec.vmax),
+                (p,  "Prediction",    spec.cmap,     spec.vmin, spec.vmax),
+                (eg, "|Pred - GT|",   spec.err_cmap, 0.0,       spec.emax_gt),
             ]
 
-            PlotTools._triple_panel(fig, axes, panels, x_label, "intensity", extent, origin=_origin)
-            axes[0].set_ylabel(y_label)
+            PlotTools._triple_panel(fig, axes, panels, spec.x_label, "intensity", spec.extent, origin=spec.origin)
+            axes[0].set_ylabel(spec.y_label)
 
         else:
             er    = np.abs(r - g)
             delta = er - eg
-            dmax  = max(emax_gt, emax_red)
+            dmax  = max(spec.emax_gt, spec.emax_red)
 
             fig     = plt.figure(figsize=(20, 11), constrained_layout=False)
             gs      = fig.add_gridspec(3, 3, height_ratios=[1, 1, 0.03], hspace=0.40, wspace=0.35)
@@ -66,38 +88,34 @@ class Animator:
             pbar_ax = fig.add_subplot(gs[2, :])
 
             panels = [
-                (g,     "GT (Gaussian)",                 cmap,     vmin,  vmax),
-                (r,     "Capon (reduced)",               cmap,     vmin,  vmax),
-                (p,     "Prediction",                    cmap,     vmin,  vmax),
-                (er,    "|Capon - GT|",                  err_cmap, 0.0,   emax_red),
-                (eg,    "|Pred - GT|",                   err_cmap, 0.0,   emax_gt),
-                (delta, "|Capon-GT| - |Pred-GT|  (>0 = model better)", "RdYlGn", -dmax, dmax),
+                (g,     "GT (Gaussian)",                            spec.cmap,     spec.vmin, spec.vmax),
+                (r,     "Capon (reduced)",                          spec.cmap,     spec.vmin, spec.vmax),
+                (p,     "Prediction",                               spec.cmap,     spec.vmin, spec.vmax),
+                (er,    "|Capon - GT|",                             spec.err_cmap, 0.0,       spec.emax_red),
+                (eg,    "|Pred - GT|",                              spec.err_cmap, 0.0,       spec.emax_gt),
+                (delta, "|Capon-GT| - |Pred-GT|  (>0 = model better)", "RdYlGn",   -dmax,     dmax),
             ]
 
-            for ax, (data, panel_title, panel_cmap, vlo, vhi) in zip(axes, panels):
-                im = ax.imshow(data, cmap=panel_cmap, vmin=vlo, vmax=vhi, extent=extent, aspect="auto", origin=_origin, interpolation="nearest")
-                ax.set_title(panel_title, fontsize=10)
-                ax.set_xlabel(x_label, fontsize=8)
-                fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+            PlotTools._render_panels(fig, axes, panels, x_label=spec.x_label, extent=spec.extent, origin=spec.origin, interpolation="nearest", title_size=10, label_size=8)
 
-            axes[0].set_ylabel(y_label)
-            axes[3].set_ylabel(y_label)
+            axes[0].set_ylabel(spec.y_label)
+            axes[3].set_ylabel(spec.y_label)
 
-        progress = (frame_order + 1) / max(1, n_frames)
+        progress = (spec.frame_order + 1) / max(1, spec.n_frames)
         pbar_ax.barh(0, progress,        height=1, color="steelblue", left=0.0)
         pbar_ax.barh(0, 1.0 - progress,  height=1, color="#333333",   left=progress)
         pbar_ax.set_xlim(0, 1)
         pbar_ax.set_axis_off()
 
-        fig.suptitle(title, fontsize=13, y=0.98)
+        fig.suptitle(spec.title, fontsize=13, y=0.98)
         fig.subplots_adjust(left=0.06, right=0.97, top=0.88 if r is None else 0.92, bottom=0.08 if r is None else 0.05)
 
         buf = BytesIO()
-        fig.savefig(buf, format="png", dpi=dpi)
+        fig.savefig(buf, format="png", dpi=spec.dpi)
         plt.close(fig)
         buf.seek(0)
 
-        return frame_order, buf.read()
+        return spec.frame_order, buf.read()
 
     def __init__(
         self,
@@ -187,12 +205,12 @@ class Animator:
 
         raise ValueError(f"axis must be elevation|range|azimuth, got {axis!r}")
 
-    def _render(self, tasks: list[tuple[Any, ...]]) -> dict[int, bytes]:
+    def _render(self, tasks: list[FrameSpec]) -> dict[int, bytes]:
         n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
         png_bytes: dict[int, bytes] = {}
 
         with ProcessPoolExecutor(max_workers=n_workers, initializer=Animator._init_worker) as pool:
-            futures = {pool.submit(Animator._render_frame, t): t[0] for t in tasks}
+            futures = {pool.submit(Animator._render_frame, t): t.frame_order for t in tasks}
             with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
                 for fut in as_completed(futures):
                     order, data = fut.result()
@@ -213,10 +231,9 @@ class Animator:
         rg_offset    : int,
         reduced_cube : np.ndarray | None = None,
     ) -> Path:
-        import matplotlib.pyplot as _plt
-        _plt.rcParams.update(Ploter.SCIENTIFIC_RC)
-        _plt.rcParams["figure.dpi"]  = self.dpi
-        _plt.rcParams["savefig.dpi"] = self.dpi
+        plt.rcParams.update(Ploter.SCIENTIFIC_RC)
+        plt.rcParams["figure.dpi"]  = self.dpi
+        plt.rcParams["savefig.dpi"] = self.dpi
 
         spec      = self._build_axis(axis, (pred_cube, gt_cube, reduced_cube), x_axis, az_offset, rg_offset)
         n_total   = spec["n_total"]
@@ -241,23 +258,29 @@ class Animator:
             if emax_red <= 0.0:
                 emax_red = 1.0
 
-        tasks: list[tuple[Any, ...]] = []
+        tasks: list[FrameSpec] = []
         n_frames = len(frame_indices)
         for frame_order, fi in enumerate(frame_indices):
             i       = int(fi)
             p, g, r = get_slice(i)
-            tasks.append((
-                frame_order,
-                n_frames,
-                g.copy(), p.copy(), r.copy() if r is not None else None,
-                vmin, vmax,
-                emax_gt, emax_red,
-                spec["extent"],
-                spec["x_label"], spec["y_label"],
-                self.cmap, self.err_cmap,
-                self.dpi,
-                spec["origin"],
-                spec["title_fn"](i),
+            tasks.append(FrameSpec(
+                frame_order = frame_order,
+                n_frames    = n_frames,
+                gt          = g.copy(),
+                pred        = p.copy(),
+                reduced     = r.copy() if r is not None else None,
+                vmin        = vmin,
+                vmax        = vmax,
+                emax_gt     = emax_gt,
+                emax_red    = emax_red,
+                extent      = spec["extent"],
+                x_label     = spec["x_label"],
+                y_label     = spec["y_label"],
+                cmap        = self.cmap,
+                err_cmap    = self.err_cmap,
+                dpi         = self.dpi,
+                origin      = spec["origin"],
+                title       = spec["title_fn"](i),
             ))
 
         png_bytes = self._render(tasks)
@@ -304,10 +327,13 @@ class FigureComposer:
         indices        : dict,
     ) -> Dict[str, List[Path]]:
 
-        plotter = self.plotter
-        meta    = self.meta
-        logger  = self.logger
-        cfg     = self.cfg
+        slice_plotter = self.plotter.slice
+        param_plotter = self.plotter.param
+        slot_plotter  = self.plotter.slot
+        track_plotter = self.plotter.track
+        meta          = self.meta
+        logger        = self.logger
+        cfg           = self.cfg
 
         slice_range_idx = indices["slice_range_idx"]
         slice_az_idx    = indices["slice_az_idx"]
@@ -320,28 +346,28 @@ class FigureComposer:
         figure_paths: Dict[str, List[Path]] = {}
 
         if run.track_baselines is not None:
-            figure_paths["track_geometry"] = [plotter.plot_track_geometry(
+            figure_paths["track_geometry"] = [track_plotter.plot_track_geometry(
                 baselines = run.track_baselines,
                 out_path  = meta.figures_dir / "tracks" / "track_geometry.png",
             )]
             logger.subsection(f"Track geometry : {meta.figures_dir / 'tracks'}")
 
         if run.track_profiles is not None:
-            figure_paths["track_profiles"] = plotter.plot_track_profiles(
+            figure_paths["track_profiles"] = track_plotter.plot_track_profiles(
                 profiles      = run.track_profiles,
                 out_dir       = meta.figures_dir / "tracks",
                 split_azimuth = (run.split_region.azimuth_start, run.split_region.azimuth_end),
             )
             logger.subsection(f"Track profiles : {len(figure_paths['track_profiles'])} figures in {meta.figures_dir / 'tracks'}")
 
-            figure_paths["track_flight_3d"] = [plotter.plot_track_flight_3d(
+            figure_paths["track_flight_3d"] = [track_plotter.plot_track_flight_3d(
                 profiles = run.track_profiles,
                 out_path = meta.figures_dir / "tracks" / "flight_tracks_3d.png",
             )]
             logger.subsection(f"Flight tracks 3D : {meta.figures_dir / 'tracks' / 'flight_tracks_3d.png'}")
 
         if run.complex_inputs is not None and run.n_secondaries > 0:
-            figure_paths["input_channels"] = plotter.plot_input_channels(
+            figure_paths["input_channels"] = slice_plotter.plot_input_channels(
                 complex_inputs = run.complex_inputs,
                 n_secondaries  = run.n_secondaries,
                 labels         = run.secondary_labels,
@@ -368,7 +394,7 @@ class FigureComposer:
         )
 
         for tag, pixels in (("best", selected["best"]), ("worst", selected["worst"]), ("random", selected["random"])):
-            figure_paths[f"profiles_{tag}"] = plotter.plot_profiles(
+            figure_paths[f"profiles_{tag}"] = slice_plotter.plot_profiles(
                 pred_curves    = result.pred_curves,
                 gt_curves      = result.gt_curves,
                 params_pred    = result.params_pred,
@@ -398,7 +424,7 @@ class FigureComposer:
             ]
 
         for key, fname, data, title, label, extra in pixel_map_specs:
-            figure_paths[key] = [plotter.plot_pixel_metric_map(
+            figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
                 metric_map = data,
                 title      = title,
                 label      = label,
@@ -409,7 +435,7 @@ class FigureComposer:
             )]
 
         if result.has_reduced:
-            figure_paths["improvement_map"] = [plotter.plot_improvement_map(
+            figure_paths["improvement_map"] = [slice_plotter.plot_improvement_map(
                 improvement = result.pixel_improvement,
                 out_path    = meta.figures_dir / "pixel_maps" / "improvement_over_capon.png",
                 az_offset   = result.azimuth_offset,
@@ -429,12 +455,12 @@ class FigureComposer:
             histogram_arrays["pixel_r2_capon"]    = result.pixel_r2_red
             histogram_arrays["pixel_improvement"] = result.pixel_improvement
 
-        figure_paths["metric_histograms"] = plotter.plot_metric_histograms(
+        figure_paths["metric_histograms"] = slice_plotter.plot_metric_histograms(
             histogram_arrays,
             meta.figures_dir / "histograms",
         )
 
-        figure_paths["param_maps"] = plotter.plot_param_maps(
+        figure_paths["param_maps"] = param_plotter.plot_param_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
@@ -443,21 +469,21 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
-        figure_paths["param_distributions"] = plotter.plot_param_distributions(
+        figure_paths["param_distributions"] = param_plotter.plot_param_distributions(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
             out_dir     = meta.figures_dir / "param_distributions",
         )
 
-        figure_paths["param_scatter"] = plotter.plot_param_scatter(
+        figure_paths["param_scatter"] = param_plotter.plot_param_scatter(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
             out_dir     = meta.figures_dir / "param_scatter",
         )
 
-        figure_paths["param_error_maps"] = plotter.plot_param_error_maps(
+        figure_paths["param_error_maps"] = param_plotter.plot_param_error_maps(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
@@ -466,25 +492,25 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
-        figure_paths["slot_mu_distributions"] = plotter.plot_slot_mu_distributions(
+        figure_paths["slot_mu_distributions"] = slot_plotter.plot_slot_mu_distributions(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
             out_dir        = meta.figures_dir / "slots",
         )
 
-        figure_paths["placeholder_detection"] = plotter.plot_placeholder_detection(
+        figure_paths["placeholder_detection"] = slot_plotter.plot_placeholder_detection(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
             out_dir        = meta.figures_dir / "slots",
         )
 
-        figure_paths["slot_ordering_summary"] = plotter.plot_slot_ordering_summary(
+        figure_paths["slot_ordering_summary"] = slot_plotter.plot_slot_ordering_summary(
             global_metrics = global_metrics,
             n_gaussians    = run.n_gaussians,
             out_dir        = meta.figures_dir / "slots",
         )
 
-        figure_paths["active_count_map"] = plotter.plot_active_count_map(
+        figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
@@ -503,8 +529,8 @@ class FigureComposer:
             ("range",   slice_range_idx, lambda i: f"range_{int(i) + result.range_offset}",     "ssim_gt_range",   "slices_range"),
             ("azimuth", slice_az_idx,    lambda i: f"azimuth_{int(i) + result.azimuth_offset}", "ssim_gt_azimuth", "slices_azimuth"),
         ):
-            for s_idx, i in enumerate(indices_arr):
-                figure_paths[group] += plotter.plot_tomogram_slice(
+            for i in indices_arr:
+                figure_paths[group] += slice_plotter.plot_tomogram_slice(
                     pred_cube    = result.pred_curves,
                     gt_cube      = result.gt_curves,
                     axis         = axis,
@@ -514,12 +540,12 @@ class FigureComposer:
                     stem         = stem_fn(i),
                     az_offset    = result.azimuth_offset,
                     rg_offset    = result.range_offset,
-                    ssim_value   = global_metrics.get(f"{metric_key}_{s_idx}"),
+                    ssim_value   = global_metrics[f"{metric_key}_{int(i)}"],
                     reduced_cube = result.reduced_curves,
                 )
 
-        for s_idx, i in enumerate(slice_elev_idx):
-            figure_paths["slices_elev"] += plotter.plot_elevation_intensity_slice(
+        for i in slice_elev_idx:
+            figure_paths["slices_elev"] += slice_plotter.plot_elevation_intensity_slice(
                 pred_cube    = result.pred_curves,
                 gt_cube      = result.gt_curves,
                 elev_idx     = int(i),
@@ -528,7 +554,7 @@ class FigureComposer:
                 stem         = f"elev_idx_{int(i)}",
                 az_offset    = result.azimuth_offset,
                 rg_offset    = result.range_offset,
-                ssim_value   = global_metrics.get(f"ssim_gt_elev_{s_idx}"),
+                ssim_value   = global_metrics[f"ssim_gt_elev_{int(i)}"],
                 reduced_cube = result.reduced_curves,
             )
 
@@ -539,7 +565,7 @@ class FigureComposer:
             ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
             ("elev",    _N_elev, all_elev_idx,  0),
         ):
-            figure_paths[f"ssim_{axis}"] = [plotter.plot_ssim_curves(
+            figure_paths[f"ssim_{axis}"] = [slice_plotter.plot_ssim_curves(
                 global_metrics = global_metrics,
                 axis           = axis,
                 out_path       = meta.figures_dir / "ssim" / f"{axis}.png",
@@ -550,7 +576,7 @@ class FigureComposer:
 
         logger.subsection(f"SSIM plots : range, azimuth, elev written to {meta.figures_dir / 'ssim'}\n")
 
-        figure_paths["elev_metric_curves"] = plotter.plot_elev_metric_curves(
+        figure_paths["elev_metric_curves"] = slice_plotter.plot_elev_metric_curves(
             global_metrics = global_metrics,
             out_dir        = meta.figures_dir / "elev_metrics",
             n_elev         = _N_elev,

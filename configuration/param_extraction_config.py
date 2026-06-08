@@ -26,10 +26,6 @@ class FitSettings:
     fit_config          : FitConfig = field(default_factory=FitMode.SigmaOnly)
 
     @property
-    def number_of_gaussians(self) -> int:
-        return self.fit_config.k_max
-
-    @property
     def parameters_per_profile(self) -> int:
         return 3 * self.fit_config.k_max
 
@@ -70,19 +66,13 @@ class ExtractionConfig:
         if self.output_suffix:
             return self.output_suffix
 
-        fs     = self.fit_settings
-        method = fs.fitting_method
-
-        if method.startswith("sigma_only"):
-            cfg      = fs.fit_config
-            k_max    = getattr(cfg, "k_max", fs.number_of_gaussians)
-            divisor  = getattr(cfg, "sigma_init_divisor", 1.0)
-            lambda_k = getattr(cfg, "lambda_k", 0.0)
-            div_tag  = f"{divisor:g}".replace(".", "p")
-            lam_tag  = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
-            return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}"
-
-        return f"Ng{fs.number_of_gaussians}_filt"
+        cfg      = self.fit_settings.fit_config
+        k_max    = cfg.k_max
+        divisor  = cfg.sigma_init_divisor
+        lambda_k = cfg.lambda_k
+        div_tag  = f"{divisor:g}".replace(".", "p")
+        lam_tag  = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
+        return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}"
 
     @property
     def output_subdir_name(self) -> str:

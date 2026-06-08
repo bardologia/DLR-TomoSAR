@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime    import datetime
 from pathlib     import Path
@@ -12,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from configuration.dataset_config    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
 from configuration.inference_config  import InferenceConfig
-from configuration.processing_config import CropRegion
+from tools.regions                   import CropRegion
 from configuration.training_config   import GaussianConfig
 from models                          import get_model
 from pipelines.dataset_pipeline.datasets      import PatchDataset
@@ -116,7 +115,6 @@ class Run:
     dataset          : PatchDataset
     loader           : DataLoader
     checkpoint_meta  : dict
-    used_ema         : bool
     complex_inputs   : np.ndarray | None = None
     n_secondaries    : int               = 0
     secondary_labels : list | None       = None
@@ -131,10 +129,7 @@ class RunLoader:
         self.meta_directory = self.run_directory / "meta"
 
     def _read_json(self, name: str) -> dict:
-        path = self.meta_directory / name
-
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        return FileIO.load_json(self.meta_directory / name)
 
     def _parse_split_payload(self, value):
         if isinstance(value, list):
@@ -219,23 +214,6 @@ class RunLoader:
 
         return model
 
-    def _apply_ema(self, model, ckpt: dict, use_ema: bool) -> bool:
-        if not use_ema:
-            return False
-        ema_state = ckpt.get("ema_shadow", {})
-        if not ema_state or not ema_state.get("shadow"):
-            return False
-        shadow  = ema_state["shadow"]
-        applied = 0
-        with torch.no_grad():
-            for name, param in model.named_parameters():
-                if name in shadow:
-                    param.data.copy_(shadow[name].to(param.device, dtype=param.dtype))
-                    applied += 1
-
-        self.logger.subsection(f"EMA : applied to {applied} parameters")
-        return True
-
     def _load_checkpoint(self, ckpt_path: Path, device: str) -> tuple[dict, np.ndarray, dict]:
         ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
         raw    = ckpt["x_axis"]
@@ -256,11 +234,15 @@ class RunLoader:
         baselines_path = dataset_dir / "meta" / TrackBaselines.FILENAME
         profiles_path  = TrackProfiles.profiles_file(dataset_dir)
 
-        baselines = TrackBaselines.load(baselines_path).subset(labels) if baselines_path.is_file() else None
-        profiles  = TrackProfiles.load(profiles_path).subset(labels)   if profiles_path.is_file()  else None
+        if not baselines_path.is_file():
+            raise FileNotFoundError(f"Track baselines file is required for inference but was not found: {baselines_path}")
+        if not profiles_path.is_file():
+            raise FileNotFoundError(f"Track profiles file is required for inference but was not found: {profiles_path}")
 
-        if baselines is not None:
-            self.logger.kv_table(baselines.describe(), title="Tracks Used in This Run")
+        baselines = TrackBaselines.load(baselines_path).subset(labels)
+        profiles  = TrackProfiles.load(profiles_path).subset(labels)
+
+        self.logger.kv_table(baselines.describe(), title="Tracks Used in This Run")
 
         return baselines, profiles
 
@@ -281,7 +263,6 @@ class RunLoader:
         batch_size      : Optional[int],
         num_workers     : int,
         device          : str,
-        use_ema         : bool,
         checkpoint_name : str,
     ) -> Run:
 
@@ -307,7 +288,6 @@ class RunLoader:
 
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
         model.load_state_dict(ckpt["params"])
-        used_ema = self._apply_ema(model, ckpt, use_ema)
 
         model.eval()
         norm_stats  = Stats.load(self.run_directory / "meta", self.logger)
@@ -365,7 +345,6 @@ class RunLoader:
             dataset          = dataset,
             loader           = loader,
             checkpoint_meta  = ckpt_meta,
-            used_ema         = used_ema,
             complex_inputs   = arrays["inputs"],
             n_secondaries    = arrays["n_secondaries"],
             secondary_labels = arrays["secondary_labels"],

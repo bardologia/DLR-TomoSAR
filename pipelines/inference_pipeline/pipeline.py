@@ -54,7 +54,6 @@ class InferencePipeline:
             "Output Dir":    meta.output_dir,
             "Split":         cfg.split,
             "Device":        cfg.device,
-            "Use EMA":       cfg.use_ema,
         })
 
         plotter = Ploter(
@@ -74,7 +73,6 @@ class InferencePipeline:
             batch_size      = cfg.batch_size,
             num_workers     = cfg.num_workers,
             device          = cfg.device,
-            use_ema         = cfg.use_ema,
             checkpoint_name = cfg.checkpoint_name,
         )
 
@@ -115,15 +113,16 @@ class InferencePipeline:
         if cfg.save_cubes:
             np.save(result.cube_directory / "reduced_curves.npy", reduced)
 
-    def _compute_slice_indices(self, cfg: InferenceConfig, n_elev: int, n_az: int, n_rg: int) -> dict:
-        def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
-            n_slices = max(1, min(n_slices, n_total))
-            return np.linspace(n_total * 0.1, n_total * 0.9, n_slices).round().astype(int)
+    @staticmethod
+    def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
+        n_slices = max(1, min(n_slices, n_total))
+        return np.linspace(n_total * 0.1, n_total * 0.9, n_slices).round().astype(int)
 
+    def _compute_slice_indices(self, cfg: InferenceConfig, n_elev: int, n_az: int, n_rg: int) -> dict:
         return {
-            "slice_elev_idx"  : _equal_indices(n_elev, cfg.n_elevation_slices),
-            "slice_range_idx" : _equal_indices(n_rg,   cfg.n_range_slices),
-            "slice_az_idx"    : _equal_indices(n_az,   cfg.n_azimuth_slices),
+            "slice_elev_idx"  : self._equal_indices(n_elev, cfg.n_elevation_slices),
+            "slice_range_idx" : self._equal_indices(n_rg,   cfg.n_range_slices),
+            "slice_az_idx"    : self._equal_indices(n_az,   cfg.n_azimuth_slices),
             "all_elev_idx"    : np.arange(n_elev),
             "all_range_idx"   : np.arange(n_rg),
             "all_az_idx"      : np.arange(n_az),

@@ -22,8 +22,7 @@ class ArtifactRegistry:
         paths = self.config.paths
         self.logger.section("[Directory Validation]")
         for directory in (paths.data_directory, paths.metadata_directory, paths.temporary_directory):
-            target_dir = directory.resolve()
-            target_dir.mkdir(parents=True, exist_ok=True)
+            target_dir = FileIO.ensure_dir(directory.resolve())
             self.logger.subsection(f"Ensured path : {target_dir}")
 
     def artifact_filenames(self) -> dict[str, str]:
@@ -64,7 +63,7 @@ class MetadataManager:
             "range"        : f"[{', '.join(str(v) for v in cfg.height_range)}]",
             "filter"       : cfg.filter_method,
             "method"       : cfg.beamforming_method,
-            "win"          : f"[{', '.join(str(v) for v in cfg.filter_arguments.get('win', []))}]",
+            "win"          : f"[{', '.join(str(v) for v in cfg.filter_arguments['win'])}]",
         }
 
     def build_inputs_metadata(self, primary_path: Path, secondaries_path: Path, interferograms_path: Path, primary_shape: Tuple[int, ...], secondaries_shape: Tuple[int, ...], interferograms_shape: Tuple[int, ...]) -> dict[str, str]:

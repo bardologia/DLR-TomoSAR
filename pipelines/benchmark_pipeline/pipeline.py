@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from models import CONFIG_REGISTRY
+from pipelines.shared.io import FileIO
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 
@@ -22,7 +22,7 @@ class BenchmarkPipeline:
         self.pipeline_dir = self.run_dir / "pipeline"
         self.state_path   = self.pipeline_dir / "state.json"
 
-        self.pipeline_dir.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dir(self.pipeline_dir)
         ConfigCli.save_resolved(config, self.pipeline_dir / "resolved_config.json")
 
         self.logger = Logger(log_dir=str(self.pipeline_dir), name="benchmark_pipeline")
@@ -110,5 +110,4 @@ class BenchmarkPipeline:
             "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        with open(self.state_path, "w", encoding="utf-8") as f:
-            json.dump(self.state, f, indent=2)
+        FileIO.save_json(self.state, self.state_path, indent=2)

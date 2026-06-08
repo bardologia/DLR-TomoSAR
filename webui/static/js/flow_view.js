@@ -52,9 +52,9 @@ class FlowView {
       loss      : { sketch: "lossbars", tip: "Curve-space and parameter-space terms, each scaled by a fixed normaliser, are summed into one weighted objective." },
       gradclip  : { sketch: "clip",     tip: "Gradients are rescaled together so their global norm never exceeds the clipping threshold." },
       adamw     : { sketch: "converge", tip: "AdamW applies bias-corrected adaptive moments with decoupled weight decay; the loss falls over the epoch loop." },
-      emaeval   : { sketch: "smooth",   tip: "Shadow weights track the model for validation and checkpointing; early stopping reverts to the best epoch." },
+      checkpoint: { sketch: "argmin",   tip: "The model is evaluated on the validation split; the best epoch is checkpointed and early stopping reverts to it." },
 
-      predict   : { sketch: "network",  tip: "The trained EMA model predicts parameters for every patch of the sliding-window grid over the scene." },
+      predict   : { sketch: "network",  tip: "The trained model predicts parameters for every patch of the sliding-window grid over the scene." },
       recon     : { sketch: "mixfit",   tip: "Each patch's parameters are evaluated to a spectrum, with amplitudes rectified at zero." },
       window    : { sketch: "window",   tip: "A separable Hann window de-emphasises patch borders so overlapping predictions blend without seams." },
       ola       : { sketch: "overlapadd",tip: "Windowed patches are scattered into value and weight accumulators at their grid positions." },

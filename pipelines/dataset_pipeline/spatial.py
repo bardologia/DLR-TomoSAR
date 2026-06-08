@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import dataclass
 from pathlib     import Path
@@ -8,9 +7,10 @@ from typing      import Tuple
 
 import numpy as np
 
-from configuration.processing_config import CropRegion
-from tools.regions                   import SplitRegions
-from tools.logger                    import Logger
+from pipelines.shared.io   import FileIO
+from tools.regions         import CropRegion, SplitRegions
+from tools.logger          import Logger
+from tools.track_baselines import SecondarySelection
 
 
 class Layout:
@@ -21,13 +21,10 @@ class Layout:
         self.parameters_path  = Path(parameters_path)
 
         layout_path = self.data_directory / "dataset.json"
-        with open(layout_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+        payload     = FileIO.load_json(layout_path)
 
         self.global_crop    : CropRegion  = CropRegion(*payload["global_crop"])
-        self.dataset_type   : str         = payload["dataset_type"]
         self.tomogram_tag   : str         = payload["tomogram_tag"]
-        self.parameter_tag  : str         = payload["parameter_tag"]
         self.artifacts      : dict        = payload["artifacts"]
         self.pass_labels    : list | None = payload["pass_labels"]
 
@@ -55,18 +52,7 @@ class Layout:
         if not self.pass_labels:
             raise ValueError("Dataset records no pass labels in dataset.json; baseline extraction must succeed during pre-processing before secondaries can be selected by label.")
 
-        primary     = self.pass_labels[0]
-        secondaries = list(self.pass_labels[1:])
-        requested   = [str(label) for label in secondary_labels]
-
-        if primary in requested:
-            raise ValueError(f"Pass {primary} is the primary and is always included; remove it from secondary_labels")
-
-        unknown = [label for label in requested if label not in secondaries]
-        if unknown:
-            raise ValueError(f"Unknown secondary labels {unknown}; dataset secondaries are {secondaries}")
-
-        return [index for index, label in enumerate(secondaries) if label in requested]
+        return SecondarySelection.indices(self.pass_labels, secondary_labels)
 
 
 class Cropper:
@@ -237,11 +223,15 @@ class Patcher:
                 v1 = v0 + ph
                 h1 = h0 + pw
 
-                pt = max(0, -v0);  pb = max(0, v1 - H)
-                pl = max(0, -h0);  pr = max(0, h1 - W)
+                pt = max(0, -v0)
+                pb = max(0, v1 - H)
+                pl = max(0, -h0)
+                pr = max(0, h1 - W)
 
-                v0c, v1c = max(0, v0), min(H, v1)
-                h0c, h1c = max(0, h0), min(W, h1)
+                v0c = max(0, v0)
+                v1c = min(H, v1)
+                h0c = max(0, h0)
+                h1c = min(W, h1)
 
                 pw_spec = None
                 if pt or pb or pl or pr:

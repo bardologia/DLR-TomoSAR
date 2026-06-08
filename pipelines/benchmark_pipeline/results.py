@@ -1,60 +1,18 @@
 from __future__ import annotations
 
-import base64
 import gc
-import json
-import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-from tools.logger import Logger
+from pipelines.shared.io        import FileIO
+from pipelines.shared.reporting import MetricSectionGrouper, ReportAssets
+from pipelines.shared.scoring   import FiniteScalar, MetricOrientation
+from tools.logger               import Logger
+from tools.markdown             import MarkdownTable, ScalarFormatter
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
 _CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
-
-_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif"}
-
-_PER_BIN_PATTERN  = re.compile(r"_\d+$")
-_NEUTRAL_PATTERN  = re.compile(r"^(n_pixels|n_elevation|x_axis_|gt_|pred_|slot_\d+_mu_)|_n_valid$|placeholder_(gt|pred)_rate$")
-_HIGHER_TOKENS    = ("r2", "ssim", "psnr", "cosine", "precision", "recall", "f1", "consensus", "ordering")
-
-_METRIC_SECTIONS = [
-    ("Dataset Statistics",           re.compile(r"^(n_pixels|n_elevation|x_axis_|gt_|pred_)")),
-    ("Curve-Level",                  re.compile(r"^(curve_|overall_r2|psnr_)")),
-    ("SSIM",                         re.compile(r"^ssim_")),
-    ("Per-Pixel MSE and MAE",        re.compile(r"^pixel_(mse|mae)_")),
-    ("Per-Pixel R² and Cosine",      re.compile(r"^pixel_(r2|cosine)_")),
-    ("Peak Location Error",          re.compile(r"^pixel_peak_")),
-    ("Per-Elevation-Bin Aggregates", re.compile(r"^elev_")),
-    ("Gaussian Parameter Errors",    re.compile(r"^gauss_")),
-    ("Slot Statistics",              re.compile(r"^slot_")),
-    ("Placeholder Detection",        re.compile(r"^placeholder_")),
-    ("Permutation and Ordering",     re.compile(r"^(permutation_|mu_ordering)")),
-]
-
-_FIGURE_GROUPS = [
-    ("Profile reconstructions",     re.compile(r"^profiles_")),
-    ("Per-pixel metric maps",       re.compile(r"^(pixel_|metric_histograms)")),
-    ("Gaussian parameter analysis", re.compile(r"^param_")),
-    ("Slot diagnostics",            re.compile(r"^(slot_|placeholder_|active_count)")),
-    ("SSIM and elevation curves",   re.compile(r"^(ssim_|elev_metric)")),
-    ("Azimuth slices",              re.compile(r"^slice_azimuth_")),
-    ("Elevation slices",            re.compile(r"^slice_elev_")),
-    ("Range slices",                re.compile(r"^slice_range_")),
-]
-
-_HEADLINE_METRICS = [
-    ("curve_rmse_gt",                "RMSE"),
-    ("curve_mae_gt",                 "MAE"),
-    ("overall_r2_gt",                "R²"),
-    ("psnr_db_gt",                   "PSNR"),
-    ("pixel_r2_gt_mean",             "Pixel R²"),
-    ("pixel_cosine_gt_mean",         "Cosine"),
-    ("ssim_gt_elev_mean",            "SSIM elev"),
-    ("pixel_peak_err_units_mean_gt", "Peak err"),
-]
 
 
 @dataclass
@@ -87,9 +45,9 @@ class TrialCollector:
         self.logger       = logger
 
     def collect(self) -> list[TrialRecord]:
-        size_match       = self._load_json(self.pipeline_dir / "size_match.json") or {}
-        overfit_results  = {r.get("model"): r for r in self._load_json(self.pipeline_dir / "overfit_results.json") or []}
-        training_results = {r.get("name"):  r for r in self._load_json(self.pipeline_dir / "training_results.json") or []}
+        size_match       = FileIO.load_json(self.pipeline_dir / "size_match.json")
+        overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
+        training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
 
         if not self.training_dir.is_dir():
             self.logger.error(f"No training directory found at: {self.training_dir}")
@@ -99,11 +57,11 @@ class TrialCollector:
         for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
             record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
 
-            record.size_match      = size_match.get(trial_dir.name, {})
-            record.trainer_config  = self._load_json(trial_dir / "docs" / "trainer_config.json") or {}
-            record.run_summary     = self._load_json(trial_dir / "meta" / "run_summary.json") or {}
-            record.overfit         = overfit_results.get(trial_dir.name, {})
-            record.training_result = training_results.get(trial_dir.name, {})
+            record.size_match      = size_match[trial_dir.name] if trial_dir.name in size_match else {}
+            record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
+            record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
+            record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
+            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
             record.parameters      = self._parse_parameters(trial_dir, record.size_match)
             record.checkpoint      = self._read_checkpoint(trial_dir)
 
@@ -116,25 +74,20 @@ class TrialCollector:
 
         return records
 
-    def _load_json(self, path: Path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return None
+    def _optional_json(self, path: Path) -> dict:
+        if not path.exists():
+            return {}
+        return FileIO.load_json(path)
 
     def _parse_parameters(self, trial_dir: Path, size_match: dict) -> int | None:
-        for filename in ("model_doc.md", "model_summary.md"):
-            summary_path = trial_dir / "docs" / filename
+        summary_path = trial_dir / "docs" / "model_doc.md"
 
-            if not summary_path.exists():
-                continue
-
+        if summary_path.exists():
             match = _TOTAL_PARAMS_PATTERN.search(summary_path.read_text(encoding="utf-8", errors="ignore"))
             if match:
                 return int(match.group(1).replace(",", ""))
 
-        return size_match.get("parameters")
+        return size_match["parameters"] if "parameters" in size_match else None
 
     def _read_checkpoint(self, trial_dir: Path) -> dict:
         import torch
@@ -143,13 +96,7 @@ class TrialCollector:
         if checkpoint_path is None:
             return {}
 
-        try:
-            try:
-                checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-            except TypeError:
-                checkpoint = torch.load(checkpoint_path, map_location="cpu")
-        except Exception:
-            return {}
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
         info = {key: checkpoint.get(key) for key in _CHECKPOINT_KEYS}
         info["n_train_epochs"] = len(checkpoint.get("train_losses") or [])
@@ -172,7 +119,7 @@ class TrialCollector:
         inference_dir = candidates[-1]
 
         record.inference_dir = inference_dir
-        record.metrics       = self._load_json(inference_dir / "metrics.json") or {}
+        record.metrics       = FileIO.load_json(inference_dir / "metrics.json")
         record.figures       = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
         record.animations    = sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else []
 
@@ -182,96 +129,129 @@ class TrialCollector:
 
 
 class ComparisonReport:
-    def __init__(self, records: list[TrialRecord], out_dir: Path, reference_model: str, embed_images: bool, logger: Logger) -> None:
+
+    FIGURE_GROUPS = [
+        ("Profile reconstructions",     re.compile(r"^profiles_")),
+        ("Per-pixel metric maps",       re.compile(r"^(pixel_|metric_histograms)")),
+        ("Gaussian parameter analysis", re.compile(r"^param_")),
+        ("Slot diagnostics",            re.compile(r"^(slot_|placeholder_|active_count)")),
+        ("SSIM and elevation curves",   re.compile(r"^(ssim_|elev_metric)")),
+        ("Azimuth slices",              re.compile(r"^slice_azimuth_")),
+        ("Elevation slices",            re.compile(r"^slice_elev_")),
+        ("Range slices",                re.compile(r"^slice_range_")),
+    ]
+
+    HEADLINE_METRICS = [
+        ("curve_rmse_gt",                "RMSE"),
+        ("curve_mae_gt",                 "MAE"),
+        ("overall_r2_gt",                "R²"),
+        ("psnr_db_gt",                   "PSNR"),
+        ("pixel_r2_gt_mean",             "Pixel R²"),
+        ("pixel_cosine_gt_mean",         "Cosine"),
+        ("ssim_gt_elev_mean",            "SSIM elev"),
+        ("pixel_peak_err_units_mean_gt", "Peak err"),
+    ]
+
+    def __init__(self, records: list[TrialRecord], out_dir: Path, reference_model: str, embed_images: bool, logger: Logger, rank_models: bool = True) -> None:
         self.records         = records
         self.out_dir         = out_dir
         self.reference_model = reference_model
         self.embed_images    = embed_images
         self.logger          = logger
-        self.timestamp       = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.rank_models     = rank_models
+        self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
+        self.timestamp       = self.assets.timestamp
 
     def write_all(self) -> list[Path]:
-        self.out_dir.mkdir(parents=True, exist_ok=True)
+        FileIO.ensure_dir(self.out_dir)
 
         written = [self._write_overview(), self._write_metrics()]
-        written.extend(self._write_figures())
-        written.append(self._write_gifs())
+        written.extend(self._write_media(self.FIGURE_GROUPS, "figures", "Figures"))
+        written.extend(self._write_media(None, "animations", "Animation Comparison"))
         written.append(self._write_summary_json())
 
         return written
 
-    def _header(self, title: str) -> list[str]:
-        return [f"# {title}", f"\n_Generated {self.timestamp}_\n"]
+    def _capacity_table(self) -> list[str]:
+        table = MarkdownTable(["Model", "Parameters", "Δ vs reference", "Width scale", "Scaled attributes"])
 
-    def _fmt(self, value) -> str:
-        if isinstance(value, float):
-            return f"{value:.5g}"
-        if value is None:
-            return "—"
-        return str(value)
-
-    def _natural_key(self, name: str) -> list:
-        return [int(token) if token.isdigit() else token for token in re.split(r"(\d+)", name)]
-
-    def _rel(self, target: Path) -> str:
-        return Path(os.path.relpath(target.resolve(), self.out_dir.resolve())).as_posix()
-
-    def _img_src(self, path: Path) -> str:
-        if self.embed_images and path.exists():
-            mime = _MIME.get(path.suffix.lower(), "image/png")
-            data = base64.b64encode(path.read_bytes()).decode("ascii")
-            return f"data:{mime};base64,{data}"
-        return self._rel(path)
-
-    def _direction(self, key: str) -> str | None:
-        if _NEUTRAL_PATTERN.search(key):
-            return None
-        if any(token in key for token in _HIGHER_TOKENS):
-            return "higher"
-        return "lower"
-
-    def _write_overview(self) -> Path:
-        lines = self._header("Benchmark Overview")
-
-        lines += ["## Model Capacity\n"]
-        lines += [f"Reference model: `{self.reference_model}`.\n"]
-        lines += ["| Model | Parameters | Δ vs reference | Width scale | Scaled attributes |", "| --- | --- | --- | --- | --- |"]
         for r in self.records:
             parameters = f"{r.parameters:,}" if r.parameters is not None else "—"
             deviation  = f"{r.size_match['deviation_pct']:+.3f} %" if "deviation_pct" in r.size_match else "—"
             scale      = f"{r.size_match['scale']:.4f}" if "scale" in r.size_match else "—"
-            overrides  = ", ".join(f"`{k}={v}`" for k, v in r.size_match.get("overrides", {}).items()) or "_(defaults)_"
-            lines.append(f"| `{r.name}` | {parameters} | {deviation} | {scale} | {overrides} |")
-        lines.append("")
+            overrides  = ", ".join(f"`{k}={v}`" for k, v in r.size_match["overrides"].items()) if "overrides" in r.size_match and r.size_match["overrides"] else "_(defaults)_"
 
-        lines += ["## Overfit Gate\n"]
-        lines += ["| Model | Status | Final loss | Converged |", "| --- | --- | --- | --- |"]
+            table.add_row(f"`{r.name}`", parameters, deviation, scale, overrides)
+
+        return table.render()
+
+    def _overfit_table(self) -> list[str]:
+        table = MarkdownTable(["Model", "Status", "Final loss", "Converged"])
+
         for r in self.records:
             final_loss = f"{r.overfit['final_loss']:.4e}" if r.overfit.get("final_loss") is not None else "—"
             converged  = {True: "yes", False: "no"}.get(r.overfit.get("converged"), "—")
-            lines.append(f"| `{r.name}` | {r.overfit.get('status', '—')} | {final_loss} | {converged} |")
-        lines.append("")
 
-        lines += ["## Training\n"]
-        lines += ["| Model | Status | Best epoch | Best val loss | Epochs run | Duration |", "| --- | --- | --- | --- | --- | --- |"]
+            table.add_row(f"`{r.name}`", r.overfit.get("status", "—"), final_loss, converged)
+
+        return table.render()
+
+    def _training_table(self) -> list[str]:
+        table = MarkdownTable(["Model", "Status", "Best epoch", "Best val loss", "Epochs run", "Duration"])
+
         for r in self.records:
             duration_s = r.training_result.get("duration_s")
             duration   = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
-            lines.append(
-                f"| `{r.name}` | {r.training_result.get('status', '—')} | {self._fmt(r.checkpoint.get('best_epoch'))} "
-                f"| {self._fmt(r.checkpoint.get('best_val_loss'))} | {self._fmt(r.checkpoint.get('n_train_epochs'))} | {duration} |"
+
+            table.add_row(
+                f"`{r.name}`",
+                r.training_result.get("status", "—"),
+                ScalarFormatter.format_scalar(r.checkpoint.get("best_epoch")),
+                ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")),
+                ScalarFormatter.format_scalar(r.checkpoint.get("n_train_epochs")),
+                duration,
             )
+
+        return table.render()
+
+    def _inference_table(self) -> list[str]:
+        table = MarkdownTable(["Model", "Inference run", "Figures", "Animations", "Report"])
+
+        for r in self.records:
+            inference = f"`{r.inference_dir.name}`" if r.has_inference else "pending"
+            report_md = f"[report.md]({self.assets.rel(r.report_path)})" if r.report_path else "—"
+
+            table.add_row(f"`{r.name}`", inference, len(r.figures), len(r.animations), report_md)
+
+        return table.render()
+
+    def _write_overview(self) -> Path:
+        if self.rank_models:
+            lines = self.assets.header("Benchmark Overview")
+        else:
+            lines  = self.assets.header("Cross-Validation Fold Overview")
+            lines += [f"Folds of the single model `{self.reference_model}`; each fold tests a different disjoint azimuth region, so fold-to-fold differences reflect data heterogeneity, not model quality. No ranking is implied.\n"]
+
+        if self.rank_models:
+            lines += ["## Model Capacity\n"]
+            lines += [f"Reference model: `{self.reference_model}`.\n"]
+            lines += self._capacity_table()
+            lines.append("")
+
+        lines += ["## Overfit Gate\n"]
+        lines += self._overfit_table()
+        lines.append("")
+
+        lines += ["## Training\n"]
+        lines += self._training_table()
         lines.append("")
 
         lines += ["## Inference\n"]
-        lines += ["| Model | Inference run | Figures | Animations | Report |", "| --- | --- | --- | --- | --- |"]
-        for r in self.records:
-            inference  = f"`{r.inference_dir.name}`" if r.has_inference else "pending"
-            report_md  = f"[report.md]({self._rel(r.report_path)})" if r.report_path else "—"
-            lines.append(f"| `{r.name}` | {inference} | {len(r.figures)} | {len(r.animations)} | {report_md} |")
+        lines += self._inference_table()
         lines.append("")
 
-        lines += self._leaderboard()
+        if self.rank_models:
+            lines += self._leaderboard()
 
         out = self.out_dir / "benchmark_overview.md"
         out.write_text("\n".join(lines), encoding="utf-8")
@@ -284,9 +264,9 @@ class ComparisonReport:
 
         ranks : dict[str, dict[str, int]] = {r.name: {} for r in scored}
 
-        for key, _ in _HEADLINE_METRICS:
-            valued  = [(r.name, r.metrics[key]) for r in scored if isinstance(r.metrics.get(key), (int, float))]
-            reverse = self._direction(key) == "higher"
+        for key, _ in self.HEADLINE_METRICS:
+            valued  = [(r.name, value) for r in scored if (value := FiniteScalar.coerce(r.metrics.get(key))) is not None]
+            reverse = MetricOrientation.direction(key) == "higher"
             ordered = sorted(valued, key=lambda item: item[1], reverse=reverse)
 
             for position, (name, _) in enumerate(ordered, start=1):
@@ -294,130 +274,120 @@ class ComparisonReport:
 
         worst = len(scored) + 1
         mean_ranks = {
-            name: sum(ranks[name].get(key, worst) for key, _ in _HEADLINE_METRICS) / len(_HEADLINE_METRICS)
+            name: sum(ranks[name].get(key, worst) for key, _ in self.HEADLINE_METRICS) / len(self.HEADLINE_METRICS)
             for name in ranks
         }
 
         lines = ["## Leaderboard\n", "Mean rank across the headline metrics (1 = best); missing metrics rank last.\n"]
-        lines += ["| Rank | Model | Mean rank | " + " | ".join(label for _, label in _HEADLINE_METRICS) + " |"]
-        lines += ["| --- | --- | --- |" + " --- |" * len(_HEADLINE_METRICS)]
+
+        table = MarkdownTable(["Rank", "Model", "Mean rank", *[label for _, label in self.HEADLINE_METRICS]])
 
         for position, name in enumerate(sorted(mean_ranks, key=mean_ranks.get), start=1):
-            cells = " | ".join(str(ranks[name].get(key, "—")) for key, _ in _HEADLINE_METRICS)
-            lines.append(f"| {position} | `{name}` | {mean_ranks[name]:.2f} | {cells} |")
+            cells = [str(ranks[name].get(key, "—")) for key, _ in self.HEADLINE_METRICS]
+            table.add_row(position, f"`{name}`", f"{mean_ranks[name]:.2f}", *cells)
 
+        lines += table.render()
         lines.append("")
+
         return lines
 
     def _write_metrics(self) -> Path:
         scored = [r for r in self.records if r.metrics]
 
-        lines = self._header("Test Metrics Comparison")
-        lines += ["> Best value per metric in **bold** (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
+        if self.rank_models:
+            lines  = self.assets.header("Test Metrics Comparison")
+            lines += ["> Best value per metric in **bold** (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
+        else:
+            lines  = self.assets.header("Per-Fold Test Metrics")
+            lines += ["> Folds of one model across disjoint azimuth regions; no value is highlighted as best (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
 
         if not scored:
             lines += ["_No inference metrics available yet._\n"]
         else:
-            all_keys = sorted({key for r in scored for key, value in r.metrics.items() if isinstance(value, (int, float)) and not _PER_BIN_PATTERN.search(key)})
-            claimed  : set[str] = set()
+            all_keys = sorted({key for r in scored for key, value in r.metrics.items() if isinstance(value, (int, float)) and not MetricSectionGrouper.PER_BIN_PATTERN.search(key)})
 
-            for title, pattern in _METRIC_SECTIONS:
-                keys = [key for key in all_keys if key not in claimed and pattern.search(key)]
-                if not keys:
-                    continue
-                claimed.update(keys)
+            for title, keys in MetricSectionGrouper().group(all_keys):
                 lines += [f"## {title}\n", *self._metric_table(keys, scored)]
-
-            leftover = [key for key in all_keys if key not in claimed]
-            if leftover:
-                lines += ["## Other Metrics\n", *self._metric_table(leftover, scored)]
 
         out = self.out_dir / "metrics_comparison.md"
         out.write_text("\n".join(lines), encoding="utf-8")
         return out
 
     def _metric_table(self, keys: list[str], scored: list[TrialRecord]) -> list[str]:
-        header  = "| Metric | " + " | ".join(f"`{r.name}`" for r in scored) + " |"
-        divider = "| --- |" + " --- |" * len(scored)
-        rows    = []
+        table = MarkdownTable(["Metric", *[f"`{r.name}`" for r in scored]])
 
         for key in keys:
-            direction = self._direction(key)
+            direction = MetricOrientation.direction(key)
             arrow     = {"higher": " ↑", "lower": " ↓", None: ""}[direction]
             values    = [r.metrics.get(key) for r in scored]
-            numeric   = [v for v in values if isinstance(v, (int, float))]
+            numeric   = [v for v in (FiniteScalar.coerce(value) for value in values) if v is not None]
 
             best = None
-            if direction is not None and numeric:
+            if self.rank_models and direction is not None and numeric:
                 best = max(numeric) if direction == "higher" else min(numeric)
 
             cells = []
             for value in values:
-                cell = self._fmt(value)
-                if best is not None and isinstance(value, (int, float)) and value == best:
+                cell   = ScalarFormatter.format_scalar(value)
+                finite = FiniteScalar.coerce(value)
+                if best is not None and finite is not None and finite == best:
                     cell = f"**{cell}**"
                 cells.append(cell)
 
-            rows.append(f"| `{key}`{arrow} | " + " | ".join(cells) + " |")
+            table.add_row(f"`{key}`{arrow}", *cells)
 
-        return [header, divider, *rows, ""]
+        return [*table.render(), ""]
 
-    def _write_figures(self) -> list[Path]:
+    def _write_media(self, groups: list[tuple[str, re.Pattern]] | None, subdir: str, title: str) -> list[Path]:
         scored = [r for r in self.records if r.has_inference]
 
-        names : set[str] = {path.name for r in scored for path in r.figures}
-        claimed : set[str] = set()
-        written : list[Path] = []
+        if groups is None:
+            return [self._write_media_file(self._media_names(scored, subdir), subdir, title, "gif_comparison.md")]
 
-        groups = list(_FIGURE_GROUPS) + [("Other figures", re.compile(r".*"))]
+        names   : set[str]    = {name for r in scored for name in self._record_media(r, subdir)}
+        claimed : set[str]    = set()
+        written : list[Path]  = []
 
-        for title, pattern in groups:
-            group_names = sorted((n for n in names if n not in claimed and pattern.search(n)), key=self._natural_key)
+        for group_title, pattern in groups + [("Other figures", re.compile(r".*"))]:
+            group_names = sorted((n for n in names if n not in claimed and pattern.search(n)), key=ReportAssets.natural_key)
             if not group_names:
                 continue
             claimed.update(group_names)
 
-            slug  = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
-            lines = self._header(f"Figures – {title}")
-            lines += ["> Only trials with at least one completed inference run are shown.\n"]
-
-            for figure_name in group_names:
-                lines.append(f"## `{figure_name}`\n")
-                for r in scored:
-                    figure_path = r.inference_dir / "figures" / figure_name
-                    if figure_path.exists():
-                        lines.append(f"*{r.name}*  \n![]({self._img_src(figure_path)})\n")
-                    else:
-                        lines.append(f"*{r.name}* — _(not found)_\n")
-                lines.append("")
-
-            out = self.out_dir / f"figures_{slug}.md"
-            out.write_text("\n".join(lines), encoding="utf-8")
+            slug = re.sub(r"[^a-z0-9]+", "_", group_title.lower()).strip("_")
+            out  = self._write_media_file(group_names, subdir, f"{title} – {group_title}", f"figures_{slug}.md")
             written.append(out)
 
         return written
 
-    def _write_gifs(self) -> Path:
-        scored = [r for r in self.records if r.has_inference]
-        names  = sorted({path.name for r in scored for path in r.animations}, key=self._natural_key)
+    def _media_names(self, scored: list[TrialRecord], subdir: str) -> list[str]:
+        names = {name for r in scored for name in self._record_media(r, subdir)}
+        return sorted(names, key=ReportAssets.natural_key)
 
-        lines = self._header("Animation Comparison")
+    def _record_media(self, record: TrialRecord, subdir: str) -> list[str]:
+        media = record.figures if subdir == "figures" else record.animations
+        return [path.name for path in media]
+
+    def _write_media_file(self, names: list[str], subdir: str, title: str, filename: str) -> Path:
+        scored = [r for r in self.records if r.has_inference]
+
+        lines = self.assets.header(title)
         lines += ["> Only trials with at least one completed inference run are shown.\n"]
 
         if not names:
-            lines.append("_No animations available yet._\n")
+            lines.append("_No media available yet._\n")
 
-        for gif_name in names:
-            lines.append(f"## `{gif_name}`\n")
+        for media_name in names:
+            lines.append(f"## `{media_name}`\n")
             for r in scored:
-                gif_path = r.inference_dir / "animations" / gif_name
-                if gif_path.exists():
-                    lines.append(f"*{r.name}*  \n![]({self._img_src(gif_path)})\n")
+                media_path = r.inference_dir / subdir / media_name
+                if media_path.exists():
+                    lines.append(f"*{r.name}*  \n![]({self.assets.src(media_path)})\n")
                 else:
                     lines.append(f"*{r.name}* — _(not found)_\n")
             lines.append("")
 
-        out = self.out_dir / "gif_comparison.md"
+        out = self.out_dir / filename
         out.write_text("\n".join(lines), encoding="utf-8")
         return out
 
@@ -442,7 +412,4 @@ class ComparisonReport:
             })
 
         out = self.out_dir / "comparison_summary.json"
-        with open(out, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, default=str)
-
-        return out
+        return FileIO.save_json(payload, out, indent=2)

@@ -11,6 +11,8 @@ class TuningConfig:
     n_trials                : int  = 100
     n_epochs                : int  = 30
 
+    base_seed               : int  = 42
+
     early_stop_patience     : int  = 8
 
     pruner_n_startup_trials : int  = 8

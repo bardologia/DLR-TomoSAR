@@ -57,7 +57,6 @@ class TrainingQueueConfig:
 @dataclass
 class InferenceQueueConfig:
     split              : str        = "test"
-    use_ema            : bool       = True
     checkpoint_name    : str        = "best_model.pt"
     batch_size         : int | None = None
     num_workers        : int        = 4

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-import json
 import math
 from datetime import datetime
 from pathlib import Path
 
-from pipelines.benchmark_pipeline.results import _METRIC_SECTIONS, _PER_BIN_PATTERN, ComparisonReport
+import numpy as np
+
+from pipelines.benchmark_pipeline.results import ComparisonReport
 from pipelines.benchmark_pipeline.results import TrialRecord
 from pipelines.cross_validation_pipeline.folds import FoldPlanner
+from pipelines.shared import FileIO, MetricSectionGrouper
+from pipelines.shared.scoring import FiniteScalar
 from tools.logger import Logger
-from tools.markdown import MarkdownTable
+from tools.markdown import MarkdownTable, ScalarFormatter
 
 
 class CrossValidationReport:
@@ -30,10 +33,13 @@ class CrossValidationReport:
         self.model_name       = model_name
         self.embed_images     = embed_images
         self.logger           = logger
+        self.grouper          = MetricSectionGrouper()
         self.timestamp        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def write_all(self) -> list[Path]:
-        self.out_dir.mkdir(parents=True, exist_ok=True)
+        self._require_all_folds()
+
+        FileIO.ensure_dir(self.out_dir)
 
         written = [self._write_aggregate()]
 
@@ -44,6 +50,7 @@ class CrossValidationReport:
                 reference_model = self.model_name,
                 embed_images    = self.embed_images,
                 logger          = self.logger,
+                rank_models     = False,
             )
             written.extend(report.write_all())
 
@@ -51,44 +58,63 @@ class CrossValidationReport:
 
         return written
 
+    def _require_all_folds(self) -> None:
+        n_total = self.planner.n_folds
+
+        if len(self.base_records) != n_total:
+            collected = [record.name for record in self.base_records]
+            raise ValueError(f"Cross-validation aggregate requires all {n_total} folds, but only {len(self.base_records)} were collected: {collected}")
+
+        scoreless = [record.name for record in self.base_records if not record.checkpoint]
+        if scoreless:
+            raise ValueError(f"Cross-validation aggregate requires every fold to have trained; folds missing checkpoint data: {scoreless}")
+
+        for split, records in self.records_by_split.items():
+            missing = [record.name for record in records if not record.metrics]
+            if missing:
+                raise ValueError(f"Cross-validation aggregate requires metrics for all {n_total} folds on split '{split}'; missing folds: {missing}")
+
     def _mean_std(self, values: list[float]) -> tuple[float, float]:
         n    = len(values)
-        mean = sum(values) / n
+        mean = float(np.mean(values))
 
         if n < 2:
-            return mean, 0.0
+            return mean, float("nan")
 
-        variance = sum((value - mean) ** 2 for value in values) / (n - 1)
-        return mean, math.sqrt(variance)
-
-    def _fmt(self, value) -> str:
-        if isinstance(value, float):
-            return f"{value:.5g}"
-        if value is None:
-            return "—"
-        return str(value)
+        return mean, float(np.std(values, ddof=1))
 
     def _scalar_keys(self, records: list[TrialRecord]) -> list[str]:
         return sorted({
             key
             for record in records
             for key, value in record.metrics.items()
-            if isinstance(value, (int, float)) and not _PER_BIN_PATTERN.search(key)
+            if isinstance(value, (int, float)) and not MetricSectionGrouper.PER_BIN_PATTERN.search(key)
         })
 
+    def _format_std(self, std: float, n_used: int) -> str:
+        if n_used < 2 or not math.isfinite(std):
+            return ScalarFormatter.EMPTY
+        return ScalarFormatter.format_scalar(std)
+
+    def _json_std(self, std: float, n_used: int) -> float | None:
+        if n_used < 2 or not math.isfinite(std):
+            return None
+        return std
+
     def _aggregate_table(self, keys: list[str], records: list[TrialRecord]) -> list[str]:
+        n_total     = len(records)
         fold_labels = [f"`{record.name}`" for record in records]
-        table       = MarkdownTable(["Metric", "Mean", "Std", *fold_labels])
+        table       = MarkdownTable(["Metric", "Mean", "Std", "N (folds used)", *fold_labels])
 
         for key in keys:
             values  = [record.metrics.get(key) for record in records]
-            numeric = [value for value in values if isinstance(value, (int, float))]
+            numeric = [value for value in (FiniteScalar.coerce(value) for value in values) if value is not None]
 
             if not numeric:
                 continue
 
-            mean, std = self._mean_std([float(value) for value in numeric])
-            table.add_row(f"`{key}`", self._fmt(mean), self._fmt(std), *[self._fmt(value) for value in values])
+            mean, std = self._mean_std(numeric)
+            table.add_row(f"`{key}`", ScalarFormatter.format_scalar(mean), self._format_std(std, len(numeric)), f"{len(numeric)}/{n_total}", *[ScalarFormatter.format_scalar(value) for value in values])
 
         return [*table.render(), ""]
 
@@ -114,71 +140,48 @@ class CrossValidationReport:
         lines += self._training_aggregate()
 
         for split, records in self.records_by_split.items():
-            scored = [record for record in records if record.metrics]
-
             lines += [f"## Split `{split}` — Metric Aggregates\n"]
 
-            if not scored:
-                lines += ["_No inference metrics available for this split._\n"]
-                continue
-
-            if len(scored) < len(records):
-                missing = [record.name for record in records if not record.metrics]
-                lines += [f"_Missing folds (no metrics): {', '.join(missing)}._\n"]
-
-            all_keys = self._scalar_keys(scored)
-            claimed  : set[str] = set()
-
-            for title, pattern in _METRIC_SECTIONS:
-                keys = [key for key in all_keys if key not in claimed and pattern.search(key)]
-                if not keys:
-                    continue
-                claimed.update(keys)
-                lines += [f"### {title}\n", *self._aggregate_table(keys, scored)]
-
-            leftover = [key for key in all_keys if key not in claimed]
-            if leftover:
-                lines += ["### Other Metrics\n", *self._aggregate_table(leftover, scored)]
+            for title, keys in self.grouper.group(self._scalar_keys(records)):
+                lines += [f"### {title}\n", *self._aggregate_table(keys, records)]
 
         out = self.out_dir / "cv_aggregate_report.md"
         out.write_text("\n".join(lines), encoding="utf-8")
         return out
 
+    SUMMARY_QUANTITIES = [
+        ("Best val loss",  "checkpoint",      "best_val_loss", 1.0),
+        ("Best epoch",     "checkpoint",      "best_epoch",    1.0),
+        ("Duration (min)", "training_result", "duration_s",    60.0),
+    ]
+
     def _training_aggregate(self) -> list[str]:
         lines = ["## Training Across Folds\n"]
         table = MarkdownTable(["Fold", "Best epoch", "Best val loss", "Epochs run", "Duration"])
 
-        best_losses = []
-        best_epochs = []
-        durations   = []
+        collected = {key: [] for _, _, key, _ in self.SUMMARY_QUANTITIES}
 
         for record in self.base_records:
-            best_val_loss = record.checkpoint.get("best_val_loss")
-            best_epoch    = record.checkpoint.get("best_epoch")
-            duration_s    = record.training_result.get("duration_s")
+            for _, source, key, _ in self.SUMMARY_QUANTITIES:
+                value = getattr(record, source).get(key)
+                if isinstance(value, (int, float)):
+                    collected[key].append(float(value))
 
-            if isinstance(best_val_loss, (int, float)):
-                best_losses.append(float(best_val_loss))
-            if isinstance(best_epoch, (int, float)):
-                best_epochs.append(float(best_epoch))
-            if isinstance(duration_s, (int, float)):
-                durations.append(float(duration_s))
-
-            duration = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
-            table.add_row(f"`{record.name}`", self._fmt(best_epoch), self._fmt(best_val_loss), self._fmt(record.checkpoint.get("n_train_epochs")), duration)
+            duration_s = record.training_result.get("duration_s")
+            duration   = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
+            table.add_row(f"`{record.name}`", ScalarFormatter.format_scalar(record.checkpoint.get("best_epoch")), ScalarFormatter.format_scalar(record.checkpoint.get("best_val_loss")), ScalarFormatter.format_scalar(record.checkpoint.get("n_train_epochs")), duration)
 
         lines += [*table.render(), ""]
 
-        summary = MarkdownTable(["Quantity", "Mean", "Std"])
-        if best_losses:
-            mean, std = self._mean_std(best_losses)
-            summary.add_row("Best val loss", self._fmt(mean), self._fmt(std))
-        if best_epochs:
-            mean, std = self._mean_std(best_epochs)
-            summary.add_row("Best epoch", self._fmt(mean), self._fmt(std))
-        if durations:
-            mean, std = self._mean_std(durations)
-            summary.add_row("Duration (min)", self._fmt(mean / 60), self._fmt(std / 60))
+        n_total = self.planner.n_folds
+
+        summary = MarkdownTable(["Quantity", "Mean", "Std", "Folds"])
+        for label, _, key, scale in self.SUMMARY_QUANTITIES:
+            values = collected[key]
+            if not values:
+                continue
+            mean, std = self._mean_std(values)
+            summary.add_row(label, ScalarFormatter.format_scalar(mean / scale), self._format_std(std / scale, len(values)), f"{len(values)}/{n_total}")
 
         if not summary.is_empty():
             lines += [*summary.render(), ""]
@@ -193,32 +196,32 @@ class CrossValidationReport:
             "splits"  : {},
         }
 
+        n_total = self.planner.n_folds
+
         for split, records in self.records_by_split.items():
             scored = [record for record in records if record.metrics]
             keys   = self._scalar_keys(scored)
 
             split_payload = {}
             for key in keys:
-                values = [float(record.metrics[key]) for record in scored if isinstance(record.metrics.get(key), (int, float))]
+                values = [value for value in (FiniteScalar.coerce(record.metrics.get(key)) for record in scored) if value is not None]
                 if not values:
                     continue
                 mean, std = self._mean_std(values)
                 split_payload[key] = {
                     "mean"     : mean,
-                    "std"      : std,
+                    "std"      : self._json_std(std, len(values)),
+                    "n_used"   : len(values),
+                    "n_total"  : n_total,
                     "per_fold" : {record.name: record.metrics.get(key) for record in scored},
                 }
 
             payload["splits"][split] = split_payload
 
-        best_losses = [record.checkpoint.get("best_val_loss") for record in self.base_records]
-        best_losses = [float(value) for value in best_losses if isinstance(value, (int, float))]
+        best_losses = [value for value in (FiniteScalar.coerce(record.checkpoint.get("best_val_loss")) for record in self.base_records) if value is not None]
         if best_losses:
             mean, std = self._mean_std(best_losses)
-            payload["best_val_loss"] = {"mean": mean, "std": std}
+            payload["best_val_loss"] = {"mean": mean, "std": self._json_std(std, len(best_losses)), "n_used": len(best_losses), "n_total": n_total}
 
         out = self.out_dir / "cv_summary.json"
-        with open(out, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, default=str)
-
-        return out
+        return FileIO.save_json(payload, out, indent=2)

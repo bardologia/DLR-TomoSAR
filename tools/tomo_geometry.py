@@ -18,6 +18,9 @@ class TomoGeometry:
         self.kz       = torch.tensor(kz_list, dtype=x_axis.dtype, device=x_axis.device)
         self.n_tracks = self.kz.shape[0]
 
+        if self.n_tracks == 0:
+            raise ValueError("TomoGeometry requires at least one track: both cfg.kz_values and cfg.baselines are empty")
+
         phase         = self.kz.reshape(-1, 1) * x_axis.reshape(1, -1)
         self.steering = torch.polar(torch.ones_like(phase), phase)
         self.outer    = torch.einsum("ik,jk->ijk", self.steering, self.steering.conj())
@@ -25,8 +28,8 @@ class TomoGeometry:
     def describe(self) -> dict:
         return {
             "Tracks":       self.n_tracks,
-            "kz min":       f"{float(self.kz.min()):.4f} rad/m" if self.n_tracks else "n/a",
-            "kz max":       f"{float(self.kz.max()):.4f} rad/m" if self.n_tracks else "n/a",
+            "kz min":       f"{float(self.kz.min()):.4f} rad/m",
+            "kz max":       f"{float(self.kz.max()):.4f} rad/m",
             "Wavelength":   f"{self.cfg.wavelength} m",
             "Slant range":  f"{self.cfg.slant_range} m",
             "kz source":    "explicit kz_values" if len(self.cfg.kz_values) > 0 else "baselines via 4*pi*b/(lambda*r0)",

@@ -24,7 +24,6 @@ class InferenceConfig:
     log_level           : str            = "INFO"
 
     split               : str            = "test"
-    use_ema             : bool           = True
     checkpoint_name     : str            = "best_model.pt"
     batch_size          : Optional[int]  = None
     num_workers         : int            = 4

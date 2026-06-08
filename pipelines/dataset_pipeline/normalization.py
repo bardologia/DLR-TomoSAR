@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib     import Path
 from typing      import Optional
@@ -11,7 +10,9 @@ from torch.utils.data import DataLoader, Subset
 
 from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod
 from configuration.dataset_config import InputConfig, OutputConfig
+from pipelines.shared.io          import FileIO
 from tools.logger                 import Logger
+from tools.ranges                 import RangeFormatter
 
 
 @dataclass
@@ -21,7 +22,6 @@ class Stats:
 
     def save(self, directory: Path) -> Path:
         directory = Path(directory)
-        directory.mkdir(parents=True, exist_ok=True)
         out_path  = directory / "normalization_stats.json"
 
         payload = {
@@ -29,10 +29,7 @@ class Stats:
             "output_stats" : self.output_stats.as_dict() if self.output_stats else None,
         }
 
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=4)
-
-        return out_path
+        return FileIO.save_json(payload, out_path, indent=4)
 
     @classmethod
     def load(cls, directory: Path, logger: Logger) -> "Stats":
@@ -40,13 +37,12 @@ class Stats:
         if not path.exists():
             raise FileNotFoundError(f"Normalization stats not found at '{path}'.")
 
-        with open(path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+        payload = FileIO.load_json(path)
 
         input_stats  = ChannelStats.from_dict(payload["input_stats"])
         output_stats = ChannelStats.from_dict(payload["output_stats"])
 
-        logger.section(f"[Normalization stats loaded]")
+        logger.section("[Normalization stats loaded]")
         logger.kv_table({
             "Stats path":      path,
             "Input channels":  input_stats.n_channels,
@@ -69,28 +65,6 @@ class StatsComputer:
         return input_config.channel_group_keys(n_secondaries, n_interferograms)
 
     @staticmethod
-    def _compact_ranges(indices: list[int], max_items: int = 6) -> str:
-        ranges: list[tuple[int, int]] = []
-        start = indices[0]
-        prev  = indices[0]
-
-        for idx in indices[1:]:
-            if idx == prev + 1:
-                prev = idx
-                continue
-            ranges.append((start, prev))
-            start = idx
-            prev  = idx
-
-        ranges.append((start, prev))
-
-        parts = [f"{a}" if a == b else f"{a}-{b}" for a, b in ranges[:max_items]]
-        if len(ranges) > max_items:
-            parts.append("...")
-
-        return ", ".join(parts)
-
-    @staticmethod
     def _log_grouping(logger : Logger, label : str, group_keys : list[str]) -> None:
         if len(group_keys) == 0:
             logger.subsection(f"{label} grouping (0 groups, 0 channels)")
@@ -103,7 +77,7 @@ class StatsComputer:
         logger.subsection(f"{label} grouping ({len(seen)} groups, {len(group_keys)} channels):")
 
         rows = {
-            k: f"{len(idxs):d} ch  [{StatsComputer._compact_ranges(sorted(idxs))}]"
+            k: f"{len(idxs):d} ch  [{RangeFormatter.compact(sorted(idxs))}]"
             for k, idxs in sorted(seen.items(), key=lambda kv: (kv[1][0], kv[0]))
         }
         logger.kv_table(rows)
@@ -140,9 +114,8 @@ class StatsComputer:
         if not collected:
             return {}
 
-        n_batches_est     = max(len(subset) // max(batch_size, 1), 1)
-        first_group_chs   = len(next(iter(group_channels.values())))
-        vals_per_ch_batch = max(64, max_vals_per_group // (n_batches_est * max(first_group_chs, 1)))
+        n_batches_est        = max(len(subset) // max(batch_size, 1), 1)
+        vals_per_ch_batch    = {g: max(64, max_vals_per_group // (n_batches_est * max(len(channels), 1))) for g, channels in group_channels.items()}
 
         loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
         rng    = np.random.default_rng(42)
@@ -157,11 +130,14 @@ class StatsComputer:
             for g, channels in group_channels.items():
                 if g not in needs_data:
                     continue
+
+                budget = vals_per_ch_batch[g]
+
                 for ch in channels:
                     flat = arr[:, ch].ravel()
 
-                    if len(flat) > vals_per_ch_batch:
-                        idx  = rng.choice(len(flat), vals_per_ch_batch, replace=False)
+                    if len(flat) > budget:
+                        idx  = rng.choice(len(flat), budget, replace=False)
                         flat = flat[idx]
 
                     collected[g].append(flat)
@@ -231,17 +207,16 @@ class StatsComputer:
 
         if logger is not None:
             logger.section("[Output stats from params]")
-            rows = [
-                {
+            rows = []
+            for key, (m, s) in role_fit.items():
+                strat = role_strat[key]
+                rows.append({
                     "Channel":  key,
                     "loc":      f"{m:.5f}",
                     "scale":    f"{s:.5f}",
                     "Method":    strat.norm_method.value,
                     "log1p":    str(strat.apply_log1p),
-                }
-                for key, (m, s) in role_fit.items()
-                for strat in [role_strat[key]]
-            ]
+                })
             logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
 
         return ChannelStats(
@@ -300,28 +275,36 @@ class StatsComputer:
         )
 
     @staticmethod
+    def _train_gt_parameters(dataset) -> list[np.ndarray]:
+        if hasattr(dataset, "parts"):
+            return [part.gt_parameters for part in dataset.parts]
+
+        return [dataset.gt_parameters]
+
+    @staticmethod
     def compute_output_stats(
-        params_path   : Path,
+        dataset,
         n_gaussians   : int,
         output_config : "OutputConfig",
         amp_threshold : float = 1e-2,
         logger        : Optional[Logger] = None,
     ) -> Stats:
-        params = np.load(params_path, mmap_mode="r")
+        regions = StatsComputer._train_gt_parameters(dataset)
 
         amp_pool_vals:  list[np.ndarray] = []
         mu_pool_vals:   list[np.ndarray] = []
         sig_pool_vals:  list[np.ndarray] = []
 
-        for g in range(n_gaussians):
-            a_flat   = params[g * 3 + 0].ravel().astype(np.float64)
-            mu_flat  = params[g * 3 + 1].ravel().astype(np.float64)
-            sig_flat = params[g * 3 + 2].ravel().astype(np.float64)
-            active   = a_flat > amp_threshold
+        for params in regions:
+            for g in range(n_gaussians):
+                a_flat   = params[g * 3 + 0].ravel().astype(np.float64)
+                mu_flat  = params[g * 3 + 1].ravel().astype(np.float64)
+                sig_flat = params[g * 3 + 2].ravel().astype(np.float64)
+                active   = a_flat > amp_threshold
 
-            amp_pool_vals.append(a_flat)
-            mu_pool_vals.append(mu_flat[active])
-            sig_pool_vals.append(sig_flat[active])
+                amp_pool_vals.append(a_flat)
+                mu_pool_vals.append(mu_flat[active])
+                sig_pool_vals.append(sig_flat[active])
 
         role_pools = {
             "out/amp"   : np.concatenate(amp_pool_vals),
@@ -342,9 +325,23 @@ class StatsComputer:
         )
 
     @staticmethod
+    def _detach_augmenters(dataset) -> list:
+        parts    = dataset.parts if hasattr(dataset, "parts") else [dataset]
+        detached = [(part, part.augmenter) for part in parts]
+
+        for part in parts:
+            part.augmenter = None
+
+        return detached
+
+    @staticmethod
+    def _restore_augmenters(detached: list) -> None:
+        for part, augmenter in detached:
+            part.augmenter = augmenter
+
+    @staticmethod
     def compute(
         dataset,
-        params_path      : Path,
         logger           : Logger,
         input_config     : InputConfig,
         output_config    : "OutputConfig",
@@ -356,19 +353,24 @@ class StatsComputer:
         batch_size       : int = 512,
     ) -> Stats:
 
-        input_only = StatsComputer.compute_input_stats(
-            dataset          = dataset,
-            logger           = logger,
-            input_config     = input_config,
-            n_secondaries    = n_secondaries,
-            n_interferograms = n_interferograms,
-            num_workers      = num_workers,
-            max_samples      = max_samples,
-            batch_size       = batch_size,
-        )
+        detached = StatsComputer._detach_augmenters(dataset)
+
+        try:
+            input_only = StatsComputer.compute_input_stats(
+                dataset          = dataset,
+                logger           = logger,
+                input_config     = input_config,
+                n_secondaries    = n_secondaries,
+                n_interferograms = n_interferograms,
+                num_workers      = num_workers,
+                max_samples      = max_samples,
+                batch_size       = batch_size,
+            )
+        finally:
+            StatsComputer._restore_augmenters(detached)
 
         output_only = StatsComputer.compute_output_stats(
-            params_path   = params_path,
+            dataset       = dataset,
             n_gaussians   = n_gaussians,
             output_config = output_config,
             logger        = logger,
@@ -421,7 +423,7 @@ class Normalizer:
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
-                out = torch.where(log1p, torch.expm1(x.clamp(max=15.0)), x)
+                out = torch.where(log1p, torch.expm1(x), x)
 
             return out
 
@@ -435,7 +437,7 @@ class Normalizer:
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
-            out = np.where(log1p, np.expm1(np.clip(x, a_min=None, a_max=15.0)), x)
+            out = np.where(log1p, np.expm1(x), x)
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
