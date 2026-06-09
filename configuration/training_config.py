@@ -171,9 +171,8 @@ class GaussianConfig:
 
 @dataclass
 class EarlyStoppingConfig:
-    patience     : int   = 15
-    min_delta    : float = 0.001
-    restore_best : bool  = True
+    patience     : int  = 15
+    restore_best : bool = True
 
 
 @dataclass

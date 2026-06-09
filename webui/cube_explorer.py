@@ -67,19 +67,19 @@ class CubeExplorer:
                 payload["cube"] = self.loaded["meta"]
         return payload
 
-    def topdown_png(self, cube_id: str, source: str) -> bytes | None:
+    def topdown_png(self, cube_id: str, source: str, space: str = "physical") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None:
             return None
 
-        mean       = entry["mean"]
+        mean       = entry["mean_norm"] if space == "normalized" else entry["mean"]
         vmin, vmax = np.percentile(mean, [1.0, 99.0])
 
         buf = io.BytesIO()
         plt.imsave(buf, mean, cmap="jet", vmin=float(vmin), vmax=float(vmax), format="png")
         return buf.getvalue()
 
-    def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int) -> bytes | None:
+    def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None or axis not in ("range", "azimuth"):
             return None
@@ -94,11 +94,19 @@ class CubeExplorer:
         else:
             data = cube[:, az, :]
 
+        if space == "normalized":
+            peak       = data.max(axis=0, keepdims=True)
+            safe       = np.where(peak > 1e-12, peak, 1.0)
+            data       = (data / safe).astype(np.float32)
+            vmin, vmax = 0.0, 1.0
+        else:
+            vmin, vmax = entry["vmin"], entry["vmax"]
+
         sort_idx = np.argsort(entry["x_axis"])
         data     = np.flipud(data[sort_idx])
 
         buf = io.BytesIO()
-        plt.imsave(buf, data, cmap="jet", vmin=entry["vmin"], vmax=entry["vmax"], format="png")
+        plt.imsave(buf, data, cmap="jet", vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
@@ -184,14 +192,19 @@ class CubeExplorer:
         sample     = cube[:, :: max(1, cube.shape[1] // 256), :: max(1, cube.shape[2] // 256)]
         sample     = sample[np.isfinite(sample)]
         vmin, vmax = (np.percentile(sample, [1.0, 99.0]) if sample.size else (0.0, 1.0))
+
         mean       = cube.mean(axis=0)
+        peak       = cube.max(axis=0)
+        safe_peak  = np.where(peak > 1e-12, peak, 1.0)
+        mean_norm  = mean / safe_peak
 
         return {
-            "cube"   : cube,
-            "mean"   : mean,
-            "x_axis" : x_axis,
-            "vmin"   : float(vmin),
-            "vmax"   : float(vmax),
+            "cube"      : cube,
+            "mean"      : mean,
+            "mean_norm" : mean_norm,
+            "x_axis"    : x_axis,
+            "vmin"      : float(vmin),
+            "vmax"      : float(vmax),
         }
 
     def _curve_axis(self, stamp_dir: Path, n_elev: int) -> np.ndarray:

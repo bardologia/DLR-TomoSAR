@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config_registry import ConfigRegistry
 from cube_explorer import CubeExplorer
+from dataset_browser import DatasetBrowser
 from equation_library import EquationLibrary
 from flow_library import FlowLibrary
 from model_library import ModelLibrary
@@ -55,6 +56,7 @@ class WebUIServer:
         self.tensorboard = TensorboardManager(self.paths, self.logger)
         self.results     = ResultsBrowser(self.logger)
         self.cubes       = CubeExplorer(self.paths, self.logger)
+        self.datasets    = DatasetBrowser(self.logger)
 
         self.router    = RequestRouter(
             paths       = self.paths,
@@ -72,6 +74,7 @@ class WebUIServer:
             tensorboard = self.tensorboard,
             results     = self.results,
             cubes       = self.cubes,
+            datasets    = self.datasets,
         )
 
     def serve(self) -> None:

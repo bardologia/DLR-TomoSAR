@@ -149,25 +149,25 @@ class ClassicalBaseline:
 
     def _build_stack(self, complex_inputs: np.ndarray, n_secondaries: int) -> np.ndarray:
         n_tracks = 1 + n_secondaries
-        stack    = np.empty((n_tracks,) + complex_inputs.shape[1:], dtype=np.complex64)
+        required = 1 + 2 * n_secondaries
 
-        stack[0]  = np.abs(complex_inputs[0]).astype(np.float32)
-        stack[1:] = complex_inputs[1 + n_secondaries:1 + 2 * n_secondaries]
+        if complex_inputs.shape[0] < required:
+            raise ValueError(f"Expected at least {required} input channels (primary + {n_secondaries} secondaries + {n_secondaries} interferograms) to rebuild the flattened SLC stack, got {complex_inputs.shape[0]}")
 
-        self.logger.subsection("Covariance      : NON-STANDARD assumption")
-        self.logger.subsection("                  channel 0 is the primary AMPLITUDE (phase discarded)")
-        self.logger.subsection("                  channels 1.. are the precomputed interferograms, not the coregistered secondary SLCs")
-        self.logger.subsection(f"                  coregistered secondary SLCs at complex_inputs[1:{1 + n_secondaries}] are NOT used")
-        self.logger.subsection("                  the boxcar sample covariance therefore differs from the SLC covariance the steering vector assumes")
+        primary        = complex_inputs[0].astype(np.complex64)
+        interferograms = complex_inputs[1 + n_secondaries:1 + 2 * n_secondaries].astype(np.complex64)
+        primary_phasor = primary / (np.abs(primary) + 1e-30)
+
+        stack     = np.empty((n_tracks,) + primary.shape, dtype=np.complex64)
+        stack[0]  = primary
+        stack[1:] = primary_phasor[None, ...] * np.conj(interferograms)
+
+        self.logger.subsection("Covariance      : DEM-flattened SLC sample covariance")
+        self.logger.subsection("                  track 0 is the primary SLC (reference)")
+        self.logger.subsection("                  tracks 1.. are the flattened secondary SLCs rebuilt as (primary/|primary|) * conj(interferogram)")
+        self.logger.subsection("                  this matches the elevation-only phase model the steering vector assumes")
 
         return stack
-
-    @staticmethod
-    def normalize_per_pixel(spectrum: np.ndarray) -> np.ndarray:
-        peak = spectrum.max(axis=0, keepdims=True)
-        safe = np.where(peak > 1e-12, peak, 1.0)
-
-        return (spectrum / safe).astype(np.float32)
 
     def compute(self, complex_inputs: np.ndarray, n_secondaries: int, x_axis: np.ndarray, secondary_labels=None) -> np.ndarray:
         self.logger.section("[Classical Capon Baseline]")
@@ -194,8 +194,6 @@ class ClassicalBaseline:
         covariance = CovarianceEstimator(window).estimate(stack)
         spectrum   = CaponSpectrum(kz, x_axis, self.loading, self.phase_sign, self.chunk_rows).compute(covariance)
 
-        reduced = self.normalize_per_pixel(spectrum)
+        self.logger.subsection(f"Capon tomogram  : {spectrum.shape}  ({spectrum.nbytes / 1e9:.2f} GB)  physical Capon-power scale, not normalized")
 
-        self.logger.subsection(f"Reduced tomogram : {reduced.shape}  ({reduced.nbytes / 1e9:.2f} GB)")
-
-        return reduced
+        return spectrum

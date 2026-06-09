@@ -45,7 +45,6 @@ class TrainingQueueConfig:
     warmup_steps         : int             = 200
     eta_min              : float           = 1e-6
     early_stop_patience  : int             = 30
-    early_stop_min_delta : float           = 1e-4
     patch_size           : tuple[int, int] = (64, 64)
     patch_stride         : int             = 32
     train_azimuth        : tuple[int, int] = (1000, 13000)

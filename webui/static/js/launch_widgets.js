@@ -218,6 +218,96 @@ class ModelTogglePanel {
 }
 
 
+class ModelCardPanel {
+  constructor(view, leaf) {
+    this.view     = view;
+    this.leaf     = leaf;
+    this.families = view.modelFamilies || [];
+    this.cards    = new Map();
+    this.currentEl = null;
+  }
+
+  build() {
+    const root     = document.createElement("section");
+    root.className = "model-panel";
+
+    const head     = document.createElement("header");
+    head.className = "special-head";
+    head.innerHTML = `<h3 class="special-head__name">Model</h3><span class="special-head__hint">the architecture to train</span>`;
+
+    const current   = document.createElement("span");
+    current.className = "model-panel__count";
+    this.currentEl  = current;
+    head.appendChild(current);
+    root.appendChild(head);
+
+    const body     = document.createElement("div");
+    body.className = "model-panel__families";
+    this.families.forEach((family) => body.appendChild(this._family(family)));
+    root.appendChild(body);
+
+    this.view.controls[this.leaf.path] = { leaf: this.leaf, reset: () => this._paint() };
+    this._paint();
+    return root;
+  }
+
+  _family(family) {
+    const block     = document.createElement("div");
+    block.className = "model-family";
+
+    const name       = document.createElement("div");
+    name.className   = "model-family__name";
+    name.textContent = family.family;
+
+    const grid     = document.createElement("div");
+    grid.className = "model-pick__grid";
+    family.models.forEach((model) => grid.appendChild(this._card(model)));
+
+    block.appendChild(name);
+    block.appendChild(grid);
+    return block;
+  }
+
+  _card(model) {
+    const card     = document.createElement("button");
+    card.type      = "button";
+    card.className = "model-pick";
+    card.title     = `--${this.leaf.path} ${model.key}`;
+
+    const badge = model.recommended ? `<span class="model-pick__badge">recommended</span>` : "";
+    const meta  = [model.head, model.skip].filter(Boolean).join("  ·  ");
+
+    card.innerHTML =
+      `<span class="model-pick__top"><span class="model-pick__name">${model.name}</span>${badge}<span class="model-pick__params">${model.params || ""}</span></span>` +
+      `<span class="model-pick__meta">${meta}</span>` +
+      `<span class="model-pick__when">${model.when || ""}</span>`;
+
+    card.addEventListener("click", () => this._select(model.key));
+    this.cards.set(model.key, card);
+    return card;
+  }
+
+  _select(key) {
+    this.view._setValue(this.leaf, key);
+    this._paint();
+  }
+
+  _paint() {
+    const current = this.view._effective(this.leaf);
+    let label     = current;
+
+    this.cards.forEach((card, key) => {
+      const on = key === current;
+      card.classList.toggle("is-on", on);
+      card.setAttribute("aria-pressed", String(on));
+      if (on) label = card.querySelector(".model-pick__name").textContent;
+    });
+
+    this.currentEl.textContent = label;
+  }
+}
+
+
 class ExperimentBuilder {
 
   static MODES = [
@@ -815,5 +905,7 @@ class ExperimentBuilder {
 
 
 window.PythonLiteral     = PythonLiteral;
+window.LaunchWidgetDom   = LaunchWidgetDom;
 window.ModelTogglePanel  = ModelTogglePanel;
+window.ModelCardPanel    = ModelCardPanel;
 window.ExperimentBuilder = ExperimentBuilder;

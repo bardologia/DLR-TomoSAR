@@ -40,6 +40,15 @@ class Result:
     pixel_cosine_red       : Optional[np.ndarray] = None
     pixel_peak_err_idx_red : Optional[np.ndarray] = None
 
+    reduced_norm_curves        : Optional[np.ndarray] = None
+    gt_norm_curves             : Optional[np.ndarray] = None
+    pixel_mse_norm             : Optional[np.ndarray] = None
+    pixel_mse_rednorm          : Optional[np.ndarray] = None
+    pixel_mae_rednorm          : Optional[np.ndarray] = None
+    pixel_r2_rednorm           : Optional[np.ndarray] = None
+    pixel_cosine_rednorm       : Optional[np.ndarray] = None
+    pixel_peak_err_idx_rednorm : Optional[np.ndarray] = None
+
     def attach_reduced(self, reduced_curves: np.ndarray) -> None:
         maps = Metrics.curve_pixel_metrics(reduced_curves, self.gt_curves)
 
@@ -49,6 +58,27 @@ class Result:
         self.pixel_r2_red           = maps["r2"]
         self.pixel_cosine_red       = maps["cos"]
         self.pixel_peak_err_idx_red = maps["peak"]
+
+        gt_norm   = self._peak_normalize(self.gt_curves)
+        red_norm  = self._peak_normalize(reduced_curves)
+        pred_norm = self._peak_normalize(self.pred_curves)
+        maps_norm = Metrics.curve_pixel_metrics(red_norm, gt_norm)
+
+        self.gt_norm_curves             = gt_norm
+        self.reduced_norm_curves        = red_norm
+        self.pixel_mse_norm             = Metrics.curve_pixel_metrics(pred_norm, gt_norm)["mse"]
+        self.pixel_mse_rednorm          = maps_norm["mse"]
+        self.pixel_mae_rednorm          = maps_norm["mae"]
+        self.pixel_r2_rednorm           = maps_norm["r2"]
+        self.pixel_cosine_rednorm       = maps_norm["cos"]
+        self.pixel_peak_err_idx_rednorm = maps_norm["peak"]
+
+    @staticmethod
+    def _peak_normalize(curves: np.ndarray) -> np.ndarray:
+        peak = curves.max(axis=0, keepdims=True)
+        safe = np.where(peak > 1e-12, peak, 1.0)
+
+        return (curves / safe).astype(np.float32)
 
     @property
     def has_reduced(self) -> bool:
@@ -62,6 +92,15 @@ class Result:
         safe = np.where(self.pixel_mse_red > 1e-12, self.pixel_mse_red, np.nan)
 
         return ((self.pixel_mse_red - self.pixel_mse) / safe).astype(np.float32)
+
+    @property
+    def pixel_improvement_norm(self) -> Optional[np.ndarray]:
+        if not self.has_reduced:
+            return None
+
+        safe = np.where(self.pixel_mse_rednorm > 1e-12, self.pixel_mse_rednorm, np.nan)
+
+        return ((self.pixel_mse_rednorm - self.pixel_mse_norm) / safe).astype(np.float32)
 
 
 class Metrics:
@@ -285,48 +324,81 @@ class Metrics:
 
         return out
 
-    def _reduced_metrics(self, pred : np.ndarray, gt : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray]) -> Dict[str, float]:
-        red = self.result.reduced_curves
+    def _reduced_block(self, red : np.ndarray, gt : np.ndarray, model_pred : np.ndarray, pixel_tags : Tuple[Tuple[str, np.ndarray], ...], improvement : np.ndarray, suffix : str, improvement_suffix : str, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray]) -> Dict[str, float]:
         out : Dict[str, float] = {}
 
-        out.update(self._curve_scalar_metrics(red, gt, suffix="red"))
-        out["red_mean"] = float(red.mean(dtype=np.float64))
-        out["red_std"]  = float(red.std(dtype=np.float64))
-        out["red_max"]  = float(red.max())
+        out.update(self._curve_scalar_metrics(red, gt, suffix=suffix))
+        out[f"{suffix}_mean"] = float(red.mean(dtype=np.float64))
+        out[f"{suffix}_std"]  = float(red.std(dtype=np.float64))
+        out[f"{suffix}_max"]  = float(red.max())
 
-        out.update(self._expand_pixel_stats((
-            ("pixel_mse_red",        self.result.pixel_mse_red),
-            ("pixel_mae_red",        self.result.pixel_mae_red),
-            ("pixel_r2_red",         self.result.pixel_r2_red),
-            ("pixel_cosine_red",     self.result.pixel_cosine_red),
-            ("pixel_peak_idx_d_red", self.result.pixel_peak_err_idx_red.astype(np.float32)),
-        )))
+        out.update(self._expand_pixel_stats(pixel_tags))
 
-        out.update(self._slice_ssim(red, gt, elev_indices, range_indices, az_indices, prefix="red"))
-        out.update(self._expand_elev(red, gt, suffix="red"))
+        out.update(self._slice_ssim(red, gt, elev_indices, range_indices, az_indices, prefix=suffix))
+        out.update(self._expand_elev(red, gt, suffix=suffix))
 
-        mse_red = out["curve_mse_red"]
-        mae_red = out["curve_mae_red"]
+        mse_red = out[f"curve_mse_{suffix}"]
+        mae_red = out[f"curve_mae_{suffix}"]
 
-        diff_gt = pred - gt
+        diff_gt = model_pred - gt
         mse_gt  = float((diff_gt * diff_gt).mean(dtype=np.float64))
         mae_gt  = float(np.abs(diff_gt).mean(dtype=np.float64))
 
-        out["improvement_mse_rel"]  = self._relative_improvement(mse_red, mse_gt)
-        out["improvement_mae_rel"]  = self._relative_improvement(mae_red, mae_gt)
-        out["improvement_rmse_rel"] = self._relative_improvement(float(np.sqrt(mse_red)), float(np.sqrt(mse_gt)))
+        out[f"improvement_mse_rel{improvement_suffix}"]  = self._relative_improvement(mse_red, mse_gt)
+        out[f"improvement_mae_rel{improvement_suffix}"]  = self._relative_improvement(mae_red, mae_gt)
+        out[f"improvement_rmse_rel{improvement_suffix}"] = self._relative_improvement(float(np.sqrt(mse_red)), float(np.sqrt(mse_gt)))
 
-        improvement = self.result.pixel_improvement
-        finite      = improvement[np.isfinite(improvement)]
+        finite = improvement[np.isfinite(improvement)]
 
         if finite.size > 0:
-            out["pixel_improvement_mean"]          = float(finite.mean(dtype=np.float64))
-            out["pixel_improvement_median"]        = float(np.median(finite))
-            out["pixel_improvement_p5"]            = float(np.percentile(finite, 5))
-            out["pixel_improvement_p95"]           = float(np.percentile(finite, 95))
-            out["pixel_improvement_positive_frac"] = float((finite > 0.0).mean())
+            out[f"pixel_improvement_mean{improvement_suffix}"]          = float(finite.mean(dtype=np.float64))
+            out[f"pixel_improvement_median{improvement_suffix}"]        = float(np.median(finite))
+            out[f"pixel_improvement_p5{improvement_suffix}"]            = float(np.percentile(finite, 5))
+            out[f"pixel_improvement_p95{improvement_suffix}"]           = float(np.percentile(finite, 95))
+            out[f"pixel_improvement_positive_frac{improvement_suffix}"] = float((finite > 0.0).mean())
 
         return out
+
+    def _reduced_metrics(self, pred : np.ndarray, gt : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray]) -> Dict[str, float]:
+        physical = self._reduced_block(
+            red                = self.result.reduced_curves,
+            gt                 = gt,
+            model_pred         = pred,
+            pixel_tags         = (
+                ("pixel_mse_red",        self.result.pixel_mse_red),
+                ("pixel_mae_red",        self.result.pixel_mae_red),
+                ("pixel_r2_red",         self.result.pixel_r2_red),
+                ("pixel_cosine_red",     self.result.pixel_cosine_red),
+                ("pixel_peak_idx_d_red", self.result.pixel_peak_err_idx_red.astype(np.float32)),
+            ),
+            improvement        = self.result.pixel_improvement,
+            suffix             = "red",
+            improvement_suffix = "",
+            elev_indices       = elev_indices,
+            range_indices      = range_indices,
+            az_indices         = az_indices,
+        )
+
+        normalized = self._reduced_block(
+            red                = self.result.reduced_norm_curves,
+            gt                 = self.result.gt_norm_curves,
+            model_pred         = Result._peak_normalize(pred),
+            pixel_tags         = (
+                ("pixel_mse_rednorm",        self.result.pixel_mse_rednorm),
+                ("pixel_mae_rednorm",        self.result.pixel_mae_rednorm),
+                ("pixel_r2_rednorm",         self.result.pixel_r2_rednorm),
+                ("pixel_cosine_rednorm",     self.result.pixel_cosine_rednorm),
+                ("pixel_peak_idx_d_rednorm", self.result.pixel_peak_err_idx_rednorm.astype(np.float32)),
+            ),
+            improvement        = self.result.pixel_improvement_norm,
+            suffix             = "rednorm",
+            improvement_suffix = "_norm",
+            elev_indices       = elev_indices,
+            range_indices      = range_indices,
+            az_indices         = az_indices,
+        )
+
+        return {**physical, **normalized}
 
     @staticmethod
     def _relative_improvement(baseline_error: float, model_error: float) -> float:

@@ -111,7 +111,8 @@ class InferencePipeline:
         result.attach_reduced(reduced)
 
         if cfg.save_cubes:
-            np.save(result.cube_directory / "reduced_curves.npy", reduced)
+            np.save(result.cube_directory / "reduced_curves.npy",      result.reduced_curves)
+            np.save(result.cube_directory / "reduced_curves_norm.npy", result.reduced_norm_curves)
 
     @staticmethod
     def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:

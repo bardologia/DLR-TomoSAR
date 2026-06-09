@@ -169,6 +169,7 @@ class App {
       progressFill  : document.getElementById("cube-progress-fill"),
       progressLabel : document.getElementById("cube-progress-label"),
       sourceBtns    : [...document.querySelectorAll(".cube-source")],
+      spaceBtns     : [...document.querySelectorAll(".cube-space")],
       panels        : [...document.querySelectorAll(".cube-slice")].map((root) => ({
         root,
         axis   : root.dataset.axis,

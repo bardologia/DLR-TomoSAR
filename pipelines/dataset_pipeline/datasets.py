@@ -10,13 +10,15 @@ from configuration.dataset_config              import AugmentationConfig, InputC
 from pipelines.dataset_pipeline.normalization  import Normalizer
 from pipelines.dataset_pipeline.spatial        import Patcher
 from tools.logger                              import Logger
+from tools.reproducibility                     import Reproducibility
 
 
 class SpatialAugmenter:
-    def __init__(self, config: AugmentationConfig, logger):
+    def __init__(self, config: AugmentationConfig, logger, seed: int = 0):
         self.config = config
         self.logger = logger
-        self._rng   = np.random.default_rng()
+        self.seed   = int(seed)
+        self._rng   = np.random.default_rng(self.seed)
 
         self.logger.section("[Data Augmentation]")
         self.logger.kv_table(
@@ -51,6 +53,10 @@ class SpatialAugmenter:
         gt_params    = np.ascontiguousarray(gt_view)
 
         return input_tensor, gt_params
+
+    def reseed(self, seed: int) -> None:
+        self.seed = int(seed)
+        self._rng = np.random.default_rng(self.seed)
 
     def add_noise(self, normalized_input: np.ndarray) -> np.ndarray:
         if self._rng.random() >= self.config.p_noise:
@@ -243,6 +249,7 @@ class Loader:
         logger        : Logger,
         pin_memory    : bool = True,
         shuffle_train : bool = True,
+        seed          : int  = 0,
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
         logger.section("[Loaders]")
@@ -251,7 +258,10 @@ class Loader:
             "Num workers":   num_workers,
             "Pin memory":    pin_memory,
             "Shuffle train": shuffle_train,
+            "Seed":          seed,
         })
+
+        worker_init = Reproducibility.worker_init(seed) if num_workers > 0 else None
 
         _base = dict(
             batch_size         = batch_size,
@@ -259,9 +269,10 @@ class Loader:
             pin_memory         = pin_memory,
             persistent_workers = num_workers > 0,
             prefetch_factor    = 8 if num_workers > 0 else None,
+            worker_init_fn     = worker_init,
         )
 
-        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last = True,  **_base)
+        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last = True,  generator = Reproducibility.generator(seed), **_base)
         val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last = False, **_base)
         test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last = False, **_base)
 

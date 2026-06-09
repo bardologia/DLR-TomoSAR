@@ -12,7 +12,7 @@ class FitMode:
         threshold_factor   : float = 0.25
         truncation_index   : int   = 170
         k_max              : int   = 5
-        lambda_k           : float = 3e-3
+        lambda_k           : float = 5e-3
         prominence_frac    : float = 0.05
         sigma_init_divisor : float = 4.0
         activity_threshold : float = 5e-2
@@ -45,13 +45,13 @@ class ExtractionConfig:
     fit_settings         : FitSettings                   = field(default_factory=FitSettings)
     parameter_workers    : int                           = 20
 
-    range_batch_size     : int                           = 256
+    range_batch_size     : int                           = 3500
     gpu_pixel_batch_size : int                           = 24576
     adam_steps           : int                           = 3000
     adam_lr              : float                         = 2e-1
     adam_b1              : float                         = 0.95
     adam_b2              : float                         = 0.999
-    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 3])
+    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 2, 3])
 
 
     @property
@@ -127,9 +127,9 @@ class ExtractParamsEntryConfig:
     height_range      : tuple | None = None
 
     fit_k_max              : int    = 5
-    fit_lambda_k           : float  = 3e-3
+    fit_lambda_k           : float  = 5e-3
     fit_sigma_init_divisor : float  = 4.0
 
-    gpu_device_ids    : list         = field(default_factory=lambda: [0, 1, 3])
-    range_batch_size  : int          = 256
-    parameter_workers : int          = 50
+    gpu_device_ids    : list         = field(default_factory=lambda: [0, 1, 2, 3])
+    range_batch_size  : int          = 3500
+    parameter_workers : int          = 100

@@ -28,6 +28,16 @@ class LaunchView {
     ["data", "run"],
   ];
 
+  static PICKERS = {
+    extract_params: {
+      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
+    },
+    train: {
+      "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
+      "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
+    },
+  };
+
   constructor(runConsole, project) {
     this.runConsole = runConsole;
     this.project = project;
@@ -36,6 +46,7 @@ class LaunchView {
     this.config = null;
     this.dirty = {};
     this.controls = {};
+    this.dependents = {};
     this.states = [];
     this.panels = new Map();
     this.bands = [];
@@ -61,6 +72,7 @@ class LaunchView {
     this.config = null;
     this.dirty = {};
     this.controls = {};
+    this.dependents = {};
     this.states = [];
     this.panels = new Map();
     this.bands = [];
@@ -96,7 +108,7 @@ class LaunchView {
     }
     this.config = cfg;
 
-    if (cfg.leaves.some((leaf) => leaf.path === "skip_models")) {
+    if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "model_name")) {
       const models = await window.apiGet("/api/models");
       if (this.key !== key) return;
       this.modelFamilies = (models && models.families) || [];
@@ -306,8 +318,13 @@ class LaunchView {
     host.appendChild(this._buildToolbar(cfg));
 
     const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
-    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean);
+
+    const modelNameLeaf = byPath.get("model_name");
+    const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
+
+    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === "model_name"));
     const claimed = new Set(pinned.map((leaf) => leaf.path));
+    if (cardPanel) claimed.add("model_name");
 
     const modelLeaf  = byPath.get("skip_models");
     const modelPanel = modelLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelTogglePanel(this, modelLeaf) : null;
@@ -322,6 +339,7 @@ class LaunchView {
     }
 
     if (pinned.length) host.appendChild(this._buildPins(pinned));
+    if (cardPanel) host.appendChild(cardPanel.build());
     if (this.builder) host.appendChild(this.builder.build());
     if (modelPanel) host.appendChild(modelPanel.build());
 
@@ -799,7 +817,10 @@ class LaunchView {
     row.appendChild(label);
 
     let control;
-    if (!leaf.editable) {
+    const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
+    if (pickerSpec && window.DatasetPicker) {
+      control = new window.DatasetPicker(this, leaf, pickerSpec).build();
+    } else if (!leaf.editable) {
       control = this._textControl(leaf);
       control.input.disabled = true;
       control.input.classList.add("is-locked");
@@ -835,6 +856,23 @@ class LaunchView {
 
   _effective(leaf) {
     return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
+  }
+
+  _leafByPath(path) {
+    return this.config ? this.config.leaves.find((leaf) => leaf.path === path) : null;
+  }
+
+  _pickerSpec(leaf) {
+    const specs = LaunchView.PICKERS[this.key];
+    return specs ? specs[leaf.path] : null;
+  }
+
+  _onDependency(path, fn) {
+    (this.dependents[path] = this.dependents[path] || []).push(fn);
+  }
+
+  _fireDependents(path, value) {
+    (this.dependents[path] || []).forEach((fn) => fn(value));
   }
 
   _setValue(leaf, value) {

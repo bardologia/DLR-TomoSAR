@@ -316,9 +316,13 @@ class PhysicsComponents:
         eye   = torch.eye(n_tracks, dtype=cov.dtype, device=cov.device)
         cov   = cov + (loading * trace.clamp(min=floor)).unsqueeze(-1).unsqueeze(-1) * eye
 
-        inv   = torch.linalg.inv(cov)
-        denom = torch.einsum("ik,bhwij,jk->bhwk", steering.conj(), inv, steering).real
-        spec  = (1.0 / denom.clamp(min=1e-12)).permute(0, 3, 1, 2)
+        cov   = 0.5 * (cov + cov.conj().transpose(-2, -1))
+        cov   = cov.to(torch.complex64)
+
+        steer  = steering.to(torch.complex64)
+        solved = torch.linalg.solve(cov, steer)
+        denom  = torch.einsum("ik,bhwik->bhwk", steer.conj(), solved).real
+        spec   = (1.0 / denom.clamp(min=1e-12)).permute(0, 3, 1, 2)
 
         p0     = spec.sum(dim=1) * dx
         spec_n = spec / p0.clamp(min=floor).unsqueeze(1)

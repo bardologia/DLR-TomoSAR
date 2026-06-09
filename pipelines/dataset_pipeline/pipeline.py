@@ -67,9 +67,10 @@ class MetadataWriter:
 
 
 class DatasetPipeline:
-    def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None) -> None:
+    def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None, seed : int = 0) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
+        self.seed                   = int(seed)
 
         log_dir = self.training_run_directory / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -78,7 +79,7 @@ class DatasetPipeline:
         self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
-        self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger)
+        self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed)
 
         ic = config.input_config
         oc = config.output_config
@@ -173,6 +174,7 @@ class DatasetPipeline:
             num_workers   = self.config.num_workers,
             pin_memory    = self.config.pin_memory,
             shuffle_train = self.config.shuffle_train,
+            seed          = self.seed,
             logger        = self.logger,
         )
 

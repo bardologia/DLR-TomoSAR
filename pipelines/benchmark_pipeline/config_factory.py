@@ -122,7 +122,7 @@ class ConfigFactory:
         return TrainerConfig(
             **self._base_trainer_kwargs(logdir),
 
-            early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, min_delta=training.early_stop_min_delta, restore_best=True),
+            early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, restore_best=True),
             warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler      = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
@@ -150,7 +150,7 @@ class ConfigFactory:
         return TrainerConfig(
             **self._base_trainer_kwargs(logdir),
 
-            early_stopping = EarlyStoppingConfig(patience=9999, min_delta=0.0, restore_best=False),
+            early_stopping = EarlyStoppingConfig(patience=9999, restore_best=False),
             warmup         = WarmupConfig(warmup_enabled=False),
             scheduler      = SchedulerConfig(type="constant"),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),

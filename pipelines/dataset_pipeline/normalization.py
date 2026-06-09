@@ -302,7 +302,7 @@ class StatsComputer:
                 sig_flat = params[g * 3 + 2].ravel().astype(np.float64)
                 active   = a_flat > amp_threshold
 
-                amp_pool_vals.append(a_flat)
+                amp_pool_vals.append(a_flat[active])
                 mu_pool_vals.append(mu_flat[active])
                 sig_pool_vals.append(sig_flat[active])
 

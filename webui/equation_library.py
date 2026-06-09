@@ -1010,12 +1010,11 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Early stopping",
-                    "tex"   : r"\text{improved} \iff \ell_{\mathrm{val}} < \ell^{*}_{\mathrm{val}} - \delta_{\min}, \qquad \text{stop} \iff \mathrm{counter} \geq P",
-                    "note"  : "The counter resets on improvement and increments otherwise; on stop, weights revert to the best epoch when restore_best is set.",
+                    "tex"   : r"\text{improved} \iff \ell_{\mathrm{val}} < \ell^{*}_{\mathrm{val}}, \qquad \text{stop} \iff \mathrm{counter} \geq P",
+                    "note"  : "Strict improvement, the same criterion the checkpoint uses to persist the best weights; the counter resets on improvement and increments otherwise; on stop, weights revert to the best checkpoint when restore_best is set.",
                     "vars"  : [
                         {"sym": r"\ell_{\mathrm{val}}",     "desc": "validation loss of the current epoch"},
                         {"sym": r"\ell^{*}_{\mathrm{val}}", "desc": "best validation loss so far"},
-                        {"sym": r"\delta_{\min}",           "desc": "min_delta = 0.001"},
                         {"sym": r"\mathrm{counter}",        "desc": "consecutive epochs without improvement"},
                         {"sym": r"P",                       "desc": "patience = 15"},
                     ],

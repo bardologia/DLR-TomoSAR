@@ -326,7 +326,8 @@ class Report:
         out = ["\n### 2.6 Classical Capon baseline (passes used in training)\n"]
         out.append(
             "The reduced tomogram is re-synthesised at inference time with classical Capon beamforming "
-            "from exactly the passes this model was trained on, per-pixel max-normalised like the GT. "
+            "from exactly the passes this model was trained on, using the DEM-flattened SLC covariance and "
+            "kept on the raw physical Capon-power scale (the same scale as GT). "
             "Relative improvement is (baseline \u2212 model) / baseline for error metrics; for scores "
             "(R\u00b2, SSIM, cosine) the sign is flipped so positive always means the model is better.\n"
         )
@@ -367,6 +368,54 @@ class Report:
             ("pixel_improvement_median",        gm["pixel_improvement_median"]),
             ("pixel_improvement_positive_frac", gm["pixel_improvement_positive_frac"]),
         ], header=("Improvement metric", "Value")))
+        out.append("")
+
+        out += self._build_baseline_comparison_norm()
+
+        return out
+
+    def _build_baseline_comparison_norm(self) -> List[str]:
+        gm = self.global_metrics
+        if gm.get("curve_mse_rednorm") is None:
+            return []
+
+        out = ["\n### 2.7 Classical Capon baseline \u2014 normalised [0, 1] (shape only)\n"]
+        out.append(
+            "The same comparison with the Capon tomogram and GT each per-pixel peak-normalised to [0, 1], "
+            "which removes the amplitude/power scale and isolates shape and elevation resolution. "
+            "Use this when the absolute Capon power bias from using few baselines should not dominate the comparison.\n"
+        )
+
+        table = MarkdownTable(("Metric", "Capon (norm) vs GT (norm)"))
+
+        rows = [
+            ("Curve MSE",         "curve_mse_rednorm"),
+            ("Curve MAE",         "curve_mae_rednorm"),
+            ("Curve RMSE",        "curve_rmse_rednorm"),
+            ("Pixel MSE mean",    "pixel_mse_rednorm_mean"),
+            ("Pixel MAE mean",    "pixel_mae_rednorm_mean"),
+            ("Peak err mean",     "pixel_peak_idx_d_rednorm_mean"),
+            ("Overall R\u00b2",        "overall_r2_rednorm"),
+            ("Pixel R\u00b2 mean",     "pixel_r2_rednorm_mean"),
+            ("Cosine mean",       "pixel_cosine_rednorm_mean"),
+            ("PSNR dB",           "psnr_db_rednorm"),
+            ("SSIM elev mean",    "ssim_rednorm_elev_mean"),
+        ]
+
+        for label, baseline_key in rows:
+            table.add_row(label, self._fmt(gm[baseline_key]))
+
+        out.append("\n".join(table.render()))
+        out.append("")
+
+        out.append(self._kv_table([
+            ("improvement_mse_rel_norm",             gm["improvement_mse_rel_norm"]),
+            ("improvement_mae_rel_norm",             gm["improvement_mae_rel_norm"]),
+            ("improvement_rmse_rel_norm",            gm["improvement_rmse_rel_norm"]),
+            ("pixel_improvement_mean_norm",          gm["pixel_improvement_mean_norm"]),
+            ("pixel_improvement_median_norm",        gm["pixel_improvement_median_norm"]),
+            ("pixel_improvement_positive_frac_norm", gm["pixel_improvement_positive_frac_norm"]),
+        ], header=("Improvement metric (normalised)", "Value")))
         out.append("")
 
         return out

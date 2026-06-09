@@ -10,6 +10,7 @@ class TomogramView {
     this.cross = refs.cross;
     this.coords = refs.coords;
     this.sourceBtns = refs.sourceBtns;
+    this.spaceBtns = refs.spaceBtns || [];
     this.hint = refs.hint;
     this.panels = refs.panels;
     this.slicesEl = refs.slices;
@@ -26,6 +27,7 @@ class TomogramView {
     this.selectedId = null;
     this.meta = null;
     this.source = "pred";
+    this.space = "physical";
     this.point = null;
     this.pinned = false;
     this.entered = false;
@@ -41,6 +43,9 @@ class TomogramView {
     this.topdown.addEventListener("error", () => this.mapWrap.classList.remove("is-loading"));
     this.sourceBtns.forEach((btn) => {
       btn.addEventListener("click", () => this._setSource(btn.dataset.source));
+    });
+    this.spaceBtns.forEach((btn) => {
+      btn.addEventListener("click", () => this._setSpace(btn.dataset.space));
     });
   }
 
@@ -183,6 +188,7 @@ class TomogramView {
 
     if (!meta.sources.includes(this.source)) this.source = meta.sources[0];
     this._syncSourceBtns();
+    this._syncSpaceBtns();
 
     this.panels.forEach((panel) => {
       panel.root.hidden = !meta.sources.includes(panel.source);
@@ -191,7 +197,11 @@ class TomogramView {
     this.hint.hidden = true;
     this.stage.hidden = false;
     this.mapWrap.classList.add("is-loading");
-    this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
+    this.topdown.src = this._topdownSrc();
+  }
+
+  _topdownSrc() {
+    return `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}&space=${this.space}`;
   }
 
   _setSource(source) {
@@ -199,13 +209,35 @@ class TomogramView {
     this.source = source;
     this._syncSourceBtns();
     this.mapWrap.classList.add("is-loading");
-    this.topdown.src = `/api/cubes/topdown?id=${encodeURIComponent(this.selectedId)}&source=${this.source}`;
+    this.topdown.src = this._topdownSrc();
+  }
+
+  _setSpace(space) {
+    if (space === this.space || !["physical", "normalized"].includes(space)) return;
+    this.space = space;
+    this._syncSpaceBtns();
+
+    if (!this.meta) return;
+
+    this.mapWrap.classList.add("is-loading");
+    this.topdown.src = this._topdownSrc();
+
+    if (this.point) {
+      this.queued = { az: this.point.az, rg: this.point.rg };
+      this._pump();
+    }
   }
 
   _syncSourceBtns() {
     this.sourceBtns.forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.source === this.source);
       btn.disabled = !this.meta || !this.meta.sources.includes(btn.dataset.source);
+    });
+  }
+
+  _syncSpaceBtns() {
+    this.spaceBtns.forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.space === this.space);
     });
   }
 
@@ -291,7 +323,7 @@ class TomogramView {
     const jobs = this.panels
       .filter((panel) => !panel.root.hidden)
       .map(async (panel) => {
-        const url = `/api/cubes/slice?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&axis=${panel.axis}&az=${az}&rg=${rg}`;
+        const url = `/api/cubes/slice?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&axis=${panel.axis}&az=${az}&rg=${rg}&space=${this.space}`;
         const skeletonTimer = setTimeout(() => panel.root.classList.add("is-loading"), 180);
         try {
           const res = await fetch(url);

@@ -23,6 +23,7 @@ from pipelines.training_pipeline.experiments import CurriculumTrialPlanner, Seco
 from pipelines.training_pipeline.trainer     import Trainer
 from tools.config_cli                        import ConfigCli
 from tools.logger                            import Logger
+from tools.reproducibility                   import Reproducibility
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
@@ -120,10 +121,7 @@ class TrainingPipeline:
         self.image_size     = patch_height
         self.seed           = seed
 
-        torch.manual_seed(self.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(self.seed)
-            torch.backends.cudnn.deterministic = True
+        Reproducibility.seed_everything(self.seed)
 
         self.run_metadata = TrainingRunMetadata(
             trainer_config = trainer_config,
@@ -137,6 +135,7 @@ class TrainingPipeline:
             config                 = dataset_config,
             training_run_directory = self.run_metadata.run_directory,
             logger                 = self.logger,
+            seed                   = self.seed,
         )
 
     def _build_model(self, in_channels: int, out_channels: int):

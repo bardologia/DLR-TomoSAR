@@ -15,10 +15,9 @@ from pipelines.training_pipeline.docs       import TrainingDocs
 
 
 class TrainStep:
-    def __init__(self, model, optimizer, scaler, criterion, grad_clipper, device, logger, tracker, accumulation_steps, use_amp):
+    def __init__(self, model, optimizer, criterion, grad_clipper, device, logger, tracker, accumulation_steps, use_amp):
         self.model              = model
         self.optimizer          = optimizer
-        self.scaler             = scaler
         self.criterion          = criterion
         self.grad_clipper       = grad_clipper
         self.device             = device
@@ -49,22 +48,19 @@ class TrainStep:
             loss        = loss_dict["total_loss"]
             loss        = loss / self.accumulation_steps
 
-        if torch.isnan(loss) or torch.isinf(loss):
-            self.logger.warning(f"Total loss evaluated to NaN or Inf at step {global_step}!")
+        if not torch.isfinite(loss):
+            raise FloatingPointError(f"Total loss evaluated to NaN or Inf at step {global_step}; aborting training before the optimizer step corrupts the weights")
 
         return loss, loss_dict
 
     def _backward(self, loss: torch.Tensor, batch_idx: int, n_batches: int, global_step: int) -> None:
-        self.scaler.scale(loss).backward()
+        loss.backward()
 
         if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
-            self.scaler.unscale_(self.optimizer)
-
             grad_norm = self.grad_clipper.maybe_clip(self.model, global_step)
             self.grad_clipper.record(grad_norm, global_step)
 
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
+            self.optimizer.step()
             self.optimizer.zero_grad(set_to_none=True)
 
 
@@ -143,8 +139,6 @@ class Trainer:
         self.accumulation_steps   = self.config.training.gradient_accumulation_steps
         self.use_amp              = self.config.training.use_amp
 
-        self.scaler = torch.amp.GradScaler("cuda", enabled=self.use_amp)
-
         param_groups    = self.model_cfg.get_param_groups(self.model)
         self.base_lrs   = [float(pg["lr"]) for pg in param_groups]
         self.optimizer  = self._build_optimizer(param_groups)
@@ -152,6 +146,7 @@ class Trainer:
         self.warmup              = Warmup(self.config, self.logger, self.tracker)
         self.lr_scheduler        = Scheduler(self.base_lrs, self.warmup, self.config, self.logger, self.tracker)
         self.early_stopping      = EarlyStopping(self.config, self.logger, self.tracker)
+        self.restore_best        = self.config.early_stopping.restore_best
         self.criterion           = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=config.training.log_all_losses)
         self.checkpoint          = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.grad_clipper        = GradientClipper(config = self.config, logger = self.logger, tracker = self.tracker)
@@ -162,7 +157,6 @@ class Trainer:
         self.train_step = TrainStep(
             model              = self.model,
             optimizer          = self.optimizer,
-            scaler             = self.scaler,
             criterion          = self.criterion,
             grad_clipper       = self.grad_clipper,
             device             = self.device,
@@ -392,7 +386,7 @@ class Trainer:
 
                             self.checkpoint.step(val_loss, epoch_num, self)
                             self.lr_scheduler.step(epoch)
-                            stop = self.early_stopping(val_loss, self.model, epoch)
+                            stop = self.early_stopping(val_loss, epoch)
                             self._trial_callback(val_loss, epoch)
                         else:
                             val_results  = {"avg_loss": float("nan"), "num_batches": 0}
@@ -429,9 +423,8 @@ class Trainer:
                         if self.overfitter.check_stop(train_loss):
                             break
 
-            self.early_stopping.restore(self.model)
-            if self.early_stopping.triggered and self.early_stopping.best_params is not None:
-                self.logger.subsection(f"Restored best parameters from epoch {self.early_stopping.best_epoch + 1}")
+            if self.restore_best:
+                self.checkpoint.restore_best(self.model, self.device)
 
             return self.train_losses, self.val_losses, self.checkpoint.best_val_loss
 

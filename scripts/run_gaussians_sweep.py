@@ -84,7 +84,7 @@ TRAIN_TEMPLATE = textwrap.dedent("""\
 
     trainer_config = TrainerConfig(
         gaussian       = GaussianConfig.from_dataset(dataset_path, params_subdir=params_subdir),
-        early_stopping = EarlyStoppingConfig(patience=15, min_delta=0.0001, restore_best=True),
+        early_stopping = EarlyStoppingConfig(patience=15, restore_best=True),
         warmup         = WarmupConfig(warmup_steps=50, warmup_start_factor=0.1, warmup_enabled=True),
         scheduler      = SchedulerConfig(epochs=150, eta_min=1e-6),
         optimizer      = OptimizerConfig(lr=3e-4, betas=(0.9, 0.999), eps=1e-8),

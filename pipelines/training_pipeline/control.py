@@ -44,6 +44,16 @@ class Checkpoint:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(checkpoint, path)
 
+    def restore_best(self, model, device) -> None:
+        if self.best_epoch < 0:
+            self.logger.warning("No improving checkpoint was saved; leaving the model in its final-epoch state.")
+            return
+
+        checkpoint = torch.load(self.save_path, map_location=device)
+        model.load_state_dict(checkpoint["params"])
+
+        self.logger.subsection(f"Restored best parameters from epoch {self.best_epoch + 1} (val_loss={self.best_val_loss:.4f}).")
+
 
 class OverfitManager:
     def __init__(self, config, logger):

@@ -94,7 +94,7 @@ class TuningOrchestrator:
         return TrainerConfig(
             gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
             geometry         = GeometryConfig().resolved(dataset_path, secondary_labels=secondary_labels),
-            early_stopping   = EarlyStoppingConfig(patience=8, min_delta=0.0001, restore_best=True),
+            early_stopping   = EarlyStoppingConfig(patience=8, restore_best=True),
             warmup           = WarmupConfig(warmup_steps=self.config.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler        = SchedulerConfig(type="cosine_annealing", epochs=60, eta_min=self.config.eta_min),
             optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),

@@ -153,42 +153,29 @@ class Scheduler:
 
 class EarlyStopping:
     def __init__(self, config, logger, tracker):
-        self.config       = config
-        self.logger       = logger
-        self.tracker      = tracker
+        self.config   = config
+        self.logger   = logger
+        self.tracker  = tracker
 
-        self.patience     = self.config.early_stopping.patience
-        self.min_delta    = self.config.early_stopping.min_delta
-        self.restore_best = self.config.early_stopping.restore_best
+        self.patience = self.config.early_stopping.patience
 
         self.logger.section("[Early Stopping]")
         self.logger.kv_table({
-            "Patience"     : self.patience,
-            "Min Delta"    : self.min_delta,
-            "Restore Best" : self.restore_best,
+            "Patience" : self.patience,
         })
 
-        self.best_loss        = None
-        self.counter          = 0
-        self.best_epoch       = -1
-        self.best_params      = None
-        self.triggered        = False
+        self.best_loss  = None
+        self.counter    = 0
+        self.best_epoch = -1
+        self.triggered  = False
 
-    def __call__(self, val_loss: float, model: torch.nn.Module, epoch: int) -> bool:
-        if self.best_loss is None:
-            self.best_loss   = float(val_loss)
-            self.best_epoch  = int(epoch)
-            self._save_state(model)
-            self.counter     = 0
-            stop             = False
-
-        elif val_loss < self.best_loss - self.min_delta:
-            self.best_loss   = float(val_loss)
-            self.best_epoch  = int(epoch)
-            self.counter     = 0
-            self._save_state(model)
+    def __call__(self, val_loss: float, epoch: int) -> bool:
+        if self.best_loss is None or val_loss < self.best_loss:
+            self.best_loss  = float(val_loss)
+            self.best_epoch = int(epoch)
+            self.counter    = 0
+            stop            = False
             self.tracker.log_scalar("early_stop/best_val_loss", self.best_loss, epoch)
-            stop = False
 
         else:
             self.counter += 1
@@ -202,20 +189,11 @@ class EarlyStopping:
 
         return stop
 
-    def _save_state(self, model: torch.nn.Module):
-        if self.restore_best:
-            self.best_params = {name: param.clone().detach().cpu() for name, param in model.state_dict().items()}
-
     def reset(self) -> None:
-        self.best_loss   = None
-        self.counter     = 0
-        self.best_epoch  = -1
-        self.best_params = None
-        self.triggered   = False
-
-    def restore(self, model: torch.nn.Module):
-        if self.restore_best and self.best_params is not None:
-            model.load_state_dict(self.best_params)
+        self.best_loss  = None
+        self.counter    = 0
+        self.best_epoch = -1
+        self.triggered  = False
 
 
 class GradientClipper:
@@ -285,7 +263,7 @@ class GradientClipper:
         for name, param in model.named_parameters():
             if param.grad is not None:
                 if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                    self.logger.warning(f"NaN/Inf gradient detected in {name} at step {global_step}! GradScaler will handle this.")
+                    self.logger.warning(f"NaN/Inf gradient detected in {name} at step {global_step}!")
                     has_invalid = True
                     break
 

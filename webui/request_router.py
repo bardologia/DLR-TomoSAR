@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from config_registry import ConfigRegistry
 from cube_explorer import CubeExplorer
+from dataset_browser import DatasetBrowser
 from equation_library import EquationLibrary
 from flow_library import FlowLibrary
 from model_library import ModelLibrary
@@ -35,7 +36,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -51,6 +52,7 @@ class RequestRouter:
         self.tensorboard = tensorboard
         self.results     = results
         self.cubes       = cubes
+        self.datasets    = datasets
 
     def route(self, handler) -> None:
         parsed = urlparse(handler.path)
@@ -96,6 +98,16 @@ class RequestRouter:
             result = self.results.folder((query.get("root") or [""])[0], (query.get("rel") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/fs/datasets":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.datasets.datasets((query.get("base") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+        if path == "/api/fs/params":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.datasets.params((query.get("dataset") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/cubes":
             self._send_json(handler, {"cubes": self.cubes.list_cubes()})
             return
@@ -107,6 +119,7 @@ class RequestRouter:
             png   = self.cubes.topdown_png(
                 cube_id = (query.get("id") or [""])[0],
                 source  = (query.get("source") or ["pred"])[0],
+                space   = (query.get("space") or ["physical"])[0],
             )
             self._send_png(handler, png)
             return
@@ -118,6 +131,7 @@ class RequestRouter:
                 axis    = (query.get("axis") or ["range"])[0],
                 az      = int((query.get("az") or ["0"])[0]),
                 rg      = int((query.get("rg") or ["0"])[0]),
+                space   = (query.get("space") or ["physical"])[0],
             )
             self._send_png(handler, png)
             return
