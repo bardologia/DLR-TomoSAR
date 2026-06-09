@@ -726,7 +726,7 @@ class FittingResultPlotter(PlotBase):
         self.logger.subsection("Plotting active-Gaussian count colormap")
         saved["n_gaussians_map"] = self.spatial_plotter._plot_discrete_k_map(
             activity_map,
-            r"Number of active Gaussians per pixel  ($A_k \geq 10^{-3}$)",
+            rf"Number of active Gaussians per pixel  ($A_k \geq {self.amp_threshold:g}$)",
             r"active Gaussians $K$",
             dirs["colormaps"] / "n_gaussians_map.png",
         )

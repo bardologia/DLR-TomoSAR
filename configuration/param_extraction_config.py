@@ -15,6 +15,7 @@ class FitMode:
         lambda_k           : float = 3e-3
         prominence_frac    : float = 0.05
         sigma_init_divisor : float = 4.0
+        activity_threshold : float = 5e-2
 
 
 FitConfig = FitMode.SigmaOnly

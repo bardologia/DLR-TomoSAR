@@ -375,6 +375,7 @@ class SigmaFittingExtractor:
         self.prominence_frac      = prominence_frac
         self.sigma_init_divisor   = sigma_init_divisor
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
+        self.activity_threshold   = fit_settings.fit_config.activity_threshold
         self._init_workers        = 80 if init_workers is None else init_workers
 
         self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
@@ -395,6 +396,7 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"k_max              : {k_max}")
         self.logger.subsection(f"lambda_k           : {lambda_k}")
         self.logger.subsection(f"sigma_init_divisor : {sigma_init_divisor}")
+        self.logger.subsection(f"activity_threshold : {self.activity_threshold}")
         self.logger.subsection(f"init_workers       : {self._init_workers}")
         self.logger.subsection(f"n_devices          : {self._n_devices}")
 
@@ -477,7 +479,7 @@ class SigmaFittingExtractor:
         raw   = ProfilePreprocessor.apply(raw, threshold_factor, truncation_index)
 
         pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H).copy()
-        active = pf.max(axis=1) > 1e-3
+        active = pf.max(axis=1) > self.activity_threshold
         pmax   = pf.max(axis=1, keepdims=True)
         scale  = np.where(active[:, None], pmax, 1.0).astype(np.float32)
         norm   = pf / scale

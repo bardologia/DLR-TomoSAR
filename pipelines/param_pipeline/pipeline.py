@@ -63,6 +63,7 @@ class ExtractionMetadataManager:
             "k_max"               : ext.fit_config.k_max,
             "lambda_k"            : ext.fit_config.lambda_k,
             "sigma_init_divisor"  : ext.fit_config.sigma_init_divisor,
+            "activity_threshold"  : ext.fit_config.activity_threshold,
         }
 
         FileIO.save_json(payload, meta_path)
@@ -162,14 +163,14 @@ class ParameterExtractor:
         self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
 
     @staticmethod
-    def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int) -> np.ndarray:
+    def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int, activity_threshold: float) -> np.ndarray:
         n_params, Az, R = parameters_array.shape
         reshaped = parameters_array.reshape(n_gaussians, 3, Az, R)
 
         amps = reshaped[:, 0, :, :]
         mus  = reshaped[:, 1, :, :]
 
-        sort_keys    = np.where(amps > 1e-3, mus, np.inf)
+        sort_keys    = np.where(amps > activity_threshold, mus, np.inf)
         order        = np.argsort(sort_keys, axis=0)
         out_reshaped = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
 
@@ -179,7 +180,7 @@ class ParameterExtractor:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
 
         parameters_array, diagnostics = self._gpu_extractor.run(tomogram_path, height_range)
-        parameters_array              = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max)
+        parameters_array              = self._sort_gaussians(parameters_array, self.parameter_extraction.fit_config.k_max, self.parameter_extraction.fit_config.activity_threshold)
 
         self.logger.subsection("[Extraction Complete]")
         return parameters_array, diagnostics
@@ -213,15 +214,17 @@ class ParamExtractionPipeline:
         self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
         self.parameter_io       = ParameterIO(logger=self.logger)
 
-        n_K              = config.fit_settings.fit_config.k_max
-        threshold_factor = float(config.fit_settings.fit_config.threshold_factor)
-        truncation_index = int(  config.fit_settings.fit_config.truncation_index)
+        n_K                = config.fit_settings.fit_config.k_max
+        threshold_factor   = float(config.fit_settings.fit_config.threshold_factor)
+        truncation_index   = int(  config.fit_settings.fit_config.truncation_index)
+        activity_threshold = float(config.fit_settings.fit_config.activity_threshold)
 
         self.metrics_calculator = FittingMetricsCalculator(
             n_gaussians      = n_K,
             logger           = self.logger,
             threshold_factor = threshold_factor,
             truncation_index = truncation_index,
+            amp_threshold    = activity_threshold,
         )
         self.result_plotter     = FittingResultPlotter(
             output_directory = self.output_directory,
@@ -229,6 +232,7 @@ class ParamExtractionPipeline:
             logger           = self.logger,
             threshold_factor = threshold_factor,
             truncation_index = truncation_index,
+            amp_threshold    = activity_threshold,
         )
 
         self.logger.section("[Param Extraction Pipeline Initialized]")
