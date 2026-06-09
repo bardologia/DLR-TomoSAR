@@ -380,6 +380,8 @@ class StatsComputer:
 
 
 class Normalizer:
+    EXPM1_INPUT_CEIL = 80.0
+
     def __init__(self, stats: Stats) -> None:
         self.stats = stats
 
@@ -423,7 +425,7 @@ class Normalizer:
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
-                out = torch.where(log1p, torch.expm1(x), x)
+                out = torch.where(log1p, torch.expm1(torch.clamp(x, max=self.EXPM1_INPUT_CEIL)), x)
 
             return out
 
@@ -437,7 +439,7 @@ class Normalizer:
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
-            out = np.where(log1p, np.expm1(x), x)
+            out = np.where(log1p, np.expm1(np.minimum(x, self.EXPM1_INPUT_CEIL)), x)
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
