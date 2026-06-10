@@ -107,6 +107,7 @@ class SlicePlotter(PlotTools):
         az_offset      : int,
         rg_offset      : int,
         reduced_curves : Optional[np.ndarray] = None,
+        full_curves    : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
         base_colors = [cm.tab10(i) for i in range(10)]
@@ -118,6 +119,10 @@ class SlicePlotter(PlotTools):
             comps = self._gaussian_components(params_pred[:, y, x], x_axis, n_gaussians)
 
             fig, ax = plt.subplots(figsize=(5.2, 3.4))
+
+            if full_curves is not None:
+                ax.plot(x_axis, full_curves[:, y, x], color="0.55", linewidth=1.0, label="Full tomo (raw)", zorder=1)
+
             ax.plot(x_axis, gt,   color="black", linewidth=1.4, label="GT",   zorder=3)
             ax.plot(x_axis, pred, color="C3",    linewidth=1.2, label="Pred", linestyle="--", zorder=4)
 
@@ -260,6 +265,8 @@ class SlicePlotter(PlotTools):
         ref_title     : str = "GT (Gaussian)",
         pred_title    : str = "Prediction",
         err_title     : str = "|Pred − GT|",
+        full_slice    : Optional[np.ndarray] = None,
+        full_title    : str = "Full tomogram (raw)",
     ) -> List[Path]:
 
         err_gt_slice = np.abs(pred_slice - gt_slice)
@@ -278,6 +285,10 @@ class SlicePlotter(PlotTools):
             (pred_slice,   f"{pred_title} — {title_pos}{ssim_str}", self.cmap,   vmin, vmax,    self._int_label, "pred"),
             (err_gt_slice, f"{err_title} — {title_pos}",           self.err_cmap, 0.0,  emax_gt, self._err_label, "error"),
         ]
+
+        if full_slice is not None:
+            full_rescaled = self._rescale(full_slice, scale)
+            panels.insert(0, (full_rescaled, f"{full_title} — {title_pos}", self.cmap, vmin, vmax, self._int_label, "full"))
 
         return [
             self._imshow_panel(
@@ -311,11 +322,14 @@ class SlicePlotter(PlotTools):
         ref_title    : str = "GT (Gaussian)",
         pred_title   : str = "Prediction",
         err_title    : str = "|Pred − GT|",
+        full_cube    : Optional[np.ndarray] = None,
+        full_title   : str = "Full tomogram (raw)",
     ) -> List[Path]:
 
         if axis == "range":
             pred_slice               = pred_cube[:, :, index]
             gt_slice                 = gt_cube  [:, :, index]
+            full_slice               = full_cube[:, :, index] if full_cube is not None else None
             x_label                  = "azimuth index"
             x_extent_lo, x_extent_hi = az_offset, az_offset + pred_slice.shape[1]
             title_pos                = f"range = {index + rg_offset}"
@@ -323,6 +337,7 @@ class SlicePlotter(PlotTools):
         elif axis == "azimuth":
             pred_slice               = pred_cube[:, index, :]
             gt_slice                 = gt_cube  [:, index, :]
+            full_slice               = full_cube[:, index, :] if full_cube is not None else None
             x_label                  = "range index"
             x_extent_lo, x_extent_hi = rg_offset, rg_offset + pred_slice.shape[1]
             title_pos                = f"azimuth = {index + az_offset}"
@@ -334,6 +349,7 @@ class SlicePlotter(PlotTools):
         x_axis_sorted = x_axis[sort_idx]
         pred_slice    = pred_slice[sort_idx]
         gt_slice      = gt_slice  [sort_idx]
+        full_slice    = full_slice[sort_idx] if full_slice is not None else None
 
         extent = [x_extent_lo, x_extent_hi, float(x_axis_sorted[0]), float(x_axis_sorted[-1])]
 
@@ -351,6 +367,8 @@ class SlicePlotter(PlotTools):
             ref_title  = ref_title,
             pred_title = pred_title,
             err_title  = err_title,
+            full_slice = full_slice,
+            full_title = full_title,
         )
 
     def plot_elevation_intensity_slice(
@@ -367,10 +385,13 @@ class SlicePlotter(PlotTools):
         ref_title    : str = "GT (Gaussian)",
         pred_title   : str = "Prediction",
         err_title    : str = "|Pred − GT|",
+        full_cube    : Optional[np.ndarray] = None,
+        full_title   : str = "Full tomogram (raw)",
     ) -> List[Path]:
 
         pred_slice = pred_cube[elev_idx]
         gt_slice   = gt_cube  [elev_idx]
+        full_slice = full_cube[elev_idx] if full_cube is not None else None
 
         H, W      = pred_slice.shape
         extent    = [rg_offset, rg_offset + W, az_offset + H, az_offset]
@@ -390,6 +411,8 @@ class SlicePlotter(PlotTools):
             ref_title  = ref_title,
             pred_title = pred_title,
             err_title  = err_title,
+            full_slice = full_slice,
+            full_title = full_title,
         )
 
     def plot_metric_histograms(self, metric_arrays: Dict[str, np.ndarray], out_dir: Path) -> List[Path]:

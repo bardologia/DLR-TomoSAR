@@ -455,6 +455,7 @@ class Report:
             "Each panel overlays the GT profile (black solid), "
             "prediction (red dashed) and individual Gaussian components. "
             "The shaded area shows the signed residual (pred \u2212 gt). "
+            "The raw full-stack tomogram that the GT Gaussians are fit to is drawn as a grey reference. "
             "When a reduced baseline is available, its classical-Capon profile is overlaid "
             "(green dotted, rescaled to the GT peak) so the network's gain in elevation shape is visible.\n"
         )
@@ -495,7 +496,8 @@ class Report:
             out.append(
                 "GT and prediction share a colour scale; "
                 "error figures are clipped at p99 of that slice. "
-                "SSIM (pred vs GT) is shown in the prediction title.\n"
+                "SSIM (pred vs GT) is shown in the prediction title. "
+                "The raw full-stack tomogram (the reference the GT Gaussians are fit to) is shown as an extra panel.\n"
             )
             self._numbered_section(out, "7.", slice_groups)
 

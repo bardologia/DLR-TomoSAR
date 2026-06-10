@@ -19,6 +19,7 @@ from configuration.inference_config       import InferenceConfig
 from pipelines.inference_pipeline.loader  import InferenceMetadata
 from pipelines.inference_pipeline.metrics import Metrics, Result
 from pipelines.inference_pipeline.plots   import PlotTools, Ploter
+from pipelines.shared                     import ProfileNormalizer
 from tools.logger                         import Logger
 
 
@@ -39,6 +40,7 @@ class FrameSpec:
     dpi         : int
     origin      : str
     title       : str
+    full        : np.ndarray | None = None
 
 
 class Animator:
@@ -60,16 +62,21 @@ class Animator:
         g, p = spec.gt, spec.pred
         eg   = np.abs(p - g)
 
-        fig     = plt.figure(figsize=(20, 6), constrained_layout=False)
-        gs      = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
-        axes    = [fig.add_subplot(gs[0, k]) for k in range(3)]
-        pbar_ax = fig.add_subplot(gs[1, :])
+        panels = []
+        if spec.full is not None:
+            panels.append((spec.full, "Full tomogram (raw)", spec.cmap, spec.vmin, spec.vmax))
 
-        panels = [
+        panels += [
             (g,  "GT (Gaussian)", spec.cmap,     spec.vmin, spec.vmax),
             (p,  "Prediction",    spec.cmap,     spec.vmin, spec.vmax),
             (eg, "|Pred - GT|",   spec.err_cmap, 0.0,       spec.emax_gt),
         ]
+
+        n_col   = len(panels)
+        fig     = plt.figure(figsize=(6.7 * n_col, 6), constrained_layout=False)
+        gs      = fig.add_gridspec(2, n_col, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
+        axes    = [fig.add_subplot(gs[0, k]) for k in range(n_col)]
+        pbar_ax = fig.add_subplot(gs[1, :])
 
         PlotTools._triple_panel(fig, axes, panels, spec.x_label, "intensity", spec.extent, origin=spec.origin)
         axes[0].set_ylabel(spec.y_label)
@@ -202,12 +209,14 @@ class Animator:
         x_axis       : np.ndarray,
         az_offset    : int,
         rg_offset    : int,
+        full_cube    : np.ndarray | None = None,
     ) -> Path:
         plt.rcParams.update(Ploter.SCIENTIFIC_RC)
         plt.rcParams["figure.dpi"]  = self.dpi
         plt.rcParams["savefig.dpi"] = self.dpi
 
-        spec      = self._build_axis(axis, (pred_cube, gt_cube), x_axis, az_offset, rg_offset)
+        cubes     = (pred_cube, gt_cube) if full_cube is None else (pred_cube, gt_cube, full_cube)
+        spec      = self._build_axis(axis, cubes, x_axis, az_offset, rg_offset)
         n_total   = spec["n_total"]
         get_slice = spec["get_slice"]
 
@@ -226,13 +235,16 @@ class Animator:
         tasks: list[FrameSpec] = []
         n_frames = len(frame_indices)
         for frame_order, fi in enumerate(frame_indices):
-            i    = int(fi)
-            p, g = get_slice(i)
+            i     = int(fi)
+            slc   = get_slice(i)
+            p, g  = slc[0], slc[1]
+            f     = slc[2] if full_cube is not None else None
             tasks.append(FrameSpec(
                 frame_order = frame_order,
                 n_frames    = n_frames,
                 gt          = g.copy(),
                 pred        = p.copy(),
+                full        = f.copy() if f is not None else None,
                 vmin        = vmin,
                 vmax        = vmax,
                 emax_gt     = emax_gt,
@@ -372,6 +384,7 @@ class FigureComposer:
                 az_offset      = result.azimuth_offset,
                 rg_offset      = result.range_offset,
                 reduced_curves = reduced_curves_for_plot,
+                full_curves    = run.full_curves,
             )
 
             logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
@@ -487,6 +500,7 @@ class FigureComposer:
                     az_offset    = result.azimuth_offset,
                     rg_offset    = result.range_offset,
                     ssim_value   = global_metrics[f"{metric_key}_{int(i)}"],
+                    full_cube    = run.full_curves,
                 )
 
         for i in slice_elev_idx:
@@ -500,6 +514,7 @@ class FigureComposer:
                 az_offset    = result.azimuth_offset,
                 rg_offset    = result.range_offset,
                 ssim_value   = global_metrics[f"ssim_gt_elev_{int(i)}"],
+                full_cube    = run.full_curves,
             )
 
         logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
@@ -530,13 +545,14 @@ class FigureComposer:
         logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir / 'elev_metrics'}\n")
 
         if result.reduced is not None:
-            self._compose_reduced(result, global_metrics, x_axis_np, indices, figure_paths)
+            self._compose_reduced(result, run, global_metrics, x_axis_np, indices, figure_paths)
 
         return figure_paths
 
     def _compose_reduced(
         self,
         result         : Result,
+        run,
         global_metrics : dict,
         x_axis_np      : np.ndarray,
         indices        : dict,
@@ -548,8 +564,9 @@ class FigureComposer:
         logger        = self.logger
         reduced       = result.reduced
 
-        gt_n  = reduced.gt_norm
-        red_n = reduced.reduced_norm
+        gt_n   = reduced.gt_norm
+        red_n  = reduced.reduced_norm
+        full_n = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
 
         slice_range_idx = indices["slice_range_idx"]
         slice_az_idx    = indices["slice_az_idx"]
@@ -608,6 +625,8 @@ class FigureComposer:
                     ref_title  = "GT (unit-area)",
                     pred_title = "Reduced (Capon, unit-area)",
                     err_title  = "|Reduced − GT|",
+                    full_cube  = full_n,
+                    full_title = "Full tomogram (unit-area)",
                 )
 
         for i in slice_elev_idx:
@@ -624,6 +643,8 @@ class FigureComposer:
                 ref_title  = "GT (unit-area)",
                 pred_title = "Reduced (Capon, unit-area)",
                 err_title  = "|Reduced − GT|",
+                full_cube  = full_n,
+                full_title = "Full tomogram (unit-area)",
             )
 
         for axis, n_slices, indices_arr, offset in (
@@ -653,7 +674,7 @@ class FigureComposer:
 
         logger.subsection(f"Reduced baseline figures written to {reduced_dir}")
 
-    def animate(self, result: Result, x_axis_np: np.ndarray) -> Dict[str, Path]:
+    def animate(self, result: Result, run, x_axis_np: np.ndarray) -> Dict[str, Path]:
         cfg    = self.cfg
         meta   = self.meta
         logger = self.logger
@@ -679,6 +700,7 @@ class FigureComposer:
                 x_axis       = x_axis_np,
                 az_offset    = result.azimuth_offset,
                 rg_offset    = result.range_offset,
+                full_cube    = run.full_curves,
             )
 
         logger.subsection("")

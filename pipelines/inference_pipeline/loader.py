@@ -118,6 +118,7 @@ class Run:
     complex_inputs   : np.ndarray | None = None
     n_secondaries    : int               = 0
     secondary_labels : list | None       = None
+    full_curves      : np.ndarray | None = None
     track_baselines  : TrackBaselines | None = None
     track_profiles   : TrackProfiles  | None = None
 
@@ -176,7 +177,7 @@ class RunLoader:
             raise ValueError(f"Inference requires a single contiguous region for split '{split_name}'; found {len(regions)} disjoint regions. Stitching is only defined over one rectangular crop.")
 
         region = regions[0]
-        arrays = cropper.load_split(region)
+        arrays = cropper.load_split(region, load_tomogram=True)
 
         grid = Patcher.build(
             spatial_size           = (region.azimuth_size, region.range_size),
@@ -350,6 +351,7 @@ class RunLoader:
             complex_inputs   = arrays["inputs"],
             n_secondaries    = arrays["n_secondaries"],
             secondary_labels = arrays["secondary_labels"],
+            full_curves      = arrays["tomogram"],
             track_baselines  = track_baselines,
             track_profiles   = track_profiles,
         )

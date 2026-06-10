@@ -169,7 +169,7 @@ class InferencePipeline:
         )
 
         logger.section("[Inference: Animations]")
-        gif_paths = composer.animate(result, x_axis_np)
+        gif_paths = composer.animate(result, run, x_axis_np)
 
         logger.section("[Inference: Report]")
         report_path = self._build_report(

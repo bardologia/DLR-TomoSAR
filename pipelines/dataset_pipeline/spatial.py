@@ -87,7 +87,7 @@ class Cropper:
 
         return np.stack([array[index, az_slice, rg_slice] for index in self.secondary_indices])
 
-    def load_split(self, region: CropRegion) -> dict[str, np.ndarray]:
+    def load_split(self, region: CropRegion, load_tomogram: bool = False) -> dict[str, np.ndarray]:
         az_slice, rg_slice = self.to_local_slices(region)
 
         primary        = np.load(str(self.layout.artifact_path("primary")),        mmap_mode="r", allow_pickle=False)
@@ -114,6 +114,11 @@ class Cropper:
         parameters_split = np.ascontiguousarray(parameters [..., az_slice, rg_slice])
         dem_split        = np.ascontiguousarray(dem        [az_slice, rg_slice].astype(np.float32))
 
+        tomogram_split = None
+        if load_tomogram:
+            tomogram       = np.load(str(self.layout.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
+            tomogram_split = np.ascontiguousarray(tomogram[:, az_slice, rg_slice].astype(np.float32))
+
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
             "Primary"          : primary_view.shape,
@@ -123,12 +128,14 @@ class Cropper:
             "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
             "DEM"              : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
             "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
+            "Full tomogram"    : f"{tomogram_split.shape}  ({tomogram_split.nbytes/1e9:.2f} GB)" if tomogram_split is not None else "not loaded",
         })
 
         return {
             "inputs"           : inputs_split,
             "dem"              : dem_split,
             "parameters"       : parameters_split,
+            "tomogram"         : tomogram_split,
             "n_secondaries"    : n_secondaries,
             "n_interferograms" : n_interferograms,
             "secondary_labels" : self.secondary_labels,
