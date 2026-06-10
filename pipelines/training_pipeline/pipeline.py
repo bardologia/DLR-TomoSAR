@@ -16,7 +16,7 @@ from configuration.dataset_config            import DatasetConfiguration
 from configuration.training_config           import TrainerConfig
 from pipelines.dataset_pipeline.pipeline     import DatasetPipeline
 from pipelines.inference_pipeline.pipeline   import InferencePipeline
-from pipelines.shared.io                     import FileIO
+from pipelines.shared.io                     import FileIO, ModelConfigIO
 from pipelines.shared.orchestration          import ExperimentStage, GpuJob
 from pipelines.training_pipeline.docs        import LossScaleProbeConfig
 from pipelines.training_pipeline.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
@@ -73,6 +73,12 @@ class TrainingRunMetadata:
 
         FileIO.save_json(serializable, out_path)
         self.logger.info(f"Trainer config saved: {out_path}")
+
+        return out_path
+
+    def save_model_config(self, model_config, model_name: str) -> Path:
+        out_path = ModelConfigIO.save(model_config, model_name, self.metadata_directory)
+        self.logger.info(f"Model config saved: {out_path}")
 
         return out_path
 
@@ -179,6 +185,7 @@ class TrainingPipeline:
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
+        self.run_metadata.save_model_config(model_cfg, self.model_name)
 
         self.run_metadata.save_run_summary(
             model_name    = self.model_name,

@@ -17,7 +17,7 @@ from models                          import get_model
 from pipelines.dataset_pipeline.datasets      import PatchDataset
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats
 from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
-from pipelines.shared.io             import FileIO
+from pipelines.shared.io             import FileIO, ModelConfigIO
 from tools.gaussians                 import GaussianClamp
 from tools.logger                    import Logger
 from tools.track_baselines           import TrackBaselines, TrackProfiles
@@ -205,12 +205,14 @@ class RunLoader:
         return dataset, grid, region, layout.global_crop, arrays
 
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
+        model_config, _ = ModelConfigIO.load(self.meta_directory)
+
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
 
         if model_name in _IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
 
-        model, _ = get_model(model_name, **overrides)
+        model, _ = get_model(model_name, config=model_config, **overrides)
 
         return model
 

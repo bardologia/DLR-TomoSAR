@@ -45,3 +45,54 @@ class FileIO:
                 f.write(f"{key}: {value}\n")
 
         return path
+
+
+class ModelConfigIO:
+    FILENAME      = "model_config.json"
+    EXCLUDED      = {"shape_logger_types"}
+
+    @staticmethod
+    def _normalize(name: str) -> str:
+        return name.lower().replace("-", "_").replace(" ", "_")
+
+    @classmethod
+    def save(cls, model_config, model_name: str, meta_directory: Path) -> Path:
+        from dataclasses import fields
+
+        serializable = {f.name: getattr(model_config, f.name) for f in fields(model_config) if f.name not in cls.EXCLUDED}
+
+        payload = {
+            "model_name" : model_name,
+            "config_type": type(model_config).__name__,
+            "config"     : serializable,
+        }
+
+        return FileIO.save_json(payload, Path(meta_directory) / cls.FILENAME)
+
+    @classmethod
+    def load(cls, meta_directory: Path):
+        from models import CONFIG_REGISTRY
+
+        path = Path(meta_directory) / cls.FILENAME
+        if not path.is_file():
+            raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the model architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
+
+        payload    = FileIO.load_json(path)
+        model_name = cls._normalize(str(payload["model_name"]))
+
+        if model_name not in CONFIG_REGISTRY:
+            raise ValueError(f"Persisted model_name '{model_name}' is not a known architecture: {list(CONFIG_REGISTRY.keys())}")
+
+        config = CONFIG_REGISTRY[model_name]()
+
+        for key, value in payload["config"].items():
+            if not hasattr(config, key):
+                raise ValueError(f"Persisted field '{key}' is not an attribute of {type(config).__name__}; the architecture definition changed since this checkpoint was trained")
+
+            current = getattr(config, key)
+            if isinstance(current, tuple) and isinstance(value, list):
+                value = tuple(value)
+
+            setattr(config, key, value)
+
+        return config, payload["model_name"]
