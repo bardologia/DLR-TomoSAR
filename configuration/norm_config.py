@@ -84,7 +84,7 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
 
     "out/amp"         : Presets.MIN_MAX_LOG1P,
     "out/mu"          : Presets.MIN_MAX,
-    "out/sigma"       : Presets.MIN_MAX_LOG1P,
+    "out/sigma"       : Presets.MIN_MAX,
 
     "dem/elevation"   : Presets.ZSCORE,
 }
