@@ -28,11 +28,9 @@ class FrameSpec:
     n_frames    : int
     gt          : np.ndarray
     pred        : np.ndarray
-    reduced     : np.ndarray | None
     vmin        : float
     vmax        : float
     emax_gt     : float
-    emax_red    : float
     extent      : list
     x_label     : str
     y_label     : str
@@ -59,47 +57,22 @@ class Animator:
         import numpy as np
         from io import BytesIO
 
-        g, p, r = spec.gt, spec.pred, spec.reduced
-        eg      = np.abs(p - g)
+        g, p = spec.gt, spec.pred
+        eg   = np.abs(p - g)
 
-        if r is None:
-            fig     = plt.figure(figsize=(20, 6), constrained_layout=False)
-            gs      = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
-            axes    = [fig.add_subplot(gs[0, k]) for k in range(3)]
-            pbar_ax = fig.add_subplot(gs[1, :])
+        fig     = plt.figure(figsize=(20, 6), constrained_layout=False)
+        gs      = fig.add_gridspec(2, 3, height_ratios=[1, 0.03], hspace=0.35, wspace=0.35)
+        axes    = [fig.add_subplot(gs[0, k]) for k in range(3)]
+        pbar_ax = fig.add_subplot(gs[1, :])
 
-            panels = [
-                (g,  "GT (Gaussian)", spec.cmap,     spec.vmin, spec.vmax),
-                (p,  "Prediction",    spec.cmap,     spec.vmin, spec.vmax),
-                (eg, "|Pred - GT|",   spec.err_cmap, 0.0,       spec.emax_gt),
-            ]
+        panels = [
+            (g,  "GT (Gaussian)", spec.cmap,     spec.vmin, spec.vmax),
+            (p,  "Prediction",    spec.cmap,     spec.vmin, spec.vmax),
+            (eg, "|Pred - GT|",   spec.err_cmap, 0.0,       spec.emax_gt),
+        ]
 
-            PlotTools._triple_panel(fig, axes, panels, spec.x_label, "intensity", spec.extent, origin=spec.origin)
-            axes[0].set_ylabel(spec.y_label)
-
-        else:
-            er    = np.abs(r - g)
-            delta = er - eg
-            dmax  = max(spec.emax_gt, spec.emax_red)
-
-            fig     = plt.figure(figsize=(20, 11), constrained_layout=False)
-            gs      = fig.add_gridspec(3, 3, height_ratios=[1, 1, 0.03], hspace=0.40, wspace=0.35)
-            axes    = [fig.add_subplot(gs[row, col]) for row in range(2) for col in range(3)]
-            pbar_ax = fig.add_subplot(gs[2, :])
-
-            panels = [
-                (g,     "GT (Gaussian)",                            spec.cmap,     spec.vmin, spec.vmax),
-                (r,     "Capon (reduced)",                          spec.cmap,     spec.vmin, spec.vmax),
-                (p,     "Prediction",                               spec.cmap,     spec.vmin, spec.vmax),
-                (er,    "|Capon - GT|",                             spec.err_cmap, 0.0,       spec.emax_red),
-                (eg,    "|Pred - GT|",                              spec.err_cmap, 0.0,       spec.emax_gt),
-                (delta, "|Capon-GT| - |Pred-GT|  (>0 = model better)", "RdYlGn",   -dmax,     dmax),
-            ]
-
-            PlotTools._render_panels(fig, axes, panels, x_label=spec.x_label, extent=spec.extent, origin=spec.origin, interpolation="nearest", title_size=10, label_size=8)
-
-            axes[0].set_ylabel(spec.y_label)
-            axes[3].set_ylabel(spec.y_label)
+        PlotTools._triple_panel(fig, axes, panels, spec.x_label, "intensity", spec.extent, origin=spec.origin)
+        axes[0].set_ylabel(spec.y_label)
 
         progress = (spec.frame_order + 1) / max(1, spec.n_frames)
         pbar_ax.barh(0, progress,        height=1, color="steelblue", left=0.0)
@@ -108,7 +81,7 @@ class Animator:
         pbar_ax.set_axis_off()
 
         fig.suptitle(spec.title, fontsize=13, y=0.98)
-        fig.subplots_adjust(left=0.06, right=0.97, top=0.88 if r is None else 0.92, bottom=0.08 if r is None else 0.05)
+        fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08)
 
         buf = BytesIO()
         fig.savefig(buf, format="png", dpi=spec.dpi)
@@ -229,13 +202,12 @@ class Animator:
         x_axis       : np.ndarray,
         az_offset    : int,
         rg_offset    : int,
-        reduced_cube : np.ndarray | None = None,
     ) -> Path:
         plt.rcParams.update(Ploter.SCIENTIFIC_RC)
         plt.rcParams["figure.dpi"]  = self.dpi
         plt.rcParams["savefig.dpi"] = self.dpi
 
-        spec      = self._build_axis(axis, (pred_cube, gt_cube, reduced_cube), x_axis, az_offset, rg_offset)
+        spec      = self._build_axis(axis, (pred_cube, gt_cube), x_axis, az_offset, rg_offset)
         n_total   = spec["n_total"]
         get_slice = spec["get_slice"]
 
@@ -251,28 +223,19 @@ class Animator:
         if emax_gt <= 0.0:
             emax_gt = 1.0
 
-        emax_red = 1.0
-        if reduced_cube is not None:
-            red_sample = np.stack([s[2] for s in samples])
-            emax_red   = float(np.percentile(np.abs(red_sample - gt_sample), 99.0))
-            if emax_red <= 0.0:
-                emax_red = 1.0
-
         tasks: list[FrameSpec] = []
         n_frames = len(frame_indices)
         for frame_order, fi in enumerate(frame_indices):
-            i       = int(fi)
-            p, g, r = get_slice(i)
+            i    = int(fi)
+            p, g = get_slice(i)
             tasks.append(FrameSpec(
                 frame_order = frame_order,
                 n_frames    = n_frames,
                 gt          = g.copy(),
                 pred        = p.copy(),
-                reduced     = r.copy() if r is not None else None,
                 vmin        = vmin,
                 vmax        = vmax,
                 emax_gt     = emax_gt,
-                emax_red    = emax_red,
                 extent      = spec["extent"],
                 x_label     = spec["x_label"],
                 y_label     = spec["y_label"],
@@ -406,7 +369,6 @@ class FigureComposer:
                 pixel_metrics  = pixel_metrics_for_plot,
                 az_offset      = result.azimuth_offset,
                 rg_offset      = result.range_offset,
-                reduced_curves = result.reduced_curves,
             )
 
             logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
@@ -416,12 +378,6 @@ class FigureComposer:
             ("pixel_r2_map",   "r2",         result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
             ("pixel_peak_map", "peak_error", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
         ]
-
-        if result.has_reduced:
-            pixel_map_specs += [
-                ("pixel_mse_capon_map", "mse_capon", result.pixel_mse_red, "Per-pixel curve MSE — Capon baseline vs GT", "MSE", {"cmap": cfg.cmap_error, "log": True}),
-                ("pixel_r2_capon_map",  "r2_capon",  result.pixel_r2_red,  "Per-pixel R² — Capon baseline vs GT",        "R²",  {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
-            ]
 
         for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
@@ -434,26 +390,13 @@ class FigureComposer:
                 **extra,
             )]
 
-        if result.has_reduced:
-            figure_paths["improvement_map"] = [slice_plotter.plot_improvement_map(
-                improvement = result.pixel_improvement,
-                out_path    = meta.figures_dir / "pixel_maps" / "improvement_over_capon.png",
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-            )]
-
-        logger.subsection(f"Pixel maps : mse, r2, peak{', capon baseline, improvement' if result.has_reduced else ''} written to {meta.figures_dir / 'pixel_maps'}")
+        logger.subsection(f"Pixel maps : mse, r2, peak written to {meta.figures_dir / 'pixel_maps'}")
 
         histogram_arrays = {
             "pixel_mse"    : result.pixel_mse,
             "pixel_r2"     : result.pixel_r2,
             "pixel_cosine" : result.pixel_cosine,
         }
-
-        if result.has_reduced:
-            histogram_arrays["pixel_mse_capon"]   = result.pixel_mse_red
-            histogram_arrays["pixel_r2_capon"]    = result.pixel_r2_red
-            histogram_arrays["pixel_improvement"] = result.pixel_improvement
 
         figure_paths["metric_histograms"] = slice_plotter.plot_metric_histograms(
             histogram_arrays,
@@ -541,7 +484,6 @@ class FigureComposer:
                     az_offset    = result.azimuth_offset,
                     rg_offset    = result.range_offset,
                     ssim_value   = global_metrics[f"{metric_key}_{int(i)}"],
-                    reduced_cube = result.reduced_curves,
                 )
 
         for i in slice_elev_idx:
@@ -555,7 +497,6 @@ class FigureComposer:
                 az_offset    = result.azimuth_offset,
                 rg_offset    = result.range_offset,
                 ssim_value   = global_metrics[f"ssim_gt_elev_{int(i)}"],
-                reduced_cube = result.reduced_curves,
             )
 
         logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
@@ -613,7 +554,6 @@ class FigureComposer:
                 x_axis       = x_axis_np,
                 az_offset    = result.azimuth_offset,
                 rg_offset    = result.range_offset,
-                reduced_cube = result.reduced_curves,
             )
 
         logger.subsection("")

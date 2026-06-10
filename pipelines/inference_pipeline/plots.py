@@ -106,7 +106,6 @@ class SlicePlotter(PlotTools):
         pixel_metrics  : Dict[str, np.ndarray],
         az_offset      : int,
         rg_offset      : int,
-        reduced_curves : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
         base_colors = [cm.tab10(i) for i in range(10)]
@@ -120,9 +119,6 @@ class SlicePlotter(PlotTools):
             fig, ax = plt.subplots(figsize=(5.2, 3.4))
             ax.plot(x_axis, gt,   color="black", linewidth=1.4, label="GT",   zorder=3)
             ax.plot(x_axis, pred, color="C3",    linewidth=1.2, label="Pred", linestyle="--", zorder=4)
-
-            if reduced_curves is not None:
-                ax.plot(x_axis, reduced_curves[:, y, x], color="C0", linewidth=1.0, label="Capon (reduced)", linestyle=":", zorder=2)
 
             for k, comp in enumerate(comps):
                 ax.plot(x_axis, comp, color=base_colors[k % len(base_colors)], linewidth=0.8, alpha=0.75, label=f"$g_{{{k+1}}}$")
@@ -241,42 +237,10 @@ class SlicePlotter(PlotTools):
             figsize    = (7, 5),
         )
 
-    def plot_improvement_map(
-        self,
-        improvement : np.ndarray,
-        out_path    : Path,
-        az_offset   : int,
-        rg_offset   : int,
-    ) -> Path:
-
-        H, W   = improvement.shape
-        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
-
-        finite = improvement[np.isfinite(improvement)]
-        vmax   = float(np.percentile(np.abs(finite), 98.0)) if finite.size else 1.0
-        vmax   = max(vmax, 1e-6)
-        frac   = float((finite > 0.0).mean()) if finite.size else float("nan")
-
-        return self._imshow_panel(
-            data       = np.nan_to_num(improvement, nan=0.0),
-            title      = f"Relative MSE improvement over Capon baseline  (positive = model better, {frac * 100:.1f}% of pixels)",
-            x_label    = "range index",
-            y_label    = "azimuth index",
-            cbar_label = "(MSE_capon − MSE_pred) / MSE_capon",
-            extent     = extent,
-            cmap       = "RdYlGn",
-            vmin       = -vmax,
-            vmax       = vmax,
-            origin     = "upper",
-            path       = out_path,
-            figsize    = (7, 5),
-        )
-
     def _render_slice_panels(
         self,
         pred_slice    : np.ndarray,
         gt_slice      : np.ndarray,
-        red_slice     : Optional[np.ndarray],
         extent        : list,
         x_label       : str,
         y_label       : str,
@@ -287,8 +251,7 @@ class SlicePlotter(PlotTools):
         stem          : str,
     ) -> List[Path]:
 
-        err_gt_slice  = np.abs(pred_slice - gt_slice)
-        err_red_slice = np.abs(red_slice - gt_slice) if red_slice is not None else None
+        err_gt_slice = np.abs(pred_slice - gt_slice)
 
         scale        = self._intensity_scale(gt_slice)
         gt_slice     = self._rescale(gt_slice,     scale)
@@ -304,16 +267,6 @@ class SlicePlotter(PlotTools):
             (pred_slice,   f"Prediction — {title_pos}{ssim_str}",  self.cmap,     vmin, vmax,    self._int_label, "pred"),
             (err_gt_slice, f"|Pred − GT| — {title_pos}",           self.err_cmap, 0.0,  emax_gt, self._err_label, "error"),
         ]
-
-        if red_slice is not None:
-            red_slice     = self._rescale(red_slice,     scale)
-            err_red_slice = self._rescale(err_red_slice, scale)
-            emax_red      = float(np.percentile(err_red_slice, 99.0))
-
-            panels += [
-                (red_slice,     f"Capon (reduced) — {title_pos}", self.cmap,     vmin, vmax,     self._int_label, "capon"),
-                (err_red_slice, f"|Capon − GT| — {title_pos}",    self.err_cmap, 0.0,  emax_red, self._err_label, "capon_error"),
-            ]
 
         return [
             self._imshow_panel(
@@ -344,13 +297,11 @@ class SlicePlotter(PlotTools):
         az_offset    : int,
         rg_offset    : int,
         ssim_value   : Optional[float] = None,
-        reduced_cube : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
         if axis == "range":
             pred_slice               = pred_cube[:, :, index]
             gt_slice                 = gt_cube  [:, :, index]
-            red_slice                = reduced_cube[:, :, index] if reduced_cube is not None else None
             x_label                  = "azimuth index"
             x_extent_lo, x_extent_hi = az_offset, az_offset + pred_slice.shape[1]
             title_pos                = f"range = {index + rg_offset}"
@@ -358,7 +309,6 @@ class SlicePlotter(PlotTools):
         elif axis == "azimuth":
             pred_slice               = pred_cube[:, index, :]
             gt_slice                 = gt_cube  [:, index, :]
-            red_slice                = reduced_cube[:, index, :] if reduced_cube is not None else None
             x_label                  = "range index"
             x_extent_lo, x_extent_hi = rg_offset, rg_offset + pred_slice.shape[1]
             title_pos                = f"azimuth = {index + az_offset}"
@@ -370,14 +320,12 @@ class SlicePlotter(PlotTools):
         x_axis_sorted = x_axis[sort_idx]
         pred_slice    = pred_slice[sort_idx]
         gt_slice      = gt_slice  [sort_idx]
-        red_slice     = red_slice[sort_idx] if red_slice is not None else None
 
         extent = [x_extent_lo, x_extent_hi, float(x_axis_sorted[0]), float(x_axis_sorted[-1])]
 
         return self._render_slice_panels(
             pred_slice = pred_slice,
             gt_slice   = gt_slice,
-            red_slice  = red_slice,
             extent     = extent,
             x_label    = x_label,
             y_label    = "elevation [m]",
@@ -399,12 +347,10 @@ class SlicePlotter(PlotTools):
         az_offset    : int,
         rg_offset    : int,
         ssim_value   : Optional[float] = None,
-        reduced_cube : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
         pred_slice = pred_cube[elev_idx]
         gt_slice   = gt_cube  [elev_idx]
-        red_slice  = reduced_cube[elev_idx] if reduced_cube is not None else None
 
         H, W      = pred_slice.shape
         extent    = [rg_offset, rg_offset + W, az_offset + H, az_offset]
@@ -413,7 +359,6 @@ class SlicePlotter(PlotTools):
         return self._render_slice_panels(
             pred_slice = pred_slice,
             gt_slice   = gt_slice,
-            red_slice  = red_slice,
             extent     = extent,
             x_label    = "range index",
             y_label    = "azimuth index",
@@ -462,7 +407,6 @@ class SlicePlotter(PlotTools):
     ) -> Path:
 
         vals_gt = np.array([global_metrics[f"ssim_gt_{axis}_{i}"]  for i in range(n_slices)], dtype=np.float64)
-        vals_rd = np.array([global_metrics.get(f"ssim_red_{axis}_{i}", float("nan")) for i in range(n_slices)], dtype=np.float64)
         x_phys  = slice_indices.astype(np.float64) + ax_offset
 
         mean_gt = float(global_metrics[f"ssim_gt_{axis}_mean"])
@@ -470,11 +414,6 @@ class SlicePlotter(PlotTools):
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
         ax.plot(x_phys, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
         ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4f}")
-
-        if np.isfinite(vals_rd).any():
-            mean_rd = float(global_metrics[f"ssim_red_{axis}_mean"])
-            ax.plot(x_phys, vals_rd, color="C2", linewidth=0.9, label="Capon (reduced) × GT", alpha=0.9)
-            ax.axhline(mean_rd, color="C2", linestyle=":", linewidth=1.0, label=f"mean = {mean_rd:.4f}")
 
         tick_locs = np.linspace(x_phys[0], x_phys[-1], min(20, n_slices)).round().astype(int)
         ax.set_xticks(tick_locs)
@@ -507,17 +446,11 @@ class SlicePlotter(PlotTools):
         paths = []
         for key, fname, ylabel, desc in metric_specs:
             vals_gt = np.array([global_metrics[f"{key}_gt_{i}"]  for i in range(n_elev)], dtype=np.float64)
-            vals_rd = np.array([global_metrics.get(f"{key}_red_{i}", float("nan")) for i in range(n_elev)], dtype=np.float64)
             mean_gt = float(global_metrics[f"{key}_gt_mean"])
 
             fig, ax = plt.subplots(figsize=(5.8, 3.6))
             ax.plot(x_axis, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
             ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4g}")
-
-            if np.isfinite(vals_rd).any():
-                mean_rd = float(global_metrics[f"{key}_red_mean"])
-                ax.plot(x_axis, vals_rd, color="C2", linewidth=0.9, label="Capon (reduced) × GT", alpha=0.9)
-                ax.axhline(mean_rd, color="C2", linestyle=":", linewidth=1.0, label=f"mean = {mean_rd:.4g}")
 
             ax.set_xlabel("elevation [m]")
             ax.set_ylabel(ylabel)

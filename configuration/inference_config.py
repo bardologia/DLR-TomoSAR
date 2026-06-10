@@ -34,11 +34,6 @@ class InferenceConfig:
     stitch_window       : str            = "hann"
     cube_dtype          : str            = "float32"
 
-    compare_classical   : bool           = True
-    capon_window        : Optional[tuple] = None
-    capon_loading       : float          = 1e-2
-    capon_phase_sign    : float          = 1.0
-
     n_best_profiles     : int            = 12
     n_worst_profiles    : int            = 12
     n_random_profiles   : int            = 12

@@ -6,7 +6,6 @@ from typing  import Dict, List
 import numpy as np
 
 from configuration.inference_config         import InferenceConfig
-from pipelines.inference_pipeline.baseline  import ClassicalBaseline
 from pipelines.inference_pipeline.figures   import FigureComposer
 from pipelines.inference_pipeline.loader    import InferenceMetadata, RunLoader
 from pipelines.inference_pipeline.metrics   import Metrics
@@ -88,32 +87,6 @@ class InferencePipeline:
         )
         return predictor.run_inference()
 
-    def _attach_classical_baseline(self, cfg: InferenceConfig, run, result, logger: Logger) -> None:
-        if not cfg.compare_classical:
-            return
-
-        baseline = ClassicalBaseline(
-            run_directory     = cfg.run_directory,
-            logger            = logger,
-            preprocessing_dir = run.dataset_config.preprocessing_run_directory,
-            window            = tuple(cfg.capon_window) if cfg.capon_window is not None else None,
-            loading           = cfg.capon_loading,
-            phase_sign        = cfg.capon_phase_sign,
-        )
-
-        reduced = baseline.compute(
-            complex_inputs   = run.complex_inputs,
-            n_secondaries    = run.n_secondaries,
-            x_axis           = run.x_axis,
-            secondary_labels = run.secondary_labels,
-        )
-
-        result.attach_reduced(reduced)
-
-        if cfg.save_cubes:
-            np.save(result.cube_directory / "reduced_curves.npy",      result.reduced_curves)
-            np.save(result.cube_directory / "reduced_curves_norm.npy", result.reduced_norm_curves)
-
     @staticmethod
     def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
         n_slices = max(1, min(n_slices, n_total))
@@ -150,8 +123,6 @@ class InferencePipeline:
         meta, logger, plotter  = self._setup(cfg)
         run                    = self._load_run(cfg, logger)
         result                 = self._predict(cfg, meta, run, logger)
-
-        self._attach_classical_baseline(cfg, run, result, logger)
 
         x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
         _N_elev, _az, _rg = result.pred_curves.shape
