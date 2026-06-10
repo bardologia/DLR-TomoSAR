@@ -37,6 +37,7 @@ class InferenceConfig:
     compute_reduced     : bool           = True
     reduced_effort      : str            = "high"
     reduced_cache_subdir: str            = "data"
+    reduced_env_name    : str            = "stetools"
     reduced_pyrat_dir   : Optional[Path] = None
 
     n_best_profiles     : int            = 12

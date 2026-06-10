@@ -7,7 +7,10 @@ from pathlib import Path
 class ProjectPaths:
 
     PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
-    SCRIPT_PRIORITY = {"pre_process": ["conda:stetools"]}
+    SCRIPT_PRIORITY = {
+        "pre_process"              : ["conda:stetools"],
+        "generate_reduced_tomogram": ["conda:stetools"],
+    }
 
     def __init__(self) -> None:
         self.webui_root   = Path(__file__).resolve().parent

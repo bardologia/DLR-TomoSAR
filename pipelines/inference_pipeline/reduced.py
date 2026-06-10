@@ -1,20 +1,15 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib     import Path
 from typing      import List, Optional
 
 import numpy as np
 
 from configuration.inference_config              import InferenceConfig
-from configuration.processing_config             import (
-    ParallelConfiguration,
-    PathConfiguration,
-    ProcessingConfiguration,
-    TomogramConfiguration,
-)
 from pipelines.inference_pipeline.loader         import InferenceMetadata, Run
-from pipelines.processing_pipeline.tomogram      import TomogramProcessor
 from pipelines.shared                            import FileIO
+from tools.conda_env                             import CondaEnv
 from tools.logger                                import Logger
 from tools.regions                               import CropRegion
 from tools.track_baselines                       import SecondarySelection
@@ -54,41 +49,43 @@ class ReducedTomogramSynthesizer:
 
         return indices
 
-    def _build_processing_config(self, state: dict, select: List[int], crop: CropRegion) -> ProcessingConfiguration:
+    def _build_spec(self, state: dict, select: List[int], crop: CropRegion, tomogram_path: Path, dem_path: Path) -> dict:
         tomogram_state = dict(state["tomogram_config"])
         tomogram_state["track_selection"] = select
 
-        tomogram_config = TomogramConfiguration(**tomogram_state)
+        pyrat_directory = str(self.cfg.reduced_pyrat_dir) if self.cfg.reduced_pyrat_dir is not None else state["paths"]["pyrat_directory"]
 
-        pyrat_directory = self.cfg.reduced_pyrat_dir if self.cfg.reduced_pyrat_dir is not None else Path(state["paths"]["pyrat_directory"])
-
-        paths = PathConfiguration(
-            main_directory   = Path(self.cfg.run_directory),
-            pyrat_directory  = Path(pyrat_directory),
-            run_subdirectory = "reduced_work",
-        )
-
-        return ProcessingConfiguration(
-            crop             = crop,
-            tomogram_config  = tomogram_config,
-            parallel         = ParallelConfiguration(effort=self.cfg.reduced_effort),
-            paths            = paths,
-            dataset_type     = state["dataset_type"],
-            stack_identifier = state["stack_identifier"],
-        )
+        return {
+            "tomogram_config"  : tomogram_state,
+            "stack_identifier" : state["stack_identifier"],
+            "dataset_type"     : state["dataset_type"],
+            "pyrat_directory"  : pyrat_directory,
+            "main_directory"   : str(self.cfg.run_directory),
+            "effort"           : self.cfg.reduced_effort,
+            "crop"             : list(crop.as_tuple()),
+            "tomogram_path"    : str(tomogram_path),
+            "dem_path"         : str(dem_path),
+        }
 
     def _cache_key(self, select: List[int], crop: CropRegion) -> str:
         select_token = "-".join(str(index) for index in sorted(select))
         return f"{crop.as_identifier_string()}_sel{len(select)}-{select_token}"
 
-    def _generate(self, processing_config: ProcessingConfiguration, tomogram_path: Path, dem_path: Path) -> None:
-        processor = TomogramProcessor(processing_config, logger=self.logger)
-        processor.run(
-            tomogram_path    = tomogram_path,
-            dem_path         = dem_path,
-            stack_identifier = processing_config.stack_identifier,
-            tomogram_config  = processing_config.tomogram_config,
-        )
+    @staticmethod
+    def _repo_root() -> Path:
+        return Path(__file__).resolve().parents[2]
+
+    def _generate(self, state: dict, select: List[int], crop: CropRegion, tomogram_path: Path, dem_path: Path, cache_key: str) -> None:
+        spec      = self._build_spec(state, select, crop, tomogram_path, dem_path)
+        spec_path = self.cache_directory / f"reduced_spec_{cache_key}.json"
+        FileIO.save_json(spec, spec_path)
+
+        interpreter = CondaEnv.interpreter(self.cfg.reduced_env_name)
+        entry       = self._repo_root() / "main" / "generate_reduced_tomogram.py"
+        command     = [str(interpreter), str(entry), "--spec", str(spec_path)]
+
+        self.logger.subsection(f"Generating reduced tomogram in env '{self.cfg.reduced_env_name}': {' '.join(command)}")
+        subprocess.run(command, check=True, cwd=str(self._repo_root()))
 
     def _validate_alignment(self, reduced: np.ndarray) -> None:
         n_height, az, rg = reduced.shape
@@ -145,8 +142,7 @@ class ReducedTomogramSynthesizer:
         if tomogram_path.is_file():
             self.logger.subsection(f"Reduced tomogram loaded from cache : {tomogram_path}")
         else:
-            processing_config = self._build_processing_config(state, select, crop)
-            self._generate(processing_config, tomogram_path, dem_path)
+            self._generate(state, select, crop, tomogram_path, dem_path, cache_key)
 
         reduced = np.load(str(tomogram_path), allow_pickle=False).astype(np.float32)
 
