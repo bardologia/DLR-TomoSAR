@@ -118,6 +118,31 @@ class InferencePipeline:
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics
 
+    def _synthesize_reduced(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, indices: dict, logger: Logger) -> None:
+        if not cfg.compute_reduced or run.secondary_labels is None:
+            return
+
+        from pipelines.inference_pipeline.reduced import ReducedTomogramSynthesizer
+
+        synth          = ReducedTomogramSynthesizer(run, meta, cfg, logger)
+        reduced_curves = synth.run(result.gt_curves)
+
+        if reduced_curves is None:
+            return
+
+        comparison = Metrics(result, x_axis_np, run.n_gaussians).reduced_comparison(
+            reduced_curves,
+            elev_indices  = indices["all_elev_idx"],
+            range_indices = indices["all_range_idx"],
+            az_indices    = indices["all_az_idx"],
+        )
+
+        result.reduced = comparison
+        global_metrics.update(comparison.metrics)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        logger.subsection(f"Reduced baseline merged : relative MSE reduction = {comparison.metrics['relative_mse_reduction']:.4f}, NN beats reduced on {comparison.metrics['fraction_pred_beats_reduced'] * 100.0:.1f}% of pixels")
+
     def run(self) -> Path:
         cfg                    = self.config
         meta, logger, plotter  = self._setup(cfg)
@@ -129,6 +154,8 @@ class InferencePipeline:
 
         indices        = self._compute_slice_indices(cfg, _N_elev, _az, _rg)
         global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
+
+        self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
 
         composer = FigureComposer(plotter=plotter, meta=meta, logger=logger, cfg=cfg)
 

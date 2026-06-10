@@ -12,8 +12,21 @@ from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
-from pipelines.shared.io      import FileIO
-from pipelines.shared.scoring import R2
+from pipelines.shared.io          import FileIO
+from pipelines.shared.preprocessing import ProfileNormalizer
+from pipelines.shared.scoring       import R2, RelativeImprovement
+
+
+@dataclass
+class ReducedComparison:
+    reduced_curves : np.ndarray
+    gt_norm        : np.ndarray
+    pred_norm      : np.ndarray
+    reduced_norm   : np.ndarray
+    err_pred       : np.ndarray
+    err_reduced    : np.ndarray
+    improvement    : np.ndarray
+    metrics        : Dict[str, float]
 
 
 @dataclass
@@ -32,6 +45,8 @@ class Result:
     cube_directory     : Path
     azimuth_offset     : int
     range_offset       : int
+
+    reduced            : Optional[ReducedComparison] = None
 
 
 class Metrics:
@@ -498,3 +513,52 @@ class Metrics:
         metrics.update(self._permutation_consensus())
 
         return metrics
+
+    def reduced_comparison(
+        self,
+        reduced_curves : np.ndarray,
+        *,
+        elev_indices   : Optional[np.ndarray] = None,
+        range_indices  : Optional[np.ndarray] = None,
+        az_indices     : Optional[np.ndarray] = None,
+    ) -> ReducedComparison:
+
+        gt_n   = ProfileNormalizer.unit_area(self.result.gt_curves)
+        pred_n = ProfileNormalizer.unit_area(self.result.pred_curves)
+        red_n  = ProfileNormalizer.unit_area(reduced_curves)
+
+        out: Dict[str, float] = {}
+        out.update(self._curve_scalar_metrics(red_n, gt_n, suffix="red"))
+        out.update(self._slice_ssim(red_n, gt_n, elev_indices, range_indices, az_indices, prefix="red"))
+        out.update(self._expand_elev(red_n, gt_n, suffix="red"))
+
+        err_pred    = self.curve_pixel_metrics(pred_n, gt_n)["mse"]
+        err_reduced = self.curve_pixel_metrics(red_n,  gt_n)["mse"]
+        improvement = (err_reduced - err_pred).astype(np.float32)
+
+        out.update(self._expand_pixel_stats((
+            ("pixel_mse_red",   err_reduced),
+            ("pixel_mse_predn", err_pred),
+        )))
+
+        finite           = np.isfinite(improvement)
+        pred_mse_mean     = float(np.nanmean(err_pred))
+        reduced_mse_mean  = float(np.nanmean(err_reduced))
+
+        out["pred_pixel_mse_norm_mean"]      = pred_mse_mean
+        out["reduced_pixel_mse_norm_mean"]   = reduced_mse_mean
+        out["improvement_pixel_mse_mean"]    = float(np.nanmean(improvement))
+        out["improvement_pixel_mse_median"]  = float(np.nanmedian(improvement))
+        out["fraction_pred_beats_reduced"]   = float(np.mean(err_pred[finite] < err_reduced[finite])) if finite.any() else float("nan")
+        out["relative_mse_reduction"]        = RelativeImprovement.fraction(reduced_mse_mean, pred_mse_mean, higher_is_better=False)
+
+        return ReducedComparison(
+            reduced_curves = reduced_curves,
+            gt_norm        = gt_n,
+            pred_norm      = pred_n,
+            reduced_norm   = red_n,
+            err_pred       = err_pred,
+            err_reduced    = err_reduced,
+            improvement    = improvement,
+            metrics        = out,
+        )

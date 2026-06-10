@@ -249,6 +249,43 @@ class Report:
 
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
+        out += self._build_reduced_headline()
+
+        return out
+
+    def _build_reduced_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "improvement_pixel_mse_mean" not in gm:
+            return []
+
+        out = ["\n### 2.6 NN improvement over the classical baseline\n"]
+        out.append(
+            "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
+            "secondary subset this run was trained on, processed identically to the ground-truth full-stack "
+            "tomogram (same pyrat `fusartomo`, height range, filter and stack). It is what tomography yields "
+            "without the network. Reduced-vs-GT and improvement quantities are computed on per-elevation-profile "
+            "unit-area-normalised cubes, so they measure elevation-distribution agreement independent of absolute "
+            "Capon power calibration.\n"
+        )
+        out.append(self._three_col_table([
+            ("Reduced MSE mean",       gm["reduced_pixel_mse_norm_mean"],  "Per-pixel reduced-vs-GT MSE (classical baseline)"),
+            ("Pred MSE mean",          gm["pred_pixel_mse_norm_mean"],     "Per-pixel pred-vs-GT MSE (neural network)"),
+            ("Improvement mean",       gm["improvement_pixel_mse_mean"],   "MSE(reduced) − MSE(pred), higher is better"),
+            ("Improvement median",     gm["improvement_pixel_mse_median"], "Median per-pixel improvement"),
+            ("Relative MSE reduction", gm["relative_mse_reduction"],       "1 − MSE(pred)/MSE(reduced)"),
+            ("Pixels where NN wins",   gm["fraction_pred_beats_reduced"],  "Fraction with pred MSE < reduced MSE"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        out.append("**Reduced vs GT** (classical baseline, unit-area profiles)\n")
+        out.append(self._three_col_table([
+            ("Curve MSE",         gm["curve_mse_red"],         "Mean squared error over all (elev, az, rg)"),
+            ("Overall R2",        gm["overall_r2_red"],        "Global coefficient of determination"),
+            ("SSIM elev mean",    gm["ssim_red_elev_mean"],    "Intensity-at-elevation-bin planes"),
+            ("SSIM range mean",   gm["ssim_red_range_mean"],   "Cross-sectional planes"),
+            ("SSIM azimuth mean", gm["ssim_red_azimuth_mean"], "Cross-sectional planes"),
+        ], header=("Metric", "Reduced vs GT", "Description")))
+        out.append("")
 
         return out
 
@@ -316,6 +353,20 @@ class Report:
 
         return out
 
+    _IMPROVEMENT_KEYS = frozenset({
+        "improvement_pixel_mse_mean", "improvement_pixel_mse_median",
+        "fraction_pred_beats_reduced", "relative_mse_reduction",
+        "pred_pixel_mse_norm_mean", "reduced_pixel_mse_norm_mean",
+    })
+
+    @classmethod
+    def _is_improvement_key(cls, k: str) -> bool:
+        return k in cls._IMPROVEMENT_KEYS
+
+    @staticmethod
+    def _is_reduced_key(k: str) -> bool:
+        return ("_red" in k) or k.startswith("ssim_red") or ("predn" in k)
+
     def _build_full_metrics(self) -> List[str]:
         gm  = self.global_metrics
         out = ["\n## 3. Full metric tables\n"]
@@ -325,6 +376,10 @@ class Report:
             "3.2 Curve-level (GT)":               {},
             "3.3 Per-pixel (GT)":                 {},
             "3.4 SSIM summaries":                 {},
+            "3.5 Curve-level (reduced vs GT)":    {},
+            "3.6 Per-pixel (reduced vs GT)":      {},
+            "3.7 SSIM summaries (reduced vs GT)": {},
+            "3.8 NN improvement over baseline":   {},
         }
 
         for k, v in sorted(gm.items()):
@@ -334,6 +389,15 @@ class Report:
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
+            elif self._is_improvement_key(k):
+                groups["3.8 NN improvement over baseline"][k] = v
+            elif self._is_reduced_key(k):
+                if k.startswith("ssim_red"):
+                    groups["3.7 SSIM summaries (reduced vs GT)"][k] = v
+                elif k.startswith("pixel_"):
+                    groups["3.6 Per-pixel (reduced vs GT)"][k] = v
+                else:
+                    groups["3.5 Curve-level (reduced vs GT)"][k] = v
             elif k.startswith("pixel_"):
                 groups["3.3 Per-pixel (GT)"][k] = v
             elif k.startswith("ssim_"):
@@ -390,7 +454,9 @@ class Report:
         out.append(
             "Each panel overlays the GT profile (black solid), "
             "prediction (red dashed) and individual Gaussian components. "
-            "The shaded area shows the signed residual (pred \u2212 gt).\n"
+            "The shaded area shows the signed residual (pred \u2212 gt). "
+            "When a reduced baseline is available, its classical-Capon profile is overlaid "
+            "(green dotted, rescaled to the GT peak) so the network's gain in elevation shape is visible.\n"
         )
         self._section(out, (
             ("profiles_best",   "4.1 Best-fit profiles (lowest MSE)"),
@@ -450,15 +516,65 @@ class Report:
             )
             out += self.assets.images("elev_metric_curves", fp["elev_metric_curves"])
 
+        out += self._build_reduced_figures()
+
         if gp:
-            out.append("\n## 9. Animations\n")
+            out.append("\n## 10. Animations\n")
             out.append(
                 "Each GIF walks through one axis of the stitched test cube. "
                 "The colour scale is fixed across frames.\n"
             )
             for n, (name, path) in enumerate(sorted(gp.items()), start=1):
-                out.append(f"\n### 9.{n} `{name}`\n")
+                out.append(f"\n### 10.{n} `{name}`\n")
                 out += self.assets.image(name, path)
+
+        return out
+
+    def _build_reduced_figures(self) -> List[str]:
+        fp = self.figure_paths
+
+        keys = (
+            "improvement_map", "reduced_pixel_mse_map",
+            "slices_range_reduced", "slices_azimuth_reduced", "slices_elev_reduced",
+            "ssim_range_reduced", "ssim_azimuth_reduced", "ssim_elev_reduced",
+            "elev_metric_curves_reduced",
+        )
+        if not any(fp.get(k) for k in keys):
+            return []
+
+        out = ["\n## 9. Classical baseline (reduced Capon) vs ground truth\n"]
+        out.append(
+            "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
+            "secondary subset this run was trained on — what tomography yields without the network. "
+            "Reduced and GT cubes are unit-area-normalised per elevation profile before comparison, so "
+            "panels and metrics measure elevation-distribution agreement. Read the network's gain by "
+            "contrasting these errors with the pred-vs-GT figures in sections 5, 7 and 8.\n"
+        )
+
+        self._section(out, (
+            ("improvement_map",       "9.1 Per-pixel NN improvement map (MSE reduced − MSE pred)"),
+            ("reduced_pixel_mse_map", "9.2 Per-pixel reduced-vs-GT MSE map"),
+        ))
+
+        slice_groups = [(key, title) for key, title in (
+            ("slices_range_reduced",   "Range cuts (GT, reduced, error)"),
+            ("slices_azimuth_reduced", "Azimuth cuts (GT, reduced, error)"),
+            ("slices_elev_reduced",    "Elevation cuts (GT, reduced, error)"),
+        ) if fp.get(key)]
+
+        if slice_groups:
+            out.append("\n### 9.3 Reduced tomogram slices\n")
+            self._numbered_section(out, "9.3.", slice_groups)
+
+        self._section(out, (
+            ("ssim_range_reduced",   "9.4 Reduced SSIM along range axis"),
+            ("ssim_azimuth_reduced", "9.5 Reduced SSIM along azimuth axis"),
+            ("ssim_elev_reduced",    "9.6 Reduced SSIM along elevation axis"),
+        ))
+
+        if fp.get("elev_metric_curves_reduced"):
+            out.append("\n### 9.7 Reduced per-elevation-bin metrics (MAE, RMSE, R², cross-entropy)\n")
+            out += self.assets.images("elev_metric_curves_reduced", fp["elev_metric_curves_reduced"])
 
         return out
 
@@ -478,7 +594,7 @@ class Report:
         lines += self._build_figures()
 
         if self.extra_sections:
-            lines.append("\n## 10. Notes\n")
+            lines.append("\n## 11. Notes\n")
             for s in self.extra_sections:
                 lines.append(s)
                 lines.append("")

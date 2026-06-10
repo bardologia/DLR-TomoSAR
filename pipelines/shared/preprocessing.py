@@ -19,3 +19,12 @@ class ProfilePreprocessor:
             out[truncation_index:] = 0.0
 
         return out
+
+
+class ProfileNormalizer:
+    @staticmethod
+    def unit_area(cube : np.ndarray, axis : int = 0, eps : float = 1e-12) -> np.ndarray:
+        cube  = np.asarray(cube, dtype=np.float32)
+        total = cube.sum(axis=axis, keepdims=True)
+
+        return (cube / np.clip(total, eps, None)).astype(np.float32)

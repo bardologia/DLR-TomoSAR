@@ -356,6 +356,8 @@ class FigureComposer:
             seed     = cfg.profile_seed,
         )
 
+        reduced_curves_for_plot = result.reduced.reduced_curves if result.reduced is not None else None
+
         for tag, pixels in (("best", selected["best"]), ("worst", selected["worst"]), ("random", selected["random"])):
             figure_paths[f"profiles_{tag}"] = slice_plotter.plot_profiles(
                 pred_curves    = result.pred_curves,
@@ -369,6 +371,7 @@ class FigureComposer:
                 pixel_metrics  = pixel_metrics_for_plot,
                 az_offset      = result.azimuth_offset,
                 rg_offset      = result.range_offset,
+                reduced_curves = reduced_curves_for_plot,
             )
 
             logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
@@ -526,7 +529,129 @@ class FigureComposer:
 
         logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir / 'elev_metrics'}\n")
 
+        if result.reduced is not None:
+            self._compose_reduced(result, global_metrics, x_axis_np, indices, figure_paths)
+
         return figure_paths
+
+    def _compose_reduced(
+        self,
+        result         : Result,
+        global_metrics : dict,
+        x_axis_np      : np.ndarray,
+        indices        : dict,
+        figure_paths   : Dict[str, List[Path]],
+    ) -> None:
+
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        reduced       = result.reduced
+
+        gt_n  = reduced.gt_norm
+        red_n = reduced.reduced_norm
+
+        slice_range_idx = indices["slice_range_idx"]
+        slice_az_idx    = indices["slice_az_idx"]
+        slice_elev_idx  = indices["slice_elev_idx"]
+        all_range_idx   = indices["all_range_idx"]
+        all_az_idx      = indices["all_az_idx"]
+        all_elev_idx    = indices["all_elev_idx"]
+
+        _N_elev, _az, _rg = red_n.shape
+
+        reduced_dir = meta.figures_dir / "reduced"
+
+        figure_paths["improvement_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = reduced.improvement,
+            title      = "NN improvement over classical baseline (per-pixel ΔMSE, unit-area profiles)",
+            label      = "MSE(reduced) − MSE(pred)",
+            out_path   = reduced_dir / "improvement_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = "RdBu_r",
+            q_low      = 2.0,
+            q_high     = 98.0,
+        )]
+
+        figure_paths["reduced_pixel_mse_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = reduced.err_reduced,
+            title      = "Per-pixel reduced-vs-GT MSE (unit-area profiles, log scale)",
+            label      = "MSE",
+            out_path   = reduced_dir / "reduced_mse_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = self.cfg.cmap_error,
+            log        = True,
+        )]
+
+        figure_paths["slices_range_reduced"]   = []
+        figure_paths["slices_azimuth_reduced"] = []
+        figure_paths["slices_elev_reduced"]    = []
+
+        for axis, indices_arr, stem_fn, group in (
+            ("range",   slice_range_idx, lambda i: f"reduced_range_{int(i) + result.range_offset}",     "slices_range_reduced"),
+            ("azimuth", slice_az_idx,    lambda i: f"reduced_azimuth_{int(i) + result.azimuth_offset}", "slices_azimuth_reduced"),
+        ):
+            for i in indices_arr:
+                figure_paths[group] += slice_plotter.plot_tomogram_slice(
+                    pred_cube  = red_n,
+                    gt_cube    = gt_n,
+                    axis       = axis,
+                    index      = int(i),
+                    x_axis     = x_axis_np,
+                    out_dir    = reduced_dir / "slices",
+                    stem       = stem_fn(i),
+                    az_offset  = result.azimuth_offset,
+                    rg_offset  = result.range_offset,
+                    ssim_value = global_metrics[f"ssim_red_{axis}_{int(i)}"],
+                    ref_title  = "GT (unit-area)",
+                    pred_title = "Reduced (Capon, unit-area)",
+                    err_title  = "|Reduced − GT|",
+                )
+
+        for i in slice_elev_idx:
+            figure_paths["slices_elev_reduced"] += slice_plotter.plot_elevation_intensity_slice(
+                pred_cube  = red_n,
+                gt_cube    = gt_n,
+                elev_idx   = int(i),
+                x_axis     = x_axis_np,
+                out_dir    = reduced_dir / "slices",
+                stem       = f"reduced_elev_idx_{int(i)}",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
+                ssim_value = global_metrics[f"ssim_red_elev_{int(i)}"],
+                ref_title  = "GT (unit-area)",
+                pred_title = "Reduced (Capon, unit-area)",
+                err_title  = "|Reduced − GT|",
+            )
+
+        for axis, n_slices, indices_arr, offset in (
+            ("range",   _rg,     all_range_idx, result.range_offset),
+            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
+            ("elev",    _N_elev, all_elev_idx,  0),
+        ):
+            figure_paths[f"ssim_{axis}_reduced"] = [slice_plotter.plot_ssim_curves(
+                global_metrics = global_metrics,
+                axis           = axis,
+                out_path       = reduced_dir / "ssim" / f"{axis}.png",
+                n_slices       = n_slices,
+                slice_indices  = indices_arr,
+                ax_offset      = offset,
+                prefix         = "red",
+                series_label   = "reduced × GT (unit-area)",
+            )]
+
+        figure_paths["elev_metric_curves_reduced"] = slice_plotter.plot_elev_metric_curves(
+            global_metrics = global_metrics,
+            out_dir        = reduced_dir / "elev_metrics",
+            n_elev         = _N_elev,
+            x_axis         = x_axis_np,
+            suffix         = "red",
+            series_label   = "reduced × GT (unit-area)",
+        )
+
+        logger.subsection(f"Reduced baseline figures written to {reduced_dir}")
 
     def animate(self, result: Result, x_axis_np: np.ndarray) -> Dict[str, Path]:
         cfg    = self.cfg

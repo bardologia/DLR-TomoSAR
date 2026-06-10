@@ -106,6 +106,7 @@ class SlicePlotter(PlotTools):
         pixel_metrics  : Dict[str, np.ndarray],
         az_offset      : int,
         rg_offset      : int,
+        reduced_curves : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
         base_colors = [cm.tab10(i) for i in range(10)]
@@ -119,6 +120,13 @@ class SlicePlotter(PlotTools):
             fig, ax = plt.subplots(figsize=(5.2, 3.4))
             ax.plot(x_axis, gt,   color="black", linewidth=1.4, label="GT",   zorder=3)
             ax.plot(x_axis, pred, color="C3",    linewidth=1.2, label="Pred", linestyle="--", zorder=4)
+
+            if reduced_curves is not None:
+                reduced   = reduced_curves[:, y, x]
+                red_peak  = float(np.nanmax(reduced))
+                gt_peak   = float(np.nanmax(gt))
+                red_scale = (gt_peak / red_peak) if red_peak > 1e-12 else 1.0
+                ax.plot(x_axis, reduced * red_scale, color="C2", linewidth=1.1, label="Reduced (GT-peak)", linestyle=":", zorder=2)
 
             for k, comp in enumerate(comps):
                 ax.plot(x_axis, comp, color=base_colors[k % len(base_colors)], linewidth=0.8, alpha=0.75, label=f"$g_{{{k+1}}}$")
@@ -249,6 +257,9 @@ class SlicePlotter(PlotTools):
         ssim_value    : Optional[float],
         out_dir       : Path,
         stem          : str,
+        ref_title     : str = "GT (Gaussian)",
+        pred_title    : str = "Prediction",
+        err_title     : str = "|Pred − GT|",
     ) -> List[Path]:
 
         err_gt_slice = np.abs(pred_slice - gt_slice)
@@ -263,9 +274,9 @@ class SlicePlotter(PlotTools):
         ssim_str   = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
 
         panels = [
-            (gt_slice,     f"GT (Gaussian) — {title_pos}",         self.cmap,     vmin, vmax,    self._int_label, "gt"),
-            (pred_slice,   f"Prediction — {title_pos}{ssim_str}",  self.cmap,     vmin, vmax,    self._int_label, "pred"),
-            (err_gt_slice, f"|Pred − GT| — {title_pos}",           self.err_cmap, 0.0,  emax_gt, self._err_label, "error"),
+            (gt_slice,     f"{ref_title} — {title_pos}",          self.cmap,     vmin, vmax,    self._int_label, "gt"),
+            (pred_slice,   f"{pred_title} — {title_pos}{ssim_str}", self.cmap,   vmin, vmax,    self._int_label, "pred"),
+            (err_gt_slice, f"{err_title} — {title_pos}",           self.err_cmap, 0.0,  emax_gt, self._err_label, "error"),
         ]
 
         return [
@@ -297,6 +308,9 @@ class SlicePlotter(PlotTools):
         az_offset    : int,
         rg_offset    : int,
         ssim_value   : Optional[float] = None,
+        ref_title    : str = "GT (Gaussian)",
+        pred_title   : str = "Prediction",
+        err_title    : str = "|Pred − GT|",
     ) -> List[Path]:
 
         if axis == "range":
@@ -334,6 +348,9 @@ class SlicePlotter(PlotTools):
             ssim_value = ssim_value,
             out_dir    = out_dir,
             stem       = stem,
+            ref_title  = ref_title,
+            pred_title = pred_title,
+            err_title  = err_title,
         )
 
     def plot_elevation_intensity_slice(
@@ -347,6 +364,9 @@ class SlicePlotter(PlotTools):
         az_offset    : int,
         rg_offset    : int,
         ssim_value   : Optional[float] = None,
+        ref_title    : str = "GT (Gaussian)",
+        pred_title   : str = "Prediction",
+        err_title    : str = "|Pred − GT|",
     ) -> List[Path]:
 
         pred_slice = pred_cube[elev_idx]
@@ -367,6 +387,9 @@ class SlicePlotter(PlotTools):
             ssim_value = ssim_value,
             out_dir    = out_dir,
             stem       = stem,
+            ref_title  = ref_title,
+            pred_title = pred_title,
+            err_title  = err_title,
         )
 
     def plot_metric_histograms(self, metric_arrays: Dict[str, np.ndarray], out_dir: Path) -> List[Path]:
@@ -404,15 +427,17 @@ class SlicePlotter(PlotTools):
         n_slices       : int,
         slice_indices  : np.ndarray,
         ax_offset      : int = 0,
+        prefix         : str = "gt",
+        series_label   : str = "pred × GT (Gaussian)",
     ) -> Path:
 
-        vals_gt = np.array([global_metrics[f"ssim_gt_{axis}_{i}"]  for i in range(n_slices)], dtype=np.float64)
+        vals_gt = np.array([global_metrics[f"ssim_{prefix}_{axis}_{i}"]  for i in range(n_slices)], dtype=np.float64)
         x_phys  = slice_indices.astype(np.float64) + ax_offset
 
-        mean_gt = float(global_metrics[f"ssim_gt_{axis}_mean"])
+        mean_gt = float(global_metrics[f"ssim_{prefix}_{axis}_mean"])
 
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
-        ax.plot(x_phys, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
+        ax.plot(x_phys, vals_gt, color="C0", linewidth=0.9, label=series_label, alpha=0.9)
         ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4f}")
 
         tick_locs = np.linspace(x_phys[0], x_phys[-1], min(20, n_slices)).round().astype(int)
@@ -434,6 +459,8 @@ class SlicePlotter(PlotTools):
         out_dir        : Path,
         n_elev         : int,
         x_axis         : np.ndarray,
+        suffix         : str = "gt",
+        series_label   : str = "pred × GT (Gaussian)",
     ) -> List[Path]:
 
         metric_specs = [
@@ -445,11 +472,11 @@ class SlicePlotter(PlotTools):
 
         paths = []
         for key, fname, ylabel, desc in metric_specs:
-            vals_gt = np.array([global_metrics[f"{key}_gt_{i}"]  for i in range(n_elev)], dtype=np.float64)
-            mean_gt = float(global_metrics[f"{key}_gt_mean"])
+            vals_gt = np.array([global_metrics[f"{key}_{suffix}_{i}"]  for i in range(n_elev)], dtype=np.float64)
+            mean_gt = float(global_metrics[f"{key}_{suffix}_mean"])
 
             fig, ax = plt.subplots(figsize=(5.8, 3.6))
-            ax.plot(x_axis, vals_gt, color="C0", linewidth=0.9, label="pred × GT (Gaussian)", alpha=0.9)
+            ax.plot(x_axis, vals_gt, color="C0", linewidth=0.9, label=series_label, alpha=0.9)
             ax.axhline(mean_gt, color="C0", linestyle="--", linewidth=1.0, label=f"mean = {mean_gt:.4g}")
 
             ax.set_xlabel("elevation [m]")

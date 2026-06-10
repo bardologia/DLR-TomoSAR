@@ -7,6 +7,7 @@ from .orchestration import ProcessPoolRunner
 from .orchestration import QueuedInferenceStage
 from .orchestration import QueuedTrainingStage
 from .plotting      import PlotBase
+from .preprocessing import ProfileNormalizer
 from .preprocessing import ProfilePreprocessor
 from .reporting     import MetricSectionGrouper
 from .reporting     import ReportAssets
@@ -18,6 +19,7 @@ from .scoring       import RelativeImprovement
 __all__ = [
     "FileIO",
     "PlotBase",
+    "ProfileNormalizer",
     "ProfilePreprocessor",
     "ExperimentStage",
     "GpuJob",

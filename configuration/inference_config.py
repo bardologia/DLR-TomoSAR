@@ -34,6 +34,11 @@ class InferenceConfig:
     stitch_window       : str            = "hann"
     cube_dtype          : str            = "float32"
 
+    compute_reduced     : bool           = True
+    reduced_effort      : str            = "high"
+    reduced_cache_subdir: str            = "data"
+    reduced_pyrat_dir   : Optional[Path] = None
+
     n_best_profiles     : int            = 12
     n_worst_profiles    : int            = 12
     n_random_profiles   : int            = 12
