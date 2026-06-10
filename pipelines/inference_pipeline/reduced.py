@@ -25,7 +25,7 @@ class ReducedTomogramSynthesizer:
     LAYOUT_FILENAME       = "dataset.json"
 
     def __init__(self, run: Run, meta: InferenceMetadata, cfg: InferenceConfig, logger: Logger) -> None:
-        self.run    = run
+        self._run   = run
         self.meta   = meta
         self.cfg    = cfg
         self.logger = logger
@@ -48,9 +48,9 @@ class ReducedTomogramSynthesizer:
         if not pass_labels:
             raise ValueError(f"Dataset layout {layout_path} records no pass labels; baseline extraction must succeed during pre-processing before secondaries can be selected by label.")
 
-        indices = SecondarySelection.indices(pass_labels, self.run.secondary_labels)
+        indices = SecondarySelection.indices(pass_labels, self._run.secondary_labels)
         if not indices:
-            raise ValueError(f"Resolved an empty secondary selection from labels {self.run.secondary_labels}; cannot build a reduced tomogram.")
+            raise ValueError(f"Resolved an empty secondary selection from labels {self._run.secondary_labels}; cannot build a reduced tomogram.")
 
         return indices
 
@@ -92,10 +92,10 @@ class ReducedTomogramSynthesizer:
 
     def _validate_alignment(self, reduced: np.ndarray) -> None:
         n_height, az, rg = reduced.shape
-        region           = self.run.split_region
+        region           = self._run.split_region
 
-        if n_height != self.run.x_axis_length:
-            raise ValueError(f"Reduced tomogram has {n_height} elevation bins but the run x_axis has {self.run.x_axis_length}; height_range must match the preprocessing run that produced the ground-truth tomogram.")
+        if n_height != self._run.x_axis_length:
+            raise ValueError(f"Reduced tomogram has {n_height} elevation bins but the run x_axis has {self._run.x_axis_length}; height_range must match the preprocessing run that produced the ground-truth tomogram.")
 
         if (az, rg) != (region.azimuth_size, region.range_size):
             raise ValueError(f"Reduced tomogram spatial shape {(az, rg)} does not match the split region {(region.azimuth_size, region.range_size)}.")
@@ -122,16 +122,16 @@ class ReducedTomogramSynthesizer:
     def run(self, gt_curves: np.ndarray) -> Optional[np.ndarray]:
         self.logger.section("[Inference: Reduced Capon Baseline]")
 
-        if self.run.secondary_labels is None:
+        if self._run.secondary_labels is None:
             self.logger.subsection("Run uses the full secondary stack; reduced tomogram equals the ground-truth tomogram. Skipping.")
             return None
 
         state  = self._load_processing_state()
         select = self._select_indices()
-        crop   = CropRegion(*self.run.split_region.as_tuple())
+        crop   = CropRegion(*self._run.split_region.as_tuple())
 
         self.logger.kv_table({
-            "Secondary labels" : ", ".join(self.run.secondary_labels),
+            "Secondary labels" : ", ".join(self._run.secondary_labels),
             "Select indices"   : ", ".join(str(index) for index in select),
             "Crop"             : crop.as_tuple(),
             "Stack id"         : state["stack_identifier"],
