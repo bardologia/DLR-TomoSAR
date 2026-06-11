@@ -5,7 +5,7 @@ class DatasetPicker {
 
   static MULTI_MODES = {
     datasets: { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "none = all datasets in the queue", flag: (d) => (d.has_params ? "" : "  (no params)") },
-    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "none = every run in the logs path", flag: (d) => (d.has_checkpoint ? "" : "  (no checkpoint)") },
+    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "none = every run in the logs path", flag: (d) => (!d.has_checkpoint ? "  (no checkpoint)" : d.has_inference ? "  (inferred)" : "") },
   };
 
   constructor(view, leaf, spec) {

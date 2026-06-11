@@ -12,6 +12,7 @@ class DatasetBrowser:
     PARAM_SUFFIX    = ".npy"
     MAX_DEPTH       = 3
     CHECKPOINT_NAME = "best_model.pt"
+    INFERENCE_DIR   = "inference"
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
@@ -54,6 +55,7 @@ class DatasetBrowser:
                 "name"           : entry.name,
                 "path"           : str(entry),
                 "has_checkpoint" : (entry / self.CHECKPOINT_NAME).is_file(),
+                "has_inference"  : self._has_inference(entry),
             })
 
         self.logger.info(f"runs: listed {len(entries)} under {base}")
@@ -77,6 +79,16 @@ class DatasetBrowser:
 
         self.logger.info(f"params: found {len(files)} under {params_dir}")
         return {"ok": True, "dataset": str(dataset), "params_root": str(params_dir), "files": files}
+
+    def _has_inference(self, run_dir: Path) -> bool:
+        inference_dir = run_dir / self.INFERENCE_DIR
+        if not inference_dir.is_dir():
+            return False
+
+        for entry in inference_dir.iterdir():
+            if entry.is_dir():
+                return True
+        return False
 
     def _directory(self, raw: str) -> Path | None:
         if not raw or not raw.strip():
