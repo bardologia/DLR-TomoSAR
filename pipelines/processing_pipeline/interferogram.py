@@ -69,11 +69,10 @@ class InterferogramBuilder:
         raw_options  = tomography_object.project.get("options", "")
         options_list = [opt.split("=") for opt in raw_options.split(",") if opt]
         options      = {opt[0].lower().strip(): True if len(opt) == 1 else opt[1].strip() for opt in options_list}
+        suffix       = options.get("suffix", "")
 
-        if "suffix" not in options:
-            raise KeyError("FuSAR project options string does not declare a 'suffix' entry")
-
-        suffix = options["suffix"]
+        if not suffix:
+            self.logger.subsection("[FSAR] Project options declare no 'suffix' entry — loading INF products without a coregistration suffix")
 
         self.logger.subsection("[FSAR] Loading primary SLC")
         primary_slc  = getdata(
