@@ -30,14 +30,14 @@ class LaunchView {
 
   static PICKERS = {
     extract_params: {
-      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true, open: true },
+      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
     },
     train: {
       "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
       "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
     },
     infer: {
-      run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir", open: true },
+      run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
   };
 
@@ -823,6 +823,7 @@ class LaunchView {
     const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
     if (pickerSpec && window.DatasetPicker) {
       control = new window.DatasetPicker(this, leaf, pickerSpec).build();
+      row.classList.add(pickerSpec.multi ? "cfg-edit__row--board" : "cfg-edit__row--wide");
     } else if (!leaf.editable) {
       control = this._textControl(leaf);
       control.input.disabled = true;

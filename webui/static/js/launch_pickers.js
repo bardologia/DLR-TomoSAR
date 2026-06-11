@@ -4,8 +4,8 @@ class DatasetPicker {
   static CUSTOM = "__custom__";
 
   static MULTI_MODES = {
-    datasets: { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "none = all datasets in the queue", flag: (d) => (d.has_params ? "" : "  (no params)") },
-    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "none = every run in the logs path", flag: (d) => (!d.has_checkpoint ? "  (no checkpoint)" : d.has_inference ? "  (inferred)" : "") },
+    datasets: { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "nothing selected = every dataset is processed", badge: (d) => (d.has_params ? null : { text: "no params", tone: "warn" }) },
+    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "nothing selected = every run is processed",     badge: (d) => (!d.has_checkpoint ? { text: "no checkpoint", tone: "warn" } : d.has_inference ? { text: "inferred", tone: "ok" } : null) },
   };
 
   constructor(view, leaf, spec) {
@@ -15,10 +15,15 @@ class DatasetPicker {
     this.el = null;
     this.select = null;
     this.custom = null;
-    this.summary = null;
-    this.panel = null;
+    this.note = null;
+    this.board = null;
+    this.count = null;
+    this.hint = null;
+    this.filter = null;
+    this.body = null;
+    this.items = [];
     this.options = [];
-    this.checks = new Map();
+    this.selected = new Set();
     this.reloadTimer = null;
   }
 
@@ -97,7 +102,7 @@ class DatasetPicker {
     }
     const items = (res.datasets || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
     this.note.textContent = items.length ? `${items.length} in ${res.base}` : `no datasets in ${res.base}`;
-    this._renderSingleOptions(items.map((d) => ({ value: d.path, label: d.name })));
+    this._renderSingleOptions(items.map((d) => ({ value: d.path, label: d.name + (d.has_params ? "" : "  (no params)") })));
   }
 
   async _fetchParams(dataset) {
@@ -159,32 +164,48 @@ class DatasetPicker {
   }
 
   _buildMulti() {
-    this.summary = document.createElement("button");
-    this.summary.type = "button";
-    this.summary.className = "cfg-edit__input picker__multi";
-    this.summary.addEventListener("click", () => this._togglePanel());
+    const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
 
-    this.panel = document.createElement("div");
-    this.panel.className = "picker__panel";
-    this.panel.hidden = true;
+    this.board = document.createElement("div");
+    this.board.className = "picker__board";
 
-    this.el.appendChild(this.summary);
-    this.el.appendChild(this.panel);
+    const head = document.createElement("div");
+    head.className = "picker__board-head";
 
-    this._paintSummary();
+    this.count = document.createElement("span");
+    this.count.className = "picker__count";
+
+    this.hint = document.createElement("span");
+    this.hint.className = "picker__hint";
+
+    this.filter = document.createElement("input");
+    this.filter.className = "picker__filter";
+    this.filter.spellcheck = false;
+    this.filter.placeholder = `filter ${mode.noun}...`;
+    this.filter.addEventListener("input", () => this._renderItems());
+
+    head.appendChild(this.count);
+    head.appendChild(this.hint);
+    head.appendChild(this.filter);
+    head.appendChild(window.LaunchWidgetDom.mini("All", () => this._setAll(true)));
+    head.appendChild(window.LaunchWidgetDom.mini("None", () => this._setAll(false)));
+    head.appendChild(window.LaunchWidgetDom.mini("Reload", () => this._loadMulti()));
+
+    this.body = document.createElement("div");
+    this.body.className = "picker__items";
+
+    this.board.appendChild(head);
+    this.board.appendChild(this.body);
+    this.el.appendChild(this.board);
 
     if (this.spec.baseFrom) {
       this.view._onDependency(this.spec.baseFrom, () => this._scheduleReload());
     }
 
-    if (this.spec.open) {
-      this.panel.hidden = false;
-      this._loadMulti();
-    }
+    this._loadMulti();
   }
 
   _scheduleReload() {
-    if (this.panel.hidden) return;
     clearTimeout(this.reloadTimer);
     this.reloadTimer = setTimeout(() => this._loadMulti(), 350);
   }
@@ -198,85 +219,112 @@ class DatasetPicker {
     }
   }
 
-  _paintSummary() {
-    const names = this._selectedNames();
-    this.summary.textContent = names.length ? `${names.length} selected` : `all ${DatasetPicker.MULTI_MODES[this.spec.mode].noun}`;
-    this.summary.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
-  }
-
-  async _togglePanel() {
-    if (!this.panel.hidden) {
-      this.panel.hidden = true;
-      return;
-    }
-    this.panel.hidden = false;
-    await this._loadMulti();
-  }
-
   async _loadMulti() {
     const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
     const base = this._base();
-    this.panel.innerHTML = `<p class="picker__note">listing ${base || "(no base)"}...</p>`;
+
+    this.count.textContent = "listing...";
+    this.hint.textContent = "";
 
     const res = await window.apiGet(`${mode.endpoint}?base=${encodeURIComponent(base || "")}`);
     if (!res.ok) {
-      this.panel.innerHTML = `<p class="picker__note">${res.error || `could not list ${mode.noun}`}</p>`;
+      this.items = [];
+      this.count.textContent = `no ${mode.noun}`;
+      this.body.innerHTML = `<p class="picker__empty">${res.error || `could not list ${mode.noun}`}</p>`;
       return;
     }
 
-    const items = (res[mode.key] || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
-    const selected = new Set(this._selectedNames());
+    this.items = (res[mode.key] || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
+    this.selected = new Set(this._selectedNames());
+    this._renderItems();
+    this._paintSummary();
+  }
 
-    this.panel.innerHTML = "";
-    const head = document.createElement("div");
-    head.className = "picker__panel-head";
-    head.appendChild(window.LaunchWidgetDom.mini("All", () => this._setAll(true)));
-    head.appendChild(window.LaunchWidgetDom.mini("None", () => this._setAll(false)));
-    const hint = document.createElement("span");
-    hint.className = "picker__note";
-    hint.textContent = mode.hint;
-    head.appendChild(hint);
-    this.panel.appendChild(head);
+  _renderItems() {
+    const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
+    const query = this.filter.value.trim().toLowerCase();
 
-    this.checks = new Map();
-    items.forEach((d) => {
+    this.body.innerHTML = "";
+
+    if (!this.items.length) {
+      this.body.appendChild(Object.assign(document.createElement("p"), { className: "picker__empty", textContent: `no ${mode.noun} in ${this._base()}` }));
+      return;
+    }
+
+    let shown = 0;
+    this.items.forEach((d) => {
+      if (query && !d.name.toLowerCase().includes(query)) return;
+      shown += 1;
+
       const row = document.createElement("label");
-      row.className = "picker__check";
+      row.className = "picker__item";
+      row.classList.toggle("is-selected", this.selected.has(d.name));
+
       const box = document.createElement("input");
       box.type = "checkbox";
-      box.checked = selected.has(d.name);
-      box.addEventListener("change", () => this._commitMulti());
-      const text = document.createElement("span");
-      text.textContent = d.name + mode.flag(d);
+      box.checked = this.selected.has(d.name);
+      box.addEventListener("change", () => {
+        if (box.checked) this.selected.add(d.name);
+        else this.selected.delete(d.name);
+        row.classList.toggle("is-selected", box.checked);
+        this._commitMulti();
+      });
+
+      const name = document.createElement("span");
+      name.className = "picker__item-name";
+      name.textContent = d.name;
+      name.title = d.path || d.name;
+
       row.appendChild(box);
-      row.appendChild(text);
-      this.panel.appendChild(row);
-      this.checks.set(d.name, box);
+      row.appendChild(name);
+
+      const badge = mode.badge(d);
+      if (badge) {
+        const pill = document.createElement("span");
+        pill.className = `picker__badge picker__badge--${badge.tone}`;
+        pill.textContent = badge.text;
+        row.appendChild(pill);
+      }
+
+      this.body.appendChild(row);
     });
 
-    if (!items.length) {
-      this.panel.appendChild(Object.assign(document.createElement("p"), { className: "picker__note", textContent: `no ${mode.noun} in ${res.base}` }));
+    if (!shown) {
+      this.body.appendChild(Object.assign(document.createElement("p"), { className: "picker__empty", textContent: `no ${mode.noun} match "${query}"` }));
     }
   }
 
+  _visibleNames() {
+    const query = this.filter.value.trim().toLowerCase();
+    return this.items.map((d) => d.name).filter((n) => (!query || n.toLowerCase().includes(query)));
+  }
+
   _setAll(on) {
-    this.checks.forEach((box) => (box.checked = on));
+    this._visibleNames().forEach((n) => (on ? this.selected.add(n) : this.selected.delete(n)));
+    this._renderItems();
     this._commitMulti();
   }
 
   _commitMulti() {
-    const names = [];
-    this.checks.forEach((box, name) => {
-      if (box.checked) names.push(name);
-    });
+    const names = this.items.map((d) => d.name).filter((n) => this.selected.has(n));
     this.view._setValue(this.leaf, window.PythonLiteral.render(names));
     this._paintSummary();
   }
 
+  _paintSummary() {
+    const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
+    const picked = this.items.filter((d) => this.selected.has(d.name)).length;
+
+    this.count.textContent = picked ? `${picked} of ${this.items.length} selected` : `all ${this.items.length} ${mode.noun}`;
+    this.hint.textContent = picked ? "" : mode.hint;
+    this.board.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
+  }
+
   _reset() {
     if (this.spec.multi) {
+      this.selected = new Set(this._selectedNames());
+      this._renderItems();
       this._paintSummary();
-      if (this.panel && !this.panel.hidden) this._loadMulti();
       return;
     }
     this.custom.hidden = true;
