@@ -36,6 +36,9 @@ class LaunchView {
       "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
       "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
     },
+    infer: {
+      run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
+    },
   };
 
   constructor(runConsole, project) {

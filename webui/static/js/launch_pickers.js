@@ -3,6 +3,11 @@
 class DatasetPicker {
   static CUSTOM = "__custom__";
 
+  static MULTI_MODES = {
+    datasets: { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "none = all datasets in the queue", flag: (d) => (d.has_params ? "" : "  (no params)") },
+    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "none = every run in the logs path", flag: (d) => (d.has_checkpoint ? "" : "  (no checkpoint)") },
+  };
+
   constructor(view, leaf, spec) {
     this.view = view;
     this.leaf = leaf;
@@ -179,7 +184,7 @@ class DatasetPicker {
 
   _paintSummary() {
     const names = this._selectedNames();
-    this.summary.textContent = names.length ? `${names.length} selected` : "all datasets";
+    this.summary.textContent = names.length ? `${names.length} selected` : `all ${DatasetPicker.MULTI_MODES[this.spec.mode].noun}`;
     this.summary.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
   }
 
@@ -193,16 +198,17 @@ class DatasetPicker {
   }
 
   async _loadMulti() {
+    const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
     const base = this._base();
     this.panel.innerHTML = `<p class="picker__note">listing ${base || "(no base)"}...</p>`;
 
-    const res = await window.apiGet(`/api/fs/datasets?base=${encodeURIComponent(base || "")}`);
+    const res = await window.apiGet(`${mode.endpoint}?base=${encodeURIComponent(base || "")}`);
     if (!res.ok) {
-      this.panel.innerHTML = `<p class="picker__note">${res.error || "could not list datasets"}</p>`;
+      this.panel.innerHTML = `<p class="picker__note">${res.error || `could not list ${mode.noun}`}</p>`;
       return;
     }
 
-    const items = (res.datasets || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
+    const items = (res[mode.key] || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
     const selected = new Set(this._selectedNames());
 
     this.panel.innerHTML = "";
@@ -212,7 +218,7 @@ class DatasetPicker {
     head.appendChild(window.LaunchWidgetDom.mini("None", () => this._setAll(false)));
     const hint = document.createElement("span");
     hint.className = "picker__note";
-    hint.textContent = "none = all datasets in the queue";
+    hint.textContent = mode.hint;
     head.appendChild(hint);
     this.panel.appendChild(head);
 
@@ -225,7 +231,7 @@ class DatasetPicker {
       box.checked = selected.has(d.name);
       box.addEventListener("change", () => this._commitMulti());
       const text = document.createElement("span");
-      text.textContent = d.name + (d.has_params ? "" : "  (no params)");
+      text.textContent = d.name + mode.flag(d);
       row.appendChild(box);
       row.appendChild(text);
       this.panel.appendChild(row);
@@ -233,7 +239,7 @@ class DatasetPicker {
     });
 
     if (!items.length) {
-      this.panel.appendChild(Object.assign(document.createElement("p"), { className: "picker__note", textContent: `no datasets in ${res.base}` }));
+      this.panel.appendChild(Object.assign(document.createElement("p"), { className: "picker__note", textContent: `no ${mode.noun} in ${res.base}` }));
     }
   }
 
