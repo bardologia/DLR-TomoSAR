@@ -38,8 +38,6 @@ class TomogramView {
     this.locked = null;
     this.entered = false;
     this.polling = false;
-    this.fetching = false;
-    this.queued = null;
     this.profMode = "raw";
     this.profData = null;
     this.profQueued = null;
@@ -132,7 +130,14 @@ class TomogramView {
     this.point = null;
     this.locked = null;
     this.mode = "map";
-    this.queued = null;
+    this.panels.forEach((panel) => {
+      panel.bitmap = null;
+      panel.key = null;
+      panel.drawnSpace = null;
+      panel.marker = 0;
+      panel.queued = null;
+      panel.fetching = false;
+    });
     this.profQueued = null;
     this.profData = null;
     this.deck.dataset.mode = "map";
@@ -237,6 +242,8 @@ class TomogramView {
     this.stage.hidden = false;
     this.mapWrap.classList.add("is-loading");
     this.topdown.src = `/api/cubes/primary?id=${encodeURIComponent(this.selectedId)}`;
+
+    this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
   }
 
   _setSpace(space) {
@@ -244,12 +251,8 @@ class TomogramView {
     this.space = space;
     this._syncSpaceBtns();
 
-    if (!this.meta) return;
-
-    if (this.point) {
-      this.queued = { az: this.point.az, rg: this.point.rg };
-      this._pump();
-    }
+    if (!this.meta || !this.point) return;
+    this._drawSlices(this.point.az, this.point.rg);
   }
 
   _setProfMode(mode) {
@@ -359,8 +362,7 @@ class TomogramView {
     this._moveCross(point);
     this.coords.textContent = `az = ${point.az} · rg = ${point.rg} · click to lock`;
 
-    this.queued = { az: point.az, rg: point.rg };
-    this._pump();
+    this._drawSlices(point.az, point.rg);
   }
 
   _moveCross(point) {
@@ -369,26 +371,13 @@ class TomogramView {
     this.cross.style.top = `${point.fy * 100}%`;
   }
 
-  async _pump() {
-    if (this.fetching || !this.queued) return;
-    this.fetching = true;
-
-    while (this.queued) {
-      const { az, rg } = this.queued;
-      this.queued = null;
-      await this._drawSlices(az, rg);
-    }
-
-    this.fetching = false;
-  }
-
   _revealSlices() {
     if (!this.slicesEl.hidden) return;
     this.slicesEl.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => this.slicesEl.classList.add("is-in")));
   }
 
-  async _drawSlices(az, rg) {
+  _drawSlices(az, rg) {
     if (!this.meta) return;
 
     this._revealSlices();
@@ -396,41 +385,78 @@ class TomogramView {
     if (this.atLabels.range)   this.atLabels.range.textContent   = `rg = ${rg}`;
     if (this.atLabels.azimuth) this.atLabels.azimuth.textContent = `az = ${az}`;
 
-    const jobs = this.panels
-      .filter((panel) => !panel.root.hidden)
-      .map(async (panel) => {
-        const url = `/api/cubes/slice?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&axis=${panel.axis}&az=${az}&rg=${rg}&space=${this.space}`;
-        const skeletonTimer = setTimeout(() => panel.root.classList.add("is-loading"), 180);
-        try {
-          const res = await fetch(url);
-          if (!res.ok) return;
-          const bitmap = await createImageBitmap(await res.blob());
+    this.panels.forEach((panel) => {
+      if (panel.root.hidden) return;
+      this._updatePanel(panel, az, rg);
+    });
+  }
 
-          const canvas = panel.canvas;
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-          }
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(bitmap, 0, 0);
+  _updatePanel(panel, az, rg) {
+    const key = panel.axis === "range" ? rg : az;
+    panel.marker = panel.axis === "range" ? az / this.meta.n_az : rg / this.meta.n_rg;
 
-          const markerFrac = panel.axis === "range" ? az / this.meta.n_az : rg / this.meta.n_rg;
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-          ctx.setLineDash([4, 4]);
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(markerFrac * canvas.width, 0);
-          ctx.lineTo(markerFrac * canvas.width, canvas.height);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        } catch (e) {
-        } finally {
-          clearTimeout(skeletonTimer);
-          panel.root.classList.remove("is-loading");
-        }
-      });
+    if (panel.bitmap && panel.key === key && panel.drawnSpace === this.space) {
+      this._paintSlice(panel);
+      return;
+    }
 
-    await Promise.all(jobs);
+    panel.queued = { az, rg, key };
+    this._panelPump(panel);
+  }
+
+  async _panelPump(panel) {
+    if (panel.fetching) return;
+    panel.fetching = true;
+
+    while (panel.queued) {
+      const job = panel.queued;
+      panel.queued = null;
+      await this._fetchSlice(panel, job);
+    }
+
+    panel.fetching = false;
+  }
+
+  async _fetchSlice(panel, job) {
+    const space = this.space;
+    const url = `/api/cubes/slice?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&axis=${panel.axis}&az=${job.az}&rg=${job.rg}&space=${space}`;
+    const skeletonTimer = panel.bitmap ? null : setTimeout(() => panel.root.classList.add("is-loading"), 120);
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+
+      panel.bitmap = await createImageBitmap(await res.blob());
+      panel.key = job.key;
+      panel.drawnSpace = space;
+      this._paintSlice(panel);
+    } catch (e) {
+    } finally {
+      if (skeletonTimer) clearTimeout(skeletonTimer);
+      panel.root.classList.remove("is-loading");
+    }
+  }
+
+  _paintSlice(panel) {
+    const bitmap = panel.bitmap;
+    const canvas = panel.canvas;
+
+    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+    }
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0);
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(panel.marker * canvas.width, 0);
+    ctx.lineTo(panel.marker * canvas.width, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   _queueProfiles(az, rg) {
