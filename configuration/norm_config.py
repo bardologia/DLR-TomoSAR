@@ -72,21 +72,21 @@ class Presets:
 
 
 _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
-    "pass/mag"        : Presets.MIN_MAX_LOG1P,
-    "pass/raw_re_im"  : Presets.MIN_MAX,
-    "pass/norm_re_im" : Presets.ROBUST_IQR,
-    "pass/phase"      : Presets.FIXED_DIV_PI,
+    "pass/mag"        : Presets.ZSCORE_LOG1P,
+    "pass/raw_re_im"  : Presets.ZSCORE,
+    "pass/norm_re_im" : Presets.ZSCORE,
+    "pass/phase"      : Presets.ZSCORE,
 
-    "ifg/mag"         : Presets.MIN_MAX_LOG1P,
-    "ifg/raw_re_im"   : Presets.MIN_MAX,
-    "ifg/norm_re_im"  : Presets.ROBUST_IQR,
-    "ifg/phase"       : Presets.FIXED_DIV_PI,
+    "ifg/mag"         : Presets.ZSCORE_LOG1P,
+    "ifg/raw_re_im"   : Presets.ZSCORE,
+    "ifg/norm_re_im"  : Presets.ZSCORE,
+    "ifg/phase"       : Presets.ZSCORE,
 
-    "out/amp"         : Presets.MIN_MAX_LOG1P,
-    "out/mu"          : Presets.MIN_MAX,
-    "out/sigma"       : Presets.MIN_MAX_LOG1P,
+    "out/amp"         : Presets.ZSCORE_LOG1P,
+    "out/mu"          : Presets.ZSCORE,
+    "out/sigma"       : Presets.ZSCORE_LOG1P,
 
-    "dem/elevation"   : Presets.ZSCORE,
+    "dem/elevation"   : Presets.ZSCORE_LOG1P,
 }
 
 
