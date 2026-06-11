@@ -19,6 +19,7 @@ class DatasetPicker {
     this.panel = null;
     this.options = [];
     this.checks = new Map();
+    this.reloadTimer = null;
   }
 
   build() {
@@ -171,6 +172,21 @@ class DatasetPicker {
     this.el.appendChild(this.panel);
 
     this._paintSummary();
+
+    if (this.spec.baseFrom) {
+      this.view._onDependency(this.spec.baseFrom, () => this._scheduleReload());
+    }
+
+    if (this.spec.open) {
+      this.panel.hidden = false;
+      this._loadMulti();
+    }
+  }
+
+  _scheduleReload() {
+    if (this.panel.hidden) return;
+    clearTimeout(this.reloadTimer);
+    this.reloadTimer = setTimeout(() => this._loadMulti(), 350);
   }
 
   _selectedNames() {

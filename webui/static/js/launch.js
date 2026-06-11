@@ -30,7 +30,7 @@ class LaunchView {
 
   static PICKERS = {
     extract_params: {
-      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
+      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true, open: true },
     },
     train: {
       "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
@@ -893,6 +893,7 @@ class LaunchView {
     input.addEventListener("input", () => {
       input.classList.toggle("is-dirty", input.value !== leaf.value);
       this._setValue(leaf, input.value);
+      this._fireDependents(leaf.path, input.value);
     });
     const reset = () => {
       input.value = leaf.value;
