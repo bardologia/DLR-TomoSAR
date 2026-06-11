@@ -109,6 +109,9 @@ class InferencePipeline:
             az_indices    = indices["all_az_idx"],
         )
 
+        global_metrics["split"]        = run.split_name
+        global_metrics["split_region"] = list(run.split_region.as_tuple())
+
         if run.track_baselines is not None:
             global_metrics["tracks"] = run.track_baselines.to_payload()
 

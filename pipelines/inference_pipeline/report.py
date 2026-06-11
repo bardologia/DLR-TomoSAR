@@ -385,7 +385,7 @@ class Report:
         for k, v in sorted(gm.items()):
             if self._is_per_slice_ssim(k):
                 continue
-            if "_raw" in k or k in ("tracks", "track_positions"):
+            if "_raw" in k or k in ("tracks", "track_positions", "split", "split_region"):
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v

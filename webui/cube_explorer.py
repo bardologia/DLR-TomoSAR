@@ -221,15 +221,18 @@ class CubeExplorer:
             "vmax"   : float(vmax),
         }
 
-    def _curve_axis(self, stamp_dir: Path, n_elev: int) -> np.ndarray:
+    def _metrics(self, stamp_dir: Path) -> dict:
         metrics_path = stamp_dir / "metrics.json"
         if not metrics_path.is_file():
             raise FileNotFoundError(f"metrics.json missing in {stamp_dir}; rerun inference to regenerate it")
 
-        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        return json.loads(metrics_path.read_text(encoding="utf-8"))
+
+    def _curve_axis(self, stamp_dir: Path, n_elev: int) -> np.ndarray:
+        metrics = self._metrics(stamp_dir)
         return np.linspace(float(metrics["x_axis_min"]), float(metrics["x_axis_max"]), n_elev)
 
-    def _preproc_layout(self, stamp_dir: Path) -> tuple[Path, dict, dict] | None:
+    def _preproc_layout(self, stamp_dir: Path) -> tuple[Path, dict] | None:
         meta_path = stamp_dir.parent.parent / "meta" / "dataset_creation_config.json"
         if not meta_path.is_file():
             return None
@@ -241,16 +244,23 @@ class CubeExplorer:
             return None
 
         layout = json.loads(layout_path.read_text(encoding="utf-8"))
-        return preproc_dir, payload, layout
+        return preproc_dir, layout
 
-    def _crop_bounds(self, payload: dict, layout: dict, n_az: int, n_rg: int) -> tuple[int, int, int, int]:
-        region      = self._matching_region(payload["split_regions"], n_az, n_rg)
+    def _crop_bounds(self, stamp_dir: Path, layout: dict, n_az: int, n_rg: int) -> tuple[int, int, int, int]:
+        metrics = self._metrics(stamp_dir)
+        if "split_region" not in metrics:
+            raise KeyError(f"metrics.json in {stamp_dir} has no split_region; rerun inference to regenerate it")
+
+        az_start, az_end, rg_start, rg_end = (int(v) for v in metrics["split_region"])
+        if (az_end - az_start, rg_end - rg_start) != (n_az, n_rg):
+            raise ValueError(f"split_region {metrics['split_region']} does not match the {n_az}x{n_rg} cube")
+
         global_crop = layout["global_crop"]
 
-        az_lo = region["azimuth_start"] - global_crop[0]
-        az_hi = region["azimuth_end"]   - global_crop[0]
-        rg_lo = region["range_start"]   - global_crop[2]
-        rg_hi = region["range_end"]     - global_crop[2]
+        az_lo = az_start - global_crop[0]
+        az_hi = az_end   - global_crop[0]
+        rg_lo = rg_start - global_crop[2]
+        rg_hi = rg_end   - global_crop[2]
         return az_lo, az_hi, rg_lo, rg_hi
 
     def _full_raw(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
@@ -258,7 +268,7 @@ class CubeExplorer:
         if resolved is None:
             return None
 
-        preproc_dir, payload, layout = resolved
+        preproc_dir, layout = resolved
 
         tomo_name = layout["artifacts"].get("tomogram_full")
         if not tomo_name:
@@ -268,7 +278,7 @@ class CubeExplorer:
         if not tomo_path.is_file():
             return None
 
-        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(payload, layout, n_az, n_rg)
+        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(stamp_dir, layout, n_az, n_rg)
 
         raw = np.load(tomo_path, mmap_mode="r")
         if raw.ndim != 3:
@@ -283,7 +293,7 @@ class CubeExplorer:
         if resolved is None:
             raise FileNotFoundError(f"cannot resolve the preprocessing run for {stamp_dir}; the primary SLC is required for the cube map")
 
-        preproc_dir, payload, layout = resolved
+        preproc_dir, layout = resolved
 
         primary_name = layout["artifacts"].get("primary")
         if not primary_name:
@@ -293,7 +303,7 @@ class CubeExplorer:
         if not primary_path.is_file():
             raise FileNotFoundError(f"primary SLC missing: {primary_path}")
 
-        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(payload, layout, n_az, n_rg)
+        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(stamp_dir, layout, n_az, n_rg)
 
         raw = np.load(primary_path, mmap_mode="r")
         if raw.ndim != 2:
@@ -304,22 +314,3 @@ class CubeExplorer:
         amplitude = np.abs(np.asarray(raw[az_lo:az_hi, rg_lo:rg_hi])).astype(np.float32)
         return 20.0 * np.log10(np.maximum(amplitude, 1e-12))
 
-    @staticmethod
-    def _matching_region(split_regions: dict, n_az: int, n_rg: int) -> dict:
-        candidates = []
-        for value in split_regions.values():
-            candidates.extend(value if isinstance(value, list) else [value])
-
-        matches = []
-        for region in candidates:
-            az_size = region["azimuth_end"] - region["azimuth_start"]
-            rg_size = region["range_end"]   - region["range_start"]
-            if (az_size, rg_size) == (n_az, n_rg):
-                key = (region["azimuth_start"], region["azimuth_end"], region["range_start"], region["range_end"])
-                if key not in [m[0] for m in matches]:
-                    matches.append((key, region))
-
-        if len(matches) != 1:
-            raise ValueError(f"cannot resolve the crop region for a {n_az}x{n_rg} cube: {len(matches)} split regions match")
-
-        return matches[0][1]
