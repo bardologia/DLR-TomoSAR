@@ -89,6 +89,17 @@ class ResultsBrowser:
             "other"      : other,
         }
 
+    def gallery(self, raw_root: str) -> dict:
+        if raw_root not in self.roots:
+            return {"ok": False, "error": "path not opened"}
+
+        root   = Path(raw_root)
+        groups = []
+        self._collect_gallery(root, root, 0, groups)
+
+        total = sum(len(group["images"]) for group in groups)
+        return {"ok": True, "root": raw_root, "total": total, "groups": groups}
+
     def file_path(self, raw_path: str) -> Path | None:
         target = Path(raw_path).resolve()
         if not any(target.is_relative_to(root) for root in self.roots):
@@ -96,6 +107,30 @@ class ResultsBrowser:
         if not target.is_file():
             return None
         return target
+
+    def _collect_gallery(self, directory: Path, root: Path, depth: int, groups: list) -> None:
+        try:
+            entries = sorted(directory.iterdir())
+        except OSError:
+            entries = []
+
+        images = []
+        for entry in entries:
+            if not entry.is_file():
+                continue
+            suffix = entry.suffix.lower()
+            if suffix in self.IMAGE_SUFFIXES:
+                images.append({"name": entry.stem, "url": self._url(entry), "kind": "img"})
+            elif suffix in self.ANIMATION_SUFFIXES:
+                images.append({"name": entry.stem, "url": self._url(entry), "kind": "gif"})
+
+        if images:
+            rel = "" if directory == root else str(directory.relative_to(root))
+            groups.append({"rel": rel, "images": images})
+
+        for entry in entries:
+            if entry.is_dir() and entry.name not in self.SKIPPED_DIRS and not entry.name.startswith(".") and depth < self.MAX_DEPTH:
+                self._collect_gallery(entry, root, depth + 1, groups)
 
     def _node(self, directory: Path, root: Path, depth: int) -> dict:
         counts   = {"markdown": 0, "images": 0, "animations": 0, "configs": 0, "other": 0}

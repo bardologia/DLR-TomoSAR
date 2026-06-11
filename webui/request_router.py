@@ -98,6 +98,11 @@ class RequestRouter:
             result = self.results.folder((query.get("root") or [""])[0], (query.get("rel") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/results/gallery":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.results.gallery((query.get("root") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
+            return
         if path == "/api/fs/datasets":
             query  = parse_qs(urlparse(handler.path).query)
             result = self.datasets.datasets((query.get("base") or [""])[0])
