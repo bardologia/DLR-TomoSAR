@@ -168,6 +168,9 @@ class SizeMatchStage(ExperimentStage):
 
             self.logger.info(f"{model_name:<18} {result.parameters:>14,}  Δ {result.deviation_pct:+7.3f} %  (scale {result.scale:.4f}, {result.iterations} iterations)")
 
+            for flag in result.flags:
+                self.logger.warning(f"{model_name}: {flag}")
+
         self._write_results(records, self.records_path)
         self._write_report(records, target)
 
@@ -202,14 +205,15 @@ class SizeMatchStage(ExperimentStage):
             f"Reference model `{self.config.size_match.reference_model}` at **{target:,}** parameters.",
             f"Counting performed with {self.config.size_match.in_channels} input channels, {self.config.n_gaussians * 3} output channels, image size {self.config.training.patch_size[0]}.\n",
             "## Matched Widths\n",
-            "| Model | Scale | Scaled attributes | Parameters | Δ vs reference | Iterations |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Model | Scale | Scaled attributes | Parameters | Δ vs reference | Iterations | Flags |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
 
         for model_name in sorted(records.keys()):
             record    = records[model_name]
             overrides = ", ".join(f"`{k}={v}`" for k, v in record["overrides"].items()) or "_(defaults)_"
-            lines.append(f"| `{model_name}` | {record['scale']:.4f} | {overrides} | {record['parameters']:,} | {record['deviation_pct']:+.3f} % | {record['iterations']} |")
+            flags     = "; ".join(record["flags"]) or "—"
+            lines.append(f"| `{model_name}` | {record['scale']:.4f} | {overrides} | {record['parameters']:,} | {record['deviation_pct']:+.3f} % | {record['iterations']} | {flags} |")
 
         lines.append("")
 

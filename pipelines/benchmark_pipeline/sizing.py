@@ -85,6 +85,48 @@ class SizeMatchResult:
     deviation_pct : float
     iterations    : int
     history       : list[dict] = field(default_factory=list)
+    flags         : list[str]  = field(default_factory=list)
+
+
+class DegeneracyAuditor:
+    def __init__(self, config, scaler: WidthScaler) -> None:
+        self.config = config
+        self.scaler = scaler
+        self.floors = {"embedding_dim": 32, "embedding_dims": 32}
+
+    def audit(self, result: SizeMatchResult) -> list[str]:
+        return self._scale_flags(result) + self._width_flags(result) + self._convergence_flags(result)
+
+    def _scale_flags(self, result: SizeMatchResult) -> list[str]:
+        flags = []
+
+        if result.scale <= self.config.scale_low * 1.1:
+            flags.append(f"scale {result.scale:.4f} converged at the lower search bound {self.config.scale_low}")
+
+        if result.scale >= self.config.scale_high:
+            flags.append(f"scale {result.scale:.4f} reached the configured upper bound {self.config.scale_high}")
+
+        return flags
+
+    def _width_flags(self, result: SizeMatchResult) -> list[str]:
+        flags = []
+
+        for rule in self.scaler.rules[result.model]:
+            value   = result.overrides[rule.attribute]
+            minimum = min(value) if isinstance(value, list) else value
+
+            if minimum <= rule.divisor:
+                flags.append(f"{rule.attribute} clamped at the rounding minimum {rule.divisor}")
+            elif rule.attribute in self.floors and minimum < self.floors[rule.attribute]:
+                flags.append(f"{rule.attribute} {minimum} below the floor {self.floors[rule.attribute]}")
+
+        return flags
+
+    def _convergence_flags(self, result: SizeMatchResult) -> list[str]:
+        if abs(result.deviation_pct) > 100.0 * self.config.tolerance:
+            return [f"deviation {result.deviation_pct:+.3f} % exceeds the {100.0 * self.config.tolerance:.1f} % tolerance after {result.iterations} iterations"]
+
+        return []
 
 
 class SizeMatcher:
@@ -92,6 +134,7 @@ class SizeMatcher:
         self.config       = config
         self.logger       = logger
         self.scaler       = WidthScaler()
+        self.auditor      = DegeneracyAuditor(config=config.size_match, scaler=self.scaler)
         self.image_size   = config.training.patch_size[0]
         self.in_channels  = config.size_match.in_channels
 
@@ -133,7 +176,7 @@ class SizeMatcher:
 
         scale, deviation, parameters = best
 
-        return SizeMatchResult(
+        result = SizeMatchResult(
             model         = model_name,
             scale         = scale,
             overrides     = self.scaler.overrides(model_name, scale),
@@ -143,6 +186,10 @@ class SizeMatcher:
             iterations    = len(history),
             history       = history,
         )
+
+        result.flags = self.auditor.audit(result)
+
+        return result
 
     def _count_at(self, model_name: str, scale: float) -> int:
         return self._count(model_name, self.scaler.scaled_config(model_name, scale))

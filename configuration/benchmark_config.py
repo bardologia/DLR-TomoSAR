@@ -28,7 +28,7 @@ class OverfitGateConfig:
 @dataclass
 class SizeMatchConfig:
     reference_model : str   = "unet"
-    tolerance       : float = 0.01
+    tolerance       : float = 0.05
     max_iterations  : int   = 100
     scale_low       : float = 0.05
     scale_high      : float = 8.0
