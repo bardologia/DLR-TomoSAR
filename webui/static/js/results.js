@@ -12,12 +12,32 @@ class ResultsView {
     this.expanded  = new Set();
     this.loaded    = false;
 
-    this.lightbox    = document.getElementById("lightbox");
-    this.lightboxImg = document.getElementById("lightbox-img");
-    this.lightboxCap = document.getElementById("lightbox-cap");
+    this.view        = "folder";
+    this.filter      = "";
+    this.size        = localStorage.getItem("results-size") || "m";
+    this.columns     = Number(localStorage.getItem("results-columns") || 2);
+    this.folderData  = null;
+    this.galleryData = null;
+    this.compare     = [];
+    this.figures     = [];
+    this.lightboxAt  = -1;
+
+    this.lightbox      = document.getElementById("lightbox");
+    this.lightboxImg   = document.getElementById("lightbox-img");
+    this.lightboxCap   = document.getElementById("lightbox-cap");
+    this.lightboxCount = document.getElementById("lightbox-count");
+    this.lightboxPrev  = document.getElementById("lightbox-prev");
+    this.lightboxNext  = document.getElementById("lightbox-next");
+
     this.lightbox.addEventListener("click", () => this._closeLightbox());
+    this.lightboxPrev.addEventListener("click", (ev) => { ev.stopPropagation(); this._stepLightbox(-1); });
+    this.lightboxNext.addEventListener("click", (ev) => { ev.stopPropagation(); this._stepLightbox(1); });
+
     document.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape") this._closeLightbox();
+      if (this.lightbox.hidden) return;
+      if (ev.key === "Escape")     this._closeLightbox();
+      if (ev.key === "ArrowLeft")  this._stepLightbox(-1);
+      if (ev.key === "ArrowRight") this._stepLightbox(1);
     });
 
     this.pathForm.addEventListener("submit", (ev) => {
@@ -65,14 +85,19 @@ class ResultsView {
     this.expanded = new Set([""]);
     data.tree.children.forEach((child) => this.expanded.add(child.rel));
 
+    this.view        = "folder";
+    this.filter      = "";
+    this.galleryData = null;
+    this.compare     = this._loadCompare();
+
     this._renderSidebar();
     this.selectFolder("");
   }
 
   async selectFolder(rel) {
     this.activeRel = rel;
+    this.view      = "folder";
     this._renderSidebar();
-    this.detailEl.innerHTML = `<div class="res-empty">Loading&hellip;</div>`;
 
     let data;
     try {
@@ -86,7 +111,24 @@ class ResultsView {
       return;
     }
 
-    this._renderFolder(data);
+    this.folderData = data;
+    this._renderDetail();
+  }
+
+  async showView(view) {
+    this.view = view;
+
+    if (view === "all" && !this.galleryData) {
+      let data;
+      try {
+        data = await window.apiGet(`/api/results/gallery?root=${encodeURIComponent(this.root.root)}`);
+      } catch (e) {
+        data = null;
+      }
+      this.galleryData = data && data.ok ? data : { groups: [], total: 0 };
+    }
+
+    this._renderDetail();
   }
 
   _renderSidebar() {
@@ -128,7 +170,7 @@ class ResultsView {
     const isOpen = this.expanded.has(node.rel);
 
     const row = document.createElement("div");
-    row.className = "res-tree__row" + (node.rel === this.activeRel ? " is-active" : "");
+    row.className = "res-tree__row" + (node.rel === this.activeRel && this.view === "folder" ? " is-active" : "");
     row.style.paddingLeft = `${8 + depth * 14}px`;
 
     const caret = document.createElement("span");
@@ -160,13 +202,110 @@ class ResultsView {
     if (isOpen) node.children.forEach((child) => this._renderNode(child, depth + 1));
   }
 
-  _renderFolder(data) {
-    let html =
-      `<header class="res-head">` +
-      `<div><h3 class="res-title">${this._esc(data.rel === "" ? this.root.name : data.rel)}</h3>` +
-      `<p class="res-path">${this._esc(data.abs)}</p></div>` +
-      `<span class="res-stamp is-active is-single">${this._esc(this.root.stage)}</span>` +
-      `</header>`;
+  _renderDetail() {
+    this.detailEl.innerHTML = this._toolbarHtml() + `<div class="res-body" id="res-body" data-size="${this.size}"></div>`;
+    this._bindToolbar();
+    this._renderBody();
+  }
+
+  _renderBody() {
+    const body = this.detailEl.querySelector("#res-body");
+    if (!body) return;
+
+    if (this.view === "folder")  body.innerHTML = this._folderHtml();
+    if (this.view === "all")     body.innerHTML = this._galleryHtml();
+    if (this.view === "compare") body.innerHTML = this._compareHtml();
+
+    if (this.view === "folder") {
+      this._fillMarkdown(body);
+      this._fillConfigs(body);
+    }
+
+    this._collectFigures(body);
+    this._bindBody(body);
+  }
+
+  _toolbarHtml() {
+    const crumbs = this._crumbsHtml();
+    const count  = this.compare.length;
+
+    return (
+      `<div class="res-bar">` +
+      `<div class="res-bar__row">${crumbs}<span class="res-stamp is-active is-single">${this._esc(this.root.stage)}</span></div>` +
+      `<div class="res-bar__row res-bar__row--controls">` +
+      `<div class="res-views" role="group" aria-label="Result views">` +
+      `<button type="button" data-view="folder" class="${this.view === "folder" ? "is-active" : ""}">Folder</button>` +
+      `<button type="button" data-view="all" class="${this.view === "all" ? "is-active" : ""}">All plots</button>` +
+      `<button type="button" data-view="compare" class="${this.view === "compare" ? "is-active" : ""}">Compare <span id="res-compare-count">${count}</span></button>` +
+      `</div>` +
+      `<input type="search" class="res-filter" id="res-filter" placeholder="Filter plots by name" value="${this._esc(this.filter)}" spellcheck="false" />` +
+      `<div class="res-sizes" id="res-sizes" role="group" aria-label="Thumbnail size" ${this.view === "compare" ? "hidden" : ""}>` +
+      ["s", "m", "l"].map((s) => `<button type="button" data-size="${s}" class="${this.size === s ? "is-active" : ""}">${s.toUpperCase()}</button>`).join("") +
+      `</div>` +
+      `<div class="res-sizes" id="res-cols" role="group" aria-label="Compare columns" ${this.view === "compare" ? "" : "hidden"}>` +
+      [1, 2, 3, 4].map((n) => `<button type="button" data-cols="${n}" class="${this.columns === n ? "is-active" : ""}">${n}</button>`).join("") +
+      `</div>` +
+      `</div></div>`
+    );
+  }
+
+  _crumbsHtml() {
+    let html = `<nav class="res-crumbs" aria-label="Folder path">`;
+    html += `<button type="button" data-rel="">${this._esc(this.root.name)}</button>`;
+
+    if (this.view === "folder" && this.activeRel) {
+      const parts = this.activeRel.split("/");
+      parts.forEach((part, index) => {
+        const rel = parts.slice(0, index + 1).join("/");
+        html += `<span class="res-crumbs__sep">/</span><button type="button" data-rel="${this._esc(rel)}">${this._esc(part)}</button>`;
+      });
+    }
+
+    if (this.view === "all")     html += `<span class="res-crumbs__sep">/</span><span class="res-crumbs__here">all plots</span>`;
+    if (this.view === "compare") html += `<span class="res-crumbs__sep">/</span><span class="res-crumbs__here">compare</span>`;
+
+    html += `</nav>`;
+    return html;
+  }
+
+  _bindToolbar() {
+    this.detailEl.querySelectorAll(".res-views button").forEach((btn) => {
+      btn.addEventListener("click", () => this.showView(btn.dataset.view));
+    });
+
+    this.detailEl.querySelectorAll(".res-crumbs button").forEach((btn) => {
+      btn.addEventListener("click", () => this.selectFolder(btn.dataset.rel));
+    });
+
+    const filter = this.detailEl.querySelector("#res-filter");
+    filter.addEventListener("input", () => {
+      this.filter = filter.value.trim().toLowerCase();
+      this._renderBody();
+    });
+
+    this.detailEl.querySelectorAll("#res-sizes button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.size = btn.dataset.size;
+        localStorage.setItem("results-size", this.size);
+        this.detailEl.querySelectorAll("#res-sizes button").forEach((b) => b.classList.toggle("is-active", b === btn));
+        this.detailEl.querySelector("#res-body").dataset.size = this.size;
+      });
+    });
+
+    this.detailEl.querySelectorAll("#res-cols button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.columns = Number(btn.dataset.cols);
+        localStorage.setItem("results-columns", String(this.columns));
+        this.detailEl.querySelectorAll("#res-cols button").forEach((b) => b.classList.toggle("is-active", b === btn));
+        const grid = this.detailEl.querySelector(".res-compare__grid");
+        if (grid) grid.style.gridTemplateColumns = `repeat(${this.columns}, 1fr)`;
+      });
+    });
+  }
+
+  _folderHtml() {
+    const data = this.folderData;
+    let html   = `<p class="res-path">${this._esc(data.abs)}</p>`;
 
     data.markdown.forEach((md, index) => {
       html += `<section class="res-section">`;
@@ -175,8 +314,14 @@ class ResultsView {
       html += `</section>`;
     });
 
-    if (data.images.length)     html += this._sectionHtml("Plots", data.images, "img");
-    if (data.animations.length) html += this._sectionHtml("Animations", data.animations, "gif");
+    const images     = this._applyFilter(data.images);
+    const animations = this._applyFilter(data.animations);
+
+    if (images.length)     html += this._sectionHtml("Plots", images, "img", data.rel, data.images.length);
+    if (animations.length) html += this._sectionHtml("Animations", animations, "gif", data.rel, data.animations.length);
+
+    if (this.filter && !images.length && data.images.length)         html += `<section class="res-section"><h4 class="res-section__cap">Plots</h4><div class="res-empty res-empty--tight">No plot matches the filter.</div></section>`;
+    if (this.filter && !animations.length && data.animations.length) html += `<section class="res-section"><h4 class="res-section__cap">Animations</h4><div class="res-empty res-empty--tight">No animation matches the filter.</div></section>`;
 
     if (data.configs.length) {
       html += `<section class="res-section"><h4 class="res-section__cap">Configs <span>${data.configs.length}</span></h4>`;
@@ -201,32 +346,98 @@ class ResultsView {
       html += `<div class="res-empty">This folder holds no files. Pick a subfolder on the left.</div>`;
     }
 
-    this.detailEl.innerHTML = html;
-    this._fillMarkdown(data);
-    this._fillConfigs(data);
-    this._bindFigures();
+    return html;
   }
 
-  _fillMarkdown(data) {
-    this.detailEl.querySelectorAll(".res-md").forEach((body) => {
-      const md = data.markdown[Number(body.dataset.md)];
+  _galleryHtml() {
+    const groups = this.galleryData.groups;
+    let total    = 0;
+    let html     = "";
 
-      let parsed;
-      try {
-        parsed = window.marked ? window.marked.parse(md.text) : null;
-      } catch (e) {
-        parsed = null;
-      }
+    groups.forEach((group) => {
+      const items = this._applyFilter(group.images);
+      if (!items.length) return;
 
-      if (parsed === null) {
-        body.innerHTML = `<pre>${this._esc(md.text)}</pre>`;
-        return;
-      }
+      total += items.length;
+      const label = group.rel === "" ? "/" : group.rel;
 
-      body.innerHTML = parsed;
-      this._gridify(body);
+      html += `<section class="res-section">`;
+      html += `<h4 class="res-section__cap res-section__cap--link"><button type="button" data-rel="${this._esc(group.rel)}" title="Open this folder">${this._esc(label)}</button> <span>${items.length}</span></h4>`;
+      html += `<div class="res-grid">${items.map((item) => this._figHtml(item, group.rel, item.kind)).join("")}</div>`;
+      html += `</section>`;
+    });
 
-      body.querySelectorAll("img").forEach((img) => {
+    if (!groups.length) return `<div class="res-empty">No plots found anywhere under this run.</div>`;
+    if (!total)         return `<div class="res-empty">No plot matches the filter.</div>`;
+
+    return `<p class="res-gallery__sum">${total} of ${this.galleryData.total} plots across the whole run.</p>` + html;
+  }
+
+  _compareHtml() {
+    const items = this._applyFilter(this.compare);
+
+    if (!this.compare.length) {
+      return `<div class="res-empty">Nothing pinned for comparison yet. Hover any figure in the Folder or All plots view and press <code>+</code> to add it to this grid.</div>`;
+    }
+    if (!items.length) {
+      return `<div class="res-empty">No pinned plot matches the filter.</div>`;
+    }
+
+    const tiles = items.map((item) =>
+      `<figure class="res-fig res-fig--cmp" data-url="${item.url}" data-name="${this._esc(item.name)}" data-rel="${this._esc(item.rel)}">` +
+      `<button type="button" class="res-pin is-on" data-url="${item.url}" title="Remove from compare">&minus;</button>` +
+      `<img src="${item.url}" alt="${this._esc(item.name)}" loading="lazy" />` +
+      `<figcaption><span class="res-fig__dir">${this._esc(item.rel === "" ? "/" : item.rel)}</span>${this._esc(item.name)}</figcaption>` +
+      `</figure>`
+    ).join("");
+
+    return (
+      `<div class="res-compare__head">` +
+      `<p class="res-gallery__sum">${this.compare.length} pinned plot${this.compare.length === 1 ? "" : "s"}, shown side by side.</p>` +
+      `<button type="button" class="btn btn--mini" id="res-compare-clear">Clear all</button>` +
+      `</div>` +
+      `<div class="res-compare__grid" style="grid-template-columns: repeat(${this.columns}, 1fr)">${tiles}</div>`
+    );
+  }
+
+  _figHtml(item, rel, kind) {
+    const pinned = this._isPinned(item.url);
+    return (
+      `<figure class="res-fig${kind === "gif" ? " res-fig--gif" : ""}" data-url="${item.url}" data-name="${this._esc(item.name)}" data-rel="${this._esc(rel)}">` +
+      `<button type="button" class="res-pin${pinned ? " is-on" : ""}" data-url="${item.url}" title="${pinned ? "Remove from compare" : "Add to compare"}">${pinned ? "&minus;" : "+"}</button>` +
+      `<img src="${item.url}" alt="${this._esc(item.name)}" loading="lazy" />` +
+      `<figcaption>${this._esc(item.name)}</figcaption>` +
+      `</figure>`
+    );
+  }
+
+  _sectionHtml(title, items, kind, rel, totalCount) {
+    const figs  = items.map((item) => this._figHtml(item, rel, kind)).join("");
+    const count = this.filter && items.length !== totalCount ? `${items.length} of ${totalCount}` : `${totalCount}`;
+
+    return (
+      `<section class="res-section">` +
+      `<h4 class="res-section__cap">${this._esc(title)} <span>${count}</span></h4>` +
+      `<div class="res-grid${kind === "gif" ? " res-grid--gif" : ""}">${figs}</div>` +
+      `</section>`
+    );
+  }
+
+  _applyFilter(items) {
+    if (!this.filter) return items;
+    return items.filter((item) => item.name.toLowerCase().includes(this.filter));
+  }
+
+  _fillMarkdown(body) {
+    const data = this.folderData;
+
+    body.querySelectorAll(".res-md").forEach((el) => {
+      const md = data.markdown[Number(el.dataset.md)];
+
+      el.innerHTML = window.marked.parse(md.text);
+      this._gridify(el, data.rel);
+
+      el.querySelectorAll("img").forEach((img) => {
         const src = img.getAttribute("src") || "";
         if (!src.startsWith("/") && !src.startsWith("http") && !src.startsWith("data:")) {
           img.src = this._mediaUrl(data.abs, src);
@@ -234,7 +445,7 @@ class ResultsView {
         img.loading = "lazy";
       });
 
-      body.querySelectorAll("a").forEach((a) => {
+      el.querySelectorAll("a").forEach((a) => {
         const href = a.getAttribute("href") || "";
         if (!href.startsWith("/") && !href.startsWith("http") && !href.startsWith("#")) {
           a.href = this._mediaUrl(data.abs, href);
@@ -245,43 +456,51 @@ class ResultsView {
     });
   }
 
-  _fillConfigs(data) {
-    this.detailEl.querySelectorAll("code[data-cfg]").forEach((code) => {
-      const cfg = data.configs[Number(code.dataset.cfg)];
+  _fillConfigs(body) {
+    body.querySelectorAll("code[data-cfg]").forEach((code) => {
+      const cfg = this.folderData.configs[Number(code.dataset.cfg)];
       code.textContent = cfg.kind === "json" ? this._prettyJson(cfg.text) : cfg.text;
     });
   }
 
-  _bindFigures() {
-    this.detailEl.querySelectorAll(".res-fig[data-url]").forEach((fig) => {
-      fig.addEventListener("click", () => this._openLightbox(fig.dataset.url, fig.dataset.name));
+  _collectFigures(body) {
+    this.figures = [...body.querySelectorAll(".res-fig")].map((fig) => ({
+      url  : fig.dataset.url,
+      name : fig.dataset.name,
+      rel  : fig.dataset.rel || "",
+    }));
+  }
+
+  _bindBody(body) {
+    body.querySelectorAll(".res-fig").forEach((fig, index) => {
+      fig.addEventListener("click", () => this._openLightbox(index));
     });
-    this.detailEl.querySelectorAll(".res-md img").forEach((img) => {
-      img.addEventListener("click", () => this._openLightbox(img.src, img.alt || ""));
+
+    body.querySelectorAll(".res-pin").forEach((pin) => {
+      pin.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const fig = pin.closest(".res-fig");
+        this._togglePin({ url: fig.dataset.url, name: fig.dataset.name, rel: fig.dataset.rel || "" });
+      });
+    });
+
+    body.querySelectorAll(".res-section__cap--link button").forEach((btn) => {
+      btn.addEventListener("click", () => this.selectFolder(btn.dataset.rel));
+    });
+
+    const clear = body.querySelector("#res-compare-clear");
+    if (clear) clear.addEventListener("click", () => {
+      this.compare = [];
+      this._persistCompare();
+      this._renderBody();
     });
   }
 
-  _sectionHtml(title, items, kind) {
-    const figs = items.map((item) =>
-      `<figure class="res-fig${kind === "gif" ? " res-fig--gif" : ""}" data-url="${item.url}" data-name="${this._esc(item.name)}">` +
-      `<img src="${item.url}" alt="${this._esc(item.name)}" loading="lazy" />` +
-      `<figcaption>${this._esc(item.name)}</figcaption>` +
-      `</figure>`
-    ).join("");
+  _gridify(el, rel) {
+    const isImgPara = (node) =>
+      node && node.tagName === "P" && node.children.length === 1 && node.children[0].tagName === "IMG" && !node.textContent.trim();
 
-    return (
-      `<section class="res-section">` +
-      `<h4 class="res-section__cap">${this._esc(title)} <span>${items.length}</span></h4>` +
-      `<div class="res-grid${kind === "gif" ? " res-grid--gif" : ""}">${figs}</div>` +
-      `</section>`
-    );
-  }
-
-  _gridify(body) {
-    const isImgPara = (el) =>
-      el && el.tagName === "P" && el.children.length === 1 && el.children[0].tagName === "IMG" && !el.textContent.trim();
-
-    let node = body.firstElementChild;
+    let node = el.firstElementChild;
     while (node) {
       if (!isImgPara(node)) {
         node = node.nextElementSibling;
@@ -300,22 +519,74 @@ class ResultsView {
       node.before(grid);
 
       run.forEach((para) => {
-        const img = para.children[0];
-        const isGif = (img.getAttribute("src") || "").toLowerCase().endsWith(".gif");
+        const img   = para.children[0];
+        const src   = img.getAttribute("src") || "";
+        const isGif = src.toLowerCase().endsWith(".gif");
+        const name  = img.alt || src.split("/").pop();
+        const url   = src.startsWith("/") || src.startsWith("http") || src.startsWith("data:") ? src : this._mediaUrl(this.folderData.abs, src);
 
         const fig = document.createElement("figure");
-        fig.className = "res-fig" + (isGif ? " res-fig--gif" : "");
+        fig.className   = "res-fig" + (isGif ? " res-fig--gif" : "");
+        fig.dataset.url  = url;
+        fig.dataset.name = name;
+        fig.dataset.rel  = rel;
+
+        const pinned = this._isPinned(url);
+        const pin    = document.createElement("button");
+        pin.type        = "button";
+        pin.className   = "res-pin" + (pinned ? " is-on" : "");
+        pin.dataset.url = url;
+        pin.title       = pinned ? "Remove from compare" : "Add to compare";
+        pin.innerHTML   = pinned ? "&minus;" : "+";
 
         const cap = document.createElement("figcaption");
-        cap.textContent = img.alt || "";
+        cap.textContent = name;
 
-        fig.append(img, cap);
+        fig.append(pin, img, cap);
         grid.appendChild(fig);
         para.remove();
       });
 
       node = grid.nextElementSibling;
     }
+  }
+
+  _isPinned(url) {
+    return this.compare.some((item) => item.url === url);
+  }
+
+  _togglePin(item) {
+    if (this._isPinned(item.url)) this.compare = this.compare.filter((it) => it.url !== item.url);
+    else                          this.compare = [...this.compare, item];
+
+    this._persistCompare();
+
+    const count = this.detailEl.querySelector("#res-compare-count");
+    if (count) count.textContent = this.compare.length;
+
+    if (this.view === "compare") {
+      this._renderBody();
+      return;
+    }
+
+    this.detailEl.querySelectorAll(`.res-pin[data-url="${CSS.escape(item.url)}"]`).forEach((pin) => {
+      const pinned = this._isPinned(item.url);
+      pin.classList.toggle("is-on", pinned);
+      pin.innerHTML = pinned ? "&minus;" : "+";
+      pin.title     = pinned ? "Remove from compare" : "Add to compare";
+    });
+  }
+
+  _loadCompare() {
+    try {
+      return JSON.parse(localStorage.getItem(`results-compare:${this.root.root}`) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _persistCompare() {
+    localStorage.setItem(`results-compare:${this.root.root}`, JSON.stringify(this.compare));
   }
 
   _mediaUrl(folderAbs, relative) {
@@ -355,10 +626,29 @@ class ResultsView {
     return bytes + " B";
   }
 
-  _openLightbox(url, name) {
-    this.lightboxImg.src = url;
-    this.lightboxCap.textContent = name;
+  _openLightbox(index) {
+    this.lightboxAt = index;
+    this._showLightbox();
     this.lightbox.hidden = false;
+  }
+
+  _stepLightbox(step) {
+    if (!this.figures.length) return;
+    this.lightboxAt = (this.lightboxAt + step + this.figures.length) % this.figures.length;
+    this._showLightbox();
+  }
+
+  _showLightbox() {
+    const fig = this.figures[this.lightboxAt];
+    if (!fig) return;
+
+    this.lightboxImg.src         = fig.url;
+    this.lightboxCap.textContent = fig.rel && fig.rel !== "" ? `${fig.rel} / ${fig.name}` : fig.name;
+
+    this.lightboxCount.textContent = `${this.lightboxAt + 1} / ${this.figures.length}`;
+    this.lightboxPrev.hidden       = this.figures.length < 2;
+    this.lightboxNext.hidden       = this.figures.length < 2;
+    this.lightboxCount.hidden      = this.figures.length < 2;
   }
 
   _closeLightbox() {
