@@ -124,14 +124,19 @@ class RequestRouter:
         if path == "/api/cubes/status":
             self._send_json(handler, self.cubes.load_status())
             return
-        if path == "/api/cubes/topdown":
+        if path == "/api/cubes/primary":
             query = parse_qs(urlparse(handler.path).query)
-            png   = self.cubes.topdown_png(
-                cube_id = (query.get("id") or [""])[0],
-                source  = (query.get("source") or ["pred"])[0],
-                space   = (query.get("space") or ["physical"])[0],
-            )
+            png   = self.cubes.primary_png((query.get("id") or [""])[0])
             self._send_png(handler, png)
+            return
+        if path == "/api/cubes/profiles":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.cubes.profiles(
+                cube_id = (query.get("id") or [""])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
         if path == "/api/cubes/slice":
             query = parse_qs(urlparse(handler.path).query)

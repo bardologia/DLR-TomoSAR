@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260616b" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260616d" />
 </head>
 <body>
 
@@ -205,8 +205,9 @@
     <div class="page__head">
       <h2 class="page__title">Tomogram explorer</h2>
       <p class="page__lead">
-        Load a saved inference cube, then hover the top-down map to cut every tomogram
-        live along range and azimuth. Click to pin a point, click again to release.
+        Load a saved inference cube, then hover the primary SLC image to cut every tomogram
+        live along range and azimuth. Click to lock a point and read vertical profiles out
+        of the slices.
       </p>
     </div>
 
@@ -220,52 +221,69 @@
     </div>
 
     <div class="cube-stage" id="cube-stage" hidden>
-      <aside class="cube-map">
-        <div class="cube-map__head">
-          <h3 class="cube-panel-title">Top-down map</h3>
-          <div class="cube-sources" role="group" aria-label="Map source">
-            <button type="button" class="cube-source is-active" data-source="pred"><i class="cube-dot" data-source="pred"></i>Pred</button>
-            <button type="button" class="cube-source" data-source="gt"><i class="cube-dot" data-source="gt"></i>GT</button>
-            <button type="button" class="cube-source" data-source="reduced"><i class="cube-dot" data-source="reduced"></i>Reduced</button>
-            <button type="button" class="cube-source" data-source="full"><i class="cube-dot" data-source="full"></i>Full</button>
+      <div class="cube-deck" id="cube-deck" data-mode="map">
+        <aside class="cube-map" id="cube-map">
+          <div class="cube-map__head">
+            <h3 class="cube-panel-title">Primary SLC amplitude</h3>
           </div>
-          <div class="cube-spaces" role="group" aria-label="Value space">
-            <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
-            <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+          <div class="cube-map__wrap">
+            <img id="cube-topdown" alt="Primary SLC amplitude" />
+            <i class="cube-cross" id="cube-cross" hidden></i>
           </div>
-        </div>
-        <div class="cube-map__wrap">
-          <img id="cube-topdown" alt="Top-down tomogram view" />
-          <i class="cube-cross" id="cube-cross" hidden></i>
-        </div>
-        <p class="cube-coords" id="cube-coords">Hover the map to explore &middot; click to pin</p>
-      </aside>
+          <p class="cube-coords" id="cube-coords">Hover the image to cut every tomogram &middot; click to lock the slices</p>
+        </aside>
 
-      <div class="cube-slices" id="cube-slices" hidden>
-        <section class="cube-cutgroup" data-axis="range">
-          <h3 class="cube-cutgroup__title">
-            Range cut <span class="cube-cutgroup__sub">tomogram column at the marked azimuth</span>
-            <span class="cube-cutgroup__at" data-axis="range"></span>
-          </h3>
-          <div class="cube-cutgroup__grid">
-            <figure class="cube-slice" data-axis="range" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="range" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="range" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="range" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+        <div class="cube-slices" id="cube-slices" hidden>
+          <div class="cube-slices__bar">
+            <button type="button" class="btn btn--mini" id="cube-back" hidden>&larr; Back to primary</button>
+            <span class="cube-slices__at" id="cube-slices-at"></span>
+            <div class="cube-spaces" role="group" aria-label="Value space">
+              <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+              <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+            </div>
           </div>
-        </section>
-        <section class="cube-cutgroup" data-axis="azimuth">
-          <h3 class="cube-cutgroup__title">
-            Azimuth cut <span class="cube-cutgroup__sub">tomogram row at the marked range</span>
-            <span class="cube-cutgroup__at" data-axis="azimuth"></span>
-          </h3>
-          <div class="cube-cutgroup__grid">
-            <figure class="cube-slice" data-axis="azimuth" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="azimuth" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
-            <figure class="cube-slice" data-axis="azimuth" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas></div></figure>
+          <section class="cube-cutgroup" data-axis="range">
+            <h3 class="cube-cutgroup__title">
+              Range cut <span class="cube-cutgroup__sub">tomogram column at the marked azimuth</span>
+              <span class="cube-cutgroup__at" data-axis="range"></span>
+            </h3>
+            <div class="cube-cutgroup__grid">
+              <figure class="cube-slice" data-axis="range" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="range" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="range" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="range" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+            </div>
+          </section>
+          <section class="cube-cutgroup" data-axis="azimuth">
+            <h3 class="cube-cutgroup__title">
+              Azimuth cut <span class="cube-cutgroup__sub">tomogram row at the marked range</span>
+              <span class="cube-cutgroup__at" data-axis="azimuth"></span>
+            </h3>
+            <div class="cube-cutgroup__grid">
+              <figure class="cube-slice" data-axis="azimuth" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-slice__media"><canvas></canvas><i class="cube-ref" hidden></i></div></figure>
+            </div>
+          </section>
+        </div>
+
+        <aside class="cube-profiles" id="cube-profiles">
+          <div class="cube-profiles__head">
+            <h3 class="cube-panel-title">Vertical profiles</h3>
+            <div class="cube-spaces" id="cube-prof-mode" role="group" aria-label="Profile scaling">
+              <button type="button" class="cube-space is-active" data-mode="raw">Raw</button>
+              <button type="button" class="cube-space" data-mode="unit">Unit area</button>
+            </div>
           </div>
-        </section>
+          <p class="cube-coords" id="cube-prof-at">Hover a slice to read the profiles at that position.</p>
+          <div class="cube-profiles__grid">
+            <figure class="cube-prof" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
+            <figure class="cube-prof" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
+            <figure class="cube-prof" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
+            <figure class="cube-prof" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
+          </div>
+        </aside>
       </div>
     </div>
   </section>
@@ -358,8 +376,8 @@
 <script src="/static/js/launch.js?v=20260609q"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
-<script src="/static/js/tomogram.js?v=20260614a"></script>
+<script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/app.js?v=20260617a"></script>
+<script src="/static/js/app.js?v=20260617b"></script>
 </body>
 </html>

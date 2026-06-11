@@ -67,17 +67,36 @@ class CubeExplorer:
                 payload["cube"] = self.loaded["meta"]
         return payload
 
-    def topdown_png(self, cube_id: str, source: str, space: str = "physical") -> bytes | None:
-        entry = self._entry(cube_id, source)
-        if entry is None:
-            return None
+    def primary_png(self, cube_id: str) -> bytes | None:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            primary = self.loaded["primary"]
 
-        mean       = entry["mean_norm"] if space == "normalized" else entry["mean"]
-        vmin, vmax = np.percentile(mean, [1.0, 99.0])
+        vmin, vmax = np.percentile(primary, [1.0, 99.0])
 
         buf = io.BytesIO()
-        plt.imsave(buf, mean, cmap="jet", vmin=float(vmin), vmax=float(vmax), format="png")
+        plt.imsave(buf, primary, cmap="gray", vmin=float(vmin), vmax=float(vmax), format="png")
         return buf.getvalue()
+
+    def profiles(self, cube_id: str, az: int, rg: int) -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+            entries = self.loaded["entries"]
+            meta    = self.loaded["meta"]
+
+        az = int(np.clip(az, 0, meta["n_az"] - 1))
+        rg = int(np.clip(rg, 0, meta["n_rg"] - 1))
+
+        sources = {}
+        for source, entry in entries.items():
+            order            = np.argsort(entry["x_axis"])
+            heights          = np.asarray(entry["x_axis"])[order]
+            values           = entry["cube"][:, az, rg][order]
+            sources[source]  = {"heights": heights.tolist(), "values": values.astype(float).tolist()}
+
+        return {"ok": True, "az": az, "rg": rg, "sources": sources}
 
     def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical") -> bytes | None:
         entry = self._entry(cube_id, source)
@@ -125,10 +144,10 @@ class CubeExplorer:
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            entries, meta = self._load_all(stamp_dir)
+            entries, meta, primary = self._load_all(stamp_dir)
 
             with self.lock:
-                self.loaded = {"id": cube_id, "entries": entries, "meta": meta}
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary}
                 self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
 
             self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
@@ -139,7 +158,7 @@ class CubeExplorer:
 
             self.logger.error(f"cube load failed: {cube_id}: {exc}")
 
-    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict]:
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray]:
         cubes_dir = stamp_dir / "cubes"
         pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
         if pred_raw.ndim != 3:
@@ -173,13 +192,15 @@ class CubeExplorer:
                 raise ValueError(f"source '{source}' spatial shape {raw.shape[1:]} does not match pred {(n_az, n_rg)}")
             entries[source] = self._ingest(raw, x_axis, lambda s=source: advance(s))
 
+        primary = self._primary_db(stamp_dir, n_az, n_rg)
+
         meta = {
             "sources" : [s for s in self.SOURCES if s in entries],
             "n_az"    : n_az,
             "n_rg"    : n_rg,
             "n_elev"  : {s: int(entries[s]["cube"].shape[0]) for s in entries},
         }
-        return entries, meta
+        return entries, meta, primary
 
     def _ingest(self, raw: np.ndarray, x_axis: np.ndarray, advance) -> dict:
         cube = np.empty(raw.shape, dtype=np.float32)
@@ -193,18 +214,11 @@ class CubeExplorer:
         sample     = sample[np.isfinite(sample)]
         vmin, vmax = (np.percentile(sample, [1.0, 99.0]) if sample.size else (0.0, 1.0))
 
-        mean       = cube.mean(axis=0)
-        peak       = cube.max(axis=0)
-        safe_peak  = np.where(peak > 1e-12, peak, 1.0)
-        mean_norm  = mean / safe_peak
-
         return {
-            "cube"      : cube,
-            "mean"      : mean,
-            "mean_norm" : mean_norm,
-            "x_axis"    : x_axis,
-            "vmin"      : float(vmin),
-            "vmax"      : float(vmax),
+            "cube"   : cube,
+            "x_axis" : x_axis,
+            "vmin"   : float(vmin),
+            "vmax"   : float(vmax),
         }
 
     def _curve_axis(self, stamp_dir: Path, n_elev: int) -> np.ndarray:
@@ -215,7 +229,7 @@ class CubeExplorer:
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
         return np.linspace(float(metrics["x_axis_min"]), float(metrics["x_axis_max"]), n_elev)
 
-    def _full_raw(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
+    def _preproc_layout(self, stamp_dir: Path) -> tuple[Path, dict, dict] | None:
         meta_path = stamp_dir.parent.parent / "meta" / "dataset_creation_config.json"
         if not meta_path.is_file():
             return None
@@ -226,7 +240,26 @@ class CubeExplorer:
         if not layout_path.is_file():
             return None
 
-        layout    = json.loads(layout_path.read_text(encoding="utf-8"))
+        layout = json.loads(layout_path.read_text(encoding="utf-8"))
+        return preproc_dir, payload, layout
+
+    def _crop_bounds(self, payload: dict, layout: dict, n_az: int, n_rg: int) -> tuple[int, int, int, int]:
+        region      = self._matching_region(payload["split_regions"], n_az, n_rg)
+        global_crop = layout["global_crop"]
+
+        az_lo = region["azimuth_start"] - global_crop[0]
+        az_hi = region["azimuth_end"]   - global_crop[0]
+        rg_lo = region["range_start"]   - global_crop[2]
+        rg_hi = region["range_end"]     - global_crop[2]
+        return az_lo, az_hi, rg_lo, rg_hi
+
+    def _full_raw(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
+        resolved = self._preproc_layout(stamp_dir)
+        if resolved is None:
+            return None
+
+        preproc_dir, payload, layout = resolved
+
         tomo_name = layout["artifacts"].get("tomogram_full")
         if not tomo_name:
             return None
@@ -235,12 +268,7 @@ class CubeExplorer:
         if not tomo_path.is_file():
             return None
 
-        region      = self._matching_region(payload["split_regions"], n_az, n_rg)
-        global_crop = layout["global_crop"]
-        az_lo       = region["azimuth_start"] - global_crop[0]
-        az_hi       = region["azimuth_end"]   - global_crop[0]
-        rg_lo       = region["range_start"]   - global_crop[2]
-        rg_hi       = region["range_end"]     - global_crop[2]
+        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(payload, layout, n_az, n_rg)
 
         raw = np.load(tomo_path, mmap_mode="r")
         if raw.ndim != 3:
@@ -249,6 +277,32 @@ class CubeExplorer:
             raise ValueError(f"cube region az[{az_lo}:{az_hi}] rg[{rg_lo}:{rg_hi}] falls outside the full tomogram {raw.shape}")
 
         return raw[:, az_lo:az_hi, rg_lo:rg_hi]
+
+    def _primary_db(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray:
+        resolved = self._preproc_layout(stamp_dir)
+        if resolved is None:
+            raise FileNotFoundError(f"cannot resolve the preprocessing run for {stamp_dir}; the primary SLC is required for the cube map")
+
+        preproc_dir, payload, layout = resolved
+
+        primary_name = layout["artifacts"].get("primary")
+        if not primary_name:
+            raise FileNotFoundError(f"dataset.json in {preproc_dir} lists no primary artifact")
+
+        primary_path = preproc_dir / "data" / primary_name
+        if not primary_path.is_file():
+            raise FileNotFoundError(f"primary SLC missing: {primary_path}")
+
+        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(payload, layout, n_az, n_rg)
+
+        raw = np.load(primary_path, mmap_mode="r")
+        if raw.ndim != 2:
+            raise ValueError(f"primary SLC is not a 2D image: shape={raw.shape}")
+        if az_lo < 0 or rg_lo < 0 or az_hi > raw.shape[0] or rg_hi > raw.shape[1]:
+            raise ValueError(f"cube region az[{az_lo}:{az_hi}] rg[{rg_lo}:{rg_hi}] falls outside the primary SLC {raw.shape}")
+
+        amplitude = np.abs(np.asarray(raw[az_lo:az_hi, rg_lo:rg_hi])).astype(np.float32)
+        return 20.0 * np.log10(np.maximum(amplitude, 1e-12))
 
     @staticmethod
     def _matching_region(split_regions: dict, n_az: int, n_rg: int) -> dict:
