@@ -9,6 +9,12 @@ Visual confirmation suites for the inner workings of every pipeline. Each notebo
 - Fully self-contained: no dependence on the `/ste/rnd` data mount, trained checkpoints, or a GPU. Run from each notebook's own directory with the Dune environment kernel.
 - Notebooks are authored against the real APIs (verified by smoke imports and live calls during authoring) but ship unexecuted; run them to produce the figures.
 
+## Studies
+
+The `studies/` directory holds data-driven studies that, unlike the confirmation suites, require the real `/ste/rnd` data mount (or locally edited paths in their configuration cell).
+
+- `studies/normalization_strategy_selection.ipynb` — exhaustive grid of all 7 `ChannelStrategy` presets against all 12 normalized slot kinds (9 input, 3 output) on real train-split pools; metric battery with invertibility gating, composite-score heatmaps, per-slot rankings and a verdict against the configured `_SLOT_STRATEGIES` standards.
+
 ## Environment notes
 
 - `h5py` was installed into the Dune environment (3.16.0, an optional `processing` extra) so `pipelines.processing_pipeline.tomogram` imports; processing notebooks 08-10 need it.
