@@ -89,6 +89,13 @@ class ResultsBrowser:
             "other"      : other,
         }
 
+    def catalog(self, datasets_raw: str, logs_raw: str) -> dict:
+        return {
+            "ok"       : True,
+            "datasets" : self._catalog_datasets(datasets_raw),
+            "runs"     : self._catalog_runs(logs_raw),
+        }
+
     def gallery(self, raw_root: str) -> dict:
         if raw_root not in self.roots:
             return {"ok": False, "error": "path not opened"}
@@ -107,6 +114,53 @@ class ResultsBrowser:
         if not target.is_file():
             return None
         return target
+
+    def _catalog_datasets(self, raw: str) -> dict:
+        root, error = self._catalog_root(raw)
+        if error:
+            return {"error": error, "items": []}
+
+        items = []
+        for entry in self._subdirs(root):
+            params     = []
+            params_dir = entry / "params"
+            if params_dir.is_dir():
+                params = [{"name": child.name, "path": str(child)} for child in self._subdirs(params_dir)]
+            items.append({"name": entry.name, "path": str(entry), "params": params})
+
+        return {"error": "", "items": items}
+
+    def _catalog_runs(self, raw: str) -> dict:
+        root, error = self._catalog_root(raw)
+        if error:
+            return {"error": error, "items": []}
+
+        dirs = self._subdirs(root)
+        dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+
+        return {"error": "", "items": [{"name": d.name, "path": str(d), "stage": self._stage(d)} for d in dirs]}
+
+    def _catalog_root(self, raw: str) -> tuple[Path | None, str]:
+        raw = raw.strip()
+        if not raw:
+            return None, "not set"
+
+        root = Path(raw).expanduser()
+        if not root.is_absolute():
+            return None, "an absolute path is required"
+
+        root = root.resolve()
+        if not root.is_dir():
+            return None, f"not a directory: {root}"
+
+        return root, ""
+
+    def _subdirs(self, directory: Path) -> list:
+        try:
+            entries = sorted(directory.iterdir())
+        except OSError:
+            entries = []
+        return [entry for entry in entries if entry.is_dir() and entry.name not in self.SKIPPED_DIRS and not entry.name.startswith(".")]
 
     def _collect_gallery(self, directory: Path, root: Path, depth: int, groups: list) -> None:
         try:

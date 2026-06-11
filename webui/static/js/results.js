@@ -12,6 +12,8 @@ class ResultsView {
     this.expanded  = new Set();
     this.loaded    = false;
 
+    this.sources     = this._loadSources();
+    this.catalog     = null;
     this.view        = "folder";
     this.filter      = "";
     this.size        = localStorage.getItem("results-size") || "m";
@@ -51,14 +53,34 @@ class ResultsView {
     if (this.loaded) return;
     this.loaded = true;
 
+    this._renderSidebar();
+    this.loadCatalog();
+
     const recents = this._recents();
     if (recents.length) {
       this.pathInput.value = recents[0];
       this.open(recents[0]);
     } else {
-      this._renderSidebar();
-      this.detailEl.innerHTML = `<div class="res-empty">Paste the path of any run directory above &mdash; preprocessing, parameter extraction, training, inference or benchmark &mdash; and press Open.</div>`;
+      this.detailEl.innerHTML = `<div class="res-empty">Point the sidebar at your datasets and runs folders, then pick a dataset, parameter extraction or run &mdash; or paste any run directory above and press Open.</div>`;
     }
+  }
+
+  async loadCatalog() {
+    if (!this.sources.datasets && !this.sources.logs) {
+      this.catalog = null;
+      this._renderSidebar();
+      return;
+    }
+
+    let data;
+    try {
+      data = await window.apiGet(`/api/results/catalog?datasets=${encodeURIComponent(this.sources.datasets)}&logs=${encodeURIComponent(this.sources.logs)}`);
+    } catch (e) {
+      data = null;
+    }
+
+    this.catalog = data && data.ok ? data : null;
+    this._renderSidebar();
   }
 
   async open(path) {
@@ -133,36 +155,86 @@ class ResultsView {
 
   _renderSidebar() {
     this.listEl.innerHTML = "";
+    this._renderSources();
 
-    const recents = this._recents();
-    if (recents.length) {
-      const head = document.createElement("div");
-      head.className = "run-group__head";
-      head.innerHTML = `<span>Recent</span><span class="run-group__count">${recents.length}</span>`;
-      this.listEl.appendChild(head);
-
-      recents.forEach((path) => {
-        const item = document.createElement("button");
-        item.type = "button";
-        item.className = "run-item" + (this.root && this.root.root === path ? " is-active" : "");
-        item.innerHTML = `<span class="run-item__name">${this._esc(this._shorten(path))}</span>`;
-        item.title = path;
-        item.addEventListener("click", () => this.open(path));
-        this.listEl.appendChild(item);
+    if (this.catalog) {
+      const datasets = this.catalog.datasets;
+      this._renderGroupHead("Datasets", datasets.items.length);
+      if (datasets.error && this.sources.datasets) this._renderNote(datasets.error, true);
+      if (!datasets.error && !datasets.items.length) this._renderNote("no datasets found", false);
+      datasets.items.forEach((dataset) => {
+        this._renderEntry(dataset.name, dataset.path, "preprocess", 0);
+        dataset.params.forEach((param) => this._renderEntry(param.name, param.path, "params", 1));
       });
+
+      const runs = this.catalog.runs;
+      this._renderGroupHead("Runs", runs.items.length);
+      if (runs.error && this.sources.logs) this._renderNote(runs.error, true);
+      if (!runs.error && !runs.items.length) this._renderNote("no runs found", false);
+      runs.items.forEach((run) => this._renderEntry(run.name, run.path, run.stage, 0));
     }
 
-    if (!this.root) {
-      if (!recents.length) this.listEl.innerHTML = `<div class="clist__empty">No results opened yet.</div>`;
-      return;
+    if (this.root && !this._inCatalog(this.root.root)) {
+      this._renderGroupHead("Opened path", "");
+      this._renderEntry(this.root.name, this.root.root, this.root.stage, 0);
     }
+  }
 
+  _renderSources() {
+    const box = document.createElement("form");
+    box.className = "res-src";
+    box.innerHTML =
+      `<div class="res-src__head">Sources</div>` +
+      `<label>Datasets dir<input id="res-src-datasets" type="text" value="${this._esc(this.sources.datasets)}" placeholder="/path/to/datasets" spellcheck="false" autocomplete="off" /></label>` +
+      `<label>Runs dir<input id="res-src-logs" type="text" value="${this._esc(this.sources.logs)}" placeholder="/path/to/logs" spellcheck="false" autocomplete="off" /></label>` +
+      `<button type="submit" class="btn btn--mini">Apply</button>`;
+
+    box.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      this.sources = {
+        datasets : box.querySelector("#res-src-datasets").value.trim(),
+        logs     : box.querySelector("#res-src-logs").value.trim(),
+      };
+      localStorage.setItem("results-sources", JSON.stringify(this.sources));
+      this.loadCatalog();
+    });
+
+    this.listEl.appendChild(box);
+  }
+
+  _renderGroupHead(title, count) {
     const head = document.createElement("div");
     head.className = "run-group__head";
-    head.innerHTML = `<span>${this._esc(this.root.name)}</span><span class="res-stage">${this._esc(this.root.stage)}</span>`;
+    head.innerHTML = `<span>${this._esc(title)}</span><span class="run-group__count">${count}</span>`;
     this.listEl.appendChild(head);
+  }
 
-    this._renderNode(this.root.tree, 0);
+  _renderNote(text, isError) {
+    const note = document.createElement("div");
+    note.className = "res-cat__note" + (isError ? " res-cat__note--err" : "");
+    note.textContent = text;
+    this.listEl.appendChild(note);
+  }
+
+  _renderEntry(name, path, stage, depth) {
+    const isOpen = this.root && this.root.root === path;
+
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "res-cat__row" + (isOpen ? " is-open" : "") + (isOpen && this.activeRel === "" && this.view === "folder" ? " is-active" : "");
+    row.style.paddingLeft = `${8 + depth * 14}px`;
+    row.title = path;
+    row.innerHTML = `<span class="res-cat__name">${this._esc(name)}</span><span class="res-cat__stage">${this._esc(stage)}</span>`;
+    row.addEventListener("click", () => isOpen ? this.selectFolder("") : this.open(path));
+    this.listEl.appendChild(row);
+
+    if (isOpen) this.root.tree.children.forEach((child) => this._renderNode(child, depth + 1));
+  }
+
+  _inCatalog(path) {
+    if (!this.catalog) return false;
+    if (this.catalog.runs.items.some((run) => run.path === path)) return true;
+    return this.catalog.datasets.items.some((dataset) => dataset.path === path || dataset.params.some((param) => param.path === path));
   }
 
   _renderNode(node, depth) {
@@ -601,6 +673,15 @@ class ResultsView {
     }
   }
 
+  _loadSources() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
+      return { datasets: raw.datasets || "", logs: raw.logs || "" };
+    } catch (e) {
+      return { datasets: "", logs: "" };
+    }
+  }
+
   _recents() {
     try {
       return JSON.parse(localStorage.getItem("results-recents") || "[]");
@@ -612,11 +693,6 @@ class ResultsView {
   _remember(path) {
     const recents = [path, ...this._recents().filter((p) => p !== path)].slice(0, 8);
     localStorage.setItem("results-recents", JSON.stringify(recents));
-  }
-
-  _shorten(path) {
-    const parts = path.replace(/\/+$/, "").split("/");
-    return parts.length > 3 ? "…/" + parts.slice(-3).join("/") : path;
   }
 
   _size(bytes) {

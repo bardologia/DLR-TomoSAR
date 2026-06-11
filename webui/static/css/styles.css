@@ -1480,19 +1480,44 @@ em { font-style: italic; color: var(--accent); }
 }
 .run-group__count { color: var(--ink-faint); }
 
-.run-item {
-  display: flex; flex-direction: column; gap: 3px;
-  width: 100%; text-align: left;
-  padding: 9px 12px; border: 1px solid transparent; border-radius: var(--r-card);
-  background: none; cursor: pointer;
-  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-.run-item:hover { background: var(--surface-2); }
-.run-item.is-active { background: rgba(29, 79, 216, 0.07); border-color: var(--accent); }
-.run-item__name { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--ink); word-break: break-all; }
-.run-item__meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
-
 .master__detail--results { padding: 20px 22px; }
+
+.res-src {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; margin-bottom: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card);
+}
+.res-src__head { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.res-src label {
+  display: flex; flex-direction: column; gap: 3px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.res-src input {
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 2px;
+  padding: 6px 8px;
+  transition: border-color 0.2s var(--ease);
+}
+.res-src input:focus { outline: none; border-color: var(--accent); }
+.res-src input::placeholder { color: var(--ink-faint); }
+.res-src .btn--mini { align-self: flex-end; padding: 5px 12px; }
+
+.res-cat__row {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: left;
+  padding: 7px 8px; border: none; border-radius: 2px;
+  background: none; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.res-cat__row:hover { background: var(--surface-2); }
+.res-cat__row.is-open { color: var(--accent-deep); }
+.res-cat__row.is-active { background: rgba(29, 79, 216, 0.07); }
+.res-cat__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-cat__stage { flex: none; font-size: 9.5px; color: var(--ink-faint); }
+
+.res-cat__note { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); padding: 2px 8px 8px; }
+.res-cat__note--err { color: var(--danger); }
 
 .res-bar {
   position: sticky; top: 66px; z-index: 6;

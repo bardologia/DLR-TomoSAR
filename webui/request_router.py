@@ -98,6 +98,11 @@ class RequestRouter:
             result = self.results.folder((query.get("root") or [""])[0], (query.get("rel") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/results/catalog":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.results.catalog((query.get("datasets") or [""])[0], (query.get("logs") or [""])[0])
+            self._send_json(handler, result)
+            return
         if path == "/api/results/gallery":
             query  = parse_qs(urlparse(handler.path).query)
             result = self.results.gallery((query.get("root") or [""])[0])
