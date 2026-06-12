@@ -32,94 +32,94 @@ class FlowView {
     this.stackTimer = null;
 
     this.GUIDE = {
-      slc_load   : { sketch: "channels", tip: "The master range-Doppler image and each co-registered secondary, plus its DEM phase, are read into one indexed complex stack." },
-      baselines  : { sketch: "baseline", tip: "Each pass's track position is averaged and expressed relative to the reference; a position std above five metres aborts the run." },
-      deramp     : { sketch: "phasor",   tip: "Each pass is multiplied by the conjugate DEM phase, removing terrain topography and leaving only the sub-resolution elevation signal." },
-      crossprod  : { sketch: "phasor",   tip: "The master conjugated against the deramped secondary leaves the phase difference minus the DEM phase, which the conjugation effectively subtracts." },
-      phasor     : { sketch: "unit",     tip: "The cross-product is divided by its magnitude to a unit phasor, so inter-pass amplitude differences drop out while coherence survives." },
-      clip       : { sketch: "clip",     tip: "The secondary amplitude is clipped at 1.25 so a bright corner reflector cannot dominate the per-pass weight." },
-      interf     : { sketch: "unit",     tip: "The clipped amplitude is reintroduced as the modulus, giving a bounded signal-to-noise weighting on the residual elevation phase." },
-      subdivide  : { sketch: "tiling",   tip: "A long azimuth crop is split into non-overlapping subsections, each beamformed in its own isolated PyRat worker." },
-      covariance : { sketch: "covmat",   tip: "A Boxcar window averages the interferometric stack into the per-pixel sample covariance the Capon estimator inverts." },
-      capon      : { sketch: "spectrum", tip: "A Capon minimum-variance beamformer turns the interferometric stack into an elevation power spectrum, sharp at each scatterer's height." },
-      concat     : { sketch: "concat",   tip: "The per-worker azimuth subsections are concatenated back into one continuous beamformed tomogram." },
+      slc_load   : { sketch: "channels", tip: "Two PyRat products meet here: the master range-Doppler image and each secondary already co-registered to it, plus its DEM phase." },
+      baselines  : { sketch: "baseline", tip: "Track positions collapse to one offset per pass relative to the reference; drift beyond five metres and the run aborts." },
+      deramp     : { sketch: "phasor",   tip: "Multiplying by the conjugate DEM phasor erases the terrain the radar already knows, leaving only the metres-scale height signal." },
+      crossprod  : { sketch: "phasor",   tip: "Conjugating master against secondary subtracts the DEM phase outright, since the conjugation flips its sign inside the product." },
+      phasor     : { sketch: "unit",     tip: "Stripped of magnitude, the product keeps direction but not strength, so an amplitude swing between passes cannot pose as signal." },
+      clip       : { sketch: "clip",     tip: "A hard ceiling of 1.25 stops a single bright corner reflector from dominating the per-pass weighting." },
+      interf     : { sketch: "unit",     tip: "The clipped amplitude returns as the modulus, stamping a bounded confidence onto the surviving elevation phase." },
+      subdivide  : { sketch: "tiling",   tip: "Too large for memory, the azimuth crop is split into bands, each handed to its own isolated PyRat worker." },
+      covariance : { sketch: "covmat",   tip: "A 20-by-10 Boxcar window blurs the stack into the per-pixel covariance matrix that Capon then inverts." },
+      capon      : { sketch: "spectrum", tip: "Capon's minimum-variance estimator sharpens the stack into an elevation spectrum that peaks exactly where scatterers sit." },
+      concat     : { sketch: "concat",   tip: "The worker bands are stitched edge to edge back into one continuous tomogram." },
 
-      threshold  : { sketch: "profile",  tip: "Each elevation profile is the tomogram magnitude, floored at a relative threshold and truncated past a fixed elevation index." },
-      activity   : { sketch: "clamp",    tip: "A pixel is fitted only when its profile peak clears the activity threshold; inactive pixels are skipped entirely." },
-      pnorm      : { sketch: "normalize",tip: "Dividing by the profile maximum decouples the loss from absolute backscatter so every pixel is comparable." },
-      peakfind   : { sketch: "peaks",    tip: "Peaks are kept only when their prominence clears a fraction of the maximum and they sit far enough apart, detected on the raw profile." },
-      geometry   : { sketch: "select",   tip: "The elevation span sets the initial width, the minimum peak spacing, and the lower and upper width clamps." },
-      residfill  : { sketch: "peaks",    tip: "When too few peaks are found, the area around each is suppressed and the remaining slots are filled from the residual maxima." },
-      seed       : { sketch: "select",   tip: "The strongest peaks seed the means and amplitudes, which stay frozen while only the widths are fit." },
-      objective  : { sketch: "mixfit",   tip: "The loss is the squared mismatch between the K-Gaussian mixture and the normalised measured profile." },
-      adam       : { sketch: "converge", tip: "The component widths are fit by clamped, bias-corrected Adam while the means and amplitudes stay fixed at the peak maxima." },
-      scoreK     : { sketch: "lossbars", tip: "Every candidate order is scored as fit error plus a complexity penalty proportional to its mean amplitude." },
-      selectK    : { sketch: "argmin",   tip: "The order minimising the penalised score wins, with ties broken toward the smaller, simpler model." },
-      rescale    : { sketch: "normalize",tip: "The winning amplitudes return to raw backscatter units while the means and widths are written unchanged." },
-      assemble   : { sketch: "sort",     tip: "The winning components are sorted by ascending elevation and packed into the interleaved 3K target vector." },
-      quality    : { sketch: "heatmap",  tip: "A per-pixel coefficient of determination over the thresholded profile is written out as a spatial quality map." },
-      diagnostics: { sketch: "argmin",   tip: "Post-hoc diagnostics flag ambiguous order choices and the peak-to-floor contrast without ever altering the fit." },
+      threshold  : { sketch: "profile",  tip: "The profile is the tomogram's magnitude, floored below a fraction of its peak and clipped past a fixed height bin." },
+      activity   : { sketch: "clamp",    tip: "Quiet pixels skip the fit entirely: only those whose peak clears the activity floor earn a mixture." },
+      pnorm      : { sketch: "normalize",tip: "Scaling by the peak frees the loss from absolute brightness, so a faint pixel and a bright one are judged alike." },
+      peakfind   : { sketch: "peaks",    tip: "A peak survives only if it stands proud of the noise and keeps its distance, all read off the raw profile." },
+      geometry   : { sketch: "select",   tip: "One elevation span fixes everything: the seed width, the minimum peak spacing, and the bounds Adam may wander between." },
+      residfill  : { sketch: "peaks",    tip: "Short on peaks, the fit suppresses the neighbourhood of each one and drafts replacements from the maxima that remain." },
+      seed       : { sketch: "select",   tip: "The loudest peaks lock in the means and amplitudes; from here on, only the widths are free to move." },
+      objective  : { sketch: "mixfit",   tip: "The loss is simply how far the K-Gaussian guess sits from the normalised profile, squared and summed." },
+      adam       : { sketch: "converge", tip: "Three thousand clamped Adam steps, compiled into a single kernel, settle the widths while means and amplitudes hold fixed." },
+      scoreK     : { sketch: "lossbars", tip: "Each candidate order must pay for itself: fit error plus a penalty that grows with the amplitude it spends." },
+      selectK    : { sketch: "argmin",   tip: "The cheapest penalised order wins, and a tie always breaks toward the simpler model." },
+      rescale    : { sketch: "normalize",tip: "Amplitudes step back into real backscatter units for storage; the means and widths were never rescaled." },
+      assemble   : { sketch: "sort",     tip: "Survivors line up by ascending height and slot into the interleaved target, empty components falling to the end as zeros." },
+      quality    : { sketch: "heatmap",  tip: "An R-squared per pixel, measured against the very profile that was fit, becomes a spatial map of trust." },
+      diagnostics: { sketch: "argmin",   tip: "Two read-outs watch from the sidelines, flagging shaky order choices and weak peak-to-floor contrast, never touching the fit." },
 
-      splitgeom  : { sketch: "tiling",   tip: "The crop is divided along azimuth into contiguous train, validation and test bands with no overlap." },
-      localslice : { sketch: "tiling",   tip: "Each split's absolute bounds are shifted by the crop origin into zero-based slices over the memory-mapped arrays." },
-      secselect  : { sketch: "channels", tip: "The secondary subset is chosen by flight label and the same indices are applied to secondaries and interferograms." },
-      stack      : { sketch: "channels", tip: "Primary, secondary, and interferogram passes are written into one complex buffer indexed by pass." },
-      patchgrid  : { sketch: "tiling",   tip: "A strided sliding window tiles the crop into overlapping patches, reflected at the borders." },
-      padgeom    : { sketch: "tiling",   tip: "The deficit between the grid and the region is padded symmetrically, with border patches reflecting their overhang." },
-      extract    : { sketch: "tiling",   tip: "The clipped read window is copied, never aliased, then reflect-padded in a single pass." },
-      represent  : { sketch: "c2r",      tip: "Each complex pass becomes real channels: magnitude and phase, or magnitude-normalised real and imaginary parts." },
-      assemble_in: { sketch: "channels", tip: "Every enabled source is concatenated along the channel axis, with the optional DEM channel last." },
-      target     : { sketch: "target",   tip: "The configured subset of Gaussian parameters becomes the supervised regression target." },
-      augment_geo: { sketch: "augment",  tip: "Flips and rotations transform input and target together before normalisation, preserving spatial correspondence." },
-      slotkeys   : { sketch: "channels", tip: "Each channel is labelled with a slot key that fixes which normalisation strategy it receives." },
-      fitstats   : { sketch: "hist",     tip: "Per-slot location and scale are fitted on the training split with z-score and optional log compression." },
-      normalise  : { sketch: "normalize",tip: "The fitted statistics standardise every split into the dimensionless tensor the network reads." },
-      noise      : { sketch: "augment",  tip: "Additive Gaussian noise perturbs only the normalised input, never the regression target." },
-      denorm     : { sketch: "normalize",tip: "The same statistics invert normalisation at loss and inference time, with a ceiling on the exponential to avoid overflow." },
+      splitgeom  : { sketch: "tiling",   tip: "Azimuth is cut into three contiguous bands, 70/15/15, so train, validation and test never share ground." },
+      localslice : { sketch: "tiling",   tip: "Absolute scene coordinates shift by the crop origin into zero-based slices straight into the memory-mapped arrays." },
+      secselect  : { sketch: "channels", tip: "A handful of flight labels pick the secondaries, and the same indices carry across to their interferograms." },
+      stack      : { sketch: "channels", tip: "Master, secondaries and interferograms drop into one complex buffer, each pass at its own index." },
+      patchgrid  : { sketch: "tiling",   tip: "A strided window walks the crop, and a ceiling on the count guarantees the final patch still reaches the edge." },
+      padgeom    : { sketch: "tiling",   tip: "Whatever the grid overshoots is padded symmetrically, with edge patches mirroring their own overhang back inward." },
+      extract    : { sketch: "tiling",   tip: "Every patch is a fresh copy, never a view, reflect-padded in a single stroke before it leaves." },
+      represent  : { sketch: "c2r",      tip: "Complex turns real: magnitude and phase, or magnitude with normalised real and imaginary parts, depending on the source." },
+      assemble_in: { sketch: "channels", tip: "Sources line up along the channel axis, primary then secondaries then interferograms, with the DEM tacked on last." },
+      target     : { sketch: "target",   tip: "From the interleaved ground truth, only the requested parameter roles are kept as the supervised target." },
+      augment_geo: { sketch: "augment",  tip: "Flips and rotations hit input and target with the identical transform, keeping geometry in lockstep, all before normalisation." },
+      slotkeys   : { sketch: "channels", tip: "Each channel earns a slot tag that decides which normalisation recipe it will later be fed." },
+      fitstats   : { sketch: "hist",     tip: "Location and scale are learned on the train split alone, z-scored, with an optional log squeeze for heavy-tailed channels." },
+      normalise  : { sketch: "normalize",tip: "One fitted statistic per slot flattens every split into the unitless tensor the network expects." },
+      noise      : { sketch: "augment",  tip: "A small Gaussian perturbation roughens only the normalised input; the regression target stays clean." },
+      denorm     : { sketch: "normalize",tip: "Reading predictions back to physical units inverts the same statistics, capping the exponential so nothing overflows." },
 
-      forward    : { sketch: "network",  tip: "The network maps one normalised patch to all per-pixel Gaussian parameters in a single pass." },
-      tdenorm    : { sketch: "normalize",tip: "Log-encoded amplitude and width channels are inverted with a capped exponential back to physical units." },
-      clamp      : { sketch: "clamp",    tip: "Predictions are clamped to physical bounds with a leaky straight-through clamp so gradients survive saturation." },
-      renorm     : { sketch: "normalize",tip: "The clamped physical predictions are mapped back to training space for the parameter-space loss terms." },
-      reconstruct: { sketch: "mixfit",   tip: "Predicted parameters are evaluated on the elevation axis; the residual against ground truth drives the curve loss." },
-      residual   : { sketch: "mixfit",   tip: "One shared residual between predicted and ground-truth curves feeds every pointwise curve term." },
-      curvepoint : { sketch: "lossbars", tip: "Pointwise curve terms reduce the shared residual by MSE, L1, Huber and Charbonnier." },
-      curveshape : { sketch: "lossbars", tip: "Shape terms compare curve form rather than magnitude through cosine, spectral coherence and structural similarity." },
-      physgeom   : { sketch: "spectrum", tip: "The physics terms share a Fourier forward operator built from the vertical wavenumber and perpendicular baseline." },
-      physmoments: { sketch: "spectrum", tip: "Ratio terms compare the relative power and the first three moments, mass, centroid and spread, of the two profiles." },
-      physcov    : { sketch: "covmat",   tip: "Coherence and covariance matching compare the synthesised multibaseline statistics of the profiles." },
-      physcapon  : { sketch: "spectrum", tip: "A Capon spectrum re-synthesised from the prediction is compared to the measured one for cycle-consistency." },
-      paramterms : { sketch: "lossbars", tip: "Parameter-space terms penalise mean, width and amplitude error and spatial irregularity, masking inactive slots." },
-      composite  : { sketch: "lossbars", tip: "Enabled terms, each scaled by a fixed empirical normaliser, are summed into one weighted objective." },
-      gradclip   : { sketch: "clip",     tip: "Gradients are rescaled together so their global norm never exceeds the clipping threshold." },
-      adamw      : { sketch: "converge", tip: "AdamW applies bias-corrected adaptive moments with decoupled weight decay; the loss falls over the epoch loop." },
-      schedule   : { sketch: "converge", tip: "The effective learning rate combines a warmup ramp and a cosine decay; a curriculum swap changes the objective midway." },
-      checkpoint : { sketch: "argmin",   tip: "The model is evaluated on the validation split; the best epoch is checkpointed and early stopping reverts to it." },
+      forward    : { sketch: "network",  tip: "One pass, one patch in, every per-pixel Gaussian parameter out." },
+      tdenorm    : { sketch: "normalize",tip: "Log-coded amplitude and width channels uncompress through a capped exp-minus-one, back into physical units." },
+      clamp      : { sketch: "clamp",    tip: "Bounds are enforced with a leaky clamp, so saturated amplitudes and widths still leak a sliver of gradient." },
+      renorm     : { sketch: "normalize",tip: "Clamped physical values fold back into training space, so the parameter losses speak the same units as the labels." },
+      reconstruct: { sketch: "mixfit",   tip: "Parameters become a curve again on the elevation axis, and its gap from ground truth is what the curve losses chase." },
+      residual   : { sketch: "mixfit",   tip: "One residual, computed once, is shared out to every pointwise curve term that follows." },
+      curvepoint : { sketch: "lossbars", tip: "Four ways to punish the same residual: squared, absolute, Huber's hybrid, and Charbonnier's smooth L1." },
+      curveshape : { sketch: "lossbars", tip: "Three terms care about shape, not size, scoring cosine alignment, spectral coherence, and structural similarity." },
+      physgeom   : { sketch: "spectrum", tip: "Every physics term hangs off one Fourier operator built from the vertical wavenumber and the perpendicular baseline." },
+      physmoments: { sketch: "spectrum", tip: "Relative checks on total power and the first three moments, mass, centroid and spread, keep the profile honest." },
+      physcov    : { sketch: "covmat",   tip: "Re-synthesised coherence and covariance pit the two profiles' multibaseline statistics against each other." },
+      physcapon  : { sketch: "spectrum", tip: "A Capon spectrum rebuilt from the prediction is matched against the measured one, closing the loop." },
+      paramterms : { sketch: "lossbars", tip: "Mean, width and amplitude errors plus a smoothness penalty, with empty slots masked down to amplitude alone." },
+      composite  : { sketch: "lossbars", tip: "Every active term, rescaled by a fixed normaliser to comparable size, sums into the one number that gets backpropagated." },
+      gradclip   : { sketch: "clip",     tip: "All gradients shrink by a single shared factor the instant their global norm threatens the clip threshold." },
+      adamw      : { sketch: "converge", tip: "Bias-corrected moments with decoupled decay nudge the weights, and across the epoch loop the loss drifts down." },
+      schedule   : { sketch: "converge", tip: "A warmup ramp and a cosine decay multiply into the live learning rate; midway, a curriculum swap changes the objective itself." },
+      checkpoint : { sketch: "argmin",   tip: "Validation crowns a best epoch and checkpoints it; patience running out rewinds the model back to it." },
 
-      load       : { sketch: "channels", tip: "The architecture is rebuilt from its saved config and the best weights, elevation axis and norm stats are restored." },
-      predict    : { sketch: "network",  tip: "The trained model predicts parameters for every patch of the sliding-window grid over the scene." },
-      idenorm    : { sketch: "clamp",    tip: "Predictions are denormalised then hard-clamped to physical bounds, with no leaky slope at inference." },
-      align      : { sketch: "sort",     tip: "Ground-truth slots are sorted by elevation while the prediction keeps its order, so the metrics measure the network's ordering." },
-      recon      : { sketch: "mixfit",   tip: "Each patch's parameters are evaluated to a spectrum, with amplitudes rectified at zero." },
-      window     : { sketch: "window",   tip: "A separable Hann window de-emphasises patch borders so overlapping predictions blend without seams." },
-      ola        : { sketch: "overlapadd",tip: "Windowed patches are scattered into value and weight accumulators at their grid positions." },
-      finalise   : { sketch: "cube",     tip: "Accumulated values divided by accumulated weights give the dense, seam-free prediction cube." },
-      pixelmaps  : { sketch: "heatmap",  tip: "Per-pixel maps of error, R-squared, cosine similarity and peak-bin shift are computed over the stitched cube." },
-      globalcurve: { sketch: "lossbars", tip: "Cube-wide scalars summarise reconstruction quality: MSE, RMSE, overall R-squared and PSNR." },
-      elevssim   : { sketch: "heatmap",  tip: "Per-elevation metrics and structural similarity score the cube slice by slice." },
-      paramslot  : { sketch: "lossbars", tip: "Parameter and slot metrics score the predicted means, widths, ordering and component assignment." },
-      reduced    : { sketch: "spectrum", tip: "A reduced-baseline Capon tomogram is re-synthesised and the network's per-pixel improvement over it is mapped." },
+      load       : { sketch: "channels", tip: "The architecture is rebuilt verbatim from its config, then its weights, elevation axis and norm stats are reloaded." },
+      predict    : { sketch: "network",  tip: "The trained model sweeps the sliding-window grid, predicting parameters for every patch in the scene." },
+      idenorm    : { sketch: "clamp",    tip: "At inference the clamp is hard, with no leaky slope, pinning amplitude, mean and width to their physical bounds." },
+      align      : { sketch: "sort",     tip: "Ground-truth slots sort by height while the prediction stays put, so the metrics test whether the network learned the order." },
+      recon      : { sketch: "mixfit",   tip: "Each patch's parameters expand back into a spectrum, with negative amplitudes rectified to zero." },
+      window     : { sketch: "window",   tip: "A separable Hann taper dims patch edges so overlapping tiles blend into each other without a seam." },
+      ola        : { sketch: "overlapadd",tip: "Windowed tiles add into a value buffer and their windows into a weight buffer, in any order, to the same result." },
+      finalise   : { sketch: "cube",     tip: "Dividing value by weight, with uncovered pixels falling to zero, yields the dense cube, trimmed of its padding." },
+      pixelmaps  : { sketch: "heatmap",  tip: "Five maps fall out per pixel: error, R-squared, cosine similarity, and how far the predicted peak bin drifted." },
+      globalcurve: { sketch: "lossbars", tip: "Four scene-wide numbers, MSE, RMSE, overall R-squared and PSNR, sum up the reconstruction at a glance." },
+      elevssim   : { sketch: "heatmap",  tip: "Sliced by elevation, the cube is scored bin by bin and by structural similarity across the slices." },
+      paramslot  : { sketch: "lossbars", tip: "Beyond curves, the metrics weigh predicted means and widths, their ordering, and how slots assign to ground truth." },
+      reduced    : { sketch: "spectrum", tip: "A Capon tomogram rebuilt from only the reduced baseline subset becomes the bar the network must clear, pixel by pixel." },
 
-      spacelr    : { sketch: "sample",   tip: "Group learning rates and weight decays are sampled log-uniform, dropout linear-uniform." },
-      spacearch  : { sketch: "sample",   tip: "Five categorical choices set the feature widths, bottleneck, activation, normalisation and upsampling." },
-      merge      : { sketch: "sample",   tip: "The two blocks merge into one joint space that multivariate TPE samples together." },
-      tpesplit   : { sketch: "density",  tip: "Observed trials are split by a quantile of their loss into good and bad sets, each fitted with a density." },
-      tpeacq     : { sketch: "density",  tip: "The next point maximises the good-over-bad density ratio, equivalent to expected improvement." },
-      liar       : { sketch: "sample",   tip: "Pending parallel trials get a phantom worst-case objective so workers do not all chase the same point." },
-      trialsetup : { sketch: "network",  tip: "Each trial deep-copies the base config and overrides the epoch budget, patience and seed." },
-      trial      : { sketch: "converge", tip: "Each trial trains a full model for the epoch budget and returns its best validation loss." },
-      prune      : { sketch: "prune",    tip: "A trial is stopped early once its reported loss exceeds the running median, after the startup and warmup gates." },
-      best       : { sketch: "argmin",   tip: "The study is topped up in chunks; the minimising configuration is exported and rewritten after every trial." },
+      spacelr    : { sketch: "sample",   tip: "Learning rates and weight decays span decades log-uniformly; dropout is sampled on a plain interval." },
+      spacearch  : { sketch: "sample",   tip: "Five categorical dials set the feature widths, bottleneck, activation, normalisation, and how the decoder upsamples." },
+      merge      : { sketch: "sample",   tip: "Both blocks fuse into one space that a multivariate TPE sampler explores with their correlations intact." },
+      tpesplit   : { sketch: "density",  tip: "Past trials split at a loss quantile into winners and losers, and a density is fit over each group." },
+      tpeacq     : { sketch: "density",  tip: "The next guess maximises the winners-over-losers density ratio, the TPE stand-in for expected improvement." },
+      liar       : { sketch: "sample",   tip: "Trials still running are handed a pessimistic placeholder score, so parallel workers do not all chase one point." },
+      trialsetup : { sketch: "network",  tip: "Every trial clones the base config and overrides its epoch budget, patience and seed before training." },
+      trial      : { sketch: "converge", tip: "A trial is a full training run; its score is the best validation loss it reaches within the budget." },
+      prune      : { sketch: "prune",    tip: "Fall behind the running median, once past the startup and warmup gates, and the trial is cut short." },
+      best       : { sketch: "argmin",   tip: "Only the missing trials are dispatched, in chunks, and the running champion is rewritten to disk after each one." },
     };
   }
 
@@ -236,6 +236,7 @@ class FlowView {
     clearTimeout(this.stackTimer);
     this.cursor = -1;
     this.shown  = -1;
+    this.groups.forEach((g) => this._killSketchLoop(g));
     this.groups = [];
     this.sceneEl.innerHTML = "";
     this.stepNo.textContent  = "00";
@@ -377,7 +378,7 @@ class FlowView {
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
     if (tip) tip.style.opacity = "0";
-    const group = { el: grp, step, i, lines, iterEl, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
+    const group = { el: grp, step, i, lines, iterEl, tipEl: tip, sketchSvg, sketchType: g ? g.sketch : null, sketchLoop: null, stackK: 0, tipShown: false };
     if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
       eq.classList.add("is-stack");
       this._stackPlace(group, false);
@@ -396,10 +397,62 @@ class FlowView {
     if (!window.gsap || window.REDUCED_MOTION) { el.style.opacity = shown ? "1" : "0"; return; }
     if (shown) {
       window.gsap.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, delay: slide ? 0.62 : 0.2, ease: "power2.out" });
-      if (group.sketchSvg) this._animateSketch(group.sketchSvg);
+      if (group.sketchSvg) {
+        this._animateSketch(group.sketchSvg);
+        this._killSketchLoop(group);
+        group.sketchLoop = this._sketchLoop(group.sketchSvg, group.sketchType);
+      }
     } else {
       window.gsap.to(el, { opacity: 0, y: 0, duration: 0.25 });
+      this._killSketchLoop(group);
     }
+  }
+
+  _sketchLoop(svg, type) {
+    if (!svg || !window.gsap || window.REDUCED_MOTION) return null;
+    const NS = "http://www.w3.org/2000/svg";
+    const ORBIT = { phasor: 1, unit: 1, clip: 1 };
+    const SCAN  = { spectrum: 1, profile: 1, mixfit: 1, smooth: 1, peaks: 1, density: 1, normalize: 1, window: 1, overlapadd: 1 };
+
+    if (ORBIT[type]) {
+      const circ = svg.querySelector("circle");
+      const cx = circ ? +circ.getAttribute("cx") : 120;
+      const cy = circ ? +circ.getAttribute("cy") : 75;
+      const els = svg.querySelectorAll("line.c-cal, circle.f-cal");
+      if (!els.length) return null;
+      return window.gsap.fromTo(els, { rotation: 0 },
+        { rotation: 360, svgOrigin: cx + " " + cy, duration: 7, ease: "none", repeat: -1, delay: 0.8 });
+    }
+
+    if (type === "converge") {
+      const path = svg.querySelector("path.c-cal") || svg.querySelector("path.skl-draw");
+      let len = 0; try { len = path && path.getTotalLength(); } catch (e) {}
+      if (!len) return null;
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("r", "4.5"); dot.setAttribute("class", "skl-pop f-cal"); dot.setAttribute("data-loop", "1");
+      svg.appendChild(dot);
+      const st = { p: 0 };
+      return window.gsap.to(st, { p: 1, duration: 2.8, ease: "power1.inOut", repeat: -1, repeatDelay: 0.5, delay: 0.6,
+        onUpdate() { const pt = path.getPointAtLength(st.p * len); dot.setAttribute("cx", pt.x); dot.setAttribute("cy", pt.y); } });
+    }
+
+    const pops = svg.querySelectorAll(".skl-pop");
+    if (!SCAN[type] && pops.length) {
+      return window.gsap.to(pops, { opacity: "-=0.4", duration: 1.0, ease: "sine.inOut",
+        repeat: -1, yoyo: true, stagger: { each: 0.1, from: "start" }, delay: 1.1 });
+    }
+    const beam = document.createElementNS(NS, "line");
+    beam.setAttribute("class", "skl-beam"); beam.setAttribute("data-loop", "1");
+    beam.setAttribute("y1", "20"); beam.setAttribute("y2", "130");
+    svg.appendChild(beam);
+    return window.gsap.fromTo(beam, { attr: { x1: 34, x2: 34 } },
+      { attr: { x1: 208, x2: 208 }, duration: 2.6, ease: "sine.inOut", repeat: -1, yoyo: true, delay: 0.7 });
+  }
+
+  _killSketchLoop(group) {
+    if (!group) return;
+    if (group.sketchLoop) { group.sketchLoop.kill(); group.sketchLoop = null; }
+    if (group.sketchSvg) group.sketchSvg.querySelectorAll("[data-loop]").forEach((e) => e.remove());
   }
 
   _writeIn(group) {
@@ -440,6 +493,7 @@ class FlowView {
   }
 
   _removeLater(group, animate) {
+    this._killSketchLoop(group);
     const el = group.el;
     if (animate) setTimeout(() => el.remove(), 700);
     else el.remove();

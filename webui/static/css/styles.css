@@ -2201,6 +2201,7 @@ main { margin-left: var(--navw); }
 .f-mid { fill: var(--c-intermediate); }
 .f-fin { fill: var(--c-final); }
 .f-faint { fill: #3c4856; }
+.skl-beam { stroke: rgba(79, 214, 196, 0.5); stroke-width: 1.5; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(79, 214, 196, 0.45)); pointer-events: none; }
 
 /* ---- iterative readout ---- */
 .cine__giter { display: none; }
