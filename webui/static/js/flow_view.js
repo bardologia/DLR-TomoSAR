@@ -22,13 +22,13 @@ class FlowView {
     this.SLOTW = "28%";
     this.SLOTS = { s0: "1.5%", s1: "36%", s2: "70.5%", enter: "102%", exit: "-30%" };
     this.LSLOT = [
-      { op: 0.35, scale: 0.60 },
-      { op: 0.55, scale: 0.80 },
+      { op: 0.65, scale: 0.85 },
+      { op: 0.80, scale: 0.92 },
       { op: 1.00, scale: 1.00 },
       { op: 0.50, scale: 0.80 },
-      { op: 0.30, scale: 0.60 },
+      { op: 0.40, scale: 0.70 },
     ];
-    this.LTOPS = { none: [8, 29, 50, 71, 92], top: [34, 42, 50, 71, 92], bottom: [8, 29, 50, 62, 71] };
+    this.LTOPS = { none: [12, 31, 50, 69, 88], bottom: [12, 31, 50, 62, 70] };
     this.stackTimer = null;
 
     this.GUIDE = {
@@ -314,7 +314,7 @@ class FlowView {
     grp.className = "cine__grp";
     grp.dataset.step = i;
 
-    const tipTop = i % 2 === 0;
+    const tipTop = (step.lines || []).length > 1 ? false : i % 2 === 0;
     const g = this.GUIDE[step.id];
     let tip = null, sketchSvg = null;
     if (g) {
@@ -408,7 +408,7 @@ class FlowView {
   }
 
   _stackPlace(group, animate) {
-    const tops = this.LTOPS[group.tipEl ? (group.tipTop ? "top" : "bottom") : "none"];
+    const tops = this.LTOPS[group.tipEl ? "bottom" : "none"];
     group.lines.forEach(({ line }, li) => {
       const o = Math.max(0, Math.min(4, li - group.stackK + 2));
       const s = this.LSLOT[o];
