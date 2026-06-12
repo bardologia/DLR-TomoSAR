@@ -332,9 +332,12 @@ class FlowView {
 
     if (tip) tip.style.opacity = "0";
     const group = { el: grp, step, i, lines, iterEl, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
-    if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
-      eq.classList.add("is-stack");
-      this._stackPlace(group, false);
+    if (lines.length > 1) {
+      grp.classList.add("cine__grp--stack");
+      if (!window.REDUCED_MOTION && window.gsap) {
+        eq.classList.add("is-stack");
+        this._stackPlace(group, false);
+      }
     }
     if (iterEl) this._iterIdle(step, iterEl);
     group.ready = ready.then(() => {
