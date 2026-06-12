@@ -128,7 +128,6 @@ class FlowView {
       <div class="cine__scene"></div>
       <p class="cine__note"></p>`;
 
-    this.wires   = this.stage.querySelector(".cine__wires");
     this.stepNo  = this.stage.querySelector(".cine__stepno");
     this.headEl  = this.stage.querySelector(".cine__head");
     this.titleEl = this.stage.querySelector(".cine__title");
@@ -154,9 +153,7 @@ class FlowView {
 
     document.addEventListener("fullscreenchange", () => {
       this.stage.classList.toggle("is-full", document.fullscreenElement === this.stage);
-      clearTimeout(this._rz); this._rz = setTimeout(() => this._drawWires(false), 130);
     });
-    window.addEventListener("resize", () => { clearTimeout(this._rz); this._rz = setTimeout(() => this._drawWires(false), 160); });
 
     this.root.appendChild(bar);
     this.root.appendChild(this.stage);
@@ -195,7 +192,6 @@ class FlowView {
     this.shown  = -1;
     this.groups = [];
     this.sceneEl.innerHTML = "";
-    this._clearWires();
     this.stepNo.textContent  = "00";
     this.titleEl.textContent = this.flow.name;
     this.phaseEl.textContent = "press play to walk the pipeline step by step";
@@ -290,8 +286,6 @@ class FlowView {
     if (slide) requestAnimationFrame(place); else place();
 
     this.groups = keep;
-    this._clearWires();
-    Promise.all(keep.map((g) => g.ready)).then(() => setTimeout(() => this._drawWires(slide), slide ? 740 : 0));
   }
 
   _buildGroup(i) {
@@ -404,47 +398,6 @@ class FlowView {
       const el = document.getElementById(`flx-${uid}-${ti}-${t.id}`);
       if (el) el.style.color = this.COLOR[t.role] || "#e7edf0";
     });
-  }
-
-  _clearWires() {
-    while (this.wires.childNodes.length > 1) this.wires.removeChild(this.wires.lastChild);
-  }
-
-  _wireHost() {
-    const host = this.stage.getBoundingClientRect();
-    this.wires.setAttribute("width", host.width);
-    this.wires.setAttribute("height", host.height);
-    this.wires.setAttribute("viewBox", `0 0 ${host.width} ${host.height}`);
-    return host;
-  }
-
-  _drawWires(animate) {
-    this._clearWires();
-    if (!this.groups.length) return;
-    const host = this._wireHost();
-    this.groups.forEach((g) => this._tipLink(g, host, animate));
-  }
-
-  _tipLink(group, host, animate) {
-    const eq  = group.el.querySelector(".cine__eq");
-    const tip = group.tipEl;
-    if (!eq || !tip) return;
-    const er = eq.getBoundingClientRect();
-    const tr = tip.getBoundingClientRect();
-    if (!er.width || !tr.width) return;
-
-    const stacked = eq.classList.contains("is-stack");
-    const cx = er.left + er.width / 2 - host.left;
-    let ya, yb;
-    if (group.tipTop) { ya = (stacked ? er.top + er.height * 0.40 : er.top - 3) - host.top;    yb = tr.bottom - host.top + 4; }
-    else              { ya = (stacked ? er.top + er.height * 0.60 : er.bottom + 3) - host.top; yb = tr.top - host.top - 4; }
-
-    const link = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    link.setAttribute("class", "cine__tiplink");
-    link.setAttribute("d", `M ${cx} ${ya} V ${yb}`);
-    link.setAttribute("marker-end", "url(#cine-arrow)");
-    this.wires.appendChild(link);
-    if (animate && window.gsap) window.gsap.fromTo(link, { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.2 });
   }
 
   _setHead(step, i, animate) {
