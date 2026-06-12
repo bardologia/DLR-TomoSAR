@@ -19,8 +19,15 @@ class FlowView {
     this.COLOR = { measured: "#6ea8ff", intermediate: "#f5b971", calculated: "#4fd6c4", final: "#c4a3ff" };
     this.ROLES = ["measured", "intermediate", "calculated", "final"];
 
-    this.SLOTW = "28%";
-    this.SLOTS = { s0: "1.5%", s1: "36%", s2: "70.5%", enter: "102%", exit: "-30%" };
+    this.SLOTS = {
+      p3    : { top: "4%",   op: 0.25, scale: 0.58 },
+      p2    : { top: "15%",  op: 0.40, scale: 0.70 },
+      p1    : { top: "28%",  op: 0.60, scale: 0.84 },
+      cur   : { top: "52%",  op: 1.00, scale: 1.00 },
+      next  : { top: "80%",  op: 0.38, scale: 0.84 },
+      enter : { top: "110%", op: 0.00, scale: 0.84 },
+      exit  : { top: "-12%", op: 0.00, scale: 0.50 },
+    };
 
     this.GUIDE = {
       deramp    : { sketch: "phasor",   tip: "Each pass is multiplied by the conjugate DEM phase, removing terrain topography and leaving only the sub-resolution elevation signal." },
@@ -110,9 +117,6 @@ class FlowView {
       <svg class="cine__wires"><defs>
         <marker id="cine-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
           <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
-        </marker>
-        <marker id="cine-prog" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="8" markerHeight="8" orient="auto">
-          <path d="M0,0 L12,6 L0,12 z" fill="context-stroke"></path>
         </marker></defs></svg>
       <div class="cine__head">
         <span class="cine__stepno"></span>
@@ -120,16 +124,20 @@ class FlowView {
       </div>
       <div class="cine__trail"></div>
       <div class="cine__scene"></div>
+      <div class="cine__guide is-empty"><div class="cine__gsketch"></div><p class="cine__gtiptext"></p></div>
       <p class="cine__note"></p>`;
 
-    this.wires   = this.stage.querySelector(".cine__wires");
-    this.stepNo  = this.stage.querySelector(".cine__stepno");
-    this.headEl  = this.stage.querySelector(".cine__head");
-    this.titleEl = this.stage.querySelector(".cine__title");
-    this.phaseEl = this.stage.querySelector(".cine__phase");
-    this.trailEl = this.stage.querySelector(".cine__trail");
-    this.sceneEl = this.stage.querySelector(".cine__scene");
-    this.noteEl  = this.stage.querySelector(".cine__note");
+    this.wires    = this.stage.querySelector(".cine__wires");
+    this.stepNo   = this.stage.querySelector(".cine__stepno");
+    this.headEl   = this.stage.querySelector(".cine__head");
+    this.titleEl  = this.stage.querySelector(".cine__title");
+    this.phaseEl  = this.stage.querySelector(".cine__phase");
+    this.trailEl  = this.stage.querySelector(".cine__trail");
+    this.sceneEl  = this.stage.querySelector(".cine__scene");
+    this.guideEl  = this.stage.querySelector(".cine__guide");
+    this.sketchEl = this.stage.querySelector(".cine__gsketch");
+    this.gtipEl   = this.stage.querySelector(".cine__gtiptext");
+    this.noteEl   = this.stage.querySelector(".cine__note");
 
     this.ctrl = document.createElement("div");
     this.ctrl.className = "cine__ctrl";
@@ -148,9 +156,9 @@ class FlowView {
 
     document.addEventListener("fullscreenchange", () => {
       this.stage.classList.toggle("is-full", document.fullscreenElement === this.stage);
-      clearTimeout(this._rz); this._rz = setTimeout(() => this._drawWires(false), 130);
+      this._clearWires();
     });
-    window.addEventListener("resize", () => { clearTimeout(this._rz); this._rz = setTimeout(() => this._drawWires(false), 160); });
+    window.addEventListener("resize", () => this._clearWires());
 
     this.root.appendChild(bar);
     this.root.appendChild(this.stage);
@@ -184,15 +192,15 @@ class FlowView {
   _reset() {
     this._pause();
     clearTimeout(this.iterTimer);
-    this._clearHighlight();
     this.cursor = -1;
     this.shown  = -1;
     this.groups = [];
     this.sceneEl.innerHTML = "";
     this._clearWires();
+    this._setGuide(null, false);
     this.stepNo.textContent  = "00";
     this.titleEl.textContent = this.flow.name;
-    this.phaseEl.textContent = "press play to walk the pipeline left to right";
+    this.phaseEl.textContent = "press play to walk the pipeline step by step";
     this.noteEl.textContent  = this.flow.blurb;
     [...this.trailEl.querySelectorAll(".cine__chip")].forEach((c) => c.classList.remove("is-done", "is-active"));
     this._progress();
@@ -239,42 +247,44 @@ class FlowView {
     const slide   = !reduced && Math.abs(i - this.shown) === 1 && this.groups.length > 0;
     this.lastAnimate = !reduced;
     this.cursor = i;
+    const forward = i - 1 === this.shown;
     this._renderWindow(i, slide);
     this.shown = i;
     this._setHead(this.flow.steps[i], i, !reduced);
+    this._setGuide(this.flow.steps[i], !reduced);
     this._setTrail(i);
     this._progress();
+    if (slide && forward) this._carryLater(i);
   }
 
   _renderWindow(c, slide) {
     clearTimeout(this.iterTimer);
-    this._clearHighlight();
     const N    = this.flow.steps.length;
-    const want = [c - 1, c, c + 1].filter((x) => x >= 0 && x < N);
+    const want = [c - 3, c - 2, c - 1, c, c + 1].filter((x) => x >= 0 && x < N);
     const have = new Map(this.groups.map((g) => [g.i, g]));
 
     const keep = want.map((si) => {
       let g = have.get(si);
-      if (!g) { g = this._buildGroup(si); this._setGeom(g, si > this.shown ? "enter" : "exit", 0, false); }
+      if (!g) { g = this._buildGroup(si); this._setGeom(g, si > this.shown ? "enter" : "exit", false); }
       return g;
     });
 
     this.groups.forEach((g) => {
       if (want.indexOf(g.i) >= 0) return;
-      this._setGeom(g, g.i < c ? "exit" : "enter", 0, slide);
+      this._setGeom(g, g.i < c ? "exit" : "enter", slide);
       this._removeLater(g, slide);
     });
 
+    const slotOf = (off) => off === 0 ? "cur" : off > 0 ? "next" : ["p1", "p2", "p3"][-off - 1];
     const place = () => keep.forEach((g) => {
       const off = g.i - c;
       g.el.classList.toggle("is-current", off === 0);
-      this._setGeom(g, off < 0 ? "s0" : off > 0 ? "s2" : "s1", 1, slide);
+      this._setGeom(g, slotOf(off), slide);
       if (off === 0) {
         g.ready.then(() => setTimeout(() => {
           if (this.cursor !== g.i) return;
-          this._highlight(g);
           if (g.step.iterative && g.iterEl) this._iterRun(g.step, g.iterEl, this.lastAnimate);
-        }, slide ? 660 : 0));
+        }, slide ? 720 : 0));
       } else if (g.step.iterative && g.iterEl) {
         this._iterIdle(g.step, g.iterEl);
       }
@@ -283,7 +293,15 @@ class FlowView {
 
     this.groups = keep;
     this._clearWires();
-    Promise.all(keep.map((g) => g.ready)).then(() => setTimeout(() => this._drawWires(slide), slide ? 740 : 0));
+  }
+
+  _carryLater(c) {
+    const prev = this.groups.find((g) => g.i === c - 1);
+    const cur  = this.groups.find((g) => g.i === c);
+    if (!prev || !cur) return;
+    Promise.all([prev.ready, cur.ready]).then(() => setTimeout(() => {
+      if (this.cursor === c) this._carry(prev, cur);
+    }, 760));
   }
 
   _buildGroup(i) {
@@ -291,21 +309,6 @@ class FlowView {
     const grp     = document.createElement("div");
     grp.className = "cine__grp";
     grp.dataset.step = i;
-    grp.style.width  = this.SLOTW;
-
-    const tipTop = i % 2 === 0;
-    const tip    = document.createElement("div");
-    tip.className = "cine__gtip " + (tipTop ? "is-top" : "is-bottom");
-    const g = this.GUIDE[step.id];
-    let sketchSvg = null;
-    if (g) {
-      tip.innerHTML = `<div class="cine__gsketch"></div><p class="cine__gtiptext">${this._esc(g.tip)}</p>`;
-      sketchSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      sketchSvg.setAttribute("viewBox", "0 0 240 150");
-      sketchSvg.classList.add("cine__skl");
-      sketchSvg.innerHTML = this._sketchMarkup(g.sketch);
-      tip.querySelector(".cine__gsketch").appendChild(sketchSvg);
-    }
 
     const eq = document.createElement("div");
     eq.className = "cine__eq";
@@ -322,19 +325,17 @@ class FlowView {
     let iterEl = null;
     if (step.iterative) { iterEl = document.createElement("div"); iterEl.className = "cine__giter"; eq.appendChild(iterEl); }
 
-    grp.appendChild(tip);
     grp.appendChild(eq);
     this.sceneEl.appendChild(grp);
 
     const ready = Promise.all(lines.map(({ line, terms, uid }) =>
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
-    const group = { el: grp, step, i, lines, termEls: {}, tipTop, iterEl, sketchSvg };
+    const group = { el: grp, step, i, lines, termEls: {}, iterEl };
     if (iterEl) this._iterIdle(step, iterEl);
     group.ready = ready.then(() => {
       this._buildTermEls(group);
       if (this.lastAnimate) this._writeIn(group);
-      if (group.sketchSvg && this.lastAnimate) this._animateSketch(group.sketchSvg);
     });
     return group;
   }
@@ -356,11 +357,17 @@ class FlowView {
     window.gsap.fromTo(svgs, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: "power2.out" });
   }
 
-  _setGeom(group, slot, op, animate) {
-    const left = this.SLOTS[slot];
-    group.el.style.width = this.SLOTW;
-    if (animate && window.gsap) window.gsap.to(group.el, { left: left, opacity: op, duration: 0.62, ease: "power3.inOut" });
-    else { group.el.style.left = left; group.el.style.opacity = op; }
+  _setGeom(group, slot, animate) {
+    const s = this.SLOTS[slot];
+    if (window.gsap) {
+      const props = { top: s.top, yPercent: -50, scale: s.scale, opacity: s.op };
+      if (animate) window.gsap.to(group.el, Object.assign(props, { duration: 0.72, ease: "power3.inOut" }));
+      else window.gsap.set(group.el, props);
+    } else {
+      group.el.style.top       = s.top;
+      group.el.style.opacity   = s.op;
+      group.el.style.transform = `translateY(-50%) scale(${s.scale})`;
+    }
   }
 
   _removeLater(group, animate) {
@@ -385,143 +392,66 @@ class FlowView {
     while (this.wires.childNodes.length > 1) this.wires.removeChild(this.wires.lastChild);
   }
 
-  _clearHighlight() {
-    clearTimeout(this.hlTimer);
-    if (this.hlEl && this.hlEl.parentNode) this.hlEl.parentNode.removeChild(this.hlEl);
-    this.hlEl = null;
-  }
-
-  _highlight(group) {
-    this._clearHighlight();
-    const eq = group.el.querySelector(".cine__eq");
-    if (!eq) return;
-    const lines = [...eq.querySelectorAll(".cine__line")];
-    if (!lines.length) return;
-
-    const hl = document.createElement("div");
-    hl.className = "cine__hl";
-    eq.appendChild(hl);
-    this.hlEl = hl;
-
-    const placeAt = (el) => {
-      hl.style.left   = (el.offsetLeft - 12) + "px";
-      hl.style.top    = (el.offsetTop - 8) + "px";
-      hl.style.width  = (el.offsetWidth + 24) + "px";
-      hl.style.height = (el.offsetHeight + 16) + "px";
-    };
-
-    hl.style.transition = "none";
-    placeAt(lines[0]);
-    requestAnimationFrame(() => { if (this.hlEl === hl) hl.style.transition = ""; });
-
-    if (lines.length === 1 || window.REDUCED_MOTION) return;
-    let k = 1;
-    const step = () => {
-      if (this.hlEl !== hl) return;
-      placeAt(lines[k]);
-      k = (k + 1) % lines.length;
-      this.hlTimer = setTimeout(step, 1200);
-    };
-    this.hlTimer = setTimeout(step, 1200);
-  }
-
-  _drawWires(animate) {
+  _carry(a, b) {
     this._clearWires();
-    if (!this.groups.length) return;
     const host = this.stage.getBoundingClientRect();
     this.wires.setAttribute("width", host.width);
     this.wires.setAttribute("height", host.height);
     this.wires.setAttribute("viewBox", `0 0 ${host.width} ${host.height}`);
 
-    this.groups.forEach((g) => this._tipLink(g, host, animate));
-    const sorted = this.groups.slice().sort((a, b) => a.i - b.i);
-    for (let k = 0; k < sorted.length - 1; k++) this._progArrow(sorted[k], sorted[k + 1], host, animate);
-
-    const byI = new Map(this.groups.map((g) => [g.i, g]));
-    const prev = byI.get(this.cursor - 1);
-    const cur  = byI.get(this.cursor);
-    if (prev && cur) this._carry(prev, cur, host, animate, 0);
-  }
-
-  _progArrow(a, b, host, animate) {
-    const ea = a.el.querySelector(".cine__eq").getBoundingClientRect();
-    const eb = b.el.querySelector(".cine__eq").getBoundingClientRect();
-    if (!ea.width || !eb.width) return;
-    const x1 = ea.right - host.left + 3;
-    const x2 = eb.left - host.left - 3;
-    if (x2 - x1 < 5) return;
-    const y = ea.top + ea.height / 2 - host.top;
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("class", "cine__prog");
-    path.setAttribute("d", `M ${x1} ${y} H ${x2}`);
-    this.wires.appendChild(path);
-    if (animate && window.gsap) window.gsap.fromTo(path, { opacity: 0 }, { opacity: 1, duration: 0.45, delay: 0.25 });
-  }
-
-  _carry(a, b, host, animate, pairIdx) {
-    const lEls = a.termEls;
-    const rEls = b.termEls;
-    const shared = Object.keys(rEls).filter((id) => lEls[id] && lEls[id].length);
-
+    const shared = Object.keys(b.termEls).filter((id) => a.termEls[id] && a.termEls[id].length);
     shared.forEach((id, k) => {
-      const src = lEls[id][0];
-      const dst = rEls[id][0];
+      const src = a.termEls[id][0];
+      const dst = b.termEls[id][0];
       if (!src || !dst) return;
       const sr = src.getBoundingClientRect();
       const dr = dst.getBoundingClientRect();
       if (!sr.width || !dr.width) return;
       const color = this.COLOR[(this.byId[id] || {}).role] || "#9fb0c2";
 
-      const pad = 4;
-      const bx = sr.left - host.left - pad;
-      const by = sr.top  - host.top  - pad;
-      const bw = sr.width  + pad * 2;
-      const bh = sr.height + pad * 2;
-      const box = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      box.setAttribute("class", "cine__box");
-      box.setAttribute("d", `M ${bx} ${by} H ${bx + bw} V ${by + bh} H ${bx} Z`);
-      box.style.stroke = color;
-      this.wires.appendChild(box);
+      const x1 = sr.left + sr.width / 2 - host.left;
+      const y1 = sr.bottom - host.top + 5;
+      const x2 = dr.left + dr.width / 2 - host.left;
+      const y2 = dr.top - host.top - 6;
+      const bend = Math.max(26, (y2 - y1) * 0.45) + k * 12;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("class", "cine__carry");
+      path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`);
+      path.style.stroke = color;
+      this.wires.appendChild(path);
 
-      const sx = sr.left + sr.width / 2 - host.left;
-      const dx = dr.left + dr.width / 2 - host.left;
-      const dTop = dr.top - host.top - 3;
-      const chY  = Math.min(by, dr.top - host.top) - 18 - (pairIdx * 2 + k) * 12;
-      const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      arrow.setAttribute("class", "cine__wire");
-      arrow.setAttribute("d", `M ${sx} ${by} V ${chY} H ${dx} V ${dTop}`);
-      arrow.setAttribute("marker-end", "url(#cine-arrow)");
-      arrow.style.stroke = color;
-      this.wires.appendChild(arrow);
-
-      if (animate && window.gsap) {
-        let len = 0; try { len = box.getTotalLength(); } catch (e) {}
-        if (len) { box.style.strokeDasharray = len; box.style.strokeDashoffset = len; window.gsap.to(box, { strokeDashoffset: 0, duration: 0.5, delay: 0.05 + k * 0.1 }); }
-        arrow.style.strokeDasharray = "2 4";
-        window.gsap.fromTo(arrow, { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.35 + k * 0.1 });
+      if (window.gsap) {
+        let len = 0; try { len = path.getTotalLength(); } catch (e) {}
+        if (len) { path.style.strokeDasharray = len; path.style.strokeDashoffset = len; }
+        window.gsap.timeline({ onComplete: () => path.remove() })
+          .to(path, { strokeDashoffset: 0, duration: 0.55, delay: k * 0.12, ease: "power2.out", onComplete: () => path.setAttribute("marker-end", "url(#cine-arrow)") })
+          .fromTo(dst, { opacity: 0.25 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, "<0.25")
+          .to(path, { opacity: 0, duration: 0.45, delay: 1.0, ease: "power1.in" });
+      } else {
+        path.setAttribute("marker-end", "url(#cine-arrow)");
+        setTimeout(() => path.remove(), 1800);
       }
     });
   }
 
-  _tipLink(group, host, animate) {
-    const eq  = group.el.querySelector(".cine__eq");
-    const tip = group.el.querySelector(".cine__gtip");
-    if (!eq || !tip) return;
-    const er = eq.getBoundingClientRect();
-    const tr = tip.getBoundingClientRect();
-    if (!er.width || !tr.width) return;
+  _setGuide(step, animate) {
+    const g = step ? this.GUIDE[step.id] : null;
+    this.guideEl.classList.toggle("is-empty", !g);
+    this.sketchEl.innerHTML = "";
+    this.gtipEl.textContent = "";
+    if (!g) return;
 
-    const cx = er.left + er.width / 2 - host.left;
-    let ya, yb;
-    if (group.tipTop) { ya = er.top - host.top - 3;    yb = tr.bottom - host.top + 4; }
-    else              { ya = er.bottom - host.top + 3; yb = tr.top - host.top - 4; }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 240 150");
+    svg.classList.add("cine__skl");
+    svg.innerHTML = this._sketchMarkup(g.sketch);
+    this.sketchEl.appendChild(svg);
+    this.gtipEl.textContent = g.tip;
 
-    const link = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    link.setAttribute("class", "cine__tiplink");
-    link.setAttribute("d", `M ${cx} ${ya} V ${yb}`);
-    link.setAttribute("marker-end", "url(#cine-arrow)");
-    this.wires.appendChild(link);
-    if (animate && window.gsap) window.gsap.fromTo(link, { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.2 });
+    if (animate && window.gsap) {
+      this._animateSketch(svg);
+      window.gsap.fromTo(this.gtipEl, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.4 });
+    }
   }
 
   _setHead(step, i, animate) {
