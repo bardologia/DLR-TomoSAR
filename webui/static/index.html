@@ -344,6 +344,22 @@
       <button class="proc-modal__close" id="proc-close" aria-label="Close">&times;</button>
     </div>
     <div class="proc-modal__stage"><canvas id="proc-canvas"></canvas></div>
+    <div class="proc-transport" id="proc-transport">
+      <button class="proc-transport__btn" id="proc-prev" type="button" aria-label="Previous chapter">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9M10.5 1.5L4.5 6l6 4.5z"/></svg>
+      </button>
+      <button class="proc-transport__btn" id="proc-play" type="button" aria-label="Pause">
+        <svg class="proc-transport__ic-play" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5l8 4.5-8 4.5z"/></svg>
+        <svg class="proc-transport__ic-pause" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5h2.4v9H2.5zM7.1 1.5h2.4v9H7.1z"/></svg>
+      </button>
+      <button class="proc-transport__btn" id="proc-next" type="button" aria-label="Next chapter">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M9 1.5v9M1.5 1.5L7.5 6l-6 4.5z"/></svg>
+      </button>
+      <div class="proc-timeline" id="proc-timeline"></div>
+      <span class="proc-transport__chapter" id="proc-chapter"></span>
+      <span class="proc-transport__time" id="proc-time"></span>
+      <button class="proc-transport__btn proc-transport__btn--speed" id="proc-speed" type="button" aria-label="Playback speed">1x</button>
+    </div>
     <div class="proc-modal__caption" id="proc-caption"></div>
     <div class="proc-modal__stages" id="proc-stages"></div>
   </div>

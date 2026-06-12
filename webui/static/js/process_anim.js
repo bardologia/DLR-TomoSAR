@@ -1,6 +1,67 @@
 "use strict";
 
 class ProcessAnimator {
+  static SCENES = {
+    processing: { T: 122, scale: 0.62, chapters: [
+      { t0: 0,   name: "SLC stack",        fn: "_prGeo" },
+      { t0: 14,  name: "Capon tomogram",   fn: "_prCapon" },
+      { t0: 56,  name: "Worker pool",      fn: "_prWorkers" },
+      { t0: 62,  name: "Interferograms",   fn: "_prIfg" },
+      { t0: 92,  name: "DEM deramp",       fn: "_prDem" },
+      { t0: 101, name: "Artifacts",        fn: "_prArtifacts" },
+    ]},
+    param: { T: 88, scale: 1, chapters: [
+      { t0: 0,    name: "Pre-clean & normalize" },
+      { t0: 15.5, name: "Local maxima" },
+      { t0: 24.5, name: "min_dist pruning" },
+      { t0: 33,   name: "Prominence" },
+      { t0: 47,   name: "Adam sigma fits" },
+      { t0: 62,   name: "Order selection" },
+      { t0: 66,   name: "mu-sort & pad" },
+      { t0: 74,   name: "Raw vs model" },
+      { t0: 80,   name: "R² & full scene" },
+    ]},
+    dataset: { T: 118, scale: 1, chapters: [
+      { t0: 0,   name: "Crop & split" },
+      { t0: 16,  name: "Patch grid" },
+      { t0: 44,  name: "Channel tensor" },
+      { t0: 62,  name: "Augmentation" },
+      { t0: 80,  name: "Normalization" },
+      { t0: 104, name: "DataLoaders" },
+    ]},
+    training: { T: 199, scale: 1, chapters: [
+      { t0: 0,   name: "Clamps & losses",   fn: "_trIntro" },
+      { t0: 36,  name: "Optimizer step",    fn: "_trStep" },
+      { t0: 66,  name: "LR schedule",       fn: "_trSched" },
+      { t0: 90,  name: "Loss curriculum",   fn: "_trCurr" },
+      { t0: 115, name: "Gradient clipping", fn: "_trClip" },
+      { t0: 129, name: "mu-sort matching",  fn: "_trMatch" },
+      { t0: 146, name: "Weight decay",      fn: "_trReg" },
+      { t0: 158, name: "Dropout",           fn: "_trDrop" },
+      { t0: 170, name: "Early stopping",    fn: "_trStop" },
+      { t0: 182, name: "Training replay",   fn: "_trEnd" },
+    ]},
+    inference: { T: 124, scale: 1, still: 89, chapters: [
+      { t0: 0,   name: "Checkpoint load",    fn: "_infLoad" },
+      { t0: 14,  name: "Window grid",        fn: "_infGrid" },
+      { t0: 30,  name: "Forward pass",       fn: "_infForward" },
+      { t0: 46,  name: "Curve scoring",      fn: "_infScore" },
+      { t0: 66,  name: "Overlap-add stitch", fn: "_infStitch" },
+      { t0: 96,  name: "Metric maps",        fn: "_infMaps" },
+      { t0: 106, name: "Global metrics",     fn: "_infMetrics" },
+      { t0: 117, name: "Report",             fn: "_infReport" },
+    ]},
+    tuning: { T: 96, scale: 1, chapters: [
+      { t0: 0,  name: "Search space",  fn: "_tuSpace" },
+      { t0: 10, name: "Random warmup", fn: "_tuAccum" },
+      { t0: 26, name: "TPE model",     fn: "_tuTpe" },
+      { t0: 44, name: "Trial run",     fn: "_tuTrial" },
+      { t0: 64, name: "Parallel GPUs", fn: "_tuParallel" },
+      { t0: 76, name: "Chunk resume",  fn: "_tuHandoff" },
+      { t0: 88, name: "Best export",   fn: "_tuExport" },
+    ]},
+  };
+
   constructor(canvas, caption) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
@@ -9,22 +70,89 @@ class ProcessAnimator {
     this.raf = null;
     this.t = 0;
     this.key = null;
+    this.speed = 1;
+    this.manual = false;
+    this.onProgress = null;
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this._loop = this._loop.bind(this);
+    window.addEventListener("resize", () => { if (this.key) { this._resize(); this._draw(); } });
   }
 
   start(key) {
     this.key = key;
     this.t = 0;
+    this.manual = false;
     this.stop();
     this._resize();
-    if (this.reduced) { this.t = 6; this._draw(); return; }
-    this._loop = this._loop.bind(this);
-    this.raf = requestAnimationFrame(this._loop);
+    if (this.reduced) { this.t = 6; this._draw(); this._notify(); return; }
+    this.play();
   }
+
+  play() {
+    if (this.raf || !this.key) return;
+    if (this.reduced) this.manual = true;
+    this.raf = requestAnimationFrame(this._loop);
+    this._notify();
+  }
+
+  pause() {
+    this.stop();
+    this._notify();
+  }
+
+  toggle() { if (this.raf) this.pause(); else this.play(); }
+
+  playing() { return this.raf !== null; }
 
   stop() {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = null;
+    this._last = undefined;
+  }
+
+  close() {
+    this.stop();
+    this.key = null;
+  }
+
+  sceneDef() { return ProcessAnimator.SCENES[this.key] || null; }
+
+  duration() {
+    const def = this.sceneDef();
+    return def ? def.T / def.scale : 0;
+  }
+
+  position() {
+    const dur = this.duration();
+    return dur ? this.t % dur : 0;
+  }
+
+  chapterIndex() {
+    const def = this.sceneDef();
+    if (!def) return 0;
+    const tt = this.position() * def.scale;
+    let idx = 0;
+    def.chapters.forEach((c, i) => { if (tt >= c.t0) idx = i; });
+    return idx;
+  }
+
+  seek(tDisplay) {
+    const dur = this.duration();
+    if (!dur) return;
+    this.t = Math.min(Math.max(0, tDisplay), dur - 1e-4);
+    if (!this.raf) this._draw();
+    this._notify();
+  }
+
+  seekChapter(i) {
+    const def = this.sceneDef();
+    if (!def) return;
+    const c = def.chapters[Math.min(Math.max(0, i), def.chapters.length - 1)];
+    this.seek(c.t0 / def.scale);
+  }
+
+  _notify() {
+    if (this.onProgress) this.onProgress(this.position(), this.chapterIndex(), this.playing());
   }
 
   _resize() {
@@ -35,9 +163,12 @@ class ProcessAnimator {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
-  _loop() {
-    this.t += 1 / 60;
+  _loop(now) {
+    const dt = this._last === undefined ? 1 / 60 : Math.min(0.05, (now - this._last) / 1000);
+    this._last = now;
+    this.t += dt * this.speed;
     this._draw();
+    this._notify();
     this.raf = requestAnimationFrame(this._loop);
   }
 
@@ -45,6 +176,15 @@ class ProcessAnimator {
     this.ctx.clearRect(0, 0, this.w, this.h);
     const fn = this["_" + this.key];
     if (fn) fn.call(this); else this._generic();
+  }
+
+  _dispatch(key, d) {
+    const def = ProcessAnimator.SCENES[key];
+    let tt = (this.t * def.scale) % def.T;
+    if (this.reduced && !this.manual && def.still !== undefined) tt = def.still;
+    let c = def.chapters[0];
+    def.chapters.forEach((ch) => { if (ch.fn && tt >= ch.t0) c = ch; });
+    this[c.fn](tt - c.t0, d);
   }
 
   /* ---------- helpers ---------- */
@@ -1275,16 +1415,7 @@ class ProcessAnimator {
     return tw;
   }
 
-  _processing() {
-    const d = this._prSetup();
-    const T = 122, tt = (this.t * 0.62) % T;
-    if (tt < 14) this._prGeo(tt, d);
-    else if (tt < 56) this._prCapon(tt - 14, d);
-    else if (tt < 62) this._prWorkers(tt - 56, d);
-    else if (tt < 92) this._prIfg(tt - 62, d);
-    else if (tt < 101) this._prDem(tt - 92, d);
-    else this._prArtifacts(tt - 101, d);
-  }
+  _processing() { this._dispatch("processing", this._prSetup()); }
 
   _prGeo(ts, d) {
     const { ctx, w, h } = this;
@@ -3837,20 +3968,7 @@ class ProcessAnimator {
     return this._tr;
   }
 
-  _training() {
-    const d = this._trSetup();
-    const T = 199, tt = this.t % T;
-    if (tt < 36) this._trIntro(tt, d);
-    else if (tt < 66) this._trStep(tt - 36, d);
-    else if (tt < 90) this._trSched(tt - 66, d);
-    else if (tt < 115) this._trCurr(tt - 90, d);
-    else if (tt < 129) this._trClip(tt - 115, d);
-    else if (tt < 146) this._trMatch(tt - 129, d);
-    else if (tt < 158) this._trReg(tt - 146, d);
-    else if (tt < 170) this._trDrop(tt - 158, d);
-    else if (tt < 182) this._trStop(tt - 170, d);
-    else this._trEnd(tt - 182, d);
-  }
+  _training() { this._dispatch("training", this._trSetup()); }
 
   _trTag(txt) {
     const { ctx, h } = this;
@@ -5749,20 +5867,7 @@ class ProcessAnimator {
     return this._inf;
   }
 
-  _inference() {
-    const d = this._infSetup();
-    const T = 124;
-    let tt = this.t % T;
-    if (this.reduced) tt = 89;
-    if      (tt < 14)  this._infLoad   (tt,         d);
-    else if (tt < 30)  this._infGrid   (tt - 14,    d);
-    else if (tt < 46)  this._infForward(tt - 30,    d);
-    else if (tt < 66)  this._infScore  (tt - 46,    d);
-    else if (tt < 96)  this._infStitch (tt - 66,    d);
-    else if (tt < 106) this._infMaps   (tt - 96,    d);
-    else if (tt < 117) this._infMetrics(tt - 106,   d);
-    else               this._infReport (tt - 117,   d);
-  }
+  _inference() { this._dispatch("inference", this._infSetup()); }
 
   _infChip(txt, x, y, color, alpha, size) {
     const ctx = this.ctx;
@@ -7129,16 +7234,8 @@ class ProcessAnimator {
 
   _tuning() {
     if (!this._tu) this._tuSetup();
-    if (this.reduced) { this._tuStill(); return; }
-    const T = 96, tt = this.t % T;
-    const S1 = 10, S2 = 26, S3 = 44, S4 = 64, S5 = 76, S6 = 88;
-    if (tt < S1) this._tuSpace(tt);
-    else if (tt < S2) this._tuAccum(tt - S1);
-    else if (tt < S3) this._tuTpe(tt - S2);
-    else if (tt < S4) this._tuTrial(tt - S3);
-    else if (tt < S5) this._tuParallel(tt - S4);
-    else if (tt < S6) this._tuHandoff(tt - S5);
-    else this._tuExport(tt - S6);
+    if (this.reduced && !this.manual) { this._tuStill(); return; }
+    this._dispatch("tuning");
   }
 
   _generic() { this._cap("Process"); }
