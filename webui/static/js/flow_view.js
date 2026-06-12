@@ -283,6 +283,7 @@ class FlowView {
       if (off === 0) {
         g.ready.then(() => setTimeout(() => {
           if (this.cursor !== g.i) return;
+          if (this.lastAnimate) this._linkLines(g);
           if (g.step.iterative && g.iterEl) this._iterRun(g.step, g.iterEl, this.lastAnimate);
         }, slide ? 720 : 0));
       } else if (g.step.iterative && g.iterEl) {
@@ -342,11 +343,11 @@ class FlowView {
 
   _buildTermEls(group) {
     group.termEls = {};
-    group.lines.forEach(({ terms, uid }) => {
+    group.lines.forEach(({ terms, uid }, li) => {
       terms.forEach((t, ti) => {
         if (!t.role) return;
         const el = document.getElementById(`flx-${uid}-${ti}-${t.id}`);
-        if (el) (group.termEls[t.id] = group.termEls[t.id] || []).push(el);
+        if (el) (group.termEls[t.id] = group.termEls[t.id] || []).push({ el, li, ti });
       });
     });
   }
@@ -392,44 +393,67 @@ class FlowView {
     while (this.wires.childNodes.length > 1) this.wires.removeChild(this.wires.lastChild);
   }
 
-  _carry(a, b) {
-    this._clearWires();
+  _wireHost() {
     const host = this.stage.getBoundingClientRect();
     this.wires.setAttribute("width", host.width);
     this.wires.setAttribute("height", host.height);
     this.wires.setAttribute("viewBox", `0 0 ${host.width} ${host.height}`);
+    return host;
+  }
 
+  _termColor(id) {
+    return this.COLOR[(this.byId[id] || {}).role] || "#9fb0c2";
+  }
+
+  _arrow(src, dst, color, host, delay) {
+    const sr = src.getBoundingClientRect();
+    const dr = dst.getBoundingClientRect();
+    if (!sr.width || !dr.width) return null;
+
+    const x1 = sr.left + sr.width / 2 - host.left;
+    const y1 = sr.bottom - host.top + 5;
+    const x2 = dr.left + dr.width / 2 - host.left;
+    const y2 = Math.max(dr.top - host.top - 6, y1 + 6);
+    const bend = Math.max(14, (y2 - y1) * 0.45);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", "cine__carry");
+    path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`);
+    path.style.stroke = color;
+    this.wires.appendChild(path);
+
+    if (window.gsap) {
+      let len = 0; try { len = path.getTotalLength(); } catch (e) {}
+      if (len) { path.style.strokeDasharray = len; path.style.strokeDashoffset = len; }
+      window.gsap.timeline({ onComplete: () => path.remove() })
+        .to(path, { strokeDashoffset: 0, duration: 0.5, delay, ease: "power2.out", onComplete: () => path.setAttribute("marker-end", "url(#cine-arrow)") })
+        .to(path, { opacity: 0, duration: 0.45, delay: 1.0, ease: "power1.in" });
+    } else {
+      path.setAttribute("marker-end", "url(#cine-arrow)");
+      setTimeout(() => path.remove(), 1800);
+    }
+    return path;
+  }
+
+  _carry(a, b) {
+    const host = this._wireHost();
     const shared = Object.keys(b.termEls).filter((id) => a.termEls[id] && a.termEls[id].length);
     shared.forEach((id, k) => {
-      const src = a.termEls[id][0];
-      const dst = b.termEls[id][0];
-      if (!src || !dst) return;
-      const sr = src.getBoundingClientRect();
-      const dr = dst.getBoundingClientRect();
-      if (!sr.width || !dr.width) return;
-      const color = this.COLOR[(this.byId[id] || {}).role] || "#9fb0c2";
+      const src = a.termEls[id][0].el;
+      const ent = b.termEls[id].find((e) => !(e.li === 0 && e.ti === 0)) || b.termEls[id][0];
+      const path = this._arrow(src, ent.el, this._termColor(id), host, k * 0.12);
+      if (path && window.gsap) window.gsap.fromTo(ent.el, { opacity: 0.25 }, { opacity: 1, duration: 0.5, delay: k * 0.12 + 0.3, ease: "power2.out" });
+    });
+  }
 
-      const x1 = sr.left + sr.width / 2 - host.left;
-      const y1 = sr.bottom - host.top + 5;
-      const x2 = dr.left + dr.width / 2 - host.left;
-      const y2 = dr.top - host.top - 6;
-      const bend = Math.max(26, (y2 - y1) * 0.45) + k * 12;
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("class", "cine__carry");
-      path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`);
-      path.style.stroke = color;
-      this.wires.appendChild(path);
-
-      if (window.gsap) {
-        let len = 0; try { len = path.getTotalLength(); } catch (e) {}
-        if (len) { path.style.strokeDasharray = len; path.style.strokeDashoffset = len; }
-        window.gsap.timeline({ onComplete: () => path.remove() })
-          .to(path, { strokeDashoffset: 0, duration: 0.55, delay: k * 0.12, ease: "power2.out", onComplete: () => path.setAttribute("marker-end", "url(#cine-arrow)") })
-          .fromTo(dst, { opacity: 0.25 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, "<0.25")
-          .to(path, { opacity: 0, duration: 0.45, delay: 1.0, ease: "power1.in" });
-      } else {
-        path.setAttribute("marker-end", "url(#cine-arrow)");
-        setTimeout(() => path.remove(), 1800);
+  _linkLines(group) {
+    const host = this._wireHost();
+    let k = 0;
+    Object.keys(group.termEls).forEach((id) => {
+      const ents = group.termEls[id];
+      for (let j = 0; j < ents.length - 1; j++) {
+        if (ents[j + 1].li <= ents[j].li) continue;
+        this._arrow(ents[j].el, ents[j + 1].el, this._termColor(id), host, 0.55 + k * 0.15);
+        k += 1;
       }
     });
   }
