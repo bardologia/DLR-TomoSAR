@@ -151,12 +151,7 @@ class ProcessAnimator {
     const rawMax  = Math.max(...ys);
     const thrZ    = 0.25 * rawMax;
     const ysClean = ys.map((v, i) => (i >= TRUNC || v < thrZ) ? 0 : v);
-    const smo = ysClean.map((v, i) => {
-      let s = 0;
-      for (let j = -2; j <= 2; j++) s += ysClean[Math.min(NS, Math.max(0, i + j))];
-      return s / 5;
-    });
-    for (let i = TRUNC; i <= NS; i++) smo[i] = 0;
+    const smo = ysClean.slice();
     const maxProf = Math.max(...smo);
     const thrP = 0.05 * maxProf;
     const H_SPAN = 40;
@@ -238,33 +233,15 @@ class ProcessAnimator {
         ctx.fillText("truncation_index", Math.max(pad.l + 4, gx - 116), pad.t + 14);
       }
 
-      if (tt >= 8.0 && !(tt >= 15.5 && tt < 22.0) && !(tt >= 24.5 && tt < 30.9)) {
-        const rev = tt < 13.0 ? this._ease((tt - 8.0) / 5.0) : 1;
-        const upTo = Math.max(1, Math.round(rev * NS));
-
-        if (tt >= 13.0) {
-          ctx.beginPath();
-          for (let i = 0; i <= NS; i++) { const sx = px(i / NS), sy = py(smo[i]); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
-          ctx.lineTo(px(1), py(0)); ctx.lineTo(px(0), py(0)); ctx.closePath();
-          ctx.fillStyle = "rgba(53,230,208,0.07)"; ctx.fill();
-        }
+      if (tt >= 13.0 && !(tt >= 15.5 && tt < 22.0) && !(tt >= 24.5 && tt < 30.9)) {
+        ctx.beginPath();
+        for (let i = 0; i <= NS; i++) { const sx = px(i / NS), sy = py(smo[i]); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
+        ctx.lineTo(px(1), py(0)); ctx.lineTo(px(0), py(0)); ctx.closePath();
+        ctx.fillStyle = "rgba(53,230,208,0.07)"; ctx.fill();
 
         ctx.beginPath();
-        for (let i = 0; i <= upTo; i++) { const sx = px(i / NS), sy = py(smo[i]); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
+        for (let i = 0; i <= NS; i++) { const sx = px(i / NS), sy = py(smo[i]); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }
         ctx.strokeStyle = "rgba(53,230,208,0.85)"; ctx.lineWidth = 2; ctx.stroke();
-
-        if (tt < 13.0 && upTo < NS - 2) {
-          const i0 = Math.max(0, upTo - 2), i1 = Math.min(NS, upTo + 2);
-          let lo = Infinity, hi = -Infinity;
-          for (let j = i0; j <= i1; j++) { lo = Math.min(lo, ys[j]); hi = Math.max(hi, ys[j]); }
-          const bx1 = px(i0 / NS) - 4, bx2 = px(i1 / NS) + 4;
-          const by1 = py(hi) - 9, by2 = py(lo) + 9;
-          ctx.strokeStyle = "rgba(255,207,107,0.85)"; ctx.lineWidth = 1.3;
-          ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
-          ctx.fillStyle = "#ffcf6b"; ctx.beginPath(); ctx.arc(px(upTo / NS), py(smo[upTo]), 4.5, 0, 7); ctx.fill();
-          ctx.font = "11px 'IBM Plex Mono', monospace"; ctx.fillStyle = "rgba(255,207,107,0.9)";
-          ctx.fillText("window = 5 samples", Math.min(bx2 + 8, w - 150), Math.max(pad.t + 14, by1 - 7));
-        }
       }
     }
 
@@ -361,7 +338,32 @@ class ProcessAnimator {
       } else if (tt < 8.0) {
         caption = "Pre-clean 2/2: high-elevation samples beyond truncation_index = 170 are zeroed";
       } else if (tt < 13.0) {
-        caption = "Sliding window: a 5-sample moving average sweeps across and smooths the profile (uniform_filter1d)";
+        const ga = this._ease(Math.min(1, (tt - 8.5) / 0.8));
+        if (ga > 0) {
+          const bw6 = Math.min(260, w * 0.27), bh6 = 86;
+          const bx6 = w - pad.r - bw6 - 14, by6 = pad.t + 30;
+          ctx.save(); ctx.globalAlpha = ga;
+          ctx.fillStyle = "rgba(7,12,17,0.94)"; ctx.fillRect(bx6, by6, bw6, bh6);
+          ctx.strokeStyle = "rgba(255,107,125,0.55)"; ctx.lineWidth = 1.3; ctx.strokeRect(bx6, by6, bw6, bh6);
+          const thY6 = by6 + bh6 - 12 - bh6 * 0.34;
+          ctx.strokeStyle = "rgba(255,207,107,0.7)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.1;
+          ctx.beginPath(); ctx.moveTo(bx6 + 6, thY6); ctx.lineTo(bx6 + bw6 - 6, thY6); ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath();
+          for (let i = 0; i <= 70; i++) {
+            const xx = bx6 + 8 + (i / 70) * (bw6 - 16);
+            const yy = by6 + bh6 - 12 - Math.abs(noise(i / 70)) * bh6 * 1.4;
+            i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+          }
+          ctx.strokeStyle = "rgba(255,107,125,0.85)"; ctx.lineWidth = 1.4; ctx.stroke();
+          ctx.font = "11px 'IBM Plex Mono', monospace";
+          ctx.fillStyle = "rgba(255,207,107,0.85)"; ctx.fillText("5e-2", bx6 + bw6 - 40, thY6 - 5);
+          ctx.fillStyle = "rgba(255,107,125,0.9)"; ctx.fillText("neighbour pixel · max ≤ 5e-2 → skipped", bx6 + 8, by6 - 8);
+          ctx.fillStyle = "rgba(94,114,128,0.95)"; ctx.fillText("output stays all-zero", bx6 + 8, by6 + bh6 + 16);
+          ctx.fillStyle = "#7cff9b"; ctx.font = "12px 'IBM Plex Mono', monospace";
+          ctx.fillText("max > 5e-2 ✓ fitted", pad.l + 10, pad.t + 36);
+          ctx.restore();
+        }
+        caption = "Activity gate: a pixel is fitted only if its profile max exceeds activity_threshold (5e-2)  ·  inactive pixels keep zeros";
       } else if (tt < 15.5) {
         const tn = tt - 13.0;
         const pmaxV = Math.max(...smo);
@@ -379,7 +381,7 @@ class ProcessAnimator {
           ctx.restore();
         }
         this._texDraw("\\tilde{\\gamma}(\\xi)=\\dfrac{\\gamma(\\xi)}{\\max_\\xi \\gamma(\\xi)}", w - pad.r - 8, pad.t + 2, 14, { align: "right", alpha: relab, color: "rgba(53,230,208,0.95)" });
-        caption = tn < 1.6 ? "Re-scale to max 1: the profile is divided by its own maximum, so the peak rises to 1.0" : "The fit and its loss are defined on this normalized profile  (γ̃ = γ / max γ)";
+        caption = tn < 1.6 ? "Re-scale to max 1: each active profile is divided by its own maximum, so the peak rises to 1.0" : "The fit and its loss are defined on this normalized profile  (γ̃ = γ / max γ)";
       } else if (tt < 22.0) {
         const ts2 = tt - 15.5;
         const refI = ranked[0] ? ranked[0].i : Math.round(0.55 * NS);
@@ -676,7 +678,7 @@ class ProcessAnimator {
             dot(m, "rgba(255,107,125,0.7)", 2.5, 1 - fade * 0.85);
           }
         });
-        caption = "Keep prominence ≥ prominence_frac × max (0.05)  ·  ranked by prominence  ·  top-K seed the fit";
+        caption = "scipy find_peaks: keep prominence ≥ 0.05 × max, ranked by prominence  ·  too few peaks? residual argmax fills the seeds";
       }
     } else if (tt < SEL0) {
       const k = Math.min(5, Math.floor((tt - FITS0) / FIT) + 1);
@@ -685,7 +687,7 @@ class ProcessAnimator {
       const guessing = segT < HOLD;
       const prog = guessing ? 0 : this._ease(Math.min(1, (segT - HOLD) / (FIT - HOLD - 0.25)));
       const DIVISOR = 4.0;
-      const S0base  = S0v(k);
+      const S0base  = S0v(5);
       const S0      = S0base / DIVISOR;
       done = k - 1;
       model = cands.slice(0, k).map((c, i) => {
@@ -724,7 +726,7 @@ class ProcessAnimator {
       const s0Alpha = fitFade * (1 - this._ease(Math.min(1, Math.max(0, (tt - 52.0) / 1.5))));
       const upAlpha = fitFade * this._ease(Math.min(1, Math.max(0, (tt - 53.0) / 1.5)));
       if (s0Alpha > 0.01) {
-        this._texDraw("\\sigma_{\\mathrm{base}}=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: s0Alpha, color: "rgba(255,207,107,0.95)" });
+        this._texDraw("\\sigma_{\\mathrm{base}}=\\max\\!\\left(2\\,\\Delta\\xi,\\;\\tfrac{h_{\\mathrm{span}}}{8K_{\\max}}\\right)", eqCx, pad.t + 62, 14, { align: "center", alpha: s0Alpha, color: "rgba(255,207,107,0.95)" });
         this._texDraw("\\sigma_0=\\sigma_{\\mathrm{base}}/d,\\;\\,d=4", pad.l + 6, pad.t + 26, 12, { align: "left", alpha: s0Alpha, color: "rgba(124,255,155,0.95)" });
       }
       if (upAlpha > 0.01) {
@@ -759,7 +761,7 @@ class ProcessAnimator {
           if (ci === 0) { ctx.fillStyle = "rgba(255,207,107,0.6)"; ctx.fillText("σ_base", (bx1 + bx2) / 2, yb - 9); }
           ctx.restore();
         });
-        caption = `K = ${k}  ·  σ_base = max(2·Δξ, h_span/(8·K)) = ${sigmaGuess(k).toFixed(1)} m  ·  σ₀ = σ_base / 4 = ${(sigmaGuess(k) / DIVISOR).toFixed(2)} m  ·  same σ₀ for every component`;
+        caption = `K = ${k}  ·  ONE shared init at K_max = 5: σ_base = max(2·Δξ, h_span/40) = ${sigmaGuess(5).toFixed(1)} m, σ₀ = σ_base / 4 = ${(sigmaGuess(5) / DIVISOR).toFixed(2)} m  ·  first ${k} seed${k > 1 ? "s" : ""} reused`;
       } else if (k === 2 && prog < 0.45) {
         caption = "σ is clipped to [Δξ, h_span/2] during the fit";
       } else {
@@ -1023,7 +1025,7 @@ class ProcessAnimator {
     }
     drawChart(done, highlight, tt >= FITS0 && tt < SEL0);
     if (model && iter) {
-      this._cap(caption + `   step ${iter} / 3000  ·  Adam (lr 0.2)  ·  loss ↓`);
+      this._cap(caption + `   step ${iter} / 3000  ·  Adam (lr 0.2, β₁ 0.95)  ·  loss ↓`);
     } else {
       this._cap(caption);
     }
@@ -2743,7 +2745,7 @@ class ProcessAnimator {
       ctx.save(); ctx.globalAlpha = this._ease(c01((ts - 2.2) / 0.5));
       ctx.font = "13px 'IBM Plex Mono', monospace";
       ctx.fillStyle = "rgba(214,234,229,0.95)";
-      ctx.fillText("P = floor(cores / threads) workers (spawn)", cropX, wkY - 14);
+      ctx.fillText("fewest-waves worker x thread plan, threads ≤ 16 (spawn)", cropX, wkY - 14);
       ctx.restore();
     }
 
@@ -2790,7 +2792,7 @@ class ProcessAnimator {
 
     let cap;
     if (ts < 1.5) cap = "One Capon job would blow PyRat's memory  ·  split the azimuth crop into M = ceil(W_az / W_max) subsections";
-    else if (ts < 3.0) cap = "Each subsection -> one PyRatJob, dispatched across P = floor(cores / threads) spawn-safe workers";
+    else if (ts < 3.0) cap = "Each subsection -> one PyRatJob  ·  a core budget (effort high = 80% of cores) picks the worker x thread plan with the fewest waves";
     else if (ts < 4.5) cap = "(PyRat holds GDAL + Qt in process globals -> every call must run in its own subprocess)";
     else cap = "Workers write HDF5 partials {DEM, tomogram}  ·  reassembled along azimuth -> one array";
     this._cap(cap);
@@ -2999,7 +3001,7 @@ class ProcessAnimator {
       });
       if (tt > 2.8) label("memory-mapped · nothing loaded", ax, atY + 38 + 5 * 42 + 6, "rgba(206,228,222,0.85)", 12);
 
-      const x70 = sx + sw2 * 0.541, x85 = sx + sw2 * 0.760;
+      const x70 = sx + sw2 * 0.800, x85 = sx + sw2 * 0.900;
       if (tt >= 2.2 && tt < 3.6) {
         const gp = this._ease(c01((tt - 2.2) / 1.2));
         ctx.strokeStyle = `rgba(255,207,107,${0.85 * gp})`; ctx.setLineDash([7, 5]); ctx.lineWidth = 1.6;
@@ -3017,8 +3019,8 @@ class ProcessAnimator {
         ctx.strokeStyle = "#35e6d0"; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(cx1, sy); ctx.lineTo(cx1, sy + sh2); ctx.stroke();
         if (p1 >= 1) {
-          centerLabel("train 1000–9120", sx + (x70 - sx) / 2, sy - 28, "#35e6d0", 13);
-          centerLabel("≈ 54%", sx + (x70 - sx) / 2, sy - 12, "rgba(206,228,222,0.7)", 12);
+          centerLabel("train 1000–13000", sx + (x70 - sx) / 2, sy - 28, "#35e6d0", 13);
+          centerLabel("≈ 80%", sx + (x70 - sx) / 2, sy - 12, "rgba(206,228,222,0.7)", 12);
         }
       }
       if (tt >= 6.6) {
@@ -3029,10 +3031,10 @@ class ProcessAnimator {
         ctx.beginPath(); ctx.moveTo(cx2, sy); ctx.lineTo(cx2, sy + sh2); ctx.stroke();
         if (p2 >= 1) {
           ctx.fillStyle = "rgba(124,255,155,0.08)"; ctx.fillRect(x85, sy, sx + sw2 - x85, sh2);
-          centerLabel("val 9120–12400", (x70 + x85) / 2, sy - 28, "#ffcf6b", 13);
-          centerLabel("≈ 22%", (x70 + x85) / 2, sy - 12, "rgba(206,228,222,0.7)", 12);
-          centerLabel("test 12400–16000", (x85 + sx + sw2) / 2, sy - 28, "#7cff9b", 13);
-          centerLabel("≈ 24%", (x85 + sx + sw2) / 2, sy - 12, "rgba(206,228,222,0.7)", 12);
+          centerLabel("val 13000–14500", (x70 + x85) / 2, sy - 44, "#ffcf6b", 13);
+          centerLabel("≈ 10%", (x70 + x85) / 2, sy - 28, "rgba(206,228,222,0.7)", 12);
+          centerLabel("test 14500–16000", (x85 + sx + sw2) / 2, sy - 76, "#7cff9b", 13);
+          centerLabel("≈ 10%", (x85 + sx + sw2) / 2, sy - 60, "rgba(206,228,222,0.7)", 12);
         }
       }
       if (tt >= 9.6 && tt < 12.2) {
@@ -3061,8 +3063,8 @@ class ProcessAnimator {
       }
 
       if (tt < 3.6) caption = "The processed artifacts are opened as memory-mapped files  ·  the data stays on disk";
-      else if (tt < 6.6) caption = "The scene is split along azimuth  ·  production uses explicit bounds, train az 1000–9120 (≈54%)";
-      else if (tt < 9.6) caption = "val az 9120–12400 (≈22%)  ·  test az 12400–16000 (≈24%)  ·  three disjoint azimuth windows";
+      else if (tt < 6.6) caption = "The scene is split along azimuth  ·  production uses explicit bounds, train az 1000–13000 (≈80%)";
+      else if (tt < 9.6) caption = "val az 13000–14500 (≈10%)  ·  test az 14500–16000 (≈10%)  ·  three disjoint azimuth windows";
       else if (tt < 12.2) caption = "The global crop is fixed (from dataset.json)  ·  each split maps into its local frame";
       else caption = "Loading the train window  ·  1 primary + 4 secondaries + 4 interferograms copied into one stacked RAM buffer";
     } else if (tt < A2) {
@@ -3520,7 +3522,7 @@ class ProcessAnimator {
         if (gate > 0) chip("a > 0.01", rpx + pw6 / 2 - 40, py6 + ph6 / 2 + 8, "#ffcf6b", gate, 14);
         if (ts >= 2.5) {
           const gA2 = c01((ts - 2.5) / 0.6);
-          (this._texDraw("\\mu,\\sigma:\\;\\text{only where}\\;a_k>0.01", w / 2, py6 + ph6 + 40, 14, { color: "rgba(206,228,222,0.9)", align: "center", alpha: gA2 }) ? null : centerLabel("amp: all pixels · mu/sigma: only where a > 0.01", w / 2, py6 + ph6 + 50, "rgba(206,228,222,0.85)", 12));
+          (this._texDraw("a,\\mu,\\sigma:\\;\\text{only where}\\;a_k>0.01", w / 2, py6 + ph6 + 40, 14, { color: "rgba(206,228,222,0.9)", align: "center", alpha: gA2 }) ? null : centerLabel("a, mu, sigma: only where a > 0.01", w / 2, py6 + ph6 + 50, "rgba(206,228,222,0.85)", 12));
         }
         ctx.restore();
       }
@@ -3665,12 +3667,12 @@ class ProcessAnimator {
       }
 
       if (ts < 2.5) caption = "Two regimes  ·  input stats sample patches, output stats read the whole parameter array";
-      else if (ts < 5.0) caption = "Output amp uses every pixel  ·  mu and sigma use only active Gaussians (a > 0.01)";
+      else if (ts < 5.0) caption = "All three output pools — amp, mu and sigma — keep only active Gaussians (a > 0.01)";
       else if (ts < 8.5) caption = "Normalization runs last, after augmentation  ·  input stats are fit on up to 4,000 train patches (seed 42, batches of 512)";
       else if (ts < 11.5) caption = "Log transform first where the data is heavy-tailed: magnitude, amplitude and sigma";
       else if (ts < 15.5) caption = "Per-slot statistics: the fitted mean recentres, the std rescales  ·  phase is z-scored too, no fixed ÷ pi";
       else if (ts < 20.5) caption = "Every lane lands at mean 0, std 1  ·  the same z-score recipe for inputs and outputs";
-      else caption = "Offsets and scales are saved with the run and reused for val/test  ·  output mu/sigma keep only active Gaussians (a > 0.01)";
+      else caption = "Offsets and scales are saved with the run and reused for val/test  ·  output stats keep only active Gaussians (a > 0.01)";
     } else {
       const ts = tt - A5;
       const cw3 = 66, chh = 54, gap = 22;
@@ -3740,11 +3742,11 @@ class ProcessAnimator {
       const doneP = this._ease(c01((ts - 9.2) / 0.8));
       if (doneP > 0) {
         ctx.save(); ctx.globalAlpha = doneP;
-        centerLabel("one batch · 8 samples", w / 2, bY - 82, "rgba(230,247,243,0.95)", 15);
+        centerLabel("one batch · 8 samples drawn (B = 256 in production)", w / 2, bY - 82, "rgba(230,247,243,0.95)", 15);
         centerLabel("patch indices", sxI + 81, bY + 90, "rgba(206,228,222,0.95)", 14);
-        centerLabel("inputs [8, 9, 64, 64]", sxA + 96, bY + 90, "#35e6d0", 14);
+        centerLabel("inputs [B, 9, 64, 64]", sxA + 96, bY + 90, "#35e6d0", 14);
         centerLabel("normalized", sxA + 96, bY + 110, "rgba(206,228,222,0.9)", 12);
-        centerLabel("targets [8, 3K, 64, 64]", sxB + 96, bY + 90, "#7cff9b", 14);
+        centerLabel("targets [B, 3K, 64, 64]", sxB + 96, bY + 90, "#7cff9b", 14);
         centerLabel("normalized", sxB + 96, bY + 110, "rgba(206,228,222,0.9)", 12);
         ctx.restore();
       }
@@ -3753,7 +3755,7 @@ class ProcessAnimator {
         { t: "train · shuffled · drop last", c: "#35e6d0" },
         { t: "val · in order · keep all", c: "rgba(178,204,210,0.95)" },
         { t: "test · in order · keep all", c: "rgba(178,204,210,0.95)" },
-        { t: "16 workers · pinned memory", c: "#ffcf6b" },
+        { t: "4 workers · prefetch 8 · pinned memory", c: "#ffcf6b" },
       ];
       const lcGap = 14;
       const lcW = loaders.map((l) => chip(l.t, 0, 0, l.c, 0, 12));
@@ -3768,7 +3770,7 @@ class ProcessAnimator {
 
       if (ts < 2.6) caption = "The dataset stores only indices and grid coordinates  ·  no patch pixels are in memory";
       else if (ts < 5.2) caption = "The training order is reshuffled every epoch";
-      else if (ts < 9.2) caption = "16 workers slice, pad and normalize on the fly  ·  each index yields an input and a target";
+      else if (ts < 9.2) caption = "4 persistent workers slice, pad and normalize on the fly (prefetch 8)  ·  each index yields an input and a target";
       else caption = "One batch consolidated  ·  indices, normalized inputs, normalized targets  ·  the three loaders feed training";
     }
 
@@ -4946,6 +4948,7 @@ class ProcessAnimator {
           "lr_scheduler.reset(offset = 50)",
           "warmup.reset()  ·  re-armed",
           "Adam moments cleared",
+          "checkpoint baseline reset",
         ];
         const x0 = pad.l + 14, y0 = pad.t + 26;
         ctx.font = "11px 'IBM Plex Mono', monospace";
@@ -5051,7 +5054,7 @@ class ProcessAnimator {
     if (ts < 3.8) this._cap("Loss curriculum  ·  phase 1: param_l1 on matched [a, mu, sigma] sets  ·  direct parameter supervision");
     else if (ts < 6.6) this._cap("epoch == swap_epoch  ->  CurriculumController.maybe_swap() fires");
     else if (ts < 9.4) this._cap("criterion.set_curriculum(complete)  ·  param_l1 stays in the formula  ·  mse_curve and ssim_curve join it");
-    else if (ts < 10.8) this._cap("Resets cascade  ·  early stopping, lr scheduler, warmup, optimizer moments");
+    else if (ts < 10.8) this._cap("Resets cascade  ·  early stopping, lr scheduler, warmup, optimizer moments, checkpoint baseline (new loss scale)");
     else if (ts < 12.6) this._cap("Zooming into the learning-rate schedule around the swap epoch");
     else if (ts < 15.2) this._cap("The cosine glides down toward epoch 50  ·  by the swap it sits at 0.5 x base");
     else if (ts < 17.0) this._cap("reset(epoch_offset = 50) rewinds the clock  ·  warmup re-arms at factor 0.1, so lr jumps to 0.1 x base (not 0.1 x the pre-swap lr)");
