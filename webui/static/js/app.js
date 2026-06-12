@@ -168,6 +168,7 @@ class App {
       hint          : document.getElementById("cube-hint"),
       slices        : document.getElementById("cube-slices"),
       slicesAt      : document.getElementById("cube-slices-at"),
+      sources       : document.getElementById("cube-sources"),
       profiles      : document.getElementById("cube-profiles"),
       profAt        : document.getElementById("cube-prof-at"),
       progress      : document.getElementById("cube-progress"),

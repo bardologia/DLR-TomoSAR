@@ -15,6 +15,7 @@ class TomogramView {
     this.panels = refs.panels;
     this.slicesEl = refs.slices;
     this.slicesAt = refs.slicesAt;
+    this.sourcesEl = refs.sources;
     this.profilesEl = refs.profiles;
     this.profAt = refs.profAt;
     this.profModeBtns = refs.profModeBtns;
@@ -43,6 +44,7 @@ class TomogramView {
     this.profQueued = null;
     this.profFetching = false;
     this.colors = {};
+    this.visible = new Set();
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -231,12 +233,10 @@ class TomogramView {
     this._syncSpaceBtns();
     this._syncProfModeBtns();
 
-    this.panels.forEach((panel) => {
-      panel.root.hidden = !meta.sources.includes(panel.source);
-    });
-    this.profPanels.forEach((panel) => {
-      panel.root.hidden = !meta.sources.includes(panel.source);
-    });
+    const kept = meta.sources.filter((s) => this.visible.has(s));
+    this.visible = new Set(kept.length ? kept : meta.sources);
+    this._renderSourceToggles();
+    this._applyVisibility();
 
     this.hint.hidden = true;
     this.stage.hidden = false;
@@ -260,6 +260,48 @@ class TomogramView {
     this.profMode = mode;
     this._syncProfModeBtns();
     this._drawProfiles();
+  }
+
+  _renderSourceToggles() {
+    this.sourcesEl.innerHTML = "";
+    this.meta.sources.forEach((source) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-source";
+      btn.dataset.source = source;
+      btn.innerHTML = `<i class="cube-dot" data-source="${source}"></i>${TomogramView.LABELS[source]}`;
+      btn.addEventListener("click", () => this._toggleSource(source));
+      this.sourcesEl.appendChild(btn);
+    });
+  }
+
+  _toggleSource(source) {
+    if (this.visible.has(source)) {
+      if (this.visible.size === 1) {
+        window.toast("At least one source must stay visible.", "warn");
+        return;
+      }
+      this.visible.delete(source);
+    } else {
+      this.visible.add(source);
+    }
+
+    this._applyVisibility();
+    if (this.point) this._drawSlices(this.point.az, this.point.rg);
+    this._drawProfiles();
+  }
+
+  _applyVisibility() {
+    this.panels.forEach((panel) => {
+      panel.root.hidden = !this.visible.has(panel.source);
+    });
+    this.profPanels.forEach((panel) => {
+      panel.root.hidden = !this.visible.has(panel.source);
+    });
+    this.sourcesEl.querySelectorAll(".cube-source").forEach((btn) => {
+      btn.classList.toggle("is-active", this.visible.has(btn.dataset.source));
+    });
+    this.slicesEl.style.setProperty("--cube-rows", String(this.visible.size));
   }
 
   _syncSpaceBtns() {
