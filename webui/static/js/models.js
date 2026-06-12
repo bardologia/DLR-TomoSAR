@@ -305,6 +305,10 @@ class ModelGallery {
   _positionPop(pop, anchorEl, side, diagram, alignTop) {
     const cR = diagram.getBoundingClientRect();
     const aR = anchorEl.getBoundingClientRect();
+    const nR = document.getElementById("nav").getBoundingClientRect();
+    const sidebar = nR.height >= window.innerHeight;
+    const minLeft = (sidebar ? nR.right : 0) + 8;
+    const minTop  = (sidebar ? 0 : nR.bottom) + 8;
     const pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 16;
     let vpLeft, vpTop, ox, oy;
 
@@ -315,7 +319,7 @@ class ModelGallery {
     } else {
       const goLeft = side === "left";
       let l = goLeft ? aR.left - gap - pw : aR.right + gap;
-      if (goLeft && l < 8) { l = aR.right + gap; ox = "0%"; }
+      if (goLeft && l < minLeft) { l = aR.right + gap; ox = "0%"; }
       else if (!goLeft && l + pw > window.innerWidth - 8) { l = aR.left - gap - pw; ox = "100%"; }
       else ox = goLeft ? "100%" : "0%";
       vpLeft = l;
@@ -323,8 +327,8 @@ class ModelGallery {
       oy = "50%";
     }
 
-    vpLeft = Math.max(8, Math.min(vpLeft, window.innerWidth - pw - 8));
-    vpTop = Math.max(74, Math.min(vpTop, window.innerHeight - ph - 8));
+    vpLeft = Math.max(minLeft, Math.min(vpLeft, window.innerWidth - pw - 8));
+    vpTop = Math.max(minTop, Math.min(vpTop, window.innerHeight - ph - 8));
     pop.style.left = (vpLeft - cR.left) + "px";
     pop.style.top = (vpTop - cR.top) + "px";
     pop.style.setProperty("--ox", ox);
