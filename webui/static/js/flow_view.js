@@ -22,12 +22,13 @@ class FlowView {
     this.SLOTW = "28%";
     this.SLOTS = { s0: "1.5%", s1: "36%", s2: "70.5%", enter: "102%", exit: "-30%" };
     this.LSLOT = [
-      { f: 0.08, op: 0.35, scale: 0.60 },
-      { f: 0.26, op: 0.55, scale: 0.80 },
-      { f: 0.50, op: 1.00, scale: 1.00 },
-      { f: 0.74, op: 0.50, scale: 0.80 },
-      { f: 0.92, op: 0.30, scale: 0.60 },
+      { op: 0.35, scale: 0.60 },
+      { op: 0.55, scale: 0.80 },
+      { op: 1.00, scale: 1.00 },
+      { op: 0.50, scale: 0.80 },
+      { op: 0.30, scale: 0.60 },
     ];
+    this.LTOPS = { none: [8, 29, 50, 71, 92], top: [34, 42, 50, 71, 92], bottom: [8, 29, 50, 62, 71] };
     this.stackTimer = null;
 
     this.GUIDE = {
@@ -116,10 +117,10 @@ class FlowView {
     this.stage.className = "cine__stage";
     this.stage.innerHTML = `
       <svg class="cine__wires"><defs>
-        <marker id="cine-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <marker id="cine-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
           <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
         </marker>
-        <marker id="cine-prog" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="cine-prog" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M0,0 L12,6 L0,12 z" fill="context-stroke"></path>
         </marker></defs></svg>
       <div class="cine__head">
@@ -273,7 +274,6 @@ class FlowView {
 
     this.groups.forEach((g) => {
       if (want.indexOf(g.i) >= 0) return;
-      this._stackStop(g);
       this._setGeom(g, g.i < c ? "exit" : "enter", 0, slide);
       this._removeLater(g, slide);
     });
@@ -283,14 +283,12 @@ class FlowView {
       g.el.classList.toggle("is-current", off === 0);
       this._setGeom(g, off < 0 ? "s0" : off > 0 ? "s2" : "s1", 1, slide);
       if (off === 0) {
-        this._stackStart(g);
         g.ready.then(() => setTimeout(() => {
           if (this.cursor !== g.i) return;
           this._stackRun(g);
           if (g.step.iterative && g.iterEl) this._iterRun(g.step, g.iterEl, this.lastAnimate);
         }, slide ? 720 : 0));
       } else {
-        this._stackStop(g);
         if (g.step.iterative && g.iterEl) this._iterIdle(g.step, g.iterEl);
       }
     });
@@ -352,7 +350,11 @@ class FlowView {
     const ready = Promise.all(lines.map(({ line, terms, uid }) =>
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
-    const group = { el: grp, step, i, lines, termEls: {}, iterEl, tipTop, tipEl: tip, sketchSvg };
+    const group = { el: grp, step, i, lines, termEls: {}, iterEl, tipTop, tipEl: tip, sketchSvg, stackK: 0 };
+    if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
+      eq.classList.add("is-stack");
+      this._stackPlace(group, false);
+    }
     if (iterEl) this._iterIdle(step, iterEl);
     if (tip && this.lastAnimate && window.gsap) window.gsap.fromTo(tip, { opacity: 0, y: tipTop ? -10 : 10 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.15, ease: "power2.out" });
     group.ready = ready.then(() => {
@@ -387,13 +389,6 @@ class FlowView {
     else { group.el.style.left = left; group.el.style.opacity = op; }
   }
 
-  _stackStart(group) {
-    if (group.lines.length < 2 || !this.lastAnimate || !window.gsap) return;
-    group.el.querySelector(".cine__eq").classList.add("is-stack");
-    group.stackK = 0;
-    this._stackPlace(group, false);
-  }
-
   _stackRun(group) {
     clearTimeout(this.stackTimer);
     if (group.lines.length < 2 || !this.lastAnimate || !window.gsap) return;
@@ -413,22 +408,14 @@ class FlowView {
   }
 
   _stackPlace(group, animate) {
-    const lo = group.tipEl ? (group.tipTop ? 34 : 0) : 8;
-    const hi = group.tipEl ? (group.tipTop ? 100 : 66) : 92;
+    const tops = this.LTOPS[group.tipEl ? (group.tipTop ? "top" : "bottom") : "none"];
     group.lines.forEach(({ line }, li) => {
-      const s = this.LSLOT[Math.max(0, Math.min(4, li - group.stackK + 2))];
-      const props = { top: (lo + s.f * (hi - lo)) + "%", yPercent: -50, scale: s.scale, opacity: s.op };
+      const o = Math.max(0, Math.min(4, li - group.stackK + 2));
+      const s = this.LSLOT[o];
+      const props = { top: tops[o] + "%", yPercent: -50, scale: s.scale, opacity: s.op };
       if (animate) window.gsap.to(line, Object.assign(props, { duration: 0.6, ease: "power3.inOut" }));
       else window.gsap.set(line, props);
     });
-  }
-
-  _stackStop(group) {
-    const eq = group.el.querySelector(".cine__eq");
-    if (!eq || !eq.classList.contains("is-stack")) return;
-    eq.classList.remove("is-stack");
-    if (window.gsap) window.gsap.set(group.lines.map((l) => l.line), { clearProps: "all" });
-    group.stackK = 0;
   }
 
   _removeLater(group, animate) {
@@ -477,15 +464,16 @@ class FlowView {
   _tipLink(group, host, animate) {
     const eq  = group.el.querySelector(".cine__eq");
     const tip = group.tipEl;
-    if (!eq || !tip || eq.classList.contains("is-stack")) return;
+    if (!eq || !tip) return;
     const er = eq.getBoundingClientRect();
     const tr = tip.getBoundingClientRect();
     if (!er.width || !tr.width) return;
 
+    const stacked = eq.classList.contains("is-stack");
     const cx = er.left + er.width / 2 - host.left;
     let ya, yb;
-    if (group.tipTop) { ya = er.top - host.top - 3;    yb = tr.bottom - host.top + 4; }
-    else              { ya = er.bottom - host.top + 3; yb = tr.top - host.top - 4; }
+    if (group.tipTop) { ya = (stacked ? er.top + er.height * 0.40 : er.top - 3) - host.top;    yb = tr.bottom - host.top + 4; }
+    else              { ya = (stacked ? er.top + er.height * 0.60 : er.bottom + 3) - host.top; yb = tr.top - host.top - 4; }
 
     const link = document.createElementNS("http://www.w3.org/2000/svg", "path");
     link.setAttribute("class", "cine__tiplink");
