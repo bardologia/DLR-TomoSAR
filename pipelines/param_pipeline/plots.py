@@ -66,8 +66,13 @@ class SpatialMapPlotter(PlotBase):
         saved    : Dict[str, Path] = {}
 
         for key, title in valid_pairs:
-            data       = maps_dict[key].astype(np.float32)
-            Az, R      = data.shape
+            data  = maps_dict[key].astype(np.float32)
+            Az, R = data.shape
+
+            if not np.isfinite(data).any():
+                self.logger.warning(f"Spatial map '{key}' in group '{group_name}' skipped: field is entirely masked, no active pixels")
+                continue
+
             vmin, vmax = self._shared_clim(data)
 
             saved[key] = self._imshow_figure(

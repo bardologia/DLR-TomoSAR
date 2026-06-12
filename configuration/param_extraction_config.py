@@ -12,10 +12,10 @@ class FitMode:
         threshold_factor   : float = 0.25
         truncation_index   : int   = 170
         k_max              : int   = 5
-        lambda_k           : float = 5e-3
+        lambda_k           : float = 1e-2
         prominence_frac    : float = 0.05
         sigma_init_divisor : float = 4.0
-        activity_threshold : float = 5e-2
+        activity_threshold : float = 5e-3
 
 
 FitConfig = FitMode.SigmaOnly
@@ -127,7 +127,7 @@ class ExtractParamsEntryConfig:
     height_range      : tuple | None = None
 
     fit_k_max              : int    = 5
-    fit_lambda_k           : float  = 5e-3
+    fit_lambda_k           : float  = 1e-2
     fit_sigma_init_divisor : float  = 4.0
 
     gpu_device_ids    : list         = field(default_factory=lambda: [0, 1, 2, 3])
