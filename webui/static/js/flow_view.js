@@ -28,7 +28,7 @@ class FlowView {
       { op: 0.50, scale: 0.80 },
       { op: 0.40, scale: 0.70 },
     ];
-    this.LTOPS = { none: [12, 31, 50, 69, 88], bottom: [12, 31, 50, 62, 70] };
+    this.LTOPS = { none: [10, 24, 38, 56, 74], bottom: [10, 24, 38, 52, 64] };
     this.stackTimer = null;
 
     this.GUIDE = {
@@ -295,12 +295,11 @@ class FlowView {
     grp.className = "cine__grp";
     grp.dataset.step = i;
 
-    const tipTop = (step.lines || []).length > 1 ? false : i % 2 === 0;
     const g = this.GUIDE[step.id];
     let tip = null, sketchSvg = null;
     if (g) {
       tip = document.createElement("div");
-      tip.className = "cine__gtip " + (tipTop ? "is-top" : "is-bottom");
+      tip.className = "cine__gtip";
       tip.innerHTML = `<div class="cine__gsketch"></div><p class="cine__gtiptext">${this._esc(g.tip)}</p>`;
       sketchSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       sketchSvg.setAttribute("viewBox", "0 0 240 150");
@@ -332,7 +331,7 @@ class FlowView {
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
     if (tip) tip.style.opacity = "0";
-    const group = { el: grp, step, i, lines, iterEl, tipTop, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
+    const group = { el: grp, step, i, lines, iterEl, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
     if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
       eq.classList.add("is-stack");
       this._stackPlace(group, false);
@@ -350,7 +349,7 @@ class FlowView {
     const el = group.tipEl;
     if (!window.gsap || window.REDUCED_MOTION) { el.style.opacity = shown ? "1" : "0"; return; }
     if (shown) {
-      window.gsap.fromTo(el, { opacity: 0, y: group.tipTop ? -10 : 10 }, { opacity: 1, y: 0, duration: 0.5, delay: slide ? 0.62 : 0.2, ease: "power2.out" });
+      window.gsap.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, delay: slide ? 0.62 : 0.2, ease: "power2.out" });
       if (group.sketchSvg) this._animateSketch(group.sketchSvg);
     } else {
       window.gsap.to(el, { opacity: 0, y: 0, duration: 0.25 });
