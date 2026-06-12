@@ -26,6 +26,15 @@ class EnvironmentPinner:
             os.environ[key] = value
 
     @classmethod
+    def gpus(cls, gpu_ids: list) -> None:
+        ids = [str(int(gpu_id)) for gpu_id in gpu_ids]
+        if not ids:
+            raise ValueError("gpu_ids must name at least one CUDA device")
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(ids)
+        cls.threads()
+
+    @classmethod
     def gpu(cls, gpu_id: int | None = None, expandable_segments: bool = False) -> None:
         if gpu_id is None:
             parser = argparse.ArgumentParser(add_help=False)

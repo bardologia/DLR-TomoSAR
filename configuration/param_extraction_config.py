@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 
 class FitMode:
@@ -51,7 +51,6 @@ class ExtractionConfig:
     adam_lr              : float                         = 2e-1
     adam_b1              : float                         = 0.95
     adam_b2              : float                         = 0.999
-    gpu_device_ids       : Optional[List[int]]           = field(default_factory=lambda: [0, 1, 2, 3])
 
 
     @property

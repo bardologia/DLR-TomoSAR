@@ -5,7 +5,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -325,12 +325,9 @@ class BestKSelector:
 
 
 class KernelBackendSelector:
-    def __init__(self, gpu_device_ids : Optional[List[int]] = None) -> None:
-        self.gpu_device_ids = gpu_device_ids
-
     def select(self) -> Tuple[object, int, str, list]:
-        all_gpu_devices = [d for d in jax.devices() if d.platform in ("gpu", "cuda")]
-        active_devices  = ([all_gpu_devices[i] for i in self.gpu_device_ids] if self.gpu_device_ids else all_gpu_devices) if all_gpu_devices else jax.devices()
+        gpu_devices    = [d for d in jax.devices() if d.platform in ("gpu", "cuda")]
+        active_devices = gpu_devices if gpu_devices else jax.devices()
 
         if len(active_devices) > 1:
             kernel    = PmapSigmaAdamKernel(active_devices)
@@ -359,7 +356,6 @@ class SigmaFittingExtractor:
         prominence_frac     : float               = 0.05,
         sigma_init_divisor  : float               = 1.0,
         gpu_pixel_batch_size: int                 = 8192,
-        gpu_device_ids      : Optional[List[int]] = None,
         init_workers        : Optional[int]       = None,
     ) -> None:
 
@@ -381,7 +377,7 @@ class SigmaFittingExtractor:
         self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
         self._best_k_selector  = BestKSelector(k_max=k_max, lambda_k=lambda_k, logger=logger)
 
-        kernel, n_devices, backend, active_devices = KernelBackendSelector(gpu_device_ids).select()
+        kernel, n_devices, backend, active_devices = KernelBackendSelector().select()
 
         self._kernel    = kernel
         self._n_devices = n_devices

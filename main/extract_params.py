@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import _bootstrap
+from _bootstrap import EnvironmentPinner
 
 from configuration.param_extraction_config import ExtractParamsEntryConfig, ExtractionConfig, FitMode, FitSettings
-from pipelines.param_pipeline.pipeline import DatasetQueueResolver, ParamExtractionPipeline
 from tools.config_cli import ConfigCli
 from tools.logger import Logger
 
 
 def main() -> None:
-    config       = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction over one or more dataset directories").apply()
+    config = ConfigCli(ExtractParamsEntryConfig(), description="Gaussian parameter extraction over one or more dataset directories").apply()
+
+    EnvironmentPinner.gpus(config.gpu_device_ids)
+
+    from pipelines.param_pipeline.pipeline import DatasetQueueResolver, ParamExtractionPipeline
+
     logger       = Logger(log_dir="logs", name="extract_params")
     base_path    = Path(config.dataset_base_path)
     dataset_dirs = DatasetQueueResolver(base_path, config.dataset_filter).resolve()
@@ -39,7 +43,6 @@ def main() -> None:
 
             fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor)),
 
-            gpu_device_ids    = [int(device) for device in config.gpu_device_ids],
             range_batch_size  = config.range_batch_size,
             parameter_workers = config.parameter_workers,
         )

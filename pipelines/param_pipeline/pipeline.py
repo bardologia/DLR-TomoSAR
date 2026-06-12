@@ -116,7 +116,6 @@ class ParameterExtractor:
         adam_lr              : float               = 1e-2,
         adam_b1              : float               = 0.9,
         adam_b2              : float               = 0.999,
-        gpu_device_ids       : list | None         = None,
         gpu_pixel_batch_size : int                 = 8192,
         init_workers         : int | None          = None,
     ) -> None:
@@ -131,7 +130,6 @@ class ParameterExtractor:
         self.adam_lr              = adam_lr
         self.adam_b1              = adam_b1
         self.adam_b2              = adam_b2
-        self.gpu_device_ids       = gpu_device_ids
         self.init_workers         = init_workers
 
         fit_cfg = parameter_extraction.fit_config
@@ -154,7 +152,6 @@ class ParameterExtractor:
             prominence_frac      = prominence_frac,
             sigma_init_divisor   = sigma_init_divisor,
             gpu_pixel_batch_size = gpu_pixel_batch_size,
-            gpu_device_ids       = gpu_device_ids,
             init_workers         = init_workers,
         )
 
@@ -207,7 +204,6 @@ class ParamExtractionPipeline:
             adam_lr              = config.adam_lr,
             adam_b1              = config.adam_b1,
             adam_b2              = config.adam_b2,
-            gpu_device_ids       = config.gpu_device_ids,
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
             init_workers         = config.parameter_workers,
         )
