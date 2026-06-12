@@ -65,11 +65,17 @@ class LaunchView {
     this.manifestEl = null;
     this.launchBtn = null;
     this.countEl = null;
+    this.active = false;
+    this.loadSeq = 0;
     this._wireTabs();
     this._wireKeys();
   }
 
   async show(key) {
+    this.active = true;
+    if (key === this.key && this.config) return;
+
+    const seq = ++this.loadSeq;
     this.key = key;
     this.detail = null;
     this.config = null;
@@ -91,7 +97,7 @@ class LaunchView {
     this._renderSkeleton();
 
     const detail = await window.apiGet(`/api/scripts/${key}`);
-    if (this.key !== key) return;
+    if (seq !== this.loadSeq) return;
     if (detail.error) {
       window.toast("Could not load script", "error");
       window.router.go("scripts");
@@ -104,7 +110,7 @@ class LaunchView {
     this._setPane("config");
 
     const cfg = await window.apiGet(`/api/scripts/${key}/config`);
-    if (this.key !== key) return;
+    if (seq !== this.loadSeq) return;
     if (!cfg.ok) {
       this._renderConfigError(cfg.error || "could not resolve configuration");
       return;
@@ -113,7 +119,7 @@ class LaunchView {
 
     if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "model_name")) {
       const models = await window.apiGet("/api/models");
-      if (this.key !== key) return;
+      if (seq !== this.loadSeq) return;
       this.modelFamilies = (models && models.families) || [];
     }
 
@@ -122,7 +128,7 @@ class LaunchView {
   }
 
   leave() {
-    this.key = null;
+    this.active = false;
   }
 
   _renderSkeleton() {
@@ -1135,7 +1141,7 @@ class LaunchView {
 
   _wireKeys() {
     document.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape" || this.key === null) return;
+      if (e.key !== "Escape" || !this.active) return;
       if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
         document.activeElement.blur();
         return;
