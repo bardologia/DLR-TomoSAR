@@ -269,7 +269,7 @@ class ProcessAnimator {
     }
 
     const S0v = (k) => sigmaGuess(k) / H_SPAN;
-    const LAM = 3e-3;
+    const LAM = 5e-3;
     const mse = (m) => {
       let e = 0;
       for (let i = 0; i <= 80; i++) { const x = i / 80; const d = mix(m, x) - target(x); e += d * d; }
@@ -770,7 +770,7 @@ class ProcessAnimator {
       done = 5; highlight = true;
       model = finalModel(bestK);
       cands.forEach((c, r) => drawPeak(c, r, r < bestK));
-      caption = `Order selection  ·  J(K) = MSE + λ·Σa, λ = 3e-3  →  K* = ${bestK}`;
+      caption = `Order selection  ·  J(K) = MSE + λ·Σa, λ = 5e-3  →  K* = ${bestK}`;
     } else if (tt < FINAL0) {
       const ts = tt - SORT0;
       const KMAX = 5;
@@ -859,7 +859,7 @@ class ProcessAnimator {
       }
 
       if (ts < SORTSTART) caption = "Fitted parameter sets [a, μ, σ]  ·  stacked in prominence order";
-      else if (ts < 5.8) caption = "Sorting by ascending μ (the highlighted key)  ·  each set flies to its slot";
+      else if (ts < 5.8) caption = "Sorting by ascending μ (the highlighted key)  ·  inactive sets (a ≤ 0.05) sort last  ·  each set flies to its slot";
       else caption = "Padding to K_max = 5  ·  inactive slots zeroed (a = 0)  ·  final per-pixel array";
     }
 
@@ -2810,7 +2810,7 @@ class ProcessAnimator {
     ctx.fill(); ctx.stroke();
     ctx.font = "14px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "rgba(214,234,229,0.95)";
-    ctx.fillText("data directory · 7 artifacts", frX + 16, frY - 10);
+    ctx.fillText("data directory · 6 artifacts", frX + 16, frY - 10);
     ctx.restore();
 
     const cards = [
@@ -2819,6 +2819,7 @@ class ProcessAnimator {
             ["primary", "(Az,Rg) cplx · tomo_tag", "#35e6d0"],
       ["secondaries", "(Ns,Az,Rg) cplx", "#35e6d0"],
       ["interferograms", "(Ns,Az,Rg) cplx", "#35e6d0"],
+      ["track_profiles", "(Nt,Az) h+v · npz", "#ffcf6b"],
     ];
     const cols = 4, cw = (frW - 40) / cols, ch = 56;
     const gx = frX + 20, gy = frY + 28;
@@ -2840,7 +2841,7 @@ class ProcessAnimator {
       ctx.font = "13px 'IBM Plex Mono', monospace";
       ctx.fillStyle = "#7cff9b";
       ctx.fillText("dataset.json", jx + 14, jy + 22);
-      const keys = ["{ global_crop", "dataset_type", "tomogram_tag", "parameter_tag", "artifacts{...} }"];
+      const keys = ["{ global_crop", "dataset_type", "tomogram_tag", "parameter_tag", "pass_labels", "artifacts{...} }"];
       const nk = Math.min(keys.length, Math.floor((ts - 13.5) / 0.8) + 1);
       ctx.font = "12px 'IBM Plex Mono', monospace";
       ctx.fillStyle = "rgba(147,167,180,0.95)";
@@ -2852,16 +2853,16 @@ class ProcessAnimator {
         ctx.save(); ctx.globalAlpha = pa * 0.6;
         ctx.font = "12px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "#5e7280";
-        ctx.fillText("config_state_*.json  +  meta_<stage>_*.txt", jx + 14, jy + jh + 16);
+        ctx.fillText("config_state.json  +  baselines.json  +  meta_<stage>.txt", jx + 14, jy + jh + 16);
         ctx.restore();
       }
     }
 
     let cap;
-    if (ts < 4.0) cap = "Seven artifacts per run  ·  two tomograms, two DEMs, three complex image arrays";
+    if (ts < 4.0) cap = "Six artifacts per run  ·  tomogram, DEM, three complex stacks, and per-azimuth track profiles";
     else if (ts < 13.0) cap = "tomogram_full = ground-truth reference (param_tag)  ·  inputs hold ALL passes, secondaries selected at training";
-    else if (ts < 18.0) cap = "A self-describing dataset.json records the crop, tags, and every filename";
-    else cap = "...alongside config_state.json + per-stage meta_*.txt for full reproducibility";
+    else if (ts < 18.0) cap = "A self-describing dataset.json records the crop, tags, pass labels, and every filename";
+    else cap = "...alongside config_state.json, baselines.json + per-stage meta_*.txt  ·  overview plots render last";
     this._cap(cap);
   }
 
@@ -3469,15 +3470,15 @@ class ProcessAnimator {
       if (ts >= 1.4 && ts < 5.0) centerLabel("the same flip is applied to input and target", w / 2, noteY, "#7cff9b", 15);
       else if (ts >= 5.0 && ts < 8.6) centerLabel("same vertical mirror on both", w / 2, noteY, "#7cff9b", 15);
       else if (ts >= 8.6 && ts < 12.4) centerLabel("the quarter-turn rotates both together", w / 2, noteY, "rgba(206,228,222,0.95)", 15);
-      else if (ts >= 12.4 && ts < 16.0) centerLabel("noise lands on the input only  ·  target unchanged", w / 2, noteY, "#ffcf6b", 15);
+      else if (ts >= 12.4 && ts < 16.0) centerLabel("noise lands on the normalized input only  ·  target unchanged", w / 2, noteY, "#ffcf6b", 15);
       else if (ts >= 16.0) centerLabel("the augmented pair docks into normalization", w / 2, noteY, "#35e6d0", 15);
 
       if (ts < 1.4) caption = "Augmentation, training split only  ·  an independent random draw gates each transform";
       else if (ts < 5.0) caption = "Horizontal flip  ·  one draw flips the input and the target together";
       else if (ts < 8.6) caption = "Vertical flip  ·  the same mirror is applied to input and target";
       else if (ts < 12.4) caption = "Rotation by quarter turns on both  ·  disabled in this configuration, shown for illustration";
-      else if (ts < 16.0) caption = "Gaussian noise (std 0.01, raw units) is added to the input before normalization  ·  targets stay exact";
-      else caption = "Augmented pair ready  ·  next it is normalized  ·  the 0.01 noise becomes 0.01 / scale per channel";
+      else if (ts < 16.0) caption = "Gaussian noise (std 0.01, normalized units) gates at p = 0.25  ·  it lands AFTER normalization, targets stay exact";
+      else caption = "Augmented pair ready  ·  next it is normalized, then the 0.01 noise is added on the normalized channels";
     } else if (tt < A5) {
       const ts = tt - A4;
 
@@ -3525,16 +3526,16 @@ class ProcessAnimator {
       }
 
       const lanes = [
-        { g: "pass/mag", sub: "min-max (p99.9) + log", tag: "patches", c: "#35e6d0", kind: "log",
+        { g: "pass/mag", sub: "z-score + log1p", tag: "patches", c: "#35e6d0", kind: "log", mu0: 0.44, sg0: 0.18,
           raw: (x, b) => (Math.exp(-x * 5.4) * (1 + 0.25 * Math.sin(b * 1.7))) / 1.25,
           log: (x, b) => (Math.exp(-((x - 0.44) ** 2) / 0.06) * (1 + 0.12 * Math.sin(b * 2.3))) / 1.12 },
-        { g: "ifg/phase", sub: "divide by pi", tag: "patches", c: "#ffcf6b", kind: "phase" },
-        { g: "out/amp", sub: "min-max (p99.9) + log", tag: "full array", c: "#7cff9b", kind: "log",
+        { g: "ifg/phase", sub: "z-score", tag: "patches", c: "#ffcf6b", kind: "phase" },
+        { g: "out/amp", sub: "z-score + log1p", tag: "full array", c: "#7cff9b", kind: "log", mu0: 0.45, sg0: 0.17,
           raw: (x, b) => Math.exp(-x * 5.0) * (1 + 0.2 * Math.sin(b * 1.9)),
           log: (x, b) => Math.exp(-((x - 0.45) ** 2) / 0.055) * (1 + 0.1 * Math.sin(b * 2.1)) },
-        { g: "out/mu", sub: "min-max (p99.9)", tag: "full array", c: "#7cff9b", kind: "plain",
+        { g: "out/mu", sub: "z-score", tag: "full array", c: "#7cff9b", kind: "plain", mu0: 0.55, sg0: 0.22,
           raw: (x, b) => 0.55 + 0.35 * Math.sin(x * 7.1 + 0.6) * Math.sin(x * 3.3 + 1.9) + 0.08 * Math.sin(b * 2.7) },
-        { g: "out/sigma", sub: "min-max (p99.9) + log", tag: "full array", c: "#7cff9b", kind: "log",
+        { g: "out/sigma", sub: "z-score + log1p", tag: "full array", c: "#7cff9b", kind: "log", mu0: 0.42, sg0: 0.17,
           raw: (x, b) => (Math.exp(-((x - 0.14) ** 2) / 0.012) + 0.45 * Math.exp(-x * 2.6)) / 1.45,
           log: (x, b) => Math.exp(-((x - 0.42) ** 2) / 0.05) * (1 + 0.1 * Math.sin(b * 1.7)) },
       ];
@@ -3588,7 +3589,7 @@ class ProcessAnimator {
           const hh3 = LH - 42;
           if (ln.kind === "phase") {
             const sq = this._ease(c01((u - 5.5) / 3.0));
-            const sw5 = this._lerp(pW * 0.94, (pW * 0.94) / Math.PI, sq);
+            const sw5 = this._lerp(pW * 0.94, (pW * 0.94) / 1.814, sq);
             const x5 = pX + (pW - sw5) / 2;
             const sh5 = Math.min(22, hh3);
             const sy5 = yT + (LH - 10 - sh5) / 2 + 4;
@@ -3601,10 +3602,10 @@ class ProcessAnimator {
             }
             ctx.strokeStyle = sq < 0.5 ? "rgba(255,207,107,0.6)" : "rgba(124,255,155,0.7)";
             ctx.lineWidth = 1.2; ctx.strokeRect(x5, sy5, sw5, sh5);
-            label(sq < 0.5 ? "-pi" : "-1", x5 + 4, sy5 - 5, sq < 0.5 ? "#ffcf6b" : "#7cff9b", 12);
-            label(sq < 0.5 ? "+pi" : "+1", x5 + sw5 - 24, sy5 - 5, sq < 0.5 ? "#ffcf6b" : "#7cff9b", 12);
-            this._texDraw("\\varphi\\mapsto\\varphi/\\pi", x5, sy5 + sh5 + 6, 14, { color: "rgba(255,207,107,0.9)" }) || label("÷ π", x5, sy5 + sh5 + 18, "rgba(255,207,107,0.85)", 12);
-            label("fixed, no statistics", x5 + 78, sy5 + sh5 + 18, "rgba(255,207,107,0.85)", 12);
+            label(sq < 0.5 ? "-pi" : "-1.73", x5 + 4, sy5 - 5, sq < 0.5 ? "#ffcf6b" : "#7cff9b", 12);
+            label(sq < 0.5 ? "+pi" : "+1.73", x5 + sw5 - 38, sy5 - 5, sq < 0.5 ? "#ffcf6b" : "#7cff9b", 12);
+            this._texDraw("\\varphi\\mapsto(\\varphi-\\mu_\\varphi)/\\sigma_\\varphi", x5, sy5 + sh5 + 6, 14, { color: "rgba(255,207,107,0.9)" }) || label("(φ - μ) / σ", x5, sy5 + sh5 + 18, "rgba(255,207,107,0.85)", 12);
+            label("fitted stats, like every slot", x5 + 168, sy5 + sh5 + 18, "rgba(255,207,107,0.85)", 12);
             ctx.restore();
           } else {
             const NB2 = 40;
@@ -3612,6 +3613,8 @@ class ProcessAnimator {
             const mp2 = this._ease(c01((u - 4.8) / 1.2));
             const q3 = this._ease(c01((u - 6.8) / 1.6));
             const inputLane = ln.c === "#35e6d0";
+            const MU = ln.mu0, SG = ln.sg0;
+            const zx = (v) => this._lerp(v, 0.5 + (v - MU) / (4 * SG), q3);
             ctx.save();
             ctx.globalAlpha = settled ? la * 0.7 : la;
             ctx.beginPath(); ctx.rect(pX - 1, yT + 6, pW + 2, LH - 18); ctx.clip();
@@ -3623,24 +3626,33 @@ class ProcessAnimator {
               const lvv = ln.kind === "log" ? c01(ln.log(xN, b)) : rvv;
               const g2 = this._ease(c01((u - b * 0.02) / 1.2));
               const bh2 = this._lerp(rvv, lvv, m2) * hh3 * g2;
-              const xs3 = this._lerp(xN, (xN - 0.07) / 0.79, q3);
-              const bw3 = this._lerp(1, 1 / 0.79, q3) * (pW / NB2) - 2;
+              const xs3 = zx(xN);
+              const bw3 = this._lerp(1, 1 / (4 * SG), q3) * (pW / NB2) - 2;
               if (inputLane) ctx.fillStyle = `rgba(${Math.round(53 + q3 * 71)},${Math.round(230 + q3 * 25)},${Math.round(208 - q3 * 53)},0.55)`;
               else ctx.fillStyle = "rgba(124,255,155,0.55)";
               ctx.fillRect(pX + xs3 * pW, hb - bh2, bw3, bh2);
             }
             if (mp2 > 0) {
-              const xlo = this._lerp(this._lerp(pX, pX + 0.07 * pW, mp2), pX, q3);
-              const xhi = this._lerp(this._lerp(pX + pW, pX + 0.86 * pW, mp2), pX + pW, q3);
-              ctx.strokeStyle = "rgba(255,207,107,0.8)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2;
-              ctx.beginPath(); ctx.moveTo(xlo, hb - hh3); ctx.lineTo(xlo, hb); ctx.stroke();
-              ctx.beginPath(); ctx.moveTo(xhi, hb - hh3); ctx.lineTo(xhi, hb); ctx.stroke();
+              ctx.save(); ctx.globalAlpha *= mp2;
+              const xMu = pX + zx(MU) * pW;
+              ctx.strokeStyle = "rgba(255,207,107,0.9)"; ctx.lineWidth = 1.4;
+              ctx.beginPath(); ctx.moveTo(xMu, hb - hh3); ctx.lineTo(xMu, hb); ctx.stroke();
+              ctx.strokeStyle = "rgba(255,207,107,0.7)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2;
+              [MU - SG, MU + SG].forEach((v) => {
+                const xv = pX + zx(v) * pW;
+                ctx.beginPath(); ctx.moveTo(xv, hb - hh3); ctx.lineTo(xv, hb); ctx.stroke();
+              });
               ctx.setLineDash([]);
+              if (q3 > 0.6) {
+                ctx.fillStyle = "rgba(255,207,107,0.85)"; ctx.font = "10px 'IBM Plex Mono', monospace";
+                ctx.fillText("0", xMu - 3, hb - hh3 - 3);
+              }
+              ctx.restore();
             }
             ctx.restore();
             if (q3 > 0.6) {
               ctx.save(); ctx.globalAlpha = la * c01((q3 - 0.6) / 0.4);
-              label("[0, 1]", pX + pW + 14, yM + 5, "#7cff9b", 13);
+              label("0 ± 1", pX + pW + 10, yM + 5, "#7cff9b", 13);
               ctx.restore();
             }
           }
@@ -3649,15 +3661,15 @@ class ProcessAnimator {
         const logA = ts < 11.0 ? c01((ts - 8.5) / 0.6) : 1 - this._ease(c01((ts - 11.0) / 0.5));
         if (logA > 0) this._texDraw("x\\mapsto\\log(1+x)", w / 2, 12, 15, { color: "#35e6d0", align: "center", alpha: logA });
         const mmA = ts < 20.5 ? c01((ts - 11.6) / 0.6) : 1 - this._ease(c01((ts - 20.5) / 0.5));
-        if (mmA > 0) this._texDraw("\\hat{x}=\\frac{x-x_{0.1}}{x_{99.9}-x_{0.1}}", w / 2, 8, 15, { color: "rgba(230,247,243,0.95)", align: "center", alpha: mmA });
+        if (mmA > 0) this._texDraw("\\hat{x}=\\frac{x-\\mu}{\\sigma}", w / 2, 8, 15, { color: "rgba(230,247,243,0.95)", align: "center", alpha: mmA });
       }
 
       if (ts < 2.5) caption = "Two regimes  ·  input stats sample patches, output stats read the whole parameter array";
       else if (ts < 5.0) caption = "Output amp uses every pixel  ·  mu and sigma use only active Gaussians (a > 0.01)";
       else if (ts < 8.5) caption = "Normalization runs last, after augmentation  ·  input stats are fit on up to 4,000 train patches (seed 42, batches of 512)";
       else if (ts < 11.5) caption = "Log transform first where the data is heavy-tailed: magnitude, amplitude and sigma";
-      else if (ts < 15.5) caption = "Percentiles 0.1 and 99.9 clip outliers, then set the offset and scale  ·  phase needs no statistics";
-      else if (ts < 20.5) caption = "Each marked range stretches to fill [0, 1]  ·  phase is divided by pi into [-1, 1]";
+      else if (ts < 15.5) caption = "Per-slot statistics: the fitted mean recentres, the std rescales  ·  phase is z-scored too, no fixed ÷ pi";
+      else if (ts < 20.5) caption = "Every lane lands at mean 0, std 1  ·  the same z-score recipe for inputs and outputs";
       else caption = "Offsets and scales are saved with the run and reused for val/test  ·  output mu/sigma keep only active Gaussians (a > 0.01)";
     } else {
       const ts = tt - A5;
@@ -4401,10 +4413,10 @@ class ProcessAnimator {
     const nodeX = (i) => railX0 + i * (nodeW + 26);
 
     const dockY = Math.round(h * 0.60);
-    const dockNodes = ["unscale_", "clip", "scaler.step", "scaler.update", "zero_grad"];
-    const dockW = Math.min(118, (w - 70 - 4 * 16) / 5);
+    const dockNodes = ["clip", "record norm", "optimizer.step", "zero_grad"];
+    const dockW = Math.min(140, (w - 70 - 3 * 16) / 4);
     const dockH = 34;
-    const dockX0 = (w - (5 * dockW + 4 * 16)) / 2;
+    const dockX0 = (w - (4 * dockW + 3 * 16)) / 2;
     const dockX = (i) => dockX0 + i * (dockW + 16);
 
     let batchIdx = 1, gstep = 0;
@@ -4477,7 +4489,7 @@ class ProcessAnimator {
       const la = this._ease(Math.min(1, (ts - 11.0) / 0.5));
       ctx.save(); ctx.globalAlpha = la * 0.9;
       ctx.font = "11px 'IBM Plex Mono', monospace"; ctx.fillStyle = "rgba(143,176,170,0.85)";
-      ctx.fillText("scaler.scale(loss).backward()", nodeX(3), railY - 6);
+      ctx.fillText("loss.backward()", nodeX(3), railY - 6);
       ctx.restore();
     }
 
@@ -4496,19 +4508,19 @@ class ProcessAnimator {
       const yOff = (1 - dockOpen) * 24;
       ctx.save(); ctx.globalAlpha = dockOpen;
       const seqHit = (i) => this._ease(Math.min(1, Math.max(0, (ts - 18.0 - i * 0.8) / 0.6)));
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 3; i++) {
         this._trArrow(dockX(i) + dockW, dockY + dockH / 2 - yOff, dockX(i + 1) - 4, dockY + dockH / 2 - yOff, "rgba(143,176,170,0.7)", dockOpen * seqHit(i + 1));
       }
       dockNodes.forEach((nm, i) => {
         const lit = ts >= 18.0 + i * 0.8 && ts < 18.0 + i * 0.8 + 1.4;
-        this._trChip(dockX(i), dockY - yOff, dockW, dockH, nm, { active: lit, color: i === 1 ? "#ffcf6b" : "#7cff9b", alpha: dockOpen });
+        this._trChip(dockX(i), dockY - yOff, dockW, dockH, nm, { active: lit, color: i === 0 ? "#ffcf6b" : "#7cff9b", alpha: dockOpen });
       });
 
       ctx.restore();
     } else {
       ctx.save(); ctx.globalAlpha = 0.4;
       ctx.strokeStyle = "rgba(120,200,220,0.18)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(dockX(i), dockY, dockW, dockH, 7); else ctx.rect(dockX(i), dockY, dockW, dockH);
         ctx.stroke();
@@ -4528,7 +4540,7 @@ class ProcessAnimator {
       ctx.strokeStyle = "rgba(124,255,155,0.45)"; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(panX, dockY + dockH); ctx.lineTo(panX, panTop + 1); ctx.stroke();
       ctx.fillStyle = "rgba(124,255,155,0.85)"; ctx.font = "10px 'IBM Plex Mono', monospace";
-      const htxt = "inside scaler.step → AdamW (decoupled weight decay)";
+      const htxt = "inside optimizer.step → AdamW (decoupled weight decay)";
       ctx.fillText(htxt, cxm - ctx.measureText(htxt).width / 2, panTop + 6);
       ctx.restore();
       this._texDraw("\\hat m_t=\\tfrac{m_t}{1-\\beta_1^{t}},\\ \\hat v_t=\\tfrac{v_t}{1-\\beta_2^{t}}", cxm, panTop + 8, 11, { align: "center", alpha: wa, color: "rgba(143,176,170,0.9)" });
@@ -4582,9 +4594,9 @@ class ProcessAnimator {
     if (ts < 3.0) this._cap("One optimizer step, in order  ·  the epoch loop just calls this, batch after batch");
     else if (ts < 7.5) this._cap("Forward under torch.autocast(bfloat16)  ·  use_amp gates the half-precision region (default off)");
     else if (ts < 11.0) this._cap("loss = criterion(pred, gt)  ·  then loss /= accumulation_steps  ·  grads shrink so A batches sum to one true step");
-    else if (ts < 14.5) this._cap("scaler.scale(loss).backward()  ·  on a non-boundary batch the step ENDS here — grads just accumulate");
+    else if (ts < 14.5) this._cap("loss.backward()  ·  on a non-boundary batch the step ENDS here — grads just accumulate");
     else if (ts < 18.0) this._cap("Boundary reached: (batch_idx + 1) % A == 0 (or last batch)  ·  now the real update fires");
-    else if (ts < 25.0) this._cap("unscale_ -> clip (max_grad_norm = 1.0) -> scaler.step -> scaler.update -> zero_grad  ·  clip sees TRUE-scale grads");
+    else if (ts < 25.0) this._cap("clip (max_grad_norm = 1.0) -> record norm -> optimizer.step -> zero_grad  ·  a non-finite loss aborts BEFORE the step");
     else if (ts < 28.0) this._cap("Two clocks: warmup steps every mini-batch  ·  the LR scheduler steps once per epoch");
     else this._cap("That is one step  ·  repeat per batch, then validate every 5 epochs  ·  next: the schedules these clocks drive");
   }
@@ -4793,7 +4805,7 @@ class ProcessAnimator {
       this._texDraw("g\\leftarrow g\\cdot\\min\\!\\left(1,\\;\\frac{c}{\\lVert g\\rVert_2+\\epsilon}\\right)", w / 2, pad.t + 2, 15, { align: "center", alpha: ha, color: "rgba(255,207,107,0.95)" });
     }
 
-    if (ts < 3.2) this._cap("Gradient clipper  ·  after backward + GradScaler.unscale_  ·  global L2 norm over every parameter gradient, each step");
+    if (ts < 3.2) this._cap("Gradient clipper  ·  right after backward, on the boundary batch  ·  global L2 norm over every parameter gradient");
     else if (ts < F0) this._cap("clip_mode = fixed  ·  threshold max_grad_norm = 1.0  ·  norms above 100 raise an exploding-gradient warning");
     else if (ts < 8.2) this._cap(`A spike lands  ·  |g| = ${demoV.toFixed(2)} exceeds the threshold  ·  unchecked it would wreck the update`);
     else if (ts < 10.4) this._cap("Every grad tensor is multiplied in-place by the scale  ·  direction preserved, magnitude capped");
@@ -4872,9 +4884,11 @@ class ProcessAnimator {
       ctx.globalAlpha = 1 - zp;
 
       const terms = [
-        { name: "param_l1",   w: "1.0", p1: true,  p2: true },
-        { name: "mse_curve",  w: "1.0", p1: false, p2: true },
-        { name: "ssim_curve", w: "0.5", p1: false, p2: true },
+        { name: "param_l1",         w: "1.0", p1: true,  p2: true },
+        { name: "mse_curve",        w: "1.0", p1: false, p2: true },
+        { name: "ssim_curve",       w: "0.5", p1: false, p2: true },
+        { name: "covariance_match", w: "0.0", p1: false, p2: false },
+        { name: "moments",          w: "0.0", p1: false, p2: false },
       ];
       const swapP = ts < 6.6 ? 0 : this._ease(Math.min(1, (ts - 6.6) / 1.6));
       const bx = w - panW - 16, by = 30, rh = 31;
@@ -5557,7 +5571,7 @@ class ProcessAnimator {
       ctx.restore();
     }
 
-    if (ts < 3.0) this._cap("Early stopping  ·  train every epoch  ·  val (and the patience counter) every 5 epochs  ·  min_delta = 0.001");
+    if (ts < 3.0) this._cap("Early stopping  ·  train every epoch  ·  val (and the patience counter) every 5 epochs  ·  any new best resets the counter");
     else if (ts < 4.4) this._cap("Train keeps improving  ·  val follows it down — until it doesn't");
     else if (ts < 5.5) this._cap(`Past the best epoch every non-improving epoch raises the counter  ·  patience ${Math.min(pc, 15)}/15`);
     else if (ts < 7.0) this._cap("15 epochs without a new best  ->  EarlyStopping fires and the loop breaks");

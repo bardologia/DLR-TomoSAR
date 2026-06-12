@@ -10,7 +10,7 @@ class PipelineLibrary:
                 "name"   : "Processing",
                 "script" : "pre_process",
                 "blurb"  : "Ingest raw F-SAR products via PyRat and produce the beamformed tomogram and interferograms.",
-                "stages" : ["Tomogram construction", "Interferogram formation", "Artifact registry"],
+                "stages" : ["Tomogram construction", "Interferogram formation", "Artifact registry", "Overview plots"],
             },
             {
                 "key"    : "param",
