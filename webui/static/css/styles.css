@@ -2181,7 +2181,6 @@ main { margin-left: var(--navw); }
   background: rgba(13, 19, 27, 0.72);
   box-shadow: 0 8px 22px rgba(0,0,0,0.28);
 }
-.cine__grp--stack .cine__gtip { top: 70%; }
 .cine__gsketch { flex: 0 0 152px; width: 152px; }
 .cine__gsketch .cine__skl { width: 100%; height: auto; display: block; }
 .cine__gtiptext {

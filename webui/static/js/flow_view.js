@@ -25,10 +25,10 @@ class FlowView {
       { op: 0.65, scale: 0.85 },
       { op: 0.80, scale: 0.92 },
       { op: 1.00, scale: 1.00 },
-      { op: 0.50, scale: 0.80 },
-      { op: 0.40, scale: 0.70 },
+      { op: 0.00, scale: 0.80 },
+      { op: 0.00, scale: 0.80 },
     ];
-    this.LTOPS = { none: [10, 24, 38, 56, 74], bottom: [10, 24, 38, 52, 64] };
+    this.LTOPS = [10, 24, 38, 50, 58];
     this.stackTimer = null;
 
     this.GUIDE = {
@@ -332,12 +332,9 @@ class FlowView {
 
     if (tip) tip.style.opacity = "0";
     const group = { el: grp, step, i, lines, iterEl, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
-    if (lines.length > 1) {
-      grp.classList.add("cine__grp--stack");
-      if (!window.REDUCED_MOTION && window.gsap) {
-        eq.classList.add("is-stack");
-        this._stackPlace(group, false);
-      }
+    if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
+      eq.classList.add("is-stack");
+      this._stackPlace(group, false);
     }
     if (iterEl) this._iterIdle(step, iterEl);
     group.ready = ready.then(() => {
@@ -387,11 +384,10 @@ class FlowView {
   }
 
   _stackPlace(group, animate) {
-    const tops = this.LTOPS[group.tipEl ? "bottom" : "none"];
     group.lines.forEach(({ line }, li) => {
       const o = Math.max(0, Math.min(4, li - group.stackK + 2));
       const s = this.LSLOT[o];
-      const props = { top: tops[o] + "%", yPercent: -50, scale: s.scale, opacity: s.op };
+      const props = { top: this.LTOPS[o] + "%", yPercent: -50, scale: s.scale, opacity: s.op };
       if (animate) window.gsap.to(line, Object.assign(props, { duration: 0.6, ease: "power3.inOut" }));
       else window.gsap.set(line, props);
     });
