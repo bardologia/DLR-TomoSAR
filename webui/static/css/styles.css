@@ -2159,10 +2159,15 @@ main { margin-left: var(--navw); }
 .cine__chip.is-active { opacity: 1; transform: translateY(-1px); box-shadow: 0 0 0 2px rgba(110,168,255,0.35), 0 4px 14px rgba(0,0,0,0.4); border-color: currentColor; }
 .cine__trailcon { width: 16px; height: 0; border-top: 1.4px dotted #3a4757; }
 
-/* ---- scene: vertical stack of equation groups ---- */
+/* ---- scene: rightward conveyor; multi-line steps cycle as a vertical stack ---- */
 .cine__scene { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0; }
-.cine__grp { position: absolute; left: 0; right: 0; top: 50%; opacity: 0; transform-origin: 50% 50%; will-change: top, transform, opacity; }
-.cine__eq { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 1.26em; }
+.cine__grp { position: absolute; top: 0; bottom: 0; left: 51%; }
+.cine__eq {
+  position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 1.26em;
+}
+.cine__eq.is-stack { top: 0; bottom: 0; transform: none; display: block; }
+.cine__eq.is-stack .cine__line { position: absolute; left: 0; right: 0; will-change: top, transform, opacity; }
 .cine__line { position: relative; text-align: center; }
 .cine__line svg { color: #eef2f5; max-width: 100%; height: auto; }
 .cine__grp.is-current .cine__line svg { color: #ffffff; }
@@ -2184,8 +2189,13 @@ main { margin-left: var(--navw); }
   border-left: 2px solid var(--c-intermediate); padding-left: 13px;
 }
 
-/* ---- transient carry-over arrow ---- */
+/* ---- transient carry-over arrow + progression arrow ---- */
 .cine__carry { fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.cine__prog {
+  fill: none; stroke: #7fb1e6; stroke-width: 2.4; stroke-linecap: round;
+  stroke-dasharray: 7 6; animation: cine-flow 0.7s linear infinite;
+}
+@keyframes cine-flow { to { stroke-dashoffset: -13; } }
 
 .skl-axis { stroke: #303d4c; stroke-width: 1.2; fill: none; }
 .skl-draw { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
