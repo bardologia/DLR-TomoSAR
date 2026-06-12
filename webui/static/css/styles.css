@@ -1130,6 +1130,7 @@ main { margin-left: var(--navw); }
 .proc-modal__stage canvas { width: 100%; height: clamp(420px, 62vh, 660px); display: block; }
 .proc-modal__caption { font-family: var(--mono); font-size: 15px; color: var(--accent-2); text-align: center; margin: 13px 0 13px; min-height: 18px; }
 .proc-modal__stages { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.proc-modal.is-open .stage { opacity: 1; transform: none; transition: opacity 0.5s var(--ease) 0.25s, transform 0.5s var(--ease) 0.25s; }
 
 .proc-transport { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .proc-transport__btn {
