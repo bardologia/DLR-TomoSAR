@@ -272,7 +272,8 @@ class FlowView {
     const place = () => keep.forEach((g) => {
       const off = g.i - c;
       g.el.classList.toggle("is-current", off === 0);
-      this._setGeom(g, off < 0 ? "s0" : off > 0 ? "s2" : "s1", 1, slide);
+      this._setGeom(g, off < 0 ? "s0" : off > 0 ? "s2" : "s1", off > 0 ? 0.45 : 1, slide);
+      this._setTip(g, off <= 0, slide);
       if (off === 0) {
         g.ready.then(() => setTimeout(() => {
           if (this.cursor !== g.i) return;
@@ -330,18 +331,30 @@ class FlowView {
     const ready = Promise.all(lines.map(({ line, terms, uid }) =>
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
-    const group = { el: grp, step, i, lines, iterEl, tipTop, tipEl: tip, sketchSvg, stackK: 0 };
+    if (tip) tip.style.opacity = "0";
+    const group = { el: grp, step, i, lines, iterEl, tipTop, tipEl: tip, sketchSvg, stackK: 0, tipShown: false };
     if (lines.length > 1 && !window.REDUCED_MOTION && window.gsap) {
       eq.classList.add("is-stack");
       this._stackPlace(group, false);
     }
     if (iterEl) this._iterIdle(step, iterEl);
-    if (tip && this.lastAnimate && window.gsap) window.gsap.fromTo(tip, { opacity: 0, y: tipTop ? -10 : 10 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.15, ease: "power2.out" });
     group.ready = ready.then(() => {
       if (this.lastAnimate) this._writeIn(group);
-      if (group.sketchSvg && this.lastAnimate) this._animateSketch(group.sketchSvg);
     });
     return group;
+  }
+
+  _setTip(group, shown, slide) {
+    if (!group.tipEl || group.tipShown === shown) return;
+    group.tipShown = shown;
+    const el = group.tipEl;
+    if (!window.gsap || window.REDUCED_MOTION) { el.style.opacity = shown ? "1" : "0"; return; }
+    if (shown) {
+      window.gsap.fromTo(el, { opacity: 0, y: group.tipTop ? -10 : 10 }, { opacity: 1, y: 0, duration: 0.5, delay: slide ? 0.62 : 0.2, ease: "power2.out" });
+      if (group.sketchSvg) this._animateSketch(group.sketchSvg);
+    } else {
+      window.gsap.to(el, { opacity: 0, y: 0, duration: 0.25 });
+    }
   }
 
   _writeIn(group) {
