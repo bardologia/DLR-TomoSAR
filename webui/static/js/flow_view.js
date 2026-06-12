@@ -22,11 +22,11 @@ class FlowView {
     this.SLOTW = "28%";
     this.SLOTS = { s0: "1.5%", s1: "36%", s2: "70.5%", enter: "102%", exit: "-30%" };
     this.LSLOT = [
-      { top: "8%",  op: 0.35, scale: 0.60 },
-      { top: "26%", op: 0.55, scale: 0.80 },
-      { top: "50%", op: 1.00, scale: 1.00 },
-      { top: "74%", op: 0.50, scale: 0.80 },
-      { top: "92%", op: 0.30, scale: 0.60 },
+      { f: 0.08, op: 0.35, scale: 0.60 },
+      { f: 0.26, op: 0.55, scale: 0.80 },
+      { f: 0.50, op: 1.00, scale: 1.00 },
+      { f: 0.74, op: 0.50, scale: 0.80 },
+      { f: 0.92, op: 0.30, scale: 0.60 },
     ];
     this.stackTimer = null;
 
@@ -128,20 +128,16 @@ class FlowView {
       </div>
       <div class="cine__trail"></div>
       <div class="cine__scene"></div>
-      <div class="cine__guide is-empty"><div class="cine__gsketch"></div><p class="cine__gtiptext"></p></div>
       <p class="cine__note"></p>`;
 
-    this.wires    = this.stage.querySelector(".cine__wires");
-    this.stepNo   = this.stage.querySelector(".cine__stepno");
-    this.headEl   = this.stage.querySelector(".cine__head");
-    this.titleEl  = this.stage.querySelector(".cine__title");
-    this.phaseEl  = this.stage.querySelector(".cine__phase");
-    this.trailEl  = this.stage.querySelector(".cine__trail");
-    this.sceneEl  = this.stage.querySelector(".cine__scene");
-    this.guideEl  = this.stage.querySelector(".cine__guide");
-    this.sketchEl = this.stage.querySelector(".cine__gsketch");
-    this.gtipEl   = this.stage.querySelector(".cine__gtiptext");
-    this.noteEl   = this.stage.querySelector(".cine__note");
+    this.wires   = this.stage.querySelector(".cine__wires");
+    this.stepNo  = this.stage.querySelector(".cine__stepno");
+    this.headEl  = this.stage.querySelector(".cine__head");
+    this.titleEl = this.stage.querySelector(".cine__title");
+    this.phaseEl = this.stage.querySelector(".cine__phase");
+    this.trailEl = this.stage.querySelector(".cine__trail");
+    this.sceneEl = this.stage.querySelector(".cine__scene");
+    this.noteEl  = this.stage.querySelector(".cine__note");
 
     this.ctrl = document.createElement("div");
     this.ctrl.className = "cine__ctrl";
@@ -202,7 +198,6 @@ class FlowView {
     this.groups = [];
     this.sceneEl.innerHTML = "";
     this._clearWires();
-    this._setGuide(null, false);
     this.stepNo.textContent  = "00";
     this.titleEl.textContent = this.flow.name;
     this.phaseEl.textContent = "press play to walk the pipeline step by step";
@@ -258,7 +253,6 @@ class FlowView {
     this._renderWindow(i, slide);
     this.shown = i;
     this._setHead(this.flow.steps[i], i, !reduced);
-    this._setGuide(this.flow.steps[i], !reduced);
     this._setTrail(i);
     this._progress();
     if (slide && forward) this._carryLater(i);
@@ -322,6 +316,20 @@ class FlowView {
     grp.className = "cine__grp";
     grp.dataset.step = i;
 
+    const tipTop = i % 2 === 0;
+    const g = this.GUIDE[step.id];
+    let tip = null, sketchSvg = null;
+    if (g) {
+      tip = document.createElement("div");
+      tip.className = "cine__gtip " + (tipTop ? "is-top" : "is-bottom");
+      tip.innerHTML = `<div class="cine__gsketch"></div><p class="cine__gtiptext">${this._esc(g.tip)}</p>`;
+      sketchSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      sketchSvg.setAttribute("viewBox", "0 0 240 150");
+      sketchSvg.classList.add("cine__skl");
+      sketchSvg.innerHTML = this._sketchMarkup(g.sketch);
+      tip.querySelector(".cine__gsketch").appendChild(sketchSvg);
+    }
+
     const eq = document.createElement("div");
     eq.className = "cine__eq";
 
@@ -337,17 +345,20 @@ class FlowView {
     let iterEl = null;
     if (step.iterative) { iterEl = document.createElement("div"); iterEl.className = "cine__giter"; eq.appendChild(iterEl); }
 
+    if (tip) grp.appendChild(tip);
     grp.appendChild(eq);
     this.sceneEl.appendChild(grp);
 
     const ready = Promise.all(lines.map(({ line, terms, uid }) =>
       this._typeset(line, this._composeLine(terms, uid), true).then(() => this._colorize(terms, uid))));
 
-    const group = { el: grp, step, i, lines, termEls: {}, iterEl };
+    const group = { el: grp, step, i, lines, termEls: {}, iterEl, tipTop, tipEl: tip, sketchSvg };
     if (iterEl) this._iterIdle(step, iterEl);
+    if (tip && this.lastAnimate && window.gsap) window.gsap.fromTo(tip, { opacity: 0, y: tipTop ? -10 : 10 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.15, ease: "power2.out" });
     group.ready = ready.then(() => {
       this._buildTermEls(group);
       if (this.lastAnimate) this._writeIn(group);
+      if (group.sketchSvg && this.lastAnimate) this._animateSketch(group.sketchSvg);
     });
     return group;
   }
@@ -394,14 +405,19 @@ class FlowView {
     if (group.stackK >= group.lines.length - 1) return;
     group.stackK += 1;
     this._stackPlace(group, true);
-    this._lineArrows(group, group.stackK);
-    this.stackTimer = setTimeout(() => this._stackAdvance(group), 1900);
+    const k = group.stackK;
+    setTimeout(() => {
+      if (this.cursor === group.i && group.stackK === k && group.el.isConnected) this._lineArrows(group, k);
+    }, 660);
+    this.stackTimer = setTimeout(() => this._stackAdvance(group), 2100);
   }
 
   _stackPlace(group, animate) {
+    const lo = group.tipEl ? (group.tipTop ? 34 : 0) : 8;
+    const hi = group.tipEl ? (group.tipTop ? 100 : 66) : 92;
     group.lines.forEach(({ line }, li) => {
       const s = this.LSLOT[Math.max(0, Math.min(4, li - group.stackK + 2))];
-      const props = { top: s.top, yPercent: -50, scale: s.scale, opacity: s.op };
+      const props = { top: (lo + s.f * (hi - lo)) + "%", yPercent: -50, scale: s.scale, opacity: s.op };
       if (animate) window.gsap.to(line, Object.assign(props, { duration: 0.6, ease: "power3.inOut" }));
       else window.gsap.set(line, props);
     });
@@ -453,8 +469,30 @@ class FlowView {
     this._clearWires();
     if (!this.groups.length) return;
     const host = this._wireHost();
+    this.groups.forEach((g) => this._tipLink(g, host, animate));
     const sorted = this.groups.slice().sort((a, b) => a.i - b.i);
     for (let k = 0; k < sorted.length - 1; k++) this._progArrow(sorted[k], sorted[k + 1], host, animate);
+  }
+
+  _tipLink(group, host, animate) {
+    const eq  = group.el.querySelector(".cine__eq");
+    const tip = group.tipEl;
+    if (!eq || !tip || eq.classList.contains("is-stack")) return;
+    const er = eq.getBoundingClientRect();
+    const tr = tip.getBoundingClientRect();
+    if (!er.width || !tr.width) return;
+
+    const cx = er.left + er.width / 2 - host.left;
+    let ya, yb;
+    if (group.tipTop) { ya = er.top - host.top - 3;    yb = tr.bottom - host.top + 4; }
+    else              { ya = er.bottom - host.top + 3; yb = tr.top - host.top - 4; }
+
+    const link = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    link.setAttribute("class", "cine__tiplink");
+    link.setAttribute("d", `M ${cx} ${ya} V ${yb}`);
+    link.setAttribute("marker-end", "url(#cine-arrow)");
+    this.wires.appendChild(link);
+    if (animate && window.gsap) window.gsap.fromTo(link, { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.2 });
   }
 
   _progArrow(a, b, host, animate) {
@@ -472,7 +510,7 @@ class FlowView {
     if (animate && window.gsap) window.gsap.fromTo(path, { opacity: 0 }, { opacity: 1, duration: 0.45, delay: 0.25 });
   }
 
-  _arrow(src, dst, color, host, delay, arch) {
+  _arrow(src, dst, color, host, delay, arch, hold) {
     const sr = src.getBoundingClientRect();
     const dr = dst.getBoundingClientRect();
     if (!sr.width || !dr.width) return null;
@@ -502,7 +540,7 @@ class FlowView {
       if (len) { path.style.strokeDasharray = len; path.style.strokeDashoffset = len; }
       window.gsap.timeline({ onComplete: () => path.remove() })
         .to(path, { strokeDashoffset: 0, duration: 0.5, delay, ease: "power2.out", onComplete: () => path.setAttribute("marker-end", "url(#cine-arrow)") })
-        .to(path, { opacity: 0, duration: 0.45, delay: 1.0, ease: "power1.in" });
+        .to(path, { opacity: 0, duration: 0.45, delay: hold == null ? 1.0 : hold, ease: "power1.in" });
     } else {
       path.setAttribute("marker-end", "url(#cine-arrow)");
       setTimeout(() => path.remove(), 1800);
@@ -530,29 +568,9 @@ class FlowView {
       if (!b) return;
       const a = ents.filter((e) => e.li < k).pop();
       if (!a) return;
-      this._arrow(a.el, b.el, this._termColor(id), host, 0.5 + j * 0.15, false);
+      this._arrow(a.el, b.el, this._termColor(id), host, j * 0.15, false, 0.4);
       j += 1;
     });
-  }
-
-  _setGuide(step, animate) {
-    const g = step ? this.GUIDE[step.id] : null;
-    this.guideEl.classList.toggle("is-empty", !g);
-    this.sketchEl.innerHTML = "";
-    this.gtipEl.textContent = "";
-    if (!g) return;
-
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 240 150");
-    svg.classList.add("cine__skl");
-    svg.innerHTML = this._sketchMarkup(g.sketch);
-    this.sketchEl.appendChild(svg);
-    this.gtipEl.textContent = g.tip;
-
-    if (animate && window.gsap) {
-      this._animateSketch(svg);
-      window.gsap.fromTo(this.gtipEl, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.4 });
-    }
   }
 
   _setHead(step, i, animate) {
