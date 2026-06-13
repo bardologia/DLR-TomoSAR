@@ -11,7 +11,7 @@ from tools                                 import Tracker, ResourceMonitor
 from pipelines.training_pipeline.callbacks import Warmup, Scheduler, EarlyStopping, GradientClipper
 from pipelines.training_pipeline.control   import Checkpoint, OverfitManager
 from pipelines.training_pipeline.trainer   import MetricAggregator
-from pipelines.jepa_pipeline.losses        import ProfileAeLoss
+from pipelines.autoencoder_pipeline.losses import ProfileAeLoss
 
 
 class ProfileAeTrainer:

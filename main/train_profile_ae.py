@@ -7,7 +7,7 @@ def main() -> None:
     EnvironmentPinner.gpu(expandable_segments=True)
 
     from configuration.autoencoder_config  import ProfileAeEntryConfig
-    from pipelines.jepa_pipeline.pipeline   import SingleProfileAeRunner
+    from pipelines.autoencoder_pipeline.pipeline import SingleProfileAeRunner
     from tools.config_cli                   import ConfigCli
 
     config = ConfigCli(ProfileAeEntryConfig(), description="Stage-A profile autoencoder training").apply()

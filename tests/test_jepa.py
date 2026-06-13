@@ -8,8 +8,9 @@ from configuration.autoencoder_config import AutoencoderLossConfig, ProfileAutoe
 from configuration.jepa_config         import EmbeddingLossConfig
 from models                        import get_model
 from models.profile_autoencoder    import ProfileAutoencoder
-from pipelines.jepa_pipeline.coupling import StageAMode, TargetProvider
-from pipelines.jepa_pipeline.losses   import JepaLoss, ProfileAeLoss
+from pipelines.jepa_pipeline.coupling          import StageAMode, TargetProvider
+from pipelines.jepa_pipeline.losses            import JepaLoss
+from pipelines.autoencoder_pipeline.losses     import ProfileAeLoss
 
 
 H_ELEV, N_GAUSS, EMB_DIM = 64, 5, 24
@@ -219,7 +220,7 @@ def test_metrics_curve_only_excludes_param_space():
 
 
 def test_profile_dataset_synthesizes_curves():
-    from pipelines.jepa_pipeline.profile_dataset import ProfileDataset
+    from pipelines.autoencoder_pipeline.profile_dataset import ProfileDataset
     rng    = np.random.default_rng(0)
     params = np.zeros((3 * N_GAUSS, 8, 8), dtype=np.float32)
     params[0::3] = rng.uniform(0.0, 1.0, size=(N_GAUSS, 8, 8))
@@ -289,7 +290,7 @@ def test_stage_a_weights_load_into_stage_b(tmp_path):
 
 def test_jepa_curve_recon_target_is_log_space():
     from tools.gaussians                  import GaussianCurve
-    from pipelines.jepa_pipeline.losses   import curve_loss
+    from pipelines.autoencoder_pipeline.losses import curve_loss
     m      = make_autoencoder(curve_norm="log1p")
     tp     = TargetProvider("stopgrad", m.encoder)
     x_axis = torch.linspace(0.0, 1.0, H_ELEV)

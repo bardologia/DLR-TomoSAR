@@ -14,7 +14,7 @@ from pipelines.inference_pipeline.loader      import ModelWrapper, RunLoader
 from pipelines.inference_pipeline.metrics     import Metrics, Result
 from pipelines.inference_pipeline.pipeline    import InferencePipeline
 from pipelines.inference_pipeline.predictor   import Predictor
-from pipelines.jepa_pipeline.pipeline          import JepaPipelineSupport
+from pipelines.autoencoder_pipeline.pipeline   import AutoencoderPipelineSupport
 from pipelines.jepa_pipeline.predictor_trainer import JepaModule
 from pipelines.shared.io                       import ModelConfigIO
 from tools.gaussians                           import GaussianReconstructor
@@ -35,7 +35,7 @@ class JepaInferenceModel(nn.Module):
 
 class JepaRunLoader(RunLoader):
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        ae_cfg          = JepaPipelineSupport.load_autoencoder_config(self.meta_directory)
+        ae_cfg          = AutoencoderPipelineSupport.load_autoencoder_config(self.meta_directory)
         model_config, _ = ModelConfigIO.load(self.meta_directory)
 
         overrides = {"in_channels": in_channels, "out_channels": ae_cfg.embedding_dim}
