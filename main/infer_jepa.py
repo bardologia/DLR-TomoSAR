@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib     import Path
+from pathlib import Path
 
 from _bootstrap import EnvironmentPinner
 
@@ -24,7 +23,7 @@ def main() -> None:
         for run_dir in run_dirs:
             if not (run_dir / "meta" / "autoencoder_config.json").is_file():
                 continue
-            report_path = JepaInferencePipeline(replace(config.inference, run_directory=run_dir, output_subdir=None), run_dir).run()
+            report_path = JepaInferencePipeline(config.inference, run_dir).run()
             logger.info(f"{run_dir.name} : {report_path}")
 
 

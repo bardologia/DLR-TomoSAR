@@ -6,7 +6,7 @@ from functools   import lru_cache
 import torch
 import torch.nn.functional as F
 
-from tools.gaussians     import GaussianClamp
+from tools.gaussians     import GaussianClamp, GaussianCurve
 from tools.logger        import Logger
 from tools.tomo_geometry import TomoGeometry
 
@@ -387,32 +387,7 @@ class Loss:
         self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
-        B, C, H, W = params.shape
-        ppg        = self.gaussian_cfg.params_per_gaussian
-
-        if C % ppg != 0:
-            raise ValueError(f"Gaussian param channels ({C}) must be divisible by {ppg}")
-
-        n_gaussians = C // ppg
-        p           = params.reshape(B, n_gaussians, ppg, H, W)
-
-        a   = p[:, :, 0, :, :]
-        mu  = p[:, :, 1, :, :]
-        sig = p[:, :, 2, :, :]
-        x   = self.x_axis.reshape(1, -1, 1, 1)
-
-        curves = torch.zeros((B, x.shape[1], H, W), dtype=params.dtype, device=params.device)
-
-        for g in range(n_gaussians):
-            a_g   = a[:, g:g+1, :, :]
-            mu_g  = mu[:, g:g+1, :, :]
-            sig_g = sig[:, g:g+1, :, :]
-
-            sig2_g     = sig_g ** 2
-            exponent_g = ((x - mu_g) ** 2) / (2.0 * sig2_g)
-            curves     = curves + a_g * torch.exp(-exponent_g)
-
-        return curves
+        return GaussianCurve.reconstruct(params, self.x_axis, self.gaussian_cfg.params_per_gaussian)
 
     def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss):
         batch_size, num_channels, height, width = pred_gauss.shape

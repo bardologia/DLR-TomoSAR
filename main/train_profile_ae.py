@@ -6,7 +6,7 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.gpu(expandable_segments=True)
 
-    from configuration.jepa_config         import ProfileAeEntryConfig
+    from configuration.autoencoder_config  import ProfileAeEntryConfig
     from pipelines.jepa_pipeline.pipeline   import SingleProfileAeRunner
     from tools.config_cli                   import ConfigCli
 

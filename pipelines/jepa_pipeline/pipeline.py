@@ -8,7 +8,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.jepa_config              import JepaTrainerConfig, ProfileAeTrainerConfig, ProfileAutoencoderConfig
+from configuration.autoencoder_config       import ProfileAeTrainerConfig, ProfileAutoencoderConfig
+from configuration.jepa_config              import JepaTrainerConfig
 from models                                 import get_model
 from models.profile_autoencoder             import ProfileAutoencoder
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
@@ -23,7 +24,7 @@ _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 _SHARED_SUBCONFIGS = (
     "geometry", "early_stopping", "warmup", "scheduler", "io", "optimizer",
-    "training", "resources", "memory", "gradient_clipper", "permutation_metrics",
+    "training", "resources", "gradient_clipper",
 )
 
 
@@ -60,13 +61,11 @@ class ProfileAePipeline:
         base = self.factory.training_trainer_config(logdir=entry_config.logdir)
 
         self.autoencoder_cfg = entry_config.autoencoder
-        self.autoencoder_cfg.n_gaussians = entry_config.n_gaussians
 
         self.trainer_config = ProfileAeTrainerConfig(
             gaussian    = base.gaussian,
             autoencoder = self.autoencoder_cfg,
             ae_loss     = entry_config.ae_loss,
-            curriculum  = entry_config.curriculum,
             overfit     = entry_config.overfit,
         )
         JepaPipelineSupport.copy_base_subconfigs(self.trainer_config, base)
@@ -87,20 +86,18 @@ class ProfileAePipeline:
         self.dataset_config.x_axis = x_axis
 
         _, _, _, datasets = dataset_pipeline.run()
-        norm_stats = datasets["train"].normalizer
 
-        self.autoencoder_cfg.profile_length      = x_len
-        self.autoencoder_cfg.params_per_gaussian = gaussian_cfg.params_per_gaussian
+        self.autoencoder_cfg.profile_length = x_len
         model = ProfileAutoencoder(self.autoencoder_cfg)
 
-        train_loader = self._profile_loader(datasets["train"], x_axis, norm_stats, gaussian_cfg, shuffle=True)
-        val_loader   = self._profile_loader(datasets["val"],   x_axis, norm_stats, gaussian_cfg, shuffle=False)
+        train_loader = self._profile_loader(datasets["train"], x_axis, gaussian_cfg, shuffle=True)
+        val_loader   = self._profile_loader(datasets["val"],   x_axis, gaussian_cfg, shuffle=False)
 
         run_meta.save_trainer_config()
         JepaPipelineSupport.save_autoencoder_config(self.autoencoder_cfg, run_meta.metadata_directory)
-        run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.out_channels, x_axis_length=x_len)
+        run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
 
-        trainer = ProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger, norm_stats)
+        trainer = ProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
         try:
             results = trainer.train(train_loader, val_loader, val_loader)
         finally:
@@ -108,9 +105,9 @@ class ProfileAePipeline:
             logger.close()
         return results, run_meta.run_directory
 
-    def _profile_loader(self, patch_ds, x_axis, norm_stats, gaussian_cfg, shuffle: bool) -> DataLoader:
+    def _profile_loader(self, patch_ds, x_axis, gaussian_cfg, shuffle: bool) -> DataLoader:
         profile_ds = ProfileDataset.from_patch_dataset(
-            patch_ds, x_axis, norm_stats, gaussian_cfg.n_default_gaussians,
+            patch_ds, x_axis, gaussian_cfg.n_default_gaussians,
             pixel_subsample = self.entry.pixel_subsample,
             keep_empty_frac = self.entry.keep_empty_frac,
             seed            = self.entry.seed,
@@ -139,7 +136,6 @@ class JepaPipeline:
             self.autoencoder_cfg = JepaPipelineSupport.load_autoencoder_config(Path(entry_config.stage_a_run) / "meta")
         else:
             self.autoencoder_cfg = entry_config.autoencoder
-        self.autoencoder_cfg.n_gaussians = entry_config.n_gaussians
 
         self.trainer_config = JepaTrainerConfig(
             gaussian           = base.gaussian,
@@ -148,7 +144,6 @@ class JepaPipeline:
             stage_a_mode       = entry_config.stage_a_mode,
             target_provider    = entry_config.target_provider,
             stage_a_checkpoint = (str(Path(entry_config.stage_a_run) / "best_model.pt") if entry_config.stage_a_run else None),
-            curriculum         = entry_config.curriculum,
             overfit            = entry_config.overfit,
         )
         JepaPipelineSupport.copy_base_subconfigs(self.trainer_config, base)
@@ -173,8 +168,7 @@ class JepaPipeline:
         norm_stats  = datasets["train"].normalizer
         in_channels = datasets["train"].input_channels
 
-        self.autoencoder_cfg.profile_length      = x_len
-        self.autoencoder_cfg.params_per_gaussian = gaussian_cfg.params_per_gaussian
+        self.autoencoder_cfg.profile_length = x_len
         embedding_dim = self.autoencoder_cfg.embedding_dim
 
         backbone, backbone_cfg = self._build_backbone(in_channels, embedding_dim, x_len)
@@ -202,12 +196,26 @@ class JepaPipeline:
             overrides[k] = v
         return get_model(self.model_name, **overrides)
 
+    @staticmethod
+    def validate_stage_a_checkpoint(ckpt_path, stage_a_mode: str) -> None:
+        if ckpt_path is None:
+            if stage_a_mode == "frozen":
+                raise ValueError("stage_a_mode 'frozen' requires pretrained autoencoder weights from a Stage-A run; pass --stage_a_run, or use 'finetune'/'joint' to train the autoencoder from scratch.")
+            return
+
+        if not Path(ckpt_path).is_file():
+            raise FileNotFoundError(f"Stage-A checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the --stage_a_run directory.")
+
     def _load_autoencoder(self) -> ProfileAutoencoder:
         autoencoder = ProfileAutoencoder(self.autoencoder_cfg)
         ckpt_path   = self.trainer_config.stage_a_checkpoint
-        if ckpt_path is not None and Path(ckpt_path).is_file():
-            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-            autoencoder.load_state_dict(ckpt["params"])
+        self.validate_stage_a_checkpoint(ckpt_path, self.trainer_config.stage_a_mode)
+
+        if ckpt_path is None:
+            return autoencoder
+
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        autoencoder.load_state_dict(ckpt["params"])
         return autoencoder
 
 

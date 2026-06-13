@@ -9,20 +9,15 @@ from torch.utils.data import DataLoader
 
 from tools                                 import Tracker, ResourceMonitor
 from pipelines.training_pipeline.callbacks import Warmup, Scheduler, EarlyStopping, GradientClipper
-from pipelines.training_pipeline.control   import Checkpoint, OverfitManager, CurriculumController
-from pipelines.training_pipeline.loss      import Loss
+from pipelines.training_pipeline.control   import Checkpoint, OverfitManager
 from pipelines.training_pipeline.trainer   import MetricAggregator
 from pipelines.jepa_pipeline.losses        import ProfileAeLoss
 
 
 class ProfileAeTrainer:
-    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger, norm_stats):
-        self.logger       = logger
-        self.config       = config
-        self.model_cfg    = model_cfg
-        self.gaussian_cfg = config.gaussian
-        self.curriculum   = config.curriculum
-        self.norm_stats   = norm_stats
+    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger):
+        self.logger = logger
+        self.config = config
 
         self.device          = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.run_dir         = Path(run_dir)
@@ -51,15 +46,7 @@ class ProfileAeTrainer:
         self.overfitter       = OverfitManager(config, self.logger)
         self.resource_monitor = ResourceMonitor(config=config.resources, logger=self.logger, tracker=self.tracker, step_getter=lambda: self.global_step)
 
-        inner = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.curriculum.warmup,
-                     norm_stats=self.norm_stats, geometry_cfg=config.geometry, log_all_losses=config.training.log_all_losses)
-        self.criterion = ProfileAeLoss(inner, config.ae_loss)
-
-        self.curriculum_controller = CurriculumController(
-            curriculum=self.curriculum, criterion=self.criterion, early_stopping=self.early_stopping,
-            lr_scheduler=self.lr_scheduler, warmup=self.warmup, optimizer=self.optimizer,
-            update_optimizer=self._update_optimizer, logger=self.logger,
-        )
+        self.criterion = ProfileAeLoss(config.ae_loss)
 
         self.global_step  = 0
         self.train_losses = []
@@ -83,12 +70,12 @@ class ProfileAeTrainer:
     def capture_state(self, epoch: int) -> dict:
         return {"epoch": epoch, "params": self.model.state_dict(), "x_axis": self.x_axis.cpu().numpy()}
 
-    def _forward(self, curve, gt_params):
-        curve     = curve.to(self.device).unsqueeze(-1).unsqueeze(-1)
-        gt_params = gt_params.to(self.device).unsqueeze(-1).unsqueeze(-1)
+    def _forward(self, curve):
+        curve = curve.to(self.device).unsqueeze(-1).unsqueeze(-1)
         with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
-            params_hat, curve_hat, _ = self.model.reconstruct(curve)
-            loss_dict = self.criterion(params_hat, curve_hat, curve, gt_params)
+            curve_hat, _ = self.model.reconstruct(curve)
+            target       = self.model.normalize_curve(curve)
+            loss_dict    = self.criterion(curve_hat, target)
         return loss_dict
 
     def train_epoch(self, loader: DataLoader, epoch: int):
@@ -98,8 +85,8 @@ class ProfileAeTrainer:
         aggregator  = MetricAggregator()
         n_batches   = len(loader)
 
-        for batch_idx, (curve, gt_params) in enumerate(loader):
-            loss_dict = self._forward(curve, gt_params)
+        for batch_idx, curve in enumerate(loader):
+            loss_dict = self._forward(curve)
             loss = loss_dict["total_loss"] / self.accumulation_steps
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"Stage-A loss is non-finite at step {self.global_step}")
@@ -131,8 +118,8 @@ class ProfileAeTrainer:
         self.model.eval()
         loss_sum, n = 0.0, 0
         aggregator  = MetricAggregator()
-        for curve, gt_params in loader:
-            loss_dict = self._forward(curve, gt_params)
+        for curve in loader:
+            loss_dict = self._forward(curve)
             loss_sum += loss_dict["total_loss"].item()
             n += 1
             aggregator.add(loss_dict)
@@ -154,7 +141,6 @@ class ProfileAeTrainer:
 
             for epoch in range(self.epochs):
                 self.logger.section(f"[Epoch {epoch + 1}/{self.epochs}]")
-                self.curriculum_controller.maybe_swap(epoch)
                 train_loss = self.train_epoch(data_loader, epoch)
                 self.logger.subsection(f"Train : loss={train_loss:.4f}")
 

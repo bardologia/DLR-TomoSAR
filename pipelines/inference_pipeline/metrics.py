@@ -33,8 +33,6 @@ class ReducedComparison:
 class Result:
     pred_curves        : np.ndarray
     gt_curves          : np.ndarray
-    params_pred        : np.ndarray
-    params_gt          : np.ndarray
 
     pixel_mse          : np.ndarray
     pixel_mae          : np.ndarray
@@ -46,6 +44,8 @@ class Result:
     azimuth_offset     : int
     range_offset       : int
 
+    params_pred        : Optional[np.ndarray]        = None
+    params_gt          : Optional[np.ndarray]        = None
     reduced            : Optional[ReducedComparison] = None
 
 
@@ -469,7 +469,7 @@ class Metrics:
 
         return out
 
-    def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None) -> Dict[str, float]:
+    def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None, param_space : bool = True) -> Dict[str, float]:
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
 
@@ -505,12 +505,13 @@ class Metrics:
         metrics.update(self._slice_ssim(pred, gt, elev_indices, range_indices, az_indices, prefix="gt"))
         metrics.update(self._expand_elev(pred, gt, suffix="gt"))
 
-        metrics.update(self._gaussian_param_metrics())
-        metrics.update(self._slot_mu_stats())
-        metrics.update(self._placeholder_detection())
+        if param_space:
+            metrics.update(self._gaussian_param_metrics())
+            metrics.update(self._slot_mu_stats())
+            metrics.update(self._placeholder_detection())
 
-        metrics["mu_ordering_rate"] = self._mu_ordering_rate()
-        metrics.update(self._permutation_consensus())
+            metrics["mu_ordering_rate"] = self._mu_ordering_rate()
+            metrics.update(self._permutation_consensus())
 
         return metrics
 

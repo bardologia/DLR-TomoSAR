@@ -12,7 +12,6 @@ class ProfileDataset(Dataset):
         self,
         param_arrays    : list[np.ndarray],
         x_axis          : np.ndarray,
-        normalizer,
         n_gaussians     : int,
         amp_zero_thr    : float = 1e-3,
         pixel_subsample : float = 1.0,
@@ -22,30 +21,20 @@ class ProfileDataset(Dataset):
     ) -> None:
         self.x_axis      = np.asarray(x_axis, dtype=np.float32)
         self.n_gaussians = int(n_gaussians)
-        self.ppg         = 3
 
-        amps_list, mus_list, sigs_list, norm_list = [], [], [], []
+        amps_list, mus_list, sigs_list = [], [], []
         for params in param_arrays:
             params = np.asarray(params, dtype=np.float32)
             C      = params.shape[0]
             flat   = params.reshape(C, -1)
 
-            amps = flat[0::3].T
-            mus  = flat[1::3].T
-            sigs = flat[2::3].T
+            amps_list.append(flat[0::3].T)
+            mus_list.append(flat[1::3].T)
+            sigs_list.append(flat[2::3].T)
 
-            params_norm = normalizer.normalize_output(params) if normalizer is not None else params
-            params_norm = params_norm.reshape(C, -1).T
-
-            amps_list.append(amps)
-            mus_list.append(mus)
-            sigs_list.append(sigs)
-            norm_list.append(params_norm)
-
-        self.amps        = np.concatenate(amps_list, axis=0)
-        self.mus         = np.concatenate(mus_list,  axis=0)
-        self.sigs        = np.concatenate(sigs_list, axis=0)
-        self.params_norm = np.concatenate(norm_list, axis=0)
+        self.amps = np.concatenate(amps_list, axis=0)
+        self.mus  = np.concatenate(mus_list,  axis=0)
+        self.sigs = np.concatenate(sigs_list, axis=0)
 
         active = (self.amps > amp_zero_thr).any(axis=1)
         rng    = np.random.default_rng(seed)
@@ -78,11 +67,11 @@ class ProfileDataset(Dataset):
             })
 
     @classmethod
-    def from_patch_dataset(cls, patch_dataset, x_axis, normalizer, n_gaussians, **kwargs) -> "ProfileDataset":
+    def from_patch_dataset(cls, patch_dataset, x_axis, n_gaussians, **kwargs) -> "ProfileDataset":
         parts        = getattr(patch_dataset, "parts", None)
         datasets     = parts if parts is not None else [patch_dataset]
         param_arrays = [ds.gt_parameters for ds in datasets]
-        return cls(param_arrays=param_arrays, x_axis=x_axis, normalizer=normalizer, n_gaussians=n_gaussians, **kwargs)
+        return cls(param_arrays=param_arrays, x_axis=x_axis, n_gaussians=n_gaussians, **kwargs)
 
     def __len__(self) -> int:
         return int(self.index.shape[0])
@@ -95,4 +84,4 @@ class ProfileDataset(Dataset):
             self.mus[idx:idx + 1],
             self.sigs[idx:idx + 1],
         )[0]
-        return curve.astype(np.float32), self.params_norm[idx].astype(np.float32)
+        return curve.astype(np.float32)

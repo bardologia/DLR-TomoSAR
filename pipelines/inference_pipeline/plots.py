@@ -97,7 +97,7 @@ class SlicePlotter(PlotTools):
         self,
         pred_curves    : np.ndarray,
         gt_curves      : np.ndarray,
-        params_pred    : np.ndarray,
+        params_pred    : Optional[np.ndarray],
         x_axis         : np.ndarray,
         pixels         : np.ndarray,
         tag            : str,
@@ -116,7 +116,7 @@ class SlicePlotter(PlotTools):
         for p, (y, x) in enumerate(pixels):
             gt    = gt_curves  [:, y, x]
             pred  = pred_curves[:, y, x]
-            comps = self._gaussian_components(params_pred[:, y, x], x_axis, n_gaussians)
+            comps = self._gaussian_components(params_pred[:, y, x], x_axis, n_gaussians) if params_pred is not None else []
 
             fig, ax = plt.subplots(figsize=(5.2, 3.4))
 

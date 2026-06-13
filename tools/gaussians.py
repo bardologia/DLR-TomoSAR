@@ -93,6 +93,36 @@ class GaussianReconstructor:
         return out
 
 
+class GaussianCurve:
+    @staticmethod
+    def reconstruct(params: torch.Tensor, x_axis: torch.Tensor, ppg: int = 3) -> torch.Tensor:
+        B, C, H, W = params.shape
+
+        if C % ppg != 0:
+            raise ValueError(f"Gaussian param channels ({C}) must be divisible by {ppg}")
+
+        n_gaussians = C // ppg
+        p           = params.reshape(B, n_gaussians, ppg, H, W)
+
+        a   = p[:, :, 0, :, :]
+        mu  = p[:, :, 1, :, :]
+        sig = p[:, :, 2, :, :]
+        x   = x_axis.reshape(1, -1, 1, 1)
+
+        curves = torch.zeros((B, x.shape[1], H, W), dtype=params.dtype, device=params.device)
+
+        for g in range(n_gaussians):
+            a_g   = a[:, g:g+1, :, :]
+            mu_g  = mu[:, g:g+1, :, :]
+            sig_g = sig[:, g:g+1, :, :].clamp(min=GaussianMixture.SIGMA_FLOOR)
+
+            sig2_g     = sig_g ** 2
+            exponent_g = (-((x - mu_g) ** 2) / (2.0 * sig2_g)).clamp(GaussianMixture.EXPON_FLOOR, GaussianMixture.EXPON_CEIL)
+            curves     = curves + a_g * torch.exp(exponent_g)
+
+        return curves
+
+
 class GaussianClamp:
     @staticmethod
     def apply(

@@ -3,104 +3,54 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from pipelines.training_pipeline.loss import Loss, LossComponents
+from pipelines.training_pipeline.loss import LossComponents
+from tools.gaussians                  import GaussianCurve
 
 
-class RunningStandardizer:
-    def __init__(self, dim: int, momentum: float = 0.01) -> None:
-        self.momentum     = float(momentum)
-        self.mean         = torch.zeros(dim)
-        self.std          = torch.ones(dim)
-        self._initialized = False
+def curve_loss(curve_hat: torch.Tensor, curve_ref: torch.Tensor, kind: str, huber_delta: float, charbonnier_eps: float) -> torch.Tensor:
+    diff = curve_hat - curve_ref
 
-    def to(self, device) -> "RunningStandardizer":
-        self.mean = self.mean.to(device)
-        self.std  = self.std.to(device)
-        return self
-
-    @torch.no_grad()
-    def update(self, z: torch.Tensor) -> None:
-        flat = z.transpose(0, 1).reshape(z.shape[1], -1)
-        m    = flat.mean(dim=1)
-        s    = flat.std(dim=1).clamp(min=1e-6)
-
-        if not self._initialized:
-            self.mean = m.clone()
-            self.std  = s.clone()
-            self._initialized = True
-        else:
-            self.mean.mul_(1 - self.momentum).add_(m, alpha=self.momentum)
-            self.std.mul_(1 - self.momentum).add_(s, alpha=self.momentum)
-
-    def apply(self, z: torch.Tensor) -> torch.Tensor:
-        shape = (1, -1, 1, 1)
-        return (z - self.mean.reshape(shape)) / self.std.reshape(shape)
+    if kind == "mse":
+        return LossComponents.mse_diff(diff)
+    if kind == "l1":
+        return LossComponents.l1_diff(diff)
+    if kind == "huber":
+        return LossComponents.huber_diff(diff, huber_delta)
+    if kind == "charbonnier":
+        return LossComponents.charbonnier_diff(diff, charbonnier_eps)
+    raise ValueError(f"Unknown curve loss kind '{kind}'. Available: mse, l1, huber, charbonnier")
 
 
 class ProfileAeLoss:
-    def __init__(self, inner_loss: Loss, ae_cfg) -> None:
-        self.inner  = inner_loss
+    def __init__(self, ae_cfg) -> None:
         self.ae_cfg = ae_cfg
-
-    @staticmethod
-    def curve_term(curve_hat: torch.Tensor, curve_ref: torch.Tensor, cfg) -> torch.Tensor:
-        diff = curve_hat - curve_ref
-        kind = cfg.ae_curve_kind
-
-        if kind == "mse":
-            return LossComponents.mse_diff(diff)
-        if kind == "l1":
-            return LossComponents.l1_diff(diff)
-        if kind == "huber":
-            return LossComponents.huber_diff(diff, cfg.ae_huber_delta)
-        if kind == "charbonnier":
-            return LossComponents.charbonnier_diff(diff, cfg.ae_charbonnier_eps)
-        raise ValueError(f"Unknown ae_curve_kind '{kind}'. Available: mse, l1, huber, charbonnier")
-
-    def set_curriculum(self, complete_cfg) -> None:
-        self.inner.set_curriculum(complete_cfg)
 
     @property
     def loss_generation(self) -> int:
-        return self.inner.loss_generation
+        return 0
 
-    def __call__(self, params_hat_norm, curve_hat, input_curve, gt_params_norm) -> dict:
-        inner = self.inner(params_hat_norm, gt_params_norm)
-
-        total      = inner["total_loss"]
-        components = dict(inner["components"])
-        weighted   = dict(inner["weighted"])
-        monitor    = dict(inner["monitor"])
-
-        if self.ae_cfg.use_ae_curve:
-            ae_val = self.curve_term(curve_hat, input_curve, self.ae_cfg)
-            w      = self.ae_cfg.weight_ae_curve
-            components["ae_curve"] = ae_val
-            weighted["ae_curve"]   = w * ae_val
-            total = total + w * ae_val
-        elif self.inner.log_all_losses:
-            with torch.no_grad():
-                monitor["ae_curve_denorm"] = self.curve_term(curve_hat, input_curve, self.ae_cfg)
-
-        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": monitor}
+    def __call__(self, curve_hat: torch.Tensor, input_curve: torch.Tensor) -> dict:
+        val = curve_loss(curve_hat, input_curve, self.ae_cfg.curve_kind, self.ae_cfg.huber_delta, self.ae_cfg.charbonnier_eps)
+        return {
+            "total_loss": val,
+            "components": {"curve_recon": val},
+            "weighted":   {"curve_recon": val},
+            "monitor":    {},
+        }
 
 
 class JepaLoss:
-    def __init__(self, autoencoder, inner_loss: Loss, target_provider, embedding_cfg, norm_stats) -> None:
+    def __init__(self, autoencoder, target_provider, embedding_cfg, x_axis, norm_stats, params_per_gaussian: int) -> None:
         self.autoencoder     = autoencoder
-        self.inner           = inner_loss
         self.target_provider = target_provider
         self.emb_cfg         = embedding_cfg
+        self.x_axis          = x_axis
         self.norm_stats      = norm_stats
-        self.standardizer    = RunningStandardizer(autoencoder.config.embedding_dim, embedding_cfg.standardize_momentum)
-        self._std_on_device  = False
-
-    def set_curriculum(self, complete_cfg) -> None:
-        self.inner.set_curriculum(complete_cfg)
+        self.ppg             = params_per_gaussian
 
     @property
     def loss_generation(self) -> int:
-        return self.inner.loss_generation
+        return 0
 
     def _embedding_terms(self, z_hat, z_star) -> tuple[torch.Tensor, dict, dict]:
         cfg        = self.emb_cfg
@@ -108,54 +58,44 @@ class JepaLoss:
         weighted   = {}
         total      = torch.zeros((), dtype=z_hat.dtype, device=z_hat.device)
 
-        if cfg.standardize_target:
-            if not self._std_on_device:
-                self.standardizer.to(z_hat.device)
-                self._std_on_device = True
-            self.standardizer.update(z_star.detach())
-            z_hat_s  = self.standardizer.apply(z_hat)
-            z_star_s = self.standardizer.apply(z_star)
-        else:
-            z_hat_s, z_star_s = z_hat, z_star
-
         if cfg.use_embedding_mse:
-            val = LossComponents.mse_diff(z_hat_s - z_star_s)
+            val = LossComponents.mse_diff(z_hat - z_star)
             components["embedding_mse"] = val
             weighted["embedding_mse"]   = cfg.weight_embedding_mse * val
             total = total + cfg.weight_embedding_mse * val
 
         if cfg.use_embedding_cosine:
-            val = LossComponents.cosine(z_hat_s, z_star_s, axis=1)
+            val = LossComponents.cosine(z_hat, z_star, axis=1)
             components["embedding_cosine"] = val
             weighted["embedding_cosine"]   = cfg.weight_embedding_cosine * val
             total = total + cfg.weight_embedding_cosine * val
 
         if cfg.use_embedding_smoothl1:
-            val = F.smooth_l1_loss(z_hat_s, z_star_s, beta=cfg.smoothl1_beta)
+            val = F.smooth_l1_loss(z_hat, z_star, beta=cfg.smoothl1_beta)
             components["embedding_smoothl1"] = val
             weighted["embedding_smoothl1"]   = cfg.weight_embedding_smoothl1 * val
             total = total + cfg.weight_embedding_smoothl1 * val
 
         return total, components, weighted
 
-    def decode_params(self, z_hat) -> torch.Tensor:
-        return self.autoencoder.heads(z_hat)
-
     def __call__(self, z_hat, gt_params_norm) -> dict:
         with torch.no_grad():
-            gt_phys  = self.norm_stats.denormalize_output(gt_params_norm.float())
-            gt_curve = self.inner.reconstruct(gt_phys).to(z_hat.dtype)
+            gt_phys    = self.norm_stats.denormalize_output(gt_params_norm.float())
+            gt_curve   = GaussianCurve.reconstruct(gt_phys, self.x_axis, self.ppg).to(z_hat.dtype)
+            gt_curve_n = self.autoencoder.normalize_curve(gt_curve)
 
-        z_star = self.target_provider.target(self.autoencoder.encoder, gt_curve)
+        z_hat_n    = self.autoencoder.normalize_embedding(z_hat)
+        z_star_raw = self.target_provider.target(self.autoencoder.encoder, gt_curve_n)
+        z_star_n   = self.autoencoder.normalize_embedding(z_star_raw)
 
-        emb_total, emb_components, emb_weighted = self._embedding_terms(z_hat, z_star)
+        total, components, weighted = self._embedding_terms(z_hat_n, z_star_n)
 
-        params_hat = self.decode_params(z_hat)
-        inner      = self.inner(params_hat, gt_params_norm)
+        if self.emb_cfg.use_curve_recon:
+            curve_hat = self.autoencoder.decode(z_hat_n)
+            c_val     = curve_loss(curve_hat, gt_curve_n, self.emb_cfg.curve_kind, self.emb_cfg.huber_delta, self.emb_cfg.charbonnier_eps)
+            w         = self.emb_cfg.weight_curve_recon
+            components["curve_recon"] = c_val
+            weighted["curve_recon"]   = w * c_val
+            total = total + w * c_val
 
-        total      = emb_total + inner["total_loss"]
-        components = {**emb_components, **inner["components"]}
-        weighted   = {**emb_weighted,   **inner["weighted"]}
-        monitor    = dict(inner["monitor"])
-
-        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": monitor}
+        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": {}}

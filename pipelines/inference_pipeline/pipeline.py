@@ -102,6 +102,15 @@ class InferencePipeline:
             "all_az_idx"      : np.arange(n_az),
         }
 
+    def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
+        return composer.compose(
+            result         = result,
+            run            = run,
+            global_metrics = global_metrics,
+            x_axis_np      = x_axis_np,
+            indices        = indices,
+        )
+
     def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta: InferenceMetadata, indices: dict) -> dict:
         global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
             elev_indices  = indices["all_elev_idx"],
@@ -163,13 +172,7 @@ class InferencePipeline:
         composer = FigureComposer(plotter=plotter, meta=meta, logger=logger, cfg=cfg)
 
         logger.section("[Inference: Plots]")
-        figure_paths = composer.compose(
-            result         = result,
-            run            = run,
-            global_metrics = global_metrics,
-            x_axis_np      = x_axis_np,
-            indices        = indices,
-        )
+        figure_paths = self._compose_figures(composer, result, run, global_metrics, x_axis_np, indices)
 
         logger.section("[Inference: Animations]")
         gif_paths = composer.animate(result, run, x_axis_np)

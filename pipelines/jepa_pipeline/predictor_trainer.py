@@ -8,10 +8,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from tools                                 import Tracker, ResourceMonitor, PermutationMetrics
+from tools                                 import Tracker, ResourceMonitor
 from pipelines.training_pipeline.callbacks import Warmup, Scheduler, EarlyStopping, GradientClipper
-from pipelines.training_pipeline.control   import Checkpoint, OverfitManager, CurriculumController
-from pipelines.training_pipeline.loss      import Loss
+from pipelines.training_pipeline.control   import Checkpoint, OverfitManager
 from pipelines.training_pipeline.trainer   import MetricAggregator
 from pipelines.jepa_pipeline.coupling      import StageAMode, TargetProvider
 from pipelines.jepa_pipeline.losses        import JepaLoss
@@ -33,7 +32,6 @@ class JepaPredictorTrainer:
         self.config       = config
         self.backbone_cfg = backbone_cfg
         self.gaussian_cfg = config.gaussian
-        self.curriculum   = config.curriculum
         self.norm_stats   = norm_stats
 
         self.device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,6 +45,8 @@ class JepaPredictorTrainer:
 
         self.stage_a_mode = StageAMode(config.stage_a_mode)
         self.stage_a_mode.apply(self.model.autoencoder)
+
+        self.validate_coupling(self.stage_a_mode, config.target_provider, config.embedding_loss)
 
         self.epochs               = config.training.epochs
         self.validation_frequency = config.training.validation_frequency
@@ -66,24 +66,23 @@ class JepaPredictorTrainer:
         self.checkpoint     = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.overfitter     = OverfitManager(config, self.logger)
         self.resource_monitor   = ResourceMonitor(config=config.resources, logger=self.logger, tracker=self.tracker, step_getter=lambda: self.global_step)
-        self.permutation_metrics = PermutationMetrics(config.permutation_metrics, logger=self.logger)
 
         target_provider = TargetProvider(config.target_provider, self.model.autoencoder.encoder, config.ema_decay).to(self.device)
-        inner = Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.curriculum.warmup,
-                     norm_stats=self.norm_stats, geometry_cfg=config.geometry, log_all_losses=config.training.log_all_losses)
-        self.criterion = JepaLoss(self.model.autoencoder, inner, target_provider, config.embedding_loss, self.norm_stats)
-
-        self.curriculum_controller = CurriculumController(
-            curriculum=self.curriculum, criterion=self.criterion, early_stopping=self.early_stopping,
-            lr_scheduler=self.lr_scheduler, warmup=self.warmup, optimizer=self.optimizer,
-            update_optimizer=self._update_optimizer, logger=self.logger,
-        )
+        self.criterion  = JepaLoss(self.model.autoencoder, target_provider, config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian)
 
         self.global_step  = 0
         self.train_losses = []
         self.val_losses   = []
 
         self._update_optimizer(self.lr_scheduler.effective_lrs())
+
+    @staticmethod
+    def validate_coupling(stage_a_mode: StageAMode, target_provider: str, embedding_cfg) -> None:
+        if target_provider in ("live", "ema") and not stage_a_mode.trainable:
+            raise ValueError(f"target_provider '{target_provider}' requires a trainable Stage-A autoencoder (stage_a_mode 'finetune' or 'joint'), but stage_a_mode is '{stage_a_mode.kind}'.")
+
+        if target_provider == "live" and not embedding_cfg.use_curve_recon:
+            raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'/'ema'.")
 
     def _build_optimizer(self, param_groups):
         betas, eps, wd = tuple(self.config.optimizer.betas), self.config.optimizer.eps, self.config.optimizer.weight_decay
@@ -166,17 +165,9 @@ class JepaPredictorTrainer:
             n += 1
             aggregator.add(loss_dict)
 
-            pred_params = self.criterion.decode_params(z_hat)
-            pred_phys   = self.norm_stats.denormalize_output(pred_params.float())
-            gt_phys     = self.norm_stats.denormalize_output(gt_params.float())
-            perm_m      = self.permutation_metrics.compute(pred_phys, gt_phys, self.gaussian_cfg.params_per_gaussian)
-            aggregator.add_extra(perm_m)
-
         avg = loss_sum / max(1, n)
         self.tracker.log_metrics(f"loss_components/{stage}", aggregator.reduce_components(), epoch)
         self.tracker.log_metrics(f"loss_weighted/{stage}", aggregator.reduce_weighted(), epoch)
-        if aggregator.extra_sum:
-            self.tracker.log_metrics(f"permutation/{stage}", aggregator.reduce_extra(), epoch)
         return {"avg_loss": avg, "num_batches": n}
 
     def train(self, train_loader, val_loader, test_loader):
@@ -192,7 +183,6 @@ class JepaPredictorTrainer:
 
             for epoch in range(self.epochs):
                 self.logger.section(f"[Epoch {epoch + 1}/{self.epochs}]")
-                self.curriculum_controller.maybe_swap(epoch)
                 train_loss = self.train_epoch(data_loader, epoch)
                 self.logger.subsection(f"Train : loss={train_loss:.4f}")
 
