@@ -82,14 +82,26 @@ class ComparisonReportConfig:
     embed_images : bool = False
 
 
+def _default_ae_loss():
+    from configuration.training.autoencoder_config import AutoencoderLossConfig
+
+    return AutoencoderLossConfig()
+
+
 @dataclass
 class BenchmarkConfig:
+    training_type : str = "backbone"
+
     paths      : BenchmarkPathsConfig   = field(default_factory=BenchmarkPathsConfig)
     overfit    : OverfitGateConfig      = field(default_factory=OverfitGateConfig)
     size_match : SizeMatchConfig        = field(default_factory=SizeMatchConfig)
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
+
+    ae_loss         : object     = field(default_factory=_default_ae_loss)
+    pixel_subsample : float      = 1.0
+    keep_empty_frac : float      = 0.05
 
     gpus            : list[int]  = field(default_factory=lambda: [2, 3])
     skip_models     : list[str]  = field(default_factory=list)
@@ -98,6 +110,12 @@ class BenchmarkConfig:
     seed            : int        = 0
     n_gaussians     : int        = 5
     poll_interval_s : float      = 5.0
+
+    def runs_size_match(self) -> bool:
+        return self.training_type == "backbone"
+
+    def runs_inference(self) -> bool:
+        return self.training_type == "backbone"
 
 
 

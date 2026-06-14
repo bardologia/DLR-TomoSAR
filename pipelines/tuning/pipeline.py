@@ -21,9 +21,10 @@ from models import CONFIG_REGISTRY
 from tools import FileIO
 from tools import GpuJob
 from tools import GpuQueue
-from pipelines.tuning_pipeline.plots import StudyPlotter
-from pipelines.tuning_pipeline.tuners import BestConfigWriter
-from pipelines.tuning_pipeline.tuners import Tuner
+from pipelines.tuning.plots import StudyPlotter
+from pipelines.tuning.tuners import AeTuner
+from pipelines.tuning.tuners import BestConfigWriter
+from pipelines.tuning.tuners import Tuner
 from tools.runtime.config_cli import ConfigCli
 from tools.monitoring.logger import Logger
 from tools.data.regions import CropRegion
@@ -55,9 +56,29 @@ class TuningOrchestrator:
     def _study_name(self, model_name: str) -> str:
         return f"{model_name}_{self.tag}"
 
+    def _registry(self) -> dict:
+        if self.config.training_type == "autoencoder":
+            from models.autoencoder import AE_CONFIG_REGISTRY
+            return AE_CONFIG_REGISTRY
+        return CONFIG_REGISTRY
+
     def _search_space(self, model_name: str) -> dict:
-        config_cls = CONFIG_REGISTRY[model_name]
+        config_cls = self._registry()[model_name]
         return {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
+
+    def _ae_entry_template(self):
+        from configuration.training.autoencoder_config import ProfileAeEntryConfig
+
+        return ProfileAeEntryConfig(
+            seed            = self.config.tuning.base_seed,
+            n_gaussians     = self.config.n_gaussians,
+            pixel_subsample = self.config.pixel_subsample,
+            keep_empty_frac = self.config.keep_empty_frac,
+            ae_loss         = self.config.ae_loss,
+            overfit         = self.config.overfit,
+            paths           = self.config.paths,
+            training        = self.config.training,
+        )
 
     def _load_layout(self, dataset_path: Path) -> dict:
         return FileIO.load_json(dataset_path / "data" / "dataset.json")
@@ -240,11 +261,12 @@ class TuningOrchestrator:
 
         self.logger = Logger(log_dir=str(self.run_dir), name="tune_scheduler")
 
-        all_models = list(CONFIG_REGISTRY.keys())
+        registry   = self._registry()
+        all_models = list(registry.keys())
         if target_model is not None:
-            if target_model not in CONFIG_REGISTRY:
+            if target_model not in registry:
                 self.logger.close()
-                sys.exit(f"ERROR: unknown model '{target_model}'. Available: {list(CONFIG_REGISTRY.keys())}")
+                sys.exit(f"ERROR: unknown model '{target_model}'. Available: {list(registry.keys())}")
             models_to_run = [target_model]
         else:
             models_to_run = [m for m in all_models if m not in set(self.config.skip_models)]
@@ -290,18 +312,30 @@ class TuningOrchestrator:
             "Storage"    : storage_url,
         })
 
-        trainer_cfg, dataset_cfg = self._build_base_configs()
+        if self.config.training_type == "autoencoder":
+            from models.autoencoder import AE_CONFIG_REGISTRY
 
-        tuner = Tuner(
-            model_name          = model_name,
-            model_config_cls    = CONFIG_REGISTRY[model_name],
-            base_trainer_config = trainer_cfg,
-            base_dataset_config = dataset_cfg,
-            tune_cfg            = tune_cfg,
-            log_dir             = str(self.run_dir / model_name),
-            logger              = logger,
-            emit_trial_docs     = tune_cfg.emit_trial_docs,
-        )
+            tuner = AeTuner(
+                model_name     = model_name,
+                config_cls     = AE_CONFIG_REGISTRY[model_name],
+                entry_template = self._ae_entry_template(),
+                tune_cfg       = tune_cfg,
+                log_dir        = str(self.run_dir / model_name),
+                logger         = logger,
+            )
+        else:
+            trainer_cfg, dataset_cfg = self._build_base_configs()
+
+            tuner = Tuner(
+                model_name          = model_name,
+                model_config_cls    = CONFIG_REGISTRY[model_name],
+                base_trainer_config = trainer_cfg,
+                base_dataset_config = dataset_cfg,
+                tune_cfg            = tune_cfg,
+                log_dir             = str(self.run_dir / model_name),
+                logger              = logger,
+                emit_trial_docs     = tune_cfg.emit_trial_docs,
+            )
 
         pruner = optuna.pruners.MedianPruner(
             n_startup_trials = tune_cfg.pruner_n_startup_trials,

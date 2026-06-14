@@ -101,7 +101,7 @@ class Tuner:
             setattr(model_config, k, v)
 
     def _objective(self, trial: optuna.Trial) -> float:
-        from pipelines.tuning_pipeline.trial import TrialPipeline
+        from pipelines.tuning.trial import TrialPipeline
 
         model_config = self.model_config_cls()
         self._apply_params(trial, model_config)
@@ -139,5 +139,67 @@ class Tuner:
             "Search dimensions"    : len(self.space),
             "Log dir"              : self.log_dir,
         }, title="Tuner config")
+
+        study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True, callbacks=[self.best_writer])
+
+
+class AeTuner:
+    def __init__(
+        self,
+        model_name     : str,
+        config_cls,
+        entry_template,
+        tune_cfg,
+        log_dir        : str,
+        logger,
+    ) -> None:
+        self.model_name     = model_name
+        self.config_cls     = config_cls
+        self.entry_template = entry_template
+        self.tune_cfg       = tune_cfg
+        self.log_dir        = log_dir
+        self.logger         = logger
+
+        self.sampler     = ParamSampler()
+        self.space       = {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
+        self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
+
+    def _apply_params(self, trial: optuna.Trial, ae_config) -> None:
+        sampled = self.sampler.sample(trial, self.space)
+        for k, v in sampled.items():
+            setattr(ae_config, k, v)
+
+    def _objective(self, trial: optuna.Trial) -> float:
+        from pipelines.tuning.trial import TrialProfileAePipeline
+
+        ae_config = self.config_cls()
+        self._apply_params(trial, ae_config)
+
+        entry = copy.deepcopy(self.entry_template)
+        entry.autoencoder   = ae_config
+        entry.ae_model_name = self.model_name
+        entry.run_name      = f"trial_{trial.number:04d}"
+        entry.seed          = self.tune_cfg.base_seed + trial.number
+        entry.logdir        = Path(self.log_dir) / "trials"
+
+        entry.training.epochs              = self.tune_cfg.n_epochs
+        entry.training.scheduler_epochs    = self.tune_cfg.n_epochs
+        entry.training.early_stop_patience = self.tune_cfg.early_stop_patience
+
+        pipeline                       = TrialProfileAePipeline(entry, trial=trial)
+        (_, _, best_val_loss), _       = pipeline.run()
+
+        return best_val_loss
+
+    def run(self, study: optuna.Study, n_trials: int) -> None:
+        self.logger.section(f"[AeTuner — {self.model_name}]")
+
+        self.logger.kv_table({
+            "Trials (this worker)" : n_trials,
+            "Epochs / trial"       : self.tune_cfg.n_epochs,
+            "Early-stop patience"  : self.tune_cfg.early_stop_patience,
+            "Search dimensions"    : len(self.space),
+            "Log dir"              : self.log_dir,
+        }, title="AeTuner config")
 
         study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True, callbacks=[self.best_writer])

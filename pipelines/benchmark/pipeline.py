@@ -9,7 +9,7 @@ from tools.data.io import FileIO
 from tools.runtime.config_cli import ConfigCli
 from tools.monitoring.logger import Logger
 
-from pipelines.benchmark_pipeline.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage
+from pipelines.benchmark.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage
 
 
 class BenchmarkPipeline:
@@ -26,8 +26,14 @@ class BenchmarkPipeline:
         ConfigCli.save_resolved(config, self.pipeline_dir / "resolved_config.json")
 
         self.logger = Logger(log_dir=str(self.pipeline_dir), name="benchmark_pipeline")
-        self.models = [m for m in CONFIG_REGISTRY.keys() if m not in set(config.skip_models)]
+        self.models = [m for m in self._registry().keys() if m not in set(config.skip_models)]
         self.state  = {"run_tag": self.run_tag, "stages": {}}
+
+    def _registry(self) -> dict:
+        if self.config.training_type == "autoencoder":
+            from models.autoencoder import AE_CONFIG_REGISTRY
+            return AE_CONFIG_REGISTRY
+        return CONFIG_REGISTRY
 
     def _run_overfit_gate(self) -> bool:
         stage   = OverfitStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)
@@ -94,9 +100,11 @@ class BenchmarkPipeline:
                 self.logger.error("Overfit gate failed — pipeline aborted. See the overfit report before retrying.")
                 raise SystemExit(1)
 
-            self._run_size_match()
+            if self.config.runs_size_match():
+                self._run_size_match()
+
             training_results  = self._run_training()
-            inference_results = self._run_inference()
+            inference_results = self._run_inference() if self.config.runs_inference() else []
             comparison_dir    = self._run_comparison()
 
             self._mark_stage("pipeline", "completed")

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import optuna
 
-from pipelines.backbone_pipeline.pipeline import TrainingPipeline
-from pipelines.backbone_pipeline.trainer  import Trainer
+from pipelines.training.autoencoder.autoencoder_trainer import ProfileAeTrainer
+from pipelines.training.autoencoder.pipeline            import ProfileAePipeline
+from pipelines.training.backbone.pipeline import TrainingPipeline
+from pipelines.training.backbone.trainer  import Trainer
 
 
 class TrialTrainer(Trainer):
@@ -35,3 +37,24 @@ class TrialPipeline(TrainingPipeline):
             trial      = self._trial,
             emit_docs  = self._emit_docs,
         )
+
+
+class TrialProfileAeTrainer(ProfileAeTrainer):
+    def __init__(self, *args, trial: optuna.Trial, **kwargs) -> None:
+        self._trial = trial
+        super().__init__(*args, **kwargs)
+
+    def _after_eval(self, val_loss: float, epoch: int) -> None:
+        super()._after_eval(val_loss, epoch)
+        self._trial.report(val_loss, epoch)
+        if self._trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
+
+
+class TrialProfileAePipeline(ProfileAePipeline):
+    def __init__(self, *args, trial: optuna.Trial, **kwargs) -> None:
+        self._trial = trial
+        super().__init__(*args, **kwargs)
+
+    def _make_trainer(self, run_meta, logger, model, x_axis):
+        return TrialProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger, trial=self._trial)

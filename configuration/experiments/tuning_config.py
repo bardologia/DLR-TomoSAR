@@ -3,7 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from configuration.experiments.benchmark_config import BenchmarkPathsConfig
+from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.training.runtime_config       import OverfitConfig
+
+
+def _default_ae_loss():
+    from configuration.training.autoencoder_config import AutoencoderLossConfig
+
+    return AutoencoderLossConfig()
 
 
 @dataclass
@@ -24,6 +31,8 @@ class TuningConfig:
 
 @dataclass
 class TuningEntryConfig:
+    training_type : str = "backbone"
+
     paths  : BenchmarkPathsConfig = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/tuning")))
     tuning : TuningConfig         = field(default_factory=TuningConfig)
 
@@ -34,3 +43,10 @@ class TuningEntryConfig:
     num_workers  : int        = 4
     warmup_steps : int        = 200
     eta_min      : float      = 1e-6
+
+    n_gaussians     : int                 = 5
+    training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
+    overfit         : OverfitConfig       = field(default_factory=OverfitConfig)
+    ae_loss         : object              = field(default_factory=_default_ae_loss)
+    pixel_subsample : float               = 1.0
+    keep_empty_frac : float               = 0.05
