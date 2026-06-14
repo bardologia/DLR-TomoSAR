@@ -20,8 +20,8 @@ Array = Union[np.ndarray, torch.Tensor]
 
 @dataclass
 class Stats:
-    input_stats  : Optional[ChannelStats]  = None
-    output_stats : Optional[ChannelStats]  = None
+    input_stats  : Optional[ChannelStats] = None
+    output_stats : Optional[ChannelStats] = None
 
     def save(self, directory: Path) -> Path:
         directory = Path(directory)
@@ -117,8 +117,8 @@ class StatsComputer:
         if not collected:
             return {}
 
-        n_batches_est        = max(len(subset) // max(batch_size, 1), 1)
-        vals_per_ch_batch    = {g: max(64, max_vals_per_group // (n_batches_est * max(len(channels), 1))) for g, channels in group_channels.items()}
+        n_batches_est     = max(len(subset) // max(batch_size, 1), 1)
+        vals_per_ch_batch = {g: max(64, max_vals_per_group // (n_batches_est * max(len(channels), 1))) for g, channels in group_channels.items()}
 
         loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
         rng    = np.random.default_rng(42)
@@ -243,16 +243,16 @@ class StatsComputer:
         n_gaussians   : int,
     ) -> ChannelStats:
 
-        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
-        role_strat : dict[str, ChannelStrategy] = {key: output_config.strategy_for(key) for key in role_pools}
+        role_fit   : dict[str, tuple[float, float]] = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
+        role_strat : dict[str, ChannelStrategy]     = {key: output_config.strategy_for(key) for key in role_pools}
 
         selected       = output_config.selected_indices(n_gaussians)
         _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
 
-        locs:       list[float]                    = []
-        scales:     list[float]                    = []
-        names:      list[str]                      = []
-        strategies: list[ChannelStrategy] = []
+        locs       : list[float]           = []
+        scales     : list[float]           = []
+        names      : list[str]             = []
+        strategies : list[ChannelStrategy] = []
 
         for out_ch, full_ch in enumerate(selected):
             g        = full_ch // 3
@@ -294,9 +294,9 @@ class StatsComputer:
     ) -> Stats:
         regions = StatsComputer._train_gt_parameters(dataset)
 
-        amp_pool_vals:  list[np.ndarray] = []
-        mu_pool_vals:   list[np.ndarray] = []
-        sig_pool_vals:  list[np.ndarray] = []
+        amp_pool_vals : list[np.ndarray] = []
+        mu_pool_vals  : list[np.ndarray] = []
+        sig_pool_vals : list[np.ndarray] = []
 
         for params in regions:
             for g in range(n_gaussians):

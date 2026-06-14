@@ -112,8 +112,8 @@ class TomogramProcessor:
 
         dem_shapes      : list[Tuple[int, ...]] = []
         tomogram_shapes : list[Tuple[int, ...]] = []
-        dem_dtype       = None
-        tomogram_dtype  = None
+        dem_dtype      = None
+        tomogram_dtype = None
 
         for partial_file_path in partial_file_paths:
             with h5py.File(str(partial_file_path), "r") as hdf5_file:

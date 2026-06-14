@@ -89,7 +89,7 @@ class AttentionUNet(nn.Module):
         if config.attention_intermediate_ratio <= 0:
             raise ValueError("attention_intermediate_ratio must be greater than 0")
 
-        feature_sizes = config.features
+        feature_sizes       = config.features
         bottleneck_channels = feature_sizes[-1] * config.bottleneck_factor
 
         self.encoder_blocks = nn.ModuleList()
@@ -118,12 +118,12 @@ class AttentionUNet(nn.Module):
             bias            = config.conv_bias,
         )
 
-        reversed_features = [bottleneck_channels] + feature_sizes[::-1]
+        reversed_features    = [bottleneck_channels] + feature_sizes[::-1]
         self.upsample_layers = nn.ModuleList()
         self.attention_gates = nn.ModuleList()
-        self.decoder_blocks = nn.ModuleList()
+        self.decoder_blocks  = nn.ModuleList()
         for index in range(len(reversed_features) - 1):
-            decoder_channels = reversed_features[index + 1]
+            decoder_channels      = reversed_features[index + 1]
             intermediate_channels = max(1, int(decoder_channels * config.attention_intermediate_ratio))
 
             self.upsample_layers.append(
@@ -180,11 +180,11 @@ class AttentionUNet(nn.Module):
             reversed(skip_connections),
         ):
             skip = attention_gate(gate_signal=x, skip_connection=skip)
-            x = upsample(x)
-            x = match_spatial_size(source=x, reference=skip)
-            x = torch.cat([skip, x], dim=1)
-            x = decoder_block(x)
+            x    = upsample(x)
+            x    = match_spatial_size(source=x, reference=skip)
+            x    = torch.cat([skip, x], dim=1)
+            x    = decoder_block(x)
 
-        x = match_spatial_size(source=x, reference=original_input)
-        out  = self.output_head(x)
+        x   = match_spatial_size(source=x, reference=original_input)
+        out = self.output_head(x)
         return out

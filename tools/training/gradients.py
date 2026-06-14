@@ -6,16 +6,16 @@ import torch
 
 class GradientClipper:
     def __init__(self, config, logger, tracker):
-        self.logger      = logger
-        self.tracker     = tracker
+        self.logger  = logger
+        self.tracker = tracker
 
-        self.mode        = config.gradient_clipper.clip_mode
-        self.threshold   = config.gradient_clipper.max_grad_norm if self.mode == "fixed" else None
-        self.window      = config.gradient_clipper.adaptive_window
-        self.percentile  = config.gradient_clipper.adaptive_percentile
-        self.mean_std_k  = config.gradient_clipper.adaptive_mean_std_k
-        self.epsilon     = config.gradient_clipper.clip_epsilon
-        self.hist_freq   = config.gradient_clipper.log_histogram_freq
+        self.mode       = config.gradient_clipper.clip_mode
+        self.threshold  = config.gradient_clipper.max_grad_norm if self.mode == "fixed" else None
+        self.window     = config.gradient_clipper.adaptive_window
+        self.percentile = config.gradient_clipper.adaptive_percentile
+        self.mean_std_k = config.gradient_clipper.adaptive_mean_std_k
+        self.epsilon    = config.gradient_clipper.clip_epsilon
+        self.hist_freq  = config.gradient_clipper.log_histogram_freq
 
         self.history     : list[float] = []
 

@@ -20,7 +20,7 @@ class TransUNet(nn.Module):
         if config.patch_size <= 0:
             raise ValueError("patch_size must be a positive integer")
 
-        cnn_features = config.cnn_features
+        cnn_features        = config.cnn_features
         bottleneck_channels = cnn_features[-1] * config.bottleneck_factor
 
         self.encoder_blocks = nn.ModuleList()
@@ -70,17 +70,17 @@ class TransUNet(nn.Module):
         ])
         self.transformer_norm = nn.LayerNorm(bottleneck_channels)
 
-        cnn_downsample = 2 ** len(cnn_features)
+        cnn_downsample          = 2 ** len(cnn_features)
         self.expected_grid_size = config.image_size // cnn_downsample // config.patch_size
-        num_patches = self.expected_grid_size ** 2
+        num_patches             = self.expected_grid_size ** 2
         self.positional_embedding = nn.Parameter(
             torch.zeros(1, num_patches, bottleneck_channels)
         )
         nn.init.trunc_normal_(self.positional_embedding, std=0.02)
 
-        reversed_features = [bottleneck_channels] + cnn_features[::-1]
+        reversed_features    = [bottleneck_channels] + cnn_features[::-1]
         self.upsample_layers = nn.ModuleList()
-        self.decoder_blocks = nn.ModuleList()
+        self.decoder_blocks  = nn.ModuleList()
         for index in range(len(reversed_features) - 1):
             self.upsample_layers.append(
                 build_upsample(
@@ -136,7 +136,7 @@ class TransUNet(nn.Module):
         for transformer_block in self.transformer_blocks:
             tokens = transformer_block(tokens)
         tokens = self.transformer_norm(tokens)
-        x = tokens_to_feature_map(tokens, grid_height, grid_width)
+        x      = tokens_to_feature_map(tokens, grid_height, grid_width)
 
         if x.shape[2:] != skip_connections[-1].shape[2:]:
             x = match_spatial_size(source=x, reference=skip_connections[-1])

@@ -83,8 +83,8 @@ class SizeMatchResult:
     target        : int
     deviation_pct : float
     iterations    : int
-    history       : list[dict] = field(default_factory=list)
-    flags         : list[str]  = field(default_factory=list)
+    history : list[dict] = field(default_factory=list)
+    flags   : list[str]  = field(default_factory=list)
 
 
 class DegeneracyAuditor:
@@ -130,12 +130,12 @@ class DegeneracyAuditor:
 
 class SizeMatcher:
     def __init__(self, config: BenchmarkConfig, logger: Logger) -> None:
-        self.config       = config
-        self.logger       = logger
-        self.scaler       = WidthScaler()
-        self.auditor      = DegeneracyAuditor(config=config.size_match, scaler=self.scaler)
-        self.image_size   = config.training.patch_size[0]
-        self.in_channels  = config.size_match.in_channels
+        self.config      = config
+        self.logger      = logger
+        self.scaler      = WidthScaler()
+        self.auditor     = DegeneracyAuditor(config=config.size_match, scaler=self.scaler)
+        self.image_size  = config.training.patch_size[0]
+        self.in_channels = config.size_match.in_channels
 
         gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
         self.out_channels = gaussian_cfg.params_per_gaussian * config.n_gaussians

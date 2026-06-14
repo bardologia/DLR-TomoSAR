@@ -92,7 +92,7 @@ class ConfigRegistry:
         if value is None:
             return "required"
         if isinstance(value, ast.Call):
-            func = value.func
+            func     = value.func
             is_field = (isinstance(func, ast.Name) and func.id == "field") or (isinstance(func, ast.Attribute) and func.attr == "field")
             if is_field:
                 for kw in value.keywords:

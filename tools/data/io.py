@@ -49,8 +49,8 @@ class FileIO:
 
 
 class ModelConfigIO:
-    FILENAME      = "model_config.json"
-    EXCLUDED      = {"shape_logger_types"}
+    FILENAME = "model_config.json"
+    EXCLUDED = {"shape_logger_types"}
 
     @staticmethod
     def _normalize(name: str) -> str:
@@ -124,8 +124,8 @@ class AutoencoderConfigIO:
         if not path.is_file():
             raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the autoencoder architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
 
-        payload  = FileIO.load_json(path)
-        ae_name  = cls._normalize(str(payload["ae_model_name"]))
+        payload = FileIO.load_json(path)
+        ae_name = cls._normalize(str(payload["ae_model_name"]))
 
         if ae_name not in AE_CONFIG_REGISTRY:
             raise ValueError(f"Persisted ae_model_name '{ae_name}' is not a known autoencoder: {list(AE_CONFIG_REGISTRY.keys())}")

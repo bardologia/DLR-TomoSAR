@@ -20,8 +20,8 @@ class ProcessingPipeline:
 
         self.artifact_registry      = ArtifactRegistry   (config, logger=self.logger)
         self.metadata_manager       = MetadataManager    (config, logger=self.logger)
-        self.tomogram_launcher       = TomogramLauncher    (config.tomogram_env_name, logger=self.logger)
-        self.interferogram_launcher  = InterferogramLauncher(config.tomogram_env_name, logger=self.logger)
+        self.tomogram_launcher      = TomogramLauncher    (config.tomogram_env_name, logger=self.logger)
+        self.interferogram_launcher = InterferogramLauncher(config.tomogram_env_name, logger=self.logger)
         self.stack_plotter          = StackPlotter       (config, logger=self.logger)
 
         self._pass_labels : list | None = None

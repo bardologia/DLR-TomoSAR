@@ -136,25 +136,25 @@ class ProcessingConfiguration:
 
 @dataclass
 class PreProcessEntryConfig:
-    azimuth_start        : int   = 1000
-    azimuth_end          : int   = 16000
-    range_start          : int   = 500
-    range_end            : int   = 4000
+    azimuth_start : int = 1000
+    azimuth_end   : int = 16000
+    range_start   : int = 500
+    range_end     : int = 4000
 
-    fusar_project_path   : str   = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
-    base_directory       : str   = "/ste/rnd/"
-    track_selection      : str   = "*"
-    polarisation         : str   = "hv"
+    fusar_project_path : str = "/ste/rnd/User/sera_se/17sartom-traun_L.csv"
+    base_directory     : str = "/ste/rnd/"
+    track_selection    : str = "*"
+    polarisation       : str = "hv"
 
-    beamforming_method   : str   = "Capon"
-    filter_method        : str   = "Boxcar"
-    height_range         : tuple = (-20.0, 80.0)
+    beamforming_method : str   = "Capon"
+    filter_method      : str   = "Boxcar"
+    height_range       : tuple = (-20.0, 80.0)
     win_list             : list  = field(default_factory=lambda: [
         [20, 10],
     ])
 
-    effort               : str           = "high"
-    max_sessions         : int           = 4
+    effort       : str = "high"
+    max_sessions : int = 4
 
     dataset_name         : Optional[str] = None
     dataset_type         : str           = "FSAR"

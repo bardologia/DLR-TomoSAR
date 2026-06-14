@@ -22,12 +22,12 @@ class ProjectPaths:
     }
 
     def __init__(self) -> None:
-        self.webui_root   = Path(__file__).resolve().parent
-        self.repo_root    = self.webui_root.parent
-        self.main_dir     = self.repo_root / "main"
-        self.scripts_dir  = self.repo_root / "scripts"
-        self.config_dir   = self.repo_root / "configuration"
-        self.static_dir   = self.webui_root / "static"
+        self.webui_root  = Path(__file__).resolve().parent
+        self.repo_root   = self.webui_root.parent
+        self.main_dir    = self.repo_root / "main"
+        self.scripts_dir = self.repo_root / "scripts"
+        self.config_dir  = self.repo_root / "configuration"
+        self.static_dir  = self.webui_root / "static"
 
     def script_entry(self, key: str) -> dict:
         override  = self.ENTRY_OVERRIDES.get(key, {})

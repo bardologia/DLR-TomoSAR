@@ -8,27 +8,27 @@ import torch.nn as nn
 
 @dataclass
 class UNetConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
     
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -71,27 +71,27 @@ class UNetConfig:
 
 @dataclass
 class UNetMultiHeadConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    heads_lr            : float           = 1e-3
+    encoder_lr    : float = 3e-4
+    bottleneck_lr : float = 3e-4
+    decoder_lr    : float = 3e-4
+    heads_lr      : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    heads_wd            : float           = 1e-4
+    encoder_wd    : float = 1e-4
+    bottleneck_wd : float = 1e-4
+    decoder_wd    : float = 1e-4
+    heads_wd      : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -134,27 +134,27 @@ class UNetMultiHeadConfig:
 
 @dataclass
 class UNetPerGaussianConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    heads_lr            : float           = 1e-3
+    encoder_lr    : float = 3e-4
+    bottleneck_lr : float = 3e-4
+    decoder_lr    : float = 3e-4
+    heads_lr      : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    heads_wd            : float           = 1e-4
+    encoder_wd    : float = 1e-4
+    bottleneck_wd : float = 1e-4
+    decoder_wd    : float = 1e-4
+    heads_wd      : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -197,27 +197,27 @@ class UNetPerGaussianConfig:
 
 @dataclass
 class ResUNetConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
     
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -262,27 +262,27 @@ class ResUNetConfig:
 
 @dataclass
 class UNetSkipConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -340,15 +340,15 @@ class AttentionUNetConfig:
     conv_bias                    : bool      = False
     init_mode                    : str       = "default"
 
-    encoder_lr                   : float     = 3e-4
-    bottleneck_lr                : float     = 3e-4
-    decoder_lr                   : float     = 3e-4
-    output_head_lr               : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd                   : float     = 1e-4
-    bottleneck_wd                : float     = 1e-4
-    decoder_wd                   : float     = 1e-4
-    output_head_wd               : float     = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
     
     shape_logger_types           : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -404,25 +404,25 @@ class AttentionUNetConfig:
 
 @dataclass
 class UNetPlusPlusConfig:
-    in_channels           : int       = 1
-    out_channels          : int       = 6
-    params_per_gaussian   : int       = 3
-    features              : list[int] = field(default_factory=lambda: [56, 112, 216, 440])
-    bottleneck_factor     : int       = 2
-    dropout               : float     = 0.15
-    activation            : str       = "relu"
-    normalization         : str       = "batch"
-    upsample_mode         : str       = "convtranspose"
-    conv_bias             : bool      = False
-    init_mode             : str       = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [56, 112, 216, 440])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 1e-4
-    decoder_wd            : float     = 1e-4
-    output_head_wd        : float     = 1e-4
+    encoder_wd     : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Upsample, nn.Dropout2d,
@@ -486,13 +486,13 @@ class LinkNetConfig:
     conv_bias                : bool      = False
     init_mode                : str       = "default"
 
-    encoder_lr               : float     = 3e-4
-    decoder_lr               : float     = 3e-4
-    output_head_lr           : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd               : float     = 1e-4
-    decoder_wd               : float     = 1e-4
-    output_head_wd           : float     = 1e-4
+    encoder_wd     : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
     
     shape_logger_types       : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Dropout2d,
@@ -549,13 +549,13 @@ class SwinUNetConfig:
     stochastic_depth_rate : float     = 0.10
     init_mode             : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 1e-2
-    decoder_wd            : float     = 1e-2
-    output_head_wd        : float     = 1e-2
+    encoder_wd     : float = 1e-2
+    decoder_wd     : float = 1e-2
+    output_head_wd : float = 1e-2
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm, nn.GELU, nn.Dropout,
@@ -632,13 +632,13 @@ class TransUNetConfig:
     stochastic_depth_rate : float     = 0.0
     init_mode             : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 5e-3
-    decoder_wd            : float     = 5e-3
-    output_head_wd        : float     = 5e-3
+    encoder_wd     : float = 5e-3
+    decoder_wd     : float = 5e-3
+    output_head_wd : float = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Linear, nn.LayerNorm,
@@ -724,13 +724,13 @@ class UNETRConfig:
     stochastic_depth_rate : float     = 0.0
     init_mode             : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 5e-3
-    decoder_wd            : float     = 5e-3
-    output_head_wd        : float     = 5e-3
+    encoder_wd     : float = 5e-3
+    decoder_wd     : float = 5e-3
+    output_head_wd : float = 5e-3
     
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm,
@@ -793,27 +793,27 @@ class UNETRConfig:
 
 @dataclass
 class ResUNetMultiHeadConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    heads_lr            : float           = 1e-3
+    encoder_lr    : float = 3e-4
+    bottleneck_lr : float = 3e-4
+    decoder_lr    : float = 3e-4
+    heads_lr      : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    heads_wd            : float           = 1e-4
+    encoder_wd    : float = 1e-4
+    bottleneck_wd : float = 1e-4
+    decoder_wd    : float = 1e-4
+    heads_wd      : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -859,27 +859,27 @@ class ResUNetMultiHeadConfig:
 
 @dataclass
 class ResUNetPerGaussianConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    heads_lr            : float           = 1e-3
+    encoder_lr    : float = 3e-4
+    bottleneck_lr : float = 3e-4
+    decoder_lr    : float = 3e-4
+    heads_lr      : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    heads_wd            : float           = 1e-4
+    encoder_wd    : float = 1e-4
+    bottleneck_wd : float = 1e-4
+    decoder_wd    : float = 1e-4
+    heads_wd      : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -924,26 +924,26 @@ class ResUNetPerGaussianConfig:
 
 @dataclass
 class DeepLabV3PlusConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    atrous_rates        : tuple           = (1, 2, 4)
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    atrous_rates        : tuple     = (1, 2, 4)
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    aspp_lr             : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    aspp_lr        : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    aspp_wd             : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    aspp_wd        : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.AdaptiveAvgPool2d, nn.Dropout2d,
@@ -1002,13 +1002,13 @@ class SegFormerLiteConfig:
     stochastic_depth_rate : float     = 0.10
     init_mode             : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 1e-2
-    decoder_wd            : float     = 1e-2
-    output_head_wd        : float     = 1e-2
+    encoder_wd     : float = 1e-2
+    decoder_wd     : float = 1e-2
+    output_head_wd : float = 1e-2
 
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.Linear, nn.LayerNorm, nn.BatchNorm2d,
@@ -1062,15 +1062,15 @@ class ConvNeXtUNetConfig:
     conv_bias             : bool      = False
     init_mode             : str       = "default"
 
-    encoder_lr            : float     = 3e-4
-    bottleneck_lr         : float     = 3e-4
-    decoder_lr            : float     = 3e-4
-    output_head_lr        : float     = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd            : float     = 5e-3
-    bottleneck_wd         : float     = 5e-3
-    decoder_wd            : float     = 5e-3
-    output_head_wd        : float     = 5e-3
+    encoder_wd     : float = 5e-3
+    bottleneck_wd  : float = 5e-3
+    decoder_wd     : float = 5e-3
+    output_head_wd : float = 5e-3
 
     shape_logger_types    : tuple     = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm,
@@ -1113,27 +1113,27 @@ class ConvNeXtUNetConfig:
 
 @dataclass
 class DenseUNetConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    growth_rate         : int             = 16
-    block_layers        : list[int]       = field(default_factory=lambda: [4, 4, 4])
-    bottleneck_layers   : int             = 4
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    growth_rate         : int       = 16
+    block_layers        : list[int] = field(default_factory=lambda: [4, 4, 4])
+    bottleneck_layers   : int       = 4
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -1190,13 +1190,13 @@ class HRNetLiteConfig:
     conv_bias           : bool  = False
     init_mode           : str   = "default"
 
-    encoder_lr          : float = 3e-4
-    decoder_lr          : float = 3e-4
-    output_head_lr      : float = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float = 1e-4
-    decoder_wd          : float = 1e-4
-    output_head_wd      : float = 1e-4
+    encoder_wd     : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout2d,
@@ -1242,27 +1242,27 @@ class HRNetLiteConfig:
 
 @dataclass
 class MultiResUNetConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    bottleneck_factor   : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    upsample_mode       : str             = "convtranspose"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    bottleneck_factor   : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    upsample_mode       : str       = "convtranspose"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
@@ -1307,25 +1307,25 @@ class MultiResUNetConfig:
 
 @dataclass
 class FPNNetConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    pyramid_channels    : int             = 128
-    segmentation_convs  : int             = 2
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    pyramid_channels    : int       = 128
+    segmentation_convs  : int       = 2
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.MaxPool2d, nn.Dropout2d,
@@ -1372,26 +1372,26 @@ class FPNNetConfig:
 
 @dataclass
 class U2NetLiteConfig:
-    in_channels         : int             = 1
-    out_channels        : int             = 6
-    params_per_gaussian : int             = 3
-    features            : list[int]       = field(default_factory=lambda: [64, 128, 256, 512])
-    rsu_heights         : tuple           = (5, 4, 3)
-    dropout             : float           = 0.15
-    activation          : str             = "relu"
-    normalization       : str             = "batch"
-    conv_bias           : bool            = False
-    init_mode           : str             = "default"
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    rsu_heights         : tuple     = (5, 4, 3)
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
 
-    encoder_lr          : float           = 3e-4
-    bottleneck_lr       : float           = 3e-4
-    decoder_lr          : float           = 3e-4
-    output_head_lr      : float           = 1e-3
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
 
-    encoder_wd          : float           = 1e-4
-    bottleneck_wd       : float           = 1e-4
-    decoder_wd          : float           = 1e-4
-    output_head_wd      : float           = 1e-4
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout2d,

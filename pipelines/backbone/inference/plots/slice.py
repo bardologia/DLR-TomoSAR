@@ -198,8 +198,8 @@ class SlicePlotter(PlotTools):
         err_gt_slice = self._rescale(err_gt_slice, scale)
 
         vmin, vmax = self._shared_clim(gt_slice, pred_slice)
-        emax_gt    = float(np.percentile(err_gt_slice, 99.0))
-        ssim_str   = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
+        emax_gt  = float(np.percentile(err_gt_slice, 99.0))
+        ssim_str = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
 
         panels = [
             (gt_slice,     f"{ref_title} — {title_pos}",          self.cmap,     vmin, vmax,    self._int_label, "gt"),
@@ -248,18 +248,18 @@ class SlicePlotter(PlotTools):
     ) -> List[Path]:
 
         if axis == "range":
-            pred_slice               = pred_cube[:, :, index]
-            gt_slice                 = gt_cube  [:, :, index]
-            full_slice               = full_cube[:, :, index] if full_cube is not None else None
-            x_label                  = "azimuth index"
+            pred_slice = pred_cube[:, :, index]
+            gt_slice   = gt_cube  [:, :, index]
+            full_slice = full_cube[:, :, index] if full_cube is not None else None
+            x_label    = "azimuth index"
             x_extent_lo, x_extent_hi = az_offset, az_offset + pred_slice.shape[1]
             title_pos                = f"range = {index + rg_offset}"
 
         elif axis == "azimuth":
-            pred_slice               = pred_cube[:, index, :]
-            gt_slice                 = gt_cube  [:, index, :]
-            full_slice               = full_cube[:, index, :] if full_cube is not None else None
-            x_label                  = "range index"
+            pred_slice = pred_cube[:, index, :]
+            gt_slice   = gt_cube  [:, index, :]
+            full_slice = full_cube[:, index, :] if full_cube is not None else None
+            x_label    = "range index"
             x_extent_lo, x_extent_hi = rg_offset, rg_offset + pred_slice.shape[1]
             title_pos                = f"azimuth = {index + az_offset}"
 

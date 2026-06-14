@@ -23,8 +23,8 @@ class Conv1dEncoder(nn.Module):
 
     def forward(self, curve: torch.Tensor) -> torch.Tensor:
         seq, dims = AutoencoderBlocks.to_sequence(curve)
-        feats     = self.body(seq.unsqueeze(1))
-        z         = self.head(feats.squeeze(-1))
+        feats = self.body(seq.unsqueeze(1))
+        z     = self.head(feats.squeeze(-1))
         return AutoencoderBlocks.from_sequence(z, dims)
 
 
@@ -43,8 +43,8 @@ class Conv1dDecoder(nn.Module):
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         seq, dims = AutoencoderBlocks.to_sequence(z)
-        feats     = self.project(seq).reshape(-1, self.seq_channels, self.length)
-        curve     = self.body(feats).squeeze(1)
+        feats = self.project(seq).reshape(-1, self.seq_channels, self.length)
+        curve = self.body(feats).squeeze(1)
         return AutoencoderBlocks.from_sequence(curve, dims)
 
 

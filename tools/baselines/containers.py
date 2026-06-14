@@ -33,9 +33,9 @@ class TrackBaselines:
     horizontal          : list
     vertical_std        : list
     horizontal_std      : list
-    vertical_absolute   : list = field(default_factory=list)
-    horizontal_absolute : list = field(default_factory=list)
-    track_files         : list = field(default_factory=list)
+    vertical_absolute   : list         = field(default_factory=list)
+    horizontal_absolute : list         = field(default_factory=list)
+    track_files         : list         = field(default_factory=list)
     azimuth_window      : tuple | None = None
 
     FILENAME : ClassVar[str] = "baselines.json"

@@ -24,18 +24,18 @@ class ProfileDatasetConfig:
     split_regions               : SplitRegions
     parameters_path             : Optional[Path] = None
 
-    n_gaussians                 : int   = 5
-    x_min                       : float = 0.0
-    x_max                       : float = 1.0
+    n_gaussians : int   = 5
+    x_min       : float = 0.0
+    x_max       : float = 1.0
 
-    pixel_subsample             : float = 1.0
-    keep_empty_frac             : float = 0.05
-    amp_zero_thr                : float = 1e-3
+    pixel_subsample : float = 1.0
+    keep_empty_frac : float = 0.05
+    amp_zero_thr    : float = 1e-3
 
-    batch_size                  : int   = 256
-    num_workers                 : int   = 8
-    pin_memory                  : bool  = True
-    shuffle_train               : bool  = True
+    batch_size    : int  = 256
+    num_workers   : int  = 8
+    pin_memory    : bool = True
+    shuffle_train : bool = True
 
     stats_max_samples           : int   = 100_000
 

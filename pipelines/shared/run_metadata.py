@@ -20,15 +20,15 @@ class TrainingRunMetadata:
         self.model_name     = model_name
         self.base_logdir    = Path(base_logdir)
 
-        timestamp           = datetime.now().strftime("%Y%m%d_%H%M%S")
-        resolved_name       = run_name or f"run_{model_name}_{timestamp}"
+        timestamp     = datetime.now().strftime("%Y%m%d_%H%M%S")
+        resolved_name = run_name or f"run_{model_name}_{timestamp}"
 
-        self.run_directory       = self.base_logdir / resolved_name
-        self.tensorboard_dir     = self.run_directory / "tensorboard"
-        self.docs_directory      = self.run_directory / "docs"
-        self.logs_directory      = self.run_directory / "logs"
-        self.metadata_directory  = self.run_directory / "meta"
-        self.checkpoint_dir      = self.run_directory / "checkpoints"
+        self.run_directory      = self.base_logdir / resolved_name
+        self.tensorboard_dir    = self.run_directory / "tensorboard"
+        self.docs_directory     = self.run_directory / "docs"
+        self.logs_directory     = self.run_directory / "logs"
+        self.metadata_directory = self.run_directory / "meta"
+        self.checkpoint_dir     = self.run_directory / "checkpoints"
 
         FileIO.ensure_dirs(
             self.run_directory, self.tensorboard_dir, self.docs_directory,
@@ -38,8 +38,8 @@ class TrainingRunMetadata:
 
         self.writer = SummaryWriter(log_dir=str(self.tensorboard_dir))
 
-        trainer_config.io.logdir     = str(self.run_directory)
-        trainer_config.io.writer     = self.writer
+        trainer_config.io.logdir = str(self.run_directory)
+        trainer_config.io.writer = self.writer
 
         self._owns_logger = logger is None
         self.logger       = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
@@ -60,8 +60,8 @@ class TrainingRunMetadata:
         self.close()
 
     def save_trainer_config(self) -> Path:
-        out_path                     = self.docs_directory / "trainer_config.json"
-        serializable                 = asdict(self.trainer_config)
+        out_path     = self.docs_directory / "trainer_config.json"
+        serializable = asdict(self.trainer_config)
         serializable["io"]["writer"] = None
 
         FileIO.save_json(serializable, out_path)

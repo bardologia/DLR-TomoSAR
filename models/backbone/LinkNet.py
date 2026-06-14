@@ -118,8 +118,8 @@ class LinkNet(nn.Module):
             raise ValueError("decoder_bottleneck_ratio must be a positive integer")
 
         feature_sizes = config.features
-        kernel_size = config.initial_kernel_size
-        padding = kernel_size // 2
+        kernel_size   = config.initial_kernel_size
+        padding       = kernel_size // 2
 
         self.initial_conv = nn.Sequential(
             nn.Conv2d(
@@ -135,7 +135,7 @@ class LinkNet(nn.Module):
         )
 
         self.encoder_stages = nn.ModuleList()
-        channels = feature_sizes[0]
+        channels            = feature_sizes[0]
         for feature_size in feature_sizes:
             self.encoder_stages.append(
                 ResidualEncoderBlock(
@@ -190,17 +190,17 @@ class LinkNet(nn.Module):
             encoder_outputs.append(x)
 
         for stage_index, decoder_stage in enumerate(self.decoder_stages):
-            current_skip = encoder_outputs[-(stage_index + 1)]
+            current_skip  = encoder_outputs[-(stage_index + 1)]
             decoder_input = current_skip if stage_index == 0 else x
-            decoded = decoder_stage(decoder_input)
+            decoded       = decoder_stage(decoder_input)
 
             if stage_index + 1 < len(encoder_outputs):
                 target_skip = encoder_outputs[-(stage_index + 2)]
-                decoded = match_spatial_size(source=decoded, reference=target_skip)
-                x = decoded + target_skip
+                decoded     = match_spatial_size(source=decoded, reference=target_skip)
+                x           = decoded + target_skip
             else:
                 x = decoded
 
-        x = match_spatial_size(source=x, reference=original_input)
-        out  = self.output_head(x)
+        x   = match_spatial_size(source=x, reference=original_input)
+        out = self.output_head(x)
         return out

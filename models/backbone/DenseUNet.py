@@ -77,7 +77,7 @@ class DenseUNet(nn.Module):
         self.dense_down    = nn.ModuleList()
         self.trans_down    = nn.ModuleList()
         skip_channel_sizes = []
-        channels = stem_channels
+        channels           = stem_channels
         for n_layers in config.block_layers:
             block = DenseBlock(channels, growth, n_layers, config.dropout, config.activation, config.normalization, config.conv_bias)
             self.dense_down.append(block)
@@ -107,7 +107,7 @@ class DenseUNet(nn.Module):
         skip_connections: list[torch.Tensor] = []
         for block, transition in zip(self.dense_down, self.trans_down):
             new_features = block(x)
-            x = torch.cat([x, new_features], dim=1)
+            x            = torch.cat([x, new_features], dim=1)
             skip_connections.append(x)
             x = transition(x)
 

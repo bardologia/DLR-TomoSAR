@@ -68,9 +68,9 @@ class CubeStitcher:
     def add_patch(self, idx: int, patch: np.ndarray) -> None:
         ph, pw = self.grid.patch_size
         iv, ih = divmod(idx, self.grid.n_h)
-        v0     = iv * self.grid.stride
-        h0     = ih * self.grid.stride
-        w      = self.window
+        v0 = iv * self.grid.stride
+        h0 = ih * self.grid.stride
+        w  = self.window
 
         self._accum[:, v0:v0 + ph, h0:h0 + pw] += (patch * w[None, :, :]).astype(self.dtype, copy=False)
         self._weight[v0:v0 + ph, h0:h0 + pw]   += w
@@ -103,21 +103,21 @@ class Predictor:
         cpu_workers    : int | None = None,
     ) -> None:
 
-        self.run            = run
-        self.logger         = logger
-        self.window_kind    = window_kind
-        self.cube_dtype     = cube_dtype
-        self.save_cubes     = save_cubes
-        self.cube_dir       = meta.cube_dir
-        self.cpu_workers    = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
+        self.run         = run
+        self.logger      = logger
+        self.window_kind = window_kind
+        self.cube_dtype  = cube_dtype
+        self.save_cubes  = save_cubes
+        self.cube_dir    = meta.cube_dir
+        self.cpu_workers = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
 
     def _forward_pass(self) -> Tuple[List[List[int]], List[np.ndarray], List[np.ndarray]]:
-        run    = self.run
-        n_K    = run.n_gaussians
+        run = self.run
+        n_K = run.n_gaussians
 
-        all_indices     : List[List[int]]   = []
-        all_pred_params : List[np.ndarray]  = []
-        all_gt_params   : List[np.ndarray]  = []
+        all_indices     : List[List[int]]  = []
+        all_pred_params : List[np.ndarray] = []
+        all_gt_params   : List[np.ndarray] = []
         sample_count = 0
 
         with self.logger.track(transient=True) as prog:
@@ -140,8 +140,8 @@ class Predictor:
         return all_indices, all_pred_params, all_gt_params
 
     def _compute_metrics(self, all_pred_params : List[np.ndarray], all_gt_params : List[np.ndarray]) -> List[tuple]:
-        run    = self.run
-        n_K    = run.n_gaussians
+        run = self.run
+        n_K = run.n_gaussians
 
         tasks = [(pred, gt, run.x_axis, n_K) for pred, gt in zip(all_pred_params, all_gt_params)]
         results: List[tuple | None] = [None] * len(tasks)
@@ -164,18 +164,18 @@ class Predictor:
         x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
         B, _, H, W = pred_params_chunk.shape
 
-        n_K         = n_gaussians
-        pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-        gt_gauss    = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+        n_K        = n_gaussians
+        pred_gauss = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+        gt_gauss   = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
 
-        sort_key    = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
-        sort_idx    = np.argsort(sort_key, axis=1)
-        sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)
+        sort_key   = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
+        sort_idx   = np.argsort(sort_key, axis=1)
+        sort_idx_e = sort_idx[:, :, None, :, :].repeat(3, axis=2)
 
         gt_gauss_matched   = np.take_along_axis(gt_gauss, sort_idx_e, axis=1)
 
-        pred_gauss_flat    = pred_gauss.reshape(      B, n_K * 3, H, W)
-        gt_gauss_flat      = gt_gauss_matched.reshape(B, n_K * 3, H, W)
+        pred_gauss_flat = pred_gauss.reshape(      B, n_K * 3, H, W)
+        gt_gauss_flat   = gt_gauss_matched.reshape(B, n_K * 3, H, W)
 
         pred_curves = GaussianReconstructor.reconstruct_batch(pred_gauss,       x)
         gt_curves   = GaussianReconstructor.reconstruct_batch(gt_gauss_matched, x)

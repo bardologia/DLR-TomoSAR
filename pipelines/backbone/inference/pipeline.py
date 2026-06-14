@@ -181,8 +181,8 @@ class InferencePipeline:
     def run(self) -> Path:
         cfg                    = self.config
         meta, logger, plotter  = self._setup(cfg)
-        run                    = self._load_run(cfg, logger)
-        result                 = self._predict(cfg, meta, run, logger)
+        run    = self._load_run(cfg, logger)
+        result = self._predict(cfg, meta, run, logger)
 
         x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
         _N_elev, _az, _rg = result.pred_curves.shape

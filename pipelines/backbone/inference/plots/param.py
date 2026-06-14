@@ -29,8 +29,8 @@ class ParamPlotter(PlotTools):
 
         for k in range(n_gaussians):
             for j, (fname, short) in enumerate(zip(("a", "mu", "sigma"), self.PARAM_SHORT)):
-                ch         = 3 * k + j
-                arr_pred   = params_pred[ch]
+                ch       = 3 * k + j
+                arr_pred = params_pred[ch]
                 vmin, vmax = self._shared_clim(arr_pred if params_gt is None else np.stack([arr_pred, params_gt[ch]]))
 
                 paths.append(self._imshow_panel(

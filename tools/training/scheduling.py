@@ -5,9 +5,9 @@ import math
 
 class Warmup:
     def __init__(self, config, logger, tracker):
-        self.config              = config
-        self.logger              = logger
-        self.tracker             = tracker
+        self.config  = config
+        self.logger  = logger
+        self.tracker = tracker
 
         self.warmup_steps        = self.config.warmup.warmup_steps
         self.warmup_start_factor = self.config.warmup.warmup_start_factor
@@ -15,9 +15,9 @@ class Warmup:
         self.mode                = self.config.warmup.warmup_mode
         self.poly_power          = self.config.warmup.warmup_poly_power
 
-        self.current_step        = 0
-        self.warmup_finished     = False
-        self._logged_completion  = False
+        self.current_step       = 0
+        self.warmup_finished    = False
+        self._logged_completion = False
 
         self.logger.section("[Warmup Scheduler]")
         self.logger.kv_table({
@@ -83,10 +83,10 @@ class Warmup:
 
 class Scheduler:
     def __init__(self, base_lrs, warmup, config, logger, tracker):
-        self.config         = config
-        self.warmup         = warmup
-        self.logger         = logger
-        self.tracker        = tracker
+        self.config  = config
+        self.warmup  = warmup
+        self.logger  = logger
+        self.tracker = tracker
 
         self.base_lrs       = list(base_lrs)
         self.current_lrs    = list(base_lrs)

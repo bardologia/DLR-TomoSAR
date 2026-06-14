@@ -207,8 +207,8 @@ class ParamExtractionPipeline:
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
             init_workers         = config.parameter_workers,
         )
-        self.metadata_manager   = ExtractionMetadataManager(config, logger=self.logger)
-        self.parameter_io       = ParameterIO(logger=self.logger)
+        self.metadata_manager = ExtractionMetadataManager(config, logger=self.logger)
+        self.parameter_io     = ParameterIO(logger=self.logger)
 
         n_K                = config.fit_settings.fit_config.k_max
         threshold_factor   = float(config.fit_settings.fit_config.threshold_factor)
@@ -268,8 +268,8 @@ class ParamExtractionPipeline:
         self.logger.section("[Param Extraction Pipeline Execution]")
 
         parameters_array, diagnostics = self._stage_extract()
-        npy_path                      = self._stage_save(parameters_array)
-        diag_path                     = self.parameter_io.save_diagnostics(diagnostics, self.config.diagnostics_npz_path)
+        npy_path  = self._stage_save(parameters_array)
+        diag_path = self.parameter_io.save_diagnostics(diagnostics, self.config.diagnostics_npz_path)
         del parameters_array, diagnostics
         gc.collect()
 

@@ -15,18 +15,18 @@ from tools.baselines import SecondarySelection
 
 class Layout:
     def __init__(self, run_directory: Path, logger: Logger, parameters_path: Path) -> None:
-        self.run_directory    = Path(run_directory)
-        self.logger           = logger
-        self.data_directory   = self.run_directory / "data"
-        self.parameters_path  = Path(parameters_path)
+        self.run_directory   = Path(run_directory)
+        self.logger          = logger
+        self.data_directory  = self.run_directory / "data"
+        self.parameters_path = Path(parameters_path)
 
         layout_path = self.data_directory / "dataset.json"
         payload     = FileIO.load_json(layout_path)
 
-        self.global_crop    : CropRegion  = CropRegion(*payload["global_crop"])
-        self.tomogram_tag   : str         = payload["tomogram_tag"]
-        self.artifacts      : dict        = payload["artifacts"]
-        self.pass_labels    : list | None = payload["pass_labels"]
+        self.global_crop  : CropRegion  = CropRegion(*payload["global_crop"])
+        self.tomogram_tag : str         = payload["tomogram_tag"]
+        self.artifacts    : dict        = payload["artifacts"]
+        self.pass_labels  : list | None = payload["pass_labels"]
 
         self.logger.section("[Layout Loaded]")
         self.logger.kv_table({
@@ -267,7 +267,7 @@ class Patcher:
 
         if pw_spec is not None:
             pt, pb, pl, pr, mode = pw_spec
-            pad_width            = [(0, 0)] * (sub.ndim - 2) + [(pt, pb), (pl, pr)]
-            sub                  = np.pad(sub, pad_width, mode=mode)
+            pad_width = [(0, 0)] * (sub.ndim - 2) + [(pt, pb), (pl, pr)]
+            sub       = np.pad(sub, pad_width, mode=mode)
 
         return sub

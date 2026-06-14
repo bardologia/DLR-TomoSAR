@@ -55,12 +55,12 @@ class SigmaScan:
 
         def _step(carry, t):
             s_, m_, v_ = carry
-            _, g = batched_vg(s_, height_axis, profiles, amps, mus)
-            m_   = b1_ * m_ + (1.0 - b1_) * g
-            v_   = b2_ * v_ + (1.0 - b2_) * g * g
-            tf   = t.astype(jnp.float32) + 1.0
-            s_   = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
-            s_   = jnp.clip(s_, sigma_lower, sigma_upper)
+            _, g       = batched_vg(s_, height_axis, profiles, amps, mus)
+            m_ = b1_ * m_ + (1.0 - b1_) * g
+            v_ = b2_ * v_ + (1.0 - b2_) * g * g
+            tf = t.astype(jnp.float32) + 1.0
+            s_ = s_ - lr_ * (m_ / (1.0 - b1_ ** tf)) / (jnp.sqrt(v_ / (1.0 - b2_ ** tf)) + eps)
+            s_ = jnp.clip(s_, sigma_lower, sigma_upper)
             return (s_, m_, v_), None
 
         (s_final, _, _), _ = jax.lax.scan(_step, (s, m, v), jnp.arange(n_steps))
@@ -143,13 +143,13 @@ class PmapSigmaAdamKernel:
         n_steps=2000, lr=1e-2, b1=0.9, b2=0.999,
     ):
         n, K = sigmas_init.shape
-        H    = profiles.shape[1]
-        D    = self._n_devices
-        pad  = (-n) % D
+        H   = profiles.shape[1]
+        D   = self._n_devices
+        pad = (-n) % D
 
         if pad > 0:
-            z_K = jnp.zeros((pad, K), dtype=jnp.float32)
-            z_H = jnp.zeros((pad, H), dtype=jnp.float32)
+            z_K         = jnp.zeros((pad, K), dtype=jnp.float32)
+            z_H         = jnp.zeros((pad, H), dtype=jnp.float32)
             sigmas_init = jnp.concatenate([sigmas_init, z_K], axis=0)
             profiles    = jnp.concatenate([profiles,    z_H], axis=0)
             amps        = jnp.concatenate([amps,        z_K], axis=0)
@@ -184,9 +184,9 @@ class PeakInitialiser:
     @staticmethod
     def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         chunk_N, H = raw_chunk.shape
-        amps       = np.zeros((chunk_N, K), dtype=np.float32)
-        mus        = np.zeros((chunk_N, K), dtype=np.float32)
-        sigs       = np.full ((chunk_N, K), sigma_guess, dtype=np.float32)
+        amps = np.zeros((chunk_N, K), dtype=np.float32)
+        mus  = np.zeros((chunk_N, K), dtype=np.float32)
+        sigs = np.full ((chunk_N, K), sigma_guess, dtype=np.float32)
 
         for n in range(chunk_N):
             raw  = raw_chunk[n]
@@ -402,16 +402,16 @@ class SigmaFittingExtractor:
         height_range  : Tuple[float, float],
     ) -> tuple:
 
-        fit_cfg       = self.fit_settings.fit_config
-        n_params_out  = 3 * self.k_max
+        fit_cfg      = self.fit_settings.fit_config
+        n_params_out = 3 * self.k_max
 
         tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r", allow_pickle=False)
         H, Az, R      = tomogram_mmap.shape
-        height_axis   = np.linspace(height_range[0], height_range[1], H, dtype=np.float32)
-        height_ax_j   = jnp.array(height_axis)
+        height_axis = np.linspace(height_range[0], height_range[1], H, dtype=np.float32)
+        height_ax_j = jnp.array(height_axis)
 
-        h_span        = float(height_axis[-1] - height_axis[0])
-        dh            = h_span / (H - 1)
+        h_span = float(height_axis[-1] - height_axis[0])
+        dh     = h_span / (H - 1)
 
         sigma_lower_j = jnp.float32(dh)
         sigma_upper_j = jnp.float32(h_span / 2.0)
@@ -446,8 +446,8 @@ class SigmaFittingExtractor:
         self.logger.section("[Kernel Compilation]")
         self.logger.subsection(f"Compiling sigma-only JAX kernel for K={self.k_max}")
 
-        N_warm  = self._n_devices * max(1, 4 // self._n_devices)
-        K       = self.k_max
+        N_warm = self._n_devices * max(1, 4 // self._n_devices)
+        K      = self.k_max
 
         dummy_s = jnp.ones((N_warm, K),  dtype=jnp.float32) * 5.0
         dummy_p = jnp.ones((N_warm, H),  dtype=jnp.float32)
@@ -630,8 +630,8 @@ class SigmaFittingExtractor:
                     while r < R:
                         profiles_flat, profiles_norm, safe_scale, active, r_end = prefetch_future.result()
 
-                        r_start      = r
-                        r_count      = r_end - r
+                        r_start = r
+                        r_count = r_end - r
                         batch_index += 1
                         batch_tag    = f"Batch {batch_index}/{n_batches}"
 

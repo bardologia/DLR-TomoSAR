@@ -14,8 +14,8 @@ class DropPath(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.training or self.drop_prob == 0.0:
             return x
-        keep_prob = 1.0 - self.drop_prob
-        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+        keep_prob     = 1.0 - self.drop_prob
+        shape         = (x.shape[0],) + (1,) * (x.ndim - 1)
         random_tensor = torch.rand(shape, dtype=x.dtype, device=x.device)
         random_tensor = torch.floor_(random_tensor + keep_prob)
         return x / keep_prob * random_tensor
@@ -311,7 +311,7 @@ class Decoder(nn.Module):
     ):
         super().__init__()
         self.upsample_layers = nn.ModuleList()
-        self.conv_blocks = nn.ModuleList()
+        self.conv_blocks     = nn.ModuleList()
         for index in range(len(feature_sizes) - 1):
             self.upsample_layers.append(
                 build_upsample(
@@ -410,9 +410,9 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         normalized = self.norm_1(x)
-        x = x + self.drop_path(self.attention(normalized))
+        x          = x + self.drop_path(self.attention(normalized))
         normalized = self.norm_2(x)
-        x = x + self.drop_path(self.feed_forward(normalized))
+        x          = x + self.drop_path(self.feed_forward(normalized))
         return x
 
 

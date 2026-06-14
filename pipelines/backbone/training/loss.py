@@ -75,8 +75,8 @@ class Loss:
         self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title=title)
 
     def set_curriculum(self, complete_cfg) -> None:
-        self.loss_cfg         = complete_cfg
-        self.match_strategy   = complete_cfg.param_match
+        self.loss_cfg       = complete_cfg
+        self.match_strategy = complete_cfg.param_match
         self.loss_generation += 1
 
         self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
@@ -87,8 +87,8 @@ class Loss:
 
     def _param_term(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss, kind):
         pred, pred_phys, gt, gt_phys = self._match_params(pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss)
-        cfg     = self.loss_cfg
-        w       = torch.tensor(cfg.param_weights, dtype=pred.dtype, device=pred.device)
+        cfg = self.loss_cfg
+        w   = torch.tensor(cfg.param_weights, dtype=pred.dtype, device=pred.device)
 
         if w.numel() < pred.shape[2]:
             w = torch.cat([w, torch.ones(pred.shape[2] - w.numel(), dtype=w.dtype, device=w.device)])
@@ -96,8 +96,8 @@ class Loss:
         w       = w[:pred.shape[2]]
         weights = w.reshape(1, 1, -1, 1, 1)
 
-        active               = (gt_phys[:, :, 0:1] > cfg.amp_zero_thr).to(pred.dtype)
-        param_mask           = torch.ones_like(pred)
+        active     = (gt_phys[:, :, 0:1] > cfg.amp_zero_thr).to(pred.dtype)
+        param_mask = torch.ones_like(pred)
         param_mask[:, :, 1:] = active.expand_as(pred[:, :, 1:])
 
         if kind == "l1":
@@ -112,22 +112,22 @@ class Loss:
         batch_size, num_channels, height, width = pred_gauss.shape
         num_gaussians = num_channels // 3
 
-        pred          = pred_gauss.reshape(     batch_size, num_gaussians, 3, height, width)
-        pred_phys     = pred_phys_gauss.reshape(batch_size, num_gaussians, 3, height, width)
+        pred      = pred_gauss.reshape(     batch_size, num_gaussians, 3, height, width)
+        pred_phys = pred_phys_gauss.reshape(batch_size, num_gaussians, 3, height, width)
 
         gt_gaussians = gt_gauss.shape[1] // 3
 
-        gt           = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
-        gt_phys      = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
+        gt      = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
+        gt_phys = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
 
         pred, pred_phys, gt, gt_phys = ParamLoss.match(self.match_strategy, pred, pred_phys, gt, gt_phys)
 
         effective_gaussians = min(num_gaussians, gt_gaussians)
 
-        pred                = pred[:,      :effective_gaussians]
-        pred_phys           = pred_phys[:, :effective_gaussians]
-        gt                  = gt[:,        :effective_gaussians]
-        gt_phys             = gt_phys[:,   :effective_gaussians]
+        pred      = pred[:,      :effective_gaussians]
+        pred_phys = pred_phys[:, :effective_gaussians]
+        gt        = gt[:,        :effective_gaussians]
+        gt_phys   = gt_phys[:,   :effective_gaussians]
 
         return pred, pred_phys, gt, gt_phys
 
@@ -182,9 +182,9 @@ class Loss:
 
         computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys)
 
-        components:    dict  = {}
-        weighted:      dict  = {}
-        monitor:       dict  = {}
+        components : dict = {}
+        weighted   : dict = {}
+        monitor    : dict = {}
         total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
         weight_sum:    float  = 0.0
 
@@ -214,8 +214,8 @@ class Loss:
 
             if is_used:
                 eff_w                  = cfg.eff(term.weight_key)
-                components[term.name]  = val
-                weighted[term.name]    = eff_w * val
+                components[term.name] = val
+                weighted[term.name]   = eff_w * val
                 total_loss             = total_loss + weighted[term.name]
                 weight_sum            += eff_w
 

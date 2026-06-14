@@ -12,7 +12,7 @@ from ..blocks import ResidualConvBlock
 class BranchFusion(nn.Module):
     def __init__(self, branch_channels: list[int], activation: str, normalization: str, bias: bool):
         super().__init__()
-        n_branches  = len(branch_channels)
+        n_branches      = len(branch_channels)
         self.n_branches = n_branches
 
         self.transforms = nn.ModuleList()

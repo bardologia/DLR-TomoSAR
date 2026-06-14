@@ -15,18 +15,18 @@ def _default_ae_loss():
 
 @dataclass
 class TuningConfig:
-    n_trials                : int  = 100
-    n_epochs                : int  = 30
+    n_trials : int = 100
+    n_epochs : int = 30
 
     base_seed               : int  = 42
 
     early_stop_patience     : int  = 8
 
-    pruner_n_startup_trials : int  = 8
-    pruner_n_warmup_steps   : int  = 8
+    pruner_n_startup_trials : int = 8
+    pruner_n_warmup_steps   : int = 8
 
-    emit_trial_docs         : bool = False
-    emit_study_plots        : bool = False
+    emit_trial_docs  : bool = False
+    emit_study_plots : bool = False
 
 
 @dataclass

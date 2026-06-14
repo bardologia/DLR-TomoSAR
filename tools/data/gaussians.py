@@ -7,9 +7,9 @@ import torch
 
 
 class GaussianMixture:
-    SIGMA_FLOOR  = 1e-6
-    EXPON_FLOOR  = -100.0
-    EXPON_CEIL   = 0.0
+    SIGMA_FLOOR = 1e-6
+    EXPON_FLOOR = -100.0
+    EXPON_CEIL  = 0.0
 
     @classmethod
     def _safe_sigma_sq(cls, sigmas: np.ndarray) -> np.ndarray:
@@ -57,8 +57,8 @@ class GaussianMixture:
             sig    = float(params[3 * k + 2])
             sig_sq = 2.0 * max(sig, cls.SIGMA_FLOOR) ** 2
 
-            expon  = np.clip(-((height_axis - mu) ** 2) / sig_sq, cls.EXPON_FLOOR, cls.EXPON_CEIL)
-            comp   = amp * np.exp(expon)
+            expon = np.clip(-((height_axis - mu) ** 2) / sig_sq, cls.EXPON_FLOOR, cls.EXPON_CEIL)
+            comp  = amp * np.exp(expon)
             components.append(comp)
             total += comp
 
@@ -73,8 +73,8 @@ class GaussianReconstructor:
     @staticmethod
     def reconstruct_batch(gauss: np.ndarray, x: np.ndarray) -> np.ndarray:
         a   = np.maximum(gauss[:, :, 0:1], 0.0)
-        mu  =            gauss[:, :, 1:2]
-        sig =            gauss[:, :, 2:3]
+        mu  = gauss[:, :, 1:2]
+        sig = gauss[:, :, 2:3]
 
         out = GaussianReconstructor._single(a, mu, sig, x).sum(axis=1)
 

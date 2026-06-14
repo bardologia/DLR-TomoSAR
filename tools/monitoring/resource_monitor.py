@@ -11,9 +11,9 @@ import pynvml
 
 class ResourceMonitor:
     def __init__(self, config, logger, tracker=None, step_getter=None):
-        self.cfg = config
-        self.logger = logger
-        self.tracker = tracker
+        self.cfg         = config
+        self.logger      = logger
+        self.tracker     = tracker
         self.step_getter = step_getter or (lambda: 0)
 
         self._load_config()
@@ -24,13 +24,13 @@ class ResourceMonitor:
         self._init_peak_tracking()
 
     def _load_config(self):
-        self.enabled = bool(getattr(self.cfg, "enabled", True))
-        self.interval = float(getattr(self.cfg, "poll_interval_sec", 5.0))
-        self.log_to_tb = bool(getattr(self.cfg, "log_to_tensorboard", True))
-        self.warn_ram_pct = float(getattr(self.cfg, "warn_ram_pct", 90.0))
-        self.warn_vram_pct = float(getattr(self.cfg, "warn_vram_pct", 90.0))
-        self.warn_swap_pct = float(getattr(self.cfg, "warn_swap_pct", 50.0))
-        self.warn_shm_pct = float(getattr(self.cfg, "warn_shm_pct", 80.0))
+        self.enabled         = bool(getattr(self.cfg, "enabled", True))
+        self.interval        = float(getattr(self.cfg, "poll_interval_sec", 5.0))
+        self.log_to_tb       = bool(getattr(self.cfg, "log_to_tensorboard", True))
+        self.warn_ram_pct    = float(getattr(self.cfg, "warn_ram_pct", 90.0))
+        self.warn_vram_pct   = float(getattr(self.cfg, "warn_vram_pct", 90.0))
+        self.warn_swap_pct   = float(getattr(self.cfg, "warn_swap_pct", 50.0))
+        self.warn_shm_pct    = float(getattr(self.cfg, "warn_shm_pct", 80.0))
         self.warn_cooldown_s = float(getattr(self.cfg, "warn_cooldown_sec", 30.0))
 
     def _init_process(self):
@@ -39,7 +39,7 @@ class ResourceMonitor:
         psutil.cpu_percent(None, percpu=False)
 
     def _init_nvml(self):
-        self._nvml_ok = False
+        self._nvml_ok     = False
         self._gpu_handles = []
         try:
             pynvml.nvmlInit()
@@ -51,12 +51,12 @@ class ResourceMonitor:
 
     def _init_disk_tracking(self):
         self._last_disk_io = psutil.disk_io_counters()
-        self._last_disk_t = time.time()
+        self._last_disk_t  = time.time()
 
     def _init_threading(self):
-        self._stop_evt = threading.Event()
-        self._thread = None
-        self._sample_idx = 0
+        self._stop_evt    = threading.Event()
+        self._thread      = None
+        self._sample_idx  = 0
         self._last_warn_t = {}
 
     def _init_peak_tracking(self):
@@ -82,7 +82,7 @@ class ResourceMonitor:
             return 0.0, 0.0
 
     def _maybe_warn(self, key, message):
-        now = time.time()
+        now  = time.time()
         last = self._last_warn_t.get(key, 0.0)
         if now - last < self.warn_cooldown_s:
             return
@@ -92,22 +92,22 @@ class ResourceMonitor:
 
     def _sample_ram_metrics(self, metrics):
         vm = psutil.virtual_memory()
-        metrics["ram_used_gb"] = self._bytes_to_gb(vm.used)
+        metrics["ram_used_gb"]      = self._bytes_to_gb(vm.used)
         metrics["ram_available_gb"] = self._bytes_to_gb(vm.available)
-        metrics["ram_total_gb"] = self._bytes_to_gb(vm.total)
-        metrics["ram_pct"] = float(vm.percent)
+        metrics["ram_total_gb"]     = self._bytes_to_gb(vm.total)
+        metrics["ram_pct"]          = float(vm.percent)
 
     def _sample_swap_metrics(self, metrics):
         sm = psutil.swap_memory()
         metrics["swap_used_gb"] = self._bytes_to_gb(sm.used)
-        metrics["swap_pct"] = float(sm.percent)
+        metrics["swap_pct"]     = float(sm.percent)
 
     def _sample_process_memory_metrics(self, metrics):
         try:
             mi = self.process.memory_full_info()
-            metrics["proc_rss_gb"] = self._bytes_to_gb(mi.rss)
-            metrics["proc_vms_gb"] = self._bytes_to_gb(mi.vms)
-            metrics["proc_uss_gb"] = self._bytes_to_gb(getattr(mi, "uss", 0))
+            metrics["proc_rss_gb"]    = self._bytes_to_gb(mi.rss)
+            metrics["proc_vms_gb"]    = self._bytes_to_gb(mi.vms)
+            metrics["proc_uss_gb"]    = self._bytes_to_gb(getattr(mi, "uss", 0))
             metrics["proc_shared_gb"] = self._bytes_to_gb(getattr(mi, "shared", 0))
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             mi = self.process.memory_info()
@@ -117,7 +117,7 @@ class ResourceMonitor:
     def _sample_process_stats(self, metrics):
         try:
             metrics["proc_num_threads"] = float(self.process.num_threads())
-            metrics["proc_num_fds"] = float(self.process.num_fds())
+            metrics["proc_num_fds"]     = float(self.process.num_fds())
         except (psutil.AccessDenied, AttributeError):
             pass
 
@@ -136,12 +136,12 @@ class ResourceMonitor:
             pass
 
     def _sample_cpu_metrics(self, metrics):
-        metrics["cpu_pct"] = float(psutil.cpu_percent(None, percpu=False))
+        metrics["cpu_pct"]      = float(psutil.cpu_percent(None, percpu=False))
         metrics["proc_cpu_pct"] = float(self.process.cpu_percent(None))
         try:
             la1, la5, la15 = os.getloadavg()
-            metrics["loadavg_1m"] = float(la1)
-            metrics["loadavg_5m"] = float(la5)
+            metrics["loadavg_1m"]  = float(la1)
+            metrics["loadavg_5m"]  = float(la5)
             metrics["loadavg_15m"] = float(la15)
         except (AttributeError, OSError):
             pass
@@ -149,7 +149,7 @@ class ResourceMonitor:
     def _sample_shm_metrics(self, metrics):
         shm_used_gb, shm_pct = self._get_shm_usage()
         metrics["shm_used_gb"] = shm_used_gb
-        metrics["shm_pct"] = shm_pct
+        metrics["shm_pct"]     = shm_pct
 
     def _sample_disk_io_metrics(self, metrics):
         now = time.time()
@@ -157,26 +157,26 @@ class ResourceMonitor:
             io = psutil.disk_io_counters()
             dt = max(now - self._last_disk_t, 1e-6)
             if io is not None and self._last_disk_io is not None:
-                metrics["disk_read_mb_s"] = (io.read_bytes - self._last_disk_io.read_bytes) / dt / (1024.0 ** 2)
+                metrics["disk_read_mb_s"]  = (io.read_bytes - self._last_disk_io.read_bytes) / dt / (1024.0 ** 2)
                 metrics["disk_write_mb_s"] = (io.write_bytes - self._last_disk_io.write_bytes) / dt / (1024.0 ** 2)
             self._last_disk_io = io
-            self._last_disk_t = now
+            self._last_disk_t  = now
         except (PermissionError, OSError):
             pass
 
     def _sample_gpu_nvml_metrics(self, metrics):
         gpu_total = 0.0
-        gpu_used = 0.0
+        gpu_used  = 0.0
         
         if self._nvml_ok:
             for i, h in enumerate(self._gpu_handles):
                 try:
-                    mem = pynvml.nvmlDeviceGetMemoryInfo(h)
-                    util = pynvml.nvmlDeviceGetUtilizationRates(h)
-                    used_gb = self._bytes_to_gb(mem.used)
+                    mem      = pynvml.nvmlDeviceGetMemoryInfo(h)
+                    util     = pynvml.nvmlDeviceGetUtilizationRates(h)
+                    used_gb  = self._bytes_to_gb(mem.used)
                     total_gb = self._bytes_to_gb(mem.total)
-                    free_gb = self._bytes_to_gb(mem.free)
-                    pct = 100.0 * mem.used / max(mem.total, 1)
+                    free_gb  = self._bytes_to_gb(mem.free)
+                    pct      = 100.0 * mem.used / max(mem.total, 1)
                     
                     metrics[f"gpu{i}_vram_used_gb"] = used_gb
                     metrics[f"gpu{i}_vram_free_gb"] = free_gb
@@ -260,7 +260,7 @@ class ResourceMonitor:
 
         vram_pct_overall = (100.0 * gpu_used / gpu_total) if gpu_total > 0 else 0.0
         metrics["vram_used_gb"] = gpu_used
-        metrics["vram_pct"] = vram_pct_overall
+        metrics["vram_pct"]     = vram_pct_overall
 
         self._update_peak_metrics(metrics)
         self._check_warnings(metrics, gpu_used, gpu_total)

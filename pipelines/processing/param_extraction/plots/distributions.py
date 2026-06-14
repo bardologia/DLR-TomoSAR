@@ -27,15 +27,15 @@ class DistributionPlotter(PlotBase):
         flat  = r2_map.reshape(-1).astype(np.float64)
         valid = flat[np.isfinite(flat)]
 
-        qs       = [10, 25, 50, 75, 90]
-        pvals    = np.percentile(valid, qs) if valid.size > 0 else [float("nan")] * 5
+        qs    = [10, 25, 50, 75, 90]
+        pvals = np.percentile(valid, qs) if valid.size > 0 else [float("nan")] * 5
         pcolors  = ["#9467bd", "#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
         stats_tx = rf"mean={summary['r2_mean']:.4f},  median={summary['r2_median']:.4f},  neg\_frac={summary['r2_neg_frac']:.3f}"
         saved    : Dict[str, Path] = {}
 
         fig, ax = plt.subplots(figsize=(6.4, 4.5))
-        lo      = float(np.percentile(valid, 0.5))
-        hi      = float(np.percentile(valid, 99.5))
+        lo = float(np.percentile(valid, 0.5))
+        hi = float(np.percentile(valid, 99.5))
         ax.hist(valid, bins=120, range=(lo, hi), density=True, color="#1f77b4", alpha=0.60, edgecolor="none", label="PDF")
 
         if valid.size > 2:
@@ -56,8 +56,8 @@ class DistributionPlotter(PlotBase):
         saved["r2_pdf"] = self._save(fig, out_dir / "r2_pdf.png")
 
         fig, ax = plt.subplots(figsize=(6.4, 4.5))
-        cdf_x   = np.sort(valid)
-        cdf_y   = np.arange(1, valid.size + 1) / valid.size
+        cdf_x = np.sort(valid)
+        cdf_y = np.arange(1, valid.size + 1) / valid.size
         ax.plot(cdf_x, cdf_y, color="#1f77b4", lw=1.4)
 
         for q, pv, pc in zip(qs, pvals, pcolors):

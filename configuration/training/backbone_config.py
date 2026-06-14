@@ -80,11 +80,11 @@ class BackboneEntryConfig:
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
     model_overrides : dict       = field(default_factory=dict)
 
-    paths      : BenchmarkPathsConfig  = field(default_factory=BenchmarkPathsConfig)
-    training   : TrainingQueueConfig   = field(default_factory=TrainingQueueConfig)
-    curriculum : LossCurriculumConfig  = field(default_factory=_default_curriculum)
-    overfit    : OverfitConfig         = field(default_factory=OverfitConfig)
-    geometry   : GeometryConfig        = field(default_factory=GeometryConfig)
+    paths      : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
+    training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
+    curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)
+    overfit    : OverfitConfig        = field(default_factory=OverfitConfig)
+    geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
 
     probe_enabled    : bool = False
     probe_n_batches  : int  = 1000

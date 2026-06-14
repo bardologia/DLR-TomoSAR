@@ -9,17 +9,17 @@ import torch.nn as nn
 class AutoencoderBaseConfig:
     profile_length : int   = 256
 
-    embedding_dim  : int   = 24
-    embedding_norm : str   = "l2"
+    embedding_dim  : int = 24
+    embedding_norm : str = "l2"
 
-    activation     : str   = "gelu"
-    init_mode      : str   = "default"
+    activation : str = "gelu"
+    init_mode  : str = "default"
 
-    encoder_lr     : float = 3e-4
-    decoder_lr     : float = 3e-4
+    encoder_lr : float = 3e-4
+    decoder_lr : float = 3e-4
 
-    encoder_wd     : float = 1e-4
-    decoder_wd     : float = 1e-4
+    encoder_wd : float = 1e-4
+    decoder_wd : float = 1e-4
 
     @classmethod
     def tunable_lr_params(cls) -> dict:

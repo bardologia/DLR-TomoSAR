@@ -125,10 +125,10 @@ class QueuedTrainingStage(ExperimentStage):
 
 
 class QueuedInferenceStage(ExperimentStage):
-    stage_subdir  : str = "training"
-    worker_action : str = "infer"
-    summary_title : str = "Inference summary"
-    worker_logname: str = "inference_worker.log"
+    stage_subdir   : str = "training"
+    worker_action  : str = "infer"
+    summary_title  : str = "Inference summary"
+    worker_logname : str = "inference_worker.log"
 
     def __init__(self, config, entry_script: Path, run_tag: str, items: list[str], logger: Logger) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)

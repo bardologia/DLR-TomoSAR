@@ -5,9 +5,9 @@ import torch
 
 class EarlyStopping:
     def __init__(self, config, logger, tracker):
-        self.config   = config
-        self.logger   = logger
-        self.tracker  = tracker
+        self.config  = config
+        self.logger  = logger
+        self.tracker = tracker
 
         self.patience = self.config.early_stopping.patience
 
@@ -50,11 +50,11 @@ class EarlyStopping:
 
 class OverfitManager:
     def __init__(self, config, logger):
-        self.enabled         = config.overfit.enabled
-        self.max_steps       = config.overfit.max_steps
-        self.stop_threshold  = config.overfit.stop_threshold
-        self.batch_size      = config.overfit.batch_size
-        self.logger          = logger
+        self.enabled        = config.overfit.enabled
+        self.max_steps      = config.overfit.max_steps
+        self.stop_threshold = config.overfit.stop_threshold
+        self.batch_size     = config.overfit.batch_size
+        self.logger         = logger
 
         self.logger.section("[Overfit Manager]")
         self.logger.kv_table({
@@ -75,9 +75,9 @@ class OverfitManager:
         self._epoch_steps = epoch_steps
         self._steps_done  = 0
 
-        data_loader       = [single_batch] * epoch_steps
-        val_loader_out    = [single_batch]
-        test_loader_out   = [single_batch]
+        data_loader     = [single_batch] * epoch_steps
+        val_loader_out  = [single_batch]
+        test_loader_out = [single_batch]
 
         return data_loader, val_loader_out, test_loader_out
 

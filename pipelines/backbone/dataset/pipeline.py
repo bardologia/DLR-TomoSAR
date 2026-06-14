@@ -174,11 +174,11 @@ class DatasetPipeline:
 
         norm_stats.save(self.training_run_directory / "meta")
 
-        normalizer        = Normalizer(norm_stats)
+        normalizer          = Normalizer(norm_stats)
         train_ds.normalizer = normalizer
 
-        val_ds,   val_patcher   = self._build_dataset("val",  normalizer=normalizer)
-        test_ds,  test_patcher  = self._build_dataset("test", normalizer=normalizer)
+        val_ds,   val_patcher  = self._build_dataset("val",  normalizer=normalizer)
+        test_ds,  test_patcher = self._build_dataset("test", normalizer=normalizer)
 
         train_loader, val_loader, test_loader = Loader.build(
             train_dataset = train_ds,

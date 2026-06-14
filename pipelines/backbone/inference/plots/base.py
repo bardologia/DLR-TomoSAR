@@ -25,11 +25,11 @@ class PlotTools(PlotBase):
         save_dpi : int  = 150,
     ) -> None:
 
-        self.cmap       = cmap
-        self.err_cmap   = err_cmap
-        self.normalize  = normalize
-        self.fig_dpi    = fig_dpi
-        self.save_dpi   = save_dpi
+        self.cmap      = cmap
+        self.err_cmap  = err_cmap
+        self.normalize = normalize
+        self.fig_dpi   = fig_dpi
+        self.save_dpi  = save_dpi
         self._apply_style()
 
     @staticmethod

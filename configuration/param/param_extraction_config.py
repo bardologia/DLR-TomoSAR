@@ -9,9 +9,9 @@ from typing import Optional, Tuple
 class FitMode:
     @dataclass
     class SigmaOnly:
-        threshold_factor   : float = 0.25
-        truncation_index   : int   = 170
-        k_max              : int   = 5
+        threshold_factor : float = 0.25
+        truncation_index : int   = 170
+        k_max            : int   = 5
         lambda_k           : float = 1e-2
         prominence_frac    : float = 0.05
         sigma_init_divisor : float = 4.0
@@ -23,8 +23,8 @@ FitConfig = FitMode.SigmaOnly
 
 @dataclass
 class FitSettings:
-    max_fit_iterations  : int       = 5000
-    fit_config          : FitConfig = field(default_factory=FitMode.SigmaOnly)
+    max_fit_iterations : int       = 5000
+    fit_config         : FitConfig = field(default_factory=FitMode.SigmaOnly)
 
     @property
     def parameters_per_profile(self) -> int:
@@ -38,19 +38,19 @@ class FitSettings:
 @dataclass
 class ExtractionConfig:
     processed_data_path  : Path
-    pyrat_directory      : Path                          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/pyrat"))
-    output_prefix        : str                           = "params"
-    output_suffix        : Optional[str]                 = None
-    height_range         : Optional[Tuple[float, float]] = None
-    fit_settings         : FitSettings                   = field(default_factory=FitSettings)
-    parameter_workers    : int                           = 20
+    pyrat_directory   : Path                          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/pyrat"))
+    output_prefix     : str                           = "params"
+    output_suffix     : Optional[str]                 = None
+    height_range      : Optional[Tuple[float, float]] = None
+    fit_settings      : FitSettings                   = field(default_factory=FitSettings)
+    parameter_workers : int                           = 20
 
-    range_batch_size     : int                           = 3500
-    gpu_pixel_batch_size : int                           = 24576
-    adam_steps           : int                           = 3000
-    adam_lr              : float                         = 2e-1
-    adam_b1              : float                         = 0.95
-    adam_b2              : float                         = 0.999
+    range_batch_size     : int   = 3500
+    gpu_pixel_batch_size : int   = 24576
+    adam_steps           : int   = 3000
+    adam_lr              : float = 2e-1
+    adam_b1              : float = 0.95
+    adam_b2              : float = 0.999
 
 
     @property
@@ -66,12 +66,12 @@ class ExtractionConfig:
         if self.output_suffix:
             return self.output_suffix
 
-        cfg      = self.fit_settings.fit_config
-        k_max    = cfg.k_max
-        divisor  = cfg.sigma_init_divisor
+        cfg     = self.fit_settings.fit_config
+        k_max   = cfg.k_max
+        divisor = cfg.sigma_init_divisor
         lambda_k = cfg.lambda_k
-        div_tag  = f"{divisor:g}".replace(".", "p")
-        lam_tag  = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
+        div_tag = f"{divisor:g}".replace(".", "p")
+        lam_tag = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
         return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}"
 
     @property
@@ -117,18 +117,18 @@ class ExtractionConfig:
 
 @dataclass
 class ExtractParamsEntryConfig:
-    dataset_base_path : Path         = Path("/ste/rnd/User/vice_vi/Dataset")
-    dataset_filter    : list         = field(default_factory=list)
-    pyrat_directory   : Path         = Path("/ste/rnd/User/vice_vi/pyrat")
+    dataset_base_path : Path = Path("/ste/rnd/User/vice_vi/Dataset")
+    dataset_filter    : list = field(default_factory=list)
+    pyrat_directory   : Path = Path("/ste/rnd/User/vice_vi/pyrat")
 
-    output_prefix     : str          = "params"
-    output_suffix     : str | None   = None
-    height_range      : tuple | None = None
+    output_prefix : str          = "params"
+    output_suffix : str | None   = None
+    height_range  : tuple | None = None
 
-    fit_k_max              : int    = 5
-    fit_lambda_k           : float  = 1e-2
-    fit_sigma_init_divisor : float  = 4.0
+    fit_k_max              : int   = 5
+    fit_lambda_k           : float = 1e-2
+    fit_sigma_init_divisor : float = 4.0
 
-    gpu_device_ids    : list         = field(default_factory=lambda: [0, 1, 2, 3])
-    range_batch_size  : int          = 3500
-    parameter_workers : int          = 100
+    gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
+    range_batch_size  : int  = 3500
+    parameter_workers : int  = 100

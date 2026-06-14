@@ -189,7 +189,7 @@ class ConfigCli:
         return raw
 
     def _print_config_help(self) -> None:
-        rows = [(path, type(value).__name__ if value is not None else "any", repr(value)) for path, value in self._leaves(self.config)]
+        rows  = [(path, type(value).__name__ if value is not None else "any", repr(value)) for path, value in self._leaves(self.config)]
         width = max(len(path) for path, _, _ in rows)
 
         print(f"Configuration overrides for {type(self.config).__name__} (pass as --<path> <value>):")

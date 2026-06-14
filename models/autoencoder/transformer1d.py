@@ -24,9 +24,9 @@ class Transformer1dEncoder(nn.Module):
 
     def forward(self, curve: torch.Tensor) -> torch.Tensor:
         seq, dims = AutoencoderBlocks.to_sequence(curve)
-        tokens    = self.embed(seq).unsqueeze(1)
-        attended  = self.encoder(tokens).squeeze(1)
-        z         = self.head(attended)
+        tokens   = self.embed(seq).unsqueeze(1)
+        attended = self.encoder(tokens).squeeze(1)
+        z        = self.head(attended)
         return AutoencoderBlocks.from_sequence(z, dims)
 
 
@@ -47,9 +47,9 @@ class Transformer1dDecoder(nn.Module):
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         seq, dims = AutoencoderBlocks.to_sequence(z)
-        tokens    = self.embed(seq).unsqueeze(1)
-        attended  = self.decoder(tokens).squeeze(1)
-        curve     = self.head(attended)
+        tokens   = self.embed(seq).unsqueeze(1)
+        attended = self.decoder(tokens).squeeze(1)
+        curve    = self.head(attended)
         return AutoencoderBlocks.from_sequence(curve, dims)
 
 

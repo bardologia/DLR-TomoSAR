@@ -76,8 +76,8 @@ class ModelLibrary:
         return {"key": key, "note": filename[:-3], "markdown": markdown, "links": links}
 
     def _strip_operational(self, markdown: str) -> str:
-        out          = []
-        skip_level   = None
+        out        = []
+        skip_level = None
         for line in markdown.split("\n"):
             heading = re.match(r"^(#{1,6})\s+(.*)$", line.strip())
             if heading:
@@ -118,8 +118,8 @@ class ModelLibrary:
         for family in families:
             for model in family["models"]:
                 activation, normalization = defaults[model["key"]]
-                model["activation"]       = activation
-                model["normalization"]    = normalization
+                model["activation"]    = activation
+                model["normalization"] = normalization
 
         return families
 
@@ -128,9 +128,9 @@ class ModelLibrary:
         resolved = {}
 
         for key, class_name in self.CONFIG_CLASSES.items():
-            config             = getattr(module, class_name)()
-            activation         = getattr(config, "activation", self.FALLBACK_ACTIVATION)
-            normalization      = getattr(config, "normalization", self.FALLBACK_NORMALIZATION)
+            config        = getattr(module, class_name)()
+            activation    = getattr(config, "activation", self.FALLBACK_ACTIVATION)
+            normalization = getattr(config, "normalization", self.FALLBACK_NORMALIZATION)
             resolved[key]      = (str(activation).lower(), str(normalization).lower())
 
         return resolved

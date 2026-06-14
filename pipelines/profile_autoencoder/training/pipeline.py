@@ -82,7 +82,7 @@ class TrainingPipeline:
         run_meta = TrainingRunMetadata(self.trainer_config, "profile_ae", Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
-        profile_config = self._profile_dataset_config()
+        profile_config   = self._profile_dataset_config()
         dataset_pipeline = ProfileDatasetPipeline(profile_config, run_meta.run_directory, logger=logger, seed=self.entry.seed)
 
         (train_loader, val_loader, _test_loader), _datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()

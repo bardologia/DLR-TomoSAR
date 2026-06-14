@@ -17,8 +17,8 @@ class OverlapPatchEmbedding(nn.Module):
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, int, int]:
         x          = self.projection(x)
         _, _, h, w = x.shape
-        x          = x.flatten(2).transpose(1, 2)
-        x          = self.norm(x)
+        x = x.flatten(2).transpose(1, 2)
+        x = self.norm(x)
         return x, h, w
 
 
@@ -108,7 +108,7 @@ class SegFormerLite(nn.Module):
             config = SegFormerLiteConfig()
         self.config = config
 
-        dims    = config.embedding_dims
+        dims     = config.embedding_dims
         n_stages = len(dims)
         if not (len(config.depths) == len(config.num_heads) == len(config.sr_ratios) == n_stages):
             raise ValueError("embedding_dims, depths, num_heads, and sr_ratios must have the same length")
@@ -116,8 +116,8 @@ class SegFormerLite(nn.Module):
         kernel_sizes = [7] + [3] * (n_stages - 1)
         strides      = [4] + [2] * (n_stages - 1)
 
-        total_blocks     = sum(config.depths)
-        drop_path_rates  = [config.stochastic_depth_rate * index / max(total_blocks - 1, 1) for index in range(total_blocks)]
+        total_blocks    = sum(config.depths)
+        drop_path_rates = [config.stochastic_depth_rate * index / max(total_blocks - 1, 1) for index in range(total_blocks)]
 
         self.patch_embeddings = nn.ModuleList()
         self.encoder_stages   = nn.ModuleList()

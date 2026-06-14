@@ -5,8 +5,8 @@ class RangeFormatter:
     @staticmethod
     def compact(values: list[int], max_items: int = 6) -> str:
         ranges : list[tuple[int, int]] = []
-        start  = values[0]
-        prev   = values[0]
+        start = values[0]
+        prev  = values[0]
 
         for idx in values[1:]:
             if idx == prev + 1:

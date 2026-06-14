@@ -14,9 +14,9 @@ class JepaCurvePredictor(Predictor):
         n_K = run.n_gaussians
         x   = np.asarray(run.x_axis, dtype=np.float32).reshape(1, 1, -1, 1, 1)
 
-        all_indices  : list = []
-        all_pred     : list = []
-        all_gt       : list = []
+        all_indices : list = []
+        all_pred    : list = []
+        all_gt      : list = []
         sample_count = 0
 
         with self.logger.track(transient=True) as prog:

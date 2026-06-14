@@ -20,8 +20,8 @@ class PermutationMetrics:
     @staticmethod
     def _mu_ordering_rate(pred_params: torch.Tensor, ppg: int, amp_threshold: float = 1e-3) -> float:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
+        G = C // ppg
+        p = pred_params.reshape(B, G, ppg, H, W)
 
         amp      = p[:, :, 0]
         mu       = p[:, :, 1]
@@ -45,10 +45,10 @@ class PermutationMetrics:
         B, C, H, W = pred_params.shape
         G          = C // ppg
 
-        p     = pred_params.reshape(B, G, ppg, H, W)
-        g     = gt_params.reshape(  B, G, ppg, H, W)
-        p_mu  = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
-        g_mu  = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        p    = pred_params.reshape(B, G, ppg, H, W)
+        g    = gt_params.reshape(  B, G, ppg, H, W)
+        p_mu = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        g_mu = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
 
         cost_mat   = torch.nan_to_num(torch.cdist(p_mu, g_mu), nan=1e9, posinf=1e9)
         perms      = torch.tensor(list(itertools.permutations(range(G))), dtype=torch.long, device=pred_params.device)
@@ -72,10 +72,10 @@ class PermutationMetrics:
     @staticmethod
     def _slot_activation_stats(pred_params: torch.Tensor, ppg: int, amp_threshold: float = 1e-3) -> dict[str, float]:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        amp        = p[:, :, 0]
-        active     = (amp > amp_threshold).float()
+        G      = C // ppg
+        p      = pred_params.reshape(B, G, ppg, H, W)
+        amp    = p[:, :, 0]
+        active = (amp > amp_threshold).float()
 
         out: dict[str, float] = {}
         rates                 = []
@@ -91,15 +91,15 @@ class PermutationMetrics:
     @staticmethod
     def _slot_mu_spread(pred_params: torch.Tensor, ppg: int) -> dict[str, float]:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        mu         = p[:, :, 1]
+        G  = C // ppg
+        p  = pred_params.reshape(B, G, ppg, H, W)
+        mu = p[:, :, 1]
 
         out: dict[str, float] = {}
         means                 = []
         for i in range(G):
-            m                          = mu[:, i].mean().item()
-            s                          = mu[:, i].std().item()
+            m = mu[:, i].mean().item()
+            s = mu[:, i].std().item()
             out[f"mu_mean/slot_{i}"]   = m
             out[f"mu_std/slot_{i}"]    = s
             means.append(m)
@@ -110,17 +110,17 @@ class PermutationMetrics:
     @staticmethod
     def _placeholder_detection_stats(pred_params: torch.Tensor, gt_params: torch.Tensor, ppg: int, amp_threshold: float = 1e-3) -> dict[str, float]:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        g          = gt_params.reshape(  B, G, ppg, H, W)
+        G = C // ppg
+        p = pred_params.reshape(B, G, ppg, H, W)
+        g = gt_params.reshape(  B, G, ppg, H, W)
 
-        pred_ph = (p[:, :, 0] <= amp_threshold)   
-        gt_ph   = (g[:, :, 0] <= amp_threshold)   
+        pred_ph = (p[:, :, 0] <= amp_threshold)
+        gt_ph   = (g[:, :, 0] <= amp_threshold)
 
         out: dict[str, float] = {}
 
         for i in range(G):
-            pp = pred_ph[:, i].float()   
+            pp = pred_ph[:, i].float()
             gp = gt_ph[:, i].float()
 
             tp = (pp * gp).sum().item()
@@ -164,9 +164,9 @@ class PermutationMetrics:
         amp_threshold: float = 1e-3,
     ) -> dict[str, float]:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        g          = gt_params.reshape(  B, G, ppg, H, W)
+        G = C // ppg
+        p = pred_params.reshape(B, G, ppg, H, W)
+        g = gt_params.reshape(  B, G, ppg, H, W)
 
         pred_n = (p[:, :, 0] > amp_threshold).sum(dim=1).float()
         gt_n   = (g[:, :, 0] > amp_threshold).sum(dim=1).float()
@@ -195,10 +195,10 @@ class PermutationMetrics:
         B, C, H, W = pred_params.shape
         G          = C // ppg
 
-        p     = pred_params.reshape(B, G, ppg, H, W)
-        g     = gt_params.reshape(  B, G, ppg, H, W)
-        p_mu  = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
-        g_mu  = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        p    = pred_params.reshape(B, G, ppg, H, W)
+        g    = gt_params.reshape(  B, G, ppg, H, W)
+        p_mu = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        g_mu = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
 
         cost_mat   = torch.nan_to_num(torch.cdist(p_mu, g_mu), nan=1e9, posinf=1e9)
         perms      = torch.tensor(list(itertools.permutations(range(G))), dtype=torch.long, device=pred_params.device)
@@ -216,8 +216,8 @@ class PermutationMetrics:
         out["consensus/mean"] = float(torch.tensor(consensus_per_sample).mean().item())
         out["consensus/min"]  = float(torch.tensor(consensus_per_sample).min().item())
 
-        all_idx   = best_perm_idx.reshape(-1)
-        counts_g  = torch.bincount(all_idx, minlength=len(perms)).float()
+        all_idx  = best_perm_idx.reshape(-1)
+        counts_g = torch.bincount(all_idx, minlength=len(perms)).float()
         out["consensus/global_dominant_frac"] = (counts_g.max() / counts_g.sum()).item()
 
         return out
@@ -230,11 +230,11 @@ class PermutationMetrics:
         amp_threshold: float = 1e-3,
     ) -> dict[str, float]:
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        g          = gt_params.reshape(  B, G, ppg, H, W)
+        G = C // ppg
+        p = pred_params.reshape(B, G, ppg, H, W)
+        g = gt_params.reshape(  B, G, ppg, H, W)
 
-        pred_amp = p[:, :, 0]
+        pred_amp  = p[:, :, 0]
         gt_active = g[:, :, 0] > amp_threshold
 
         out: dict[str, float] = {}
@@ -275,9 +275,9 @@ class PermutationMetrics:
             return {}
 
         B, C, H, W = pred_params.shape
-        G          = C // ppg
-        p          = pred_params.reshape(B, G, ppg, H, W)
-        g          = gt_params.reshape(  B, G, ppg, H, W)
+        G = C // ppg
+        p = pred_params.reshape(B, G, ppg, H, W)
+        g = gt_params.reshape(  B, G, ppg, H, W)
 
         pred_sigma = p[:, :, 2]
         gt_active  = g[:, :, 0] > amp_threshold
@@ -297,8 +297,8 @@ class PermutationMetrics:
                 out[f"sigma/inactive_gt/mean/slot_{i}"] = s.mean().item()
                 out[f"sigma/inactive_gt/std/slot_{i}"]  = s.std().item()
 
-        act_s  = pred_sigma[gt_active]
-        ina_s  = pred_sigma[~gt_active]
+        act_s = pred_sigma[gt_active]
+        ina_s = pred_sigma[~gt_active]
         if act_s.numel() > 0:
             out["sigma/active_gt/mean"]   = act_s.mean().item()
         if ina_s.numel() > 0:

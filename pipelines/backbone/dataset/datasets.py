@@ -30,18 +30,18 @@ class PatchDataset(Dataset):
         dem              : Optional[np.ndarray]       = None,
     ) -> None:
 
-        self.inputs         = inputs
-        self.gt_parameters  = gt_parameters
-        self.grid           = grid
-        self.input_config   = input_config
-        self.output_config  = output_config
-        self.split_name     = split_name
-        self.normalizer     = normalizer
-        self.x_axis         = x_axis
-        self.n_gaussians    = n_gaussians
-        self.augmenter      = augmenter
-        self.dem            = dem
-        self.input_layers   = int(inputs.shape[0])
+        self.inputs        = inputs
+        self.gt_parameters = gt_parameters
+        self.grid          = grid
+        self.input_config  = input_config
+        self.output_config = output_config
+        self.split_name    = split_name
+        self.normalizer    = normalizer
+        self.x_axis        = x_axis
+        self.n_gaussians   = n_gaussians
+        self.augmenter     = augmenter
+        self.dem           = dem
+        self.input_layers  = int(inputs.shape[0])
 
         self.n_secondaries    = n_secondaries
         self.n_interferograms = n_interferograms

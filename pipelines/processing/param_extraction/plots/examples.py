@@ -135,11 +135,11 @@ class ExampleFitPlotter(PlotBase):
                 if profile is None:
                     continue
 
-                profile      = profile.astype(np.float64)
-                params       = parameters_array[:, az, rg].astype(np.float64)
+                profile = profile.astype(np.float64)
+                params  = parameters_array[:, az, rg].astype(np.float64)
                 total, comps = self._reconstruct_pixel(params, height_axis.astype(np.float64))
-                residual     = profile - total
-                r2_val       = float(r2_map[az, rg]) if np.isfinite(r2_map[az, rg]) else float("nan")
+                residual = profile - total
+                r2_val   = float(r2_map[az, rg]) if np.isfinite(r2_map[az, rg]) else float("nan")
 
                 saved[f"k{K}_az{az}_rg{rg}_fit"]      = self._plot_pixel_fit(height_axis, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir)
                 saved[f"k{K}_az{az}_rg{rg}_residual"] = self._plot_pixel_residual(height_axis, residual, az, rg, r2_val, k_dir)

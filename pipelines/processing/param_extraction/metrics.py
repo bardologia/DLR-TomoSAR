@@ -194,11 +194,11 @@ class FittingMetricsCalculator:
         return maps
 
     def _compute_global_summary(self, r2_map : np.ndarray, activity_map : np.ndarray) -> Dict[str, float]:
-        r2_flat   = r2_map.reshape(-1).astype(np.float64)
-        r2_valid  = r2_flat[np.isfinite(r2_flat)]
-        n_total   = int(r2_map.size)
-        act_flat  = activity_map.reshape(-1)
-        n_fitted  = int((act_flat > 0).sum())
+        r2_flat  = r2_map.reshape(-1).astype(np.float64)
+        r2_valid = r2_flat[np.isfinite(r2_flat)]
+        n_total  = int(r2_map.size)
+        act_flat = activity_map.reshape(-1)
+        n_fitted = int((act_flat > 0).sum())
 
         def _pct(q: float) -> float:
             return float(np.percentile(r2_valid, q)) if r2_valid.size > 0 else float("nan")

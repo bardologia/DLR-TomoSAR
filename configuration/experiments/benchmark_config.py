@@ -55,26 +55,26 @@ class TrainingQueueConfig:
 
 @dataclass
 class InferenceQueueConfig:
-    split              : str        = "test"
-    checkpoint_name    : str        = "best_model.pt"
-    batch_size         : int | None = None
-    num_workers        : int        = 4
-    cpu_workers        : int        = 16
+    split           : str        = "test"
+    checkpoint_name : str        = "best_model.pt"
+    batch_size      : int | None = None
+    num_workers     : int        = 4
+    cpu_workers     : int        = 16
 
-    save_cubes         : bool       = False
-    stitch_window      : str        = "hann"
+    save_cubes    : bool = False
+    stitch_window : str  = "hann"
 
-    n_best_profiles    : int        = 12
-    n_worst_profiles   : int        = 12
-    n_random_profiles  : int        = 12
+    n_best_profiles   : int = 12
+    n_worst_profiles  : int = 12
+    n_random_profiles : int = 12
 
-    n_range_slices     : int        = 5
-    n_azimuth_slices   : int        = 5
-    n_elevation_slices : int        = 5
+    n_range_slices     : int = 5
+    n_azimuth_slices   : int = 5
+    n_elevation_slices : int = 5
 
-    gif_axes           : list[str]  = field(default_factory=lambda: ["elevation"])
-    gif_fps            : int        = 12
-    gif_max_frames     : int        = 150
+    gif_axes       : list[str] = field(default_factory=lambda: ["elevation"])
+    gif_fps        : int       = 12
+    gif_max_frames : int       = 150
 
 
 @dataclass
@@ -99,9 +99,9 @@ class BenchmarkConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    ae_loss         : object     = field(default_factory=_default_ae_loss)
-    pixel_subsample : float      = 1.0
-    keep_empty_frac : float      = 0.05
+    ae_loss         : object = field(default_factory=_default_ae_loss)
+    pixel_subsample : float  = 1.0
+    keep_empty_frac : float  = 0.05
 
     gpus            : list[int]  = field(default_factory=lambda: [2, 3])
     skip_models     : list[str]  = field(default_factory=list)

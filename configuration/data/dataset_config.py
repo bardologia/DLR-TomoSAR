@@ -13,11 +13,11 @@ from tools.data.regions                import SplitRegions
 
 @dataclass
 class InputConfig:
-    use_primary                   : bool           = True
-    primary_representation        : Representation = Representation.MAG_ONLY
+    use_primary            : bool           = True
+    primary_representation : Representation = Representation.MAG_ONLY
  
-    use_secondaries               : bool           = False
-    secondaries_representation    : Representation = Representation.MAG_ONLY
+    use_secondaries            : bool           = False
+    secondaries_representation : Representation = Representation.MAG_ONLY
  
     use_interferograms            : bool           = True
     interferograms_representation : Representation = Representation.ANGLE_ONLY
@@ -93,9 +93,9 @@ class InputConfig:
       
 @dataclass
 class OutputConfig:
-    use_amplitude      : bool                              = True
-    use_mu             : bool                              = True
-    use_sigma          : bool                              = True
+    use_amplitude : bool = True
+    use_mu        : bool = True
+    use_sigma     : bool = True
     
     output_strategies  : dict[str, ChannelStrategy] = field(default_factory=lambda: {
         "out/amp"   : ChannelStrategy.from_slot("out/amp"),
@@ -123,7 +123,7 @@ class OutputConfig:
 
     def selected_indices(self, n_gaussians: int) -> list[int]:
         role_to_idx = {"a": 0, "mu": 1, "sig": 2}
-        local        = [role_to_idx[name] for name in self.role_names]
+        local       = [role_to_idx[name] for name in self.role_names]
 
         indices: list[int] = []
         for g in range(n_gaussians):
@@ -180,17 +180,17 @@ class AugmentationConfig:
 class DatasetConfiguration:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
-    parameters_path             : Optional[Path]          = None
-    secondary_labels            : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
-    patch                       : PatchConfiguration      = field(default_factory=PatchConfiguration)
-    input_config                : InputConfig             = field(default_factory=InputConfig)
-    output_config               : OutputConfig            = field(default_factory=OutputConfig)
-    augmentation                : AugmentationConfig      = field(default_factory=AugmentationConfig)
+    parameters_path  : Optional[Path]            = None
+    secondary_labels : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
+    patch            : PatchConfiguration        = field(default_factory=PatchConfiguration)
+    input_config     : InputConfig               = field(default_factory=InputConfig)
+    output_config    : OutputConfig              = field(default_factory=OutputConfig)
+    augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)
 
-    batch_size                  : int                     = 8
-    num_workers                 : int                     = 16
-    shuffle_train               : bool                    = True
-    pin_memory                  : bool                    = True
-    x_axis                      : Optional[np.ndarray]    = field(default=None, repr=False)
-    n_gaussians                 : int                     = 1
+    batch_size    : int                  = 8
+    num_workers   : int                  = 16
+    shuffle_train : bool                 = True
+    pin_memory    : bool                 = True
+    x_axis        : Optional[np.ndarray] = field(default=None, repr=False)
+    n_gaussians   : int                  = 1
 

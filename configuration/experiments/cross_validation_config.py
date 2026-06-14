@@ -53,10 +53,10 @@ class CrossValidationConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    geometry   : GeometryConfig         = field(default_factory=GeometryConfig)
-    overfit    : OverfitConfig          = field(default_factory=OverfitConfig)
-    jepa       : JepaCvConfig           = field(default_factory=JepaCvConfig)
-    autoencoder: AeCvConfig             = field(default_factory=AeCvConfig)
+    geometry    : GeometryConfig = field(default_factory=GeometryConfig)
+    overfit     : OverfitConfig  = field(default_factory=OverfitConfig)
+    jepa        : JepaCvConfig   = field(default_factory=JepaCvConfig)
+    autoencoder : AeCvConfig     = field(default_factory=AeCvConfig)
 
     inference_splits : list[str] = field(default_factory=lambda: ["val", "test"])
 

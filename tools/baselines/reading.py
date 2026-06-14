@@ -56,8 +56,8 @@ class TrackFileResolver:
         mapping = {}
 
         for directory in pass_directories:
-            label          = self.label(directory)
-            path           = self.resolve(directory)
+            label = self.label(directory)
+            path  = self.resolve(directory)
             mapping[label] = path
 
         return mapping

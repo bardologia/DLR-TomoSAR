@@ -1,9 +1,9 @@
 class MetricAggregator:
     def __init__(self):
-        self.components_sum: dict = {}
-        self.weighted_sum:   dict = {}
-        self.monitor_sum:    dict = {}
-        self.extra_sum:      dict = {}
+        self.components_sum : dict = {}
+        self.weighted_sum   : dict = {}
+        self.monitor_sum    : dict = {}
+        self.extra_sum      : dict = {}
         self.count                = 0
 
     def add(self, loss_dict: dict) -> None:

@@ -66,8 +66,8 @@ class TrackPlotter(PlotTools):
         h_mean  = np.nanmean(profiles.horizontal, axis=1)
         v_mean  = np.nanmean(profiles.vertical,   axis=1)
 
-        step             = max(1, len(azimuth) // 200)
-        theta            = np.linspace(0.0, 2.0 * np.pi, 36)
+        step  = max(1, len(azimuth) // 200)
+        theta = np.linspace(0.0, 2.0 * np.pi, 36)
         az_grid, th_grid = np.meshgrid(azimuth[::step], theta)
 
         fig = plt.figure(figsize=(12.0, 7.0))

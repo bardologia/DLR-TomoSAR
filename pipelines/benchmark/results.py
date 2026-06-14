@@ -334,9 +334,9 @@ class ComparisonReport:
         if groups is None:
             return [self._write_media_file(self._media_names(scored, subdir), subdir, title, "gif_comparison.md")]
 
-        names   : set[str]    = {name for r in scored for name in self._record_media(r, subdir)}
-        claimed : set[str]    = set()
-        written : list[Path]  = []
+        names   : set[str]   = {name for r in scored for name in self._record_media(r, subdir)}
+        claimed : set[str]   = set()
+        written : list[Path] = []
 
         for group_title, pattern in groups + [("Other figures", re.compile(r".*"))]:
             group_names = sorted((n for n in names if n not in claimed and pattern.search(n)), key=ReportAssets.natural_key)

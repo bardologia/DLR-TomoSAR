@@ -235,8 +235,8 @@ class Animator:
         tasks: list[FrameSpec] = []
         n_frames = len(frame_indices)
         for frame_order, fi in enumerate(frame_indices):
-            i     = int(fi)
-            slc   = get_slice(i)
+            i   = int(fi)
+            slc = get_slice(i)
             p, g  = slc[0], slc[1]
             f     = slc[2] if full_cube is not None else None
             tasks.append(FrameSpec(
@@ -607,10 +607,10 @@ class FigureComposer:
         logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
 
     def _compose_slices(self, result: Result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
-        slice_plotter   = self.plotter.slice
-        meta            = self.meta
-        logger          = self.logger
-        cfg             = self.cfg
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        cfg           = self.cfg
         
         slice_range_idx = indices["slice_range_idx"]
         slice_az_idx    = indices["slice_az_idx"]

@@ -31,9 +31,9 @@ from tools.reporting.markdown import MarkdownDoc, MarkdownTable
 class LiveMonitor:
     def __init__(self, console: Console, title: str = "Training Monitor") -> None:
         self.console = console
-        self.title = title
-        self._metrics: dict[str, Any] = {}
-        self._live: Optional[Live] = None
+        self.title   = title
+        self._metrics : dict[str, Any] = {}
+        self._live    : Optional[Live] = None
 
     def __enter__(self):
         self._live = Live(self._render(), console=self.console, refresh_per_second=4, transient=False)
@@ -130,7 +130,7 @@ class Logger:
             os.makedirs(self.log_dir, exist_ok=True)
 
         self.console: Console = get_console()
-        self.logger = logging.getLogger(name)
+        self.logger           = logging.getLogger(name)
         self.logger.propagate = False
         if self.logger.hasHandlers():
             for handler in list(self.logger.handlers):
@@ -157,7 +157,7 @@ class Logger:
         self._file_handler: Optional[logging.FileHandler] = None
         if log_dir:
             file_formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-            file_handler = logging.FileHandler(os.path.join(self.log_dir, f'{name}.log'), mode='w', encoding='utf-8')
+            file_handler   = logging.FileHandler(os.path.join(self.log_dir, f'{name}.log'), mode='w', encoding='utf-8')
             file_handler.setFormatter(file_formatter)
             file_handler.setLevel(log_level)
             self.logger.addHandler(file_handler)

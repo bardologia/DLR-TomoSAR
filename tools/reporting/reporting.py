@@ -79,7 +79,7 @@ class MetricSectionGrouper:
 
     def group(self, keys: list[str]) -> list[tuple[str, list[str]]]:
         all_keys = list(keys)
-        claimed  : set[str] = set()
+        claimed  : set[str]                    = set()
         sections : list[tuple[str, list[str]]] = []
 
         for title, pattern in self.METRIC_SECTIONS:

@@ -20,10 +20,10 @@ class StackPlotter(PlotBase):
     PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
 
     def __init__(self, config: ProcessingConfiguration, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
-        self.config      = config
-        self.logger      = logger
-        self.fig_dpi     = fig_dpi
-        self.save_dpi    = save_dpi
+        self.config           = config
+        self.logger           = logger
+        self.fig_dpi          = fig_dpi
+        self.save_dpi         = save_dpi
         self.images_directory = Path(config.paths.run_directory) / "images"
 
     def _setup_output_dirs(self) -> Dict[str, Path]:

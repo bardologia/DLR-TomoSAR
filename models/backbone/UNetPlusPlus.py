@@ -24,7 +24,7 @@ class UNetPlusPlus(nn.Module):
         norm = config.normalization
         bias = config.conv_bias
 
-        self.pool = nn.MaxPool2d(2)
+        self.pool           = nn.MaxPool2d(2)
         self._upsample_mode = config.upsample_mode
         if config.upsample_mode == "convtranspose":
             unique_channels = sorted(set([level_1, level_2, level_3, bottleneck_width]))
@@ -76,28 +76,28 @@ class UNetPlusPlus(nn.Module):
         node_3_0 = self.encoder_3_0(self.pool(node_2_0))
         node_4_0 = self.encoder_4_0(self.pool(node_3_0))
 
-        up_1_0 = self._upsample_and_match(source=node_1_0, reference=node_0_0)
+        up_1_0   = self._upsample_and_match(source=node_1_0, reference=node_0_0)
         node_0_1 = self.dense_0_1(torch.cat([node_0_0, up_1_0], dim=1))
-        up_2_0 = self._upsample_and_match(source=node_2_0, reference=node_1_0)
+        up_2_0   = self._upsample_and_match(source=node_2_0, reference=node_1_0)
         node_1_1 = self.dense_1_1(torch.cat([node_1_0, up_2_0], dim=1))
-        up_3_0 = self._upsample_and_match(source=node_3_0, reference=node_2_0)
+        up_3_0   = self._upsample_and_match(source=node_3_0, reference=node_2_0)
         node_2_1 = self.dense_2_1(torch.cat([node_2_0, up_3_0], dim=1))
-        up_4_0 = self._upsample_and_match(source=node_4_0, reference=node_3_0)
+        up_4_0   = self._upsample_and_match(source=node_4_0, reference=node_3_0)
         node_3_1 = self.dense_3_1(torch.cat([node_3_0, up_4_0], dim=1))
 
-        up_1_1 = self._upsample_and_match(source=node_1_1, reference=node_0_0)
+        up_1_1   = self._upsample_and_match(source=node_1_1, reference=node_0_0)
         node_0_2 = self.dense_0_2(torch.cat([node_0_0, node_0_1, up_1_1], dim=1))
-        up_2_1 = self._upsample_and_match(source=node_2_1, reference=node_1_0)
+        up_2_1   = self._upsample_and_match(source=node_2_1, reference=node_1_0)
         node_1_2 = self.dense_1_2(torch.cat([node_1_0, node_1_1, up_2_1], dim=1))
-        up_3_1 = self._upsample_and_match(source=node_3_1, reference=node_2_0)
+        up_3_1   = self._upsample_and_match(source=node_3_1, reference=node_2_0)
         node_2_2 = self.dense_2_2(torch.cat([node_2_0, node_2_1, up_3_1], dim=1))
 
-        up_1_2 = self._upsample_and_match(source=node_1_2, reference=node_0_0)
+        up_1_2   = self._upsample_and_match(source=node_1_2, reference=node_0_0)
         node_0_3 = self.dense_0_3(torch.cat([node_0_0, node_0_1, node_0_2, up_1_2], dim=1))
-        up_2_2 = self._upsample_and_match(source=node_2_2, reference=node_1_0)
+        up_2_2   = self._upsample_and_match(source=node_2_2, reference=node_1_0)
         node_1_3 = self.dense_1_3(torch.cat([node_1_0, node_1_1, node_1_2, up_2_2], dim=1))
 
-        up_1_3 = self._upsample_and_match(source=node_1_3, reference=node_0_0)
+        up_1_3   = self._upsample_and_match(source=node_1_3, reference=node_0_0)
         node_0_4 = self.dense_0_4(torch.cat([node_0_0, node_0_1, node_0_2, node_0_3, up_1_3], dim=1))
 
         out = self.output_head(node_0_4)

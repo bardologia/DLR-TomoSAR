@@ -57,7 +57,7 @@ class ProgressiveProjectionHead(nn.Module):
 class UNETR(nn.Module):
     def __init__(self, config: UNETRConfig | None = None):
         super().__init__()
-        config = config or UNETRConfig()
+        config      = config or UNETRConfig()
         self.config = config
 
         if config.patch_size <= 0:
@@ -150,7 +150,7 @@ class UNETR(nn.Module):
         self.decoder_blocks  = nn.ModuleList()
 
         upsample_output_channels = decoder_features[1:] + [decoder_features[-1]]
-        skip_channels = [decoder_features[1], decoder_features[2], decoder_features[3], decoder_features[3]]
+        skip_channels            = [decoder_features[1], decoder_features[2], decoder_features[3], decoder_features[3]]
 
         for index, output_channels in enumerate(upsample_output_channels):
             input_to_upsample = decoder_features[index]
@@ -226,7 +226,7 @@ class UNETR(nn.Module):
             x = torch.cat([x, skip], dim=1)
             x = self.decoder_blocks[index](x)
 
-        x = self.final_upsample(x)
-        x = match_spatial_size(source=x, reference=original_input)
-        out  = self.output_head(x)
+        x   = self.final_upsample(x)
+        x   = match_spatial_size(source=x, reference=original_input)
+        out = self.output_head(x)
         return out

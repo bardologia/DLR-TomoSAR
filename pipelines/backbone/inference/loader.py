@@ -27,8 +27,8 @@ from tools.baselines           import TrackBaselines, TrackProfiles
 
 class InferenceMetadata:
     def __init__(self, config: InferenceConfig) -> None:
-        self.config  = config
-        paths        = config.paths
+        self.config = config
+        paths       = config.paths
 
         base = config.run_directory / "inference"
         self.output_dir     = base / config.output_subdir if config.output_subdir else base / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -114,10 +114,10 @@ class Run:
     dataset          : PatchDataset
     loader           : DataLoader
     checkpoint_meta  : dict
-    complex_inputs   : np.ndarray | None = None
-    n_secondaries    : int               = 0
-    secondary_labels : list | None       = None
-    full_curves      : np.ndarray | None = None
+    complex_inputs   : np.ndarray | None     = None
+    n_secondaries    : int                   = 0
+    secondary_labels : list | None           = None
+    full_curves      : np.ndarray | None     = None
     track_baselines  : TrackBaselines | None = None
     track_profiles   : TrackProfiles  | None = None
 
@@ -279,10 +279,10 @@ class RunLoader:
             num_workers = num_workers,
         )
 
-        model_name     = str(run_summary["model_name"])
-        in_channels    = int(run_summary["in_channels"])
-        out_channels   = int(run_summary["out_channels"])
-        n_gaussians    = out_channels // 3
+        model_name   = str(run_summary["model_name"])
+        in_channels  = int(run_summary["in_channels"])
+        out_channels = int(run_summary["out_channels"])
+        n_gaussians  = out_channels // 3
 
         ckpt_path = self.run_directory / checkpoint_name
         model     = self._build_model(model_name, in_channels, out_channels, dataset_config.patch.size[0])
@@ -292,9 +292,9 @@ class RunLoader:
         model.load_state_dict(ckpt["params"])
 
         model.eval()
-        norm_stats  = Stats.load(self.run_directory / "meta", self.logger)
-        gauss_cfg   = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
-        model       = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
+        norm_stats = Stats.load(self.run_directory / "meta", self.logger)
+        gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
+        model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(
             dataset_config = dataset_config,

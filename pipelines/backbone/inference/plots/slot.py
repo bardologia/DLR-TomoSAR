@@ -99,8 +99,8 @@ class SlotPlotter(PlotTools):
         paths.append(self._save(fig, out_dir / "placeholder_scores.png"))
 
         fig, ax = plt.subplots(figsize=(max(5.6, 1.2 * len(labels)), 3.8))
-        colors  = [f"C{k % 10}" for k in range(len(labels))]
-        bars    = ax.bar(x, gt_rates, color=colors, alpha=0.75)
+        colors = [f"C{k % 10}" for k in range(len(labels))]
+        bars   = ax.bar(x, gt_rates, color=colors, alpha=0.75)
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
         ax.set_ylim(0, 1.08)
@@ -133,9 +133,9 @@ class SlotPlotter(PlotTools):
         paths = []
 
         fig, ax = plt.subplots(figsize=(5.2, 3.4))
-        labels  = ["µ ordering\nrate", "consensus\ndominant", "consensus\nidentity"]
-        values  = [ordering_rate, dominant_frac, identity_frac]
-        bars    = ax.barh(labels, values, color=["C0", "C2", "C3"], alpha=0.80)
+        labels = ["µ ordering\nrate", "consensus\ndominant", "consensus\nidentity"]
+        values = [ordering_rate, dominant_frac, identity_frac]
+        bars   = ax.barh(labels, values, color=["C0", "C2", "C3"], alpha=0.80)
         ax.set_xlim(0, 1.08)
         ax.set_xlabel("fraction")
         ax.set_title("Slot organisation scalars")

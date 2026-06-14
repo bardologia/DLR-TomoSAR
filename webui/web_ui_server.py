@@ -38,18 +38,18 @@ class _Handler(BaseHTTPRequestHandler):
 class WebUIServer:
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8765) -> None:
-        self.host      = host
-        self.port      = port
-        self.logger    = WebLogger()
-        self.paths     = ProjectPaths()
+        self.host   = host
+        self.port   = port
+        self.logger = WebLogger()
+        self.paths  = ProjectPaths()
 
-        self.resolver  = ScriptConfigResolver(self.paths)
-        self.catalog   = ScriptCatalog(self.paths, self.resolver)
-        self.configs   = ConfigRegistry(self.paths)
-        self.equations = EquationLibrary()
-        self.flows     = FlowLibrary()
-        self.models    = ModelLibrary()
-        self.pipelines = PipelineLibrary()
+        self.resolver    = ScriptConfigResolver(self.paths)
+        self.catalog     = ScriptCatalog(self.paths, self.resolver)
+        self.configs     = ConfigRegistry(self.paths)
+        self.equations   = EquationLibrary()
+        self.flows       = FlowLibrary()
+        self.models      = ModelLibrary()
+        self.pipelines   = PipelineLibrary()
         self.processes   = ProcessManager(self.paths, self.logger)
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)

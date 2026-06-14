@@ -101,8 +101,8 @@ class PhysicalLoss:
         eye   = torch.eye(n_tracks, dtype=cov.dtype, device=cov.device)
         cov   = cov + (loading * trace.clamp(min=floor)).unsqueeze(-1).unsqueeze(-1) * eye
 
-        cov   = 0.5 * (cov + cov.conj().transpose(-2, -1))
-        cov   = cov.to(torch.complex64)
+        cov = 0.5 * (cov + cov.conj().transpose(-2, -1))
+        cov = cov.to(torch.complex64)
 
         steer  = steering.to(torch.complex64)
         solved = torch.linalg.solve(cov, steer)

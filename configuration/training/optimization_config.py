@@ -35,10 +35,10 @@ class EarlyStoppingConfig:
 
 @dataclass
 class GradientClipperConfig:
-    clip_mode            : str   = "fixed"
-    max_grad_norm        : float = 1.0
-    adaptive_window      : int   = 200
-    adaptive_percentile  : float = 95.0
-    adaptive_mean_std_k  : float = 2.0
-    clip_epsilon         : float = 1e-6
-    log_histogram_freq   : int   = 100
+    clip_mode           : str   = "fixed"
+    max_grad_norm       : float = 1.0
+    adaptive_window     : int   = 200
+    adaptive_percentile : float = 95.0
+    adaptive_mean_std_k : float = 2.0
+    clip_epsilon        : float = 1e-6
+    log_histogram_freq  : int   = 100

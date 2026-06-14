@@ -40,8 +40,8 @@ class TuningOrchestrator:
         self.summary_path = self.run_dir / "tuning_results.json"
         self.db_path      = self.run_dir / "optuna.db"
 
-        self.logger        = None
-        self.results       = []
+        self.logger  = None
+        self.results = []
 
         self._quiet_optuna()
 

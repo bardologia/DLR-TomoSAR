@@ -44,9 +44,9 @@ class Result:
     azimuth_offset     : int
     range_offset       : int
 
-    params_pred        : Optional[np.ndarray]        = None
-    params_gt          : Optional[np.ndarray]        = None
-    reduced            : Optional[ReducedComparison] = None
+    params_pred : Optional[np.ndarray]        = None
+    params_gt   : Optional[np.ndarray]        = None
+    reduced     : Optional[ReducedComparison] = None
 
 
 class Metrics:
@@ -93,16 +93,16 @@ class Metrics:
 
         flat       = metric_map.reshape(-1)
         H, W       = metric_map.shape
-        rng        = np.random.default_rng(seed)
-        valid_idx  = np.where(np.isfinite(flat))[0]
-        order      = valid_idx[np.argsort(flat[valid_idx])]
+        rng       = np.random.default_rng(seed)
+        valid_idx = np.where(np.isfinite(flat))[0]
+        order     = valid_idx[np.argsort(flat[valid_idx])]
 
         best_flat  = order[:n_best]
         worst_flat = order[-n_worst:][::-1]
 
-        pool       = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
-        n_random   = min(n_random, pool.size)
-        rand_flat  = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
+        pool      = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
+        n_random  = min(n_random, pool.size)
+        rand_flat = rng.choice(pool, size=n_random, replace=False) if n_random > 0 else np.array([], dtype=np.int64)
 
         return {
             "best"   : Metrics._flat_to_yx(best_flat,  W),
@@ -131,8 +131,8 @@ class Metrics:
 
     @staticmethod
     def _psnr(pred: np.ndarray, ref: np.ndarray) -> float:
-        diff       = pred - ref
-        mse        = float((diff * diff).mean(dtype=np.float64))
+        diff = pred - ref
+        mse  = float((diff * diff).mean(dtype=np.float64))
 
         if mse <= 0.0:
             return float("inf")
@@ -251,17 +251,17 @@ class Metrics:
         P = pred.reshape(pred.shape[0], -1)
         G = gt  .reshape(gt  .shape[0], -1)
 
-        diff_g    = P - G
-        mae_gt    = np.abs(diff_g).mean(axis=1, dtype=np.float64)
-        rmse_gt   = np.sqrt((diff_g ** 2).mean(axis=1, dtype=np.float64))
-        g_var     = ((G - G.mean(axis=1, keepdims=True, dtype=np.float64)) ** 2).sum(axis=1, dtype=np.float64) + 1e-12
-        r2_gt     = 1.0 - (diff_g ** 2).sum(axis=1, dtype=np.float64) / g_var
+        diff_g  = P - G
+        mae_gt  = np.abs(diff_g).mean(axis=1, dtype=np.float64)
+        rmse_gt = np.sqrt((diff_g ** 2).mean(axis=1, dtype=np.float64))
+        g_var   = ((G - G.mean(axis=1, keepdims=True, dtype=np.float64)) ** 2).sum(axis=1, dtype=np.float64) + 1e-12
+        r2_gt   = 1.0 - (diff_g ** 2).sum(axis=1, dtype=np.float64) / g_var
 
         gt_prob   = G / G.sum(axis=0, keepdims=True, dtype=np.float64).clip(1e-12, None)
         pred_prob = P / P.sum(axis=0, keepdims=True, dtype=np.float64).clip(1e-12, None)
 
-        log_pp    = np.log(pred_prob.clip(1e-12, None))
-        ce_gt     = -(gt_prob * log_pp).mean(axis=1, dtype=np.float64)
+        log_pp = np.log(pred_prob.clip(1e-12, None))
+        ce_gt  = -(gt_prob * log_pp).mean(axis=1, dtype=np.float64)
 
         return {
             f"elev_mae_{suffix}"  : mae_gt,
@@ -272,16 +272,16 @@ class Metrics:
 
     def _gaussian_param_metrics(self) -> Dict[str, float]:
         out    : Dict[str, float] = {}
-        pp     = self.result.params_pred
-        pg     = self.result.params_gt
-        n_K    = self.n_gaussians
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
 
         all_mu_ae  : list[np.ndarray] = []
         all_sig_ae : list[np.ndarray] = []
 
         for k in range(n_K):
-            gt_amp  = pg[3 * k]
-            valid   = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
+            gt_amp = pg[3 * k]
+            valid  = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
 
             mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
             mu_gt   = np.where(valid, pg[3 * k + 1], np.nan)
@@ -327,8 +327,8 @@ class Metrics:
         out: Dict[str, float] = {}
 
         for k in range(n_K):
-            gt_amp  = pg[3 * k].reshape(-1)
-            active  = (gt_amp >= 1e-3) & np.isfinite(gt_amp)
+            gt_amp = pg[3 * k].reshape(-1)
+            active = (gt_amp >= 1e-3) & np.isfinite(gt_amp)
 
             mu_pred = pp[3 * k + 1].reshape(-1)[active]
             mu_gt   = pg[3 * k + 1].reshape(-1)[active]
@@ -348,8 +348,8 @@ class Metrics:
         n_K = self.n_gaussians
         out: Dict[str, float] = {}
 
-        all_gt_ph: list[np.ndarray]   = []
-        all_pred_ph: list[np.ndarray] = []
+        all_gt_ph   : list[np.ndarray] = []
+        all_pred_ph : list[np.ndarray] = []
 
         for k in range(n_K):
             gt_amp   = pg[3 * k].reshape(-1)
@@ -378,11 +378,11 @@ class Metrics:
 
         gt_all   = np.concatenate(all_gt_ph)
         pred_all = np.concatenate(all_pred_ph)
-        tp  = (pred_all * gt_all).sum()
-        fp  = (pred_all * (1.0 - gt_all)).sum()
-        fn  = ((1.0 - pred_all) * gt_all).sum()
-        p   = float(tp / (tp + fp + 1e-8))
-        r   = float(tp / (tp + fn + 1e-8))
+        tp       = (pred_all * gt_all).sum()
+        fp       = (pred_all * (1.0 - gt_all)).sum()
+        fn       = ((1.0 - pred_all) * gt_all).sum()
+        p        = float(tp / (tp + fp + 1e-8))
+        r        = float(tp / (tp + fn + 1e-8))
         out["placeholder_precision"] = p
         out["placeholder_recall"]    = r
         out["placeholder_f1"]        = 2.0 * p * r / (p + r + 1e-8)
@@ -430,7 +430,7 @@ class Metrics:
 
         cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])
 
-        all_perms   = list(permutations(range(n_K)))
+        all_perms    = list(permutations(range(n_K)))
         identity_idx = all_perms.index(tuple(range(n_K)))
 
         if n_K <= 4:
@@ -543,15 +543,15 @@ class Metrics:
         )))
 
         finite           = np.isfinite(improvement)
-        pred_mse_mean     = float(np.nanmean(err_pred))
-        reduced_mse_mean  = float(np.nanmean(err_reduced))
+        pred_mse_mean    = float(np.nanmean(err_pred))
+        reduced_mse_mean = float(np.nanmean(err_reduced))
 
-        out["pred_pixel_mse_norm_mean"]      = pred_mse_mean
-        out["reduced_pixel_mse_norm_mean"]   = reduced_mse_mean
-        out["improvement_pixel_mse_mean"]    = float(np.nanmean(improvement))
-        out["improvement_pixel_mse_median"]  = float(np.nanmedian(improvement))
-        out["fraction_pred_beats_reduced"]   = float(np.mean(err_pred[finite] < err_reduced[finite])) if finite.any() else float("nan")
-        out["relative_mse_reduction"]        = RelativeImprovement.fraction(reduced_mse_mean, pred_mse_mean, higher_is_better=False)
+        out["pred_pixel_mse_norm_mean"]     = pred_mse_mean
+        out["reduced_pixel_mse_norm_mean"]  = reduced_mse_mean
+        out["improvement_pixel_mse_mean"]   = float(np.nanmean(improvement))
+        out["improvement_pixel_mse_median"] = float(np.nanmedian(improvement))
+        out["fraction_pred_beats_reduced"]  = float(np.mean(err_pred[finite] < err_reduced[finite])) if finite.any() else float("nan")
+        out["relative_mse_reduction"]       = RelativeImprovement.fraction(reduced_mse_mean, pred_mse_mean, higher_is_better=False)
 
         return ReducedComparison(
             reduced_curves = reduced_curves,

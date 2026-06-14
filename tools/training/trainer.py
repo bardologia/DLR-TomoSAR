@@ -134,9 +134,9 @@ class BaseTrainer:
         self.optimizer.zero_grad(set_to_none=True)
 
         loss_sum, n = 0.0, 0
-        aggregator  = MetricAggregator()
-        n_batches   = len(loader)
-        clear_n     = self.config.memory.clear_cache_every_n_steps
+        aggregator = MetricAggregator()
+        n_batches  = len(loader)
+        clear_n    = self.config.memory.clear_cache_every_n_steps
 
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch + 1}/{self.epochs}[/section] - train", total=n_batches)

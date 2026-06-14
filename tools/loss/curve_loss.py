@@ -80,13 +80,13 @@ class CurveLoss:
         axis: str,
     ) -> torch.Tensor:
         B, N, H, W = pred.shape
-        dtype      = pred.dtype
-        device     = pred.device
+        dtype  = pred.dtype
+        device = pred.device
 
         kernel  = CurveLoss.gaussian_kernel(window_size, sigma, dtype, device)
         padding = window_size // 2
-        c1 = (k1 * data_range) ** 2
-        c2 = (k2 * data_range) ** 2
+        c1      = (k1 * data_range) ** 2
+        c2      = (k2 * data_range) ** 2
 
         def conv(z: torch.Tensor) -> torch.Tensor:
             return F.conv2d(z, kernel, padding=padding)

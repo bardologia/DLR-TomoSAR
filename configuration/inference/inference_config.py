@@ -18,47 +18,47 @@ class InferencePaths:
 @dataclass
 class InferenceConfig:
     run_directory       : Path
-    output_subdir       : Optional[str]  = None
-    device              : str            = "cuda"
-    seed                : int            = 0
-    log_level           : str            = "INFO"
+    output_subdir : Optional[str] = None
+    device        : str           = "cuda"
+    seed          : int           = 0
+    log_level     : str           = "INFO"
 
-    split               : str            = "test"
-    checkpoint_name     : str            = "best_model.pt"
-    batch_size          : Optional[int]  = None
-    num_workers         : int            = 4
-    cpu_workers         : int            = 80
-    gif_workers         : int            = 40
+    split           : str           = "test"
+    checkpoint_name : str           = "best_model.pt"
+    batch_size      : Optional[int] = None
+    num_workers     : int           = 4
+    cpu_workers     : int           = 80
+    gif_workers     : int           = 40
 
-    save_cubes          : bool           = True
-    stitch_window       : str            = "hann"
-    cube_dtype          : str            = "float32"
+    save_cubes    : bool = True
+    stitch_window : str  = "hann"
+    cube_dtype    : str  = "float32"
 
-    compute_reduced     : bool           = True
-    reduced_effort      : str            = "high"
-    reduced_cache_subdir: str            = "data"
-    reduced_env_name    : str            = "stetools"
-    reduced_pyrat_dir   : Optional[Path] = None
+    compute_reduced      : bool           = True
+    reduced_effort       : str            = "high"
+    reduced_cache_subdir : str            = "data"
+    reduced_env_name     : str            = "stetools"
+    reduced_pyrat_dir    : Optional[Path] = None
 
-    n_best_profiles     : int            = 12
-    n_worst_profiles    : int            = 12
-    n_random_profiles   : int            = 12
-    profile_seed        : int            = 0
+    n_best_profiles   : int = 12
+    n_worst_profiles  : int = 12
+    n_random_profiles : int = 12
+    profile_seed      : int = 0
 
-    n_range_slices      : int            = 5
-    n_azimuth_slices    : int            = 5
-    n_elevation_slices  : int            = 5
+    n_range_slices     : int = 5
+    n_azimuth_slices   : int = 5
+    n_elevation_slices : int = 5
 
-    gif_axes            : List[str]      = field(default_factory=lambda: ["elevation"])
-    gif_fps             : int            = 12
-    gif_max_frames      : int            = 150
-    gif_dpi             : int            = 110
+    gif_axes       : List[str] = field(default_factory=lambda: ["elevation"])
+    gif_fps        : int       = 12
+    gif_max_frames : int       = 150
+    gif_dpi        : int       = 110
 
-    cmap_intensity      : str            = "jet"
-    cmap_error          : str            = "magma"
-    normalize_intensity : bool           = True
-    fig_dpi             : int            = 150
-    save_dpi            : int            = 300
+    cmap_intensity      : str  = "jet"
+    cmap_error          : str  = "magma"
+    normalize_intensity : bool = True
+    fig_dpi             : int  = 150
+    save_dpi            : int  = 300
 
     paths               : InferencePaths = field(default_factory=InferencePaths)
 

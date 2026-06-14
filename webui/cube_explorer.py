@@ -91,9 +91,9 @@ class CubeExplorer:
 
         sources = {}
         for source, entry in entries.items():
-            order            = np.argsort(entry["x_axis"])
-            heights          = np.asarray(entry["x_axis"])[order]
-            values           = entry["cube"][:, az, rg][order]
+            order   = np.argsort(entry["x_axis"])
+            heights = np.asarray(entry["x_axis"])[order]
+            values  = entry["cube"][:, az, rg][order]
             sources[source]  = {"heights": heights.tolist(), "values": values.astype(float).tolist()}
 
         return {"ok": True, "az": az, "rg": rg, "sources": sources}
@@ -105,8 +105,8 @@ class CubeExplorer:
 
         cube               = entry["cube"]
         n_elev, n_az, n_rg = cube.shape
-        az                 = int(np.clip(az, 0, n_az - 1))
-        rg                 = int(np.clip(rg, 0, n_rg - 1))
+        az = int(np.clip(az, 0, n_az - 1))
+        rg = int(np.clip(rg, 0, n_rg - 1))
 
         if axis == "range":
             data = cube[:, :, rg]
@@ -114,9 +114,9 @@ class CubeExplorer:
             data = cube[:, az, :]
 
         if space == "normalized":
-            peak       = data.max(axis=0, keepdims=True)
-            safe       = np.where(peak > 1e-12, peak, 1.0)
-            data       = (data / safe).astype(np.float32)
+            peak = data.max(axis=0, keepdims=True)
+            safe = np.where(peak > 1e-12, peak, 1.0)
+            data = (data / safe).astype(np.float32)
             vmin, vmax = 0.0, 1.0
         else:
             vmin, vmax = entry["vmin"], entry["vmax"]
@@ -210,8 +210,8 @@ class CubeExplorer:
             cube[i] = np.abs(plane) if np.iscomplexobj(plane) else plane
             advance()
 
-        sample     = cube[:, :: max(1, cube.shape[1] // 256), :: max(1, cube.shape[2] // 256)]
-        sample     = sample[np.isfinite(sample)]
+        sample = cube[:, :: max(1, cube.shape[1] // 256), :: max(1, cube.shape[2] // 256)]
+        sample = sample[np.isfinite(sample)]
         vmin, vmax = (np.percentile(sample, [1.0, 99.0]) if sample.size else (0.0, 1.0))
 
         return {

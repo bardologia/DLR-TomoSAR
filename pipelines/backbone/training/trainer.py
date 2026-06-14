@@ -11,14 +11,14 @@ from pipelines.backbone.training.docs import TrainingDocs
 
 class CurriculumController:
     def __init__(self, curriculum, criterion, early_stopping, lr_scheduler, warmup, optimizer, update_optimizer, logger):
-        self.curriculum        = curriculum
-        self.criterion         = criterion
-        self.early_stopping    = early_stopping
-        self.lr_scheduler      = lr_scheduler
-        self.warmup            = warmup
-        self.optimizer         = optimizer
-        self.update_optimizer  = update_optimizer
-        self.logger            = logger
+        self.curriculum       = curriculum
+        self.criterion        = criterion
+        self.early_stopping   = early_stopping
+        self.lr_scheduler     = lr_scheduler
+        self.warmup           = warmup
+        self.optimizer        = optimizer
+        self.update_optimizer = update_optimizer
+        self.logger           = logger
 
     def maybe_swap(self, epoch: int) -> bool:
         lc = self.curriculum

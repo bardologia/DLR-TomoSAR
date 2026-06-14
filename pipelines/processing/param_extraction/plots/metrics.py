@@ -23,8 +23,8 @@ class MetricsBarPlotter(PlotBase):
         self.save_dpi    = save_dpi
 
     def _plot_global_metrics_summary(self, summary : dict, out_dir : Path) -> Dict[str, Path]:
-        qs      = [10, 25, 50, 75, 90]
-        pvals   = [summary[f"r2_p{q}"] for q in qs]
+        qs    = [10, 25, 50, 75, 90]
+        pvals = [summary[f"r2_p{q}"] for q in qs]
         pcolors = ["#9467bd", "#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
         saved   : Dict[str, Path] = {}
 
@@ -51,11 +51,11 @@ class MetricsBarPlotter(PlotBase):
         saved["r2_percentiles"] = self._save(fig, out_dir / "r2_percentiles.png")
 
         fig, ax = plt.subplots(figsize=(6.4, 5))
-        n_K     = self.n_gaussians
-        k_vals  = list(range(1, n_K + 1))
-        fracs   = [summary[f"frac_{k}_fitted"] for k in k_vals]
-        cols    = [cm.tab10((k - 1) % 10) for k in k_vals]
-        bars    = ax.bar(k_vals, fracs, color=cols, alpha=0.80, edgecolor="white", lw=0.5)
+        n_K    = self.n_gaussians
+        k_vals = list(range(1, n_K + 1))
+        fracs  = [summary[f"frac_{k}_fitted"] for k in k_vals]
+        cols   = [cm.tab10((k - 1) % 10) for k in k_vals]
+        bars   = ax.bar(k_vals, fracs, color=cols, alpha=0.80, edgecolor="white", lw=0.5)
 
         frac_unfitted = summary["frac_0_active"]
         n_fitted      = summary["n_fitted"]
@@ -119,8 +119,8 @@ class MetricsBarPlotter(PlotBase):
         saved["penalised_score_decomposition"] = self._save(fig, out_dir / "penalised_score_decomposition.png")
 
         fig, ax = plt.subplots(figsize=(6.4, 4.8))
-        wins    = [per_k_summary[f"k{k}_win_fraction"] for k in k_vals]
-        bars    = ax.bar(k_vals, wins, color=palette, alpha=0.80, edgecolor="white", lw=0.5)
+        wins = [per_k_summary[f"k{k}_win_fraction"] for k in k_vals]
+        bars = ax.bar(k_vals, wins, color=palette, alpha=0.80, edgecolor="white", lw=0.5)
         ax.set_xticks(k_vals)
         ax.set_xticklabels([f"$K={k}$" for k in k_vals])
         ax.set_xlabel(r"model order $K$")
@@ -179,8 +179,8 @@ class MetricsBarPlotter(PlotBase):
     def _plot_snr_vs_ambiguity(self, snr_db_map: np.ndarray, rel_margin_map: np.ndarray, out_dir: Path) -> Path:
         fig, ax  = plt.subplots(figsize=(6.4, 4.8))
         s_m, rel = self._paired_subsample([snr_db_map, rel_margin_map], 400_000)
-        log_rel  = np.log10(np.maximum(rel, 1e-9))
-        hb       = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
+        log_rel = np.log10(np.maximum(rel, 1e-9))
+        hb      = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
         fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
 
         centers, medians = self._binned_median(s_m, log_rel)
