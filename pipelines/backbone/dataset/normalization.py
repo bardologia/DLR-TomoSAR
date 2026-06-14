@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib     import Path
-from typing      import Optional
+from typing      import Optional, Union
 
 import numpy as np
 import torch
@@ -13,6 +13,9 @@ from configuration.data.dataset_config import InputConfig, OutputConfig
 from tools.data.io          import FileIO
 from tools.monitoring.logger                 import Logger
 from tools.reporting.ranges                 import RangeFormatter
+
+
+Array = Union[np.ndarray, torch.Tensor]
 
 
 @dataclass
@@ -392,6 +395,9 @@ class Normalizer:
         if key in self._vectors:
             return self._vectors[key]
 
+        if stats.strategies is None:
+            raise ValueError("ChannelStats is missing per-channel strategies; cannot build normalization vectors.")
+
         loc       = np.asarray(stats.loc,   dtype=np.float32)
         scale     = np.asarray(stats.scale, dtype=np.float32)
         log1p     = np.asarray([strat.apply_log1p for strat in stats.strategies], dtype=bool)
@@ -407,7 +413,7 @@ class Normalizer:
 
         return vectors
 
-    def _apply_normalization(self, tensor, stats: ChannelStats, inverse: bool):
+    def _apply_normalization(self, tensor: Array, stats: ChannelStats, inverse: bool) -> Array:
         is_torch = isinstance(tensor, torch.Tensor)
         vectors  = self._channel_vectors(stats)
 
@@ -443,14 +449,21 @@ class Normalizer:
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
-    def normalize_input(self, tensor: np.ndarray) -> np.ndarray:
-        return self._apply_normalization(tensor, self.stats.input_stats, inverse=False)
+    @staticmethod
+    def _require(stats: Optional[ChannelStats], role: str) -> ChannelStats:
+        if stats is None:
+            raise ValueError(f"Normalizer has no {role} stats; cannot (de)normalize {role}.")
 
-    def normalize_output(self, tensor) -> np.ndarray:
-        return self._apply_normalization(tensor, self.stats.output_stats, inverse=False)
+        return stats
 
-    def denormalize_input(self, tensor):
-        return self._apply_normalization(tensor, self.stats.input_stats, inverse=True)
+    def normalize_input(self, tensor: Array) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=False)
 
-    def denormalize_output(self, tensor):
-        return self._apply_normalization(tensor, self.stats.output_stats, inverse=True)
+    def normalize_output(self, tensor: Array) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=False)
+
+    def denormalize_input(self, tensor: Array) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=True)
+
+    def denormalize_output(self, tensor: Array) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=True)
