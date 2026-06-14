@@ -19,6 +19,18 @@ class ProjectPaths:
             "config_module" : "configuration.training.backbone_config",
             "config_class"  : "BackboneEntryConfig",
         },
+        "train_autoencoder": {
+            "file"          : "train",
+            "args"          : ["autoencoder"],
+            "config_module" : "configuration.training.autoencoder_config",
+            "config_class"  : "ProfileAeEntryConfig",
+        },
+        "train_jepa": {
+            "file"          : "train",
+            "args"          : ["jepa"],
+            "config_module" : "configuration.training.jepa_config",
+            "config_class"  : "JepaEntryConfig",
+        },
     }
 
     def __init__(self) -> None:

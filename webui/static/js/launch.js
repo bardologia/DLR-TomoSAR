@@ -3,6 +3,8 @@
 class LaunchView {
   static PALETTE = ["#1d4fd8", "#0f766e", "#b45309", "#7c3aed", "#be185d", "#0e7490", "#4d7c0f", "#b91c1c"];
 
+  static FOLLOW_INFER = new Set(["train_backbone", "train_jepa"]);
+
   static FIELD_TAXONOMY = [
     ["curve space", /curve|spectral|ssim/],
     ["param space", /^param/],
@@ -10,6 +12,8 @@ class LaunchView {
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
+    ["stage A", /stage_a|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
+    ["embedding", /embedding/],
     ["probe", /^probe_/],
     ["identifiers", /identifier|output_tag$|^dataset_type$/],
     ["data", /batch|worker|patch|stride|azimuth|dataset/],
@@ -28,14 +32,18 @@ class LaunchView {
     ["data", "run"],
   ];
 
+  static DATASET_PICKERS = {
+    "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
+    "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
+  };
+
   static PICKERS = {
     extract_params: {
       dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
     },
-    train: {
-      "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
-      "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
-    },
+    train_backbone:    LaunchView.DATASET_PICKERS,
+    train_autoencoder: LaunchView.DATASET_PICKERS,
+    train_jepa:        LaunchView.DATASET_PICKERS,
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
@@ -196,7 +204,7 @@ class LaunchView {
 
     let follow = null;
     let followSelect = null;
-    if (this.detail && this.detail.category === "Training") {
+    if (this.detail && LaunchView.FOLLOW_INFER.has(this.detail.key)) {
       follow = document.createElement("div");
       follow.className = "rail-block";
       follow.innerHTML = `<span class="rail-block__label">After run</span>`;

@@ -20,10 +20,22 @@ class ScriptCatalog:
             "essentials": ["dataset_base_path", "dataset_filter", "gpu_device_ids", "output_prefix", "fit_k_max", "fit_sigma_init_divisor"],
         },
         "train_backbone": {
-            "title"     : "Train",
+            "title"     : "Train Backbone",
             "category"  : "Training",
-            "purpose"   : "Train one model end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
+            "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
             "essentials": ["run_name", "model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+        },
+        "train_autoencoder": {
+            "title"     : "Train Autoencoder",
+            "category"  : "Training",
+            "purpose"   : "Stage-A: train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
+            "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+        },
+        "train_jepa": {
+            "title"     : "Train JEPA",
+            "category"  : "Training",
+            "purpose"   : "Stage-B: train the JEPA predictor against a frozen or fine-tuned Stage-A autoencoder in latent space.",
+            "essentials": ["run_name", "model_name", "gpu", "logdir", "stage_a_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
             "title"     : "Inference",
@@ -55,6 +67,8 @@ class ScriptCatalog:
         "pre_process",
         "extract_params",
         "train_backbone",
+        "train_autoencoder",
+        "train_jepa",
         "infer",
         "benchmark",
         "physics_check",

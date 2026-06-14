@@ -18,8 +18,10 @@ from web_logger    import WebLogger
 class TensorboardManager:
 
     TRAINING_LOGDIRS = {
-        "train_backbone" : ("logdir",),
-        "benchmark"      : ("paths.log_base_dir",),
+        "train_backbone"    : ("logdir",),
+        "train_autoencoder" : ("logdir",),
+        "train_jepa"        : ("logdir",),
+        "benchmark"         : ("paths.log_base_dir",),
     }
 
     STARTUP_TIMEOUT_S = 90.0
