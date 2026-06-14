@@ -10,7 +10,7 @@ from models.autoencoder             import get_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.shared.config_factory import ConfigFactory
 from pipelines.shared.run_metadata import TrainingRunMetadata
-from pipelines.shared.profile_preparation import ProfileDatasetPreparation
+from pipelines.jepa.training.dataset_prep import ProfileDatasetPreparation
 from pipelines.jepa.training.trainer   import JepaModule, Trainer
 from tools.data.io                          import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
