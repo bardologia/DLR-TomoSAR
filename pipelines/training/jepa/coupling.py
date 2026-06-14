@@ -7,12 +7,17 @@ import torch.nn as nn
 
 
 class StageAMode:
+    VALID = ("frozen", "finetune")
+
     def __init__(self, kind: str) -> None:
+        if kind not in self.VALID:
+            raise ValueError(f"Unknown stage_a_mode '{kind}'. Available: {list(self.VALID)}. The autoencoder must be imported from a Stage-A run and either frozen or fine-tuned; joint training from scratch is not supported.")
+
         self.kind = kind
 
     @property
     def trainable(self) -> bool:
-        return self.kind in ("finetune", "joint")
+        return self.kind == "finetune"
 
     def apply(self, autoencoder: nn.Module) -> None:
         autoencoder.requires_grad_(self.trainable)

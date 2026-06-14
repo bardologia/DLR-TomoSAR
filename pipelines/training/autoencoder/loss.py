@@ -5,7 +5,7 @@ import torch
 from tools.loss.curve_loss import CurveLoss
 
 
-class ProfileAeLoss:
+class Loss:
     def __init__(self, ae_cfg) -> None:
         self.ae_cfg = ae_cfg
 

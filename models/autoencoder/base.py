@@ -8,7 +8,6 @@ from models.blocks import build_activation, initialize_weights
 
 
 _EMBEDDING_NORMS = ("none", "l2", "layernorm")
-_CURVE_NORMS     = ("none", "log1p")
 
 
 class AutoencoderBlocks:
@@ -51,23 +50,11 @@ class AutoencoderBase(nn.Module):
 
         if config.embedding_norm not in _EMBEDDING_NORMS:
             raise ValueError(f"Unknown embedding_norm '{config.embedding_norm}'. Available: {list(_EMBEDDING_NORMS)}")
-        if config.curve_norm not in _CURVE_NORMS:
-            raise ValueError(f"Unknown curve_norm '{config.curve_norm}'. Available: {list(_CURVE_NORMS)}")
 
         self.encoder = encoder
         self.decoder = decoder
 
         initialize_weights(module=self, mode=config.init_mode)
-
-    def normalize_curve(self, curve: torch.Tensor) -> torch.Tensor:
-        if self.config.curve_norm == "none":
-            return curve
-        return torch.log1p(curve.clamp(min=0.0))
-
-    def denormalize_curve(self, curve: torch.Tensor) -> torch.Tensor:
-        if self.config.curve_norm == "none":
-            return curve
-        return torch.expm1(curve)
 
     def normalize_embedding(self, z: torch.Tensor) -> torch.Tensor:
         kind = self.config.embedding_norm
@@ -81,7 +68,7 @@ class AutoencoderBase(nn.Module):
         return (z - mean) / torch.sqrt(var + 1e-6)
 
     def encode(self, curve: torch.Tensor) -> torch.Tensor:
-        return self.normalize_embedding(self.encoder(self.normalize_curve(curve)))
+        return self.normalize_embedding(self.encoder(curve))
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         return self.decoder(z)

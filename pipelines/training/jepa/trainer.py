@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from tools.training       import BaseTrainer
 from pipelines.training.jepa.coupling    import StageAMode, TargetProvider
-from pipelines.training.jepa.loss        import JepaLoss
+from pipelines.training.jepa.loss        import Loss
 
 
 class JepaModule(nn.Module):
@@ -17,14 +17,15 @@ class JepaModule(nn.Module):
         return self.backbone(images)
 
 
-class JepaPredictorTrainer(BaseTrainer):
+class Trainer(BaseTrainer):
     stage_name    = "Stage-B"
     section_title = "[Stage-B JEPA Predictor Training]"
 
-    def __init__(self, model: JepaModule, backbone_cfg, x_axis, config, run_dir, logger, norm_stats):
-        self.backbone_cfg = backbone_cfg
-        self.gaussian_cfg = config.gaussian
-        self.norm_stats   = norm_stats
+    def __init__(self, model: JepaModule, backbone_cfg, x_axis, config, run_dir, logger, norm_stats, profile_normalizer):
+        self.backbone_cfg       = backbone_cfg
+        self.gaussian_cfg       = config.gaussian
+        self.norm_stats         = norm_stats
+        self.profile_normalizer = profile_normalizer
 
         self.stage_a_mode = StageAMode(config.stage_a_mode)
         self.stage_a_mode.apply(model.autoencoder)
@@ -35,7 +36,7 @@ class JepaPredictorTrainer(BaseTrainer):
     @staticmethod
     def validate_coupling(stage_a_mode: StageAMode, target_provider: str, embedding_cfg) -> None:
         if target_provider in ("live", "ema") and not stage_a_mode.trainable:
-            raise ValueError(f"target_provider '{target_provider}' requires a trainable Stage-A autoencoder (stage_a_mode 'finetune' or 'joint'), but stage_a_mode is '{stage_a_mode.kind}'.")
+            raise ValueError(f"target_provider '{target_provider}' requires a trainable Stage-A autoencoder (stage_a_mode 'finetune'), but stage_a_mode is '{stage_a_mode.kind}'.")
 
         if target_provider == "live" and not embedding_cfg.use_curve_recon:
             raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'/'ema'.")
@@ -47,7 +48,7 @@ class JepaPredictorTrainer(BaseTrainer):
 
     def _build_criterion(self):
         target_provider = TargetProvider(self.config.target_provider, self.model.autoencoder.encoder, self.config.ema_decay).to(self.device)
-        return JepaLoss(self.model.autoencoder, target_provider, self.config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian)
+        return Loss(self.model.autoencoder, target_provider, self.config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian, self.profile_normalizer)
 
     def _set_train_mode(self):
         self.model.backbone.train()

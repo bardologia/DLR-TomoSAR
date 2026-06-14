@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
+from configuration.data.profile_config import ProfileAugmentationConfig
 from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
 from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config     import GeometryConfig
@@ -46,6 +47,8 @@ class ProfileAeEntryConfig:
 
     pixel_subsample : float      = 1.0
     keep_empty_frac : float      = 0.05
+
+    profile_augmentation : ProfileAugmentationConfig = field(default_factory=ProfileAugmentationConfig)
 
     ae_model_name   : str               = "mlp_ae"
     autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)

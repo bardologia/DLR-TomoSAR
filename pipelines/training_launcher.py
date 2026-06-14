@@ -38,17 +38,17 @@ class TrainingLauncher:
 
     def _jepa(self, argv: list[str]) -> None:
         from configuration.training.jepa_config       import JepaEntryConfig
-        from pipelines.training.jepa.pipeline import SingleJepaRunner
+        from pipelines.training.jepa.pipeline import SingleTrainRunner
 
         config = ConfigCli(JepaEntryConfig(), description="Stage-B JEPA predictor training").apply(argv)
-        SingleJepaRunner(config).run()
+        SingleTrainRunner(config).run()
 
     def _autoencoder(self, argv: list[str]) -> None:
         from configuration.training.autoencoder_config       import ProfileAeEntryConfig
-        from pipelines.training.autoencoder.pipeline import SingleProfileAeRunner
+        from pipelines.training.autoencoder.pipeline import SingleTrainRunner
 
         config = ConfigCli(ProfileAeEntryConfig(), description="Stage-A profile autoencoder training").apply(argv)
-        SingleProfileAeRunner(config).run()
+        SingleTrainRunner(config).run()
 
     def run(self) -> None:
         stage, argv = self._parse_stage()

@@ -6,14 +6,15 @@ from tools.data.gaussians       import GaussianCurve
 from tools.loss.curve_loss import CurveLoss
 
 
-class JepaLoss:
-    def __init__(self, autoencoder, target_provider, embedding_cfg, x_axis, norm_stats, params_per_gaussian: int) -> None:
-        self.autoencoder     = autoencoder
-        self.target_provider = target_provider
-        self.emb_cfg         = embedding_cfg
-        self.x_axis          = x_axis
-        self.norm_stats      = norm_stats
-        self.ppg             = params_per_gaussian
+class Loss:
+    def __init__(self, autoencoder, target_provider, embedding_cfg, x_axis, norm_stats, params_per_gaussian: int, profile_normalizer) -> None:
+        self.autoencoder        = autoencoder
+        self.target_provider    = target_provider
+        self.emb_cfg            = embedding_cfg
+        self.x_axis             = x_axis
+        self.norm_stats         = norm_stats
+        self.ppg                = params_per_gaussian
+        self.profile_normalizer = profile_normalizer
 
     @property
     def loss_generation(self) -> int:
@@ -49,7 +50,7 @@ class JepaLoss:
         with torch.no_grad():
             gt_phys    = self.norm_stats.denormalize_output(gt_params_norm.float())
             gt_curve   = GaussianCurve.reconstruct(gt_phys, self.x_axis, self.ppg).to(z_hat.dtype)
-            gt_curve_n = self.autoencoder.normalize_curve(gt_curve)
+            gt_curve_n = self.profile_normalizer.normalize(gt_curve)
 
         z_hat_n    = self.autoencoder.normalize_embedding(z_hat)
         z_star_raw = self.target_provider.target(self.autoencoder.encoder, gt_curve_n)

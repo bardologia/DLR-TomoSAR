@@ -2,20 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from torch.utils.data import DataLoader
-
+from configuration.data.profile_config               import ProfileDatasetConfig
 from configuration.training.autoencoder_config       import ProfileAeTrainerConfig
 from models.autoencoder             import get_autoencoder
+from pipelines.dataset.autoencoder.pipeline import ProfileDatasetPipeline
 from pipelines.shared.config_factory import ConfigFactory
-from pipelines.shared.profile_preparation import ProfileDatasetPreparation
 from pipelines.shared.run_metadata import TrainingRunMetadata
-from pipelines.training.autoencoder.autoencoder_trainer import ProfileAeTrainer
-from pipelines.dataset.autoencoder.profile_dataset     import ProfileDataset
+from pipelines.training.autoencoder.trainer import Trainer
 from tools.data.io                               import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
 
-class ProfileAePipeline:
+class TrainingPipeline:
     def __init__(self, entry_config, split_regions=None) -> None:
         self.entry   = entry_config
         self.factory = ConfigFactory(entry_config)
@@ -44,29 +42,33 @@ class ProfileAePipeline:
         model, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
         return model
 
-    def _profile_loaders(self, datasets, x_axis):
+    def _profile_dataset_config(self) -> ProfileDatasetConfig:
         gaussian_cfg = self.trainer_config.gaussian
-        train_loader = self._profile_loader(datasets["train"], x_axis, gaussian_cfg, shuffle=True)
-        val_loader   = self._profile_loader(datasets["val"],   x_axis, gaussian_cfg, shuffle=False)
-        return train_loader, val_loader
+        ds           = self.dataset_config
 
-    def _profile_loader(self, patch_ds, x_axis, gaussian_cfg, shuffle: bool) -> DataLoader:
-        profile_ds = ProfileDataset.from_patch_dataset(
-            patch_ds, x_axis, gaussian_cfg.n_default_gaussians,
-            pixel_subsample = self.entry.pixel_subsample,
-            keep_empty_frac = self.entry.keep_empty_frac,
-            seed            = self.entry.seed,
+        return ProfileDatasetConfig(
+            preprocessing_run_directory = ds.preprocessing_run_directory,
+            split_regions               = ds.split_regions,
+            parameters_path             = ds.parameters_path,
+            n_gaussians                 = gaussian_cfg.n_default_gaussians,
+            x_min                       = gaussian_cfg.x_min,
+            x_max                       = gaussian_cfg.x_max,
+            pixel_subsample             = self.entry.pixel_subsample,
+            keep_empty_frac             = self.entry.keep_empty_frac,
+            batch_size                  = ds.batch_size,
+            num_workers                 = ds.num_workers,
+            pin_memory                  = ds.pin_memory,
+            shuffle_train               = ds.shuffle_train,
+            augmentation                = self.entry.profile_augmentation,
         )
-        return DataLoader(profile_ds, batch_size=self.dataset_config.batch_size, shuffle=shuffle,
-                          num_workers=self.dataset_config.num_workers, pin_memory=self.dataset_config.pin_memory, drop_last=False)
 
     def _save_metadata(self, run_meta, x_len: int) -> None:
         run_meta.save_trainer_config()
         AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
 
-    def _make_trainer(self, run_meta, logger, model, x_axis) -> ProfileAeTrainer:
-        return ProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
+    def _make_trainer(self, run_meta, logger, model, x_axis) -> Trainer:
+        return Trainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
 
     def _train(self, run_meta, logger, model, x_axis, train_loader, val_loader):
         trainer = self._make_trainer(run_meta, logger, model, x_axis)
@@ -81,19 +83,21 @@ class ProfileAePipeline:
         run_meta = TrainingRunMetadata(self.trainer_config, "profile_ae", Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
-        _, datasets, x_axis, x_len = ProfileDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
+        profile_config = self._profile_dataset_config()
+        dataset_pipeline = ProfileDatasetPipeline(profile_config, run_meta.run_directory, logger=logger, seed=self.entry.seed)
 
-        model                    = self._build_model(x_len)
-        train_loader, val_loader = self._profile_loaders(datasets, x_axis)
+        (train_loader, val_loader, _test_loader), _datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
+
+        model = self._build_model(x_len)
 
         self._save_metadata(run_meta, x_len)
 
         return self._train(run_meta, logger, model, x_axis, train_loader, val_loader)
 
 
-class SingleProfileAeRunner:
+class SingleTrainRunner:
     def __init__(self, config) -> None:
         self.config = config
 
     def run(self):
-        return ProfileAePipeline(self.config).run()
+        return TrainingPipeline(self.config).run()

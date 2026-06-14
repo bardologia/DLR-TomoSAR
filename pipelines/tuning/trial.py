@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import optuna
 
-from pipelines.training.autoencoder.autoencoder_trainer import ProfileAeTrainer
-from pipelines.training.autoencoder.pipeline            import ProfileAePipeline
+from pipelines.training.autoencoder.trainer  import Trainer as AeTrainer
+from pipelines.training.autoencoder.pipeline import TrainingPipeline as AeTrainingPipeline
 from pipelines.training.backbone.pipeline import TrainingPipeline
 from pipelines.training.backbone.trainer  import Trainer
 
@@ -39,7 +39,7 @@ class TrialPipeline(TrainingPipeline):
         )
 
 
-class TrialProfileAeTrainer(ProfileAeTrainer):
+class TrialProfileAeTrainer(AeTrainer):
     def __init__(self, *args, trial: optuna.Trial, **kwargs) -> None:
         self._trial = trial
         super().__init__(*args, **kwargs)
@@ -51,7 +51,7 @@ class TrialProfileAeTrainer(ProfileAeTrainer):
             raise optuna.exceptions.TrialPruned()
 
 
-class TrialProfileAePipeline(ProfileAePipeline):
+class TrialProfileAePipeline(AeTrainingPipeline):
     def __init__(self, *args, trial: optuna.Trial, **kwargs) -> None:
         self._trial = trial
         super().__init__(*args, **kwargs)

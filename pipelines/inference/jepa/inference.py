@@ -6,11 +6,12 @@ import torch.nn as nn
 
 from models                                    import get_model
 from models.autoencoder               import get_autoencoder
+from pipelines.dataset.autoencoder.normalization import ProfileNormalizer, ProfileStats
 from pipelines.inference.backbone.loader      import ModelWrapper, RunLoader
 from pipelines.inference.backbone.metrics     import Metrics, Result
 from pipelines.inference.backbone.pipeline    import InferenceComponents
 from pipelines.inference.backbone.predictor   import Predictor
-from pipelines.training.jepa.predictor_trainer import JepaModule
+from pipelines.training.jepa.trainer import JepaModule
 from tools.data.io                       import AutoencoderConfigIO, ModelConfigIO
 from tools.data.gaussians                           import GaussianReconstructor
 
@@ -18,14 +19,15 @@ _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 class JepaInferenceModel(nn.Module):
-    def __init__(self, jepa_module: JepaModule) -> None:
+    def __init__(self, jepa_module: JepaModule, profile_normalizer: ProfileNormalizer) -> None:
         super().__init__()
-        self.jepa = jepa_module
+        self.jepa               = jepa_module
+        self.profile_normalizer = profile_normalizer
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         z_hat   = self.jepa.backbone(x)
         curve_n = self.jepa.autoencoder.decode(self.jepa.autoencoder.normalize_embedding(z_hat))
-        return self.jepa.autoencoder.denormalize_curve(curve_n)
+        return self.profile_normalizer.denormalize(curve_n)
 
 
 class JepaRunLoader(RunLoader):
@@ -38,11 +40,13 @@ class JepaRunLoader(RunLoader):
             overrides["image_size"] = image_size
         backbone, _ = get_model(model_name, config=model_config, **overrides)
 
-        autoencoder, _ = get_autoencoder(ae_name, ae_cfg)
+        autoencoder, _          = get_autoencoder(ae_name, ae_cfg)
+        self.profile_normalizer = ProfileNormalizer(ProfileStats.load(self.meta_directory))
+
         return JepaModule(backbone, autoencoder)
 
     def _wrap_model(self, model, device: str, norm_stats, x_axis, amp_max: float) -> ModelWrapper:
-        adapter = JepaInferenceModel(model).to(device)
+        adapter = JepaInferenceModel(model, self.profile_normalizer).to(device)
         adapter.eval()
         return ModelWrapper(model=adapter, device=device, params_per_gaussian=3, normalizer=None, x_axis=None, amp_max=None)
 

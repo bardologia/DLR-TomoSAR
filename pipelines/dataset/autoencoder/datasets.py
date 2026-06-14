@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 from torch.utils.data import Dataset
 
+from pipelines.dataset.autoencoder.augmentation  import ProfileAugmenter
+from pipelines.dataset.autoencoder.normalization import ProfileNormalizer
 from tools.data.gaussians import GaussianMixture
-from tools.monitoring.logger    import Logger
+from tools.monitoring.logger import Logger
 
 
 class ProfileDataset(Dataset):
@@ -13,16 +17,30 @@ class ProfileDataset(Dataset):
         param_arrays    : list[np.ndarray],
         x_axis          : np.ndarray,
         n_gaussians     : int,
+        split_name      : str,
         amp_zero_thr    : float = 1e-3,
         pixel_subsample : float = 1.0,
         keep_empty_frac : float = 0.05,
         seed            : int   = 0,
-        logger          : Logger | None = None,
+        normalizer      : Optional[ProfileNormalizer] = None,
+        augmenter       : Optional[ProfileAugmenter]  = None,
+        logger          : Optional[Logger] = None,
     ) -> None:
         self.x_axis      = np.asarray(x_axis, dtype=np.float32)
         self.n_gaussians = int(n_gaussians)
+        self.split_name  = split_name
+        self.normalizer  = normalizer
+        self.augmenter   = augmenter
 
+        self._stack_parameters(param_arrays)
+        self._select_pixels(amp_zero_thr, pixel_subsample, keep_empty_frac, seed)
+
+        if logger is not None:
+            self._log(logger)
+
+    def _stack_parameters(self, param_arrays: list[np.ndarray]) -> None:
         amps_list, mus_list, sigs_list = [], [], []
+
         for params in param_arrays:
             params = np.asarray(params, dtype=np.float32)
             C      = params.shape[0]
@@ -36,6 +54,7 @@ class ProfileDataset(Dataset):
         self.mus  = np.concatenate(mus_list,  axis=0)
         self.sigs = np.concatenate(sigs_list, axis=0)
 
+    def _select_pixels(self, amp_zero_thr: float, pixel_subsample: float, keep_empty_frac: float, seed: int) -> None:
         active = (self.amps > amp_zero_thr).any(axis=1)
         rng    = np.random.default_rng(seed)
 
@@ -52,26 +71,19 @@ class ProfileDataset(Dataset):
         else:
             empty_idx = np.empty(0, dtype=np.int64)
 
-        self.index = np.concatenate([active_idx, empty_idx]).astype(np.int64)
+        self.n_active = int(active.sum())
+        self.index    = np.concatenate([active_idx, empty_idx]).astype(np.int64)
         rng.shuffle(self.index)
 
-        if logger is not None:
-            logger.section("[ProfileDataset]")
-            logger.kv_table({
-                "Total pixels"  : int(self.amps.shape[0]),
-                "Active pixels" : int(active.sum()),
-                "Kept active"   : int(len(active_idx)),
-                "Kept empty"    : int(len(empty_idx)),
-                "Profile length": int(self.x_axis.shape[0]),
-                "Gaussians"     : self.n_gaussians,
-            })
-
-    @classmethod
-    def from_patch_dataset(cls, patch_dataset, x_axis, n_gaussians, **kwargs) -> "ProfileDataset":
-        parts        = getattr(patch_dataset, "parts", None)
-        datasets     = parts if parts is not None else [patch_dataset]
-        param_arrays = [ds.gt_parameters for ds in datasets]
-        return cls(param_arrays=param_arrays, x_axis=x_axis, n_gaussians=n_gaussians, **kwargs)
+    def _log(self, logger: Logger) -> None:
+        logger.section(f"[ProfileDataset: {self.split_name}]")
+        logger.kv_table({
+            "Total pixels"  : int(self.amps.shape[0]),
+            "Active pixels" : self.n_active,
+            "Kept pixels"   : int(self.index.shape[0]),
+            "Profile length": int(self.x_axis.shape[0]),
+            "Gaussians"     : self.n_gaussians,
+        })
 
     def __len__(self) -> int:
         return int(self.index.shape[0])
@@ -83,5 +95,15 @@ class ProfileDataset(Dataset):
             self.amps[idx:idx + 1],
             self.mus[idx:idx + 1],
             self.sigs[idx:idx + 1],
-        )[0]
-        return curve.astype(np.float32)
+        )[0].astype(np.float32)
+
+        if self.augmenter is not None and self.split_name == "train":
+            curve = self.augmenter(curve)
+
+        if self.normalizer is not None:
+            curve = self.normalizer.normalize(curve)
+
+        if self.augmenter is not None and self.split_name == "train":
+            curve = self.augmenter.add_noise(curve)
+
+        return curve

@@ -11,7 +11,6 @@ class AutoencoderBaseConfig:
 
     embedding_dim  : int   = 24
     embedding_norm : str   = "l2"
-    curve_norm     : str   = "log1p"
 
     activation     : str   = "gelu"
     init_mode      : str   = "default"

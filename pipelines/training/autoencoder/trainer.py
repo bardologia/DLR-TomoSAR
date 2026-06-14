@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from tools.training         import BaseTrainer
-from pipelines.training.autoencoder.loss import ProfileAeLoss
+from pipelines.training.autoencoder.loss import Loss
 
 
-class ProfileAeTrainer(BaseTrainer):
+class Trainer(BaseTrainer):
     stage_name    = "Stage-A"
     section_title = "[Stage-A Autoencoder Training]"
 
@@ -16,10 +16,9 @@ class ProfileAeTrainer(BaseTrainer):
         return self.model_cfg.get_param_groups(self.model)
 
     def _build_criterion(self):
-        return ProfileAeLoss(self.config.ae_loss)
+        return Loss(self.config.ae_loss)
 
     def _compute_loss(self, batch):
         curve        = batch.to(self.device).unsqueeze(-1).unsqueeze(-1)
         curve_hat, _ = self.model.reconstruct(curve)
-        target       = self.model.normalize_curve(curve)
-        return self.criterion(curve_hat, target)
+        return self.criterion(curve_hat, curve)

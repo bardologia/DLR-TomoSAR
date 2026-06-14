@@ -83,8 +83,6 @@ class JepaEntryConfig:
     stage_a_mode    : str         = "frozen"
     target_provider : str         = "stopgrad"
 
-    ae_model_name   : str               = "mlp_ae"
-    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     embedding_loss  : EmbeddingLossConfig       = field(default_factory=EmbeddingLossConfig)
     overfit         : OverfitConfig             = field(default_factory=OverfitConfig)
     geometry        : GeometryConfig            = field(default_factory=GeometryConfig)

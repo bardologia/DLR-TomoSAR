@@ -121,7 +121,7 @@ class OverfitWorker(BenchmarkWorker):
 
     def _run_ae(self, model_name: str) -> None:
         from configuration.training.runtime_config import OverfitConfig
-        from pipelines.training.autoencoder.pipeline import ProfileAePipeline
+        from pipelines.training.autoencoder.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
@@ -145,7 +145,7 @@ class OverfitWorker(BenchmarkWorker):
 
         try:
             entry                   = self._ae_entry_config(model_name, stage_dir, overfit)
-            (train_losses, _, _), _ = ProfileAePipeline(entry).run()
+            (train_losses, _, _), _ = TrainingPipeline(entry).run()
 
             result["status"]     = "PASS"
             result["final_loss"] = float(train_losses[-1]) if train_losses else None
@@ -173,10 +173,10 @@ class TrainingWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
         if self.config.training_type == "autoencoder":
             from configuration.training.runtime_config import OverfitConfig
-            from pipelines.training.autoencoder.pipeline import ProfileAePipeline
+            from pipelines.training.autoencoder.pipeline import TrainingPipeline
 
             entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
-            ProfileAePipeline(entry).run()
+            TrainingPipeline(entry).run()
             return
 
         from models import CONFIG_REGISTRY
