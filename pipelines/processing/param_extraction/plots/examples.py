@@ -75,6 +75,40 @@ class ExampleFitPlotter(PlotBase):
 
         return pixel_profiles
 
+    def _plot_pixel_fit(self, height_axis, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir) -> Path:
+        fig, ax = plt.subplots(figsize=(5.6, 4.4))
+        ax.plot(height_axis, profile, color="black",   lw=1.5, label="data", zorder=4)
+        ax.plot(height_axis, total,   color=k_color,   lw=1.4, ls="--", label="fit", zorder=5)
+
+        for k, comp in enumerate(comps):
+            if float(params[3 * k]) >= self.amp_threshold:
+                ax.fill_between(height_axis, comp, alpha=0.20, color=comp_colors[k], zorder=2)
+                ax.plot(height_axis, comp, color=comp_colors[k], lw=0.9, alpha=0.85, label=f"$g_{{{k + 1}}}$")
+
+        ax.set_title(f"Example fit — {k_label}\naz={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
+        ax.set_xlabel(r"height $h$ [m]")
+        ax.set_ylabel(r"backscatter intensity")
+        ax.grid(True, which="major", lw=0.25, alpha=0.40)
+        ax.legend(fontsize=8, framealpha=0.90, ncol=2)
+        fig.tight_layout()
+
+        return self._save(fig, k_dir / f"az{az}_rg{rg}_fit.png")
+
+    def _plot_pixel_residual(self, height_axis, residual, az, rg, r2_val, k_dir) -> Path:
+        fig, ax = plt.subplots(figsize=(5.6, 2.8))
+        ax.plot(height_axis, residual, color="0.35", lw=0.9, zorder=3)
+        ax.axhline(0.0, color="black", lw=0.7)
+        ax.fill_between(height_axis, residual, 0.0, where=residual >= 0, color="#1f77b4", alpha=0.25, zorder=2)
+        ax.fill_between(height_axis, residual, 0.0, where=residual < 0,  color="#d62728", alpha=0.25, zorder=2)
+
+        ax.set_title(f"Fit residual — az={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
+        ax.set_xlabel(r"height $h$ [m]")
+        ax.set_ylabel(r"$\varepsilon = \mathrm{data} - \mathrm{fit}$")
+        ax.grid(True, which="major", lw=0.25, alpha=0.40)
+        fig.tight_layout()
+
+        return self._save(fig, k_dir / f"az{az}_rg{rg}_residual.png")
+
     def _plot_example_fits(
         self,
         parameters_array : np.ndarray,
@@ -107,37 +141,8 @@ class ExampleFitPlotter(PlotBase):
                 residual     = profile - total
                 r2_val       = float(r2_map[az, rg]) if np.isfinite(r2_map[az, rg]) else float("nan")
 
-                fig, ax = plt.subplots(figsize=(5.6, 4.4))
-                ax.plot(height_axis, profile, color="black",   lw=1.5, label="data", zorder=4)
-                ax.plot(height_axis, total,   color=k_color,   lw=1.4, ls="--", label="fit", zorder=5)
-
-                for k, comp in enumerate(comps):
-                    if float(params[3 * k]) >= self.amp_threshold:
-                        ax.fill_between(height_axis, comp, alpha=0.20, color=comp_colors[k], zorder=2)
-                        ax.plot(height_axis, comp, color=comp_colors[k], lw=0.9, alpha=0.85, label=f"$g_{{{k + 1}}}$")
-
-                ax.set_title(f"Example fit — {k_label}\naz={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
-                ax.set_xlabel(r"height $h$ [m]")
-                ax.set_ylabel(r"backscatter intensity")
-                ax.grid(True, which="major", lw=0.25, alpha=0.40)
-                ax.legend(fontsize=8, framealpha=0.90, ncol=2)
-                fig.tight_layout()
-
-                saved[f"k{K}_az{az}_rg{rg}_fit"] = self._save(fig, k_dir / f"az{az}_rg{rg}_fit.png")
-
-                fig, ax = plt.subplots(figsize=(5.6, 2.8))
-                ax.plot(height_axis, residual, color="0.35", lw=0.9, zorder=3)
-                ax.axhline(0.0, color="black", lw=0.7)
-                ax.fill_between(height_axis, residual, 0.0, where=residual >= 0, color="#1f77b4", alpha=0.25, zorder=2)
-                ax.fill_between(height_axis, residual, 0.0, where=residual < 0,  color="#d62728", alpha=0.25, zorder=2)
-
-                ax.set_title(f"Fit residual — az={az},  rg={rg},  $R^2={r2_val:.3f}$", fontsize=10)
-                ax.set_xlabel(r"height $h$ [m]")
-                ax.set_ylabel(r"$\varepsilon = \mathrm{data} - \mathrm{fit}$")
-                ax.grid(True, which="major", lw=0.25, alpha=0.40)
-                fig.tight_layout()
-
-                saved[f"k{K}_az{az}_rg{rg}_residual"] = self._save(fig, k_dir / f"az{az}_rg{rg}_residual.png")
+                saved[f"k{K}_az{az}_rg{rg}_fit"]      = self._plot_pixel_fit(height_axis, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir)
+                saved[f"k{K}_az{az}_rg{rg}_residual"] = self._plot_pixel_residual(height_axis, residual, az, rg, r2_val, k_dir)
 
         return saved
 
