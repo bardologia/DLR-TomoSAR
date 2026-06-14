@@ -9,7 +9,9 @@ from torch.utils.data import DataLoader
 
 from configuration.data.dataset_config             import DatasetConfiguration
 from tools.data.regions                            import CropRegion
-from pipelines.dataset.backbone.datasets      import Loader, MultiRegionDataset, PatchDataset, SpatialAugmenter
+from pipelines.dataset.backbone.augmentation  import SpatialAugmenter
+from pipelines.dataset.backbone.datasets      import MultiRegionDataset, PatchDataset
+from pipelines.dataset.backbone.loaders       import Loader
 from pipelines.dataset.backbone.normalization import Normalizer, Stats, StatsComputer
 from pipelines.dataset.backbone.spatial       import Cropper, GridInfo, Layout, Patcher
 from tools.data.io                      import FileIO

@@ -1,70 +1,15 @@
 from __future__ import annotations
 
 import bisect
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
-from configuration.data.dataset_config              import AugmentationConfig, InputConfig, OutputConfig
-from pipelines.dataset.backbone.normalization  import Normalizer
-from pipelines.dataset.backbone.spatial        import Patcher
-from tools.monitoring.logger                              import Logger
-from tools.runtime.reproducibility                     import Reproducibility
-
-
-class SpatialAugmenter:
-    def __init__(self, config: AugmentationConfig, logger, seed: int = 0):
-        self.config = config
-        self.logger = logger
-        self.seed   = int(seed)
-        self._rng   = np.random.default_rng(self.seed)
-
-        self.logger.section("[Data Augmentation]")
-        self.logger.kv_table(
-            {
-                "Flip Horizontal" : self.config.p_flip_h,
-                "Flip Vertical"   : self.config.p_flip_v,
-                "Rotate 90°"      : self.config.p_rot90,
-                "Noise"           : f"std={self.config.noise_std} (normalized units) p={self.config.p_noise}",
-            },
-            title="Augmentation Config",
-        )
-
-    def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-
-        flip_h  = self._rng.random() < self.config.p_flip_h
-        flip_v  = self._rng.random() < self.config.p_flip_v
-        rotate  = self.config.p_rot90 > 0.0 and self._rng.random() < self.config.p_rot90
-        k       = int(self._rng.integers(1, 4)) if rotate else 0
-
-        sl_h    = slice(None, None, -1) if flip_h else slice(None)
-        sl_v    = slice(None, None, -1) if flip_v else slice(None)
-        sl      = (Ellipsis, sl_v, sl_h)
-
-        input_view = input_tensor[sl]
-        gt_view    = gt_params[sl]
-
-        if k:
-            input_view = np.rot90(input_view, k=k, axes=(-2, -1))
-            gt_view    = np.rot90(gt_view, k=k, axes=(-2, -1))
-
-        input_tensor = np.ascontiguousarray(input_view)
-        gt_params    = np.ascontiguousarray(gt_view)
-
-        return input_tensor, gt_params
-
-    def reseed(self, seed: int) -> None:
-        self.seed = int(seed)
-        self._rng = np.random.default_rng(self.seed)
-
-    def add_noise(self, normalized_input: np.ndarray) -> np.ndarray:
-        if self._rng.random() >= self.config.p_noise:
-            return normalized_input
-
-        noise = self._rng.normal(0.0, self.config.noise_std, normalized_input.shape).astype(normalized_input.dtype)
-
-        return normalized_input + noise
+from configuration.data.dataset_config             import InputConfig, OutputConfig
+from pipelines.dataset.backbone.augmentation  import SpatialAugmenter
+from pipelines.dataset.backbone.normalization import Normalizer
+from pipelines.dataset.backbone.spatial       import Patcher
 
 
 class PatchDataset(Dataset):
@@ -236,50 +181,3 @@ class MultiRegionDataset(Dataset):
         part_index = bisect.bisect_right(self.offsets, idx) - 1
 
         return self.parts[part_index][idx - self.offsets[part_index]]
-
-
-class Loader:
-    @staticmethod
-    def build(
-        train_dataset : PatchDataset,
-        val_dataset   : PatchDataset,
-        test_dataset  : PatchDataset,
-        batch_size    : int,
-        num_workers   : int,
-        logger        : Logger,
-        pin_memory    : bool = True,
-        shuffle_train : bool = True,
-        seed          : int  = 0,
-    ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-
-        logger.section("[Loaders]")
-        logger.kv_table({
-            "Batch size":    batch_size,
-            "Num workers":   num_workers,
-            "Pin memory":    pin_memory,
-            "Shuffle train": shuffle_train,
-            "Seed":          seed,
-        })
-
-        worker_init = Reproducibility.worker_init(seed) if num_workers > 0 else None
-
-        _base = dict(
-            batch_size         = batch_size,
-            num_workers        = num_workers,
-            pin_memory         = pin_memory,
-            persistent_workers = num_workers > 0,
-            prefetch_factor    = 8 if num_workers > 0 else None,
-            worker_init_fn     = worker_init,
-        )
-
-        train_loader = DataLoader(train_dataset, shuffle = shuffle_train, drop_last = True,  generator = Reproducibility.generator(seed), **_base)
-        val_loader   = DataLoader(val_dataset,   shuffle = False,         drop_last = False, **_base)
-        test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last = False, **_base)
-
-        logger.kv_table({
-            "Train batches": len(train_loader),
-            "Val batches":   len(val_loader),
-            "Test batches":  len(test_loader),
-        })
-
-        return train_loader, val_loader, test_loader
