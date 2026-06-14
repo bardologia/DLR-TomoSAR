@@ -131,7 +131,7 @@ class BenchmarkConfig:
         return self.training_type == "backbone"
 
     def runs_inference(self) -> bool:
-        return self.training_type == "backbone"
+        return self.training_type in ("backbone", "jepa")
 
 
 
