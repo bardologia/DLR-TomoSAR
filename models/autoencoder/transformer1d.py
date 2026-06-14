@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+import torch
+import torch.nn as nn
+
+from configuration.model.autoencoder_models_config import Transformer1dAutoencoderConfig
+from models.autoencoder.base import AutoencoderBase, AutoencoderBlocks
+
+
+class Transformer1dEncoder(nn.Module):
+    def __init__(self, config: Transformer1dAutoencoderConfig) -> None:
+        super().__init__()
+        self.embed = nn.Linear(config.profile_length, config.hidden_dim)
+        layer      = nn.TransformerEncoderLayer(
+            d_model         = config.hidden_dim,
+            nhead           = config.num_heads,
+            dim_feedforward = config.hidden_dim * 2,
+            dropout         = config.dropout,
+            activation      = config.activation if config.activation in ("relu", "gelu") else "gelu",
+            batch_first     = True,
+        )
+        self.encoder = nn.TransformerEncoder(layer, num_layers=max(1, config.depth))
+        self.head    = nn.Linear(config.hidden_dim, config.embedding_dim)
+
+    def forward(self, curve: torch.Tensor) -> torch.Tensor:
+        seq, dims = AutoencoderBlocks.to_sequence(curve)
+        tokens    = self.embed(seq).unsqueeze(1)
+        attended  = self.encoder(tokens).squeeze(1)
+        z         = self.head(attended)
+        return AutoencoderBlocks.from_sequence(z, dims)
+
+
+class Transformer1dDecoder(nn.Module):
+    def __init__(self, config: Transformer1dAutoencoderConfig) -> None:
+        super().__init__()
+        self.embed = nn.Linear(config.embedding_dim, config.hidden_dim)
+        layer      = nn.TransformerEncoderLayer(
+            d_model         = config.hidden_dim,
+            nhead           = config.num_heads,
+            dim_feedforward = config.hidden_dim * 2,
+            dropout         = config.dropout,
+            activation      = config.activation if config.activation in ("relu", "gelu") else "gelu",
+            batch_first     = True,
+        )
+        self.decoder = nn.TransformerEncoder(layer, num_layers=max(1, config.depth))
+        self.head    = nn.Linear(config.hidden_dim, config.profile_length)
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        seq, dims = AutoencoderBlocks.to_sequence(z)
+        tokens    = self.embed(seq).unsqueeze(1)
+        attended  = self.decoder(tokens).squeeze(1)
+        curve     = self.head(attended)
+        return AutoencoderBlocks.from_sequence(curve, dims)
+
+
+class Transformer1dAutoencoder(AutoencoderBase):
+    def __init__(self, config: Transformer1dAutoencoderConfig | None = None) -> None:
+        config = config if config is not None else Transformer1dAutoencoderConfig()
+        super().__init__(config, Transformer1dEncoder(config), Transformer1dDecoder(config))

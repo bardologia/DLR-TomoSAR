@@ -22,7 +22,10 @@ _EXPORTS = {
     "MultiResUNetConfig": "models_config",
     "FPNNetConfig": "models_config",
     "U2NetLiteConfig": "models_config",
-    "AutoencoderConfig": "models_config",
+    "AutoencoderBaseConfig": "autoencoder_models_config",
+    "MlpAutoencoderConfig": "autoencoder_models_config",
+    "Conv1dAutoencoderConfig": "autoencoder_models_config",
+    "Transformer1dAutoencoderConfig": "autoencoder_models_config",
 }
 
 __all__ = [
@@ -47,7 +50,10 @@ __all__ = [
     "MultiResUNetConfig",
     "FPNNetConfig",
     "U2NetLiteConfig",
-    "AutoencoderConfig",
+    "AutoencoderBaseConfig",
+    "MlpAutoencoderConfig",
+    "Conv1dAutoencoderConfig",
+    "Transformer1dAutoencoderConfig",
 ]
 
 

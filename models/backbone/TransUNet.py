@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.model.models_config import TransUNetConfig
-from .blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
 class TransUNet(nn.Module):

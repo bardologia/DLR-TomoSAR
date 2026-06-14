@@ -6,11 +6,11 @@ import torch
 
 from configuration.training.jepa_config              import JepaTrainerConfig
 from models                                 import get_model
-from models.autoencoder             import Autoencoder
-from pipelines.benchmark_pipeline.config_factory import ConfigFactory
-from pipelines.backbone_pipeline.pipeline   import TrainingRunMetadata
-from pipelines.dataset_pipeline.profile_preparation import ProfileDatasetPreparation
-from pipelines.jepa_pipeline.predictor_trainer   import JepaModule, JepaPredictorTrainer
+from models.autoencoder             import get_autoencoder
+from pipelines.shared.config_factory import ConfigFactory
+from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.shared.profile_preparation import ProfileDatasetPreparation
+from pipelines.training.jepa.predictor_trainer   import JepaModule, JepaPredictorTrainer
 from tools.data.io                          import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
@@ -26,9 +26,10 @@ class JepaPipeline:
         base = self.factory.training_trainer_config(logdir=entry_config.logdir)
 
         if entry_config.stage_a_run is not None:
-            self.autoencoder_cfg = AutoencoderConfigIO.load(Path(entry_config.stage_a_run) / "meta")
+            self.autoencoder_cfg, self.ae_model_name = AutoencoderConfigIO.load(Path(entry_config.stage_a_run) / "meta")
         else:
             self.autoencoder_cfg = entry_config.autoencoder
+            self.ae_model_name   = entry_config.ae_model_name
 
         self.trainer_config = JepaTrainerConfig(
             gaussian           = base.gaussian,
@@ -66,9 +67,9 @@ class JepaPipeline:
             overrides[k] = v
         return get_model(self.model_name, **overrides)
 
-    def _load_autoencoder(self) -> Autoencoder:
-        autoencoder = Autoencoder(self.autoencoder_cfg)
-        ckpt_path   = self.trainer_config.stage_a_checkpoint
+    def _load_autoencoder(self):
+        autoencoder, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+        ckpt_path      = self.trainer_config.stage_a_checkpoint
         self.validate_stage_a_checkpoint(ckpt_path, self.trainer_config.stage_a_mode)
 
         if ckpt_path is None:
@@ -94,7 +95,7 @@ class JepaPipeline:
 
         run_meta.save_trainer_config()
         run_meta.save_model_config(backbone_cfg, self.model_name)
-        AutoencoderConfigIO.save(self.autoencoder_cfg, run_meta.metadata_directory)
+        AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         run_meta.save_run_summary(self.model_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len)
 
     def _train(self, run_meta, logger, model, backbone_cfg, x_axis, datasets, loaders):
@@ -130,8 +131,8 @@ class SingleJepaRunner:
         results, run_directory = JepaPipeline(self.config).run()
         if self.config.infer_after:
             from dataclasses import replace
-            from pipelines.inference_pipeline.pipeline import InferencePipeline
-            from pipelines.jepa_pipeline.inference     import JEPA_INFERENCE_COMPONENTS
+            from pipelines.inference.backbone.pipeline import InferencePipeline
+            from pipelines.inference.jepa.inference     import JEPA_INFERENCE_COMPONENTS
 
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
             InferencePipeline(inference_config, components=JEPA_INFERENCE_COMPONENTS).run()

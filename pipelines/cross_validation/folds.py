@@ -5,9 +5,9 @@ from pathlib import Path
 
 from configuration.experiments.cross_validation_config       import CrossValidationConfig
 from configuration.inference.inference_config              import InferenceConfig
-from pipelines.benchmark_pipeline.config_factory import ConfigFactory
-from pipelines.benchmark_pipeline.results        import TrialCollector, TrialRecord
-from pipelines.benchmark_pipeline.workers        import BenchmarkWorker
+from pipelines.shared.config_factory import ConfigFactory
+from pipelines.benchmark.results        import TrialCollector, TrialRecord
+from pipelines.benchmark.workers        import BenchmarkWorker
 from tools.data.regions                               import CropRegion, SplitRegions
 from tools.monitoring.logger                                import Logger
 
@@ -172,7 +172,7 @@ class CrossValidationWorker(BenchmarkWorker):
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, split_regions: SplitRegions) -> None:
         from models import CONFIG_REGISTRY
-        from pipelines.backbone_pipeline.pipeline import TrainingPipeline
+        from pipelines.training.backbone.pipeline import TrainingPipeline
 
         model_config = CONFIG_REGISTRY[self.config.model_name]()
 
@@ -194,7 +194,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         pipeline.run(probe_config=self._probe_config())
 
     def _run_jepa(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from pipelines.jepa_pipeline.pipeline import JepaPipeline
+        from pipelines.training.jepa.pipeline import JepaPipeline
 
         JepaPipeline(self._jepa_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
@@ -214,6 +214,7 @@ class FoldTrainingWorker(CrossValidationWorker):
             stage_a_run     = jepa.stage_a_run,
             stage_a_mode    = jepa.stage_a_mode,
             target_provider = jepa.target_provider,
+            ae_model_name   = jepa.ae_model_name,
             autoencoder     = jepa.autoencoder,
             embedding_loss  = jepa.embedding_loss,
             overfit         = cv.overfit,
@@ -223,7 +224,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         )
 
     def _run_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from pipelines.autoencoder_pipeline.pipeline import ProfileAePipeline
+        from pipelines.training.autoencoder.pipeline import ProfileAePipeline
 
         ProfileAePipeline(self._ae_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
@@ -240,6 +241,7 @@ class FoldTrainingWorker(CrossValidationWorker):
             logdir          = self.run_dir / "folds",
             pixel_subsample = ae.pixel_subsample,
             keep_empty_frac = ae.keep_empty_frac,
+            ae_model_name   = ae.ae_model_name,
             autoencoder     = ae.autoencoder,
             ae_loss         = ae.ae_loss,
             overfit         = cv.overfit,
@@ -265,7 +267,7 @@ class FoldTrainingWorker(CrossValidationWorker):
 
 class FoldInferenceWorker(CrossValidationWorker):
     def run(self, fold_index: int, split: str) -> None:
-        from pipelines.inference_pipeline.pipeline import InferencePipeline
+        from pipelines.inference.backbone.pipeline import InferencePipeline
 
         run_directory = self.run_dir / "folds" / self.fold_name(fold_index)
 

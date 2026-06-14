@@ -5,12 +5,12 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 from configuration.training.autoencoder_config       import ProfileAeTrainerConfig
-from models.autoencoder             import Autoencoder
-from pipelines.benchmark_pipeline.config_factory import ConfigFactory
-from pipelines.dataset_pipeline.profile_preparation import ProfileDatasetPreparation
-from pipelines.backbone_pipeline.pipeline   import TrainingRunMetadata
-from pipelines.autoencoder_pipeline.autoencoder_trainer import ProfileAeTrainer
-from pipelines.autoencoder_pipeline.profile_dataset     import ProfileDataset
+from models.autoencoder             import get_autoencoder
+from pipelines.shared.config_factory import ConfigFactory
+from pipelines.shared.profile_preparation import ProfileDatasetPreparation
+from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.training.autoencoder.autoencoder_trainer import ProfileAeTrainer
+from pipelines.dataset.autoencoder.profile_dataset     import ProfileDataset
 from tools.data.io                               import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
@@ -24,6 +24,7 @@ class ProfileAePipeline:
         base = self.factory.training_trainer_config(logdir=entry_config.logdir)
 
         self.autoencoder_cfg = entry_config.autoencoder
+        self.ae_model_name   = entry_config.ae_model_name
 
         self.trainer_config = ProfileAeTrainerConfig(
             gaussian    = base.gaussian,
@@ -38,9 +39,10 @@ class ProfileAePipeline:
         if split_regions is not None:
             self.dataset_config.split_regions = split_regions
 
-    def _build_model(self, x_len: int) -> Autoencoder:
+    def _build_model(self, x_len: int):
         self.autoencoder_cfg.profile_length = x_len
-        return Autoencoder(self.autoencoder_cfg)
+        model, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+        return model
 
     def _profile_loaders(self, datasets, x_axis):
         gaussian_cfg = self.trainer_config.gaussian
@@ -60,11 +62,14 @@ class ProfileAePipeline:
 
     def _save_metadata(self, run_meta, x_len: int) -> None:
         run_meta.save_trainer_config()
-        AutoencoderConfigIO.save(self.autoencoder_cfg, run_meta.metadata_directory)
+        AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
 
+    def _make_trainer(self, run_meta, logger, model, x_axis) -> ProfileAeTrainer:
+        return ProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
+
     def _train(self, run_meta, logger, model, x_axis, train_loader, val_loader):
-        trainer = ProfileAeTrainer(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
+        trainer = self._make_trainer(run_meta, logger, model, x_axis)
         try:
             results = trainer.train(train_loader, val_loader, val_loader)
         finally:

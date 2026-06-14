@@ -5,12 +5,12 @@ import torch
 import torch.nn as nn
 
 from models                                    import get_model
-from models.autoencoder               import Autoencoder
-from pipelines.inference_pipeline.loader      import ModelWrapper, RunLoader
-from pipelines.inference_pipeline.metrics     import Metrics, Result
-from pipelines.inference_pipeline.pipeline    import InferenceComponents
-from pipelines.inference_pipeline.predictor   import Predictor
-from pipelines.jepa_pipeline.predictor_trainer import JepaModule
+from models.autoencoder               import get_autoencoder
+from pipelines.inference.backbone.loader      import ModelWrapper, RunLoader
+from pipelines.inference.backbone.metrics     import Metrics, Result
+from pipelines.inference.backbone.pipeline    import InferenceComponents
+from pipelines.inference.backbone.predictor   import Predictor
+from pipelines.training.jepa.predictor_trainer import JepaModule
 from tools.data.io                       import AutoencoderConfigIO, ModelConfigIO
 from tools.data.gaussians                           import GaussianReconstructor
 
@@ -30,7 +30,7 @@ class JepaInferenceModel(nn.Module):
 
 class JepaRunLoader(RunLoader):
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        ae_cfg          = AutoencoderConfigIO.load(self.meta_directory)
+        ae_cfg, ae_name = AutoencoderConfigIO.load(self.meta_directory)
         model_config, _ = ModelConfigIO.load(self.meta_directory)
 
         overrides = {"in_channels": in_channels, "out_channels": ae_cfg.embedding_dim}
@@ -38,7 +38,7 @@ class JepaRunLoader(RunLoader):
             overrides["image_size"] = image_size
         backbone, _ = get_model(model_name, config=model_config, **overrides)
 
-        autoencoder = Autoencoder(ae_cfg)
+        autoencoder, _ = get_autoencoder(ae_name, ae_cfg)
         return JepaModule(backbone, autoencoder)
 
     def _wrap_model(self, model, device: str, norm_stats, x_axis, amp_max: float) -> ModelWrapper:

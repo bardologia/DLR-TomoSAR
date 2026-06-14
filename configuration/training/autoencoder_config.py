@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.models_config    import AutoencoderConfig
+from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config     import GeometryConfig
 from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.runtime_config      import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
@@ -21,7 +21,7 @@ class AutoencoderLossConfig:
 @dataclass
 class ProfileAeTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder         : AutoencoderConfig = field(default_factory=AutoencoderConfig)
+    autoencoder         : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     ae_loss             : AutoencoderLossConfig     = field(default_factory=AutoencoderLossConfig)
     geometry            : GeometryConfig            = field(default_factory=GeometryConfig)
     early_stopping      : EarlyStoppingConfig       = field(default_factory=EarlyStoppingConfig)
@@ -47,7 +47,8 @@ class ProfileAeEntryConfig:
     pixel_subsample : float      = 1.0
     keep_empty_frac : float      = 0.05
 
-    autoencoder     : AutoencoderConfig = field(default_factory=AutoencoderConfig)
+    ae_model_name   : str               = "mlp_ae"
+    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     ae_loss         : AutoencoderLossConfig     = field(default_factory=AutoencoderLossConfig)
     overfit         : OverfitConfig             = field(default_factory=OverfitConfig)
     geometry        : GeometryConfig            = field(default_factory=GeometryConfig)

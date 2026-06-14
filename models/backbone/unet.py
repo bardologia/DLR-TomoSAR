@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.model.models_config import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig
-from .blocks import initialize_weights
-from .blocks import ConvBlock, Decoder, Encoder, GaussianHeadsMixin
+from ..blocks import initialize_weights
+from ..blocks import ConvBlock, Decoder, Encoder, GaussianHeadsMixin
 
 
 class UNetBackbone(nn.Module, GaussianHeadsMixin):

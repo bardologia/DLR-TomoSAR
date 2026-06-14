@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.experiments.benchmark_config   import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.models_config      import AutoencoderConfig
+from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.inference.inference_config   import InferenceConfig
 from configuration.sar.geometry_config     import GeometryConfig
 from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
@@ -34,7 +34,7 @@ class EmbeddingLossConfig:
 @dataclass
 class JepaTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder         : AutoencoderConfig = field(default_factory=AutoencoderConfig)
+    autoencoder         : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     embedding_loss      : EmbeddingLossConfig       = field(default_factory=EmbeddingLossConfig)
 
     stage_a_mode        : str                       = "frozen"
@@ -83,7 +83,8 @@ class JepaEntryConfig:
     stage_a_mode    : str         = "frozen"
     target_provider : str         = "stopgrad"
 
-    autoencoder     : AutoencoderConfig = field(default_factory=AutoencoderConfig)
+    ae_model_name   : str               = "mlp_ae"
+    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     embedding_loss  : EmbeddingLossConfig       = field(default_factory=EmbeddingLossConfig)
     overfit         : OverfitConfig             = field(default_factory=OverfitConfig)
     geometry        : GeometryConfig            = field(default_factory=GeometryConfig)

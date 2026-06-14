@@ -102,15 +102,43 @@ class ModelConfigIO:
 class AutoencoderConfigIO:
     FILENAME = "autoencoder_config.json"
 
+    @staticmethod
+    def _normalize(name: str) -> str:
+        return name.lower().replace("-", "_").replace(" ", "_")
+
     @classmethod
-    def save(cls, config, meta_directory: Path) -> Path:
-        return FileIO.save_json(asdict(config), Path(meta_directory) / cls.FILENAME)
+    def save(cls, config, model_name: str, meta_directory: Path) -> Path:
+        payload = {
+            "ae_model_name" : model_name,
+            "config_type"   : type(config).__name__,
+            "config"        : asdict(config),
+        }
+
+        return FileIO.save_json(payload, Path(meta_directory) / cls.FILENAME)
 
     @classmethod
     def load(cls, meta_directory: Path):
-        from configuration.model.models_config import AutoencoderConfig
+        from models.autoencoder import AE_CONFIG_REGISTRY
 
-        return AutoencoderConfig(**FileIO.load_json(Path(meta_directory) / cls.FILENAME))
+        path = Path(meta_directory) / cls.FILENAME
+        if not path.is_file():
+            raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the autoencoder architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
+
+        payload  = FileIO.load_json(path)
+        ae_name  = cls._normalize(str(payload["ae_model_name"]))
+
+        if ae_name not in AE_CONFIG_REGISTRY:
+            raise ValueError(f"Persisted ae_model_name '{ae_name}' is not a known autoencoder: {list(AE_CONFIG_REGISTRY.keys())}")
+
+        config = AE_CONFIG_REGISTRY[ae_name]()
+
+        for key, value in payload["config"].items():
+            if not hasattr(config, key):
+                raise ValueError(f"Persisted field '{key}' is not an attribute of {type(config).__name__}; the architecture definition changed since this checkpoint was trained")
+
+            setattr(config, key, value)
+
+        return config, payload["ae_model_name"]
 
     @classmethod
     def exists(cls, meta_directory: Path) -> bool:

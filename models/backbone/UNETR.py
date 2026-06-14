@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.model.models_config import UNETRConfig
-from .blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
 class ProgressiveProjectionHead(nn.Module):

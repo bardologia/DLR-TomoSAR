@@ -12,7 +12,7 @@ from configuration.experiments.benchmark_config import (
 from configuration.training.autoencoder_config  import AutoencoderLossConfig
 from configuration.sar.geometry_config     import GeometryConfig
 from configuration.training.jepa_config         import EmbeddingLossConfig
-from configuration.model.models_config       import AutoencoderConfig
+from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.training.runtime_config      import OverfitConfig
 
 
@@ -28,13 +28,15 @@ class JepaCvConfig:
     stage_a_run     : Path | None         = None
     stage_a_mode    : str                 = "frozen"
     target_provider : str                 = "stopgrad"
-    autoencoder     : AutoencoderConfig   = field(default_factory=AutoencoderConfig)
+    ae_model_name   : str                 = "mlp_ae"
+    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     embedding_loss  : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
 
 
 @dataclass
 class AeCvConfig:
-    autoencoder     : AutoencoderConfig     = field(default_factory=AutoencoderConfig)
+    ae_model_name   : str                   = "mlp_ae"
+    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     ae_loss         : AutoencoderLossConfig = field(default_factory=AutoencoderLossConfig)
     pixel_subsample : float                 = 1.0
     keep_empty_frac : float                 = 0.05
