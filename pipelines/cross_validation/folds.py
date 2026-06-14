@@ -109,7 +109,12 @@ class FoldConfigFactory(ConfigFactory):
 
     def planner(self) -> FoldPlanner:
         if self._planner is None:
-            crop          = self.global_crop()
+            crop  = self.global_crop()
+            folds = self.config.folds
+
+            if folds.azimuth_start < crop.azimuth_start or folds.azimuth_end > crop.azimuth_end:
+                raise ValueError(f"Fold azimuth window [{folds.azimuth_start}, {folds.azimuth_end}) must lie within the dataset global crop azimuth extent [{crop.azimuth_start}, {crop.azimuth_end})")
+
             self._planner = FoldPlanner(self.config, range_start=crop.range_start, range_end=crop.range_end)
         return self._planner
 
