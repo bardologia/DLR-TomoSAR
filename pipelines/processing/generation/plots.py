@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from configuration.sar.processing_config import ProcessingConfiguration
+from configuration.sar.processing_config import ProcessingConfig
 from tools.data.io                       import FileIO
 from tools.reporting.plotting            import PlotBase
 from tools.monitoring.logger             import Logger
@@ -19,7 +19,7 @@ class StackPlotter(PlotBase):
     PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
     PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
 
-    def __init__(self, config: ProcessingConfiguration, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
         self.config           = config
         self.logger           = logger
         self.fig_dpi          = fig_dpi

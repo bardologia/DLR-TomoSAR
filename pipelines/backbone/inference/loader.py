@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.data.dataset_config        import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
+from configuration.data.dataset_config        import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from configuration.inference.inference_config import InferenceConfig
 from tools.data.regions                       import CropRegion
 from configuration.sar.gaussian_config        import GaussianConfig
@@ -106,7 +106,7 @@ class Run:
     x_axis           : np.ndarray
     x_axis_length    : int
     n_gaussians      : int
-    dataset_config   : DatasetConfiguration
+    dataset_config   : DatasetConfig
     split_name       : str
     split_region     : CropRegion
     global_crop      : CropRegion
@@ -136,7 +136,7 @@ class RunLoader:
             return [CropRegion(**region) for region in value]
         return CropRegion(**value)
 
-    def _build_dataset_config(self, payload: dict, batch_size: Optional[int], num_workers: int) -> DatasetConfiguration:
+    def _build_dataset_config(self, payload: dict, batch_size: Optional[int], num_workers: int) -> DatasetConfig:
         splits = payload["split_regions"]
 
         split_regions = SplitRegions(
@@ -145,7 +145,7 @@ class RunLoader:
             test  = self._parse_split_payload(splits["test"]),
         )
 
-        patch = PatchConfiguration(
+        patch = PatchConfig(
             size                   = tuple(payload["patch"]["size"]),
             stride                 = int(payload["patch"]["stride"]),
             use_reflective_padding = bool(payload["patch"]["use_reflective_padding"]),
@@ -153,7 +153,7 @@ class RunLoader:
 
         secondary_labels = payload["secondary_labels"]
 
-        return DatasetConfiguration(
+        return DatasetConfig(
             preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
             parameters_path             = Path(payload["parameters_path"]),
             split_regions               = split_regions,
@@ -202,7 +202,7 @@ class RunLoader:
             amp_max             = amp_max,
         )
 
-    def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
+    def _build_dataset(self, dataset_config : DatasetConfig, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger, secondary_labels=dataset_config.secondary_labels)
 
@@ -239,7 +239,7 @@ class RunLoader:
 
         return dataset, grid, region, layout.global_crop, arrays
 
-    def _load_track_info(self, dataset_config: DatasetConfiguration) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
+    def _load_track_info(self, dataset_config: DatasetConfig) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
         dataset_dir = Path(dataset_config.preprocessing_run_directory)
         labels      = dataset_config.secondary_labels
 

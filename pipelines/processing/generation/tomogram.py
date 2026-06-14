@@ -11,9 +11,9 @@ import h5py
 import numpy as np
 
 from configuration.sar.processing_config              import (
-    ParallelConfiguration,
-    ProcessingConfiguration,
-    TomogramConfiguration,
+    ParallelConfig,
+    ProcessingConfig,
+    TomogramConfig,
 )
 from tools.sar.pyrat_env             import PyRatEnvironment
 from tools.sar.tomogram_worker       import PyRatJob, run_pyrat_job
@@ -24,7 +24,7 @@ from pipelines.shared.spec_generator import GeneratorBase
 
 
 class TomogramProcessor:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -40,7 +40,7 @@ class TomogramProcessor:
         temporary_directory = Path(tempfile.mkdtemp(prefix="tomo_", dir=str(parent)))
         return temporary_directory
 
-    def _divide_crop(self, tomogram_config: TomogramConfiguration) -> list[Tuple[int, int, int, int]]:
+    def _divide_crop(self, tomogram_config: TomogramConfig) -> list[Tuple[int, int, int, int]]:
         crop      = self.config.crop
         max_width = tomogram_config.max_crop_azimuth_width
 
@@ -62,7 +62,7 @@ class TomogramProcessor:
         self,
         subsections         : list[Tuple[int, int, int, int]],
         stack_identifier    : str,
-        tomogram_config     : TomogramConfiguration,
+        tomogram_config     : TomogramConfig,
         temporary_directory : Path,
     ) -> None:
         PyRatEnvironment.ensure_conda_lib_on_ld_path()
@@ -163,7 +163,7 @@ class TomogramProcessor:
         if temporary_directory.exists():
             shutil.rmtree(temporary_directory, ignore_errors=True)
 
-    def run(self, tomogram_path: Path, dem_path: Path, stack_identifier: str, tomogram_config: TomogramConfiguration) -> Tuple[Path, Path]:
+    def run(self, tomogram_path: Path, dem_path: Path, stack_identifier: str, tomogram_config: TomogramConfig) -> Tuple[Path, Path]:
         self.logger.section("[Generating Tomogram]")
         self.logger.subsection(f"Target: {tomogram_path.name}")
 
@@ -186,11 +186,11 @@ class TomogramProcessor:
 
 
 class TomogramGenerator(GeneratorBase):
-    def _build_config(self) -> ProcessingConfiguration:
-        return ProcessingConfiguration(
+    def _build_config(self) -> ProcessingConfig:
+        return ProcessingConfig(
             crop             = CropRegion(*self.spec["crop"]),
             tomogram_config  = self._tomogram_config(),
-            parallel         = ParallelConfiguration(effort=self.spec["effort"]),
+            parallel         = ParallelConfig(effort=self.spec["effort"]),
             paths            = self._paths(),
             dataset_type     = self.spec["dataset_type"],
             stack_identifier = self.spec["stack_identifier"],

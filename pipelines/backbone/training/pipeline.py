@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from models                                  import IMAGE_SIZE_MODELS
-from configuration.data.dataset_config       import DatasetConfiguration
+from configuration.data.dataset_config       import DatasetConfig
 from configuration.training.training_config  import TrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
@@ -27,7 +27,7 @@ class TrainingPipeline:
     def __init__(
         self,
         trainer_config : TrainerConfig,
-        dataset_config : DatasetConfiguration,
+        dataset_config : DatasetConfig,
         model_name     : str,
         model_config   = None,
         seed           : int = 0,

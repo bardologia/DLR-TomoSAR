@@ -6,11 +6,11 @@ from datetime import datetime
 
 from configuration.sar.processing_config import (
     CropRegion,
-    ParallelConfiguration,
-    PathConfiguration,
+    ParallelConfig,
+    PathConfig,
     PreProcessEntryConfig,
-    ProcessingConfiguration,
-    TomogramConfiguration,
+    ProcessingConfig,
+    TomogramConfig,
 )
 from pipelines.processing.generation.pipeline import PreProcessScheduler, PreProcessSession
 from tools.runtime.config_cli                 import ConfigCli
@@ -40,7 +40,7 @@ def main() -> None:
 
         logger.subsection(f"[Session {index + 1}/{len(config.win_list)}] {dataset_name} queued with filter arguments {filter_arguments}")
 
-        tomogram_config = TomogramConfiguration(
+        tomogram_config = TomogramConfig(
             fusar_project_path = config.fusar_project_path,
             base_directory     = config.base_directory,
             track_selection    = config.track_selection,
@@ -51,13 +51,13 @@ def main() -> None:
             height_range       = tuple(config.height_range),
         )
 
-        processing_config = ProcessingConfiguration(
+        processing_config = ProcessingConfig(
             crop            = global_crop,
             tomogram_config = tomogram_config,
 
-            parallel = ParallelConfiguration(effort=config.effort),
+            parallel = ParallelConfig(effort=config.effort),
 
-            paths                = PathConfiguration(run_subdirectory=dataset_name),
+            paths                = PathConfig(run_subdirectory=dataset_name),
             dataset_type         = config.dataset_type,
             stack_identifier     = config.stack_identifier,
             tomogram_output_tag  = config.tomogram_output_tag,

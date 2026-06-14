@@ -8,7 +8,7 @@ from tools.runtime.conda_env import CondaJobDispatcher
 from tools.monitoring.logger import Logger
 
 if TYPE_CHECKING:
-    from configuration.sar.processing_config import ProcessingConfiguration
+    from configuration.sar.processing_config import ProcessingConfig
 
 
 class TomogramLauncher:
@@ -19,7 +19,7 @@ class TomogramLauncher:
         self.dispatcher = CondaJobDispatcher(env_name, logger, repo_root)
 
     @staticmethod
-    def build_spec(config: "ProcessingConfiguration", tomogram_path: Path, dem_path: Path) -> dict:
+    def build_spec(config: "ProcessingConfig", tomogram_path: Path, dem_path: Path) -> dict:
         return {
             "tomogram_config"  : asdict(config.tomogram_config),
             "stack_identifier" : config.stack_identifier,

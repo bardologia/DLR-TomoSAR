@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.sar.processing_config import PathConfiguration, TomogramConfiguration
+from configuration.sar.processing_config import PathConfig, TomogramConfig
 
 from tools                   import FileIO
 from tools.monitoring.logger import Logger
@@ -17,12 +17,12 @@ class GeneratorBase:
     def from_spec_file(cls, spec_path: str | Path, logger: Logger) -> "GeneratorBase":
         return cls(FileIO.load_json(Path(spec_path)), logger)
 
-    def _paths(self) -> PathConfiguration:
-        return PathConfiguration(
+    def _paths(self) -> PathConfig:
+        return PathConfig(
             main_directory   = Path(self.spec["main_directory"]),
             pyrat_directory  = Path(self.spec["pyrat_directory"]),
             run_subdirectory = self.spec["run_subdirectory"],
         )
 
-    def _tomogram_config(self) -> TomogramConfiguration:
-        return TomogramConfiguration(**self.spec["tomogram_config"])
+    def _tomogram_config(self) -> TomogramConfig:
+        return TomogramConfig(**self.spec["tomogram_config"])

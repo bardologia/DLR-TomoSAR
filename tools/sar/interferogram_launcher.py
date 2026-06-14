@@ -9,7 +9,7 @@ from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
 if TYPE_CHECKING:
-    from configuration.sar.processing_config import ProcessingConfiguration
+    from configuration.sar.processing_config import ProcessingConfig
 
 
 class InterferogramLauncher:
@@ -21,7 +21,7 @@ class InterferogramLauncher:
 
     @staticmethod
     def build_spec(
-        config              : "ProcessingConfiguration",
+        config              : "ProcessingConfig",
         primary_path        : Path,
         secondaries_path    : Path,
         interferograms_path : Path,

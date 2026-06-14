@@ -7,8 +7,8 @@ from typing  import Tuple
 import numpy as np
 
 from configuration.sar.processing_config         import (
-    ParallelConfiguration,
-    ProcessingConfiguration,
+    ParallelConfig,
+    ProcessingConfig,
 )
 from tools.sar.pyrat_env             import PyRatEnvironment
 from tools                           import FileIO
@@ -19,7 +19,7 @@ from tools.baselines                 import BaselineExtractor, TrackBaselines, T
 
 
 class InterferogramProcessor:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config          = config
         self.logger          = logger
         self.track_baselines = None
@@ -178,11 +178,11 @@ class InterferogramProcessor:
 
 
 class InterferogramGenerator(GeneratorBase):
-    def _build_config(self) -> ProcessingConfiguration:
-        return ProcessingConfiguration(
+    def _build_config(self) -> ProcessingConfig:
+        return ProcessingConfig(
             crop             = CropRegion(*self.spec["crop"]),
             tomogram_config  = self._tomogram_config(),
-            parallel         = ParallelConfiguration(effort=self.spec["effort"], pyrat_threads=self.spec["pyrat_threads"]),
+            parallel         = ParallelConfig(effort=self.spec["effort"], pyrat_threads=self.spec["pyrat_threads"]),
             paths            = self._paths(),
             dataset_type     = self.spec["dataset_type"],
             stack_identifier = self.spec["stack_identifier"],

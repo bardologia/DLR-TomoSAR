@@ -7,8 +7,8 @@ import optuna
 from optuna.trial import TrialState
 
 from configuration.experiments.benchmark_config import TrainingQueueConfig
-from configuration.data.dataset_config          import DatasetConfiguration
-from configuration.data.dataset_config          import PatchConfiguration
+from configuration.data.dataset_config          import DatasetConfig
+from configuration.data.dataset_config          import PatchConfig
 from configuration.data.dataset_config          import SplitRegions
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
@@ -92,13 +92,13 @@ class TuningOrchestrator:
             test  = CropRegion(canonical.test_azimuth[0],  canonical.test_azimuth[1],  global_crop.range_start, global_crop.range_end),
         )
 
-    def _dataset_config(self, dataset_path: Path, split_regions: SplitRegions, secondary_labels) -> DatasetConfiguration:
-        return DatasetConfiguration(
+    def _dataset_config(self, dataset_path: Path, split_regions: SplitRegions, secondary_labels) -> DatasetConfig:
+        return DatasetConfig(
             preprocessing_run_directory = dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
             secondary_labels            = secondary_labels,
-            patch                       = PatchConfiguration(size=(64, 64), stride=32, use_reflective_padding=True),
+            patch                       = PatchConfig(size=(64, 64), stride=32, use_reflective_padding=True),
             batch_size                  = self.config.batch_size,
             num_workers                 = self.config.num_workers,
             shuffle_train               = True,

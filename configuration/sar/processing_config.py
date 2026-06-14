@@ -11,7 +11,7 @@ from tools.data.regions import CropRegion
 
 
 @dataclass
-class TomogramConfiguration:
+class TomogramConfig:
     fusar_project_path     : str                 = ""
     base_directory         : str                 = "/ste/rnd/"
     polarisation           : str                 = "hv"
@@ -28,7 +28,7 @@ class TomogramConfiguration:
 
 
 @dataclass
-class ParallelConfiguration:
+class ParallelConfig:
     effort           : str           = "high"
     tomogram_workers : Optional[int] = None
     pyrat_threads    : Optional[int] = None
@@ -81,7 +81,7 @@ class ParallelConfiguration:
 
 
 @dataclass
-class PathConfiguration:
+class PathConfig:
     main_directory         : Path          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/Dataset"))
     pyrat_directory        : Path          = field(default_factory=lambda: Path("/ste/rnd/User/vice_vi/pyrat"))
     data_subdirectory      : str           = "data"
@@ -109,11 +109,11 @@ class PathConfiguration:
 
 
 @dataclass
-class ProcessingConfiguration:
+class ProcessingConfig:
     crop            : CropRegion
-    tomogram_config : TomogramConfiguration = field(default_factory=TomogramConfiguration)
-    parallel        : ParallelConfiguration = field(default_factory=ParallelConfiguration)
-    paths           : PathConfiguration     = field(default_factory=PathConfiguration)
+    tomogram_config : TomogramConfig = field(default_factory=TomogramConfig)
+    parallel        : ParallelConfig = field(default_factory=ParallelConfig)
+    paths           : PathConfig     = field(default_factory=PathConfig)
 
     dataset_type         : str = "FSAR"
     stack_identifier     : str = "1"

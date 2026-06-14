@@ -4,7 +4,7 @@ import gc
 from pathlib import Path
 from typing  import Tuple
 
-from configuration.sar.processing_config       import ProcessingConfiguration
+from configuration.sar.processing_config       import ProcessingConfig
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
 from pipelines.processing.generation.plots     import StackPlotter
 from tools                                     import FileIO, ProcessPoolRunner
@@ -14,7 +14,7 @@ from tools.baselines                           import TrackBaselines
 
 
 class ProcessingPipeline:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -125,7 +125,7 @@ class ProcessingPipeline:
 
 
 class PreProcessSession:
-    def __init__(self, index: int, total: int, dataset_name: str, config: ProcessingConfiguration) -> None:
+    def __init__(self, index: int, total: int, dataset_name: str, config: ProcessingConfig) -> None:
         self.index        = index
         self.total        = total
         self.dataset_name = dataset_name

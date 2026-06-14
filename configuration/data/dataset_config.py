@@ -159,7 +159,7 @@ class OutputConfig:
 
    
 @dataclass
-class PatchConfiguration:
+class PatchConfig:
     size                   : Tuple[int, int] = (64, 64)
     stride                 : int             = 32
     use_reflective_padding : bool            = True
@@ -177,12 +177,12 @@ class AugmentationConfig:
 
 
 @dataclass
-class DatasetConfiguration:
+class DatasetConfig:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
     parameters_path  : Optional[Path]            = None
     secondary_labels : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
-    patch            : PatchConfiguration        = field(default_factory=PatchConfiguration)
+    patch            : PatchConfig        = field(default_factory=PatchConfig)
     input_config     : InputConfig               = field(default_factory=InputConfig)
     output_config    : OutputConfig              = field(default_factory=OutputConfig)
     augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)

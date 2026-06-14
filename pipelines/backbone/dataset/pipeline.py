@@ -7,7 +7,7 @@ from typing      import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader
 
-from configuration.data.dataset_config        import DatasetConfiguration
+from configuration.data.dataset_config        import DatasetConfig
 from tools.data.regions                       import CropRegion
 from pipelines.backbone.dataset.augmentation  import SpatialAugmenter
 from pipelines.backbone.dataset.datasets      import MultiRegionDataset, PatchDataset
@@ -35,7 +35,7 @@ class MetadataWriter:
         self.logger.section("[MetadataWriter Initialized]")
         self.logger.subsection(f"Metadata Directory : {self.metadata_directory} \n")
 
-    def save_dataset_configuration(self, config: DatasetConfiguration) -> Path:
+    def save_dataset_configuration(self, config: DatasetConfig) -> Path:
         out_path = self.outpaths["dataset_configuration"]
         payload  = asdict(config)
 
@@ -70,7 +70,7 @@ class MetadataWriter:
 
 
 class DatasetPipeline:
-    def __init__(self, config : DatasetConfiguration, training_run_directory : Path, logger : Logger | None = None, seed : int = 0) -> None:
+    def __init__(self, config : DatasetConfig, training_run_directory : Path, logger : Logger | None = None, seed : int = 0) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
         self.seed                   = int(seed)

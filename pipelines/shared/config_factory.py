@@ -9,9 +9,9 @@ from tools.data.regions                         import CropRegion
 
 from configuration.data.dataset_config import (
     AugmentationConfig,
-    DatasetConfiguration,
+    DatasetConfig,
     InputConfig,
-    PatchConfiguration,
+    PatchConfig,
     Representation,
     SplitRegions,
 )
@@ -45,7 +45,7 @@ class ConfigFactory:
             use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
         )
 
-    def training_dataset_config(self) -> DatasetConfiguration:
+    def training_dataset_config(self) -> DatasetConfig:
         crop     = self.global_crop()
         training = self.config.training
 
@@ -55,12 +55,12 @@ class ConfigFactory:
             test  = CropRegion(training.test_azimuth[0],  training.test_azimuth[1],  crop.range_start, crop.range_end),
         )
 
-        return DatasetConfiguration(
+        return DatasetConfig(
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
             secondary_labels            = self._secondary_labels(),
-            patch         = PatchConfiguration(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
+            patch         = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
             input_config  = self.benchmark_input_config(),
             batch_size    = training.batch_size,
             num_workers   = training.num_workers,
@@ -68,7 +68,7 @@ class ConfigFactory:
             pin_memory    = True,
         )
 
-    def overfit_dataset_config(self) -> DatasetConfiguration:
+    def overfit_dataset_config(self) -> DatasetConfig:
         crop    = self.global_crop()
         overfit = self.config.overfit
 
@@ -76,7 +76,7 @@ class ConfigFactory:
         range_end    = crop.range_start + overfit.range_lines
         overfit_crop = CropRegion(overfit.azimuth_start, azimuth_end, crop.range_start, range_end)
 
-        return DatasetConfiguration(
+        return DatasetConfig(
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
             secondary_labels            = self._secondary_labels(),

@@ -4,7 +4,7 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Literal, Tuple
 
-from configuration.sar.processing_config import ProcessingConfiguration, TomogramConfiguration
+from configuration.sar.processing_config import ProcessingConfig, TomogramConfig
 from tools.data.io                       import FileIO
 from tools.monitoring.logger             import Logger
 from tools.baselines                     import TrackProfiles
@@ -14,7 +14,7 @@ ArtifactType = Literal["tomogram_full", "dem_full", "primary", "secondaries", "i
 
 
 class ArtifactRegistry:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -41,7 +41,7 @@ class ArtifactRegistry:
 
 
 class MetadataManager:
-    def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
+    def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config   = config
         self.logger   = logger
         self.registry = ArtifactRegistry(config, logger)
@@ -51,7 +51,7 @@ class MetadataManager:
         self.logger.subsection(f"Tomogram Tag  : {config.tomogram_tag}")
         self.logger.subsection(f"Parameter Tag : {config.parameter_tag}")
 
-    def build_tomogram_metadata(self, output_path: Path, stack_identifier: str, cfg: TomogramConfiguration) -> dict[str, str]:
+    def build_tomogram_metadata(self, output_path: Path, stack_identifier: str, cfg: TomogramConfig) -> dict[str, str]:
         return {
             "tomo_full"    : str(output_path),
             "crop"         : f"[{', '.join(str(v) for v in self.config.crop.as_tuple())}]",
