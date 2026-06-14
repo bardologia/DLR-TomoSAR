@@ -97,10 +97,15 @@ class TrialCollector:
         if report_path.exists():
             record.report_path = report_path
 
-    def collect(self) -> list[TrialRecord]:
-        size_match       = FileIO.load_json(self.pipeline_dir / "size_match.json")
+    def _aggregate_sources(self) -> tuple[dict, dict, dict]:
+        size_match       = self._optional_json(self.pipeline_dir / "size_match.json")
         overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
         training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
+
+        return size_match, overfit_results, training_results
+
+    def collect(self) -> list[TrialRecord]:
+        size_match, overfit_results, training_results = self._aggregate_sources()
 
         if not self.training_dir.is_dir():
             self.logger.error(f"No training directory found at: {self.training_dir}")

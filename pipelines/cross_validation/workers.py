@@ -7,6 +7,7 @@ from configuration.experiments.cross_validation_config import CrossValidationCon
 from pipelines.benchmark.results                       import TrialCollector, TrialRecord
 from pipelines.benchmark.workers                       import BenchmarkWorker
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
+from tools.data.io                                      import FileIO
 from tools.data.regions                                import SplitRegions
 from tools.monitoring.logger                           import Logger
 
@@ -16,6 +17,11 @@ class FoldCollector(TrialCollector):
         super().__init__(run_dir=run_dir, logger=logger)
         self.training_dir = run_dir / "folds"
         self.splits       = splits
+
+    def _aggregate_sources(self) -> tuple[dict, dict, dict]:
+        training_results = {r["name"]: r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
+
+        return {}, {}, training_results
 
     def collect_by_split(self) -> tuple[list[TrialRecord], dict[str, list[TrialRecord]]]:
         base_records = self.collect()
