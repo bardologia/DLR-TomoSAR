@@ -8,13 +8,13 @@ import numpy as np
 
 from configuration.sar.processing_config         import (
     ParallelConfiguration,
-    PathConfiguration,
     ProcessingConfiguration,
 )
 from tools.sar.pyrat_env import PyRatEnvironment
 from tools                        import FileIO
 from tools.monitoring.logger                            import Logger
 from tools.data.regions                           import CropRegion
+from pipelines.shared.spec_generator              import GeneratorBase
 from tools.baselines                   import BaselineExtractor, TrackBaselines, TrackProfiles
 
 
@@ -172,31 +172,13 @@ class InterferogramProcessor:
         return shapes
 
 
-class InterferogramGenerator:
-    def __init__(self, spec: dict, logger: Logger) -> None:
-        self.spec   = spec
-        self.logger = logger
-
-    @classmethod
-    def from_spec_file(cls, spec_path: str | Path, logger: Logger) -> "InterferogramGenerator":
-        return cls(FileIO.load_json(Path(spec_path)), logger)
-
+class InterferogramGenerator(GeneratorBase):
     def _build_config(self) -> ProcessingConfiguration:
-        from configuration.sar.processing_config import TomogramConfiguration
-
-        tomogram_config = TomogramConfiguration(**self.spec["tomogram_config"])
-
-        paths = PathConfiguration(
-            main_directory   = Path(self.spec["main_directory"]),
-            pyrat_directory  = Path(self.spec["pyrat_directory"]),
-            run_subdirectory = self.spec["run_subdirectory"],
-        )
-
         return ProcessingConfiguration(
             crop             = CropRegion(*self.spec["crop"]),
-            tomogram_config  = tomogram_config,
+            tomogram_config  = self._tomogram_config(),
             parallel         = ParallelConfiguration(effort=self.spec["effort"], pyrat_threads=self.spec["pyrat_threads"]),
-            paths            = paths,
+            paths            = self._paths(),
             dataset_type     = self.spec["dataset_type"],
             stack_identifier = self.spec["stack_identifier"],
         )

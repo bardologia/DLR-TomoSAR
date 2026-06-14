@@ -12,7 +12,6 @@ import numpy as np
 
 from configuration.sar.processing_config              import (
     ParallelConfiguration,
-    PathConfiguration,
     ProcessingConfiguration,
     TomogramConfiguration,
 )
@@ -21,6 +20,7 @@ from tools.sar.tomogram_worker import PyRatJob, run_pyrat_job
 from tools                             import FileIO, ProcessPoolRunner
 from tools.monitoring.logger                                 import Logger
 from tools.data.regions                                import CropRegion
+from pipelines.shared.spec_generator                  import GeneratorBase
 
 
 class TomogramProcessor:
@@ -185,29 +185,13 @@ class TomogramProcessor:
         return tomogram_path, dem_path
 
 
-class TomogramGenerator:
-    def __init__(self, spec: dict, logger: Logger) -> None:
-        self.spec   = spec
-        self.logger = logger
-
-    @classmethod
-    def from_spec_file(cls, spec_path: str | Path, logger: Logger) -> "TomogramGenerator":
-        return cls(FileIO.load_json(Path(spec_path)), logger)
-
+class TomogramGenerator(GeneratorBase):
     def _build_config(self) -> ProcessingConfiguration:
-        tomogram_config = TomogramConfiguration(**self.spec["tomogram_config"])
-
-        paths = PathConfiguration(
-            main_directory   = Path(self.spec["main_directory"]),
-            pyrat_directory  = Path(self.spec["pyrat_directory"]),
-            run_subdirectory = self.spec["run_subdirectory"],
-        )
-
         return ProcessingConfiguration(
             crop             = CropRegion(*self.spec["crop"]),
-            tomogram_config  = tomogram_config,
+            tomogram_config  = self._tomogram_config(),
             parallel         = ParallelConfiguration(effort=self.spec["effort"]),
-            paths            = paths,
+            paths            = self._paths(),
             dataset_type     = self.spec["dataset_type"],
             stack_identifier = self.spec["stack_identifier"],
         )
