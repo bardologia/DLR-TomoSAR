@@ -8,7 +8,7 @@ from tools.monitoring.logger       import Logger
 from tools.runtime.reproducibility import Reproducibility
 
 
-class ProfileLoader:
+class Loader:
     @staticmethod
     def build(
         train_dataset : Dataset,
@@ -20,9 +20,10 @@ class ProfileLoader:
         pin_memory    : bool = True,
         shuffle_train : bool = True,
         seed          : int  = 0,
+        section_label : str  = "[Loaders]",
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
-        logger.section("[Profile Loaders]")
+        logger.section(section_label)
         logger.kv_table({
             "Batch size":    batch_size,
             "Num workers":   num_workers,

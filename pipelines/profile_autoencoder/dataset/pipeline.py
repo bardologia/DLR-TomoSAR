@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from configuration.data.profile_config import ProfileDatasetConfig
 from pipelines.profile_autoencoder.dataset.augmentation  import ProfileAugmenter
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
-from pipelines.profile_autoencoder.dataset.loaders       import ProfileLoader
+from pipelines.shared.loaders                             import Loader
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStatsComputer
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
 from pipelines.backbone.dataset.spatial          import Layout
@@ -80,7 +80,7 @@ class ProfileDatasetPipeline:
         val_ds  = self._build_dataset("val",  x_axis, normalizer=normalizer)
         test_ds = self._build_dataset("test", x_axis, normalizer=normalizer)
 
-        train_loader, val_loader, test_loader = ProfileLoader.build(
+        train_loader, val_loader, test_loader = Loader.build(
             train_dataset = train_ds,
             val_dataset   = val_ds,
             test_dataset  = test_ds,
@@ -90,6 +90,7 @@ class ProfileDatasetPipeline:
             shuffle_train = self.config.shuffle_train,
             seed          = self.seed,
             logger        = self.logger,
+            section_label = "[Profile Loaders]",
         )
 
         datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
