@@ -258,10 +258,7 @@ class Predictor:
             np.save(self.cube_dir / "pixel_cos.npy",   pixel_cos)
             np.save(self.cube_dir / "pixel_peak.npy",  pixel_peak_idx)
             for tmp in self.cube_dir.glob("_tmp_*.npy"):
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
+                tmp.unlink(missing_ok=True)
 
         self.logger.section("[Inference: Results]")
         self.logger.kv_table({
