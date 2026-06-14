@@ -64,6 +64,31 @@ class BenchmarkWorker:
             raise SystemExit(1)
 
 
+class OverfitModelPreparer:
+    def __init__(self, model_config) -> None:
+        self.model_config = model_config
+
+    def _disable_regularization(self) -> None:
+        for attribute in ("dropout", "attention_dropout", "stochastic_depth_rate"):
+            if hasattr(self.model_config, attribute):
+                setattr(self.model_config, attribute, 0.0)
+
+        for attribute in vars(self.model_config):
+            if attribute.endswith("_wd"):
+                setattr(self.model_config, attribute, 0.0)
+
+    def _boost_learning_rates(self) -> None:
+        for attribute in vars(self.model_config):
+            if attribute.endswith("_lr"):
+                setattr(self.model_config, attribute, getattr(self.model_config, attribute) * 10.0)
+
+    def prepare(self):
+        self._disable_regularization()
+        self._boost_learning_rates()
+
+        return self.model_config
+
+
 class OverfitWorker(BenchmarkWorker):
     def _final_loss(self, outputs) -> float | None:
         if not isinstance(outputs, (tuple, list)) or len(outputs) == 0:
@@ -85,7 +110,7 @@ class OverfitWorker(BenchmarkWorker):
 
         stage_dir    = self.run_dir / "overfit"
         result_path  = stage_dir / model_name / "overfit_result.json"
-        model_config = self.factory.prepare_overfit_model_config(CONFIG_REGISTRY[model_name]())
+        model_config = OverfitModelPreparer(CONFIG_REGISTRY[model_name]()).prepare()
 
         result = {
             "model"      : model_name,

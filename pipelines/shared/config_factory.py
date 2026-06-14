@@ -166,26 +166,6 @@ class ConfigFactory:
             ),
         )
 
-    def prepare_overfit_model_config(self, model_config):
-        self._disable_regularization(model_config)
-        self._boost_learning_rates(model_config)
-
-        return model_config
-
-    def _disable_regularization(self, model_config) -> None:
-        for attribute in ("dropout", "attention_dropout", "stochastic_depth_rate"):
-            if hasattr(model_config, attribute):
-                setattr(model_config, attribute, 0.0)
-
-        for attribute in vars(model_config):
-            if attribute.endswith("_wd"):
-                setattr(model_config, attribute, 0.0)
-
-    def _boost_learning_rates(self, model_config) -> None:
-        for attribute in vars(model_config):
-            if attribute.endswith("_lr"):
-                setattr(model_config, attribute, getattr(model_config, attribute) * 10.0)
-
     def inference_config(self, run_directory: Path) -> InferenceConfig:
         inference = self.config.inference
 
