@@ -162,6 +162,38 @@ class ComparisonReport:
         self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
         self.timestamp       = self.assets.timestamp
 
+    def _write_overview(self) -> Path:
+        if self.rank_models:
+            lines = self.assets.header("Benchmark Overview")
+        else:
+            lines  = self.assets.header("Cross-Validation Fold Overview")
+            lines += [f"Folds of the single model `{self.reference_model}`; each fold tests a different disjoint azimuth region, so fold-to-fold differences reflect data heterogeneity, not model quality. No ranking is implied.\n"]
+
+        if self.rank_models:
+            lines += ["## Model Capacity\n"]
+            lines += [f"Reference model: `{self.reference_model}`.\n"]
+            lines += self._capacity_table()
+            lines.append("")
+
+        lines += ["## Overfit Gate\n"]
+        lines += self._overfit_table()
+        lines.append("")
+
+        lines += ["## Training\n"]
+        lines += self._training_table()
+        lines.append("")
+
+        lines += ["## Inference\n"]
+        lines += self._inference_table()
+        lines.append("")
+
+        if self.rank_models:
+            lines += self._leaderboard()
+
+        out = self.out_dir / "benchmark_overview.md"
+        out.write_text("\n".join(lines), encoding="utf-8")
+        return out
+
     def _capacity_table(self) -> list[str]:
         table = MarkdownTable(["Model", "Parameters", "Δ vs reference", "Width scale", "Scaled attributes"])
 
@@ -214,38 +246,6 @@ class ComparisonReport:
             table.add_row(f"`{r.name}`", inference, len(r.figures), len(r.animations), report_md)
 
         return table.render()
-
-    def _write_overview(self) -> Path:
-        if self.rank_models:
-            lines = self.assets.header("Benchmark Overview")
-        else:
-            lines  = self.assets.header("Cross-Validation Fold Overview")
-            lines += [f"Folds of the single model `{self.reference_model}`; each fold tests a different disjoint azimuth region, so fold-to-fold differences reflect data heterogeneity, not model quality. No ranking is implied.\n"]
-
-        if self.rank_models:
-            lines += ["## Model Capacity\n"]
-            lines += [f"Reference model: `{self.reference_model}`.\n"]
-            lines += self._capacity_table()
-            lines.append("")
-
-        lines += ["## Overfit Gate\n"]
-        lines += self._overfit_table()
-        lines.append("")
-
-        lines += ["## Training\n"]
-        lines += self._training_table()
-        lines.append("")
-
-        lines += ["## Inference\n"]
-        lines += self._inference_table()
-        lines.append("")
-
-        if self.rank_models:
-            lines += self._leaderboard()
-
-        out = self.out_dir / "benchmark_overview.md"
-        out.write_text("\n".join(lines), encoding="utf-8")
-        return out
 
     def _leaderboard(self) -> list[str]:
         scored = [r for r in self.records if r.metrics]

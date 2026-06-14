@@ -100,6 +100,28 @@ class OverfitWorker(BenchmarkWorker):
 
         return float(train_losses[-1])
 
+    def _execute_overfit(self, model_name: str, threshold: float, result_path: Path, run_body) -> None:
+        result = {
+            "model"      : model_name,
+            "status"     : None,
+            "final_loss" : None,
+            "converged"  : None,
+            "threshold"  : threshold,
+            "error"      : None,
+        }
+
+        try:
+            result["final_loss"] = run_body()
+            result["status"]     = "PASS"
+        except SystemExit:
+            result["status"] = "PASS"
+            result["error"]  = "worker exited via SystemExit before reporting a final loss"
+        except Exception:
+            result["status"] = "FAIL"
+            result["error"]  = traceback.format_exc()
+
+        self._finalize_overfit(result, result_path)
+
     def run(self, model_name: str) -> None:
         if self.config.training_type == "autoencoder":
             self._run_ae(model_name)
@@ -112,16 +134,7 @@ class OverfitWorker(BenchmarkWorker):
         result_path  = stage_dir / model_name / "overfit_result.json"
         model_config = OverfitModelPreparer(CONFIG_REGISTRY[model_name]()).prepare()
 
-        result = {
-            "model"      : model_name,
-            "status"     : None,
-            "final_loss" : None,
-            "converged"  : None,
-            "threshold"  : self.config.overfit.stop_threshold,
-            "error"      : None,
-        }
-
-        try:
+        def run_body():
             pipeline = TrainingPipeline(
                 trainer_config = self.factory.overfit_trainer_config(logdir=stage_dir),
                 dataset_config = self.factory.overfit_dataset_config(),
@@ -131,18 +144,9 @@ class OverfitWorker(BenchmarkWorker):
                 run_name       = model_name,
             )
 
-            outputs = pipeline.run(probe_config=self._probe_config())
+            return self._final_loss(pipeline.run(probe_config=self._probe_config()))
 
-            result["status"]     = "PASS"
-            result["final_loss"] = self._final_loss(outputs)
-        except SystemExit:
-            result["status"] = "PASS"
-            result["error"]  = "worker exited via SystemExit before reporting a final loss"
-        except Exception:
-            result["status"] = "FAIL"
-            result["error"]  = traceback.format_exc()
-
-        self._finalize_overfit(result, result_path)
+        self._execute_overfit(model_name, self.config.overfit.stop_threshold, result_path, run_body)
 
     def _run_ae(self, model_name: str) -> None:
         from configuration.training.runtime_config import OverfitConfig
@@ -159,29 +163,13 @@ class OverfitWorker(BenchmarkWorker):
             batch_size     = gate.batch_size,
         )
 
-        result = {
-            "model"      : model_name,
-            "status"     : None,
-            "final_loss" : None,
-            "converged"  : None,
-            "threshold"  : gate.stop_threshold,
-            "error"      : None,
-        }
-
-        try:
+        def run_body():
             entry                   = self._ae_entry_config(model_name, stage_dir, overfit)
             (train_losses, _, _), _ = TrainingPipeline(entry).run()
 
-            result["status"]     = "PASS"
-            result["final_loss"] = float(train_losses[-1]) if train_losses else None
-        except SystemExit:
-            result["status"] = "PASS"
-            result["error"]  = "worker exited via SystemExit before reporting a final loss"
-        except Exception:
-            result["status"] = "FAIL"
-            result["error"]  = traceback.format_exc()
+            return float(train_losses[-1]) if train_losses else None
 
-        self._finalize_overfit(result, result_path)
+        self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
 
 
 class TrainingWorker(BenchmarkWorker):
