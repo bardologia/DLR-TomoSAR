@@ -88,6 +88,21 @@ def _default_ae_loss():
     return AutoencoderLossConfig()
 
 
+def _default_embedding_loss():
+    from configuration.training.jepa_config import EmbeddingLossConfig
+
+    return EmbeddingLossConfig()
+
+
+@dataclass
+class JepaBenchConfig:
+    stage_a_logdir  : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
+    stage_a_run     : str | None = None
+    stage_a_mode    : str        = "frozen"
+    target_provider : str        = "stopgrad"
+    embedding_loss  : object     = field(default_factory=_default_embedding_loss)
+
+
 @dataclass
 class BenchmarkConfig:
     training_type : str = "backbone"
@@ -99,9 +114,10 @@ class BenchmarkConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    ae_loss         : object = field(default_factory=_default_ae_loss)
-    pixel_subsample : float  = 1.0
-    keep_empty_frac : float  = 0.05
+    ae_loss         : object          = field(default_factory=_default_ae_loss)
+    jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)
+    pixel_subsample : float           = 1.0
+    keep_empty_frac : float           = 0.05
 
     gpus            : list[int]  = field(default_factory=lambda: [2, 3])
     skip_models     : list[str]  = field(default_factory=list)

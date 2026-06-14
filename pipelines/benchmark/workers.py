@@ -44,6 +44,27 @@ class BenchmarkWorker:
             training        = self.config.training,
         )
 
+    def _jepa_entry_config(self, model_name: str, logdir: Path, overfit):
+        from configuration.training.jepa_config import JepaEntryConfig
+
+        jepa = self.config.jepa
+
+        return JepaEntryConfig(
+            run_name        = model_name,
+            model_name      = model_name,
+            seed            = self.config.seed,
+            n_gaussians     = self.config.n_gaussians,
+            logdir          = logdir,
+            stage_a_logdir  = jepa.stage_a_logdir,
+            stage_a_run     = jepa.stage_a_run,
+            stage_a_mode    = jepa.stage_a_mode,
+            target_provider = jepa.target_provider,
+            embedding_loss  = jepa.embedding_loss,
+            overfit         = overfit,
+            paths           = self.config.paths,
+            training        = self.config.training,
+        )
+
     def _finalize_overfit(self, result: dict, result_path: Path) -> None:
         threshold = result["threshold"]
 
@@ -126,6 +147,9 @@ class OverfitWorker(BenchmarkWorker):
         if self.config.training_type == "autoencoder":
             self._run_ae(model_name)
             return
+        if self.config.training_type == "jepa":
+            self._run_jepa(model_name)
+            return
 
         from models                               import CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
@@ -171,6 +195,29 @@ class OverfitWorker(BenchmarkWorker):
 
         self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
 
+    def _run_jepa(self, model_name: str) -> None:
+        from configuration.training.runtime_config import OverfitConfig
+        from pipelines.jepa.training.pipeline      import TrainingPipeline
+
+        gate        = self.config.overfit
+        stage_dir   = self.run_dir / "overfit"
+        result_path = stage_dir / model_name / "overfit_result.json"
+
+        overfit = OverfitConfig(
+            enabled        = True,
+            max_steps      = gate.max_steps,
+            stop_threshold = gate.stop_threshold,
+            batch_size     = gate.batch_size,
+        )
+
+        def run_body():
+            entry                   = self._jepa_entry_config(model_name, stage_dir, overfit)
+            (train_losses, _, _), _ = TrainingPipeline(entry).run()
+
+            return float(train_losses[-1]) if train_losses else None
+
+        self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
+
 
 class TrainingWorker(BenchmarkWorker):
     def _size_overrides(self, model_name: str) -> dict:
@@ -189,6 +236,14 @@ class TrainingWorker(BenchmarkWorker):
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
             entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
+            TrainingPipeline(entry).run()
+            return
+
+        if self.config.training_type == "jepa":
+            from configuration.training.runtime_config import OverfitConfig
+            from pipelines.jepa.training.pipeline      import TrainingPipeline
+
+            entry = self._jepa_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
             TrainingPipeline(entry).run()
             return
 

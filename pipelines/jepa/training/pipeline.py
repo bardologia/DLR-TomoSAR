@@ -100,11 +100,14 @@ class TrainingPipeline:
 
         return ProfileNormalizer(stats)
 
+    def _make_trainer(self, model, backbone_cfg, x_axis, run_dir, logger, norm_stats, profile_normalizer):
+        return Trainer(model, backbone_cfg, x_axis, self.trainer_config, run_dir, logger, norm_stats, profile_normalizer)
+
     def _train(self, run_meta, logger, model, backbone_cfg, x_axis, datasets, loaders, profile_normalizer):
         train_loader, val_loader, test_loader = loaders
         norm_stats                            = datasets["train"].normalizer
 
-        trainer = Trainer(model, backbone_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger, norm_stats, profile_normalizer)
+        trainer = self._make_trainer(model, backbone_cfg, x_axis, run_meta.run_directory, logger, norm_stats, profile_normalizer)
         try:
             results = trainer.train(train_loader, val_loader, test_loader)
         finally:

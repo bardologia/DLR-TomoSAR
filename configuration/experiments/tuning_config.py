@@ -13,6 +13,21 @@ def _default_ae_loss():
     return AutoencoderLossConfig()
 
 
+def _default_embedding_loss():
+    from configuration.training.jepa_config import EmbeddingLossConfig
+
+    return EmbeddingLossConfig()
+
+
+@dataclass
+class JepaTuneConfig:
+    stage_a_logdir  : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
+    stage_a_run     : str | None = None
+    stage_a_mode    : str        = "frozen"
+    target_provider : str        = "stopgrad"
+    embedding_loss  : object     = field(default_factory=_default_embedding_loss)
+
+
 @dataclass
 class TuningConfig:
     n_trials : int = 100
@@ -48,5 +63,6 @@ class TuningEntryConfig:
     training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
     overfit         : OverfitConfig       = field(default_factory=OverfitConfig)
     ae_loss         : object              = field(default_factory=_default_ae_loss)
+    jepa            : JepaTuneConfig       = field(default_factory=JepaTuneConfig)
     pixel_subsample : float               = 1.0
     keep_empty_frac : float               = 0.05

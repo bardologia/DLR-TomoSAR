@@ -24,6 +24,7 @@ from tools                                      import GpuQueue
 from pipelines.tuning.plots                     import StudyPlotter
 from pipelines.tuning.tuners                    import AeTuner
 from pipelines.tuning.tuners                    import BestConfigWriter
+from pipelines.tuning.tuners                    import JepaTuner
 from pipelines.tuning.tuners                    import Tuner
 from tools.runtime.config_cli                   import ConfigCli
 from tools.monitoring.logger                    import Logger
@@ -75,6 +76,24 @@ class TuningOrchestrator:
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
             ae_loss         = self.config.ae_loss,
+            overfit         = self.config.overfit,
+            paths           = self.config.paths,
+            training        = self.config.training,
+        )
+
+    def _jepa_entry_template(self):
+        from configuration.training.jepa_config import JepaEntryConfig
+
+        jepa = self.config.jepa
+
+        return JepaEntryConfig(
+            seed            = self.config.tuning.base_seed,
+            n_gaussians     = self.config.n_gaussians,
+            stage_a_logdir  = jepa.stage_a_logdir,
+            stage_a_run     = jepa.stage_a_run,
+            stage_a_mode    = jepa.stage_a_mode,
+            target_provider = jepa.target_provider,
+            embedding_loss  = jepa.embedding_loss,
             overfit         = self.config.overfit,
             paths           = self.config.paths,
             training        = self.config.training,
@@ -322,6 +341,15 @@ class TuningOrchestrator:
                 tune_cfg       = tune_cfg,
                 log_dir        = str(self.run_dir / model_name),
                 logger         = logger,
+            )
+        elif self.config.training_type == "jepa":
+            tuner = JepaTuner(
+                model_name       = model_name,
+                model_config_cls = CONFIG_REGISTRY[model_name],
+                entry_template   = self._jepa_entry_template(),
+                tune_cfg         = tune_cfg,
+                log_dir          = str(self.run_dir / model_name),
+                logger           = logger,
             )
         else:
             trainer_cfg, dataset_cfg = self._build_base_configs()

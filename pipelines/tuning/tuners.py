@@ -203,3 +203,59 @@ class AeTuner:
         }, title="AeTuner config")
 
         study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True, callbacks=[self.best_writer])
+
+
+class JepaTuner:
+    def __init__(
+        self,
+        model_name     : str,
+        model_config_cls,
+        entry_template,
+        tune_cfg,
+        log_dir        : str,
+        logger,
+    ) -> None:
+        self.model_name       = model_name
+        self.model_config_cls = model_config_cls
+        self.entry_template   = entry_template
+        self.tune_cfg         = tune_cfg
+        self.log_dir          = log_dir
+        self.logger           = logger
+
+        self.sampler     = ParamSampler()
+        self.space       = model_config_cls.tunable_arch_params()
+        self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
+
+    def _objective(self, trial: optuna.Trial) -> float:
+        from pipelines.tuning.trial import TrialJepaPipeline
+
+        sampled = self.sampler.sample(trial, self.space)
+
+        entry                 = copy.deepcopy(self.entry_template)
+        entry.model_name      = self.model_name
+        entry.model_overrides = sampled
+        entry.run_name        = f"trial_{trial.number:04d}"
+        entry.seed            = self.tune_cfg.base_seed + trial.number
+        entry.logdir          = Path(self.log_dir) / "trials"
+
+        entry.training.epochs              = self.tune_cfg.n_epochs
+        entry.training.scheduler_epochs    = self.tune_cfg.n_epochs
+        entry.training.early_stop_patience = self.tune_cfg.early_stop_patience
+
+        pipeline                 = TrialJepaPipeline(entry, trial=trial)
+        (_, _, best_val_loss), _ = pipeline.run()
+
+        return best_val_loss
+
+    def run(self, study: optuna.Study, n_trials: int) -> None:
+        self.logger.section(f"[JepaTuner — {self.model_name}]")
+
+        self.logger.kv_table({
+            "Trials (this worker)" : n_trials,
+            "Epochs / trial"       : self.tune_cfg.n_epochs,
+            "Early-stop patience"  : self.tune_cfg.early_stop_patience,
+            "Search dimensions"    : len(self.space),
+            "Log dir"              : self.log_dir,
+        }, title="JepaTuner config")
+
+        study.optimize(self._objective, n_trials=n_trials, gc_after_trial=True, callbacks=[self.best_writer])
