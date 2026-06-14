@@ -32,16 +32,41 @@ class LaunchView {
     ["data", "run"],
   ];
 
+  static TRAINING_TYPES = [
+    ["backbone", "Backbone"],
+    ["autoencoder", "Autoencoder"],
+    ["jepa", "JEPA"],
+  ];
+
+  static TYPE_TABS = {
+    benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
+    cross_validate: { field: "training_type", options: LaunchView.TRAINING_TYPES },
+    tune:           { field: "training_type", options: LaunchView.TRAINING_TYPES },
+  };
+
+  static EXPERIMENT_JEPA_CHOICES = {
+    "jepa.stage_a_mode":    ["frozen", "finetune"],
+    "jepa.target_provider": ["stopgrad", "ema", "live"],
+  };
+
   static CHOICES = {
     train_jepa: {
       stage_a_mode:    ["frozen", "finetune"],
       target_provider: ["stopgrad", "ema", "live"],
     },
+    benchmark:      LaunchView.EXPERIMENT_JEPA_CHOICES,
+    cross_validate: LaunchView.EXPERIMENT_JEPA_CHOICES,
+    tune:           LaunchView.EXPERIMENT_JEPA_CHOICES,
   };
 
   static DATASET_PICKERS = {
     "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
     "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
+  };
+
+  static EXPERIMENT_PICKERS = {
+    ...LaunchView.DATASET_PICKERS,
+    "jepa.stage_a_run": { mode: "runs", baseFrom: "jepa.stage_a_logdir", checkpointOnly: true },
   };
 
   static PICKERS = {
@@ -51,9 +76,9 @@ class LaunchView {
     train_backbone:    LaunchView.DATASET_PICKERS,
     train_autoencoder: LaunchView.DATASET_PICKERS,
     train_jepa:        { ...LaunchView.DATASET_PICKERS, stage_a_run: { mode: "runs", baseFrom: "stage_a_logdir", checkpointOnly: true } },
-    benchmark:         LaunchView.DATASET_PICKERS,
-    cross_validate:    LaunchView.DATASET_PICKERS,
-    tune:              LaunchView.DATASET_PICKERS,
+    benchmark:         LaunchView.EXPERIMENT_PICKERS,
+    cross_validate:    LaunchView.EXPERIMENT_PICKERS,
+    tune:              LaunchView.EXPERIMENT_PICKERS,
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
@@ -198,6 +223,33 @@ class LaunchView {
       if (v.key !== d.key) tab.addEventListener("click", () => window.router.go(`launch/${v.key}`));
       host.appendChild(tab);
     });
+  }
+
+  _renderTypeTab(spec, leaf) {
+    const host = document.getElementById("launch-variants");
+    host.hidden = false;
+    host.innerHTML = "";
+
+    const paint = () => {
+      const value = this._effective(leaf);
+      [...host.children].forEach((child) => child.classList.toggle("is-active", child.dataset.value === value));
+    };
+
+    spec.options.forEach(([value, label]) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "launch__variant";
+      tab.dataset.value = value;
+      tab.setAttribute("role", "tab");
+      tab.textContent = label;
+      tab.addEventListener("click", () => {
+        this._setValue(leaf, value);
+        paint();
+      });
+      host.appendChild(tab);
+    });
+
+    paint();
   }
 
   _renderFacts() {
@@ -371,12 +423,17 @@ class LaunchView {
 
     const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
 
+    const typeTab  = LaunchView.TYPE_TABS[this.key];
+    const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
+    if (typeLeaf) this._renderTypeTab(typeTab, typeLeaf);
+
     const modelNameLeaf = byPath.get("model_name");
     const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
 
-    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === "model_name"));
+    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === "model_name")).filter((leaf) => !(typeLeaf && leaf.path === typeLeaf.path));
     const claimed = new Set(pinned.map((leaf) => leaf.path));
     if (cardPanel) claimed.add("model_name");
+    if (typeLeaf) claimed.add(typeLeaf.path);
 
     const modelLeaf  = byPath.get("skip_models");
     const modelPanel = modelLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelTogglePanel(this, modelLeaf) : null;

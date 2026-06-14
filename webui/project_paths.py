@@ -31,23 +31,10 @@ class ProjectPaths:
             "config_module" : "configuration.training.jepa_config",
             "config_class"  : "JepaEntryConfig",
         },
-        "benchmark": {
-            "file"          : "experiment",
-            "args"          : ["--mode", "benchmark"],
-            "config_module" : "configuration.experiments.benchmark_config",
-            "config_class"  : "BenchmarkConfig",
-        },
         "cross_validate": {
-            "file"          : "experiment",
-            "args"          : ["--mode", "cv"],
+            "file"          : "cross_validate",
             "config_module" : "configuration.experiments.cross_validation_config",
             "config_class"  : "CrossValidationConfig",
-        },
-        "tune": {
-            "file"          : "experiment",
-            "args"          : ["--mode", "tune"],
-            "config_module" : "configuration.experiments.tuning_config",
-            "config_class"  : "TuningEntryConfig",
         },
     }
 

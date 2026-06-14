@@ -47,13 +47,13 @@ class ScriptCatalog:
             "title"     : "Benchmark",
             "category"  : "Experiments",
             "purpose"   : "Benchmark inference speed and capacity-matched architecture trade-offs.",
-            "essentials": ["run_tag", "gpus", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "cross_validate": {
             "title"     : "Cross-validate",
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
-            "essentials": ["training_type", "model_name", "run_tag", "gpus", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["model_name", "run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "physics_check": {
             "title"     : "Physics Check",
@@ -65,7 +65,7 @@ class ScriptCatalog:
             "title"     : "Tune",
             "category"  : "Experiments",
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
-            "essentials": ["run_tag", "gpus"],
+            "essentials": ["run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run"],
         },
     }
 
@@ -91,16 +91,6 @@ class ScriptCatalog:
                 ("train_backbone",    "Backbone"),
                 ("train_autoencoder", "Autoencoder"),
                 ("train_jepa",        "JEPA"),
-            ],
-        },
-        "experiment": {
-            "title"    : "Experiment",
-            "category" : "Experiments",
-            "purpose"  : "Run a multi-model experiment across GPUs. Pick the kind: full architecture benchmark, K-fold cross-validation, or Optuna hyperparameter tuning.",
-            "members"  : [
-                ("benchmark",      "Benchmark"),
-                ("cross_validate", "Cross-validate"),
-                ("tune",           "Tune"),
             ],
         },
     }
