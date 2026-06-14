@@ -129,7 +129,6 @@ class TrainingPipeline:
             results = trainer.train(train_loader, val_loader, test_loader)
         finally:
             self.run_metadata.close()
-            self.logger.close()
 
         return results
 

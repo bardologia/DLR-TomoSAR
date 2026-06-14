@@ -105,7 +105,6 @@ class TrainingPipeline:
             results = trainer.train(train_loader, val_loader, test_loader)
         finally:
             run_meta.close()
-            logger.close()
         return results, run_meta.run_directory
 
     def run(self):

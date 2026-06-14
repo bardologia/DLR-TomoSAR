@@ -41,7 +41,8 @@ class TrainingRunMetadata:
         trainer_config.io.logdir     = str(self.run_directory)
         trainer_config.io.writer     = self.writer
 
-        self.logger = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
+        self._owns_logger = logger is None
+        self.logger       = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
 
         self.logger.section("[Training RunMetadata Initialized]")
         devices = torch.cuda.device_count() if torch.cuda.is_available() else 0
@@ -51,6 +52,12 @@ class TrainingRunMetadata:
             "Backend"       : "PyTorch",
             "Devices"       : f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
         })
+
+    def __enter__(self) -> "TrainingRunMetadata":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
     def save_trainer_config(self) -> Path:
         out_path                     = self.docs_directory / "trainer_config.json"
@@ -91,3 +98,6 @@ class TrainingRunMetadata:
         if self.writer is not None:
             self.writer.flush()
             self.writer.close()
+
+        if self._owns_logger:
+            self.logger.close()
