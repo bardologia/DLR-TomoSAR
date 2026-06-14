@@ -418,33 +418,10 @@ class FigureComposer:
 
         logger.subsection(f"Reduced baseline figures written to {reduced_dir}")
 
-    def compose(
-        self,
-        result         : Result,
-        run,
-        global_metrics : dict,
-        x_axis_np      : np.ndarray,
-        indices        : dict,
-        param_space    : bool = True,
-    ) -> Dict[str, List[Path]]:
-
-        slice_plotter = self.plotter.slice
-        param_plotter = self.plotter.param
-        slot_plotter  = self.plotter.slot
+    def _compose_tracks(self, run, figure_paths: Dict[str, List[Path]]) -> None:
         track_plotter = self.plotter.track
         meta          = self.meta
         logger        = self.logger
-        cfg           = self.cfg
-
-        slice_range_idx = indices["slice_range_idx"]
-        slice_az_idx    = indices["slice_az_idx"]
-        slice_elev_idx  = indices["slice_elev_idx"]
-        all_range_idx   = indices["all_range_idx"]
-        all_az_idx      = indices["all_az_idx"]
-        all_elev_idx    = indices["all_elev_idx"]
-
-        _N_elev, _az, _rg = result.pred_curves.shape
-        figure_paths: Dict[str, List[Path]] = {}
 
         if run.track_baselines is not None:
             figure_paths["track_geometry"] = [track_plotter.plot_track_geometry(
@@ -467,6 +444,11 @@ class FigureComposer:
             )]
             logger.subsection(f"Flight tracks 3D : {meta.figures_dir / 'tracks' / 'flight_tracks_3d.png'}")
 
+    def _compose_input_channels(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+
         if run.complex_inputs is not None and run.n_secondaries > 0:
             figure_paths["input_channels"] = slice_plotter.plot_input_channels(
                 complex_inputs = run.complex_inputs,
@@ -478,6 +460,12 @@ class FigureComposer:
                 primary_label  = run.track_baselines.reference if run.track_baselines is not None else "primary",
             )
             logger.subsection(f"Input channels : {len(figure_paths['input_channels'])} figures in {meta.figures_dir / 'input_channels'}")
+
+    def _compose_profiles(self, result: Result, run, x_axis_np: np.ndarray, param_space: bool, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        cfg           = self.cfg
 
         pixel_metrics_for_plot = {
             "mse" : result.pixel_mse,
@@ -515,6 +503,12 @@ class FigureComposer:
 
             logger.subsection(f"Profiles ({tag:<6}) : {len(figure_paths[f'profiles_{tag}'])} figures in {meta.figures_dir / 'profiles'}")
 
+    def _compose_pixel_maps(self, result: Result, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        cfg           = self.cfg
+
         pixel_map_specs = [
             ("pixel_mse_map",  "mse",        result.pixel_mse,                             "Per-pixel curve MSE (denorm)",          "MSE",          {"cmap": cfg.cmap_error, "log": True}),
             ("pixel_r2_map",   "r2",         result.pixel_r2,                              "Per-pixel R² (denorm)",                 "R²",           {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
@@ -545,67 +539,82 @@ class FigureComposer:
             meta.figures_dir / "histograms",
         )
 
-        if param_space:
-            figure_paths["param_maps"] = param_plotter.plot_param_maps(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
-                n_gaussians = run.n_gaussians,
-                out_dir     = meta.figures_dir / "param_maps",
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-            )
+    def _compose_param_plots(self, result: Result, run, global_metrics: dict, figure_paths: Dict[str, List[Path]]) -> None:
+        param_plotter = self.plotter.param
+        slot_plotter  = self.plotter.slot
+        meta          = self.meta
+        logger        = self.logger
 
-            figure_paths["param_distributions"] = param_plotter.plot_param_distributions(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
-                n_gaussians = run.n_gaussians,
-                out_dir     = meta.figures_dir / "param_distributions",
-            )
+        figure_paths["param_maps"] = param_plotter.plot_param_maps(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "param_maps",
+            az_offset   = result.azimuth_offset,
+            rg_offset   = result.range_offset,
+        )
 
-            figure_paths["param_scatter"] = param_plotter.plot_param_scatter(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = result.params_gt  [: run.n_gaussians * 3],
-                n_gaussians = run.n_gaussians,
-                out_dir     = meta.figures_dir / "param_scatter",
-            )
+        figure_paths["param_distributions"] = param_plotter.plot_param_distributions(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "param_distributions",
+        )
 
-            figure_paths["param_error_maps"] = param_plotter.plot_param_error_maps(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = result.params_gt  [: run.n_gaussians * 3],
-                n_gaussians = run.n_gaussians,
-                out_dir     = meta.figures_dir / "param_error_maps",
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-            )
+        figure_paths["param_scatter"] = param_plotter.plot_param_scatter(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "param_scatter",
+        )
 
-            figure_paths["slot_mu_distributions"] = slot_plotter.plot_slot_mu_distributions(
-                global_metrics = global_metrics,
-                n_gaussians    = run.n_gaussians,
-                out_dir        = meta.figures_dir / "slots",
-            )
+        figure_paths["param_error_maps"] = param_plotter.plot_param_error_maps(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "param_error_maps",
+            az_offset   = result.azimuth_offset,
+            rg_offset   = result.range_offset,
+        )
 
-            figure_paths["placeholder_detection"] = slot_plotter.plot_placeholder_detection(
-                global_metrics = global_metrics,
-                n_gaussians    = run.n_gaussians,
-                out_dir        = meta.figures_dir / "slots",
-            )
+        figure_paths["slot_mu_distributions"] = slot_plotter.plot_slot_mu_distributions(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_dir        = meta.figures_dir / "slots",
+        )
 
-            figure_paths["slot_ordering_summary"] = slot_plotter.plot_slot_ordering_summary(
-                global_metrics = global_metrics,
-                n_gaussians    = run.n_gaussians,
-                out_dir        = meta.figures_dir / "slots",
-            )
+        figure_paths["placeholder_detection"] = slot_plotter.plot_placeholder_detection(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_dir        = meta.figures_dir / "slots",
+        )
 
-            figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
-                params_pred = result.params_pred[: run.n_gaussians * 3],
-                params_gt   = result.params_gt  [: run.n_gaussians * 3],
-                n_gaussians = run.n_gaussians,
-                out_dir     = meta.figures_dir / "slots",
-                az_offset   = result.azimuth_offset,
-                rg_offset   = result.range_offset,
-            )
+        figure_paths["slot_ordering_summary"] = slot_plotter.plot_slot_ordering_summary(
+            global_metrics = global_metrics,
+            n_gaussians    = run.n_gaussians,
+            out_dir        = meta.figures_dir / "slots",
+        )
 
-            logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
+        figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "slots",
+            az_offset   = result.azimuth_offset,
+            rg_offset   = result.range_offset,
+        )
+
+        logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
+
+    def _compose_slices(self, result: Result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter   = self.plotter.slice
+        meta            = self.meta
+        logger          = self.logger
+        cfg             = self.cfg
+        
+        slice_range_idx = indices["slice_range_idx"]
+        slice_az_idx    = indices["slice_az_idx"]
+        slice_elev_idx  = indices["slice_elev_idx"]
 
         figure_paths["slices_range"]   = []
         figure_paths["slices_azimuth"] = []
@@ -646,6 +655,17 @@ class FigureComposer:
 
         logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
 
+    def _compose_ssim(self, result: Result, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        
+        all_range_idx = indices["all_range_idx"]
+        all_az_idx    = indices["all_az_idx"]
+        all_elev_idx  = indices["all_elev_idx"]
+        
+        _N_elev, _az, _rg = result.pred_curves.shape
+
         for axis, n_slices, indices_arr, offset in (
             ("range",   _rg,     all_range_idx, result.range_offset),
             ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
@@ -670,6 +690,29 @@ class FigureComposer:
         )
 
         logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir / 'elev_metrics'}\n")
+
+    def compose(
+        self,
+        result         : Result,
+        run,
+        global_metrics : dict,
+        x_axis_np      : np.ndarray,
+        indices        : dict,
+        param_space    : bool = True,
+    ) -> Dict[str, List[Path]]:
+
+        figure_paths: Dict[str, List[Path]] = {}
+
+        self._compose_tracks(run, figure_paths)
+        self._compose_input_channels(result, run, figure_paths)
+        self._compose_profiles(result, run, x_axis_np, param_space, figure_paths)
+        self._compose_pixel_maps(result, figure_paths)
+
+        if param_space:
+            self._compose_param_plots(result, run, global_metrics, figure_paths)
+
+        self._compose_slices(result, run, global_metrics, x_axis_np, indices, figure_paths)
+        self._compose_ssim(result, global_metrics, x_axis_np, indices, figure_paths)
 
         if result.reduced is not None:
             self._compose_reduced(result, run, global_metrics, x_axis_np, indices, figure_paths)
