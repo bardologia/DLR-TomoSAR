@@ -294,7 +294,7 @@ class ComparisonReport:
         if not scored:
             lines += ["_No inference metrics available yet._\n"]
         else:
-            all_keys = sorted({key for r in scored for key, value in r.metrics.items() if isinstance(value, (int, float)) and not MetricSectionGrouper.PER_BIN_PATTERN.search(key)})
+            all_keys = MetricSectionGrouper.scalar_keys(scored)
 
             for title, keys in MetricSectionGrouper().group(all_keys):
                 lines += [f"## {title}\n", *self._metric_table(keys, scored)]

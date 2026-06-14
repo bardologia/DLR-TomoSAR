@@ -61,14 +61,6 @@ class CrossValidationReport:
 
         return mean, float(np.std(values, ddof=1))
 
-    def _scalar_keys(self, records: list[TrialRecord]) -> list[str]:
-        return sorted({
-            key
-            for record in records
-            for key, value in record.metrics.items()
-            if isinstance(value, (int, float)) and not MetricSectionGrouper.PER_BIN_PATTERN.search(key)
-        })
-
     def _format_std(self, std: float, n_used: int) -> str:
         if n_used < 2 or not math.isfinite(std):
             return ScalarFormatter.EMPTY
@@ -120,7 +112,7 @@ class CrossValidationReport:
         for split, records in self.records_by_split.items():
             lines += [f"## Split `{split}` — Metric Aggregates\n"]
 
-            for title, keys in self.grouper.group(self._scalar_keys(records)):
+            for title, keys in self.grouper.group(MetricSectionGrouper.scalar_keys(records)):
                 lines += [f"### {title}\n", *self._aggregate_table(keys, records)]
 
         out = self.out_dir / "cv_aggregate_report.md"
@@ -178,7 +170,7 @@ class CrossValidationReport:
 
         for split, records in self.records_by_split.items():
             scored = [record for record in records if record.metrics]
-            keys   = self._scalar_keys(scored)
+            keys   = MetricSectionGrouper.scalar_keys(scored)
 
             split_payload = {}
             for key in keys:

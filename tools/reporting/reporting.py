@@ -68,6 +68,15 @@ class MetricSectionGrouper:
 
     LEFTOVER_TITLE = "Other Metrics"
 
+    @classmethod
+    def scalar_keys(cls, records) -> list[str]:
+        return sorted({
+            key
+            for record in records
+            for key, value in record.metrics.items()
+            if isinstance(value, (int, float)) and not cls.PER_BIN_PATTERN.search(key)
+        })
+
     def group(self, keys: list[str]) -> list[tuple[str, list[str]]]:
         all_keys = list(keys)
         claimed  : set[str] = set()
