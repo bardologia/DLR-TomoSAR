@@ -3,12 +3,12 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from models                                      import IMAGE_SIZE_MODELS, get_model
-from models.autoencoder                          import get_autoencoder
+from models                                              import IMAGE_SIZE_MODELS, get_model
+from models.autoencoder                                  import get_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.backbone.inference.loader         import ModelWrapper, RunLoader
-from pipelines.jepa.training.trainer             import JepaModule
-from tools.data.io                               import AutoencoderConfigIO, ModelConfigIO
+from pipelines.backbone.inference.loader                 import ModelWrapper, RunLoader
+from pipelines.jepa.training.trainer                     import JepaModule
+from tools.data.io                                       import AutoencoderConfigIO, ModelConfigIO
 
 
 

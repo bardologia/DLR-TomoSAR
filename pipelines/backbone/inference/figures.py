@@ -12,15 +12,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy             as np
-from PIL                 import Image
-from tqdm                import tqdm
+from PIL  import Image
+from tqdm import tqdm
 
-from configuration.inference.inference_config       import InferenceConfig
-from pipelines.backbone.inference.loader  import InferenceMetadata
-from pipelines.backbone.inference.metrics import Metrics, Result
-from pipelines.backbone.inference.plots   import PlotTools, Ploter
-from tools                     import ProfileNormalizer
-from tools.monitoring.logger                         import Logger
+from configuration.inference.inference_config import InferenceConfig
+from pipelines.backbone.inference.loader      import InferenceMetadata
+from pipelines.backbone.inference.metrics     import Metrics, Result
+from pipelines.backbone.inference.plots       import PlotTools, Ploter
+from tools                                    import ProfileNormalizer
+from tools.monitoring.logger                  import Logger
 
 
 @dataclass

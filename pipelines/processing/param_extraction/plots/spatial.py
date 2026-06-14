@@ -8,8 +8,8 @@ import matplotlib
 matplotlib.use("Agg")
 import numpy             as np
 
-from tools.reporting.plotting      import PlotBase
-from tools.monitoring.logger                   import Logger
+from tools.reporting.plotting import PlotBase
+from tools.monitoring.logger  import Logger
 
 
 class SpatialMapPlotter(PlotBase):

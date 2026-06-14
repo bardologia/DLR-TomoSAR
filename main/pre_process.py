@@ -13,8 +13,8 @@ from configuration.sar.processing_config import (
     TomogramConfiguration,
 )
 from pipelines.processing.generation.pipeline import PreProcessScheduler, PreProcessSession
-from tools.runtime.config_cli import ConfigCli
-from tools.monitoring.logger import Logger
+from tools.runtime.config_cli                 import ConfigCli
+from tools.monitoring.logger                  import Logger
 
 
 def main() -> None:

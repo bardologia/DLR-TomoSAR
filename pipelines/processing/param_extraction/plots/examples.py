@@ -11,10 +11,10 @@ import matplotlib.cm     as cm
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from tools.reporting.plotting      import PlotBase
+from tools.reporting.plotting import PlotBase
 from tools.data.preprocessing import ProfilePreprocessor
-from tools.data.gaussians                import GaussianMixture
-from tools.monitoring.logger                   import Logger
+from tools.data.gaussians     import GaussianMixture
+from tools.monitoring.logger  import Logger
 
 
 class ExampleFitPlotter(PlotBase):

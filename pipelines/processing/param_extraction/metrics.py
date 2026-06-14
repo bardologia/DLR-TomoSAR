@@ -8,9 +8,9 @@ import numpy as np
 from scipy.stats import pearsonr, spearmanr
 
 from tools.data.preprocessing import ProfilePreprocessor
-from tools.metrics.scoring        import R2
-from tools.data.gaussians                 import GaussianMixture
-from tools.monitoring.logger                    import Logger
+from tools.metrics.scoring    import R2
+from tools.data.gaussians     import GaussianMixture
+from tools.monitoring.logger  import Logger
 
 
 class SnrEstimator:

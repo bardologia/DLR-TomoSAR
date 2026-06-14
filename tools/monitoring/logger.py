@@ -2,14 +2,14 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from datetime   import datetime
+from pathlib    import Path
+from typing     import Any, Mapping, Optional, Sequence
 
 from rich.console import Console
-from rich.live import Live
+from rich.live    import Live
 from rich.logging import RichHandler
-from rich.panel import Panel
+from rich.panel   import Panel
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -20,9 +20,9 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.rule import Rule
+from rich.rule  import Rule
 from rich.table import Table
-from rich.text import Text
+from rich.text  import Text
 from rich.theme import Theme
 
 from tools.reporting.markdown import MarkdownDoc, MarkdownTable

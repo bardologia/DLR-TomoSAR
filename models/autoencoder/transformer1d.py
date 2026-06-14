@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.model.autoencoder_models_config import Transformer1dAutoencoderConfig
-from models.autoencoder.base import AutoencoderBase, AutoencoderBlocks
+from models.autoencoder.base                       import AutoencoderBase, AutoencoderBlocks
 
 
 class Transformer1dEncoder(nn.Module):

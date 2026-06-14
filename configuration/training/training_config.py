@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from configuration.sar.gaussian_config     import GaussianConfig
-from configuration.sar.geometry_config     import GeometryConfig
+from configuration.sar.gaussian_config          import GaussianConfig
+from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.loss_config         import LossCurriculumConfig
 from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.runtime_config      import IOConfig, MemoryConfig, OverfitConfig, PermutationMetricsConfig, ResourceConfig, TrainingLoopConfig

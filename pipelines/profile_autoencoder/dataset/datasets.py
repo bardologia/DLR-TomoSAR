@@ -7,8 +7,8 @@ from torch.utils.data import Dataset
 
 from pipelines.profile_autoencoder.dataset.augmentation  import ProfileAugmenter
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer
-from tools.data.gaussians import GaussianMixture
-from tools.monitoring.logger import Logger
+from tools.data.gaussians                                import GaussianMixture
+from tools.monitoring.logger                             import Logger
 
 
 class ProfileDataset(Dataset):

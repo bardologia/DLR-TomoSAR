@@ -1,6 +1,6 @@
 from .backbone import *  # noqa: F401,F403
 from .backbone import CONFIG_REGISTRY, IMAGE_SIZE_MODELS, MODEL_REGISTRY, get_model
-from .blocks import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
+from .blocks   import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .autoencoder import (
     AE_CONFIG_REGISTRY,
     AE_MODEL_REGISTRY,

@@ -7,7 +7,7 @@ from typing   import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from tools.reporting.reporting import ReportAssets
-from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
+from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
 
 
 class ReportPayloadBuilder:

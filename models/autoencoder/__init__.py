@@ -4,9 +4,9 @@ from configuration.model.autoencoder_models_config import (
     MlpAutoencoderConfig,
     Transformer1dAutoencoderConfig,
 )
-from .base import AutoencoderBase, AutoencoderBlocks
-from .mlp import MlpAutoencoder
-from .conv1d import Conv1dAutoencoder
+from .base          import AutoencoderBase, AutoencoderBlocks
+from .mlp           import MlpAutoencoder
+from .conv1d        import Conv1dAutoencoder
 from .transformer1d import Transformer1dAutoencoder
 
 

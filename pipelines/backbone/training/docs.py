@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing  import Optional
 
 import torch
 import torch.nn as nn
-from rich.tree import Tree
+from rich.tree        import Tree
 from torch.utils.data import DataLoader
 
 from tools.reporting.markdown import MarkdownDoc, MarkdownTable

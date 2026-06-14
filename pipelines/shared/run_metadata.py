@@ -7,11 +7,11 @@ from pathlib     import Path
 import torch
 
 from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard                      import SummaryWriter
 
 from configuration.training.training_config import TrainerConfig
-from tools.data.io           import FileIO, ModelConfigIO
-from tools.monitoring.logger import Logger
+from tools.data.io                          import FileIO, ModelConfigIO
+from tools.monitoring.logger                import Logger
 
 
 class TrainingRunMetadata:

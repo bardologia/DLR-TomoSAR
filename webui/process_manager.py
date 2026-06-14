@@ -11,10 +11,10 @@ import threading
 import time
 import uuid
 from collections import deque
-from datetime import datetime
+from datetime    import datetime
 
 from project_paths import ProjectPaths
-from web_logger import WebLogger
+from web_logger    import WebLogger
 
 
 class JobStream:

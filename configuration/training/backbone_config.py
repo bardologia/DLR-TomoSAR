@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib     import Path
 
 from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.sar.geometry_config  import GeometryConfig
-from configuration.inference.inference_config import InferenceConfig
-from configuration.training.loss_config      import LossConfig, LossCurriculumConfig
-from configuration.training.runtime_config   import OverfitConfig
+from configuration.sar.geometry_config          import GeometryConfig
+from configuration.inference.inference_config   import InferenceConfig
+from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
+from configuration.training.runtime_config      import OverfitConfig
 
 
 def _default_curriculum() -> LossCurriculumConfig:

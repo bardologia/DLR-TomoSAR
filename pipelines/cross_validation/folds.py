@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib     import Path
 
-from configuration.experiments.cross_validation_config       import CrossValidationConfig
-from configuration.inference.inference_config              import InferenceConfig
-from pipelines.shared.config_factory import ConfigFactory
-from tools.data.regions                               import CropRegion, SplitRegions
+from configuration.experiments.cross_validation_config import CrossValidationConfig
+from configuration.inference.inference_config          import InferenceConfig
+from pipelines.shared.config_factory                   import ConfigFactory
+from tools.data.regions                                import CropRegion, SplitRegions
 
 
 @dataclass

@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader, Subset
 
 from configuration.data.norm_config    import ChannelStats, ChannelStrategy, NormMethod
 from configuration.data.dataset_config import InputConfig, OutputConfig
-from tools.data.io          import FileIO
-from tools.monitoring.logger                 import Logger
-from tools.reporting.ranges                 import RangeFormatter
+from tools.data.io                     import FileIO
+from tools.monitoring.logger           import Logger
+from tools.reporting.ranges            import RangeFormatter
 
 
 Array = Union[np.ndarray, torch.Tensor]

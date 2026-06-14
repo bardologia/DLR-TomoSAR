@@ -6,14 +6,14 @@ from typing      import Dict, List, Type
 
 import numpy as np
 
-from configuration.inference.inference_config         import InferenceConfig
-from pipelines.backbone.inference.figures   import FigureComposer
-from pipelines.backbone.inference.loader    import InferenceMetadata, RunLoader
-from pipelines.backbone.inference.metrics   import Metrics
-from pipelines.backbone.inference.plots     import Ploter
-from pipelines.backbone.inference.predictor import Predictor
-from pipelines.backbone.inference.report    import Report, ReportPayloadBuilder
-from tools.monitoring.logger                           import Logger
+from configuration.inference.inference_config import InferenceConfig
+from pipelines.backbone.inference.figures     import FigureComposer
+from pipelines.backbone.inference.loader      import InferenceMetadata, RunLoader
+from pipelines.backbone.inference.metrics     import Metrics
+from pipelines.backbone.inference.plots       import Ploter
+from pipelines.backbone.inference.predictor   import Predictor
+from pipelines.backbone.inference.report      import Report, ReportPayloadBuilder
+from tools.monitoring.logger                  import Logger
 
 
 @dataclass(frozen=True)

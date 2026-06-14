@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import numpy             as np
 from scipy.stats         import pearsonr, spearmanr
 
-from tools.reporting.plotting      import PlotBase
-from tools.monitoring.logger                   import Logger
+from tools.reporting.plotting import PlotBase
+from tools.monitoring.logger  import Logger
 
 
 class MetricsBarPlotter(PlotBase):

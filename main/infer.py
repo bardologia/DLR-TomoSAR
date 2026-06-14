@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
+from pathlib     import Path
 
 from _bootstrap import EnvironmentPinner
 
@@ -10,9 +10,9 @@ def main() -> None:
     EnvironmentPinner.gpu()
 
     from configuration.inference.inference_config import InferenceEntryConfig
-    from pipelines.backbone.inference.pipeline import InferencePipeline
-    from tools.runtime.config_cli import ConfigCli
-    from tools.monitoring.logger import Logger
+    from pipelines.backbone.inference.pipeline    import InferencePipeline
+    from tools.runtime.config_cli                 import ConfigCli
+    from tools.monitoring.logger                  import Logger
 
     config   = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected").apply()
     logs_dir = Path(config.logs_dir)

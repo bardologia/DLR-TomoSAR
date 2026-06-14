@@ -9,10 +9,10 @@ import time
 import urllib.request
 import uuid
 from datetime import datetime
-from pathlib import Path
+from pathlib  import Path
 
 from project_paths import ProjectPaths
-from web_logger import WebLogger
+from web_logger    import WebLogger
 
 
 class TensorboardManager:

@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.model.autoencoder_models_config import MlpAutoencoderConfig
-from models.autoencoder.base import AutoencoderBase, AutoencoderBlocks
+from models.autoencoder.base                       import AutoencoderBase, AutoencoderBlocks
 
 
 class MlpEncoder(nn.Module):

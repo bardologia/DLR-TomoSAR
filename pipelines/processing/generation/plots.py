@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 import numpy             as np
 
 from configuration.sar.processing_config import ProcessingConfiguration
-from tools.data.io             import FileIO
-from tools.reporting.plotting       import PlotBase
-from tools.monitoring.logger                    import Logger
+from tools.data.io                       import FileIO
+from tools.reporting.plotting            import PlotBase
+from tools.monitoring.logger             import Logger
 
 
 class StackPlotter(PlotBase):

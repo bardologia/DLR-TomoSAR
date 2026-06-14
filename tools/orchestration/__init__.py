@@ -1,6 +1,6 @@
 from .pool      import ProcessPoolRunner
-from .gpu_queue  import GpuJob, GpuJobResult, GpuQueue
-from .stages     import ExperimentStage, QueuedInferenceStage, QueuedTrainingStage
+from .gpu_queue import GpuJob, GpuJobResult, GpuQueue
+from .stages    import ExperimentStage, QueuedInferenceStage, QueuedTrainingStage
 
 __all__ = [
     "ProcessPoolRunner",

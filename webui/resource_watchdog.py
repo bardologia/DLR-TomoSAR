@@ -4,10 +4,10 @@ import os
 import threading
 import time
 from collections import deque
-from datetime import datetime
+from datetime    import datetime
 
 from process_manager import ProcessManager
-from web_logger import WebLogger
+from web_logger      import WebLogger
 
 
 class ResourceWatchdog:

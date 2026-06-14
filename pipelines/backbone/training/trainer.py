@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from tools                            import PermutationMetrics
-from tools.training        import BaseTrainer, MetricAggregator
+from tools.training                   import BaseTrainer, MetricAggregator
 from pipelines.backbone.training.loss import Loss
 from pipelines.backbone.training.docs import TrainingDocs
 

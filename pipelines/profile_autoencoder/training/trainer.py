@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tools.training         import BaseTrainer
+from tools.training                              import BaseTrainer
 from pipelines.profile_autoencoder.training.loss import Loss
 
 

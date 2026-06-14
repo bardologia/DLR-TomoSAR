@@ -4,8 +4,8 @@ import base64
 import os
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import List
+from pathlib  import Path
+from typing   import List
 
 
 class ReportAssets:

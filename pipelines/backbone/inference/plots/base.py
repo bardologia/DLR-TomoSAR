@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import numpy                as np
 
 from tools.reporting.plotting import PlotBase
-from tools.data.gaussians           import GaussianReconstructor
+from tools.data.gaussians     import GaussianReconstructor
 
 
 class PlotTools(PlotBase):

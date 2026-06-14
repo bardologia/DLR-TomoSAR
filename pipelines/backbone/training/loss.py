@@ -4,11 +4,11 @@ from collections import namedtuple
 
 import torch
 
-from tools.data.gaussians          import GaussianClamp, GaussianCurve
+from tools.data.gaussians     import GaussianClamp, GaussianCurve
 from tools.loss.curve_loss    import CurveLoss
 from tools.loss.param_loss    import ParamLoss
 from tools.loss.physical_loss import PhysicalLoss
-from tools.sar.tomo_geometry      import TomoGeometry
+from tools.sar.tomo_geometry  import TomoGeometry
 
 
 LossTerm = namedtuple("LossTerm", ["name", "use_flag", "weight_key", "space"])

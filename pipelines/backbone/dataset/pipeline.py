@@ -7,15 +7,15 @@ from typing      import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader
 
-from configuration.data.dataset_config             import DatasetConfiguration
-from tools.data.regions                            import CropRegion
+from configuration.data.dataset_config        import DatasetConfiguration
+from tools.data.regions                       import CropRegion
 from pipelines.backbone.dataset.augmentation  import SpatialAugmenter
 from pipelines.backbone.dataset.datasets      import MultiRegionDataset, PatchDataset
-from pipelines.shared.loaders             import Loader
+from pipelines.shared.loaders                 import Loader
 from pipelines.backbone.dataset.normalization import Normalizer, StatsComputer
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
-from tools.data.io                      import FileIO
-from tools.monitoring.logger                             import Logger
+from tools.data.io                            import FileIO
+from tools.monitoring.logger                  import Logger
 
 
 class MetadataWriter:

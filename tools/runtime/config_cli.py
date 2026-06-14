@@ -8,8 +8,8 @@ import signal
 import subprocess
 import sys
 from dataclasses import fields, is_dataclass
-from datetime import datetime
-from pathlib import Path
+from datetime    import datetime
+from pathlib     import Path
 
 _SUPPORTED_TYPES = (bool, int, float, str, Path, list, tuple, dict)
 

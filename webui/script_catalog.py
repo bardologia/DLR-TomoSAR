@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from project_paths import ProjectPaths
+from project_paths          import ProjectPaths
 from script_config_resolver import ScriptConfigResolver
 
 

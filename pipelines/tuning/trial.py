@@ -4,8 +4,8 @@ import optuna
 
 from pipelines.profile_autoencoder.training.trainer  import Trainer as AeTrainer
 from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as AeTrainingPipeline
-from pipelines.backbone.training.pipeline import TrainingPipeline
-from pipelines.backbone.training.trainer  import Trainer
+from pipelines.backbone.training.pipeline            import TrainingPipeline
+from pipelines.backbone.training.trainer             import Trainer
 
 
 class TrialTrainer(Trainer):

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
-from pathlib import Path
+from pathlib  import Path
 
 import numpy as np
 
-from pipelines.benchmark.results import ComparisonReport
-from pipelines.benchmark.results import TrialRecord
+from pipelines.benchmark.results      import ComparisonReport
+from pipelines.benchmark.results      import TrialRecord
 from pipelines.cross_validation.folds import FoldPlanner
-from tools import FileIO, MetricSectionGrouper
-from tools.metrics.scoring import FiniteScalar
-from tools.monitoring.logger import Logger
-from tools.reporting.markdown import MarkdownTable, ScalarFormatter
+from tools                            import FileIO, MetricSectionGrouper
+from tools.metrics.scoring            import FiniteScalar
+from tools.monitoring.logger          import Logger
+from tools.reporting.markdown         import MarkdownTable, ScalarFormatter
 
 
 class CrossValidationReport:

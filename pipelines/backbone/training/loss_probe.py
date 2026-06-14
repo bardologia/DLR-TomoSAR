@@ -5,11 +5,11 @@ import math
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
+from typing      import Optional
 
 import torch
 
-from tools import NullLogger, NullTracker
+from tools                            import NullLogger, NullTracker
 from pipelines.backbone.training.loss import LOSS_TERMS
 
 

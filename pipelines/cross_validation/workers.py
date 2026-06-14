@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
+from pathlib     import Path
 
 from configuration.experiments.cross_validation_config import CrossValidationConfig
-from pipelines.benchmark.results      import TrialCollector, TrialRecord
-from pipelines.benchmark.workers      import BenchmarkWorker
-from pipelines.cross_validation.folds import FoldConfigFactory, FoldNaming
-from tools.data.regions               import SplitRegions
-from tools.monitoring.logger          import Logger
+from pipelines.benchmark.results                       import TrialCollector, TrialRecord
+from pipelines.benchmark.workers                       import BenchmarkWorker
+from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
+from tools.data.regions                                import SplitRegions
+from tools.monitoring.logger                           import Logger
 
 
 class FoldCollector(TrialCollector):
@@ -58,7 +58,7 @@ class CrossValidationWorker(BenchmarkWorker):
 
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from models import CONFIG_REGISTRY
+        from models                               import CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
         model_config = CONFIG_REGISTRY[self.config.model_name]()

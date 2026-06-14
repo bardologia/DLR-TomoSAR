@@ -12,9 +12,9 @@ from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
-from tools.data.io          import FileIO
+from tools.data.io            import FileIO
 from tools.data.preprocessing import ProfileNormalizer
-from tools.metrics.scoring       import R2, RelativeImprovement
+from tools.metrics.scoring    import R2, RelativeImprovement
 
 
 @dataclass

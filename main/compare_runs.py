@@ -7,10 +7,10 @@ from _bootstrap import EnvironmentPinner
 
 EnvironmentPinner.threads()
 
-from configuration.experiments.benchmark_config                import BenchmarkConfig
-from pipelines.benchmark.stages           import ComparisonStage
-from tools.runtime.config_cli                              import ConfigCli
-from tools.monitoring.logger                                  import Logger
+from configuration.experiments.benchmark_config import BenchmarkConfig
+from pipelines.benchmark.stages                 import ComparisonStage
+from tools.runtime.config_cli                   import ConfigCli
+from tools.monitoring.logger                    import Logger
 
 
 def _resolve_run_tag(config: BenchmarkConfig) -> str:

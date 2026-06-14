@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.model.models_config import SwinUNetConfig
-from ..blocks import DropPath, build_activation, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                          import DropPath, build_activation, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
 class WindowAttention(nn.Module):

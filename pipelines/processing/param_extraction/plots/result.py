@@ -8,8 +8,8 @@ import matplotlib
 matplotlib.use("Agg")
 import numpy             as np
 
-from tools.reporting.plotting      import PlotBase
-from tools.monitoring.logger                   import Logger
+from tools.reporting.plotting                                  import PlotBase
+from tools.monitoring.logger                                   import Logger
 from pipelines.processing.param_extraction.plots.spatial       import SpatialMapPlotter
 from pipelines.processing.param_extraction.plots.distributions import DistributionPlotter
 from pipelines.processing.param_extraction.plots.metrics       import MetricsBarPlotter

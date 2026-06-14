@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from tools.data.gaussians       import GaussianCurve
+from tools.data.gaussians  import GaussianCurve
 from tools.loss.curve_loss import CurveLoss
 
 

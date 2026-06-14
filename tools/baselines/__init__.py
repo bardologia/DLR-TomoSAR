@@ -1,6 +1,6 @@
-from .containers  import SecondarySelection, TrackBaselines, TrackProfiles
-from .reading     import TrackFileResolver, TrackReader
-from .extraction  import BaselineExtractor
+from .containers import SecondarySelection, TrackBaselines, TrackProfiles
+from .reading    import TrackFileResolver, TrackReader
+from .extraction import BaselineExtractor
 
 __all__ = [
     "SecondarySelection",

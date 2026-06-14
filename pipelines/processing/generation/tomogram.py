@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Tuple
+from typing  import Tuple
 
 import h5py
 import numpy as np
@@ -15,12 +15,12 @@ from configuration.sar.processing_config              import (
     ProcessingConfiguration,
     TomogramConfiguration,
 )
-from tools.sar.pyrat_env      import PyRatEnvironment
-from tools.sar.tomogram_worker import PyRatJob, run_pyrat_job
-from tools                             import FileIO, ProcessPoolRunner
-from tools.monitoring.logger                                 import Logger
-from tools.data.regions                                import CropRegion
-from pipelines.shared.spec_generator                  import GeneratorBase
+from tools.sar.pyrat_env             import PyRatEnvironment
+from tools.sar.tomogram_worker       import PyRatJob, run_pyrat_job
+from tools                           import FileIO, ProcessPoolRunner
+from tools.monitoring.logger         import Logger
+from tools.data.regions              import CropRegion
+from pipelines.shared.spec_generator import GeneratorBase
 
 
 class TomogramProcessor:

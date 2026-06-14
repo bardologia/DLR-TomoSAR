@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from project_paths import ProjectPaths
-from web_logger import WebLogger
+from web_logger    import WebLogger
 
 
 class CubeExplorer:

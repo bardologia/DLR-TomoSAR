@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import asdict
-from pathlib import Path
+from pathlib     import Path
 
 from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger

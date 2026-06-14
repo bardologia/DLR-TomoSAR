@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib     import Path
 
 from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.training.runtime_config       import OverfitConfig
+from configuration.training.runtime_config      import OverfitConfig
 
 
 def _default_ae_loss():

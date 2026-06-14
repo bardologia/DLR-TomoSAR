@@ -14,7 +14,7 @@ def main() -> None:
     args = parser.parse_args()
 
     from pipelines.processing.generation.interferogram import InterferogramGenerator
-    from tools.monitoring.logger import Logger
+    from tools.monitoring.logger                       import Logger
 
     spec_path = Path(args.spec)
 

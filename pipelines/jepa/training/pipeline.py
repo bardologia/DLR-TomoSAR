@@ -4,16 +4,16 @@ from pathlib import Path
 
 import torch
 
-from configuration.training.jepa_config              import JepaTrainerConfig
-from models                                 import IMAGE_SIZE_MODELS, get_model
-from models.autoencoder             import get_autoencoder
+from configuration.training.jepa_config                  import JepaTrainerConfig
+from models                                              import IMAGE_SIZE_MODELS, get_model
+from models.autoencoder                                  import get_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.shared.config_factory import ConfigFactory
-from pipelines.shared.run_metadata import TrainingRunMetadata
-from pipelines.jepa.training.dataset_prep import ProfileDatasetPreparation
-from pipelines.jepa.training.trainer   import JepaModule, Trainer
-from tools.data.io                          import AutoencoderConfigIO
-from tools.runtime.reproducibility                  import Reproducibility
+from pipelines.shared.config_factory                     import ConfigFactory
+from pipelines.shared.run_metadata                       import TrainingRunMetadata
+from pipelines.jepa.training.dataset_prep                import ProfileDatasetPreparation
+from pipelines.jepa.training.trainer                     import JepaModule, Trainer
+from tools.data.io                                       import AutoencoderConfigIO
+from tools.runtime.reproducibility                       import Reproducibility
 
 
 
@@ -129,9 +129,9 @@ class SingleTrainRunner:
     def run(self):
         results, run_directory = TrainingPipeline(self.config).run()
         if self.config.infer_after:
-            from dataclasses import replace
+            from dataclasses                           import replace
             from pipelines.backbone.inference.pipeline import InferencePipeline
-            from pipelines.jepa.inference.pipeline      import JEPA_INFERENCE_COMPONENTS
+            from pipelines.jepa.inference.pipeline     import JEPA_INFERENCE_COMPONENTS
 
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
             InferencePipeline(inference_config, components=JEPA_INFERENCE_COMPONENTS).run()

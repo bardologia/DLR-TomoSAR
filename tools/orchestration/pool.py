@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any, Callable, Iterable
+from typing             import Any, Callable, Iterable
 
 from tools.monitoring.logger import Logger
 

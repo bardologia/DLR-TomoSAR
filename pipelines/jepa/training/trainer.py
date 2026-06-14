@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from tools.training       import BaseTrainer
-from pipelines.jepa.training.coupling    import StageAMode, TargetProvider
-from pipelines.jepa.training.loss        import Loss
+from tools.training                   import BaseTrainer
+from pipelines.jepa.training.coupling import StageAMode, TargetProvider
+from pipelines.jepa.training.loss     import Loss
 
 
 class JepaModule(nn.Module):

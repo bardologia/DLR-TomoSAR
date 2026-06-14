@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.model.autoencoder_models_config import Conv1dAutoencoderConfig
-from models.autoencoder.base import AutoencoderBase, AutoencoderBlocks
-from models.blocks import build_activation
+from models.autoencoder.base                       import AutoencoderBase, AutoencoderBlocks
+from models.blocks                                 import build_activation
 
 
 class Conv1dEncoder(nn.Module):

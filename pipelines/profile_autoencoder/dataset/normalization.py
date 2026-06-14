@@ -7,8 +7,8 @@ from typing      import Optional
 import numpy as np
 import torch
 
-from tools.data.gaussians import GaussianMixture
-from tools.data.io        import FileIO
+from tools.data.gaussians    import GaussianMixture
+from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
 

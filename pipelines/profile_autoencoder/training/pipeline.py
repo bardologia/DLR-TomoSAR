@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.data.profile_config               import ProfileDatasetConfig
-from configuration.training.autoencoder_config       import ProfileAeTrainerConfig
-from models.autoencoder             import get_autoencoder
+from configuration.data.profile_config              import ProfileDatasetConfig
+from configuration.training.autoencoder_config      import ProfileAeTrainerConfig
+from models.autoencoder                             import get_autoencoder
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
-from pipelines.shared.config_factory import ConfigFactory
-from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.shared.config_factory                import ConfigFactory
+from pipelines.shared.run_metadata                  import TrainingRunMetadata
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from tools.data.io                               import AutoencoderConfigIO
+from tools.data.io                                  import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
 
