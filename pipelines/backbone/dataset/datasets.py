@@ -61,9 +61,6 @@ class PatchDataset(Dataset):
         self.output_channel_indices = output_config.selected_indices(n_gaussians = n_gaussians)
         self.gt_channels            = len(self.output_channel_indices)
 
-    def __len__(self) -> int:
-        return self.grid.grid.number_of_patches
-
     def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
         primary_data        = complex_patch[                       : 1                                              ]
         secondaries_data    = complex_patch[1                      : 1 + self.n_secondaries                         ]
@@ -111,6 +108,9 @@ class PatchDataset(Dataset):
             return gt_params
 
         return self.normalizer.normalize_output(gt_params)
+
+    def __len__(self) -> int:
+        return self.grid.grid.number_of_patches
 
     def __getitem__(self, idx: int):
         complex_patch = self.grid.extract(self.inputs, idx)

@@ -181,55 +181,6 @@ class StatsComputer:
         )
 
     @staticmethod
-    def _fit_output(
-        logger        : Optional[Logger],
-        role_pools    : dict[str, np.ndarray],
-        output_config : "OutputConfig",
-        n_gaussians   : int,
-    ) -> ChannelStats:
-
-        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
-        role_strat : dict[str, ChannelStrategy] = {key: output_config.strategy_for(key) for key in role_pools}
-
-        selected       = output_config.selected_indices(n_gaussians)
-        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
-
-        locs:       list[float]                    = []
-        scales:     list[float]                    = []
-        names:      list[str]                      = []
-        strategies: list[ChannelStrategy] = []
-
-        for out_ch, full_ch in enumerate(selected):
-            g        = full_ch // 3
-            role_key = _local_to_role[full_ch % 3]
-            m, s     = role_fit[role_key]
-            locs.append(m)
-            scales.append(s)
-            names.append(f"G{g+1}_{role_key.split('/')[1]}")
-            strategies.append(role_strat[role_key])
-
-        if logger is not None:
-            logger.section("[Output stats from params]")
-            rows = []
-            for key, (m, s) in role_fit.items():
-                strat = role_strat[key]
-                rows.append({
-                    "Channel":  key,
-                    "loc":      f"{m:.5f}",
-                    "scale":    f"{s:.5f}",
-                    "Method":    strat.norm_method.value,
-                    "log1p":    str(strat.apply_log1p),
-                })
-            logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
-
-        return ChannelStats(
-            loc        = locs,
-            scale      = scales,
-            names      = names,
-            strategies = strategies,
-        )
-
-    @staticmethod
     def compute_input_stats(
         dataset,
         logger           : Logger,
@@ -283,6 +234,55 @@ class StatsComputer:
             return [part.gt_parameters for part in dataset.parts]
 
         return [dataset.gt_parameters]
+
+    @staticmethod
+    def _fit_output(
+        logger        : Optional[Logger],
+        role_pools    : dict[str, np.ndarray],
+        output_config : "OutputConfig",
+        n_gaussians   : int,
+    ) -> ChannelStats:
+
+        role_fit   : dict[str, tuple[float, float]]      = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
+        role_strat : dict[str, ChannelStrategy] = {key: output_config.strategy_for(key) for key in role_pools}
+
+        selected       = output_config.selected_indices(n_gaussians)
+        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
+
+        locs:       list[float]                    = []
+        scales:     list[float]                    = []
+        names:      list[str]                      = []
+        strategies: list[ChannelStrategy] = []
+
+        for out_ch, full_ch in enumerate(selected):
+            g        = full_ch // 3
+            role_key = _local_to_role[full_ch % 3]
+            m, s     = role_fit[role_key]
+            locs.append(m)
+            scales.append(s)
+            names.append(f"G{g+1}_{role_key.split('/')[1]}")
+            strategies.append(role_strat[role_key])
+
+        if logger is not None:
+            logger.section("[Output stats from params]")
+            rows = []
+            for key, (m, s) in role_fit.items():
+                strat = role_strat[key]
+                rows.append({
+                    "Channel":  key,
+                    "loc":      f"{m:.5f}",
+                    "scale":    f"{s:.5f}",
+                    "Method":    strat.norm_method.value,
+                    "log1p":    str(strat.apply_log1p),
+                })
+            logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
+
+        return ChannelStats(
+            loc        = locs,
+            scale      = scales,
+            names      = names,
+            strategies = strategies,
+        )
 
     @staticmethod
     def compute_output_stats(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib     import Path
-from typing      import Tuple
+from typing      import Optional, Tuple
 
 import numpy as np
 
@@ -87,14 +87,10 @@ class Cropper:
 
         return np.stack([array[index, az_slice, rg_slice] for index in self.secondary_indices])
 
-    def load_split(self, region: CropRegion, load_tomogram: bool = False) -> dict[str, np.ndarray]:
-        az_slice, rg_slice = self.to_local_slices(region)
-
+    def _stack_inputs(self, az_slice: slice, rg_slice: slice) -> Tuple[np.ndarray, int, int]:
         primary        = np.load(str(self.layout.artifact_path("primary")),        mmap_mode="r", allow_pickle=False)
         secondaries    = np.load(str(self.layout.artifact_path("secondaries")),    mmap_mode="r", allow_pickle=False)
         interferograms = np.load(str(self.layout.artifact_path("interferograms")), mmap_mode="r", allow_pickle=False)
-        parameters     = np.load(str(self.layout.artifact_path("parameters")),     mmap_mode="r", allow_pickle=False)
-        dem            = np.load(str(self.layout.artifact_path("dem_full")),       mmap_mode="r", allow_pickle=False)
 
         primary_view        = primary[..., az_slice, rg_slice]
         secondaries_view    = self._select_channels(secondaries,    az_slice, rg_slice)
@@ -106,30 +102,47 @@ class Cropper:
         az_size          = primary_view.shape[-2]
         rg_size          = primary_view.shape[-1]
 
-        inputs_split     = np.empty((n_passes, az_size, rg_size), dtype=primary.dtype)
+        inputs_split                      = np.empty((n_passes, az_size, rg_size), dtype=primary.dtype)
         inputs_split[0]                   = primary_view
         inputs_split[1:1 + n_secondaries] = secondaries_view
         inputs_split[1 + n_secondaries:]  = interferograms_view
 
-        parameters_split = np.ascontiguousarray(parameters [..., az_slice, rg_slice])
-        dem_split        = np.ascontiguousarray(dem        [az_slice, rg_slice].astype(np.float32))
+        return inputs_split, n_secondaries, n_interferograms
 
-        tomogram_split = None
-        if load_tomogram:
-            tomogram       = np.load(str(self.layout.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
-            tomogram_split = np.ascontiguousarray(tomogram[:, az_slice, rg_slice].astype(np.float32))
+    def _load_targets(self, az_slice: slice, rg_slice: slice) -> Tuple[np.ndarray, np.ndarray]:
+        parameters = np.load(str(self.layout.artifact_path("parameters")), mmap_mode="r", allow_pickle=False)
+        dem        = np.load(str(self.layout.artifact_path("dem_full")),   mmap_mode="r", allow_pickle=False)
 
+        parameters_split = np.ascontiguousarray(parameters[..., az_slice, rg_slice])
+        dem_split        = np.ascontiguousarray(dem[az_slice, rg_slice].astype(np.float32))
+
+        return parameters_split, dem_split
+
+    def _load_tomogram(self, az_slice: slice, rg_slice: slice) -> np.ndarray:
+        tomogram = np.load(str(self.layout.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
+        return np.ascontiguousarray(tomogram[:, az_slice, rg_slice].astype(np.float32))
+
+    def _log_crop(self, inputs_split: np.ndarray, dem_split: np.ndarray, parameters_split: np.ndarray, tomogram_split: Optional[np.ndarray], n_secondaries: int, n_interferograms: int) -> None:
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
-            "Primary"          : primary_view.shape,
-            "Secondaries"      : secondaries_view.shape,
-            "Interferograms"   : interferograms_view.shape,
+            "Primary"          : inputs_split[0].shape,
+            "Secondaries"      : inputs_split[1:1 + n_secondaries].shape,
+            "Interferograms"   : inputs_split[1 + n_secondaries:].shape,
             "Selection"        : ", ".join(self.secondary_labels) if self.secondary_labels else "all passes",
             "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
             "DEM"              : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
             "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
             "Full tomogram"    : f"{tomogram_split.shape}  ({tomogram_split.nbytes/1e9:.2f} GB)" if tomogram_split is not None else "not loaded",
         })
+
+    def load_split(self, region: CropRegion, load_tomogram: bool = False) -> dict[str, np.ndarray]:
+        az_slice, rg_slice = self.to_local_slices(region)
+
+        inputs_split, n_secondaries, n_interferograms = self._stack_inputs(az_slice, rg_slice)
+        parameters_split, dem_split                   = self._load_targets(az_slice, rg_slice)
+        tomogram_split                                = self._load_tomogram(az_slice, rg_slice) if load_tomogram else None
+
+        self._log_crop(inputs_split, dem_split, parameters_split, tomogram_split, n_secondaries, n_interferograms)
 
         return {
             "inputs"           : inputs_split,
