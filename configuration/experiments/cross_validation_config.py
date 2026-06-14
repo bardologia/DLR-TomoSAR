@@ -25,7 +25,8 @@ class FoldConfig:
 
 @dataclass
 class JepaCvConfig:
-    stage_a_run     : Path | None         = None
+    stage_a_logdir  : Path                = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
+    stage_a_run     : str | None          = None
     stage_a_mode    : str                 = "frozen"
     target_provider : str                 = "stopgrad"
     embedding_loss  : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
@@ -47,7 +48,7 @@ class CrossValidationConfig:
     model_name      : str  = "resunet"
     model_overrides : dict = field(default_factory=dict)
 
-    paths      : BenchmarkPathsConfig   = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/cross_validation")))
+    paths      : BenchmarkPathsConfig   = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/cross_validation")))
     folds      : FoldConfig             = field(default_factory=FoldConfig)
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)

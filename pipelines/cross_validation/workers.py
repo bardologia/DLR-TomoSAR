@@ -98,6 +98,7 @@ class FoldTrainingWorker(CrossValidationWorker):
             n_gaussians     = cv.n_gaussians,
             logdir          = self.run_dir / "folds",
             model_overrides = cv.model_overrides,
+            stage_a_logdir  = jepa.stage_a_logdir,
             stage_a_run     = jepa.stage_a_run,
             stage_a_mode    = jepa.stage_a_mode,
             target_provider = jepa.target_provider,

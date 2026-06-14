@@ -35,7 +35,7 @@ class ScriptCatalog:
             "title"     : "Train JEPA",
             "category"  : "Training",
             "purpose"   : "Stage-B: train the JEPA predictor against a frozen or fine-tuned Stage-A autoencoder in latent space.",
-            "essentials": ["run_name", "model_name", "gpu", "logdir", "stage_a_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_name", "model_name", "stage_a_mode", "stage_a_logdir", "stage_a_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
             "title"     : "Inference",
@@ -45,9 +45,15 @@ class ScriptCatalog:
         },
         "benchmark": {
             "title"     : "Benchmark",
-            "category"  : "Analysis",
+            "category"  : "Experiments",
             "purpose"   : "Benchmark inference speed and capacity-matched architecture trade-offs.",
-            "essentials": ["run_tag", "gpus"],
+            "essentials": ["run_tag", "gpus", "paths.dataset_path", "paths.parameters_path"],
+        },
+        "cross_validate": {
+            "title"     : "Cross-validate",
+            "category"  : "Experiments",
+            "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
+            "essentials": ["training_type", "model_name", "run_tag", "gpus", "paths.dataset_path", "paths.parameters_path"],
         },
         "physics_check": {
             "title"     : "Physics Check",
@@ -57,7 +63,7 @@ class ScriptCatalog:
         },
         "tune": {
             "title"     : "Tune",
-            "category"  : "Tuning",
+            "category"  : "Experiments",
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
             "essentials": ["run_tag", "gpus"],
         },
@@ -71,13 +77,51 @@ class ScriptCatalog:
         "train_jepa",
         "infer",
         "benchmark",
-        "physics_check",
+        "cross_validate",
         "tune",
+        "physics_check",
     ]
+
+    GROUPS = {
+        "train": {
+            "title"    : "Train",
+            "category" : "Training",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the Stage-A profile autoencoder, or the Stage-B JEPA predictor.",
+            "members"  : [
+                ("train_backbone",    "Backbone"),
+                ("train_autoencoder", "Autoencoder"),
+                ("train_jepa",        "JEPA"),
+            ],
+        },
+        "experiment": {
+            "title"    : "Experiment",
+            "category" : "Experiments",
+            "purpose"  : "Run a multi-model experiment across GPUs. Pick the kind: full architecture benchmark, K-fold cross-validation, or Optuna hyperparameter tuning.",
+            "members"  : [
+                ("benchmark",      "Benchmark"),
+                ("cross_validate", "Cross-validate"),
+                ("tune",           "Tune"),
+            ],
+        },
+    }
 
     def __init__(self, paths: ProjectPaths, resolver: ScriptConfigResolver) -> None:
         self.paths    = paths
         self.resolver = resolver
+
+    def _group_of(self, key: str) -> tuple[str | None, dict | None, str | None]:
+        for group_key, group in self.GROUPS.items():
+            for member_key, label in group["members"]:
+                if member_key == key:
+                    return group_key, group, label
+        return None, None, None
+
+    def _variants(self, group: dict) -> list[dict]:
+        variants = []
+        for member_key, label in group["members"]:
+            if self.paths.script_entry(member_key)["path"].exists():
+                variants.append({"key": member_key, "label": label})
+        return variants
 
     def list_scripts(self) -> list[dict]:
         entries = []
@@ -89,13 +133,21 @@ class ScriptCatalog:
             meta  = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
             entry = self.resolver.entry_config(key)
 
+            group_key, group, label = self._group_of(key)
+
             entries.append({
-                "key"          : key,
-                "file"         : spec["rel"],
-                "title"        : meta["title"],
-                "category"     : meta["category"],
-                "purpose"      : meta["purpose"],
-                "config_class" : entry["class"] if entry else None,
+                "key"            : key,
+                "file"           : spec["rel"],
+                "title"          : meta["title"],
+                "category"       : meta["category"],
+                "purpose"        : meta["purpose"],
+                "config_class"   : entry["class"] if entry else None,
+                "group"          : group_key,
+                "variant"        : label,
+                "group_title"    : group["title"] if group else None,
+                "group_category" : group["category"] if group else None,
+                "group_purpose"  : group["purpose"] if group else None,
+                "variants"       : self._variants(group) if group else [],
             })
         return entries
 
@@ -109,6 +161,8 @@ class ScriptCatalog:
         entry   = self.resolver.entry_config(key)
         command = " ".join(["python", spec["rel"], *spec["args"]])
 
+        group_key, group, label = self._group_of(key)
+
         return {
             "key"          : key,
             "file"         : spec["rel"],
@@ -121,4 +175,8 @@ class ScriptCatalog:
             "config_class" : entry["class"] if entry else None,
             "command"      : command,
             "preferred"    : self.paths.preferred_interpreter(self.paths.discover_interpreters(), key),
+            "group"        : group_key,
+            "group_title"  : group["title"] if group else None,
+            "variant"      : label,
+            "variants"     : self._variants(group) if group else [],
         }

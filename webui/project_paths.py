@@ -15,21 +15,39 @@ class ProjectPaths:
     ENTRY_OVERRIDES = {
         "train_backbone": {
             "file"          : "train",
-            "args"          : ["backbone"],
+            "args"          : ["--mode", "backbone"],
             "config_module" : "configuration.training.backbone_config",
             "config_class"  : "BackboneEntryConfig",
         },
         "train_autoencoder": {
             "file"          : "train",
-            "args"          : ["autoencoder"],
+            "args"          : ["--mode", "autoencoder"],
             "config_module" : "configuration.training.autoencoder_config",
             "config_class"  : "ProfileAeEntryConfig",
         },
         "train_jepa": {
             "file"          : "train",
-            "args"          : ["jepa"],
+            "args"          : ["--mode", "jepa"],
             "config_module" : "configuration.training.jepa_config",
             "config_class"  : "JepaEntryConfig",
+        },
+        "benchmark": {
+            "file"          : "experiment",
+            "args"          : ["--mode", "benchmark"],
+            "config_module" : "configuration.experiments.benchmark_config",
+            "config_class"  : "BenchmarkConfig",
+        },
+        "cross_validate": {
+            "file"          : "experiment",
+            "args"          : ["--mode", "cv"],
+            "config_module" : "configuration.experiments.cross_validation_config",
+            "config_class"  : "CrossValidationConfig",
+        },
+        "tune": {
+            "file"          : "experiment",
+            "args"          : ["--mode", "tune"],
+            "config_module" : "configuration.experiments.tuning_config",
+            "config_class"  : "TuningEntryConfig",
         },
     }
 

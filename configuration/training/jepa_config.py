@@ -76,10 +76,11 @@ class JepaEntryConfig:
     gpu             : int        = 0
     seed            : int        = 0
     n_gaussians     : int        = 5
-    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/jepa_stage_b")
+    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_b")
     model_overrides : dict       = field(default_factory=dict)
 
-    stage_a_run     : Path | None = None
+    stage_a_logdir  : Path        = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
+    stage_a_run     : str | None  = None
     stage_a_mode    : str         = "frozen"
     target_provider : str         = "stopgrad"
 

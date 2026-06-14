@@ -65,6 +65,10 @@ class DatasetPicker {
     this.el.appendChild(this.custom);
     this.el.appendChild(this.note);
 
+    if (this.spec.baseFrom) {
+      this.view._onDependency(this.spec.baseFrom, () => this._loadSingle());
+    }
+
     this._renderSingleOptions([]);
     this._loadSingle();
   }
@@ -89,7 +93,30 @@ class DatasetPicker {
       await this._fetchParams(dataset);
       return;
     }
+    if (this.spec.mode === "runs") {
+      await this._fetchRuns(this._base());
+      return;
+    }
     await this._fetchDatasets(this._base());
+  }
+
+  async _fetchRuns(base) {
+    if (!base) {
+      this.note.textContent = "set a runs directory first";
+      this._renderSingleOptions([]);
+      return;
+    }
+    this.note.textContent = "listing...";
+    const res = await window.apiGet(`/api/fs/runs?base=${encodeURIComponent(base)}`);
+    if (!res.ok) {
+      this.note.textContent = res.error || "could not list runs";
+      this._renderSingleOptions([]);
+      return;
+    }
+    let items = res.runs || [];
+    if (this.spec.checkpointOnly) items = items.filter((r) => r.has_checkpoint);
+    this.note.textContent = items.length ? `${items.length} run${items.length > 1 ? "s" : ""} in ${res.base}` : `no completed runs in ${res.base}`;
+    this._renderSingleOptions(items.map((r) => ({ value: r.name, label: r.name + (r.has_checkpoint ? "" : "  (no checkpoint)") })));
   }
 
   async _fetchDatasets(base) {

@@ -25,10 +25,14 @@ class TrainingPipeline:
 
         base = self.factory.training_trainer_config(logdir=entry_config.logdir)
 
-        if entry_config.stage_a_run is None:
-            raise ValueError("JEPA training requires a pretrained Stage-A autoencoder; pass --stage_a_run pointing to a completed autoencoder run. Training the autoencoder jointly with the backbone is not supported.")
+        if not entry_config.stage_a_run:
+            raise ValueError("JEPA training requires a pretrained Stage-A autoencoder; set stage_a_run to a completed autoencoder run under stage_a_logdir. Training the autoencoder jointly with the backbone is not supported.")
 
-        self.stage_a_meta = Path(entry_config.stage_a_run) / "meta"
+        stage_a_dir = Path(entry_config.stage_a_logdir) / entry_config.stage_a_run
+        if not stage_a_dir.is_dir():
+            raise FileNotFoundError(f"Stage-A run '{entry_config.stage_a_run}' not found under {entry_config.stage_a_logdir}")
+
+        self.stage_a_meta = stage_a_dir / "meta"
         self.autoencoder_cfg, self.ae_model_name = AutoencoderConfigIO.load(self.stage_a_meta)
 
         self.trainer_config = JepaTrainerConfig(
@@ -37,7 +41,7 @@ class TrainingPipeline:
             embedding_loss     = entry_config.embedding_loss,
             stage_a_mode       = entry_config.stage_a_mode,
             target_provider    = entry_config.target_provider,
-            stage_a_checkpoint = str(Path(entry_config.stage_a_run) / "best_model.pt"),
+            stage_a_checkpoint = str(stage_a_dir / "best_model.pt"),
             overfit            = entry_config.overfit,
         )
         self.trainer_config.inherit_shared_from(base)
@@ -79,7 +83,7 @@ class TrainingPipeline:
     @staticmethod
     def validate_stage_a_checkpoint(ckpt_path) -> None:
         if not Path(ckpt_path).is_file():
-            raise FileNotFoundError(f"Stage-A checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the --stage_a_run directory.")
+            raise FileNotFoundError(f"Stage-A checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the selected stage_a_run directory.")
 
     def _save_metadata(self, run_meta, backbone_cfg, datasets, x_len: int) -> None:
         gaussian_cfg = self.trainer_config.gaussian

@@ -220,7 +220,7 @@ class TrainScheduler:
 
         return GpuJob(
             name     = run_name,
-            command  = [sys.executable, str(self.entry_script), self.stage_name, "--trial"] + argv,
+            command  = [sys.executable, str(self.entry_script), "--mode", self.stage_name, "--trial"] + argv,
             log_path = self.log_dir / f"{run_name}.log",
         )
 

@@ -32,6 +32,13 @@ class LaunchView {
     ["data", "run"],
   ];
 
+  static CHOICES = {
+    train_jepa: {
+      stage_a_mode:    ["frozen", "finetune"],
+      target_provider: ["stopgrad", "ema", "live"],
+    },
+  };
+
   static DATASET_PICKERS = {
     "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
     "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
@@ -43,7 +50,10 @@ class LaunchView {
     },
     train_backbone:    LaunchView.DATASET_PICKERS,
     train_autoencoder: LaunchView.DATASET_PICKERS,
-    train_jepa:        LaunchView.DATASET_PICKERS,
+    train_jepa:        { ...LaunchView.DATASET_PICKERS, stage_a_run: { mode: "runs", baseFrom: "stage_a_logdir", checkpointOnly: true } },
+    benchmark:         LaunchView.DATASET_PICKERS,
+    cross_validate:    LaunchView.DATASET_PICKERS,
+    tune:              LaunchView.DATASET_PICKERS,
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
@@ -141,6 +151,7 @@ class LaunchView {
 
   _renderSkeleton() {
     document.getElementById("launch-kicker").textContent = "";
+    document.getElementById("launch-variants").innerHTML = "";
     document.getElementById("launch-title").textContent = "Loading...";
     document.getElementById("launch-purpose").textContent = "";
     document.getElementById("launch-facts").innerHTML = "";
@@ -159,10 +170,34 @@ class LaunchView {
   }
 
   _renderHead(d) {
-    document.getElementById("launch-kicker").textContent = `${d.category} · ${d.file}`;
+    this._renderVariants(d);
+    document.getElementById("launch-kicker").textContent = d.group_title ? `${d.group_title} · ${d.file}` : `${d.category} · ${d.file}`;
     document.getElementById("launch-title").textContent = d.title;
     document.getElementById("launch-purpose").textContent = d.purpose;
     this._renderFacts();
+  }
+
+  _renderVariants(d) {
+    const host = document.getElementById("launch-variants");
+    host.innerHTML = "";
+
+    const variants = d.variants || [];
+    if (variants.length < 2) {
+      host.hidden = true;
+      return;
+    }
+    host.hidden = false;
+
+    variants.forEach((v) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "launch__variant" + (v.key === d.key ? " is-active" : "");
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", String(v.key === d.key));
+      tab.textContent = v.label;
+      if (v.key !== d.key) tab.addEventListener("click", () => window.router.go(`launch/${v.key}`));
+      host.appendChild(tab);
+    });
   }
 
   _renderFacts() {
@@ -835,9 +870,12 @@ class LaunchView {
 
     let control;
     const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
+    const choices    = leaf.editable ? this._choicesFor(leaf) : null;
     if (pickerSpec && window.DatasetPicker) {
       control = new window.DatasetPicker(this, leaf, pickerSpec).build();
       row.classList.add(pickerSpec.multi ? "cfg-edit__row--board" : "cfg-edit__row--wide");
+    } else if (choices) {
+      control = this._choiceControl(leaf, choices);
     } else if (!leaf.editable) {
       control = this._textControl(leaf);
       control.input.disabled = true;
@@ -883,6 +921,38 @@ class LaunchView {
   _pickerSpec(leaf) {
     const specs = LaunchView.PICKERS[this.key];
     return specs ? specs[leaf.path] : null;
+  }
+
+  _choicesFor(leaf) {
+    const map = LaunchView.CHOICES[this.key];
+    return map ? map[leaf.path] || null : null;
+  }
+
+  _choiceControl(leaf, choices) {
+    const select = document.createElement("select");
+    select.className = "cfg-edit__input picker__select";
+
+    const current = String(leaf.value);
+    const options = choices.includes(current) ? choices : [current, ...choices];
+    options.forEach((value) => {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = value;
+      select.appendChild(opt);
+    });
+    select.value = current;
+
+    select.addEventListener("change", () => {
+      select.classList.toggle("is-dirty", select.value !== leaf.value);
+      this._setValue(leaf, select.value);
+      this._fireDependents(leaf.path, select.value);
+    });
+
+    const reset = () => {
+      select.value = leaf.value;
+      select.classList.remove("is-dirty");
+    };
+    return { el: select, input: select, reset };
   }
 
   _onDependency(path, fn) {

@@ -74,6 +74,7 @@ class ConfigCli:
         "--help-config",
         "--detach", "--nohup",
         "--gpu",
+        "--mode",
         "--trial", "--worker", "--resume",
         "--model",
         "--n-trials", "--study-name", "--storage-url",
@@ -84,7 +85,7 @@ class ConfigCli:
     def __init__(self, config, description: str | None = None) -> None:
         self.config    = config
         self.overrides : dict = {}
-        self.parser    = argparse.ArgumentParser(description=description, add_help=False)
+        self.parser    = argparse.ArgumentParser(description=description, add_help=False, allow_abbrev=False)
 
         self.parser.add_argument("--help-config", action="store_true", dest="_help_config")
         self.parser.add_argument("--detach", "--nohup", action="store_true", dest="_detach")
