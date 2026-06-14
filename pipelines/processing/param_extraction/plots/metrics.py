@@ -138,17 +138,7 @@ class MetricsBarPlotter(PlotBase):
 
         return saved
 
-    def _plot_snr_vs_fit_quality(
-        self,
-        snr_db_map     : np.ndarray,
-        r2_map         : np.ndarray,
-        best_k_map     : Optional[np.ndarray],
-        rel_margin_map : Optional[np.ndarray],
-        snr_summary    : dict,
-        out_dir        : Path,
-    ) -> Dict[str, Path]:
-        saved : Dict[str, Path] = {}
-
+    def _plot_snr_vs_r2(self, snr_db_map: np.ndarray, r2_map: np.ndarray, out_dir: Path) -> Path:
         fig, ax = plt.subplots(figsize=(6.4, 4.8))
         s, r    = self._paired_subsample([snr_db_map, np.maximum(r2_map, -1.0)], 400_000)
         hb      = ax.hexbin(s, r, gridsize=70, bins="log", cmap="magma", mincnt=1)
@@ -166,41 +156,60 @@ class MetricsBarPlotter(PlotBase):
         ax.text(0.02, 0.98, f"Pearson $r$ = {pearson:.3f}\nSpearman $\\rho$ = {spearman:.3f}\n(on plotted, $-1$-floored $R^2$)", transform=ax.transAxes, fontsize=9, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
-        saved["snr_vs_r2"] = self._save(fig, out_dir / "snr_vs_r2.png")
+        return self._save(fig, out_dir / "snr_vs_r2.png")
+
+    def _plot_snr_by_k(self, snr_db_map: np.ndarray, best_k_map: np.ndarray, out_dir: Path) -> Path:
+        fig, ax = plt.subplots(figsize=(6.4, 4.8))
+        k_vals  = list(range(1, self.n_gaussians + 1))
+        palette = [cm.tab10((k - 1) % 10) for k in k_vals]
+        snr_f   = snr_db_map.reshape(-1)
+        bk_f    = best_k_map.reshape(-1)
+        data    = [self._subsample(snr_f[bk_f == k], 200_000, seed=k) for k in k_vals]
+        self._violin_with_iqr(ax, data, palette)
+        ax.set_xticks(k_vals)
+        ax.set_xticklabels([f"$K={k}$" for k in k_vals])
+        ax.set_xlabel(r"selected model order $K^*$")
+        ax.set_ylabel("peak-to-floor contrast [dB]")
+        ax.set_title("Peak-to-floor contrast conditioned on selected model order  (uncalibrated proxy, not calibrated SNR)")
+        ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
+        fig.tight_layout()
+
+        return self._save(fig, out_dir / "snr_by_selected_k.png")
+
+    def _plot_snr_vs_ambiguity(self, snr_db_map: np.ndarray, rel_margin_map: np.ndarray, out_dir: Path) -> Path:
+        fig, ax  = plt.subplots(figsize=(6.4, 4.8))
+        s_m, rel = self._paired_subsample([snr_db_map, rel_margin_map], 400_000)
+        log_rel  = np.log10(np.maximum(rel, 1e-9))
+        hb       = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
+        fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
+
+        centers, medians = self._binned_median(s_m, log_rel)
+        ax.plot(centers, medians, color="cyan", lw=1.6, label="binned median margin")
+        ax.set_xlabel("peak-to-floor contrast [dB]")
+        ax.set_ylabel(r"$\log_{10}$ relative selection margin")
+        ax.set_title("K-selection ambiguity vs peak-to-floor contrast  (uncalibrated proxy, not calibrated SNR)")
+        ax.legend(loc="lower right", framealpha=0.90)
+        fig.tight_layout()
+
+        return self._save(fig, out_dir / "snr_vs_k_ambiguity.png")
+
+    def _plot_snr_vs_fit_quality(
+        self,
+        snr_db_map     : np.ndarray,
+        r2_map         : np.ndarray,
+        best_k_map     : Optional[np.ndarray],
+        rel_margin_map : Optional[np.ndarray],
+        snr_summary    : dict,
+        out_dir        : Path,
+    ) -> Dict[str, Path]:
+        saved : Dict[str, Path] = {}
+
+        saved["snr_vs_r2"] = self._plot_snr_vs_r2(snr_db_map, r2_map, out_dir)
 
         if best_k_map is not None:
-            fig, ax = plt.subplots(figsize=(6.4, 4.8))
-            k_vals  = list(range(1, self.n_gaussians + 1))
-            palette = [cm.tab10((k - 1) % 10) for k in k_vals]
-            snr_f   = snr_db_map.reshape(-1)
-            bk_f    = best_k_map.reshape(-1)
-            data    = [self._subsample(snr_f[bk_f == k], 200_000, seed=k) for k in k_vals]
-            self._violin_with_iqr(ax, data, palette)
-            ax.set_xticks(k_vals)
-            ax.set_xticklabels([f"$K={k}$" for k in k_vals])
-            ax.set_xlabel(r"selected model order $K^*$")
-            ax.set_ylabel("peak-to-floor contrast [dB]")
-            ax.set_title("Peak-to-floor contrast conditioned on selected model order  (uncalibrated proxy, not calibrated SNR)")
-            ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
-            fig.tight_layout()
-
-            saved["snr_by_selected_k"] = self._save(fig, out_dir / "snr_by_selected_k.png")
+            saved["snr_by_selected_k"] = self._plot_snr_by_k(snr_db_map, best_k_map, out_dir)
 
         if rel_margin_map is not None:
-            fig, ax  = plt.subplots(figsize=(6.4, 4.8))
-            s_m, rel = self._paired_subsample([snr_db_map, rel_margin_map], 400_000)
-            log_rel  = np.log10(np.maximum(rel, 1e-9))
-            hb       = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
-            fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
-
-            centers, medians = self._binned_median(s_m, log_rel)
-            ax.plot(centers, medians, color="cyan", lw=1.6, label="binned median margin")
-            ax.set_xlabel("peak-to-floor contrast [dB]")
-            ax.set_ylabel(r"$\log_{10}$ relative selection margin")
-            ax.set_title("K-selection ambiguity vs peak-to-floor contrast  (uncalibrated proxy, not calibrated SNR)")
-            ax.legend(loc="lower right", framealpha=0.90)
-            fig.tight_layout()
-
-            saved["snr_vs_k_ambiguity"] = self._save(fig, out_dir / "snr_vs_k_ambiguity.png")
+            saved["snr_vs_k_ambiguity"] = self._plot_snr_vs_ambiguity(snr_db_map, rel_margin_map, out_dir)
 
         return saved
