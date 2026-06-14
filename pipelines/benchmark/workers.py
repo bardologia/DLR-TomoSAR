@@ -6,7 +6,7 @@ from pathlib import Path
 from configuration.experiments.benchmark_config import BenchmarkConfig
 from pipelines.shared.config_factory import ConfigFactory
 from tools.data.io import FileIO
-from pipelines.training.backbone.docs import LossScaleProbeConfig
+from pipelines.backbone.training.docs import LossScaleProbeConfig
 
 
 class BenchmarkWorker:
@@ -81,7 +81,7 @@ class OverfitWorker(BenchmarkWorker):
             return
 
         from models import CONFIG_REGISTRY
-        from pipelines.training.backbone.pipeline import TrainingPipeline
+        from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "overfit"
         result_path  = stage_dir / model_name / "overfit_result.json"
@@ -121,7 +121,7 @@ class OverfitWorker(BenchmarkWorker):
 
     def _run_ae(self, model_name: str) -> None:
         from configuration.training.runtime_config import OverfitConfig
-        from pipelines.training.autoencoder.pipeline import TrainingPipeline
+        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
@@ -173,14 +173,14 @@ class TrainingWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
         if self.config.training_type == "autoencoder":
             from configuration.training.runtime_config import OverfitConfig
-            from pipelines.training.autoencoder.pipeline import TrainingPipeline
+            from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
             entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
             TrainingPipeline(entry).run()
             return
 
         from models import CONFIG_REGISTRY
-        from pipelines.training.backbone.pipeline import TrainingPipeline
+        from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "training"
         model_config = CONFIG_REGISTRY[model_name]()
@@ -202,7 +202,7 @@ class TrainingWorker(BenchmarkWorker):
 
 class InferenceWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
-        from pipelines.inference.backbone.pipeline import InferencePipeline
+        from pipelines.backbone.inference.pipeline import InferencePipeline
 
         run_directory = self.run_dir / "training" / model_name
 

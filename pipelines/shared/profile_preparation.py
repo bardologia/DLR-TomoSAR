@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pipelines.dataset.backbone.pipeline import DatasetPipeline
+from pipelines.backbone.dataset.pipeline import DatasetPipeline
 
 
 class ProfileDatasetPreparation:

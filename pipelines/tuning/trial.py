@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import optuna
 
-from pipelines.training.autoencoder.trainer  import Trainer as AeTrainer
-from pipelines.training.autoencoder.pipeline import TrainingPipeline as AeTrainingPipeline
-from pipelines.training.backbone.pipeline import TrainingPipeline
-from pipelines.training.backbone.trainer  import Trainer
+from pipelines.profile_autoencoder.training.trainer  import Trainer as AeTrainer
+from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as AeTrainingPipeline
+from pipelines.backbone.training.pipeline import TrainingPipeline
+from pipelines.backbone.training.trainer  import Trainer
 
 
 class TrialTrainer(Trainer):

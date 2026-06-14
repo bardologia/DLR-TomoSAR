@@ -172,7 +172,7 @@ class CrossValidationWorker(BenchmarkWorker):
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, split_regions: SplitRegions) -> None:
         from models import CONFIG_REGISTRY
-        from pipelines.training.backbone.pipeline import TrainingPipeline
+        from pipelines.backbone.training.pipeline import TrainingPipeline
 
         model_config = CONFIG_REGISTRY[self.config.model_name]()
 
@@ -194,7 +194,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         pipeline.run(probe_config=self._probe_config())
 
     def _run_jepa(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from pipelines.training.jepa.pipeline import TrainingPipeline
+        from pipelines.jepa.training.pipeline import TrainingPipeline
 
         TrainingPipeline(self._jepa_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
@@ -222,7 +222,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         )
 
     def _run_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from pipelines.training.autoencoder.pipeline import TrainingPipeline
+        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
         TrainingPipeline(self._ae_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
@@ -265,7 +265,7 @@ class FoldTrainingWorker(CrossValidationWorker):
 
 class FoldInferenceWorker(CrossValidationWorker):
     def run(self, fold_index: int, split: str) -> None:
-        from pipelines.inference.backbone.pipeline import InferencePipeline
+        from pipelines.backbone.inference.pipeline import InferencePipeline
 
         run_directory = self.run_dir / "folds" / self.fold_name(fold_index)
 
