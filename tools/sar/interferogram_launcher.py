@@ -4,7 +4,7 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Optional, TYPE_CHECKING
 
-from tools.conda_env import CondaJobDispatcher
+from tools.runtime.conda_env import CondaJobDispatcher
 from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from configuration.sar.processing_config import ProcessingConfiguration
 
 
-class InterferogramBuilder:
+class InterferogramLauncher:
     ENTRY = "main/generate_interferograms.py"
 
     def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:

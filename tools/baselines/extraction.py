@@ -5,8 +5,8 @@ from typing import Callable
 
 import numpy as np
 
-from tools.track_baselines.containers import TrackBaselines, TrackProfiles
-from tools.track_baselines.reading    import TrackFileResolver, TrackReader
+from tools.baselines.containers import TrackBaselines, TrackProfiles
+from tools.baselines.reading    import TrackFileResolver, TrackReader
 
 
 class BaselineExtractor:

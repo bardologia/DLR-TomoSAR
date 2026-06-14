@@ -7,7 +7,7 @@ from typing import Literal, Tuple
 from configuration.sar.processing_config import ProcessingConfiguration, TomogramConfiguration
 from tools.data.io             import FileIO
 from tools.monitoring.logger                    import Logger
-from tools.track_baselines           import TrackProfiles
+from tools.baselines           import TrackProfiles
 
 
 ArtifactType = Literal["tomogram_full", "dem_full", "primary", "secondaries", "interferograms", "track_profiles"]

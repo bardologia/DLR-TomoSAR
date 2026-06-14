@@ -12,7 +12,7 @@ from pipelines.backbone_pipeline.pipeline   import TrainingRunMetadata
 from pipelines.dataset_pipeline.profile_preparation import ProfileDatasetPreparation
 from pipelines.jepa_pipeline.predictor_trainer   import JepaModule, JepaPredictorTrainer
 from tools.data.io                          import AutoencoderConfigIO
-from tools.reproducibility                  import Reproducibility
+from tools.runtime.reproducibility                  import Reproducibility
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 

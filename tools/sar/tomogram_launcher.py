@@ -4,14 +4,14 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Optional, Tuple, TYPE_CHECKING
 
-from tools.conda_env import CondaJobDispatcher
+from tools.runtime.conda_env import CondaJobDispatcher
 from tools.monitoring.logger import Logger
 
 if TYPE_CHECKING:
     from configuration.sar.processing_config import ProcessingConfiguration
 
 
-class TomogramBuilder:
+class TomogramLauncher:
     ENTRY = "main/generate_tomogram.py"
 
     def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:

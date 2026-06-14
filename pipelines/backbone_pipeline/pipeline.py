@@ -21,9 +21,9 @@ from tools.orchestration          import ExperimentStage, GpuJob
 from pipelines.backbone_pipeline.docs        import LossScaleProbeConfig
 from pipelines.backbone_pipeline.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone_pipeline.trainer     import Trainer
-from tools.config_cli                        import ConfigCli
+from tools.runtime.config_cli                        import ConfigCli
 from tools.monitoring.logger                            import Logger
-from tools.reproducibility                   import Reproducibility
+from tools.runtime.reproducibility                   import Reproducibility
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 

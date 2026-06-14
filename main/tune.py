@@ -28,7 +28,7 @@ def main() -> None:
 
     from configuration.experiments.tuning_config import TuningEntryConfig
     from pipelines.tuning_pipeline.pipeline import TuningOrchestrator
-    from tools.config_cli import ConfigCli
+    from tools.runtime.config_cli import ConfigCli
 
     entry_script = Path(__file__).resolve()
 

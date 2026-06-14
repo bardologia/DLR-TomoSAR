@@ -20,7 +20,7 @@ class ScriptConfigResolver:
         "import ast as ast_mod, inspect, textwrap\n"
         "from dataclasses import fields, is_dataclass\n"
         "from pathlib import Path\n"
-        "from tools.config_cli import _SUPPORTED_TYPES\n"
+        "from tools.runtime.config_cli import _SUPPORTED_TYPES\n"
         "module = __import__(sys.argv[2], fromlist=[sys.argv[3]])\n"
         "config = getattr(module, sys.argv[3])()\n"
         "block_maps = {}\n"
@@ -127,7 +127,7 @@ class ScriptConfigResolver:
     def _signature(self, key: str) -> tuple:
         watched = sorted(self.paths.config_dir.rglob("*.py"))
         watched.append(self.paths.script_entry(key)["path"])
-        watched.append(self.paths.repo_root / "tools" / "config_cli.py")
+        watched.append(self.paths.repo_root / "tools" / "runtime" / "config_cli.py")
 
         stamps = []
         for path in watched:

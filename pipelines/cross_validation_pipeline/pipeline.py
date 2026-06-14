@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from configuration.experiments.cross_validation_config import CrossValidationConfig
-from tools.config_cli import ConfigCli
+from tools.runtime.config_cli import ConfigCli
 from pipelines.cross_validation_pipeline.folds import FoldConfigFactory, FoldPlanner
 from pipelines.cross_validation_pipeline.stages import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
 from tools.data.io import FileIO

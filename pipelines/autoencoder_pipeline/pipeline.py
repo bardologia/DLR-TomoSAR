@@ -12,7 +12,7 @@ from pipelines.backbone_pipeline.pipeline   import TrainingRunMetadata
 from pipelines.autoencoder_pipeline.autoencoder_trainer import ProfileAeTrainer
 from pipelines.autoencoder_pipeline.profile_dataset     import ProfileDataset
 from tools.data.io                               import AutoencoderConfigIO
-from tools.reproducibility                  import Reproducibility
+from tools.runtime.reproducibility                  import Reproducibility
 
 
 class ProfileAePipeline:

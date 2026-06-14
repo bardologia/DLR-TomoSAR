@@ -10,8 +10,8 @@ from pipelines.inference_pipeline.loader         import InferenceMetadata, Run
 from tools                            import FileIO
 from tools.monitoring.logger                                import Logger
 from tools.data.regions                               import CropRegion
-from tools.sar                                 import TomogramBuilder
-from tools.track_baselines                       import SecondarySelection
+from tools.sar                                 import TomogramLauncher
+from tools.baselines                       import SecondarySelection
 
 
 class ReducedTomogramSynthesizer:
@@ -75,8 +75,8 @@ class ReducedTomogramSynthesizer:
         spec      = self._build_spec(state, select, crop, tomogram_path, dem_path)
         spec_path = self.cache_directory / f"reduced_spec_{cache_key}.json"
 
-        builder = TomogramBuilder(self.cfg.reduced_env_name, logger=self.logger)
-        builder.generate(spec, spec_path)
+        launcher = TomogramLauncher(self.cfg.reduced_env_name, logger=self.logger)
+        launcher.generate(spec, spec_path)
 
     def _validate_alignment(self, reduced: np.ndarray) -> None:
         n_height, az, rg = reduced.shape

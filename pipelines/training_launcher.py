@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from tools.config_cli import ConfigCli
+from tools.runtime.config_cli import ConfigCli
 
 
 class TrainingLauncher:

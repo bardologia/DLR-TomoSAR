@@ -12,7 +12,7 @@ def _scheduler() -> None:
 
     from configuration.experiments.benchmark_config        import BenchmarkConfig
     from pipelines.benchmark_pipeline.pipeline import BenchmarkPipeline
-    from tools.config_cli                      import ConfigCli
+    from tools.runtime.config_cli                      import ConfigCli
 
     config = ConfigCli(BenchmarkConfig(), description="Full architecture benchmark").apply()
 
@@ -25,7 +25,7 @@ def _worker(stage: str, model_name: str, gpu_id: int, run_tag: str, run_dir: str
 
     from configuration.experiments.benchmark_config       import BenchmarkConfig
     from pipelines.benchmark_pipeline.workers import InferenceWorker, OverfitWorker, TrainingWorker
-    from tools.config_cli                     import ConfigCli
+    from tools.runtime.config_cli                     import ConfigCli
 
     config        = BenchmarkConfig()
     resolved_path = Path(run_dir) / "pipeline" / "resolved_config.json" if run_dir else Path(config.paths.log_base_dir) / run_tag / "pipeline" / "resolved_config.json"

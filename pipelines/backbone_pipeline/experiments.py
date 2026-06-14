@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.track_baselines import TrackBaselines
+from tools.baselines import TrackBaselines
 
 
 class CurriculumTrialPlanner:

@@ -6,7 +6,7 @@ from pathlib import Path
 from configuration.experiments.benchmark_config import BenchmarkConfig
 from models import CONFIG_REGISTRY
 from tools.data.io import FileIO
-from tools.config_cli import ConfigCli
+from tools.runtime.config_cli import ConfigCli
 from tools.monitoring.logger import Logger
 
 from pipelines.benchmark_pipeline.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage

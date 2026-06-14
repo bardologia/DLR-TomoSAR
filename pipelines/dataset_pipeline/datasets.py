@@ -10,7 +10,7 @@ from configuration.data.dataset_config              import AugmentationConfig, I
 from pipelines.dataset_pipeline.normalization  import Normalizer
 from pipelines.dataset_pipeline.spatial        import Patcher
 from tools.monitoring.logger                              import Logger
-from tools.reproducibility                     import Reproducibility
+from tools.runtime.reproducibility                     import Reproducibility
 
 
 class SpatialAugmenter:

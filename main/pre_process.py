@@ -13,7 +13,7 @@ from configuration.sar.processing_config import (
     TomogramConfiguration,
 )
 from pipelines.processing_pipeline.pipeline import PreProcessScheduler, PreProcessSession
-from tools.config_cli import ConfigCli
+from tools.runtime.config_cli import ConfigCli
 from tools.monitoring.logger import Logger
 
 

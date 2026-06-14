@@ -10,7 +10,7 @@ import numpy as np
 from tools.data.io   import FileIO
 from tools.data.regions         import CropRegion, SplitRegions
 from tools.monitoring.logger          import Logger
-from tools.track_baselines import SecondarySelection
+from tools.baselines import SecondarySelection
 
 
 class Layout:

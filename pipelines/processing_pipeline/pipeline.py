@@ -9,8 +9,8 @@ from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, Metada
 from pipelines.processing_pipeline.plots         import StackPlotter
 from tools                            import FileIO, ProcessPoolRunner
 from tools.monitoring.logger                                import Logger
-from tools.sar                                 import InterferogramBuilder, TomogramBuilder
-from tools.track_baselines                       import TrackBaselines
+from tools.sar                                 import InterferogramLauncher, TomogramLauncher
+from tools.baselines                       import TrackBaselines
 
 
 class ProcessingPipeline:
@@ -20,8 +20,8 @@ class ProcessingPipeline:
 
         self.artifact_registry      = ArtifactRegistry   (config, logger=self.logger)
         self.metadata_manager       = MetadataManager    (config, logger=self.logger)
-        self.tomogram_builder       = TomogramBuilder    (config.tomogram_env_name, logger=self.logger)
-        self.interferogram_builder  = InterferogramBuilder(config.tomogram_env_name, logger=self.logger)
+        self.tomogram_launcher       = TomogramLauncher    (config.tomogram_env_name, logger=self.logger)
+        self.interferogram_launcher  = InterferogramLauncher(config.tomogram_env_name, logger=self.logger)
         self.stack_plotter          = StackPlotter       (config, logger=self.logger)
 
         self._pass_labels : list | None = None
@@ -35,9 +35,9 @@ class ProcessingPipeline:
         dem_path      = self.artifact_registry.artifact_path("dem_full")
 
         self.logger.subsection(f"[Active] Generating full-stack tomogram in env '{self.config.tomogram_env_name}'")
-        spec      = self.tomogram_builder.build_spec(self.config, tomogram_path, dem_path)
+        spec      = self.tomogram_launcher.build_spec(self.config, tomogram_path, dem_path)
         spec_path = self.config.paths.metadata_directory / "tomogram_spec.json"
-        self.tomogram_builder.generate(spec, spec_path)
+        self.tomogram_launcher.generate(spec, spec_path)
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = "tomogram_full",
@@ -57,7 +57,7 @@ class ProcessingPipeline:
         result_path         = self.config.paths.metadata_directory / "interferogram_result.json"
 
         self.logger.subsection(f"[Active] Building interferometric stack in env '{self.config.tomogram_env_name}'")
-        spec = self.interferogram_builder.build_spec(
+        spec = self.interferogram_launcher.build_spec(
             self.config,
             primary_path        = primary_path,
             secondaries_path    = secondaries_path,
@@ -67,7 +67,7 @@ class ProcessingPipeline:
             result_path         = result_path,
         )
         spec_path = self.config.paths.metadata_directory / "interferogram_spec.json"
-        result    = self.interferogram_builder.generate(spec, spec_path)
+        result    = self.interferogram_launcher.generate(spec, spec_path)
 
         primary_shape        = tuple(result["primary_shape"])
         secondaries_shape    = tuple(result["secondaries_shape"])

@@ -24,7 +24,7 @@ from tools import GpuQueue
 from pipelines.tuning_pipeline.plots import StudyPlotter
 from pipelines.tuning_pipeline.tuners import BestConfigWriter
 from pipelines.tuning_pipeline.tuners import Tuner
-from tools.config_cli import ConfigCli
+from tools.runtime.config_cli import ConfigCli
 from tools.monitoring.logger import Logger
 from tools.data.regions import CropRegion
 
