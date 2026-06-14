@@ -11,8 +11,8 @@ import numpy as np
 from configuration.param_extraction_config import ExtractionConfig, FitSettings
 from pipelines.param_pipeline.metrics       import FittingMetricsCalculator
 from pipelines.param_pipeline.plots         import FittingResultPlotter
-from pipelines.shared.io                    import FileIO
-from tools.logger                           import Logger
+from tools.data.io                    import FileIO
+from tools.monitoring.logger                           import Logger
 
 
 class DatasetQueueResolver:

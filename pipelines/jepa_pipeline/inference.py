@@ -1,23 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib     import Path
-from typing      import Dict, List
-
 import numpy as np
 import torch
 import torch.nn as nn
 
 from models                                    import get_model
-from models.profile_autoencoder               import ProfileAutoencoder
+from models.autoencoder               import Autoencoder
 from pipelines.inference_pipeline.loader      import ModelWrapper, RunLoader
 from pipelines.inference_pipeline.metrics     import Metrics, Result
-from pipelines.inference_pipeline.pipeline    import InferencePipeline
+from pipelines.inference_pipeline.pipeline    import InferenceComponents
 from pipelines.inference_pipeline.predictor   import Predictor
-from pipelines.autoencoder_pipeline.pipeline   import AutoencoderPipelineSupport
 from pipelines.jepa_pipeline.predictor_trainer import JepaModule
-from pipelines.shared.io                       import ModelConfigIO
-from tools.gaussians                           import GaussianReconstructor
+from tools.data.io                       import AutoencoderConfigIO, ModelConfigIO
+from tools.data.gaussians                           import GaussianReconstructor
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
@@ -35,7 +30,7 @@ class JepaInferenceModel(nn.Module):
 
 class JepaRunLoader(RunLoader):
     def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        ae_cfg          = AutoencoderPipelineSupport.load_autoencoder_config(self.meta_directory)
+        ae_cfg          = AutoencoderConfigIO.load(self.meta_directory)
         model_config, _ = ModelConfigIO.load(self.meta_directory)
 
         overrides = {"in_channels": in_channels, "out_channels": ae_cfg.embedding_dim}
@@ -43,7 +38,7 @@ class JepaRunLoader(RunLoader):
             overrides["image_size"] = image_size
         backbone, _ = get_model(model_name, config=model_config, **overrides)
 
-        autoencoder = ProfileAutoencoder(ae_cfg)
+        autoencoder = Autoencoder(ae_cfg)
         return JepaModule(backbone, autoencoder)
 
     def _wrap_model(self, model, device: str, norm_stats, x_axis, amp_max: float) -> ModelWrapper:
@@ -155,58 +150,8 @@ class JepaCurvePredictor(Predictor):
         return self._finalize(pred_cube, gt_cube)
 
 
-class JepaInferencePipeline(InferencePipeline):
-    def __init__(self, config, run_directory: Path) -> None:
-        super().__init__(replace(config, run_directory=Path(run_directory), output_subdir=None))
-
-    def _load_run(self, cfg, logger):
-        loader = JepaRunLoader(cfg.run_directory, logger=logger)
-        return loader.load(
-            split           = cfg.split,
-            batch_size      = cfg.batch_size,
-            num_workers     = cfg.num_workers,
-            device          = cfg.device,
-            checkpoint_name = cfg.checkpoint_name,
-        )
-
-    def _predict(self, cfg, meta, run, logger):
-        predictor = JepaCurvePredictor(
-            run         = run,
-            logger      = logger,
-            window_kind = cfg.stitch_window,
-            cube_dtype  = cfg.cube_dtype,
-            save_cubes  = cfg.save_cubes,
-            meta        = meta,
-            cpu_workers = cfg.cpu_workers,
-        )
-        return predictor.run_inference()
-
-    def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta, indices: dict) -> dict:
-        global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
-            elev_indices  = indices["all_elev_idx"],
-            range_indices = indices["all_range_idx"],
-            az_indices    = indices["all_az_idx"],
-            param_space   = False,
-        )
-
-        global_metrics["split"]        = run.split_name
-        global_metrics["split_region"] = list(run.split_region.as_tuple())
-
-        if run.track_baselines is not None:
-            global_metrics["tracks"] = run.track_baselines.to_payload()
-
-        if run.track_profiles is not None:
-            global_metrics["track_positions"] = run.track_profiles.position_summary()
-
-        Metrics.write_json(global_metrics, meta.metrics_path)
-        return global_metrics
-
-    def _compose_figures(self, composer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
-        return composer.compose(
-            result         = result,
-            run            = run,
-            global_metrics = global_metrics,
-            x_axis_np      = x_axis_np,
-            indices        = indices,
-            param_space    = False,
-        )
+JEPA_INFERENCE_COMPONENTS = InferenceComponents(
+    loader_cls    = JepaRunLoader,
+    predictor_cls = JepaCurvePredictor,
+    param_space   = False,
+)

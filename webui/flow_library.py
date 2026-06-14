@@ -1,15 +1,5 @@
 class FlowLibrary:
 
-    def collect(self) -> list:
-        return [
-            self._processing(),
-            self._param_extraction(),
-            self._dataset(),
-            self._training(),
-            self._inference(),
-            self._tuning(),
-        ]
-
     def _processing(self) -> dict:
         nodes = [
             {"id": "s0",      "tex": r"s_0",                   "role": "measured",     "kind": "matrix", "shape": "A_z x R_g",   "desc": "master (primary) SLC, complex (PyRat RGI-SLC)",          "sample": [["0.8+0.2j", "0.6-0.4j", "1.1+0.0j"], ["0.5+0.5j", "0.9-0.1j", "0.7+0.3j"], ["1.0+0.2j", "0.4-0.6j", "0.8+0.1j"]]},
@@ -913,3 +903,13 @@ class FlowLibrary:
             "blurb": "A single joint Optuna study wraps the training pipeline: an explicit log-uniform and categorical search space, TPE density-ratio proposals with constant-liar parallelism, gated median pruning, and the best joint configuration exported, resumable in chunks.",
             "nodes": nodes, "steps": steps,
         }
+
+    def collect(self) -> list:
+        return [
+            self._processing(),
+            self._param_extraction(),
+            self._dataset(),
+            self._training(),
+            self._inference(),
+            self._tuning(),
+        ]

@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 from torch.utils.data import Dataset
 
-from tools.gaussians import GaussianMixture
-from tools.logger    import Logger
+from tools.data.gaussians import GaussianMixture
+from tools.monitoring.logger    import Logger
 
 
 class ProfileDataset(Dataset):

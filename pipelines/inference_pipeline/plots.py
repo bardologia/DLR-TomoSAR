@@ -11,8 +11,8 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 from matplotlib.patches     import Patch
 
-from pipelines.shared.plotting import PlotBase
-from tools.gaussians           import GaussianReconstructor
+from tools.reporting.plotting import PlotBase
+from tools.data.gaussians           import GaussianReconstructor
 
 
 class PlotTools(PlotBase):

@@ -14,9 +14,9 @@ import jax
 import jax.numpy as jnp
 
 from configuration.param_extraction_config import FitSettings
-from pipelines.shared.preprocessing         import ProfilePreprocessor
-from tools.gaussians                        import GaussianMixture
-from tools.logger                           import Logger
+from tools.data.preprocessing         import ProfilePreprocessor
+from tools.data.gaussians                        import GaussianMixture
+from tools.monitoring.logger                           import Logger
 
 
 class SigmaScan:

@@ -19,8 +19,8 @@ from configuration.inference_config       import InferenceConfig
 from pipelines.inference_pipeline.loader  import InferenceMetadata
 from pipelines.inference_pipeline.metrics import Metrics, Result
 from pipelines.inference_pipeline.plots   import PlotTools, Ploter
-from pipelines.shared                     import ProfileNormalizer
-from tools.logger                         import Logger
+from tools                     import ProfileNormalizer
+from tools.monitoring.logger                         import Logger
 
 
 @dataclass
@@ -45,13 +45,107 @@ class FrameSpec:
 
 class Animator:
 
+    def __init__(
+        self,
+        logger      : Logger,
+        *,
+        cmap        : str = "jet",
+        err_cmap    : str = "magma",
+        dpi         : int = 110,
+        fps         : int = 12,
+        max_frames  : int = 150,
+        num_workers : int | None = None,
+    ) -> None:
+        self.logger      = logger
+        self.cmap        = cmap
+        self.err_cmap    = err_cmap
+        self.dpi         = dpi
+        self.fps         = fps
+        self.max_frames  = max_frames
+        self.num_workers = num_workers
+
+        self.logger.section("[Animator]")
+        self.logger.subsection(f"colormap for GT and prediction : {cmap}")
+        self.logger.subsection(f"colormap for error             : {err_cmap}")
+        self.logger.subsection(f"figure DPI                     : {dpi}")
+        self.logger.subsection(f"GIF frames per second          : {fps}")
+        self.logger.subsection(f"max frames per GIF             : {max_frames}")
+        self.logger.subsection(f"CPU workers for rendering      : {num_workers if num_workers is not None else 'auto'} \n")
+
+    def _build_axis(self, axis: str, cubes: tuple, x_axis: np.ndarray, az_offset: int, rg_offset: int) -> dict:
+        N_elev, az, rg = cubes[0].shape
+        sort_idx = None
+
+        if axis in ("range", "azimuth"):
+            sort_idx = np.argsort(x_axis)
+            x_axis   = x_axis[sort_idx]
+
+        if axis == "elevation":
+            return dict(
+                n_total   = N_elev,
+                get_slice = lambda i: self._slice_elevation(cubes, i),
+                extent    = [rg_offset, rg_offset + rg, az_offset + az, az_offset],
+                x_label   = "range index",
+                y_label   = "azimuth index",
+                title_fn  = lambda i: f"elevation = {x_axis[i]:.2f} m  (idx {i}/{N_elev - 1})",
+                origin    = "upper",
+            )
+
+        if axis == "range":
+            return dict(
+                n_total   = rg,
+                get_slice = lambda i: self._slice_range(cubes, sort_idx, i),
+                extent    = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])],
+                x_label   = "azimuth index",
+                y_label   = "elevation [m]",
+                title_fn  = lambda i: f"range = {i + rg_offset}",
+                origin    = "lower",
+            )
+
+        if axis == "azimuth":
+            return dict(
+                n_total   = az,
+                get_slice = lambda i: self._slice_azimuth(cubes, sort_idx, i),
+                extent    = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])],
+                x_label   = "range index",
+                y_label   = "elevation [m]",
+                title_fn  = lambda i: f"azimuth = {i + az_offset}",
+                origin    = "lower",
+            )
+
+        raise ValueError(f"axis must be elevation|range|azimuth, got {axis!r}")
+
     @staticmethod
-    def _init_worker() -> None:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot
-        import numpy
-        import io
+    def _slice_elevation(cubes: tuple, i: int) -> tuple:
+        return tuple(cube[i] if cube is not None else None for cube in cubes)
+
+    @staticmethod
+    def _slice_range(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
+        slices = tuple(cube[:, :, i] if cube is not None else None for cube in cubes)
+        if sort_idx is not None:
+            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
+        return slices
+
+    @staticmethod
+    def _slice_azimuth(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
+        slices = tuple(cube[:, i, :] if cube is not None else None for cube in cubes)
+        if sort_idx is not None:
+            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
+        return slices
+
+    def _render(self, tasks: list[FrameSpec]) -> dict[int, bytes]:
+        n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
+        png_bytes: dict[int, bytes] = {}
+
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=Animator._init_worker) as pool:
+            futures = {pool.submit(Animator._render_frame, t): t.frame_order for t in tasks}
+            with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
+                for fut in as_completed(futures):
+                    order, data = fut.result()
+                    png_bytes[order] = data
+                    pbar.update(1)
+
+        return png_bytes
 
     @staticmethod
     def _render_frame(spec: FrameSpec) -> tuple[int, bytes]:
@@ -97,107 +191,13 @@ class Animator:
 
         return spec.frame_order, buf.read()
 
-    def __init__(
-        self,
-        logger      : Logger,
-        *,
-        cmap        : str = "jet",
-        err_cmap    : str = "magma",
-        dpi         : int = 110,
-        fps         : int = 12,
-        max_frames  : int = 150,
-        num_workers : int | None = None,
-    ) -> None:
-        self.logger      = logger
-        self.cmap        = cmap
-        self.err_cmap    = err_cmap
-        self.dpi         = dpi
-        self.fps         = fps
-        self.max_frames  = max_frames
-        self.num_workers = num_workers
-
-        self.logger.section("[Animator]")
-        self.logger.subsection(f"colormap for GT and prediction : {cmap}")
-        self.logger.subsection(f"colormap for error             : {err_cmap}")
-        self.logger.subsection(f"figure DPI                     : {dpi}")
-        self.logger.subsection(f"GIF frames per second          : {fps}")
-        self.logger.subsection(f"max frames per GIF             : {max_frames}")
-        self.logger.subsection(f"CPU workers for rendering      : {num_workers if num_workers is not None else 'auto'} \n")
-
     @staticmethod
-    def _slice_elevation(cubes: tuple, i: int) -> tuple:
-        return tuple(cube[i] if cube is not None else None for cube in cubes)
-
-    @staticmethod
-    def _slice_range(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
-        slices = tuple(cube[:, :, i] if cube is not None else None for cube in cubes)
-        if sort_idx is not None:
-            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
-        return slices
-
-    @staticmethod
-    def _slice_azimuth(cubes: tuple, sort_idx: np.ndarray | None, i: int) -> tuple:
-        slices = tuple(cube[:, i, :] if cube is not None else None for cube in cubes)
-        if sort_idx is not None:
-            slices = tuple(s[sort_idx] if s is not None else None for s in slices)
-        return slices
-
-    def _build_axis(self, axis: str, cubes: tuple, x_axis: np.ndarray, az_offset: int, rg_offset: int) -> dict:
-        N_elev, az, rg = cubes[0].shape
-        sort_idx = None
-
-        if axis in ("range", "azimuth"):
-            sort_idx = np.argsort(x_axis)
-            x_axis   = x_axis[sort_idx]
-
-        if axis == "elevation":
-            return dict(
-                n_total   = N_elev,
-                get_slice = lambda i: self._slice_elevation(cubes, i),
-                extent    = [rg_offset, rg_offset + rg, az_offset + az, az_offset],
-                x_label   = "range index",
-                y_label   = "azimuth index",
-                title_fn  = lambda i: f"elevation = {x_axis[i]:.2f} m  (idx {i}/{N_elev - 1})",
-                origin    = "upper",
-            )
-
-        if axis == "range":
-            return dict(
-                n_total   = rg,
-                get_slice = lambda i: self._slice_range(cubes, sort_idx, i),
-                extent    = [az_offset, az_offset + az, float(x_axis[0]), float(x_axis[-1])],
-                x_label   = "azimuth index",
-                y_label   = "elevation [m]",
-                title_fn  = lambda i: f"range = {i + rg_offset}",
-                origin    = "lower",
-            )
-
-        if axis == "azimuth":
-            return dict(
-                n_total   = az,
-                get_slice = lambda i: self._slice_azimuth(cubes, sort_idx, i),
-                extent    = [rg_offset, rg_offset + rg, float(x_axis[0]), float(x_axis[-1])],
-                x_label   = "range index",
-                y_label   = "elevation [m]",
-                title_fn  = lambda i: f"azimuth = {i + az_offset}",
-                origin    = "lower",
-            )
-
-        raise ValueError(f"axis must be elevation|range|azimuth, got {axis!r}")
-
-    def _render(self, tasks: list[FrameSpec]) -> dict[int, bytes]:
-        n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
-        png_bytes: dict[int, bytes] = {}
-
-        with ProcessPoolExecutor(max_workers=n_workers, initializer=Animator._init_worker) as pool:
-            futures = {pool.submit(Animator._render_frame, t): t.frame_order for t in tasks}
-            with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
-                for fut in as_completed(futures):
-                    order, data = fut.result()
-                    png_bytes[order] = data
-                    pbar.update(1)
-
-        return png_bytes
+    def _init_worker() -> None:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot
+        import numpy
+        import io
 
     def walk_gif(
         self,
@@ -292,6 +292,131 @@ class FigureComposer:
         self.meta    = meta
         self.logger  = logger
         self.cfg     = cfg
+
+    def _compose_reduced(
+        self,
+        result         : Result,
+        run,
+        global_metrics : dict,
+        x_axis_np      : np.ndarray,
+        indices        : dict,
+        figure_paths   : Dict[str, List[Path]],
+    ) -> None:
+
+        slice_plotter = self.plotter.slice
+        meta          = self.meta
+        logger        = self.logger
+        reduced       = result.reduced
+
+        gt_n   = reduced.gt_norm
+        red_n  = reduced.reduced_norm
+        full_n = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
+
+        slice_range_idx = indices["slice_range_idx"]
+        slice_az_idx    = indices["slice_az_idx"]
+        slice_elev_idx  = indices["slice_elev_idx"]
+        all_range_idx   = indices["all_range_idx"]
+        all_az_idx      = indices["all_az_idx"]
+        all_elev_idx    = indices["all_elev_idx"]
+
+        _N_elev, _az, _rg = red_n.shape
+
+        reduced_dir = meta.figures_dir / "reduced"
+
+        figure_paths["improvement_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = reduced.improvement,
+            title      = "NN improvement over classical baseline (per-pixel ΔMSE, unit-area profiles)",
+            label      = "MSE(reduced) − MSE(pred)",
+            out_path   = reduced_dir / "improvement_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = "RdBu_r",
+            q_low      = 2.0,
+            q_high     = 98.0,
+        )]
+
+        figure_paths["reduced_pixel_mse_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = reduced.err_reduced,
+            title      = "Per-pixel reduced-vs-GT MSE (unit-area profiles, log scale)",
+            label      = "MSE",
+            out_path   = reduced_dir / "reduced_mse_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = self.cfg.cmap_error,
+            log        = True,
+        )]
+
+        figure_paths["slices_range_reduced"]   = []
+        figure_paths["slices_azimuth_reduced"] = []
+        figure_paths["slices_elev_reduced"]    = []
+
+        for axis, indices_arr, stem_fn, group in (
+            ("range",   slice_range_idx, lambda i: f"reduced_range_{int(i) + result.range_offset}",     "slices_range_reduced"),
+            ("azimuth", slice_az_idx,    lambda i: f"reduced_azimuth_{int(i) + result.azimuth_offset}", "slices_azimuth_reduced"),
+        ):
+            for i in indices_arr:
+                figure_paths[group] += slice_plotter.plot_tomogram_slice(
+                    pred_cube  = red_n,
+                    gt_cube    = gt_n,
+                    axis       = axis,
+                    index      = int(i),
+                    x_axis     = x_axis_np,
+                    out_dir    = reduced_dir / "slices",
+                    stem       = stem_fn(i),
+                    az_offset  = result.azimuth_offset,
+                    rg_offset  = result.range_offset,
+                    ssim_value = global_metrics[f"ssim_red_{axis}_{int(i)}"],
+                    ref_title  = "GT (unit-area)",
+                    pred_title = "Reduced (Capon, unit-area)",
+                    err_title  = "|Reduced − GT|",
+                    full_cube  = full_n,
+                    full_title = "Full tomogram (unit-area)",
+                )
+
+        for i in slice_elev_idx:
+            figure_paths["slices_elev_reduced"] += slice_plotter.plot_elevation_intensity_slice(
+                pred_cube  = red_n,
+                gt_cube    = gt_n,
+                elev_idx   = int(i),
+                x_axis     = x_axis_np,
+                out_dir    = reduced_dir / "slices",
+                stem       = f"reduced_elev_idx_{int(i)}",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
+                ssim_value = global_metrics[f"ssim_red_elev_{int(i)}"],
+                ref_title  = "GT (unit-area)",
+                pred_title = "Reduced (Capon, unit-area)",
+                err_title  = "|Reduced − GT|",
+                full_cube  = full_n,
+                full_title = "Full tomogram (unit-area)",
+            )
+
+        for axis, n_slices, indices_arr, offset in (
+            ("range",   _rg,     all_range_idx, result.range_offset),
+            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
+            ("elev",    _N_elev, all_elev_idx,  0),
+        ):
+            figure_paths[f"ssim_{axis}_reduced"] = [slice_plotter.plot_ssim_curves(
+                global_metrics = global_metrics,
+                axis           = axis,
+                out_path       = reduced_dir / "ssim" / f"{axis}.png",
+                n_slices       = n_slices,
+                slice_indices  = indices_arr,
+                ax_offset      = offset,
+                prefix         = "red",
+                series_label   = "reduced × GT (unit-area)",
+            )]
+
+        figure_paths["elev_metric_curves_reduced"] = slice_plotter.plot_elev_metric_curves(
+            global_metrics = global_metrics,
+            out_dir        = reduced_dir / "elev_metrics",
+            n_elev         = _N_elev,
+            x_axis         = x_axis_np,
+            suffix         = "red",
+            series_label   = "reduced × GT (unit-area)",
+        )
+
+        logger.subsection(f"Reduced baseline figures written to {reduced_dir}")
 
     def compose(
         self,
@@ -550,131 +675,6 @@ class FigureComposer:
             self._compose_reduced(result, run, global_metrics, x_axis_np, indices, figure_paths)
 
         return figure_paths
-
-    def _compose_reduced(
-        self,
-        result         : Result,
-        run,
-        global_metrics : dict,
-        x_axis_np      : np.ndarray,
-        indices        : dict,
-        figure_paths   : Dict[str, List[Path]],
-    ) -> None:
-
-        slice_plotter = self.plotter.slice
-        meta          = self.meta
-        logger        = self.logger
-        reduced       = result.reduced
-
-        gt_n   = reduced.gt_norm
-        red_n  = reduced.reduced_norm
-        full_n = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
-
-        slice_range_idx = indices["slice_range_idx"]
-        slice_az_idx    = indices["slice_az_idx"]
-        slice_elev_idx  = indices["slice_elev_idx"]
-        all_range_idx   = indices["all_range_idx"]
-        all_az_idx      = indices["all_az_idx"]
-        all_elev_idx    = indices["all_elev_idx"]
-
-        _N_elev, _az, _rg = red_n.shape
-
-        reduced_dir = meta.figures_dir / "reduced"
-
-        figure_paths["improvement_map"] = [slice_plotter.plot_pixel_metric_map(
-            metric_map = reduced.improvement,
-            title      = "NN improvement over classical baseline (per-pixel ΔMSE, unit-area profiles)",
-            label      = "MSE(reduced) − MSE(pred)",
-            out_path   = reduced_dir / "improvement_map.png",
-            az_offset  = result.azimuth_offset,
-            rg_offset  = result.range_offset,
-            cmap       = "RdBu_r",
-            q_low      = 2.0,
-            q_high     = 98.0,
-        )]
-
-        figure_paths["reduced_pixel_mse_map"] = [slice_plotter.plot_pixel_metric_map(
-            metric_map = reduced.err_reduced,
-            title      = "Per-pixel reduced-vs-GT MSE (unit-area profiles, log scale)",
-            label      = "MSE",
-            out_path   = reduced_dir / "reduced_mse_map.png",
-            az_offset  = result.azimuth_offset,
-            rg_offset  = result.range_offset,
-            cmap       = self.cfg.cmap_error,
-            log        = True,
-        )]
-
-        figure_paths["slices_range_reduced"]   = []
-        figure_paths["slices_azimuth_reduced"] = []
-        figure_paths["slices_elev_reduced"]    = []
-
-        for axis, indices_arr, stem_fn, group in (
-            ("range",   slice_range_idx, lambda i: f"reduced_range_{int(i) + result.range_offset}",     "slices_range_reduced"),
-            ("azimuth", slice_az_idx,    lambda i: f"reduced_azimuth_{int(i) + result.azimuth_offset}", "slices_azimuth_reduced"),
-        ):
-            for i in indices_arr:
-                figure_paths[group] += slice_plotter.plot_tomogram_slice(
-                    pred_cube  = red_n,
-                    gt_cube    = gt_n,
-                    axis       = axis,
-                    index      = int(i),
-                    x_axis     = x_axis_np,
-                    out_dir    = reduced_dir / "slices",
-                    stem       = stem_fn(i),
-                    az_offset  = result.azimuth_offset,
-                    rg_offset  = result.range_offset,
-                    ssim_value = global_metrics[f"ssim_red_{axis}_{int(i)}"],
-                    ref_title  = "GT (unit-area)",
-                    pred_title = "Reduced (Capon, unit-area)",
-                    err_title  = "|Reduced − GT|",
-                    full_cube  = full_n,
-                    full_title = "Full tomogram (unit-area)",
-                )
-
-        for i in slice_elev_idx:
-            figure_paths["slices_elev_reduced"] += slice_plotter.plot_elevation_intensity_slice(
-                pred_cube  = red_n,
-                gt_cube    = gt_n,
-                elev_idx   = int(i),
-                x_axis     = x_axis_np,
-                out_dir    = reduced_dir / "slices",
-                stem       = f"reduced_elev_idx_{int(i)}",
-                az_offset  = result.azimuth_offset,
-                rg_offset  = result.range_offset,
-                ssim_value = global_metrics[f"ssim_red_elev_{int(i)}"],
-                ref_title  = "GT (unit-area)",
-                pred_title = "Reduced (Capon, unit-area)",
-                err_title  = "|Reduced − GT|",
-                full_cube  = full_n,
-                full_title = "Full tomogram (unit-area)",
-            )
-
-        for axis, n_slices, indices_arr, offset in (
-            ("range",   _rg,     all_range_idx, result.range_offset),
-            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
-            ("elev",    _N_elev, all_elev_idx,  0),
-        ):
-            figure_paths[f"ssim_{axis}_reduced"] = [slice_plotter.plot_ssim_curves(
-                global_metrics = global_metrics,
-                axis           = axis,
-                out_path       = reduced_dir / "ssim" / f"{axis}.png",
-                n_slices       = n_slices,
-                slice_indices  = indices_arr,
-                ax_offset      = offset,
-                prefix         = "red",
-                series_label   = "reduced × GT (unit-area)",
-            )]
-
-        figure_paths["elev_metric_curves_reduced"] = slice_plotter.plot_elev_metric_curves(
-            global_metrics = global_metrics,
-            out_dir        = reduced_dir / "elev_metrics",
-            n_elev         = _N_elev,
-            x_axis         = x_axis_np,
-            suffix         = "red",
-            series_label   = "reduced × GT (unit-area)",
-        )
-
-        logger.subsection(f"Reduced baseline figures written to {reduced_dir}")
 
     def animate(self, result: Result, run, x_axis_np: np.ndarray) -> Dict[str, Path]:
         cfg    = self.cfg

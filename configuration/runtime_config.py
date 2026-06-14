@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass
+class IOConfig:
+    logdir     : str = "/ste/rnd/User/vice_vi/DLR-TomoSAR/logs"
+    writer = None
+
+
+@dataclass
+class OverfitConfig:
+    enabled        : bool  = False
+    max_steps      : int   = 50
+    stop_threshold : float = 1e-6
+    batch_size     : int   = 1
+
+
+@dataclass
+class TrainingLoopConfig:
+    epochs                      : int   = 3
+    validation_frequency        : int   = 5
+    use_amp                     : bool  = False
+    gradient_accumulation_steps : int   = 1
+    log_debug                   : bool  = True
+    log_all_losses              : bool  = False
+
+
+@dataclass
+class MemoryConfig:
+    clear_cache_every_n_steps : int  = 0
+    clear_cache_after_eval    : bool = False
+    clear_cache_after_epoch   : bool = False
+
+
+@dataclass
+class ResourceConfig:
+    enabled            : bool  = True
+    poll_interval_sec  : float = 5.0
+    log_to_tensorboard : bool  = True
+    warn_ram_pct       : float = 90.0
+    warn_vram_pct      : float = 90.0
+    warn_swap_pct      : float = 50.0
+    warn_shm_pct       : float = 80.0
+    warn_cooldown_sec  : float = 30.0
+
+
+@dataclass
+class PermutationMetricsConfig:
+    enabled       : bool  = True
+    amp_threshold : float = 1e-3

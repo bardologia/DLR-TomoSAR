@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from pathlib     import Path
 from typing      import List, Optional
 
@@ -8,10 +7,10 @@ import numpy as np
 
 from configuration.inference_config              import InferenceConfig
 from pipelines.inference_pipeline.loader         import InferenceMetadata, Run
-from pipelines.shared                            import FileIO
-from tools.conda_env                             import CondaEnv
-from tools.logger                                import Logger
-from tools.regions                               import CropRegion
+from tools                            import FileIO
+from tools.monitoring.logger                                import Logger
+from tools.data.regions                               import CropRegion
+from tools.sar                                 import TomogramBuilder
 from tools.track_baselines                       import SecondarySelection
 
 
@@ -49,6 +48,10 @@ class ReducedTomogramSynthesizer:
 
         return indices
 
+    def _cache_key(self, select: List[int], crop: CropRegion) -> str:
+        select_token = "-".join(str(index) for index in sorted(select))
+        return f"{crop.as_identifier_string()}_sel{len(select)}-{select_token}"
+
     def _build_spec(self, state: dict, select: List[int], crop: CropRegion, tomogram_path: Path, dem_path: Path) -> dict:
         tomogram_state = dict(state["tomogram_config"])
         tomogram_state["track_selection"] = select
@@ -61,31 +64,19 @@ class ReducedTomogramSynthesizer:
             "dataset_type"     : state["dataset_type"],
             "pyrat_directory"  : pyrat_directory,
             "main_directory"   : str(self.cfg.run_directory),
+            "run_subdirectory" : "reduced_work",
             "effort"           : self.cfg.reduced_effort,
             "crop"             : list(crop.as_tuple()),
             "tomogram_path"    : str(tomogram_path),
             "dem_path"         : str(dem_path),
         }
 
-    def _cache_key(self, select: List[int], crop: CropRegion) -> str:
-        select_token = "-".join(str(index) for index in sorted(select))
-        return f"{crop.as_identifier_string()}_sel{len(select)}-{select_token}"
-
-    @staticmethod
-    def _repo_root() -> Path:
-        return Path(__file__).resolve().parents[2]
-
     def _generate(self, state: dict, select: List[int], crop: CropRegion, tomogram_path: Path, dem_path: Path, cache_key: str) -> None:
         spec      = self._build_spec(state, select, crop, tomogram_path, dem_path)
         spec_path = self.cache_directory / f"reduced_spec_{cache_key}.json"
-        FileIO.save_json(spec, spec_path)
 
-        interpreter = CondaEnv.interpreter(self.cfg.reduced_env_name)
-        entry       = self._repo_root() / "main" / "generate_reduced_tomogram.py"
-        command     = [str(interpreter), str(entry), "--spec", str(spec_path)]
-
-        self.logger.subsection(f"Generating reduced tomogram in env '{self.cfg.reduced_env_name}': {' '.join(command)}")
-        subprocess.run(command, check=True, cwd=str(self._repo_root()))
+        builder = TomogramBuilder(self.cfg.reduced_env_name, logger=self.logger)
+        builder.generate(spec, spec_path)
 
     def _validate_alignment(self, reduced: np.ndarray) -> None:
         n_height, az, rg = reduced.shape

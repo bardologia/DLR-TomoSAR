@@ -59,7 +59,7 @@ class ProcessManager:
         self.lock    = threading.Lock()
 
     def launch(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None, detach: bool = False) -> dict:
-        script = self.paths.main_dir / f"{key}.py"
+        script = self.paths.script_entry(key)["path"]
         if not script.exists():
             return {"ok": False, "error": "script not found"}
 
@@ -116,8 +116,8 @@ class ProcessManager:
         return env
 
     def _start(self, record: dict, stream: JobStream) -> str | None:
-        script = self.paths.main_dir / f"{record['script']}.py"
-        argv   = [record["interpreter"], "-u", str(script)]
+        entry = self.paths.script_entry(record["script"])
+        argv  = [record["interpreter"], "-u", str(entry["path"]), *entry["args"]]
         for path, value in record["overrides"].items():
             argv += [f"--{path}", value]
         if record.get("detach"):
@@ -150,7 +150,7 @@ class ProcessManager:
         return None
 
     def _schedule(self, parent: dict, key: str) -> None:
-        script = self.paths.main_dir / f"{key}.py"
+        script = self.paths.script_entry(key)["path"]
         if not script.exists():
             self.logger.warning(f"follow-up {key} skipped, script not found")
             return
@@ -202,7 +202,8 @@ class ProcessManager:
         return cleaned
 
     def _render_command(self, interpreter: str, key: str, overrides: dict, detach: bool = False) -> str:
-        parts = [interpreter, "-u", f"main/{key}.py"]
+        entry = self.paths.script_entry(key)
+        parts = [interpreter, "-u", entry["rel"], *entry["args"]]
         for path, value in overrides.items():
             parts += [f"--{path}", shlex.quote(value)]
         if detach:

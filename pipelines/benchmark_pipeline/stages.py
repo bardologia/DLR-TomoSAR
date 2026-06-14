@@ -8,9 +8,9 @@ from pathlib import Path
 from configuration.benchmark_config              import BenchmarkConfig
 from pipelines.benchmark_pipeline.results        import ComparisonReport, TrialCollector
 from pipelines.benchmark_pipeline.sizing         import SizeMatcher, SizeMatchResult
-from pipelines.shared.orchestration              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
-from pipelines.shared.io                         import FileIO
-from tools.logger                                import Logger
+from tools.orchestration              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
+from tools.data.io                         import FileIO
+from tools.monitoring.logger                                import Logger
 
 
 class OverfitStage(ExperimentStage):
@@ -21,36 +21,14 @@ class OverfitStage(ExperimentStage):
         self.results_path = self.run_dir / "pipeline" / "overfit_results.json"
         self.report_path  = self.run_dir / "pipeline" / "overfit_report.md"
 
-    def run(self) -> list[dict]:
-        self.logger.section("Overfit gate")
-        self.logger.kv_table({
-            "Models"              : len(self.models),
-            "Max steps"           : self.config.overfit.max_steps,
-            "Stop threshold"      : self.config.overfit.stop_threshold,
-            "Batch size"          : self.config.overfit.batch_size,
-            "Require convergence" : self.config.overfit.require_convergence,
-            "GPUs"                : self.config.gpus,
-        }, title="Configuration")
-
-        cached  = [m for m in self.models if self._has_result(m)]
-        pending = [m for m in self.models if m not in cached]
-
-        for model_name in cached:
-            self.logger.info(f"{model_name}: cached result reused")
-
-        if pending:
-            self._run_queue([self._job(m) for m in pending])
-
-        results = [self._load_result(m) for m in self.models]
-
-        self._write_results(results, self.results_path)
-        self._write_report(results)
-        self._log_summary(results)
-
-        return results
-
     def passed(self, results: list[dict]) -> bool:
         return bool(results) and all(r["status"] == "PASS" for r in results)
+
+    def _result_path(self, model_name: str) -> Path:
+        return self.stage_dir / model_name / "overfit_result.json"
+
+    def _has_result(self, model_name: str) -> bool:
+        return self.config.resume and self._result_path(model_name).exists()
 
     def _job(self, model_name: str) -> GpuJob:
         return GpuJob(
@@ -58,12 +36,6 @@ class OverfitStage(ExperimentStage):
             command  = [sys.executable, str(self.entry_script), "--worker", "overfit", "--model", model_name, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
             log_path = self.stage_dir / model_name / "worker.log",
         )
-
-    def _result_path(self, model_name: str) -> Path:
-        return self.stage_dir / model_name / "overfit_result.json"
-
-    def _has_result(self, model_name: str) -> bool:
-        return self.config.resume and self._result_path(model_name).exists()
 
     def _load_result(self, model_name: str) -> dict:
         path = self._result_path(model_name)
@@ -128,6 +100,34 @@ class OverfitStage(ExperimentStage):
         for r in failed:
             self.logger.error(f"FAILED  {r['model']}")
 
+    def run(self) -> list[dict]:
+        self.logger.section("Overfit gate")
+        self.logger.kv_table({
+            "Models"              : len(self.models),
+            "Max steps"           : self.config.overfit.max_steps,
+            "Stop threshold"      : self.config.overfit.stop_threshold,
+            "Batch size"          : self.config.overfit.batch_size,
+            "Require convergence" : self.config.overfit.require_convergence,
+            "GPUs"                : self.config.gpus,
+        }, title="Configuration")
+
+        cached  = [m for m in self.models if self._has_result(m)]
+        pending = [m for m in self.models if m not in cached]
+
+        for model_name in cached:
+            self.logger.info(f"{model_name}: cached result reused")
+
+        if pending:
+            self._run_queue([self._job(m) for m in pending])
+
+        results = [self._load_result(m) for m in self.models]
+
+        self._write_results(results, self.results_path)
+        self._write_report(results)
+        self._log_summary(results)
+
+        return results
+
 
 class SizeMatchStage(ExperimentStage):
     def __init__(self, config: BenchmarkConfig, run_tag: str, models: list[str], logger: Logger) -> None:
@@ -135,6 +135,50 @@ class SizeMatchStage(ExperimentStage):
         self.models       = models
         self.records_path = self.run_dir / "pipeline" / "size_match.json"
         self.report_path  = self.run_dir / "pipeline" / "size_match_report.md"
+
+    def _load_cached(self) -> dict | None:
+        if not self.config.resume or not self.records_path.exists():
+            return None
+
+        records = FileIO.load_json(self.records_path)
+
+        if all(m in records for m in self.models):
+            return records
+
+        return None
+
+    def _reference_record(self, reference: str, target: int) -> dict:
+        return asdict(SizeMatchResult(
+            model         = reference,
+            scale         = 1.0,
+            overrides     = {},
+            parameters    = target,
+            target        = target,
+            deviation_pct = 0.0,
+            iterations    = 0,
+        ))
+
+    def _write_report(self, records: dict, target: int) -> None:
+        lines = [
+            "# Capacity Matching Report",
+            f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  —  run tag `{self.run_tag}`_\n",
+            f"Reference model `{self.config.size_match.reference_model}` at **{target:,}** parameters.",
+            f"Counting performed with {self.config.size_match.in_channels} input channels, {self.config.n_gaussians * 3} output channels, image size {self.config.training.patch_size[0]}.\n",
+            "## Matched Widths\n",
+            "| Model | Scale | Scaled attributes | Parameters | Δ vs reference | Iterations | Flags |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+
+        for model_name in sorted(records.keys()):
+            record    = records[model_name]
+            overrides = ", ".join(f"`{k}={v}`" for k, v in record["overrides"].items()) or "_(defaults)_"
+            flags     = "; ".join(record["flags"]) or "—"
+            lines.append(f"| `{model_name}` | {record['scale']:.4f} | {overrides} | {record['parameters']:,} | {record['deviation_pct']:+.3f} % | {record['iterations']} | {flags} |")
+
+        lines.append("")
+
+        self.report_path.write_text("\n".join(lines), encoding="utf-8")
+        self.logger.info(f"Report written to: {self.report_path}")
 
     def run(self) -> dict:
         self.logger.section("Capacity matching")
@@ -175,50 +219,6 @@ class SizeMatchStage(ExperimentStage):
         self._write_report(records, target)
 
         return records
-
-    def _reference_record(self, reference: str, target: int) -> dict:
-        return asdict(SizeMatchResult(
-            model         = reference,
-            scale         = 1.0,
-            overrides     = {},
-            parameters    = target,
-            target        = target,
-            deviation_pct = 0.0,
-            iterations    = 0,
-        ))
-
-    def _load_cached(self) -> dict | None:
-        if not self.config.resume or not self.records_path.exists():
-            return None
-
-        records = FileIO.load_json(self.records_path)
-
-        if all(m in records for m in self.models):
-            return records
-
-        return None
-
-    def _write_report(self, records: dict, target: int) -> None:
-        lines = [
-            "# Capacity Matching Report",
-            f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  —  run tag `{self.run_tag}`_\n",
-            f"Reference model `{self.config.size_match.reference_model}` at **{target:,}** parameters.",
-            f"Counting performed with {self.config.size_match.in_channels} input channels, {self.config.n_gaussians * 3} output channels, image size {self.config.training.patch_size[0]}.\n",
-            "## Matched Widths\n",
-            "| Model | Scale | Scaled attributes | Parameters | Δ vs reference | Iterations | Flags |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
-        ]
-
-        for model_name in sorted(records.keys()):
-            record    = records[model_name]
-            overrides = ", ".join(f"`{k}={v}`" for k, v in record["overrides"].items()) or "_(defaults)_"
-            flags     = "; ".join(record["flags"]) or "—"
-            lines.append(f"| `{model_name}` | {record['scale']:.4f} | {overrides} | {record['parameters']:,} | {record['deviation_pct']:+.3f} % | {record['iterations']} | {flags} |")
-
-        lines.append("")
-
-        self.report_path.write_text("\n".join(lines), encoding="utf-8")
-        self.logger.info(f"Report written to: {self.report_path}")
 
 
 class TrainingStage(QueuedTrainingStage):

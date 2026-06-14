@@ -7,8 +7,8 @@ from typing      import Literal, Optional, Sequence, Tuple
 import numpy as np
 
 from configuration.norm_config    import ChannelStrategy
-from configuration.representation import Representation
-from tools.regions                import SplitRegions
+from tools.data.representation import Representation
+from tools.data.regions                import SplitRegions
 
 
 @dataclass

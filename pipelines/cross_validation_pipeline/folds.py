@@ -4,13 +4,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from configuration.cross_validation_config       import CrossValidationConfig
-from configuration.dataset_config                import DatasetConfiguration
 from configuration.inference_config              import InferenceConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
 from pipelines.benchmark_pipeline.results        import TrialCollector, TrialRecord
 from pipelines.benchmark_pipeline.workers        import BenchmarkWorker
-from tools.regions                               import CropRegion, SplitRegions
-from tools.logger                                import Logger
+from tools.data.regions                               import CropRegion, SplitRegions
+from tools.monitoring.logger                                import Logger
 
 
 @dataclass
@@ -44,6 +43,30 @@ class FoldPlanner:
 
         return [(bounds[index], bounds[index + 1]) for index in range(n_folds)]
 
+    def _merge_adjacent(self, block_indices: list[int]) -> list[tuple[int, int]]:
+        runs  = []
+        start = block_indices[0]
+        prev  = block_indices[0]
+
+        for index in block_indices[1:]:
+            if index == prev + 1:
+                prev = index
+                continue
+            runs.append((start, prev))
+            start = index
+            prev  = index
+
+        runs.append((start, prev))
+        return runs
+
+    def _run_region(self, run: tuple[int, int]) -> CropRegion:
+        first_block, last_block = run
+        return CropRegion(self.blocks[first_block][0], self.blocks[last_block][1], self.range_start, self.range_end)
+
+    def _block_region(self, block_index: int) -> CropRegion:
+        azimuth_start, azimuth_end = self.blocks[block_index]
+        return CropRegion(azimuth_start, azimuth_end, self.range_start, self.range_end)
+
     def plan(self, fold_index: int) -> FoldPlan:
         if not 0 <= fold_index < self.n_folds:
             raise ValueError(f"fold_index must be in [0, {self.n_folds}); got {fold_index}")
@@ -71,30 +94,6 @@ class FoldPlanner:
     def plans(self) -> list[FoldPlan]:
         return [self.plan(fold_index) for fold_index in range(self.n_folds)]
 
-    def _merge_adjacent(self, block_indices: list[int]) -> list[tuple[int, int]]:
-        runs  = []
-        start = block_indices[0]
-        prev  = block_indices[0]
-
-        for index in block_indices[1:]:
-            if index == prev + 1:
-                prev = index
-                continue
-            runs.append((start, prev))
-            start = index
-            prev  = index
-
-        runs.append((start, prev))
-        return runs
-
-    def _run_region(self, run: tuple[int, int]) -> CropRegion:
-        first_block, last_block = run
-        return CropRegion(self.blocks[first_block][0], self.blocks[last_block][1], self.range_start, self.range_end)
-
-    def _block_region(self, block_index: int) -> CropRegion:
-        azimuth_start, azimuth_end = self.blocks[block_index]
-        return CropRegion(azimuth_start, azimuth_end, self.range_start, self.range_end)
-
 
 class FoldNaming:
     @staticmethod
@@ -116,12 +115,6 @@ class FoldConfigFactory(ConfigFactory):
             crop          = self.global_crop()
             self._planner = FoldPlanner(self.config, range_start=crop.range_start, range_end=crop.range_end)
         return self._planner
-
-    def fold_dataset_config(self, fold_index: int) -> DatasetConfiguration:
-        dataset_config               = self.training_dataset_config()
-        dataset_config.split_regions = self.planner().plan(fold_index).split_regions
-
-        return dataset_config
 
     def fold_inference_config(self, run_directory: Path, split: str) -> InferenceConfig:
         inference_config               = self.inference_config(run_directory)
@@ -177,18 +170,21 @@ class CrossValidationWorker(BenchmarkWorker):
 
 
 class FoldTrainingWorker(CrossValidationWorker):
-    def run(self, fold_index: int) -> None:
+    def _run_backbone(self, fold_index: int, split_regions: SplitRegions) -> None:
         from models import CONFIG_REGISTRY
-        from pipelines.training_pipeline.pipeline import TrainingPipeline
+        from pipelines.backbone_pipeline.pipeline import TrainingPipeline
 
         model_config = CONFIG_REGISTRY[self.config.model_name]()
 
         for attribute, value in self.config.model_overrides.items():
             setattr(model_config, attribute, value)
 
+        dataset_config               = self.factory.training_dataset_config()
+        dataset_config.split_regions = split_regions
+
         pipeline = TrainingPipeline(
             trainer_config = self.factory.training_trainer_config(logdir=self.run_dir / "folds"),
-            dataset_config = self.factory.fold_dataset_config(fold_index),
+            dataset_config = dataset_config,
             model_name     = self.config.model_name,
             model_config   = model_config,
             seed           = self.config.seed,
@@ -196,6 +192,75 @@ class FoldTrainingWorker(CrossValidationWorker):
         )
 
         pipeline.run(probe_config=self._probe_config())
+
+    def _run_jepa(self, fold_index: int, split_regions: SplitRegions) -> None:
+        from pipelines.jepa_pipeline.pipeline import JepaPipeline
+
+        JepaPipeline(self._jepa_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
+
+    def _jepa_entry_config(self, run_name: str):
+        from configuration.jepa_config import JepaEntryConfig
+
+        cv   = self.config
+        jepa = cv.jepa
+
+        return JepaEntryConfig(
+            run_name        = run_name,
+            model_name      = cv.model_name,
+            seed            = cv.seed,
+            n_gaussians     = cv.n_gaussians,
+            logdir          = self.run_dir / "folds",
+            model_overrides = cv.model_overrides,
+            stage_a_run     = jepa.stage_a_run,
+            stage_a_mode    = jepa.stage_a_mode,
+            target_provider = jepa.target_provider,
+            autoencoder     = jepa.autoencoder,
+            embedding_loss  = jepa.embedding_loss,
+            overfit         = cv.overfit,
+            geometry        = cv.geometry,
+            paths           = cv.paths,
+            training        = cv.training,
+        )
+
+    def _run_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:
+        from pipelines.autoencoder_pipeline.pipeline import ProfileAePipeline
+
+        ProfileAePipeline(self._ae_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
+
+    def _ae_entry_config(self, run_name: str):
+        from configuration.autoencoder_config import ProfileAeEntryConfig
+
+        cv = self.config
+        ae = cv.autoencoder
+
+        return ProfileAeEntryConfig(
+            run_name        = run_name,
+            seed            = cv.seed,
+            n_gaussians     = cv.n_gaussians,
+            logdir          = self.run_dir / "folds",
+            pixel_subsample = ae.pixel_subsample,
+            keep_empty_frac = ae.keep_empty_frac,
+            autoencoder     = ae.autoencoder,
+            ae_loss         = ae.ae_loss,
+            overfit         = cv.overfit,
+            geometry        = cv.geometry,
+            paths           = cv.paths,
+            training        = cv.training,
+        )
+
+    def run(self, fold_index: int) -> None:
+        dispatch = {
+            "backbone"    : self._run_backbone,
+            "jepa"        : self._run_jepa,
+            "autoencoder" : self._run_autoencoder,
+        }
+
+        training_type = self.config.training_type
+        if training_type not in dispatch:
+            raise ValueError(f"Unknown training_type '{training_type}', expected one of {sorted(dispatch)}")
+
+        split_regions = self.factory.planner().plan(fold_index).split_regions
+        dispatch[training_type](fold_index, split_regions)
 
 
 class FoldInferenceWorker(CrossValidationWorker):

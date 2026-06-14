@@ -9,6 +9,11 @@ from configuration.benchmark_config import (
     InferenceQueueConfig,
     TrainingQueueConfig,
 )
+from configuration.autoencoder_config  import AutoencoderLossConfig
+from configuration.geometry_config     import GeometryConfig
+from configuration.jepa_config         import EmbeddingLossConfig
+from configuration.models_config       import AutoencoderConfig
+from configuration.runtime_config      import OverfitConfig
 
 
 @dataclass
@@ -19,7 +24,26 @@ class FoldConfig:
 
 
 @dataclass
+class JepaCvConfig:
+    stage_a_run     : Path | None         = None
+    stage_a_mode    : str                 = "frozen"
+    target_provider : str                 = "stopgrad"
+    autoencoder     : AutoencoderConfig   = field(default_factory=AutoencoderConfig)
+    embedding_loss  : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
+
+
+@dataclass
+class AeCvConfig:
+    autoencoder     : AutoencoderConfig     = field(default_factory=AutoencoderConfig)
+    ae_loss         : AutoencoderLossConfig = field(default_factory=AutoencoderLossConfig)
+    pixel_subsample : float                 = 1.0
+    keep_empty_frac : float                 = 0.05
+
+
+@dataclass
 class CrossValidationConfig:
+    training_type   : str  = "backbone"
+
     model_name      : str  = "resunet"
     model_overrides : dict = field(default_factory=dict)
 
@@ -29,6 +53,11 @@ class CrossValidationConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
+    geometry   : GeometryConfig         = field(default_factory=GeometryConfig)
+    overfit    : OverfitConfig          = field(default_factory=OverfitConfig)
+    jepa       : JepaCvConfig           = field(default_factory=JepaCvConfig)
+    autoencoder: AeCvConfig             = field(default_factory=AeCvConfig)
+
     inference_splits : list[str] = field(default_factory=lambda: ["val", "test"])
 
     gpus            : list[int]  = field(default_factory=lambda: [2, 3])
@@ -37,3 +66,6 @@ class CrossValidationConfig:
     seed            : int        = 0
     n_gaussians     : int        = 5
     poll_interval_s : float      = 5.0
+
+    def runs_inference(self) -> bool:
+        return self.training_type != "autoencoder"

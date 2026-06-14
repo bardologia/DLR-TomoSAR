@@ -3,21 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.autoencoder_config import ProfileAutoencoderConfig
 from configuration.benchmark_config   import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.models_config      import AutoencoderConfig
 from configuration.inference_config   import InferenceConfig
-from configuration.training_config    import (
-    EarlyStoppingConfig,
-    GeometryConfig,
-    GradientClipperConfig,
-    IOConfig,
-    OptimizerConfig,
-    OverfitConfig,
-    ResourceConfig,
-    SchedulerConfig,
-    TrainingConfigInner,
-    WarmupConfig,
-)
+from configuration.geometry_config     import GeometryConfig
+from configuration.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.runtime_config      import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.trainer_config       import SharedSubConfigInheritance
 
 
 @dataclass
@@ -40,9 +32,9 @@ class EmbeddingLossConfig:
 
 
 @dataclass
-class JepaTrainerConfig:
+class JepaTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder         : ProfileAutoencoderConfig = field(default_factory=ProfileAutoencoderConfig)
+    autoencoder         : AutoencoderConfig = field(default_factory=AutoencoderConfig)
     embedding_loss      : EmbeddingLossConfig       = field(default_factory=EmbeddingLossConfig)
 
     stage_a_mode        : str                       = "frozen"
@@ -59,9 +51,10 @@ class JepaTrainerConfig:
     scheduler           : SchedulerConfig           = field(default_factory=SchedulerConfig)
     io                  : IOConfig                  = field(default_factory=IOConfig)
     optimizer           : OptimizerConfig           = field(default_factory=OptimizerConfig)
-    training            : TrainingConfigInner       = field(default_factory=TrainingConfigInner)
+    training            : TrainingLoopConfig       = field(default_factory=TrainingLoopConfig)
     overfit             : OverfitConfig             = field(default_factory=OverfitConfig)
     resources           : ResourceConfig            = field(default_factory=ResourceConfig)
+    memory              : MemoryConfig              = field(default_factory=MemoryConfig)
     gradient_clipper    : GradientClipperConfig     = field(default_factory=GradientClipperConfig)
 
 
@@ -90,7 +83,7 @@ class JepaEntryConfig:
     stage_a_mode    : str         = "frozen"
     target_provider : str         = "stopgrad"
 
-    autoencoder     : ProfileAutoencoderConfig = field(default_factory=ProfileAutoencoderConfig)
+    autoencoder     : AutoencoderConfig = field(default_factory=AutoencoderConfig)
     embedding_loss  : EmbeddingLossConfig       = field(default_factory=EmbeddingLossConfig)
     overfit         : OverfitConfig             = field(default_factory=OverfitConfig)
     geometry        : GeometryConfig            = field(default_factory=GeometryConfig)

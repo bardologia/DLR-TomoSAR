@@ -14,7 +14,7 @@ from configuration.processing_config import (
 )
 from pipelines.processing_pipeline.pipeline import PreProcessScheduler, PreProcessSession
 from tools.config_cli import ConfigCli
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 
 def main() -> None:
@@ -62,6 +62,7 @@ def main() -> None:
             stack_identifier     = config.stack_identifier,
             tomogram_output_tag  = config.tomogram_output_tag,
             parameter_output_tag = config.parameter_output_tag,
+            tomogram_env_name    = config.tomogram_env_name,
         )
 
         sessions.append(PreProcessSession(index=index, total=len(config.win_list), dataset_name=dataset_name, config=processing_config))

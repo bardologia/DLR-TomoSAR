@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import numpy             as np
 from scipy.stats         import gaussian_kde, pearsonr, spearmanr
 
-from pipelines.shared.plotting      import PlotBase
-from pipelines.shared.preprocessing import ProfilePreprocessor
-from tools.gaussians                import GaussianMixture
-from tools.logger                   import Logger
+from tools.reporting.plotting      import PlotBase
+from tools.data.preprocessing import ProfilePreprocessor
+from tools.data.gaussians                import GaussianMixture
+from tools.monitoring.logger                   import Logger
 
 
 class SpatialMapPlotter(PlotBase):

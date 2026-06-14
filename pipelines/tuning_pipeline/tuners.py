@@ -5,7 +5,7 @@ from pathlib import Path
 
 import optuna
 
-from pipelines.shared.io import FileIO
+from tools.data.io import FileIO
 
 
 class ParamSampler:
@@ -49,9 +49,6 @@ class BestConfigWriter:
         self.path       = Path(path)
         self.sampler    = ParamSampler()
 
-    def __call__(self, study: optuna.Study, frozen_trial: optuna.trial.FrozenTrial) -> None:
-        self.write(study)
-
     def write(self, study: optuna.Study) -> dict | None:
         try:
             best = study.best_trial
@@ -68,6 +65,9 @@ class BestConfigWriter:
         FileIO.save_json(payload, self.path, indent=2, atomic=True)
 
         return payload
+
+    def __call__(self, study: optuna.Study, frozen_trial: optuna.trial.FrozenTrial) -> None:
+        self.write(study)
 
 
 class Tuner:

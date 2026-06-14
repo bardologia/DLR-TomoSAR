@@ -1431,3 +1431,38 @@ class U2NetLiteConfig:
         ] if len(g['params']) > 0]
 
 
+@dataclass
+class AutoencoderConfig:
+    profile_length     : int   = 256
+
+    embedding_dim      : int   = 24
+    embedding_norm     : str   = "l2"
+    curve_norm         : str   = "log1p"
+
+    encoder_kind       : str   = "mlp"
+    decoder_kind       : str   = "mlp"
+
+    hidden_dim         : int   = 128
+    depth              : int   = 2
+    activation         : str   = "gelu"
+    dropout            : float = 0.0
+    init_mode          : str   = "default"
+
+    seq_channels       : int   = 32
+    seq_kernel_size    : int   = 5
+    num_heads          : int   = 4
+
+    encoder_lr         : float = 3e-4
+    decoder_lr         : float = 3e-4
+
+    encoder_wd         : float = 1e-4
+    decoder_wd         : float = 1e-4
+
+    def get_param_groups(self, model: nn.Module) -> list[dict]:
+        groups = [
+            {"params": list(model.encoder.parameters()), "lr": self.encoder_lr, "weight_decay": self.encoder_wd, "name": "ae_encoder"},
+            {"params": list(model.decoder.parameters()), "lr": self.decoder_lr, "weight_decay": self.decoder_wd, "name": "ae_decoder"},
+        ]
+        return [g for g in groups if len(g["params"]) > 0]
+
+

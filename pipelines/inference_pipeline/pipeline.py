@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing  import Dict, List
+from dataclasses import dataclass
+from pathlib     import Path
+from typing      import Dict, List, Type
 
 import numpy as np
 
@@ -12,34 +13,32 @@ from pipelines.inference_pipeline.metrics   import Metrics
 from pipelines.inference_pipeline.plots     import Ploter
 from pipelines.inference_pipeline.predictor import Predictor
 from pipelines.inference_pipeline.report    import Report, ReportPayloadBuilder
-from tools.logger                           import Logger
+from tools.monitoring.logger                           import Logger
+
+
+@dataclass(frozen=True)
+class InferenceComponents:
+    loader_cls    : Type[RunLoader] = RunLoader
+    predictor_cls : Type[Predictor] = Predictor
+    param_space   : bool            = True
+
+
+class InferenceComponentsResolver:
+    @staticmethod
+    def for_run(run_directory: Path) -> InferenceComponents:
+        from tools.data.io import AutoencoderConfigIO
+
+        if AutoencoderConfigIO.exists(Path(run_directory) / "meta"):
+            from pipelines.jepa_pipeline.inference import JEPA_INFERENCE_COMPONENTS
+            return JEPA_INFERENCE_COMPONENTS
+
+        return InferenceComponents()
 
 
 class InferencePipeline:
-    def __init__(self, config: InferenceConfig) -> None:
-        self.config = config
-
-    def _build_report(
-        self,
-        meta           : InferenceMetadata,
-        run,
-        cfg            : InferenceConfig,
-        x_axis_np      : np.ndarray,
-        global_metrics : dict,
-        figure_paths   : Dict[str, List[Path]],
-        gif_paths      : Dict[str, Path],
-    ) -> Path:
-
-        return Report(
-            output_dir       = meta.output_dir,
-            run_summary      = ReportPayloadBuilder.run_summary(run, x_axis_np),
-            inference_config = ReportPayloadBuilder.inference_config(cfg, run),
-            checkpoint_meta  = run.checkpoint_meta,
-            global_metrics   = global_metrics,
-            figure_paths     = figure_paths,
-            gif_paths        = gif_paths,
-            report_path      = meta.report_path,
-        ).assemble()
+    def __init__(self, config: InferenceConfig, components: InferenceComponents | None = None) -> None:
+        self.config     = config
+        self.components = components if components is not None else InferenceComponentsResolver.for_run(config.run_directory)
 
     def _setup(self, cfg: InferenceConfig) -> tuple[InferenceMetadata, Logger, Ploter]:
         meta = InferenceMetadata(cfg)
@@ -66,7 +65,7 @@ class InferencePipeline:
         return meta, logger, plotter
 
     def _load_run(self, cfg: InferenceConfig, logger: Logger):
-        loader = RunLoader(cfg.run_directory, logger=logger)
+        loader = self.components.loader_cls(cfg.run_directory, logger=logger)
         return loader.load(
             split           = cfg.split,
             batch_size      = cfg.batch_size,
@@ -76,7 +75,7 @@ class InferencePipeline:
         )
 
     def _predict(self, cfg: InferenceConfig, meta: InferenceMetadata, run, logger: Logger):
-        predictor = Predictor(
+        predictor = self.components.predictor_cls(
             run         = run,
             logger      = logger,
             window_kind = cfg.stitch_window,
@@ -102,20 +101,12 @@ class InferencePipeline:
             "all_az_idx"      : np.arange(n_az),
         }
 
-    def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
-        return composer.compose(
-            result         = result,
-            run            = run,
-            global_metrics = global_metrics,
-            x_axis_np      = x_axis_np,
-            indices        = indices,
-        )
-
     def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta: InferenceMetadata, indices: dict) -> dict:
         global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
             elev_indices  = indices["all_elev_idx"],
             range_indices = indices["all_range_idx"],
             az_indices    = indices["all_az_idx"],
+            param_space   = self.components.param_space,
         )
 
         global_metrics["split"]        = run.split_name
@@ -154,6 +145,38 @@ class InferencePipeline:
         Metrics.write_json(global_metrics, meta.metrics_path)
 
         logger.subsection(f"Reduced baseline merged : relative MSE reduction = {comparison.metrics['relative_mse_reduction']:.4f}, NN beats reduced on {comparison.metrics['fraction_pred_beats_reduced'] * 100.0:.1f}% of pixels")
+
+    def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
+        return composer.compose(
+            result         = result,
+            run            = run,
+            global_metrics = global_metrics,
+            x_axis_np      = x_axis_np,
+            indices        = indices,
+            param_space    = self.components.param_space,
+        )
+
+    def _build_report(
+        self,
+        meta           : InferenceMetadata,
+        run,
+        cfg            : InferenceConfig,
+        x_axis_np      : np.ndarray,
+        global_metrics : dict,
+        figure_paths   : Dict[str, List[Path]],
+        gif_paths      : Dict[str, Path],
+    ) -> Path:
+
+        return Report(
+            output_dir       = meta.output_dir,
+            run_summary      = ReportPayloadBuilder.run_summary(run, x_axis_np),
+            inference_config = ReportPayloadBuilder.inference_config(cfg, run),
+            checkpoint_meta  = run.checkpoint_meta,
+            global_metrics   = global_metrics,
+            figure_paths     = figure_paths,
+            gif_paths        = gif_paths,
+            report_path      = meta.report_path,
+        ).assemble()
 
     def run(self) -> Path:
         cfg                    = self.config

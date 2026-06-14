@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import optuna
 import optuna.visualization.matplotlib as ovm
 
-from pipelines.shared.plotting import PlotBase
+from tools.reporting.plotting import PlotBase
 
 
 class StudyPlotter(PlotBase):
@@ -51,19 +51,6 @@ class StudyPlotter(PlotBase):
     def _save_study_figure(self, fig, path: Path) -> Path:
         self._relabel_figure(fig)
         return self._save(fig, path)
-
-    def render(self, study: optuna.Study, out_dir: Path) -> list[Path]:
-        self._apply_style()
-
-        out_dir = Path(out_dir)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        saved  = []
-        saved += self._render_single(study, out_dir)
-        saved += self._render_per_param(study, out_dir)
-        saved += self._render_contours(study, out_dir)
-
-        return saved
 
     def _render_single(self, study: optuna.Study, out_dir: Path) -> list[Path]:
         saved = []
@@ -130,3 +117,16 @@ class StudyPlotter(PlotBase):
         top         = list(importances)[: self.CONTOUR_MAX_PARAMS]
         self.logger.info(f"Contour plots limited to top {len(top)} of {len(params)} parameters by importance")
         return sorted(top)
+
+    def render(self, study: optuna.Study, out_dir: Path) -> list[Path]:
+        self._apply_style()
+
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        saved  = []
+        saved += self._render_single(study, out_dir)
+        saved += self._render_per_param(study, out_dir)
+        saved += self._render_contours(study, out_dir)
+
+        return saved

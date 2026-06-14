@@ -10,8 +10,8 @@ import torch
 from pipelines.dataset_pipeline.spatial     import GridInfo
 from pipelines.inference_pipeline.loader    import InferenceMetadata, Run
 from pipelines.inference_pipeline.metrics   import Metrics, Result
-from tools.gaussians                        import GaussianReconstructor
-from tools.logger                           import Logger
+from tools.data.gaussians                        import GaussianReconstructor
+from tools.monitoring.logger                           import Logger
 
 
 class CubeStitcher:
@@ -111,46 +111,6 @@ class Predictor:
         self.cube_dir       = meta.cube_dir
         self.cpu_workers    = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
 
-    @staticmethod
-    def _cpu_worker(args: tuple) -> tuple:
-        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians = args
-
-        x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
-        B, _, H, W = pred_params_chunk.shape
-
-        n_K         = n_gaussians
-        pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-        gt_gauss    = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-
-        sort_key    = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
-        sort_idx    = np.argsort(sort_key, axis=1)
-        sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)
-
-        gt_gauss_matched   = np.take_along_axis(gt_gauss, sort_idx_e, axis=1)
-
-        pred_gauss_flat    = pred_gauss.reshape(      B, n_K * 3, H, W)
-        gt_gauss_flat      = gt_gauss_matched.reshape(B, n_K * 3, H, W)
-
-        pred_curves = GaussianReconstructor.reconstruct_batch(pred_gauss,       x)
-        gt_curves   = GaussianReconstructor.reconstruct_batch(gt_gauss_matched, x)
-
-        return (
-            pred_curves,
-            gt_curves,
-            pred_gauss_flat,
-            gt_gauss_flat,
-        )
-
-    def _create_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
-        memmap_path = str(self.cube_dir / f"_tmp_{name}.npy") if self.save_cubes else None
-        return CubeStitcher(
-            grid        = self.run.grid,
-            n_channels  = n_channels,
-            window_kind = self.window_kind,
-            dtype       = self.cube_dtype,
-            memmap_path = memmap_path,
-        )
-
     def _forward_pass(self) -> Tuple[List[List[int]], List[np.ndarray], List[np.ndarray]]:
         run    = self.run
         n_K    = run.n_gaussians
@@ -197,6 +157,36 @@ class Predictor:
 
         return results
 
+    @staticmethod
+    def _cpu_worker(args: tuple) -> tuple:
+        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians = args
+
+        x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
+        B, _, H, W = pred_params_chunk.shape
+
+        n_K         = n_gaussians
+        pred_gauss  = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+        gt_gauss    = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
+
+        sort_key    = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
+        sort_idx    = np.argsort(sort_key, axis=1)
+        sort_idx_e  = sort_idx[:, :, None, :, :].repeat(3, axis=2)
+
+        gt_gauss_matched   = np.take_along_axis(gt_gauss, sort_idx_e, axis=1)
+
+        pred_gauss_flat    = pred_gauss.reshape(      B, n_K * 3, H, W)
+        gt_gauss_flat      = gt_gauss_matched.reshape(B, n_K * 3, H, W)
+
+        pred_curves = GaussianReconstructor.reconstruct_batch(pred_gauss,       x)
+        gt_curves   = GaussianReconstructor.reconstruct_batch(gt_gauss_matched, x)
+
+        return (
+            pred_curves,
+            gt_curves,
+            pred_gauss_flat,
+            gt_gauss_flat,
+        )
+
     def _stitch_results(self, all_indices : List[List[int]], cpu_results : List[tuple]) -> Result:
         run    = self.run
         n_K    = run.n_gaussians
@@ -218,6 +208,16 @@ class Predictor:
         return self._finalize_results(
             pred_curve_stitcher, gt_curve_stitcher,
             param_pred_stitcher, gt_param_stitcher,
+        )
+
+    def _create_stitcher(self, n_channels: int, name: str) -> CubeStitcher:
+        memmap_path = str(self.cube_dir / f"_tmp_{name}.npy") if self.save_cubes else None
+        return CubeStitcher(
+            grid        = self.run.grid,
+            n_channels  = n_channels,
+            window_kind = self.window_kind,
+            dtype       = self.cube_dtype,
+            memmap_path = memmap_path,
         )
 
     def _finalize_results(

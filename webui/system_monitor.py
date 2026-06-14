@@ -30,24 +30,6 @@ class SystemMonitor:
 
         threading.Thread(target=self._du_loop, daemon=True).start()
 
-    def snapshot(self) -> dict:
-        gpu_mem, gpu_users = self._gpu_procs()
-
-        with self.lock:
-            cores, total = self._cpu_percents()
-            procs        = self._procs(gpu_mem)
-
-        return {
-            "host"   : socket.gethostname(),
-            "user"   : self.user,
-            "uptime" : self._uptime(),
-            "cpu"    : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
-            "mem"    : self._memory(),
-            "disk"   : self._disk(),
-            "gpus"   : self._gpus(gpu_users),
-            "procs"  : procs,
-        }
-
     def _cpu_percents(self) -> tuple[list[float], float]:
         cores = []
         total = 0.0
@@ -303,3 +285,21 @@ class SystemMonitor:
         except ValueError:
             return None
         return int(value) if value.is_integer() else value
+
+    def snapshot(self) -> dict:
+        gpu_mem, gpu_users = self._gpu_procs()
+
+        with self.lock:
+            cores, total = self._cpu_percents()
+            procs        = self._procs(gpu_mem)
+
+        return {
+            "host"   : socket.gethostname(),
+            "user"   : self.user,
+            "uptime" : self._uptime(),
+            "cpu"    : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
+            "mem"    : self._memory(),
+            "disk"   : self._disk(),
+            "gpus"   : self._gpus(gpu_users),
+            "procs"  : procs,
+        }

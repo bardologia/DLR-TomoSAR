@@ -6,21 +6,26 @@ from typing import Tuple
 
 import numpy as np
 
-from configuration.processing_config         import ProcessingConfiguration
-from pipelines.processing_pipeline.pyrat_env import PyRatEnvironment
-from pipelines.shared                        import FileIO
-from tools.logger                            import Logger
+from configuration.processing_config         import (
+    ParallelConfiguration,
+    PathConfiguration,
+    ProcessingConfiguration,
+)
+from tools.sar.pyrat_env import PyRatEnvironment
+from tools                        import FileIO
+from tools.monitoring.logger                            import Logger
+from tools.data.regions                           import CropRegion
 from tools.track_baselines                   import BaselineExtractor, TrackBaselines, TrackProfiles
 
 
-class InterferogramBuilder:
+class InterferogramProcessor:
     def __init__(self, config: ProcessingConfiguration, logger: Logger) -> None:
         self.config          = config
         self.logger          = logger
         self.track_baselines = None
         self.track_profiles  = None
 
-        self.logger.section("[InterferogramBuilder Initialization]")
+        self.logger.section("[InterferogramProcessor Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
         self.logger.subsection(f"PyRat Threads : {self.config.parallel.interferogram_threads()}")
 
@@ -165,3 +170,68 @@ class InterferogramBuilder:
         gc.collect()
 
         return shapes
+
+
+class InterferogramGenerator:
+    def __init__(self, spec: dict, logger: Logger) -> None:
+        self.spec   = spec
+        self.logger = logger
+
+    @classmethod
+    def from_spec_file(cls, spec_path: str | Path, logger: Logger) -> "InterferogramGenerator":
+        return cls(FileIO.load_json(Path(spec_path)), logger)
+
+    def _build_config(self) -> ProcessingConfiguration:
+        from configuration.processing_config import TomogramConfiguration
+
+        tomogram_config = TomogramConfiguration(**self.spec["tomogram_config"])
+
+        paths = PathConfiguration(
+            main_directory   = Path(self.spec["main_directory"]),
+            pyrat_directory  = Path(self.spec["pyrat_directory"]),
+            run_subdirectory = self.spec["run_subdirectory"],
+        )
+
+        return ProcessingConfiguration(
+            crop             = CropRegion(*self.spec["crop"]),
+            tomogram_config  = tomogram_config,
+            parallel         = ParallelConfiguration(effort=self.spec["effort"], pyrat_threads=self.spec["pyrat_threads"]),
+            paths            = paths,
+            dataset_type     = self.spec["dataset_type"],
+            stack_identifier = self.spec["stack_identifier"],
+        )
+
+    def run(self) -> None:
+        config    = self._build_config()
+        processor = InterferogramProcessor(config, logger=self.logger)
+
+        primary_shape, secondaries_shape, interferograms_shape = processor.run(
+            crop_tuple          = config.crop.as_tuple(),
+            primary_path        = Path(self.spec["primary_path"]),
+            secondaries_path    = Path(self.spec["secondaries_path"]),
+            interferograms_path = Path(self.spec["interferograms_path"]),
+        )
+
+        pass_labels = None
+
+        if processor.track_baselines is not None:
+            baselines_path = Path(self.spec["baselines_path"])
+            FileIO.ensure_dir(baselines_path.parent)
+            processor.track_baselines.save(baselines_path)
+            pass_labels = list(processor.track_baselines.labels)
+
+        if processor.track_profiles is not None:
+            profiles_path = Path(self.spec["profiles_path"])
+            FileIO.ensure_dir(profiles_path.parent)
+            processor.track_profiles.save(profiles_path)
+
+        result = {
+            "primary_shape"        : list(primary_shape),
+            "secondaries_shape"    : list(secondaries_shape),
+            "interferograms_shape" : list(interferograms_shape),
+            "pass_labels"          : pass_labels,
+        }
+
+        FileIO.save_json(result, Path(self.spec["result_path"]))
+
+        self.logger.subsection(f"Interferogram result written: {self.spec['result_path']}")

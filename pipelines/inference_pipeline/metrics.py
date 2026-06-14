@@ -12,9 +12,9 @@ from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
-from pipelines.shared.io          import FileIO
-from pipelines.shared.preprocessing import ProfileNormalizer
-from pipelines.shared.scoring       import R2, RelativeImprovement
+from tools.data.io          import FileIO
+from tools.data.preprocessing import ProfileNormalizer
+from tools.metrics.scoring       import R2, RelativeImprovement
 
 
 @dataclass
@@ -78,55 +78,8 @@ class Metrics:
         return {"mse": mse, "mae": mae, "r2": r2, "cos": cos, "peak": peak}
 
     @staticmethod
-    def _ssim_worker(args: tuple) -> tuple[str, float]:
-        key, pred_slice, ref_slice = args
-        data_range = float(ref_slice.max() - ref_slice.min())
-        min_side   = min(pred_slice.shape)
-        win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
-        value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
-
-        return key, value
-
-    @staticmethod
     def write_json(metrics: Dict[str, object], path: Path) -> Path:
         return FileIO.save_json(metrics, path, indent=4)
-
-    @staticmethod
-    def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
-        flat = x.reshape(-1)
-        out  = {}
-        p    = np.percentile(flat, qs)
-       
-        for q, v in zip(qs, p):
-            out[f"p{q}"] = float(v)
-       
-        return out
-
-    @staticmethod
-    def _basic_stats(x: np.ndarray) -> Dict[str, float]:
-        flat = x.reshape(-1)
-
-        return {
-            "mean"   : float(flat.mean(dtype=np.float64)),
-            "std"    : float(flat.std(dtype=np.float64)),
-            "median" : float(np.median(flat)),
-            "min"    : float(flat.min()),
-            "max"    : float(flat.max()),
-        }
-
-    @staticmethod
-    def _psnr(pred: np.ndarray, ref: np.ndarray) -> float:
-        diff       = pred - ref
-        mse        = float((diff * diff).mean(dtype=np.float64))
-        
-        if mse <= 0.0:
-            return float("inf")
-        
-        data_range = float(ref.max() - ref.min())
-        if data_range <= 0.0:
-            return float("nan")
-       
-        return 10.0 * np.log10(data_range * data_range / mse)
 
     @staticmethod
     def select_pixels(
@@ -161,29 +114,66 @@ class Metrics:
     def _flat_to_yx(flat_idx: np.ndarray, width: int) -> np.ndarray:
         return np.stack([(flat_idx // width).astype(np.int32), (flat_idx % width).astype(np.int32)], axis=1)
 
+    def _curve_scalar_metrics(self, pred: np.ndarray, ref: np.ndarray, suffix: str) -> Dict[str, float]:
+        diff       = pred - ref
+        mse        = float((diff * diff).mean(dtype=np.float64))
+        mae        = float(np.abs(diff).mean(dtype=np.float64))
+        ref_mean   = float(ref.mean(dtype=np.float64))
+        overall_r2 = 1.0 - float((diff * diff).sum(dtype=np.float64)) / (float(((ref - ref_mean) ** 2).sum(dtype=np.float64)) + 1e-12)
+
+        return {
+            f"curve_mse_{suffix}"  : mse,
+            f"curve_mae_{suffix}"  : mae,
+            f"curve_rmse_{suffix}" : float(np.sqrt(mse)),
+            f"overall_r2_{suffix}" : float(overall_r2),
+            f"psnr_db_{suffix}"    : self._psnr(pred, ref),
+        }
+
     @staticmethod
-    def _enqueue_tasks(
-        tasks  : list,
-        pred   : np.ndarray,
-        ref    : np.ndarray,
-        prefix : str,
-        indices: np.ndarray,
-        axis   : int,
-        label  : str,
-    ) -> None:
+    def _psnr(pred: np.ndarray, ref: np.ndarray) -> float:
+        diff       = pred - ref
+        mse        = float((diff * diff).mean(dtype=np.float64))
 
-        if indices is None:
-            return
+        if mse <= 0.0:
+            return float("inf")
 
-        for i, idx in enumerate(indices):
-            if axis == 0:
-                p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
-            elif axis == 1:
-                p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
-            else:
-                p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
-       
-            tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
+        data_range = float(ref.max() - ref.min())
+        if data_range <= 0.0:
+            return float("nan")
+
+        return 10.0 * np.log10(data_range * data_range / mse)
+
+    def _expand_pixel_stats(self, tagged_arrays: Tuple[Tuple[str, np.ndarray], ...]) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+
+        for tag, arr in tagged_arrays:
+            out.update({f"{tag}_{k}": v for k, v in self._basic_stats(arr).items()})
+            out.update({f"{tag}_{k}": v for k, v in self._percentiles(arr).items()})
+
+        return out
+
+    @staticmethod
+    def _basic_stats(x: np.ndarray) -> Dict[str, float]:
+        flat = x.reshape(-1)
+
+        return {
+            "mean"   : float(flat.mean(dtype=np.float64)),
+            "std"    : float(flat.std(dtype=np.float64)),
+            "median" : float(np.median(flat)),
+            "min"    : float(flat.min()),
+            "max"    : float(flat.max()),
+        }
+
+    @staticmethod
+    def _percentiles(x: np.ndarray, qs: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)) -> Dict[str, float]:
+        flat = x.reshape(-1)
+        out  = {}
+        p    = np.percentile(flat, qs)
+
+        for q, v in zip(qs, p):
+            out[f"p{q}"] = float(v)
+
+        return out
 
     def _slice_ssim(self, pred : np.ndarray, ref : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray], prefix : str) -> Dict[str, float]:
         out   : Dict[str, float]                         = {}
@@ -214,6 +204,49 @@ class Metrics:
 
         return out
 
+    @staticmethod
+    def _enqueue_tasks(
+        tasks  : list,
+        pred   : np.ndarray,
+        ref    : np.ndarray,
+        prefix : str,
+        indices: np.ndarray,
+        axis   : int,
+        label  : str,
+    ) -> None:
+
+        if indices is None:
+            return
+
+        for i, idx in enumerate(indices):
+            if axis == 0:
+                p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
+            elif axis == 1:
+                p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
+            else:
+                p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
+
+            tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
+
+    @staticmethod
+    def _ssim_worker(args: tuple) -> tuple[str, float]:
+        key, pred_slice, ref_slice = args
+        data_range = float(ref_slice.max() - ref_slice.min())
+        min_side   = min(pred_slice.shape)
+        win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
+        value      = float(ssim(ref_slice, pred_slice, data_range=data_range, win_size=win_size))
+
+        return key, value
+
+    def _expand_elev(self, pred: np.ndarray, gt: np.ndarray, suffix: str) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+
+        for metric_name, arr in self._elev_metrics(pred, gt, suffix=suffix).items():
+            out.update({f"{metric_name}_{i}": float(v) for i, v in enumerate(arr)})
+            out[f"{metric_name}_mean"] = float(np.nanmean(arr))
+
+        return out
+
     def _elev_metrics(self, pred: np.ndarray, gt: np.ndarray, suffix: str = "gt") -> Dict[str, np.ndarray]:
         P = pred.reshape(pred.shape[0], -1)
         G = gt  .reshape(gt  .shape[0], -1)
@@ -237,62 +270,55 @@ class Metrics:
             f"elev_ce_{suffix}"   : ce_gt,
         }
 
-    def _curve_scalar_metrics(self, pred: np.ndarray, ref: np.ndarray, suffix: str) -> Dict[str, float]:
-        diff       = pred - ref
-        mse        = float((diff * diff).mean(dtype=np.float64))
-        mae        = float(np.abs(diff).mean(dtype=np.float64))
-        ref_mean   = float(ref.mean(dtype=np.float64))
-        overall_r2 = 1.0 - float((diff * diff).sum(dtype=np.float64)) / (float(((ref - ref_mean) ** 2).sum(dtype=np.float64)) + 1e-12)
+    def _gaussian_param_metrics(self) -> Dict[str, float]:
+        out    : Dict[str, float] = {}
+        pp     = self.result.params_pred
+        pg     = self.result.params_gt
+        n_K    = self.n_gaussians
 
-        return {
-            f"curve_mse_{suffix}"  : mse,
-            f"curve_mae_{suffix}"  : mae,
-            f"curve_rmse_{suffix}" : float(np.sqrt(mse)),
-            f"overall_r2_{suffix}" : float(overall_r2),
-            f"psnr_db_{suffix}"    : self._psnr(pred, ref),
-        }
+        all_mu_ae  : list[np.ndarray] = []
+        all_sig_ae : list[np.ndarray] = []
 
-    def _expand_pixel_stats(self, tagged_arrays: Tuple[Tuple[str, np.ndarray], ...]) -> Dict[str, float]:
-        out: Dict[str, float] = {}
+        for k in range(n_K):
+            gt_amp  = pg[3 * k]
+            valid   = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
 
-        for tag, arr in tagged_arrays:
-            out.update({f"{tag}_{k}": v for k, v in self._basic_stats(arr).items()})
-            out.update({f"{tag}_{k}": v for k, v in self._percentiles(arr).items()})
+            mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
+            mu_gt   = np.where(valid, pg[3 * k + 1], np.nan)
+            sg_pred = np.where(valid, pp[3 * k + 2], np.nan)
+            sg_gt   = np.where(valid, pg[3 * k + 2], np.nan)
+
+            mu_ae  = np.abs(mu_pred  - mu_gt)
+            sig_ae = np.abs(sg_pred  - sg_gt)
+            mu_se  = (mu_pred  - mu_gt)  ** 2
+            sig_se = (sg_pred  - sg_gt)  ** 2
+
+            n_valid = int(np.sum(valid))
+
+            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae,  dtype=np.float64))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))  if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae, dtype=np.float64)) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64))) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_n_valid"]  = n_valid
+
+            if n_valid > 0:
+                all_mu_ae .append(mu_ae [valid])
+                all_sig_ae.append(sig_ae[valid])
+
+        if all_mu_ae:
+            cat_mu  = np.concatenate(all_mu_ae)
+            cat_sig = np.concatenate(all_sig_ae)
+            out["gauss_all_mu_mae"]   = float(cat_mu .mean(dtype=np.float64))
+            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean(dtype=np.float64)))
+            out["gauss_all_sig_mae"]  = float(cat_sig.mean(dtype=np.float64))
+            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean(dtype=np.float64)))
+        else:
+            out["gauss_all_mu_mae"]   = float("nan")
+            out["gauss_all_mu_rmse"]  = float("nan")
+            out["gauss_all_sig_mae"]  = float("nan")
+            out["gauss_all_sig_rmse"] = float("nan")
 
         return out
-
-    def _expand_elev(self, pred: np.ndarray, gt: np.ndarray, suffix: str) -> Dict[str, float]:
-        out: Dict[str, float] = {}
-
-        for metric_name, arr in self._elev_metrics(pred, gt, suffix=suffix).items():
-            out.update({f"{metric_name}_{i}": float(v) for i, v in enumerate(arr)})
-            out[f"{metric_name}_mean"] = float(np.nanmean(arr))
-
-        return out
-
-    def _mu_ordering_rate(self) -> float:
-        pp  = self.result.params_pred
-        n_K = self.n_gaussians
-        
-        if n_K < 2:
-            return float("nan")
-
-        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)
-        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)
-        active = amps >= 1e-3
-
-        ordered       = mus[:-1] < mus[1:]
-        both_active   = active[:-1] & active[1:]
-        has_violation = ((~ordered) & both_active).any(axis=0)
-
-        n_active     = active.sum(axis=0)
-        multi_active = n_active >= 2
-        denom        = int(multi_active.sum())
-        
-        if denom == 0:
-            return float("nan")
-      
-        return float((~has_violation & multi_active).sum() / denom)
 
     def _slot_mu_stats(self) -> Dict[str, float]:
         pp  = self.result.params_pred
@@ -363,6 +389,30 @@ class Metrics:
 
         return out
 
+    def _mu_ordering_rate(self) -> float:
+        pp  = self.result.params_pred
+        n_K = self.n_gaussians
+
+        if n_K < 2:
+            return float("nan")
+
+        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)
+        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)
+        active = amps >= 1e-3
+
+        ordered       = mus[:-1] < mus[1:]
+        both_active   = active[:-1] & active[1:]
+        has_violation = ((~ordered) & both_active).any(axis=0)
+
+        n_active     = active.sum(axis=0)
+        multi_active = n_active >= 2
+        denom        = int(multi_active.sum())
+
+        if denom == 0:
+            return float("nan")
+
+        return float((~has_violation & multi_active).sum() / denom)
+
     def _permutation_consensus(self) -> Dict[str, float]:
         pp  = self.result.params_pred
         pg  = self.result.params_gt
@@ -418,56 +468,6 @@ class Metrics:
             best_idx[hw] = perm_to_idx[tuple(col)]
 
         return best_idx
-
-    def _gaussian_param_metrics(self) -> Dict[str, float]:
-        out    : Dict[str, float] = {}
-        pp     = self.result.params_pred
-        pg     = self.result.params_gt
-        n_K    = self.n_gaussians
-
-        all_mu_ae  : list[np.ndarray] = []
-        all_sig_ae : list[np.ndarray] = []
-
-        for k in range(n_K):
-            gt_amp  = pg[3 * k]
-            valid   = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
-
-            mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
-            mu_gt   = np.where(valid, pg[3 * k + 1], np.nan)
-            sg_pred = np.where(valid, pp[3 * k + 2], np.nan)
-            sg_gt   = np.where(valid, pg[3 * k + 2], np.nan)
-
-            mu_ae  = np.abs(mu_pred  - mu_gt)
-            sig_ae = np.abs(sg_pred  - sg_gt)
-            mu_se  = (mu_pred  - mu_gt)  ** 2
-            sig_se = (sg_pred  - sg_gt)  ** 2
-
-            n_valid = int(np.sum(valid))
-
-            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae,  dtype=np.float64))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae, dtype=np.float64)) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64))) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_n_valid"]  = n_valid
-
-            if n_valid > 0:
-                all_mu_ae .append(mu_ae [valid])
-                all_sig_ae.append(sig_ae[valid])
-
-        if all_mu_ae:
-            cat_mu  = np.concatenate(all_mu_ae)
-            cat_sig = np.concatenate(all_sig_ae)
-            out["gauss_all_mu_mae"]   = float(cat_mu .mean(dtype=np.float64))
-            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean(dtype=np.float64)))
-            out["gauss_all_sig_mae"]  = float(cat_sig.mean(dtype=np.float64))
-            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean(dtype=np.float64)))
-        else:
-            out["gauss_all_mu_mae"]   = float("nan")
-            out["gauss_all_mu_rmse"]  = float("nan")
-            out["gauss_all_sig_mae"]  = float("nan")
-            out["gauss_all_sig_rmse"] = float("nan")
-
-        return out
 
     def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None, param_space : bool = True) -> Dict[str, float]:
         pred = self.result.pred_curves

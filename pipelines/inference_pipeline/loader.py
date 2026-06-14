@@ -11,15 +11,15 @@ from torch.utils.data import DataLoader
 
 from configuration.dataset_config    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
 from configuration.inference_config  import InferenceConfig
-from tools.regions                   import CropRegion
-from configuration.training_config   import GaussianConfig
+from tools.data.regions                   import CropRegion
+from configuration.gaussian_config import GaussianConfig
 from models                          import get_model
 from pipelines.dataset_pipeline.datasets      import PatchDataset
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats
 from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
-from pipelines.shared.io             import FileIO, ModelConfigIO
-from tools.gaussians                 import GaussianClamp
-from tools.logger                    import Logger
+from tools.data.io             import FileIO, ModelConfigIO
+from tools.data.gaussians                 import GaussianClamp
+from tools.monitoring.logger                    import Logger
 from tools.track_baselines           import TrackBaselines, TrackProfiles
 
 
@@ -72,16 +72,6 @@ class ModelWrapper:
         self._x_axis              = x_axis
         self._amp_max             = amp_max
 
-    def __call__(self, x: np.ndarray) -> np.ndarray:
-        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self._device)
-
-        with torch.no_grad():
-            out = self._model(x_t)
-
-        out = self.denormalize_output(out)
-
-        return out.cpu().numpy()
-
     def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
         if self._normalizer is not None:
             out = self._normalizer.denormalize_output(out)
@@ -96,6 +86,16 @@ class ModelWrapper:
             )
 
         return out
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self._device)
+
+        with torch.no_grad():
+            out = self._model(x_t)
+
+        out = self.denormalize_output(out)
+
+        return out.cpu().numpy()
 
 
 @dataclass
@@ -168,6 +168,41 @@ class RunLoader:
             pin_memory                  = bool(payload["pin_memory"]),
         )
 
+    def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
+        model_config, _ = ModelConfigIO.load(self.meta_directory)
+
+        overrides = {"in_channels": in_channels, "out_channels": out_channels}
+
+        if model_name in _IMAGE_SIZE_MODELS:
+            overrides["image_size"] = image_size
+
+        model, _ = get_model(model_name, config=model_config, **overrides)
+
+        return model
+
+    def _load_checkpoint(self, ckpt_path: Path, device: str) -> tuple[dict, np.ndarray, dict]:
+        ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
+        raw    = ckpt["x_axis"]
+        x_axis = raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
+
+        meta = {
+            "epoch"         : int(ckpt["epoch"]),
+            "best_val_loss" : float(ckpt["best_val_loss"]),
+            "best_epoch"    : int(ckpt["best_epoch"]),
+        }
+
+        return ckpt, x_axis, meta
+
+    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
+        return ModelWrapper(
+            model               = model,
+            device              = device,
+            params_per_gaussian = 3,
+            normalizer          = Normalizer(norm_stats),
+            x_axis              = torch.from_numpy(x_axis),
+            amp_max             = amp_max,
+        )
+
     def _build_dataset(self, dataset_config : DatasetConfiguration, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger, secondary_labels=dataset_config.secondary_labels)
@@ -205,31 +240,6 @@ class RunLoader:
 
         return dataset, grid, region, layout.global_crop, arrays
 
-    def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        model_config, _ = ModelConfigIO.load(self.meta_directory)
-
-        overrides = {"in_channels": in_channels, "out_channels": out_channels}
-
-        if model_name in _IMAGE_SIZE_MODELS:
-            overrides["image_size"] = image_size
-
-        model, _ = get_model(model_name, config=model_config, **overrides)
-
-        return model
-
-    def _load_checkpoint(self, ckpt_path: Path, device: str) -> tuple[dict, np.ndarray, dict]:
-        ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
-        raw    = ckpt["x_axis"]
-        x_axis = raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
-
-        meta = {
-            "epoch"         : int(ckpt["epoch"]),
-            "best_val_loss" : float(ckpt["best_val_loss"]),
-            "best_epoch"    : int(ckpt["best_epoch"]),
-        }
-
-        return ckpt, x_axis, meta
-
     def _load_track_info(self, dataset_config: DatasetConfiguration) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
         dataset_dir = Path(dataset_config.preprocessing_run_directory)
         labels      = dataset_config.secondary_labels
@@ -248,16 +258,6 @@ class RunLoader:
         self.logger.kv_table(baselines.describe(), title="Tracks Used in This Run")
 
         return baselines, profiles
-
-    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
-        return ModelWrapper(
-            model               = model,
-            device              = device,
-            params_per_gaussian = 3,
-            normalizer          = Normalizer(norm_stats),
-            x_axis              = torch.from_numpy(x_axis),
-            amp_max             = amp_max,
-        )
 
     def load(
         self,

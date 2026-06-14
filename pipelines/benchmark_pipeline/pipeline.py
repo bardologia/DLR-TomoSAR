@@ -5,9 +5,9 @@ from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from models import CONFIG_REGISTRY
-from pipelines.shared.io import FileIO
+from tools.data.io import FileIO
 from tools.config_cli import ConfigCli
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 from pipelines.benchmark_pipeline.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage
 
@@ -28,43 +28,6 @@ class BenchmarkPipeline:
         self.logger = Logger(log_dir=str(self.pipeline_dir), name="benchmark_pipeline")
         self.models = [m for m in CONFIG_REGISTRY.keys() if m not in set(config.skip_models)]
         self.state  = {"run_tag": self.run_tag, "stages": {}}
-
-    def run(self) -> None:
-        self.logger.section("Benchmark pipeline")
-        self.logger.kv_table({
-            "Run tag"   : self.run_tag,
-            "Models"    : len(self.models),
-            "GPUs"      : self.config.gpus,
-            "Reference" : self.config.size_match.reference_model,
-            "Epochs"    : self.config.training.epochs,
-            "Resume"    : self.config.resume,
-            "Run dir"   : str(self.run_dir),
-        }, title="Configuration")
-
-        try:
-            gate_passed = self._run_overfit_gate()
-            if not gate_passed and self.config.overfit.abort_on_fail:
-                self._mark_stage("pipeline", "aborted")
-                self.logger.error("Overfit gate failed — pipeline aborted. See the overfit report before retrying.")
-                raise SystemExit(1)
-
-            self._run_size_match()
-            training_results  = self._run_training()
-            inference_results = self._run_inference()
-            comparison_dir    = self._run_comparison()
-
-            self._mark_stage("pipeline", "completed")
-
-            self.logger.section("Pipeline summary")
-            self.logger.kv_table({
-                "Models"        : len(self.models),
-                "Trained"       : sum(1 for r in training_results if r["status"] == "DONE"),
-                "Inferred"      : sum(1 for r in inference_results if r["status"] == "DONE"),
-                "Comparison"    : str(comparison_dir),
-                "Pipeline logs" : str(self.pipeline_dir),
-            }, title="Done")
-        finally:
-            self.logger.close()
 
     def _run_overfit_gate(self) -> bool:
         stage   = OverfitStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)
@@ -111,3 +74,40 @@ class BenchmarkPipeline:
         }
 
         FileIO.save_json(self.state, self.state_path, indent=2)
+
+    def run(self) -> None:
+        self.logger.section("Benchmark pipeline")
+        self.logger.kv_table({
+            "Run tag"   : self.run_tag,
+            "Models"    : len(self.models),
+            "GPUs"      : self.config.gpus,
+            "Reference" : self.config.size_match.reference_model,
+            "Epochs"    : self.config.training.epochs,
+            "Resume"    : self.config.resume,
+            "Run dir"   : str(self.run_dir),
+        }, title="Configuration")
+
+        try:
+            gate_passed = self._run_overfit_gate()
+            if not gate_passed and self.config.overfit.abort_on_fail:
+                self._mark_stage("pipeline", "aborted")
+                self.logger.error("Overfit gate failed — pipeline aborted. See the overfit report before retrying.")
+                raise SystemExit(1)
+
+            self._run_size_match()
+            training_results  = self._run_training()
+            inference_results = self._run_inference()
+            comparison_dir    = self._run_comparison()
+
+            self._mark_stage("pipeline", "completed")
+
+            self.logger.section("Pipeline summary")
+            self.logger.kv_table({
+                "Models"        : len(self.models),
+                "Trained"       : sum(1 for r in training_results if r["status"] == "DONE"),
+                "Inferred"      : sum(1 for r in inference_results if r["status"] == "DONE"),
+                "Comparison"    : str(comparison_dir),
+                "Pipeline logs" : str(self.pipeline_dir),
+            }, title="Done")
+        finally:
+            self.logger.close()

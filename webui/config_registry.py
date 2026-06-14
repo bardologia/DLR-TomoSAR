@@ -35,22 +35,6 @@ class ConfigRegistry:
     def __init__(self, paths: ProjectPaths) -> None:
         self.paths = paths
 
-    def collect(self) -> list[dict]:
-        groups = []
-        for module in self.MODULE_ORDER:
-            path = self.paths.config_dir / f"{module}.py"
-            if not path.exists():
-                continue
-            classes = self._parse_module(path)
-            if not classes:
-                continue
-            groups.append({
-                "module" : module,
-                "title"  : self.MODULE_TITLES.get(module, module),
-                "classes": classes,
-            })
-        return groups
-
     def _parse_module(self, path: Path) -> list[dict]:
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -127,3 +111,19 @@ class ConfigRegistry:
             return ast.unparse(node)
         except Exception:
             return "?"
+
+    def collect(self) -> list[dict]:
+        groups = []
+        for module in self.MODULE_ORDER:
+            path = self.paths.config_dir / f"{module}.py"
+            if not path.exists():
+                continue
+            classes = self._parse_module(path)
+            if not classes:
+                continue
+            groups.append({
+                "module" : module,
+                "title"  : self.MODULE_TITLES.get(module, module),
+                "classes": classes,
+            })
+        return groups

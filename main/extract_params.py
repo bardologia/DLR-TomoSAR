@@ -6,7 +6,7 @@ from _bootstrap import EnvironmentPinner
 
 from configuration.param_extraction_config import ExtractParamsEntryConfig, ExtractionConfig, FitMode, FitSettings
 from tools.config_cli import ConfigCli
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 
 def main() -> None:

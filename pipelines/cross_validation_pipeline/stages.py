@@ -7,8 +7,8 @@ from pathlib import Path
 from configuration.cross_validation_config         import CrossValidationConfig
 from pipelines.cross_validation_pipeline.cv_report import CrossValidationReport
 from pipelines.cross_validation_pipeline.folds     import FoldCollector, FoldNaming, FoldPlanner
-from pipelines.shared                              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
-from tools.logger                                  import Logger
+from tools                              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
+from tools.monitoring.logger                                  import Logger
 
 
 class FoldTrainingStage(QueuedTrainingStage):
@@ -43,6 +43,34 @@ class FoldInferenceStage(QueuedInferenceStage):
         super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=fold_names, logger=logger)
         self.planner = planner
         self.splits  = config.inference_splits
+
+    def _split_log(self, fold_name: str, split: str) -> Path:
+        return self.stage_dir / fold_name / f"inference_{split}_worker.log"
+
+    def _split_result(self, fold_name: str, split: str, status: str) -> dict:
+        return {
+            "name"       : f"{fold_name}:{split}",
+            "gpu"        : None,
+            "status"     : status,
+            "returncode" : 0 if status == "DONE" else None,
+            "duration_s" : None,
+            "log_file"   : str(self._split_log(fold_name, split)),
+        }
+
+    def _has_split_inference(self, fold_name: str, split: str) -> bool:
+        if not self.config.resume:
+            return False
+
+        return (self.stage_dir / fold_name / "inference" / split / "metrics.json").exists()
+
+    def _split_job(self, fold_index: int, split: str) -> GpuJob:
+        fold_name = FoldNaming.name(fold_index)
+
+        return GpuJob(
+            name     = f"{fold_name}:{split}",
+            command  = [sys.executable, str(self.entry_script), "--worker", "infer", "--fold", str(fold_index), "--split", split, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
+            log_path = self._split_log(fold_name, split),
+        )
 
     def run(self) -> list[dict]:
         self.logger.section("Fold inference queue")
@@ -86,34 +114,6 @@ class FoldInferenceStage(QueuedInferenceStage):
 
         return results
 
-    def _split_job(self, fold_index: int, split: str) -> GpuJob:
-        fold_name = FoldNaming.name(fold_index)
-
-        return GpuJob(
-            name     = f"{fold_name}:{split}",
-            command  = [sys.executable, str(self.entry_script), "--worker", "infer", "--fold", str(fold_index), "--split", split, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self._split_log(fold_name, split),
-        )
-
-    def _has_split_inference(self, fold_name: str, split: str) -> bool:
-        if not self.config.resume:
-            return False
-
-        return (self.stage_dir / fold_name / "inference" / split / "metrics.json").exists()
-
-    def _split_log(self, fold_name: str, split: str) -> Path:
-        return self.stage_dir / fold_name / f"inference_{split}_worker.log"
-
-    def _split_result(self, fold_name: str, split: str, status: str) -> dict:
-        return {
-            "name"       : f"{fold_name}:{split}",
-            "gpu"        : None,
-            "status"     : status,
-            "returncode" : 0 if status == "DONE" else None,
-            "duration_s" : None,
-            "log_file"   : str(self._split_log(fold_name, split)),
-        }
-
 
 class CrossValidationReportStage(ExperimentStage):
     def __init__(self, config: CrossValidationConfig, run_tag: str, planner: FoldPlanner, logger: Logger) -> None:
@@ -123,7 +123,10 @@ class CrossValidationReportStage(ExperimentStage):
     def run(self) -> Path:
         self.logger.section("Cross-validation reports")
 
-        collector = FoldCollector(run_dir=self.run_dir, splits=self.config.inference_splits, logger=self.logger)
+        splits     = self.config.inference_splits if self.config.runs_inference() else []
+        model_name = self.config.model_name if self.config.training_type != "autoencoder" else "profile_ae"
+
+        collector = FoldCollector(run_dir=self.run_dir, splits=splits, logger=self.logger)
         base_records, records_by_split = collector.collect_by_split()
 
         out_dir = self.run_dir / "reports" / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -133,7 +136,7 @@ class CrossValidationReportStage(ExperimentStage):
             records_by_split = records_by_split,
             planner          = self.planner,
             out_dir          = out_dir,
-            model_name       = self.config.model_name,
+            model_name       = model_name,
             embed_images     = self.config.comparison.embed_images,
             logger           = self.logger,
         )

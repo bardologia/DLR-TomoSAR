@@ -5,11 +5,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pipelines.shared.io        import FileIO
-from pipelines.shared.reporting import MetricSectionGrouper, ReportAssets
-from pipelines.shared.scoring   import FiniteScalar, MetricOrientation
-from tools.logger               import Logger
-from tools.markdown             import MarkdownTable, ScalarFormatter
+from tools.data.io        import FileIO
+from tools.reporting.reporting import MetricSectionGrouper, ReportAssets
+from tools.metrics.scoring   import FiniteScalar, MetricOrientation
+from tools.monitoring.logger               import Logger
+from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
 _CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
@@ -43,36 +43,6 @@ class TrialCollector:
         self.training_dir = run_dir / "training"
         self.pipeline_dir = run_dir / "pipeline"
         self.logger       = logger
-
-    def collect(self) -> list[TrialRecord]:
-        size_match       = FileIO.load_json(self.pipeline_dir / "size_match.json")
-        overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
-        training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
-
-        if not self.training_dir.is_dir():
-            self.logger.error(f"No training directory found at: {self.training_dir}")
-            return []
-
-        records = []
-        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
-            record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
-
-            record.size_match      = size_match[trial_dir.name] if trial_dir.name in size_match else {}
-            record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
-            record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
-            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
-            record.parameters      = self._parse_parameters(trial_dir, record.size_match)
-            record.checkpoint      = self._read_checkpoint(trial_dir)
-
-            self._attach_inference(record)
-
-            status = f"inference {record.inference_dir.name}" if record.has_inference else "no inference"
-            self.logger.info(f"{record.name:<22} {status}")
-
-            records.append(record)
-
-        return records
 
     def _optional_json(self, path: Path) -> dict:
         if not path.exists():
@@ -127,6 +97,36 @@ class TrialCollector:
         if report_path.exists():
             record.report_path = report_path
 
+    def collect(self) -> list[TrialRecord]:
+        size_match       = FileIO.load_json(self.pipeline_dir / "size_match.json")
+        overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
+        training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
+
+        if not self.training_dir.is_dir():
+            self.logger.error(f"No training directory found at: {self.training_dir}")
+            return []
+
+        records = []
+        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
+            record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
+
+            record.size_match      = size_match[trial_dir.name] if trial_dir.name in size_match else {}
+            record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
+            record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
+            record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
+            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
+            record.parameters      = self._parse_parameters(trial_dir, record.size_match)
+            record.checkpoint      = self._read_checkpoint(trial_dir)
+
+            self._attach_inference(record)
+
+            status = f"inference {record.inference_dir.name}" if record.has_inference else "no inference"
+            self.logger.info(f"{record.name:<22} {status}")
+
+            records.append(record)
+
+        return records
+
 
 class ComparisonReport:
 
@@ -161,16 +161,6 @@ class ComparisonReport:
         self.rank_models     = rank_models
         self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
         self.timestamp       = self.assets.timestamp
-
-    def write_all(self) -> list[Path]:
-        FileIO.ensure_dir(self.out_dir)
-
-        written = [self._write_overview(), self._write_metrics()]
-        written.extend(self._write_media(self.FIGURE_GROUPS, "figures", "Figures"))
-        written.extend(self._write_media(None, "animations", "Animation Comparison"))
-        written.append(self._write_summary_json())
-
-        return written
 
     def _capacity_table(self) -> list[str]:
         table = MarkdownTable(["Model", "Parameters", "Δ vs reference", "Width scale", "Scaled attributes"])
@@ -413,3 +403,13 @@ class ComparisonReport:
 
         out = self.out_dir / "comparison_summary.json"
         return FileIO.save_json(payload, out, indent=2)
+
+    def write_all(self) -> list[Path]:
+        FileIO.ensure_dir(self.out_dir)
+
+        written = [self._write_overview(), self._write_metrics()]
+        written.extend(self._write_media(self.FIGURE_GROUPS, "figures", "Figures"))
+        written.extend(self._write_media(None, "animations", "Animation Comparison"))
+        written.append(self._write_summary_json())
+
+        return written

@@ -10,29 +10,23 @@ from configuration.benchmark_config import TrainingQueueConfig
 from configuration.dataset_config import DatasetConfiguration
 from configuration.dataset_config import PatchConfiguration
 from configuration.dataset_config import SplitRegions
-from configuration.training_config import EarlyStoppingConfig
-from configuration.training_config import GaussianConfig
-from configuration.training_config import GeometryConfig
-from configuration.training_config import GradientClipperConfig
-from configuration.training_config import IOConfig
-from configuration.training_config import LossConfig
-from configuration.training_config import LossCurriculumConfig
-from configuration.training_config import OptimizerConfig
-from configuration.training_config import SchedulerConfig
-from configuration.training_config import TrainerConfig
-from configuration.training_config import TrainingConfigInner
-from configuration.training_config import WarmupConfig
+from configuration.gaussian_config     import GaussianConfig
+from configuration.geometry_config     import GeometryConfig
+from configuration.loss_config         import LossConfig, LossCurriculumConfig
+from configuration.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.runtime_config      import IOConfig, TrainingLoopConfig
+from configuration.training_config     import TrainerConfig
 from configuration.tuning_config import TuningConfig
 from models import CONFIG_REGISTRY
-from pipelines.shared import FileIO
-from pipelines.shared import GpuJob
-from pipelines.shared import GpuQueue
+from tools import FileIO
+from tools import GpuJob
+from tools import GpuQueue
 from pipelines.tuning_pipeline.plots import StudyPlotter
 from pipelines.tuning_pipeline.tuners import BestConfigWriter
 from pipelines.tuning_pipeline.tuners import Tuner
 from tools.config_cli import ConfigCli
-from tools.logger import Logger
-from tools.regions import CropRegion
+from tools.monitoring.logger import Logger
+from tools.data.regions import CropRegion
 
 
 class TuningOrchestrator:
@@ -100,7 +94,7 @@ class TuningOrchestrator:
             optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
             gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
             io               = IOConfig(logdir=str(self.config.paths.log_base_dir)),
-            training         = TrainingConfigInner(epochs=60, validation_frequency=1, gradient_accumulation_steps=1),
+            training         = TrainingLoopConfig(epochs=60, validation_frequency=1, gradient_accumulation_steps=1),
 
             curriculum = LossCurriculumConfig(
                 enabled  = False,

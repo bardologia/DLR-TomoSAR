@@ -74,7 +74,12 @@ class ScriptConfigResolver:
         self.lock  = threading.Lock()
 
     def entry_config(self, key: str) -> dict | None:
-        path = self.paths.main_dir / f"{key}.py"
+        entry = self.paths.script_entry(key)
+
+        if entry["config_module"] and entry["config_class"]:
+            return {"module": entry["config_module"], "class": entry["config_class"]}
+
+        path = entry["path"]
         if not path.exists():
             return None
 
@@ -93,44 +98,6 @@ class ScriptConfigResolver:
 
         module, real_name = located
         return {"module": module, "class": real_name}
-
-    def resolve(self, key: str, interpreter: str) -> dict:
-        entry = self.entry_config(key)
-        if entry is None:
-            return {"ok": False, "error": "no entry configuration detected"}
-
-        signature = self._signature(key)
-        cache_key = (key, interpreter)
-
-        with self.lock:
-            hit = self.cache.get(cache_key)
-            if hit is not None and hit[0] == signature:
-                return hit[1]
-
-        result = self._run_bootstrap(entry, interpreter)
-        if result.get("ok"):
-            with self.lock:
-                self.cache[cache_key] = (signature, result)
-        return result
-
-    def _run_bootstrap(self, entry: dict, interpreter: str) -> dict:
-        argv = [interpreter, "-c", self.BOOTSTRAP, str(self.paths.repo_root), entry["module"], entry["class"]]
-
-        try:
-            proc = subprocess.run(argv, cwd=str(self.paths.repo_root), capture_output=True, text=True, timeout=180)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return {"ok": False, "error": f"config resolution failed: {exc}"}
-
-        if proc.returncode != 0:
-            tail = "\n".join(proc.stderr.strip().splitlines()[-4:])
-            return {"ok": False, "error": f"config resolution failed:\n{tail}"}
-
-        try:
-            leaves = json.loads(proc.stdout.strip().splitlines()[-1])
-        except (ValueError, IndexError):
-            return {"ok": False, "error": "config resolution produced no output"}
-
-        return {"ok": True, "module": entry["module"], "config_class": entry["class"], "leaves": leaves}
 
     def _config_cli_class(self, tree: ast.Module) -> str | None:
         for node in ast.walk(tree):
@@ -159,7 +126,7 @@ class ScriptConfigResolver:
 
     def _signature(self, key: str) -> tuple:
         watched = sorted(self.paths.config_dir.glob("*.py"))
-        watched.append(self.paths.main_dir / f"{key}.py")
+        watched.append(self.paths.script_entry(key)["path"])
         watched.append(self.paths.repo_root / "tools" / "config_cli.py")
 
         stamps = []
@@ -169,3 +136,41 @@ class ScriptConfigResolver:
             except OSError:
                 continue
         return tuple(stamps)
+
+    def _run_bootstrap(self, entry: dict, interpreter: str) -> dict:
+        argv = [interpreter, "-c", self.BOOTSTRAP, str(self.paths.repo_root), entry["module"], entry["class"]]
+
+        try:
+            proc = subprocess.run(argv, cwd=str(self.paths.repo_root), capture_output=True, text=True, timeout=180)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {"ok": False, "error": f"config resolution failed: {exc}"}
+
+        if proc.returncode != 0:
+            tail = "\n".join(proc.stderr.strip().splitlines()[-4:])
+            return {"ok": False, "error": f"config resolution failed:\n{tail}"}
+
+        try:
+            leaves = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"ok": False, "error": "config resolution produced no output"}
+
+        return {"ok": True, "module": entry["module"], "config_class": entry["class"], "leaves": leaves}
+
+    def resolve(self, key: str, interpreter: str) -> dict:
+        entry = self.entry_config(key)
+        if entry is None:
+            return {"ok": False, "error": "no entry configuration detected"}
+
+        signature = self._signature(key)
+        cache_key = (key, interpreter)
+
+        with self.lock:
+            hit = self.cache.get(cache_key)
+            if hit is not None and hit[0] == signature:
+                return hit[1]
+
+        result = self._run_bootstrap(entry, interpreter)
+        if result.get("ok"):
+            with self.lock:
+                self.cache[cache_key] = (signature, result)
+        return result

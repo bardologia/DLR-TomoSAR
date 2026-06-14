@@ -8,8 +8,17 @@ class ProjectPaths:
 
     PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
     SCRIPT_PRIORITY = {
-        "pre_process"              : ["conda:stetools"],
-        "generate_reduced_tomogram": ["conda:stetools"],
+        "generate_tomogram"        : ["conda:stetools"],
+        "generate_interferograms"  : ["conda:stetools"],
+    }
+
+    ENTRY_OVERRIDES = {
+        "train_backbone": {
+            "file"          : "train",
+            "args"          : ["backbone"],
+            "config_module" : "configuration.backbone_config",
+            "config_class"  : "BackboneEntryConfig",
+        },
     }
 
     def __init__(self) -> None:
@@ -19,6 +28,18 @@ class ProjectPaths:
         self.scripts_dir  = self.repo_root / "scripts"
         self.config_dir   = self.repo_root / "configuration"
         self.static_dir   = self.webui_root / "static"
+
+    def script_entry(self, key: str) -> dict:
+        override  = self.ENTRY_OVERRIDES.get(key, {})
+        file_stem = override.get("file", key)
+
+        return {
+            "path"          : self.main_dir / f"{file_stem}.py",
+            "rel"           : f"main/{file_stem}.py",
+            "args"          : list(override.get("args", [])),
+            "config_module" : override.get("config_module"),
+            "config_class"  : override.get("config_class"),
+        }
 
     def discover_interpreters(self) -> list[dict]:
         found   = []

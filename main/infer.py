@@ -12,9 +12,9 @@ def main() -> None:
     from configuration.inference_config import InferenceEntryConfig
     from pipelines.inference_pipeline.pipeline import InferencePipeline
     from tools.config_cli import ConfigCli
-    from tools.logger import Logger
+    from tools.monitoring.logger import Logger
 
-    config   = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories").apply()
+    config   = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected").apply()
     logs_dir = Path(config.logs_dir)
 
     run_dirs = sorted(

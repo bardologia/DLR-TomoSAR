@@ -19,7 +19,7 @@ class ScriptCatalog:
             "purpose"   : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets.",
             "essentials": ["dataset_base_path", "dataset_filter", "gpu_device_ids", "output_prefix", "fit_k_max", "fit_sigma_init_divisor"],
         },
-        "train": {
+        "train_backbone": {
             "title"     : "Train",
             "category"  : "Training",
             "purpose"   : "Train one model end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
@@ -54,7 +54,7 @@ class ScriptCatalog:
     ORDER = [
         "pre_process",
         "extract_params",
-        "train",
+        "train_backbone",
         "infer",
         "benchmark",
         "physics_check",
@@ -68,8 +68,8 @@ class ScriptCatalog:
     def list_scripts(self) -> list[dict]:
         entries = []
         for key in self.ORDER:
-            path = self.paths.main_dir / f"{key}.py"
-            if not path.exists():
+            spec = self.paths.script_entry(key)
+            if not spec["path"].exists():
                 continue
 
             meta  = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
@@ -77,7 +77,7 @@ class ScriptCatalog:
 
             entries.append({
                 "key"          : key,
-                "file"         : f"main/{key}.py",
+                "file"         : spec["rel"],
                 "title"        : meta["title"],
                 "category"     : meta["category"],
                 "purpose"      : meta["purpose"],
@@ -86,17 +86,18 @@ class ScriptCatalog:
         return entries
 
     def get_script(self, key: str) -> dict | None:
-        path = self.paths.main_dir / f"{key}.py"
-        if not path.exists():
+        spec = self.paths.script_entry(key)
+        if not spec["path"].exists():
             return None
 
-        meta   = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
-        source = path.read_text(encoding="utf-8")
-        entry  = self.resolver.entry_config(key)
+        meta    = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
+        source  = spec["path"].read_text(encoding="utf-8")
+        entry   = self.resolver.entry_config(key)
+        command = " ".join(["python", spec["rel"], *spec["args"]])
 
         return {
             "key"          : key,
-            "file"         : f"main/{key}.py",
+            "file"         : spec["rel"],
             "title"        : meta["title"],
             "category"     : meta["category"],
             "purpose"      : meta["purpose"],
@@ -104,6 +105,6 @@ class ScriptCatalog:
             "source"       : source,
             "language"     : "python",
             "config_class" : entry["class"] if entry else None,
-            "command"      : f"python main/{key}.py",
+            "command"      : command,
             "preferred"    : self.paths.preferred_interpreter(self.paths.discover_interpreters(), key),
         }

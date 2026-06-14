@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
-from typing  import List
+from typing  import List, Optional
+
+from tools.data.io           import FileIO
+from tools.monitoring.logger import Logger
 
 
 class CondaEnv:
@@ -31,3 +35,20 @@ class CondaEnv:
 
         searched = ", ".join(str(candidate) for candidate in candidates)
         raise FileNotFoundError(f"Conda environment '{env_name}' interpreter not found (searched: {searched}); it is required to run pyrat for the reduced tomogram.")
+
+
+class CondaJobDispatcher:
+    def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:
+        self.env_name  = env_name
+        self.logger    = logger
+        self.repo_root = repo_root if repo_root is not None else Path(__file__).resolve().parents[1]
+
+    def dispatch(self, entry_relative_path: str, spec_payload: dict, spec_path: Path) -> None:
+        FileIO.save_json(spec_payload, spec_path)
+
+        interpreter = CondaEnv.interpreter(self.env_name)
+        entry       = self.repo_root / entry_relative_path
+        command     = [str(interpreter), str(entry), "--spec", str(spec_path)]
+
+        self.logger.subsection(f"Dispatching '{entry_relative_path}' in env '{self.env_name}': {' '.join(command)}")
+        subprocess.run(command, check=True, cwd=str(self.repo_root))

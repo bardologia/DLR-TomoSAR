@@ -6,11 +6,11 @@ from typing  import Tuple
 
 from configuration.processing_config             import ProcessingConfiguration
 from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, MetadataManager
-from pipelines.processing_pipeline.interferogram import InterferogramBuilder
 from pipelines.processing_pipeline.plots         import StackPlotter
-from pipelines.processing_pipeline.tomogram      import TomogramProcessor
-from pipelines.shared                            import FileIO, ProcessPoolRunner
-from tools.logger                                import Logger
+from tools                            import FileIO, ProcessPoolRunner
+from tools.monitoring.logger                                import Logger
+from tools.sar                                 import InterferogramBuilder, TomogramBuilder
+from tools.track_baselines                       import TrackBaselines
 
 
 class ProcessingPipeline:
@@ -18,26 +18,26 @@ class ProcessingPipeline:
         self.config = config
         self.logger = logger
 
-        self.artifact_registry     = ArtifactRegistry   (config, logger=self.logger)
-        self.metadata_manager      = MetadataManager    (config, logger=self.logger)
-        self.tomogram_processor    = TomogramProcessor  (config, logger=self.logger)
-        self.interferogram_builder = InterferogramBuilder(config, logger=self.logger)
-        self.stack_plotter         = StackPlotter       (config, logger=self.logger)
+        self.artifact_registry      = ArtifactRegistry   (config, logger=self.logger)
+        self.metadata_manager       = MetadataManager    (config, logger=self.logger)
+        self.tomogram_builder       = TomogramBuilder    (config.tomogram_env_name, logger=self.logger)
+        self.interferogram_builder  = InterferogramBuilder(config.tomogram_env_name, logger=self.logger)
+        self.stack_plotter          = StackPlotter       (config, logger=self.logger)
+
+        self._pass_labels : list | None = None
 
         self.logger.section("[Pre-Processing Pipeline Initialized]")
-        self.logger.subsection(f"Stack ID : {config.stack_identifier}")
+        self.logger.subsection(f"Stack ID         : {config.stack_identifier}")
+        self.logger.subsection(f"Tomogram Env     : {config.tomogram_env_name}")
 
     def _stage_tomogram(self) -> Tuple[Path, Path]:
         tomogram_path = self.artifact_registry.artifact_path("tomogram_full")
         dem_path      = self.artifact_registry.artifact_path("dem_full")
 
-        self.logger.subsection("[Active] Generating full-stack tomogram")
-        self.tomogram_processor.run(
-            tomogram_path    = tomogram_path,
-            dem_path         = dem_path,
-            stack_identifier = self.config.stack_identifier,
-            tomogram_config  = self.config.tomogram_config,
-        )
+        self.logger.subsection(f"[Active] Generating full-stack tomogram in env '{self.config.tomogram_env_name}'")
+        spec      = self.tomogram_builder.build_spec(self.config, tomogram_path, dem_path)
+        spec_path = self.config.paths.metadata_directory / "tomogram_spec.json"
+        self.tomogram_builder.generate(spec, spec_path)
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = "tomogram_full",
@@ -52,25 +52,33 @@ class ProcessingPipeline:
         primary_path        = self.artifact_registry.artifact_path("primary")
         secondaries_path    = self.artifact_registry.artifact_path("secondaries")
         interferograms_path = self.artifact_registry.artifact_path("interferograms")
+        profiles_path       = self.artifact_registry.artifact_path("track_profiles")
+        baselines_path      = self.config.paths.metadata_directory / TrackBaselines.FILENAME
+        result_path         = self.config.paths.metadata_directory / "interferogram_result.json"
 
-        self.logger.subsection("[Active] Building interferometric stack")
-        primary_shape, secondaries_shape, interferograms_shape = self.interferogram_builder.run(
-            crop_tuple          = self.config.crop.as_tuple(),
+        self.logger.subsection(f"[Active] Building interferometric stack in env '{self.config.tomogram_env_name}'")
+        spec = self.interferogram_builder.build_spec(
+            self.config,
             primary_path        = primary_path,
             secondaries_path    = secondaries_path,
             interferograms_path = interferograms_path,
+            baselines_path      = baselines_path,
+            profiles_path       = profiles_path,
+            result_path         = result_path,
         )
+        spec_path = self.config.paths.metadata_directory / "interferogram_spec.json"
+        result    = self.interferogram_builder.generate(spec, spec_path)
+
+        primary_shape        = tuple(result["primary_shape"])
+        secondaries_shape    = tuple(result["secondaries_shape"])
+        interferograms_shape = tuple(result["interferograms_shape"])
 
         self.metadata_manager.save_stage_metadata(
             stage_name       = "inputs",
             metadata_entries = self.metadata_manager.build_inputs_metadata(primary_path, secondaries_path, interferograms_path, primary_shape, secondaries_shape, interferograms_shape),
         )
 
-        if self.interferogram_builder.track_baselines is not None:
-            self.metadata_manager.save_baselines(self.interferogram_builder.track_baselines)
-
-        if self.interferogram_builder.track_profiles is not None:
-            self.metadata_manager.save_track_profiles(self.interferogram_builder.track_profiles)
+        self._pass_labels = result["pass_labels"]
 
         gc.collect()
 
@@ -99,11 +107,9 @@ class ProcessingPipeline:
 
         primary_path, secondaries_path, interferograms_path = self._stage_inputs()
 
-        baselines   = self.interferogram_builder.track_baselines
-        pass_labels = list(baselines.labels) if baselines is not None else None
-        self.metadata_manager.save_dataset_layout(pass_labels=pass_labels)
+        self.metadata_manager.save_dataset_layout(pass_labels=self._pass_labels)
 
-        images_directory = self._stage_plots(primary_path, secondaries_path, interferograms_path, full_dem_path, pass_labels)
+        images_directory = self._stage_plots(primary_path, secondaries_path, interferograms_path, full_dem_path, self._pass_labels)
 
         self.logger.section("[Pre-Processing Execution Completed]")
 

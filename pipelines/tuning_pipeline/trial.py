@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import optuna
 
-from pipelines.training_pipeline.pipeline import TrainingPipeline
-from pipelines.training_pipeline.trainer  import Trainer
+from pipelines.backbone_pipeline.pipeline import TrainingPipeline
+from pipelines.backbone_pipeline.trainer  import Trainer
 
 
 class TrialTrainer(Trainer):

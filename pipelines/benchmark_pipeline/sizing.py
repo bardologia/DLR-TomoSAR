@@ -4,9 +4,9 @@ import gc
 from dataclasses import dataclass, field
 
 from configuration.benchmark_config import BenchmarkConfig
-from configuration.training_config  import GaussianConfig
+from configuration.gaussian_config import GaussianConfig
 from models import CONFIG_REGISTRY, get_model
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 _IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
@@ -94,9 +94,6 @@ class DegeneracyAuditor:
         self.scaler = scaler
         self.floors = {"embedding_dim": 32, "embedding_dims": 32}
 
-    def audit(self, result: SizeMatchResult) -> list[str]:
-        return self._scale_flags(result) + self._width_flags(result) + self._convergence_flags(result)
-
     def _scale_flags(self, result: SizeMatchResult) -> list[str]:
         flags = []
 
@@ -127,6 +124,9 @@ class DegeneracyAuditor:
             return [f"deviation {result.deviation_pct:+.3f} % exceeds the {100.0 * self.config.tolerance:.1f} % tolerance after {result.iterations} iterations"]
 
         return []
+
+    def audit(self, result: SizeMatchResult) -> list[str]:
+        return self._scale_flags(result) + self._width_flags(result) + self._convergence_flags(result)
 
 
 class SizeMatcher:

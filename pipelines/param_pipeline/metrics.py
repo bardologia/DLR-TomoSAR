@@ -7,10 +7,10 @@ from typing  import Dict, Optional, Tuple
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 
-from pipelines.shared.preprocessing import ProfilePreprocessor
-from pipelines.shared.scoring        import R2
-from tools.gaussians                 import GaussianMixture
-from tools.logger                    import Logger
+from tools.data.preprocessing import ProfilePreprocessor
+from tools.metrics.scoring        import R2
+from tools.data.gaussians                 import GaussianMixture
+from tools.monitoring.logger                    import Logger
 
 
 class SnrEstimator:

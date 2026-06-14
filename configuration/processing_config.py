@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import ClassVar, Dict, List, Optional, Tuple
 
-from tools.regions import CropRegion
+from tools.data.regions import CropRegion
 
 
 @dataclass
@@ -119,6 +119,7 @@ class ProcessingConfiguration:
     stack_identifier     : str = "1"
     tomogram_output_tag  : str = "Xtomo_id2X"
     parameter_output_tag : str = "Xparams_id2X"
+    tomogram_env_name    : str = "stetools"
 
     @property
     def tomogram_tag(self) -> str:
@@ -160,6 +161,7 @@ class PreProcessEntryConfig:
     stack_identifier     : str           = "1"
     tomogram_output_tag  : str           = "Xtomo_id2X"
     parameter_output_tag : str           = "Xparams_id2X"
+    tomogram_env_name    : str           = "stetools"
 
     def resolve_dataset_name(self, win: List[int], run_identifier: str) -> str:
         win_string = "_".join(str(value) for value in win)

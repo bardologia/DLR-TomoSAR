@@ -6,8 +6,8 @@ from typing   import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from pipelines.shared.reporting import ReportAssets
-from tools.markdown             import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting import ReportAssets
+from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
 
 
 class ReportPayloadBuilder:
@@ -253,42 +253,6 @@ class Report:
 
         return out
 
-    def _build_reduced_headline(self) -> List[str]:
-        gm = self.global_metrics
-        if "improvement_pixel_mse_mean" not in gm:
-            return []
-
-        out = ["\n### 2.6 NN improvement over the classical baseline\n"]
-        out.append(
-            "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
-            "secondary subset this run was trained on, processed identically to the ground-truth full-stack "
-            "tomogram (same pyrat `fusartomo`, height range, filter and stack). It is what tomography yields "
-            "without the network. Reduced-vs-GT and improvement quantities are computed on per-elevation-profile "
-            "unit-area-normalised cubes, so they measure elevation-distribution agreement independent of absolute "
-            "Capon power calibration.\n"
-        )
-        out.append(self._three_col_table([
-            ("Reduced MSE mean",       gm["reduced_pixel_mse_norm_mean"],  "Per-pixel reduced-vs-GT MSE (classical baseline)"),
-            ("Pred MSE mean",          gm["pred_pixel_mse_norm_mean"],     "Per-pixel pred-vs-GT MSE (neural network)"),
-            ("Improvement mean",       gm["improvement_pixel_mse_mean"],   "MSE(reduced) − MSE(pred), higher is better"),
-            ("Improvement median",     gm["improvement_pixel_mse_median"], "Median per-pixel improvement"),
-            ("Relative MSE reduction", gm["relative_mse_reduction"],       "1 − MSE(pred)/MSE(reduced)"),
-            ("Pixels where NN wins",   gm["fraction_pred_beats_reduced"],  "Fraction with pred MSE < reduced MSE"),
-        ], header=("Metric", "Value", "Description")))
-        out.append("")
-
-        out.append("**Reduced vs GT** (classical baseline, unit-area profiles)\n")
-        out.append(self._three_col_table([
-            ("Curve MSE",         gm["curve_mse_red"],         "Mean squared error over all (elev, az, rg)"),
-            ("Overall R2",        gm["overall_r2_red"],        "Global coefficient of determination"),
-            ("SSIM elev mean",    gm["ssim_red_elev_mean"],    "Intensity-at-elevation-bin planes"),
-            ("SSIM range mean",   gm["ssim_red_range_mean"],   "Cross-sectional planes"),
-            ("SSIM azimuth mean", gm["ssim_red_azimuth_mean"], "Cross-sectional planes"),
-        ], header=("Metric", "Reduced vs GT", "Description")))
-        out.append("")
-
-        return out
-
     def _build_tracks_table(self) -> List[str]:
         tracks = self.global_metrics.get("tracks")
         if not isinstance(tracks, dict):
@@ -349,6 +313,42 @@ class Report:
             table.add_row(row[0], *(self._fmt(value) for value in row[1:]))
 
         out.append("\n".join(table.render()))
+        out.append("")
+
+        return out
+
+    def _build_reduced_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "improvement_pixel_mse_mean" not in gm:
+            return []
+
+        out = ["\n### 2.6 NN improvement over the classical baseline\n"]
+        out.append(
+            "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
+            "secondary subset this run was trained on, processed identically to the ground-truth full-stack "
+            "tomogram (same pyrat `fusartomo`, height range, filter and stack). It is what tomography yields "
+            "without the network. Reduced-vs-GT and improvement quantities are computed on per-elevation-profile "
+            "unit-area-normalised cubes, so they measure elevation-distribution agreement independent of absolute "
+            "Capon power calibration.\n"
+        )
+        out.append(self._three_col_table([
+            ("Reduced MSE mean",       gm["reduced_pixel_mse_norm_mean"],  "Per-pixel reduced-vs-GT MSE (classical baseline)"),
+            ("Pred MSE mean",          gm["pred_pixel_mse_norm_mean"],     "Per-pixel pred-vs-GT MSE (neural network)"),
+            ("Improvement mean",       gm["improvement_pixel_mse_mean"],   "MSE(reduced) − MSE(pred), higher is better"),
+            ("Improvement median",     gm["improvement_pixel_mse_median"], "Median per-pixel improvement"),
+            ("Relative MSE reduction", gm["relative_mse_reduction"],       "1 − MSE(pred)/MSE(reduced)"),
+            ("Pixels where NN wins",   gm["fraction_pred_beats_reduced"],  "Fraction with pred MSE < reduced MSE"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        out.append("**Reduced vs GT** (classical baseline, unit-area profiles)\n")
+        out.append(self._three_col_table([
+            ("Curve MSE",         gm["curve_mse_red"],         "Mean squared error over all (elev, az, rg)"),
+            ("Overall R2",        gm["overall_r2_red"],        "Global coefficient of determination"),
+            ("SSIM elev mean",    gm["ssim_red_elev_mean"],    "Intensity-at-elevation-bin planes"),
+            ("SSIM range mean",   gm["ssim_red_range_mean"],   "Cross-sectional planes"),
+            ("SSIM azimuth mean", gm["ssim_red_azimuth_mean"], "Cross-sectional planes"),
+        ], header=("Metric", "Reduced vs GT", "Description")))
         out.append("")
 
         return out

@@ -4,8 +4,8 @@ from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from configuration.inference_config import InferenceConfig
-from pipelines.shared.io        import FileIO
-from tools.regions              import CropRegion
+from tools.data.io        import FileIO
+from tools.data.regions              import CropRegion
 
 from configuration.dataset_config import (
     AugmentationConfig,
@@ -16,21 +16,12 @@ from configuration.dataset_config import (
     SplitRegions,
 )
 
-from configuration.training_config import (
-    LossCurriculumConfig,
-    EarlyStoppingConfig,
-    GaussianConfig,
-    GeometryConfig,
-    GradientClipperConfig,
-    IOConfig,
-    LossConfig,
-    OptimizerConfig,
-    OverfitConfig,
-    SchedulerConfig,
-    TrainerConfig,
-    TrainingConfigInner,
-    WarmupConfig,
-)
+from configuration.gaussian_config     import GaussianConfig
+from configuration.geometry_config     import GeometryConfig
+from configuration.loss_config         import LossConfig, LossCurriculumConfig
+from configuration.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.runtime_config      import IOConfig, OverfitConfig, TrainingLoopConfig
+from configuration.training_config     import TrainerConfig
 
 
 class ConfigFactory:
@@ -127,7 +118,7 @@ class ConfigFactory:
             scheduler      = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
 
-            training = TrainingConfigInner(
+            training = TrainingLoopConfig(
                 epochs                      = training.epochs,
                 validation_frequency        = training.validation_frequency,
                 use_amp                     = False,
@@ -155,7 +146,7 @@ class ConfigFactory:
             scheduler      = SchedulerConfig(type="constant"),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
 
-            training = TrainingConfigInner(
+            training = TrainingLoopConfig(
                 device               = "gpu",
                 epochs               = 10000,
                 validation_frequency = 9999,

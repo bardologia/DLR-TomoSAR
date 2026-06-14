@@ -5,8 +5,8 @@ from pathlib import Path
 
 from configuration.benchmark_config import BenchmarkConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
-from pipelines.shared.io import FileIO
-from pipelines.training_pipeline.docs import LossScaleProbeConfig
+from tools.data.io import FileIO
+from pipelines.backbone_pipeline.docs import LossScaleProbeConfig
 
 
 class BenchmarkWorker:
@@ -27,9 +27,19 @@ class BenchmarkWorker:
 
 
 class OverfitWorker(BenchmarkWorker):
+    def _final_loss(self, outputs) -> float | None:
+        if not isinstance(outputs, (tuple, list)) or len(outputs) == 0:
+            return None
+
+        train_losses = outputs[0]
+        if not isinstance(train_losses, (list, tuple)) or len(train_losses) == 0:
+            return None
+
+        return float(train_losses[-1])
+
     def run(self, model_name: str) -> None:
         from models import CONFIG_REGISTRY
-        from pipelines.training_pipeline.pipeline import TrainingPipeline
+        from pipelines.backbone_pipeline.pipeline import TrainingPipeline
 
         stage_dir   = self.run_dir / "overfit"
         result_path = stage_dir / model_name / "overfit_result.json"
@@ -83,21 +93,21 @@ class OverfitWorker(BenchmarkWorker):
         if result["status"] == "FAIL":
             raise SystemExit(1)
 
-    def _final_loss(self, outputs) -> float | None:
-        if not isinstance(outputs, (tuple, list)) or len(outputs) == 0:
-            return None
-
-        train_losses = outputs[0]
-        if not isinstance(train_losses, (list, tuple)) or len(train_losses) == 0:
-            return None
-
-        return float(train_losses[-1])
-
 
 class TrainingWorker(BenchmarkWorker):
+    def _size_overrides(self, model_name: str) -> dict:
+        size_match_path = self.run_dir / "pipeline" / "size_match.json"
+        if not size_match_path.exists():
+            return {}
+
+        records = FileIO.load_json(size_match_path)
+
+        entry = records.get(model_name, {})
+        return entry.get("overrides", {})
+
     def run(self, model_name: str) -> None:
         from models import CONFIG_REGISTRY
-        from pipelines.training_pipeline.pipeline import TrainingPipeline
+        from pipelines.backbone_pipeline.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "training"
         model_config = CONFIG_REGISTRY[model_name]()
@@ -115,16 +125,6 @@ class TrainingWorker(BenchmarkWorker):
         )
 
         pipeline.run(probe_config=self._probe_config())
-
-    def _size_overrides(self, model_name: str) -> dict:
-        size_match_path = self.run_dir / "pipeline" / "size_match.json"
-        if not size_match_path.exists():
-            return {}
-
-        records = FileIO.load_json(size_match_path)
-
-        entry = records.get(model_name, {})
-        return entry.get("overrides", {})
 
 
 class InferenceWorker(BenchmarkWorker):

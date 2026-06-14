@@ -54,29 +54,6 @@ class RequestRouter:
         self.cubes       = cubes
         self.datasets    = datasets
 
-    def route(self, handler) -> None:
-        parsed = urlparse(handler.path)
-        path   = parsed.path.rstrip("/") or "/"
-        method = handler.command
-
-        try:
-            if parsed.path.startswith("/tb/"):
-                self._proxy_tensorboard(handler)
-            elif method == "GET":
-                self._route_get(handler, path)
-            elif method == "POST":
-                self._route_post(handler, path)
-            else:
-                self._send_json(handler, {"error": "method not allowed"}, 405)
-        except BrokenPipeError:
-            pass
-        except Exception as exc:
-            self.logger.error(f"router error on {method} {path}: {exc}")
-            try:
-                self._send_json(handler, {"error": str(exc)}, 500)
-            except Exception:
-                pass
-
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
             self._serve_static(handler, "index.html")
@@ -244,8 +221,8 @@ class RequestRouter:
             return
 
         if path == "/api/tensorboard/start":
-            interpreter = body.get("interpreter") or self._preferred_interpreter(body.get("script_key", "train"))
-            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train"), {}, interpreter)
+            interpreter = body.get("interpreter") or self._preferred_interpreter(body.get("script_key", "train_backbone"))
+            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train_backbone"), {}, interpreter)
 
             if not logdir:
                 self._send_json(handler, {"ok": False, "error": "could not resolve a training log directory"}, 400)
@@ -448,3 +425,26 @@ class RequestRouter:
         handler.send_header("Cache-Control", "no-cache")
         handler.end_headers()
         handler.wfile.write(data)
+
+    def route(self, handler) -> None:
+        parsed = urlparse(handler.path)
+        path   = parsed.path.rstrip("/") or "/"
+        method = handler.command
+
+        try:
+            if parsed.path.startswith("/tb/"):
+                self._proxy_tensorboard(handler)
+            elif method == "GET":
+                self._route_get(handler, path)
+            elif method == "POST":
+                self._route_post(handler, path)
+            else:
+                self._send_json(handler, {"error": "method not allowed"}, 405)
+        except BrokenPipeError:
+            pass
+        except Exception as exc:
+            self.logger.error(f"router error on {method} {path}: {exc}")
+            try:
+                self._send_json(handler, {"error": str(exc)}, 500)
+            except Exception:
+                pass

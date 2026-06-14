@@ -4,15 +4,16 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Optional, Tuple
 
+import numpy as np
 from torch.utils.data import DataLoader
 
 from configuration.dataset_config             import DatasetConfiguration
-from tools.regions                            import CropRegion
+from tools.data.regions                            import CropRegion
 from pipelines.dataset_pipeline.datasets      import Loader, MultiRegionDataset, PatchDataset, SpatialAugmenter
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats, StatsComputer
 from pipelines.dataset_pipeline.spatial       import Cropper, GridInfo, Layout, Patcher
-from pipelines.shared.io                      import FileIO
-from tools.logger                             import Logger
+from tools.data.io                      import FileIO
+from tools.monitoring.logger                             import Logger
 
 
 class MetadataWriter:
@@ -100,6 +101,12 @@ class DatasetPipeline:
             title="Dataset Creation",
         )
 
+    @property
+    def profile_length(self) -> int:
+        tomo_path = self.layout.artifact_path("tomogram_full")
+        tomo_mmap = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
+        return int(tomo_mmap.shape[0])
+
     def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None):
         regions  = self.config.split_regions.regions(split_name)
         parts    = []
@@ -141,6 +148,11 @@ class DatasetPipeline:
         self.logger.subsection(f"Split '{split_name}': {len(parts)} disjoint regions, {sum(len(p) for p in parts)} patches total")
 
         return MultiRegionDataset(parts), patchers
+
+    def _patch_grids(self, patcher):
+        if isinstance(patcher, list):
+            return [p.grid for p in patcher]
+        return patcher.grid
 
     def run(self) -> Tuple[DataLoader, DataLoader, DataLoader, dict[str, PatchDataset]]:
 
@@ -194,8 +206,3 @@ class DatasetPipeline:
         datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
 
         return train_loader, val_loader, test_loader, datasets
-
-    def _patch_grids(self, patcher):
-        if isinstance(patcher, list):
-            return [p.grid for p in patcher]
-        return patcher.grid

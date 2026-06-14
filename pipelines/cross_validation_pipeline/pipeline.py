@@ -7,8 +7,8 @@ from configuration.cross_validation_config import CrossValidationConfig
 from tools.config_cli import ConfigCli
 from pipelines.cross_validation_pipeline.folds import FoldConfigFactory, FoldPlanner
 from pipelines.cross_validation_pipeline.stages import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
-from pipelines.shared.io import FileIO
-from tools.logger import Logger
+from tools.data.io import FileIO
+from tools.monitoring.logger import Logger
 
 
 class CrossValidationPipeline:
@@ -27,6 +27,42 @@ class CrossValidationPipeline:
         self.logger  = Logger(log_dir=str(self.pipeline_dir), name="cross_validation_pipeline")
         self.factory = FoldConfigFactory(config)
         self.state   = {"run_tag": self.run_tag, "stages": {}}
+
+    def _run_training(self) -> list[dict]:
+        stage   = FoldTrainingStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, logger=self.logger)
+        results = stage.run()
+
+        failed = [r for r in results if r["status"] != "DONE"]
+        self._mark_stage("training", "completed" if not failed else "partial")
+        return results
+
+    def _run_inference(self, planner: FoldPlanner) -> list[dict]:
+        if not self.config.runs_inference():
+            self.logger.subsection(f"Inference skipped for training_type '{self.config.training_type}'; folds evaluated by reconstruction loss")
+            self._mark_stage("inference", "skipped")
+            return []
+
+        stage   = FoldInferenceStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, planner=planner, logger=self.logger)
+        results = stage.run()
+
+        failed = [r for r in results if r["status"] == "FAILED"]
+        self._mark_stage("inference", "completed" if not failed else "partial")
+        return results
+
+    def _run_reports(self, planner: FoldPlanner) -> Path:
+        stage   = CrossValidationReportStage(config=self.config, run_tag=self.run_tag, planner=planner, logger=self.logger)
+        out_dir = stage.run()
+
+        self._mark_stage("reports", "completed")
+        return out_dir
+
+    def _mark_stage(self, stage_name: str, status: str) -> None:
+        self.state["stages"][stage_name] = {
+            "status"    : status,
+            "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        FileIO.save_json(self.state, self.state_path, indent=2)
 
     def run(self) -> None:
         planner = self.factory.planner()
@@ -72,34 +108,3 @@ class CrossValidationPipeline:
             }, title="Done")
         finally:
             self.logger.close()
-
-    def _run_training(self) -> list[dict]:
-        stage   = FoldTrainingStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, logger=self.logger)
-        results = stage.run()
-
-        failed = [r for r in results if r["status"] != "DONE"]
-        self._mark_stage("training", "completed" if not failed else "partial")
-        return results
-
-    def _run_inference(self, planner: FoldPlanner) -> list[dict]:
-        stage   = FoldInferenceStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, planner=planner, logger=self.logger)
-        results = stage.run()
-
-        failed = [r for r in results if r["status"] == "FAILED"]
-        self._mark_stage("inference", "completed" if not failed else "partial")
-        return results
-
-    def _run_reports(self, planner: FoldPlanner) -> Path:
-        stage   = CrossValidationReportStage(config=self.config, run_tag=self.run_tag, planner=planner, logger=self.logger)
-        out_dir = stage.run()
-
-        self._mark_stage("reports", "completed")
-        return out_dir
-
-    def _mark_stage(self, stage_name: str, status: str) -> None:
-        self.state["stages"][stage_name] = {
-            "status"    : status,
-            "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-
-        FileIO.save_json(self.state, self.state_path, indent=2)

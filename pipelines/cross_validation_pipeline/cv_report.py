@@ -9,10 +9,10 @@ import numpy as np
 from pipelines.benchmark_pipeline.results import ComparisonReport
 from pipelines.benchmark_pipeline.results import TrialRecord
 from pipelines.cross_validation_pipeline.folds import FoldPlanner
-from pipelines.shared import FileIO, MetricSectionGrouper
-from pipelines.shared.scoring import FiniteScalar
-from tools.logger import Logger
-from tools.markdown import MarkdownTable, ScalarFormatter
+from tools import FileIO, MetricSectionGrouper
+from tools.metrics.scoring import FiniteScalar
+from tools.monitoring.logger import Logger
+from tools.reporting.markdown import MarkdownTable, ScalarFormatter
 
 
 class CrossValidationReport:
@@ -35,28 +35,6 @@ class CrossValidationReport:
         self.logger           = logger
         self.grouper          = MetricSectionGrouper()
         self.timestamp        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    def write_all(self) -> list[Path]:
-        self._require_all_folds()
-
-        FileIO.ensure_dir(self.out_dir)
-
-        written = [self._write_aggregate()]
-
-        for split, records in self.records_by_split.items():
-            report = ComparisonReport(
-                records         = records,
-                out_dir         = self.out_dir / split,
-                reference_model = self.model_name,
-                embed_images    = self.embed_images,
-                logger          = self.logger,
-                rank_models     = False,
-            )
-            written.extend(report.write_all())
-
-        written.append(self._write_summary_json())
-
-        return written
 
     def _require_all_folds(self) -> None:
         n_total = self.planner.n_folds
@@ -225,3 +203,25 @@ class CrossValidationReport:
 
         out = self.out_dir / "cv_summary.json"
         return FileIO.save_json(payload, out, indent=2)
+
+    def write_all(self) -> list[Path]:
+        self._require_all_folds()
+
+        FileIO.ensure_dir(self.out_dir)
+
+        written = [self._write_aggregate()]
+
+        for split, records in self.records_by_split.items():
+            report = ComparisonReport(
+                records         = records,
+                out_dir         = self.out_dir / split,
+                reference_model = self.model_name,
+                embed_images    = self.embed_images,
+                logger          = self.logger,
+                rank_models     = False,
+            )
+            written.extend(report.write_all())
+
+        written.append(self._write_summary_json())
+
+        return written

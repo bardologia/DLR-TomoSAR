@@ -3,19 +3,6 @@ from __future__ import annotations
 
 class EquationLibrary:
 
-    def collect(self) -> list[dict]:
-        return [
-            self._signal_model(),
-            self._processing(),
-            self._param_extraction(),
-            self._dataset(),
-            self._training_loss(),
-            self._training_optim(),
-            self._diagnostics(),
-            self._inference(),
-            self._tuning(),
-        ]
-
     def _signal_model(self) -> dict:
         return {
             "group" : "Signal Model",
@@ -1033,6 +1020,119 @@ class EquationLibrary:
             ],
         }
 
+    def _diagnostics(self) -> dict:
+        return {
+            "group" : "Diagnostics",
+            "blurb" : "Training-time slot diagnostics from tools/permutation_metrics.py, computed on validation batches to watch the model's internal slot organisation.",
+            "items" : [
+                {
+                    "title" : "Mu ordering rate (batch)",
+                    "tex"   : r"\mathrm{rate} = \frac{\left|\left\{(b,h,w) : n^{\mathrm{act}} \geq 2 \wedge \text{no adjacent active violation}\right\}\right|}{\left|\left\{(b,h,w) : n^{\mathrm{act}} \geq 2\right\}\right|}, \qquad \text{violation} \iff \mu_{k} \geq \mu_{k+1} \wedge \text{both active}",
+                    "note"  : "Same definition as the inference metric, evaluated on training batches with threshold 1e-3.",
+                    "vars"  : [
+                        {"sym": r"n^{\mathrm{act}}",  "desc": "active predicted slots at the pixel"},
+                        {"sym": r"\mu_k, \mu_{k+1}",  "desc": "predicted means of adjacent slots"},
+                        {"sym": r"(b, h, w)",         "desc": "batch sample and pixel position"},
+                    ],
+                },
+                {
+                    "title" : "Assignment cost margin",
+                    "tex"   : r"\mathrm{margin} = \operatorname{mean}\!\left(c_{(2)} - c_{(1)}\right), \qquad \mathrm{rel} = \operatorname{mean}\!\left(\frac{c_{(2)} - c_{(1)}}{c_{(1)}}\right), \qquad \mathrm{ambiguous} = \operatorname{mean}\!\left(\mathbf{1}\!\left[\mathrm{rel} < 0.05\right]\right)",
+                    "note"  : "Gap between the best and second-best slot permutation per pixel; small margins mean interchangeable slots, the ambiguous fraction counts near-ties. The denominator carries a 1e-8 stabiliser in code.",
+                    "vars"  : [
+                        {"sym": r"c_{(1)}",            "desc": "lowest permutation cost at the pixel"},
+                        {"sym": r"c_{(2)}",            "desc": "second-lowest permutation cost"},
+                        {"sym": r"\mathrm{margin}",    "desc": "mean absolute best-to-second gap"},
+                        {"sym": r"\mathrm{rel}",       "desc": "mean relative gap"},
+                        {"sym": r"\mathrm{ambiguous}", "desc": "fraction of pixels with rel below 5%"},
+                    ],
+                },
+                {
+                    "title" : "Slot activation statistics",
+                    "tex"   : r"\mathrm{rate}_i = \operatorname{mean}\!\left(\mathbf{1}\!\left[a_i > 10^{-3}\right]\right), \qquad \mathrm{spread} = \operatorname{std}\!\left(\mathrm{rate}_1, \dots, \mathrm{rate}_G\right)",
+                    "note"  : "Per-slot activation rate and mean amplitude, plus the spread of rates across slots; uneven rates show specialised slot roles.",
+                    "vars"  : [
+                        {"sym": r"\mathrm{rate}_i", "desc": "fraction of pixels where slot i is active"},
+                        {"sym": r"a_i",             "desc": "predicted amplitude of slot i"},
+                        {"sym": r"G",               "desc": "number of slots"},
+                        {"sym": r"\mathrm{spread}", "desc": "standard deviation of the per-slot rates"},
+                    ],
+                },
+                {
+                    "title" : "Slot mu spread",
+                    "tex"   : r"\mathrm{mean}_i = \operatorname{mean}(\mu_i), \qquad \mathrm{std}_i = \operatorname{std}(\mu_i), \qquad \mathrm{spread} = \operatorname{std}\!\left(\mathrm{mean}_1, \dots, \mathrm{mean}_G\right)",
+                    "note"  : "Where each slot centres its Gaussians on average; a large spread of slot means shows slots claiming distinct elevation bands.",
+                    "vars"  : [
+                        {"sym": r"\mu_i",                           "desc": "predicted mean elevation of slot i"},
+                        {"sym": r"\mathrm{mean}_i, \mathrm{std}_i", "desc": "batch statistics of slot i's mu"},
+                        {"sym": r"\mathrm{spread}",                 "desc": "std of the per-slot means"},
+                        {"sym": r"G",                               "desc": "number of slots"},
+                    ],
+                },
+                {
+                    "title" : "Placeholder detection (batch)",
+                    "tex"   : r"\mathrm{Prec} = \frac{TP}{TP + FP}, \qquad \mathrm{Rec} = \frac{TP}{TP + FN}, \qquad F1 = \frac{2\,\mathrm{Prec}\,\mathrm{Rec}}{\mathrm{Prec} + \mathrm{Rec}}",
+                    "note"  : "Inactive-slot detection scored per slot and overall on the batch, with predicted and GT placeholders defined by amplitude at most 1e-3; each denominator carries a 1e-8 stabiliser in code.",
+                    "vars"  : [
+                        {"sym": r"TP", "desc": "both predicted and GT slot inactive"},
+                        {"sym": r"FP", "desc": "predicted inactive but GT active"},
+                        {"sym": r"FN", "desc": "predicted active but GT inactive"},
+                        {"sym": r"\mathrm{Prec}, \mathrm{Rec}, F1", "desc": "precision, recall, F1"},
+                    ],
+                },
+                {
+                    "title" : "Active count error and bias",
+                    "tex"   : r"\mathrm{MAE}_{\mathrm{count}} = \operatorname{mean}\!\left|n^{\mathrm{pred}} - n^{\mathrm{GT}}\right|, \qquad \mathrm{bias} = \operatorname{mean}\!\left(n^{\mathrm{pred}} - n^{\mathrm{GT}}\right)",
+                    "note"  : "Cardinality error of the predicted number of active slots per pixel; positive bias means systematic over-activation.",
+                    "vars"  : [
+                        {"sym": r"n^{\mathrm{pred}}", "desc": "predicted active slot count per pixel"},
+                        {"sym": r"n^{\mathrm{GT}}",   "desc": "GT active slot count per pixel"},
+                        {"sym": r"\mathrm{bias}",     "desc": "signed mean count difference"},
+                    ],
+                },
+                {
+                    "title" : "Count confusion fractions",
+                    "tex"   : r"\mathrm{frac}_{jk} = \frac{\left|\{n^{\mathrm{GT}} = j \wedge n^{\mathrm{pred}} = k\}\right|}{\left|\{n^{\mathrm{GT}} = j\}\right|}",
+                    "note"  : "A per-(GT count, predicted count) confusion matrix expressed as fractions, revealing which cardinalities the model confuses.",
+                    "vars"  : [
+                        {"sym": r"\mathrm{frac}_{jk}",                 "desc": "fraction of GT-count-j pixels predicted as count k"},
+                        {"sym": r"j, k",                               "desc": "GT and predicted active counts, 0 to G"},
+                        {"sym": r"n^{\mathrm{GT}}, n^{\mathrm{pred}}", "desc": "active slot counts per pixel"},
+                    ],
+                },
+                {
+                    "title" : "Permutation consensus (batch)",
+                    "tex"   : r"\mathrm{consensus}_b = \frac{\max_\pi \mathrm{count}_b(\pi)}{\sum_\pi \mathrm{count}_b(\pi)}, \qquad f_{\mathrm{global}} = \frac{\max_\pi \sum_b \mathrm{count}_b(\pi)}{\sum_{\pi,b} \mathrm{count}_b(\pi)}",
+                    "note"  : "Computed per sample (mean and min reported) and globally across the batch; the cost matrix uses cdist on slot means with the full permutation set via einsum.",
+                    "vars"  : [
+                        {"sym": r"\mathrm{consensus}_b",  "desc": "dominant assignment fraction within sample b"},
+                        {"sym": r"\mathrm{count}_b(\pi)", "desc": "pixels of sample b whose optimum is π"},
+                        {"sym": r"f_{\mathrm{global}}",   "desc": "dominant fraction across the whole batch"},
+                        {"sym": r"\pi",                   "desc": "a slot permutation"},
+                    ],
+                },
+                {
+                    "title" : "Amplitude calibration gap",
+                    "tex"   : r"\mathrm{gap} = \operatorname{mean}\!\left(\hat{a} \mid \mathrm{GT\ active}\right) - \operatorname{mean}\!\left(\hat{a} \mid \mathrm{GT\ inactive}\right)",
+                    "note"  : "Mean predicted amplitude conditioned on GT slot activity; a large gap shows the model separating active from placeholder slots in amplitude space.",
+                    "vars"  : [
+                        {"sym": r"\hat{a}",             "desc": "predicted slot amplitude"},
+                        {"sym": r"\mathrm{GT\ active}", "desc": "pixels where the GT slot amplitude exceeds 1e-3"},
+                        {"sym": r"\mathrm{gap}",        "desc": "active-minus-inactive mean amplitude"},
+                    ],
+                },
+                {
+                    "title" : "Sigma degeneration watch",
+                    "tex"   : r"\operatorname{mean}\!\left(\hat{\sigma} \mid \mathrm{GT\ active}\right), \qquad \operatorname{mean}\!\left(\hat{\sigma} \mid \mathrm{GT\ inactive}\right)",
+                    "note"  : "Width statistics on placeholder versus active slots; placeholder sigmas that blow up or collapse indicate instability or sigma used as a kill switch.",
+                    "vars"  : [
+                        {"sym": r"\hat{\sigma}",        "desc": "predicted slot spread"},
+                        {"sym": r"\mathrm{GT\ active}", "desc": "pixels where the GT slot is active"},
+                    ],
+                },
+            ],
+        }
+
     def _inference(self) -> dict:
         return {
             "group" : "Inference",
@@ -1327,119 +1427,6 @@ class EquationLibrary:
             ],
         }
 
-    def _diagnostics(self) -> dict:
-        return {
-            "group" : "Diagnostics",
-            "blurb" : "Training-time slot diagnostics from tools/permutation_metrics.py, computed on validation batches to watch the model's internal slot organisation.",
-            "items" : [
-                {
-                    "title" : "Mu ordering rate (batch)",
-                    "tex"   : r"\mathrm{rate} = \frac{\left|\left\{(b,h,w) : n^{\mathrm{act}} \geq 2 \wedge \text{no adjacent active violation}\right\}\right|}{\left|\left\{(b,h,w) : n^{\mathrm{act}} \geq 2\right\}\right|}, \qquad \text{violation} \iff \mu_{k} \geq \mu_{k+1} \wedge \text{both active}",
-                    "note"  : "Same definition as the inference metric, evaluated on training batches with threshold 1e-3.",
-                    "vars"  : [
-                        {"sym": r"n^{\mathrm{act}}",  "desc": "active predicted slots at the pixel"},
-                        {"sym": r"\mu_k, \mu_{k+1}",  "desc": "predicted means of adjacent slots"},
-                        {"sym": r"(b, h, w)",         "desc": "batch sample and pixel position"},
-                    ],
-                },
-                {
-                    "title" : "Assignment cost margin",
-                    "tex"   : r"\mathrm{margin} = \operatorname{mean}\!\left(c_{(2)} - c_{(1)}\right), \qquad \mathrm{rel} = \operatorname{mean}\!\left(\frac{c_{(2)} - c_{(1)}}{c_{(1)}}\right), \qquad \mathrm{ambiguous} = \operatorname{mean}\!\left(\mathbf{1}\!\left[\mathrm{rel} < 0.05\right]\right)",
-                    "note"  : "Gap between the best and second-best slot permutation per pixel; small margins mean interchangeable slots, the ambiguous fraction counts near-ties. The denominator carries a 1e-8 stabiliser in code.",
-                    "vars"  : [
-                        {"sym": r"c_{(1)}",            "desc": "lowest permutation cost at the pixel"},
-                        {"sym": r"c_{(2)}",            "desc": "second-lowest permutation cost"},
-                        {"sym": r"\mathrm{margin}",    "desc": "mean absolute best-to-second gap"},
-                        {"sym": r"\mathrm{rel}",       "desc": "mean relative gap"},
-                        {"sym": r"\mathrm{ambiguous}", "desc": "fraction of pixels with rel below 5%"},
-                    ],
-                },
-                {
-                    "title" : "Slot activation statistics",
-                    "tex"   : r"\mathrm{rate}_i = \operatorname{mean}\!\left(\mathbf{1}\!\left[a_i > 10^{-3}\right]\right), \qquad \mathrm{spread} = \operatorname{std}\!\left(\mathrm{rate}_1, \dots, \mathrm{rate}_G\right)",
-                    "note"  : "Per-slot activation rate and mean amplitude, plus the spread of rates across slots; uneven rates show specialised slot roles.",
-                    "vars"  : [
-                        {"sym": r"\mathrm{rate}_i", "desc": "fraction of pixels where slot i is active"},
-                        {"sym": r"a_i",             "desc": "predicted amplitude of slot i"},
-                        {"sym": r"G",               "desc": "number of slots"},
-                        {"sym": r"\mathrm{spread}", "desc": "standard deviation of the per-slot rates"},
-                    ],
-                },
-                {
-                    "title" : "Slot mu spread",
-                    "tex"   : r"\mathrm{mean}_i = \operatorname{mean}(\mu_i), \qquad \mathrm{std}_i = \operatorname{std}(\mu_i), \qquad \mathrm{spread} = \operatorname{std}\!\left(\mathrm{mean}_1, \dots, \mathrm{mean}_G\right)",
-                    "note"  : "Where each slot centres its Gaussians on average; a large spread of slot means shows slots claiming distinct elevation bands.",
-                    "vars"  : [
-                        {"sym": r"\mu_i",                           "desc": "predicted mean elevation of slot i"},
-                        {"sym": r"\mathrm{mean}_i, \mathrm{std}_i", "desc": "batch statistics of slot i's mu"},
-                        {"sym": r"\mathrm{spread}",                 "desc": "std of the per-slot means"},
-                        {"sym": r"G",                               "desc": "number of slots"},
-                    ],
-                },
-                {
-                    "title" : "Placeholder detection (batch)",
-                    "tex"   : r"\mathrm{Prec} = \frac{TP}{TP + FP}, \qquad \mathrm{Rec} = \frac{TP}{TP + FN}, \qquad F1 = \frac{2\,\mathrm{Prec}\,\mathrm{Rec}}{\mathrm{Prec} + \mathrm{Rec}}",
-                    "note"  : "Inactive-slot detection scored per slot and overall on the batch, with predicted and GT placeholders defined by amplitude at most 1e-3; each denominator carries a 1e-8 stabiliser in code.",
-                    "vars"  : [
-                        {"sym": r"TP", "desc": "both predicted and GT slot inactive"},
-                        {"sym": r"FP", "desc": "predicted inactive but GT active"},
-                        {"sym": r"FN", "desc": "predicted active but GT inactive"},
-                        {"sym": r"\mathrm{Prec}, \mathrm{Rec}, F1", "desc": "precision, recall, F1"},
-                    ],
-                },
-                {
-                    "title" : "Active count error and bias",
-                    "tex"   : r"\mathrm{MAE}_{\mathrm{count}} = \operatorname{mean}\!\left|n^{\mathrm{pred}} - n^{\mathrm{GT}}\right|, \qquad \mathrm{bias} = \operatorname{mean}\!\left(n^{\mathrm{pred}} - n^{\mathrm{GT}}\right)",
-                    "note"  : "Cardinality error of the predicted number of active slots per pixel; positive bias means systematic over-activation.",
-                    "vars"  : [
-                        {"sym": r"n^{\mathrm{pred}}", "desc": "predicted active slot count per pixel"},
-                        {"sym": r"n^{\mathrm{GT}}",   "desc": "GT active slot count per pixel"},
-                        {"sym": r"\mathrm{bias}",     "desc": "signed mean count difference"},
-                    ],
-                },
-                {
-                    "title" : "Count confusion fractions",
-                    "tex"   : r"\mathrm{frac}_{jk} = \frac{\left|\{n^{\mathrm{GT}} = j \wedge n^{\mathrm{pred}} = k\}\right|}{\left|\{n^{\mathrm{GT}} = j\}\right|}",
-                    "note"  : "A per-(GT count, predicted count) confusion matrix expressed as fractions, revealing which cardinalities the model confuses.",
-                    "vars"  : [
-                        {"sym": r"\mathrm{frac}_{jk}",                 "desc": "fraction of GT-count-j pixels predicted as count k"},
-                        {"sym": r"j, k",                               "desc": "GT and predicted active counts, 0 to G"},
-                        {"sym": r"n^{\mathrm{GT}}, n^{\mathrm{pred}}", "desc": "active slot counts per pixel"},
-                    ],
-                },
-                {
-                    "title" : "Permutation consensus (batch)",
-                    "tex"   : r"\mathrm{consensus}_b = \frac{\max_\pi \mathrm{count}_b(\pi)}{\sum_\pi \mathrm{count}_b(\pi)}, \qquad f_{\mathrm{global}} = \frac{\max_\pi \sum_b \mathrm{count}_b(\pi)}{\sum_{\pi,b} \mathrm{count}_b(\pi)}",
-                    "note"  : "Computed per sample (mean and min reported) and globally across the batch; the cost matrix uses cdist on slot means with the full permutation set via einsum.",
-                    "vars"  : [
-                        {"sym": r"\mathrm{consensus}_b",  "desc": "dominant assignment fraction within sample b"},
-                        {"sym": r"\mathrm{count}_b(\pi)", "desc": "pixels of sample b whose optimum is π"},
-                        {"sym": r"f_{\mathrm{global}}",   "desc": "dominant fraction across the whole batch"},
-                        {"sym": r"\pi",                   "desc": "a slot permutation"},
-                    ],
-                },
-                {
-                    "title" : "Amplitude calibration gap",
-                    "tex"   : r"\mathrm{gap} = \operatorname{mean}\!\left(\hat{a} \mid \mathrm{GT\ active}\right) - \operatorname{mean}\!\left(\hat{a} \mid \mathrm{GT\ inactive}\right)",
-                    "note"  : "Mean predicted amplitude conditioned on GT slot activity; a large gap shows the model separating active from placeholder slots in amplitude space.",
-                    "vars"  : [
-                        {"sym": r"\hat{a}",             "desc": "predicted slot amplitude"},
-                        {"sym": r"\mathrm{GT\ active}", "desc": "pixels where the GT slot amplitude exceeds 1e-3"},
-                        {"sym": r"\mathrm{gap}",        "desc": "active-minus-inactive mean amplitude"},
-                    ],
-                },
-                {
-                    "title" : "Sigma degeneration watch",
-                    "tex"   : r"\operatorname{mean}\!\left(\hat{\sigma} \mid \mathrm{GT\ active}\right), \qquad \operatorname{mean}\!\left(\hat{\sigma} \mid \mathrm{GT\ inactive}\right)",
-                    "note"  : "Width statistics on placeholder versus active slots; placeholder sigmas that blow up or collapse indicate instability or sigma used as a kill switch.",
-                    "vars"  : [
-                        {"sym": r"\hat{\sigma}",        "desc": "predicted slot spread"},
-                        {"sym": r"\mathrm{GT\ active}", "desc": "pixels where the GT slot is active"},
-                    ],
-                },
-            ],
-        }
-
     def _tuning(self) -> dict:
         return {
             "group" : "Tuning",
@@ -1483,3 +1470,16 @@ class EquationLibrary:
                 },
             ],
         }
+
+    def collect(self) -> list[dict]:
+        return [
+            self._signal_model(),
+            self._processing(),
+            self._param_extraction(),
+            self._dataset(),
+            self._training_loss(),
+            self._training_optim(),
+            self._diagnostics(),
+            self._inference(),
+            self._tuning(),
+        ]

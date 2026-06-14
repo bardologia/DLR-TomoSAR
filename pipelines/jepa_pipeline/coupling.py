@@ -7,11 +7,7 @@ import torch.nn as nn
 
 
 class StageAMode:
-    VALID = ("frozen", "finetune", "joint")
-
     def __init__(self, kind: str) -> None:
-        if kind not in self.VALID:
-            raise ValueError(f"Unknown stage_a_mode '{kind}'. Available: {self.VALID}")
         self.kind = kind
 
     @property
@@ -34,11 +30,7 @@ class StageAMode:
 
 
 class TargetProvider:
-    VALID = ("stopgrad", "live", "ema")
-
     def __init__(self, kind: str, encoder: nn.Module, decay: float = 0.996) -> None:
-        if kind not in self.VALID:
-            raise ValueError(f"Unknown target_provider '{kind}'. Available: {self.VALID}")
         self.kind  = kind
         self.decay = float(decay)
 
