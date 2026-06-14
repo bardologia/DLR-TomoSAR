@@ -65,7 +65,7 @@ class InferenceConfig:
 
 @dataclass
 class InferenceEntryConfig:
-    logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
+    logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     run_filter : List[str] = field(default_factory=list)
     gpu        : int       = 0
 

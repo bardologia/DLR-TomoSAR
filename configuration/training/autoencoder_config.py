@@ -43,7 +43,7 @@ class ProfileAeEntryConfig:
     gpu         : int        = 0
     seed        : int        = 0
     n_gaussians : int        = 5
-    logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/jepa_stage_a")
+    logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
 
     pixel_subsample : float = 1.0
     keep_empty_frac : float = 0.05

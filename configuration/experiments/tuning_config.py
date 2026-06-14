@@ -33,7 +33,7 @@ class TuningConfig:
 class TuningEntryConfig:
     training_type : str = "backbone"
 
-    paths  : BenchmarkPathsConfig = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/tuning")))
+    paths  : BenchmarkPathsConfig = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/tuning")))
     tuning : TuningConfig         = field(default_factory=TuningConfig)
 
     gpus         : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])

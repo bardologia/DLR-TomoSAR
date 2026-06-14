@@ -77,7 +77,7 @@ class BackboneEntryConfig:
     gpu             : int        = 0
     seed            : int        = 0
     n_gaussians     : int        = 5
-    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/logs/test")
+    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
     paths      : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)

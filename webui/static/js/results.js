@@ -186,7 +186,7 @@ class ResultsView {
     box.innerHTML =
       `<div class="res-src__head">Sources</div>` +
       `<label>Datasets dir<input id="res-src-datasets" type="text" value="${this._esc(this.sources.datasets)}" placeholder="/path/to/datasets" spellcheck="false" autocomplete="off" /></label>` +
-      `<label>Runs dir<input id="res-src-logs" type="text" value="${this._esc(this.sources.logs)}" placeholder="/path/to/logs" spellcheck="false" autocomplete="off" /></label>` +
+      `<label>Runs dir<input id="res-src-logs" type="text" value="${this._esc(this.sources.logs)}" placeholder="/path/to/runs" spellcheck="false" autocomplete="off" /></label>` +
       `<button type="submit" class="btn btn--mini">Apply</button>`;
 
     box.addEventListener("submit", (ev) => {
