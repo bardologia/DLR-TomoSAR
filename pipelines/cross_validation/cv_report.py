@@ -83,8 +83,13 @@ class CrossValidationReport:
             if not numeric:
                 continue
 
-            mean, std = self._mean_std(numeric)
-            table.add_row(f"`{key}`", ScalarFormatter.format_scalar(mean), self._format_std(std, len(numeric)), f"{len(numeric)}/{n_total}", *[ScalarFormatter.format_scalar(value) for value in values])
+            mean, std  = self._mean_std(numeric)
+            mean_cell  = ScalarFormatter.format_scalar(mean)
+            std_cell   = self._format_std(std, len(numeric))
+            count_cell = f"{len(numeric)}/{n_total}"
+            fold_cells = [ScalarFormatter.format_scalar(value) for value in values]
+
+            table.add_row(f"`{key}`", mean_cell, std_cell, count_cell, *fold_cells)
 
         return [*table.render(), ""]
 
@@ -103,7 +108,10 @@ class CrossValidationReport:
             val_region    = plan.split_regions.regions("val")[0]
             train_regions = plan.split_regions.regions("train")
             train_text    = ", ".join(f"[{r.azimuth_start}, {r.azimuth_end})" for r in train_regions)
-            plan_table.add_row(plan.fold_index, f"[{test_region.azimuth_start}, {test_region.azimuth_end})", f"[{val_region.azimuth_start}, {val_region.azimuth_end})", train_text)
+            test_text     = f"[{test_region.azimuth_start}, {test_region.azimuth_end})"
+            val_text      = f"[{val_region.azimuth_start}, {val_region.azimuth_end})"
+
+            plan_table.add_row(plan.fold_index, test_text, val_text, train_text)
 
         lines += [*plan_table.render(), ""]
 
@@ -139,7 +147,11 @@ class CrossValidationReport:
 
             duration_s = record.training_result.get("duration_s")
             duration   = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
-            table.add_row(f"`{record.name}`", ScalarFormatter.format_scalar(record.checkpoint.get("best_epoch")), ScalarFormatter.format_scalar(record.checkpoint.get("best_val_loss")), ScalarFormatter.format_scalar(record.checkpoint.get("n_train_epochs")), duration)
+            epoch_cell = ScalarFormatter.format_scalar(record.checkpoint.get("best_epoch"))
+            loss_cell  = ScalarFormatter.format_scalar(record.checkpoint.get("best_val_loss"))
+            run_cell   = ScalarFormatter.format_scalar(record.checkpoint.get("n_train_epochs"))
+
+            table.add_row(f"`{record.name}`", epoch_cell, loss_cell, run_cell, duration)
 
         lines += [*table.render(), ""]
 
@@ -150,8 +162,12 @@ class CrossValidationReport:
             values = collected[key]
             if not values:
                 continue
-            mean, std = self._mean_std(values)
-            summary.add_row(label, ScalarFormatter.format_scalar(mean / scale), self._format_std(std / scale, len(values)), f"{len(values)}/{n_total}")
+            mean, std  = self._mean_std(values)
+            mean_cell  = ScalarFormatter.format_scalar(mean / scale)
+            std_cell   = self._format_std(std / scale, len(values))
+            count_cell = f"{len(values)}/{n_total}"
+
+            summary.add_row(label, mean_cell, std_cell, count_cell)
 
         if not summary.is_empty():
             lines += [*summary.render(), ""]
