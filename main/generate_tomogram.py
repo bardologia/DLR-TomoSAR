@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument("--spec", required=True, help="Path to the tomogram job spec JSON")
     args = parser.parse_args()
 
-    from pipelines.processing_pipeline.tomogram import TomogramGenerator
+    from pipelines.processing.generation.tomogram import TomogramGenerator
     from tools.monitoring.logger import Logger
 
     spec_path = Path(args.spec)

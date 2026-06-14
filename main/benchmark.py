@@ -11,7 +11,7 @@ def _scheduler() -> None:
     EnvironmentPinner.threads()
 
     from configuration.experiments.benchmark_config        import BenchmarkConfig
-    from pipelines.benchmark_pipeline.pipeline import BenchmarkPipeline
+    from pipelines.benchmark.pipeline import BenchmarkPipeline
     from tools.runtime.config_cli                      import ConfigCli
 
     config = ConfigCli(BenchmarkConfig(), description="Full architecture benchmark").apply()
@@ -24,7 +24,7 @@ def _worker(stage: str, model_name: str, gpu_id: int, run_tag: str, run_dir: str
     EnvironmentPinner.gpu(gpu_id)
 
     from configuration.experiments.benchmark_config       import BenchmarkConfig
-    from pipelines.benchmark_pipeline.workers import InferenceWorker, OverfitWorker, TrainingWorker
+    from pipelines.benchmark.workers import InferenceWorker, OverfitWorker, TrainingWorker
     from tools.runtime.config_cli                     import ConfigCli
 
     config        = BenchmarkConfig()

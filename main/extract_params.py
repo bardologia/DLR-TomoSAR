@@ -14,7 +14,7 @@ def main() -> None:
 
     EnvironmentPinner.gpus(config.gpu_device_ids)
 
-    from pipelines.param_pipeline.pipeline import DatasetQueueResolver, ParamExtractionPipeline
+    from pipelines.processing.param_extraction.pipeline import DatasetQueueResolver, ParamExtractionPipeline
 
     logger       = Logger(log_dir="logs", name="extract_params")
     base_path    = Path(config.dataset_base_path)

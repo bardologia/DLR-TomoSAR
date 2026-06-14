@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument("--spec", required=True, help="Path to the interferogram job spec JSON")
     args = parser.parse_args()
 
-    from pipelines.processing_pipeline.interferogram import InterferogramGenerator
+    from pipelines.processing.generation.interferogram import InterferogramGenerator
     from tools.monitoring.logger import Logger
 
     spec_path = Path(args.spec)

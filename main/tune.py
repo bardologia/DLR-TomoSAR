@@ -27,7 +27,7 @@ def main() -> None:
         EnvironmentPinner.threads()
 
     from configuration.experiments.tuning_config import TuningEntryConfig
-    from pipelines.tuning_pipeline.pipeline import TuningOrchestrator
+    from pipelines.tuning.pipeline import TuningOrchestrator
     from tools.runtime.config_cli import ConfigCli
 
     entry_script = Path(__file__).resolve()

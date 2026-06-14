@@ -8,7 +8,7 @@ from _bootstrap import EnvironmentPinner
 EnvironmentPinner.threads()
 
 from configuration.experiments.benchmark_config                import BenchmarkConfig
-from pipelines.benchmark_pipeline.stages           import ComparisonStage
+from pipelines.benchmark.stages           import ComparisonStage
 from tools.runtime.config_cli                              import ConfigCli
 from tools.monitoring.logger                                  import Logger
 
