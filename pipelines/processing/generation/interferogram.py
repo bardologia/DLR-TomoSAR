@@ -123,16 +123,21 @@ class InterferogramProcessor:
 
             secondaries[secondary_index] = secondary_slc
 
-            secondary_amplitude   = np.clip(np.abs(secondary_slc), 0.0, self.config.tomogram_config.max_amplitude_clip)
-            deramped_secondary    = secondary_slc * np.exp(1.0j * dem_phase)
-            phasor                = primary_slc * np.conj(deramped_secondary)
-            phasor               /= (np.abs(phasor) + 1e-30)
+            secondary_amplitude = np.clip(np.abs(secondary_slc), 0.0, self.config.tomogram_config.max_amplitude_clip)
+            phasor              = self._compute_phasor(primary_slc, secondary_slc, dem_phase)
 
             interferograms[secondary_index] = secondary_amplitude * phasor
 
-            del secondary_slc, dem_phase, deramped_secondary, phasor, secondary_amplitude
+            del secondary_slc, dem_phase, phasor, secondary_amplitude
 
         return primary, secondaries, interferograms
+
+    def _compute_phasor(self, primary_slc: np.ndarray, secondary_slc: np.ndarray, dem_phase: np.ndarray) -> np.ndarray:
+        deramped_secondary = secondary_slc * np.exp(1.0j * dem_phase)
+        phasor             = primary_slc * np.conj(deramped_secondary)
+        phasor            /= (np.abs(phasor) + 1e-30)
+
+        return phasor
 
     def build(self, crop_tuple: Tuple[int, int, int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.logger.section(f"[Building Stack] Crop parameters: {crop_tuple}")
