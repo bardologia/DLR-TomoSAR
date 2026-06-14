@@ -6,7 +6,7 @@ from pathlib import Path
 from configuration.experiments.benchmark_config import BenchmarkConfig
 from pipelines.shared.config_factory import ConfigFactory
 from tools.data.io import FileIO
-from pipelines.backbone.training.docs import LossScaleProbeConfig
+from pipelines.backbone.training.loss_probe import LossScaleProbeConfig
 
 
 class BenchmarkWorker:

@@ -131,9 +131,7 @@ class Loss:
 
         return pred, pred_phys, gt, gt_phys
 
-    def __call__(self, pred_params, gt_params):
-        cfg = self.loss_cfg
-
+    def _prepare(self, pred_params, gt_params):
         pred_params_phys = GaussianClamp.apply(
             self.norm_stats.denormalize_output(pred_params.float()),
             x_axis      = self.x_axis,
@@ -148,16 +146,16 @@ class Loss:
             gt_phys    = self.norm_stats.denormalize_output(gt_params.float())
             exp_curves = self.reconstruct(gt_phys)
 
-        pred_curves  = self.reconstruct(pred_params_phys.float())
-        exp_curves   = exp_curves.float()
+        pred_curves = self.reconstruct(pred_params_phys.float())
+        exp_curves  = exp_curves.float()
 
+        return pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves
+
+    def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys) -> dict:
         lc = CurveLoss
         pc = PhysicalLoss
 
-        needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
-        diff       = (pred_curves - exp_curves) if needs_diff else None
-
-        computes = {
+        return {
             "mse_curve":          lambda: lc.mse_diff(diff),
             "l1_curve":           lambda: lc.l1_diff(diff),
             "huber_curve":        lambda: lc.huber_diff(diff, cfg.huber_delta),
@@ -173,6 +171,16 @@ class Loss:
             "param_huber":        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0],
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
         }
+
+    def __call__(self, pred_params, gt_params):
+        cfg = self.loss_cfg
+
+        pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_params, gt_params)
+
+        needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
+        diff       = (pred_curves - exp_curves) if needs_diff else None
+
+        computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys)
 
         components:    dict  = {}
         weighted:      dict  = {}

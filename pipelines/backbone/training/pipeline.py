@@ -14,7 +14,7 @@ from configuration.training.training_config           import TrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from tools.orchestration          import ExperimentStage, GpuJob
-from pipelines.backbone.training.docs        import LossScaleProbeConfig
+from pipelines.backbone.training.loss_probe   import LossScaleProbeConfig
 from pipelines.backbone.training.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.run_metadata           import TrainingRunMetadata

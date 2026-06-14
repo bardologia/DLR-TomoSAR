@@ -7,10 +7,19 @@ import numpy as np
 from tools.baselines import TrackBaselines
 
 
-class CurriculumTrialPlanner:
+class TrialPlanner:
+    def __init__(self, model_name: str, warmup_losses: dict) -> None:
+        self.model_name    = model_name
+        self.warmup_losses = warmup_losses
+
+    @staticmethod
+    def _warmup_overrides(loss: dict) -> dict:
+        return {f"curriculum.warmup.{key}": value for key, value in loss.items()}
+
+
+class CurriculumTrialPlanner(TrialPlanner):
     def __init__(self, model_name: str, warmup_losses: dict, complete_losses: dict) -> None:
-        self.model_name      = model_name
-        self.warmup_losses   = warmup_losses
+        super().__init__(model_name, warmup_losses)
         self.complete_losses = complete_losses
 
     def summary(self) -> dict:
@@ -23,18 +32,14 @@ class CurriculumTrialPlanner:
             for complete_label, complete_loss in self.complete_losses.items():
                 run_name  = f"{self.model_name}_w-{warmup_label}_c-{complete_label}"
                 overrides = {"curriculum.enabled": True}
-                overrides.update({f"curriculum.warmup.{key}":   value for key, value in warmup_loss.items()})
+                overrides.update(self._warmup_overrides(warmup_loss))
                 overrides.update({f"curriculum.complete.{key}": value for key, value in complete_loss.items()})
                 plans.append((run_name, overrides))
 
         return plans
 
 
-class WarmupTrialPlanner:
-    def __init__(self, model_name: str, warmup_losses: dict) -> None:
-        self.model_name    = model_name
-        self.warmup_losses = warmup_losses
-
+class WarmupTrialPlanner(TrialPlanner):
     def summary(self) -> dict:
         return {"Warmup losses": len(self.warmup_losses)}
 
@@ -44,7 +49,7 @@ class WarmupTrialPlanner:
         for label, loss in self.warmup_losses.items():
             run_name  = f"{self.model_name}_nc-{label}"
             overrides = {"curriculum.enabled": False}
-            overrides.update({f"curriculum.warmup.{key}": value for key, value in loss.items()})
+            overrides.update(self._warmup_overrides(loss))
             plans.append((run_name, overrides))
 
         return plans

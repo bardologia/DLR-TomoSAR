@@ -173,7 +173,7 @@ class Trainer(BaseTrainer):
         if probe_config is None or not probe_config.enabled:
             return
 
-        from pipelines.backbone.training.docs import LossScaleProbe
+        from pipelines.backbone.training.loss_probe import LossScaleProbe
 
         probe = LossScaleProbe(
             probe_cfg    = probe_config,
