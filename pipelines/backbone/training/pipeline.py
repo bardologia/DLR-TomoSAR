@@ -8,6 +8,7 @@ from pathlib     import Path
 import numpy as np
 import torch
 
+from models                                       import IMAGE_SIZE_MODELS
 from configuration.data.dataset_config            import DatasetConfiguration
 from configuration.training.training_config           import TrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
@@ -20,8 +21,6 @@ from pipelines.shared.run_metadata           import TrainingRunMetadata
 from tools.runtime.config_cli                        import ConfigCli
 from tools.monitoring.logger                            import Logger
 from tools.runtime.reproducibility                   import Reproducibility
-
-_IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 class TrainingPipeline:
@@ -65,7 +64,7 @@ class TrainingPipeline:
         from models import get_model
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.model_name in _IMAGE_SIZE_MODELS:
+        if self.model_name in IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
         model, model_cfg = get_model(self.model_name, config=self.model_config, **overrides)

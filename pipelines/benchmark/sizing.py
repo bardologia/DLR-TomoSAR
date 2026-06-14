@@ -5,10 +5,9 @@ from dataclasses import dataclass, field
 
 from configuration.experiments.benchmark_config import BenchmarkConfig
 from configuration.sar.gaussian_config import GaussianConfig
-from models import CONFIG_REGISTRY, get_model
+from models import CONFIG_REGISTRY, IMAGE_SIZE_MODELS, get_model
 from tools.monitoring.logger import Logger
 
-_IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 @dataclass
@@ -196,7 +195,7 @@ class SizeMatcher:
 
     def _count(self, model_name: str, model_config) -> int:
         overrides = {"in_channels": self.in_channels, "out_channels": self.out_channels}
-        if model_name in _IMAGE_SIZE_MODELS:
+        if model_name in IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
         model, _   = get_model(model_name, config=model_config, **overrides)

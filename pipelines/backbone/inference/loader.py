@@ -13,7 +13,7 @@ from configuration.data.dataset_config    import DatasetConfiguration, InputConf
 from configuration.inference.inference_config  import InferenceConfig
 from tools.data.regions                   import CropRegion
 from configuration.sar.gaussian_config import GaussianConfig
-from models                          import get_model
+from models                          import IMAGE_SIZE_MODELS, get_model
 from pipelines.backbone.dataset.datasets      import PatchDataset
 from pipelines.backbone.dataset.normalization import Normalizer, Stats
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
@@ -23,7 +23,6 @@ from tools.monitoring.logger                    import Logger
 from tools.baselines           import TrackBaselines, TrackProfiles
 
 
-_IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 class InferenceMetadata:
@@ -173,7 +172,7 @@ class RunLoader:
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
 
-        if model_name in _IMAGE_SIZE_MODELS:
+        if model_name in IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
 
         model, _ = get_model(model_name, config=model_config, **overrides)

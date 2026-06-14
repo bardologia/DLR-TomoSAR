@@ -3,14 +3,13 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from models                                      import get_model
+from models                                      import IMAGE_SIZE_MODELS, get_model
 from models.autoencoder                          import get_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.backbone.inference.loader         import ModelWrapper, RunLoader
 from pipelines.jepa.training.trainer             import JepaModule
 from tools.data.io                               import AutoencoderConfigIO, ModelConfigIO
 
-_IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 class JepaInferenceModel(nn.Module):
@@ -31,7 +30,7 @@ class JepaRunLoader(RunLoader):
         model_config, _ = ModelConfigIO.load(self.meta_directory)
 
         overrides = {"in_channels": in_channels, "out_channels": ae_cfg.embedding_dim}
-        if model_name in _IMAGE_SIZE_MODELS:
+        if model_name in IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
         backbone, _ = get_model(model_name, config=model_config, **overrides)
 

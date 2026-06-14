@@ -88,6 +88,9 @@ CONFIG_REGISTRY: dict[str, type] = {
 }
 
 
+IMAGE_SIZE_MODELS: frozenset[str] = frozenset({"swin_unet", "transunet", "unetr"})
+
+
 def get_model(name: str, config=None, **overrides):
     key = name.lower().replace("-", "_").replace(" ", "_")
     if key not in MODEL_REGISTRY:
@@ -147,6 +150,7 @@ __all__ = [
     "get_model",
     "MODEL_REGISTRY",
     "CONFIG_REGISTRY",
+    "IMAGE_SIZE_MODELS",
     "build_activation",
     "build_norm2d",
     "build_upsample",

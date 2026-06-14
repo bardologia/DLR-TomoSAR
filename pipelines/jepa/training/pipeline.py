@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 from configuration.training.jepa_config              import JepaTrainerConfig
-from models                                 import get_model
+from models                                 import IMAGE_SIZE_MODELS, get_model
 from models.autoencoder             import get_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.shared.config_factory import ConfigFactory
@@ -15,7 +15,6 @@ from pipelines.jepa.training.trainer   import JepaModule, Trainer
 from tools.data.io                          import AutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
-_IMAGE_SIZE_MODELS = {"swin_unet", "transunet", "unetr"}
 
 
 class TrainingPipeline:
@@ -62,7 +61,7 @@ class TrainingPipeline:
 
     def _build_backbone(self, in_channels: int, embedding_dim: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": embedding_dim}
-        if self.model_name in _IMAGE_SIZE_MODELS:
+        if self.model_name in IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
         for k, v in self.entry.model_overrides.items():
             overrides[k] = v
