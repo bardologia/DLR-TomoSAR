@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import HRNetLiteConfig
+from configuration.model.models_config import HRNetLiteConfig
 from .blocks import build_activation, build_norm2d, initialize_weights
 from .blocks import ResidualConvBlock
 

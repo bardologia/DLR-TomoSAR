@@ -6,17 +6,17 @@ from pathlib import Path
 import optuna
 from optuna.trial import TrialState
 
-from configuration.benchmark_config import TrainingQueueConfig
-from configuration.dataset_config import DatasetConfiguration
-from configuration.dataset_config import PatchConfiguration
-from configuration.dataset_config import SplitRegions
-from configuration.gaussian_config     import GaussianConfig
-from configuration.geometry_config     import GeometryConfig
-from configuration.loss_config         import LossConfig, LossCurriculumConfig
-from configuration.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.runtime_config      import IOConfig, TrainingLoopConfig
-from configuration.training_config     import TrainerConfig
-from configuration.tuning_config import TuningConfig
+from configuration.experiments.benchmark_config import TrainingQueueConfig
+from configuration.data.dataset_config import DatasetConfiguration
+from configuration.data.dataset_config import PatchConfiguration
+from configuration.data.dataset_config import SplitRegions
+from configuration.sar.gaussian_config     import GaussianConfig
+from configuration.sar.geometry_config     import GeometryConfig
+from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
+from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.training.runtime_config      import IOConfig, TrainingLoopConfig
+from configuration.training.training_config     import TrainerConfig
+from configuration.experiments.tuning_config import TuningConfig
 from models import CONFIG_REGISTRY
 from tools import FileIO
 from tools import GpuJob

@@ -9,10 +9,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.dataset_config    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
-from configuration.inference_config  import InferenceConfig
+from configuration.data.dataset_config    import DatasetConfiguration, InputConfig, OutputConfig, PatchConfiguration, SplitRegions
+from configuration.inference.inference_config  import InferenceConfig
 from tools.data.regions                   import CropRegion
-from configuration.gaussian_config import GaussianConfig
+from configuration.sar.gaussian_config import GaussianConfig
 from models                          import get_model
 from pipelines.dataset_pipeline.datasets      import PatchDataset
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats

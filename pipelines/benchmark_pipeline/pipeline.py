@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from configuration.benchmark_config import BenchmarkConfig
+from configuration.experiments.benchmark_config import BenchmarkConfig
 from models import CONFIG_REGISTRY
 from tools.data.io import FileIO
 from tools.config_cli import ConfigCli

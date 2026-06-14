@@ -13,7 +13,7 @@ from scipy.signal import find_peaks
 import jax
 import jax.numpy as jnp
 
-from configuration.param_extraction_config import FitSettings
+from configuration.param.param_extraction_config import FitSettings
 from tools.data.preprocessing         import ProfilePreprocessor
 from tools.data.gaussians                        import GaussianMixture
 from tools.monitoring.logger                           import Logger

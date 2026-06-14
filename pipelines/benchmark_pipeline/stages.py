@@ -5,7 +5,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from configuration.benchmark_config              import BenchmarkConfig
+from configuration.experiments.benchmark_config              import BenchmarkConfig
 from pipelines.benchmark_pipeline.results        import ComparisonReport, TrialCollector
 from pipelines.benchmark_pipeline.sizing         import SizeMatcher, SizeMatchResult
 from tools.orchestration              import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage

@@ -4,7 +4,7 @@ import _bootstrap
 
 from datetime import datetime
 
-from configuration.processing_config import (
+from configuration.sar.processing_config import (
     CropRegion,
     ParallelConfiguration,
     PathConfiguration,

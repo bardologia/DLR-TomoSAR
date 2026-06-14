@@ -7,7 +7,7 @@ from typing      import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader
 
-from configuration.dataset_config             import DatasetConfiguration
+from configuration.data.dataset_config             import DatasetConfiguration
 from tools.data.regions                            import CropRegion
 from pipelines.dataset_pipeline.datasets      import Loader, MultiRegionDataset, PatchDataset, SpatialAugmenter
 from pipelines.dataset_pipeline.normalization import Normalizer, Stats, StatsComputer

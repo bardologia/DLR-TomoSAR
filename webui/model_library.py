@@ -136,7 +136,7 @@ class ModelLibrary:
         return resolved
 
     def _import_models_config(self):
-        config_dir = Path(__file__).resolve().parent.parent / "configuration"
+        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
         path       = str(config_dir)
 
         if path not in sys.path:

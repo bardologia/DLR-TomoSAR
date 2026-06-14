@@ -1,4 +1,4 @@
-from configuration.models_config import (
+from configuration.model.models_config import (
     AttentionUNetConfig,
     ConvNeXtUNetConfig,
     DeepLabV3PlusConfig,

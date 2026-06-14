@@ -10,7 +10,7 @@ from typing import Tuple
 import h5py
 import numpy as np
 
-from configuration.processing_config              import (
+from configuration.sar.processing_config              import (
     ParallelConfiguration,
     PathConfiguration,
     ProcessingConfiguration,

@@ -8,7 +8,7 @@ from tools.conda_env import CondaJobDispatcher
 from tools.monitoring.logger import Logger
 
 if TYPE_CHECKING:
-    from configuration.processing_config import ProcessingConfiguration
+    from configuration.sar.processing_config import ProcessingConfiguration
 
 
 class TomogramBuilder:

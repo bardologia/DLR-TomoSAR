@@ -4,7 +4,7 @@ import gc
 from pathlib import Path
 from typing  import Tuple
 
-from configuration.processing_config             import ProcessingConfiguration
+from configuration.sar.processing_config             import ProcessingConfiguration
 from pipelines.processing_pipeline.artifacts     import ArtifactRegistry, MetadataManager
 from pipelines.processing_pipeline.plots         import StackPlotter
 from tools                            import FileIO, ProcessPoolRunner

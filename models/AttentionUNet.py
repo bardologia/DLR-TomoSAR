@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import AttentionUNetConfig
+from configuration.model.models_config import AttentionUNetConfig
 from .blocks import ConvBlock, build_norm2d, build_upsample, initialize_weights, match_spatial_size
 
 class AttentionGate(nn.Module):

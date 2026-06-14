@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.models_config import UNETRConfig
+from configuration.model.models_config import UNETRConfig
 from .blocks import ConvBlock, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 

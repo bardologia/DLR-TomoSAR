@@ -108,7 +108,7 @@ class AutoencoderConfigIO:
 
     @classmethod
     def load(cls, meta_directory: Path):
-        from configuration.models_config import AutoencoderConfig
+        from configuration.model.models_config import AutoencoderConfig
 
         return AutoencoderConfig(**FileIO.load_json(Path(meta_directory) / cls.FILENAME))
 

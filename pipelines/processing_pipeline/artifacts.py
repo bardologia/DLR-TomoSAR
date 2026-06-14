@@ -4,7 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Literal, Tuple
 
-from configuration.processing_config import ProcessingConfiguration, TomogramConfiguration
+from configuration.sar.processing_config import ProcessingConfiguration, TomogramConfiguration
 from tools.data.io             import FileIO
 from tools.monitoring.logger                    import Logger
 from tools.track_baselines           import TrackProfiles

@@ -15,7 +15,7 @@ import numpy             as np
 from PIL                 import Image
 from tqdm                import tqdm
 
-from configuration.inference_config       import InferenceConfig
+from configuration.inference.inference_config       import InferenceConfig
 from pipelines.inference_pipeline.loader  import InferenceMetadata
 from pipelines.inference_pipeline.metrics import Metrics, Result
 from pipelines.inference_pipeline.plots   import PlotTools, Ploter

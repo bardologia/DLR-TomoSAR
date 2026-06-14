@@ -3,7 +3,7 @@ from __future__ import annotations
 import traceback
 from pathlib import Path
 
-from configuration.benchmark_config import BenchmarkConfig
+from configuration.experiments.benchmark_config import BenchmarkConfig
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
 from tools.data.io import FileIO
 from pipelines.backbone_pipeline.docs import LossScaleProbeConfig

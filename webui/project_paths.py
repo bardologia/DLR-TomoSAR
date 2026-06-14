@@ -16,7 +16,7 @@ class ProjectPaths:
         "train_backbone": {
             "file"          : "train",
             "args"          : ["backbone"],
-            "config_module" : "configuration.backbone_config",
+            "config_module" : "configuration.training.backbone_config",
             "config_class"  : "BackboneEntryConfig",
         },
     }

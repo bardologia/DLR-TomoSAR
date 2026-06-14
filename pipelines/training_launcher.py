@@ -20,7 +20,7 @@ class TrainingLauncher:
         return args.stage, rest
 
     def _backbone(self, argv: list[str]) -> None:
-        from configuration.backbone_config       import BackboneEntryConfig
+        from configuration.training.backbone_config       import BackboneEntryConfig
         from pipelines.backbone_pipeline.pipeline import SingleTrainRunner, TrainScheduler
 
         trial_parser = argparse.ArgumentParser(add_help=False)
@@ -37,14 +37,14 @@ class TrainingLauncher:
         TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script, stage="backbone").run()
 
     def _jepa(self, argv: list[str]) -> None:
-        from configuration.jepa_config       import JepaEntryConfig
+        from configuration.training.jepa_config       import JepaEntryConfig
         from pipelines.jepa_pipeline.pipeline import SingleJepaRunner
 
         config = ConfigCli(JepaEntryConfig(), description="Stage-B JEPA predictor training").apply(argv)
         SingleJepaRunner(config).run()
 
     def _autoencoder(self, argv: list[str]) -> None:
-        from configuration.autoencoder_config       import ProfileAeEntryConfig
+        from configuration.training.autoencoder_config       import ProfileAeEntryConfig
         from pipelines.autoencoder_pipeline.pipeline import SingleProfileAeRunner
 
         config = ConfigCli(ProfileAeEntryConfig(), description="Stage-A profile autoencoder training").apply(argv)

@@ -125,7 +125,7 @@ class ScriptConfigResolver:
         return None
 
     def _signature(self, key: str) -> tuple:
-        watched = sorted(self.paths.config_dir.glob("*.py"))
+        watched = sorted(self.paths.config_dir.rglob("*.py"))
         watched.append(self.paths.script_entry(key)["path"])
         watched.append(self.paths.repo_root / "tools" / "config_cli.py")
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from configuration.jepa_config              import JepaTrainerConfig
+from configuration.training.jepa_config              import JepaTrainerConfig
 from models                                 import get_model
 from models.autoencoder             import Autoencoder
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory

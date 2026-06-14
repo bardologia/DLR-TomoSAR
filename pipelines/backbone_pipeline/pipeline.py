@@ -12,8 +12,8 @@ import torch
 from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
 from torch.utils.tensorboard import SummaryWriter
 
-from configuration.dataset_config            import DatasetConfiguration
-from configuration.training_config           import TrainerConfig
+from configuration.data.dataset_config            import DatasetConfiguration
+from configuration.training.training_config           import TrainerConfig
 from pipelines.dataset_pipeline.pipeline     import DatasetPipeline
 from pipelines.inference_pipeline.pipeline   import InferencePipeline
 from tools.data.io                     import FileIO, ModelConfigIO

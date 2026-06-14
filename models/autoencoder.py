@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from configuration.models_config import AutoencoderConfig
+from configuration.model.models_config import AutoencoderConfig
 from .blocks import build_activation, initialize_weights
 
 

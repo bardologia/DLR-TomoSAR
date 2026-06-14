@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.benchmark_config import BenchmarkConfig
-from configuration.inference_config import InferenceConfig
+from configuration.experiments.benchmark_config import BenchmarkConfig
+from configuration.inference.inference_config import InferenceConfig
 from tools.data.io        import FileIO
 from tools.data.regions              import CropRegion
 
-from configuration.dataset_config import (
+from configuration.data.dataset_config import (
     AugmentationConfig,
     DatasetConfiguration,
     InputConfig,
@@ -16,12 +16,12 @@ from configuration.dataset_config import (
     SplitRegions,
 )
 
-from configuration.gaussian_config     import GaussianConfig
-from configuration.geometry_config     import GeometryConfig
-from configuration.loss_config         import LossConfig, LossCurriculumConfig
-from configuration.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.runtime_config      import IOConfig, OverfitConfig, TrainingLoopConfig
-from configuration.training_config     import TrainerConfig
+from configuration.sar.gaussian_config     import GaussianConfig
+from configuration.sar.geometry_config     import GeometryConfig
+from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
+from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.training.runtime_config      import IOConfig, OverfitConfig, TrainingLoopConfig
+from configuration.training.training_config     import TrainerConfig
 
 
 class ConfigFactory:

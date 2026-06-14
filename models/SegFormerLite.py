@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.models_config import SegFormerLiteConfig
+from configuration.model.models_config import SegFormerLiteConfig
 from .blocks import DropPath, build_activation, initialize_weights
 
 

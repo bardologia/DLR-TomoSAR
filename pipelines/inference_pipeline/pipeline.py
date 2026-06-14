@@ -6,7 +6,7 @@ from typing      import Dict, List, Type
 
 import numpy as np
 
-from configuration.inference_config         import InferenceConfig
+from configuration.inference.inference_config         import InferenceConfig
 from pipelines.inference_pipeline.figures   import FigureComposer
 from pipelines.inference_pipeline.loader    import InferenceMetadata, RunLoader
 from pipelines.inference_pipeline.metrics   import Metrics

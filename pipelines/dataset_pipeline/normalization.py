@@ -8,8 +8,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from configuration.norm_config    import ChannelStats, ChannelStrategy, NormMethod
-from configuration.dataset_config import InputConfig, OutputConfig
+from configuration.data.norm_config    import ChannelStats, ChannelStrategy, NormMethod
+from configuration.data.dataset_config import InputConfig, OutputConfig
 from tools.data.io          import FileIO
 from tools.monitoring.logger                 import Logger
 from tools.reporting.ranges                 import RangeFormatter

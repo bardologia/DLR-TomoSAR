@@ -5,7 +5,7 @@ from typing      import List, Optional
 
 import numpy as np
 
-from configuration.inference_config              import InferenceConfig
+from configuration.inference.inference_config              import InferenceConfig
 from pipelines.inference_pipeline.loader         import InferenceMetadata, Run
 from tools                            import FileIO
 from tools.monitoring.logger                                import Logger

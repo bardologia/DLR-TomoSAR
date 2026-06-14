@@ -3,8 +3,8 @@ from __future__ import annotations
 import gc
 from dataclasses import dataclass, field
 
-from configuration.benchmark_config import BenchmarkConfig
-from configuration.gaussian_config import GaussianConfig
+from configuration.experiments.benchmark_config import BenchmarkConfig
+from configuration.sar.gaussian_config import GaussianConfig
 from models import CONFIG_REGISTRY, get_model
 from tools.monitoring.logger import Logger
 

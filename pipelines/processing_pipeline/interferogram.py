@@ -6,7 +6,7 @@ from typing import Tuple
 
 import numpy as np
 
-from configuration.processing_config         import (
+from configuration.sar.processing_config         import (
     ParallelConfiguration,
     PathConfiguration,
     ProcessingConfiguration,
@@ -182,7 +182,7 @@ class InterferogramGenerator:
         return cls(FileIO.load_json(Path(spec_path)), logger)
 
     def _build_config(self) -> ProcessingConfiguration:
-        from configuration.processing_config import TomogramConfiguration
+        from configuration.sar.processing_config import TomogramConfiguration
 
         tomogram_config = TomogramConfiguration(**self.spec["tomogram_config"])
 

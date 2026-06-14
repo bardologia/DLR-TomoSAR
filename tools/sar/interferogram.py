@@ -9,7 +9,7 @@ from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
 if TYPE_CHECKING:
-    from configuration.processing_config import ProcessingConfiguration
+    from configuration.sar.processing_config import ProcessingConfiguration
 
 
 class InterferogramBuilder:

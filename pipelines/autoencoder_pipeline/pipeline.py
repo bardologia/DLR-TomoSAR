@@ -4,7 +4,7 @@ from pathlib import Path
 
 from torch.utils.data import DataLoader
 
-from configuration.autoencoder_config       import ProfileAeTrainerConfig
+from configuration.training.autoencoder_config       import ProfileAeTrainerConfig
 from models.autoencoder             import Autoencoder
 from pipelines.benchmark_pipeline.config_factory import ConfigFactory
 from pipelines.dataset_pipeline.profile_preparation import ProfileDatasetPreparation

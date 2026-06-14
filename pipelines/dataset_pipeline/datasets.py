@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
-from configuration.dataset_config              import AugmentationConfig, InputConfig, OutputConfig
+from configuration.data.dataset_config              import AugmentationConfig, InputConfig, OutputConfig
 from pipelines.dataset_pipeline.normalization  import Normalizer
 from pipelines.dataset_pipeline.spatial        import Patcher
 from tools.monitoring.logger                              import Logger
