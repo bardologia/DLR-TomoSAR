@@ -78,9 +78,43 @@ class LaunchView {
     },
   };
 
-  static MODEL_COLORS = { input: "#1d4fd8", model: "#16191b", latent: "#a16207", output: "#0f766e" };
+  static MODEL_COLORS = { input: "#1d4fd8", model: "#16191b", latent: "#a16207", output: "#0f766e", calc: "#7c3aed" };
 
-  static MODEL_TAGS = { input: "input", model: "network", latent: "latent", output: "output" };
+  static MODEL_TAGS = { input: "input", model: "network", latent: "latent", output: "output", calc: "result" };
+
+  static PROCESS_MEANINGS = {
+    pre_process: {
+      title  : "Pre-process",
+      summary: "Ingests the raw F-SAR products, beamforms the full-stack Capon tomogram, and forms the interferometric image stack.",
+      flow   : [
+        { kind: "input", glyph: "stack", label: "Raw F-SAR products", sub: "single-look complex stack" },
+        { kind: "model", glyph: "beam",  label: "Beamform", tag: "operation", sub: "Capon + interferograms" },
+        [
+          { kind: "output", glyph: "cube",  label: "Capon tomogram", sub: "full stack" },
+          { kind: "output", glyph: "stack", label: "Image stack",    sub: "primary · secondaries · interferograms" },
+        ],
+      ],
+    },
+    extract_params: {
+      title  : "Extract Parameters",
+      summary: "Fits a per-pixel Gaussian mixture to the Capon tomogram to build the supervised profile-parameter targets.",
+      flow   : [
+        { kind: "input",  glyph: "cube",   label: "Capon tomogram",      sub: "reflectivity profiles" },
+        { kind: "model",  glyph: "fit",    label: "Gaussian-mixture fit", tag: "operation", sub: "per pixel" },
+        { kind: "output", glyph: "params", label: "Params array",        sub: "amp, μ, σ, amp, μ, σ, …" },
+      ],
+    },
+    infer: {
+      title  : "Inference",
+      summary: "Runs a trained model over the image stack with a sliding window, stitches the predicted cube, and renders reports.",
+      flow   : [
+        { kind: "input",  glyph: "run",    label: "Trained run",      sub: "checkpoint + image stack" },
+        { kind: "model",  glyph: "net",    label: "Predict",          sub: "sliding window" },
+        { kind: "calc",   glyph: "cube",   label: "Stitched cube",    sub: "predicted profiles" },
+        { kind: "output", glyph: "report", label: "Reports & figures", sub: "metrics · plots · animations" },
+      ],
+    },
+  };
 
   static TYPE_TABS = {
     benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
@@ -289,7 +323,7 @@ class LaunchView {
       tab.addEventListener("click", () => {
         this._setValue(leaf, value);
         paint();
-        this._paintModelCard(value);
+        this._paintModelCard(LaunchView.MODEL_MEANINGS[value]);
       });
       host.appendChild(tab);
     });
@@ -297,20 +331,18 @@ class LaunchView {
     paint();
   }
 
-  _buildModelCard(type) {
+  _buildModelCard(meaning) {
     const card = document.createElement("section");
     card.className = "modelcard";
     card.id = "launch-model-card";
     this.modelCardEl = card;
-    this._paintModelCard(type);
+    this._paintModelCard(meaning);
     return card;
   }
 
-  _paintModelCard(type) {
+  _paintModelCard(meaning) {
     const card = this.modelCardEl;
     if (!card) return;
-
-    const meaning = LaunchView.MODEL_MEANINGS[type];
     if (!meaning) {
       card.hidden = true;
       return;
@@ -324,34 +356,43 @@ class LaunchView {
   }
 
   _modelDiagram(flow) {
-    const SLOT = 200, PAD = 26, CY = 88, H = 226;
-    const width = flow.length * SLOT + PAD * 2;
+    const SLOT = 200, PAD = 26, BH = 164, GH = 44, TOP = 14;
+    const columns = flow.map((col) => (Array.isArray(col) ? col : [col]));
+    const maxM    = columns.reduce((m, col) => Math.max(m, col.length), 1);
+    const width   = columns.length * SLOT + PAD * 2;
+    const height  = TOP * 2 + maxM * BH;
 
-    let arrows = "";
-    let nodes  = "";
-    flow.forEach((node, i) => {
-      const cx    = PAD + i * SLOT + SLOT / 2;
-      const color = LaunchView.MODEL_COLORS[node.kind] || "#16191b";
-
-      if (i) {
-        const prev = PAD + (i - 1) * SLOT + SLOT / 2;
-        arrows += `<line class="mflow-link" x1="${prev + 58}" y1="${CY}" x2="${cx - 58}" y2="${CY}" marker-end="url(#mflow-arrow)"/>`;
-      }
-
-      nodes += this._glyph(node.glyph, cx, CY, color) + this._caption(node, cx, CY, color, SLOT);
+    const laid = columns.map((col, i) => {
+      const cx       = PAD + i * SLOT + SLOT / 2;
+      const groupTop = TOP + (maxM * BH - col.length * BH) / 2;
+      return col.map((node, j) => ({ node, cx, cy: groupTop + j * BH + GH + 8 }));
     });
 
-    return `<svg class="mflow-svg" width="${width}" height="${H}" viewBox="0 0 ${width} ${H}" role="img" aria-label="model data flow">` +
+    let links = "";
+    for (let i = 1; i < laid.length; i++) {
+      laid[i - 1].forEach((src) => laid[i].forEach((tgt) => {
+        const x1 = src.cx + 54, x2 = tgt.cx - 54, mx = (x1 + x2) / 2;
+        links += `<path class="mflow-link" d="M${x1} ${src.cy} C ${mx} ${src.cy}, ${mx} ${tgt.cy}, ${x2} ${tgt.cy}" fill="none" marker-end="url(#mflow-arrow)"/>`;
+      }));
+    }
+
+    let nodes = "";
+    laid.flat().forEach(({ node, cx, cy }) => {
+      const color = LaunchView.MODEL_COLORS[node.kind] || "#16191b";
+      nodes += this._glyph(node.glyph, cx, cy, color) + this._caption(node, cx, cy, color, SLOT);
+    });
+
+    return `<svg class="mflow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="data flow">` +
       `<defs><marker id="mflow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
       `<path d="M0 0L10 5L0 10z" fill="#9aa196"/></marker></defs>` +
-      arrows + nodes + `</svg>`;
+      links + nodes + `</svg>`;
   }
 
   _caption(node, cx, cy, color, slot) {
-    const tag = LaunchView.MODEL_TAGS[node.kind] || node.kind;
+    const tag = node.tag || LaunchView.MODEL_TAGS[node.kind] || node.kind;
     const sub = node.sub ? `<span class="mflow-sub">${node.sub}</span>` : "";
     const w   = slot - 28;
-    return `<foreignObject x="${cx - w / 2}" y="${cy + 56}" width="${w}" height="72">` +
+    return `<foreignObject x="${cx - w / 2}" y="${cy + 50}" width="${w}" height="64">` +
       `<div xmlns="http://www.w3.org/1999/xhtml" class="mflow-cap">` +
       `<span class="mflow-tag" style="color:${color}">${tag}</span>` +
       `<span class="mflow-name">${node.label}</span>${sub}</div></foreignObject>`;
@@ -406,6 +447,47 @@ class LaunchView {
       const axis  = `<path d="M${ax} ${ay0} L${ax} ${ay1} L${axr} ${ay1}" fill="none" stroke="${color}" stroke-width="1.2" opacity="0.4"/>`;
       const curve = `<path d="M${ax + 4} ${ay1 - 2} C ${cx - 16} ${ay1 - 2}, ${cx - 11} ${cy - 30}, ${cx} ${cy - 30} C ${cx + 11} ${cy - 30}, ${cx + 16} ${ay1 - 2}, ${axr - 4} ${ay1 - 2} Z" fill="${tint}" stroke="${color}" stroke-width="2"/>`;
       return `<g>${axis}${curve}</g>`;
+    }
+
+    if (glyph === "cube") {
+      const u = 26;
+      const top   = `<polygon points="${cx},${cy - 28} ${cx + u},${cy - 13} ${cx},${cy + 2} ${cx - u},${cy - 13}" fill="${color}" opacity="0.20"/>`;
+      const left  = `<polygon points="${cx - u},${cy - 13} ${cx},${cy + 2} ${cx},${cy + 32} ${cx - u},${cy + 17}" fill="${color}" opacity="0.11"/>`;
+      const right = `<polygon points="${cx + u},${cy - 13} ${cx},${cy + 2} ${cx},${cy + 32} ${cx + u},${cy + 17}" fill="${color}" opacity="0.05"/>`;
+      return `<g stroke="${color}" stroke-width="1.5" stroke-linejoin="round">${top}${left}${right}</g>`;
+    }
+
+    if (glyph === "beam") {
+      const s = 84;
+      let arcs = "";
+      [16, 28, 40].forEach((r, k) => { arcs += `<path d="M${cx - 24} ${cy - r} A ${r} ${r} 0 0 1 ${cx - 24} ${cy + r}" fill="none" stroke="#fff" stroke-width="1.6" opacity="${0.5 - k * 0.12}"/>`; });
+      return `<g><rect x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" rx="11" fill="${color}"/>${arcs}<circle cx="${cx - 24}" cy="${cy}" r="3.2" fill="#fff"/></g>`;
+    }
+
+    if (glyph === "fit") {
+      const s = 84;
+      const curve = `<path d="M${cx - 28} ${cy + 22} C ${cx - 12} ${cy + 22}, ${cx - 8} ${cy - 20}, ${cx} ${cy - 20} C ${cx + 8} ${cy - 20}, ${cx + 12} ${cy + 22}, ${cx + 28} ${cy + 22}" fill="none" stroke="#fff" stroke-width="1.8" opacity="0.9"/>`;
+      let dots = "";
+      [[-16, 8], [-4, -12], [9, -7], [19, 12]].forEach(([dx, dy]) => { dots += `<circle cx="${cx + dx}" cy="${cy + dy}" r="2.2" fill="#fff" opacity="0.85"/>`; });
+      return `<g><rect x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" rx="11" fill="${color}"/>${curve}${dots}</g>`;
+    }
+
+    if (glyph === "run") {
+      const s = 78, x = cx - s / 2, y = cy - s / 2, lx = cx - 16, rx = cx + 16, rows = [cy - 18, cy, cy + 18];
+      let lines = "", dots = "";
+      rows.forEach((ly) => rows.forEach((ry) => { lines += `<line x1="${lx}" y1="${ly}" x2="${rx}" y2="${ry}" stroke="${color}" stroke-width="0.8" opacity="0.3"/>`; }));
+      rows.forEach((ry) => { dots += `<circle cx="${lx}" cy="${ry}" r="3.4" fill="${color}"/><circle cx="${rx}" cy="${ry}" r="3.4" fill="${color}"/>`; });
+      const badge = `<circle cx="${cx + 28}" cy="${cy - 28}" r="9" fill="${color}"/><path d="M${cx + 23.5} ${cy - 28} l3 3 l5 -6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+      return `<g><rect x="${x}" y="${y}" width="${s}" height="${s}" rx="10" fill="${tint}" stroke="${color}" stroke-width="1.6"/>${lines}${dots}${badge}</g>`;
+    }
+
+    if (glyph === "report") {
+      const w = 52, h = 66, x = cx - w / 2, y = cy - h / 2;
+      let lines = "";
+      [-18, -10, -2].forEach((dy) => { lines += `<line x1="${cx - 16}" y1="${cy + dy}" x2="${cx + 16}" y2="${cy + dy}" stroke="${color}" stroke-width="1.3" opacity="0.55"/>`; });
+      let bars = "";
+      [[-16, 14], [-4, 22], [8, 11]].forEach(([dx, bh]) => { bars += `<rect x="${cx + dx}" y="${cy + 26 - bh}" width="7" height="${bh}" rx="1.5" fill="${color}" opacity="0.85"/>`; });
+      return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${tint}" stroke="${color}" stroke-width="1.6"/>${lines}${bars}</g>`;
     }
 
     const r = 30;
@@ -585,7 +667,8 @@ class LaunchView {
     const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
 
     const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
-    if (modelType) host.appendChild(this._buildModelCard(modelType));
+    const meaning   = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
+    if (meaning) host.appendChild(this._buildModelCard(meaning));
 
     host.appendChild(this._buildToolbar(cfg));
 
