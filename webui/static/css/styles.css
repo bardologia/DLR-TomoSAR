@@ -1915,6 +1915,8 @@ main { margin-left: var(--navw); }
   --src-gt:      var(--accent-2);
   --src-reduced: #b45309;
   --src-full:    #7c3aed;
+  --cut-range:   #e11d48;
+  --cut-azimuth: #06b6d4;
 }
 
 .cube-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); display: inline-block; flex: none; }
@@ -1971,7 +1973,7 @@ main { margin-left: var(--navw); }
 .cube-space:hover { color: var(--ink); }
 .cube-space.is-active { color: var(--accent-deep); background: rgba(29, 79, 216, 0.08); }
 
-.cube-map__wrap { position: relative; line-height: 0; }
+.cube-map__wrap { position: relative; line-height: 0; overflow: hidden; }
 .cube-map__wrap img { width: 100%; height: auto; display: block; cursor: crosshair; image-rendering: pixelated; border: 1px solid var(--line); }
 
 .cube-axis {
@@ -1983,10 +1985,10 @@ main { margin-left: var(--navw); }
 .cube-axis--x { left: 50%; bottom: 8px; transform: translateX(-50%); }
 .cube-axis--y { top: 50%; left: 8px; transform: translateY(-50%); writing-mode: vertical-rl; }
 
-.cube-cross { position: absolute; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; }
-.cube-cross::before, .cube-cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px rgba(0, 0, 0, 0.9); }
-.cube-cross::before { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
-.cube-cross::after  { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+.cube-cross { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.cube-cross::before, .cube-cross::after { content: ""; position: absolute; filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.45)); }
+.cube-cross::before { left: 0; top: -1200px; height: 2400px; width: 0; border-left: 2px dotted var(--cut-range); transform: translateX(-50%); }
+.cube-cross::after  { top: 0; left: -1600px; width: 3200px; height: 0; border-top: 2px dotted var(--cut-azimuth); transform: translateY(-50%); }
 
 .cube-coords { font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); margin: 13px 0 0; padding-top: 13px; border-top: 1px solid var(--line); }
 .cube-coords.is-pinned { color: var(--accent-deep); }
@@ -2018,10 +2020,12 @@ main { margin-left: var(--navw); }
 
 .cube-ref {
   position: absolute; top: 0; bottom: 0; width: 0;
-  border-left: 1px dashed rgba(17, 20, 24, 0.85);
-  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9));
+  border-left: 2px dotted var(--line-strong);
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
   pointer-events: none; z-index: 2;
 }
+.cube-slice[data-axis="range"]   .cube-ref { border-left-color: var(--cut-range); }
+.cube-slice[data-axis="azimuth"] .cube-ref { border-left-color: var(--cut-azimuth); }
 
 /* vertical profile rail */
 .cube-profiles {

@@ -237,6 +237,8 @@ class TomogramView {
       gt      : css.getPropertyValue("--src-gt").trim(),
       reduced : css.getPropertyValue("--src-reduced").trim(),
       full    : css.getPropertyValue("--src-full").trim(),
+      range   : css.getPropertyValue("--cut-range").trim(),
+      azimuth : css.getPropertyValue("--cut-azimuth").trim(),
     };
 
     this._syncSpaceBtns();
@@ -500,12 +502,21 @@ class TomogramView {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(bitmap, 0, 0);
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1;
+    const x = panel.marker * canvas.width;
+
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
-    ctx.moveTo(panel.marker * canvas.width, 0);
-    ctx.lineTo(panel.marker * canvas.width, canvas.height);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+
+    ctx.strokeStyle = this.colors[panel.axis] || "#fff";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
     ctx.stroke();
     ctx.setLineDash([]);
   }
