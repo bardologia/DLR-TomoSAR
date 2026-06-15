@@ -9,7 +9,7 @@ from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
 from model_library          import ModelLibrary
 from pipeline_library       import PipelineLibrary
-from process_manager        import ProcessManager
+from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from request_router         import RequestRouter
 from resource_watchdog      import ResourceWatchdog
@@ -51,6 +51,7 @@ class WebUIServer:
         self.models      = ModelLibrary()
         self.pipelines   = PipelineLibrary()
         self.processes   = ProcessManager(self.paths, self.logger)
+        self.nuke        = ProcessNuke(self.logger)
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
@@ -69,6 +70,7 @@ class WebUIServer:
             models      = self.models,
             pipelines   = self.pipelines,
             processes   = self.processes,
+            nuke        = self.nuke,
             system      = self.system,
             watchdog    = self.watchdog,
             tensorboard = self.tensorboard,

@@ -72,7 +72,11 @@ class StatusBoard {
       `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
 
       `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
-      `<div class="wd__state"><i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
+      `<div class="wd__state">` +
+      `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
+      `<span class="wd__nuke-sym" aria-hidden="true">&#9762;</span><span class="wd__nuke-txt">NUKE</span>` +
+      `</button>` +
+      `<i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
       `<span class="wd__status" id="sb-wd-status">--</span>` +
       `<dl class="wd__limits">${limitCells}</dl>` +
       `</section>` +
@@ -139,9 +143,37 @@ class StatusBoard {
     }));
     this.coreEls = [...this.els.board.querySelectorAll(".cpu__cell")];
 
+    this._wireNuke();
+
     if (!window.REDUCED_MOTION && window.gsap) {
       gsap.from(this.els.board.querySelectorAll(".sboard"), { opacity: 0, y: 16, duration: 0.7, stagger: 0.08, ease: "expo.out" });
     }
+  }
+
+  _wireNuke() {
+    const btn = document.getElementById("sb-nuke");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      const ok = window.confirm("NUKE: this kills EVERY process running under your user (training runs, shells, jobs). The web UI is spared. Continue?");
+      if (!ok) return;
+
+      btn.disabled = true;
+      btn.classList.add("is-firing");
+      try {
+        const res = await window.apiPost("/api/system/nuke");
+        if (res && res.ok) {
+          window.toast(`nuke: terminated ${res.signalled}, force-killed ${res.killed}`, "ok");
+        } else {
+          window.toast(`nuke failed: ${(res && res.error) || "unknown error"}`, "error");
+        }
+      } catch (e) {
+        window.toast("nuke failed: network error", "error");
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove("is-firing");
+      }
+    });
   }
 
   _update(sys) {

@@ -314,3 +314,80 @@ class ProcessManager:
     def get_stream(self, job_id: str) -> JobStream | None:
         with self.lock:
             return self.streams.get(job_id)
+
+
+class ProcessNuke:
+
+    def __init__(self, logger: WebLogger) -> None:
+        self.logger = logger
+        self.uid    = os.getuid()
+
+    def _spared_pids(self) -> set[int]:
+        spared = {0, 1}
+        pid    = os.getpid()
+
+        while pid > 1:
+            spared.add(pid)
+            pid = self._ppid(pid)
+
+        return spared
+
+    def _ppid(self, pid: int) -> int:
+        try:
+            stat   = open(f"/proc/{pid}/stat").read()
+            fields = stat[stat.rindex(")") + 2 :].split()
+            return int(fields[1])
+        except (OSError, ValueError, IndexError):
+            return 0
+
+    def _targets(self, spared: set[int]) -> list[int]:
+        return [pid for pid in self._user_pids() if pid not in spared]
+
+    def _user_pids(self) -> list[int]:
+        pids = []
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            try:
+                if os.stat(f"/proc/{pid}").st_uid == self.uid:
+                    pids.append(pid)
+            except OSError:
+                continue
+        return pids
+
+    def _terminate(self, targets: list[int], sig: signal.Signals) -> int:
+        hit = 0
+        for pid in targets:
+            try:
+                os.kill(pid, sig)
+                hit += 1
+            except (ProcessLookupError, PermissionError):
+                continue
+        return hit
+
+    def _alive(self, targets: list[int]) -> list[int]:
+        return [pid for pid in targets if os.path.exists(f"/proc/{pid}")]
+
+    def nuke(self, grace: float = 4.0) -> dict:
+        spared  = self._spared_pids()
+        targets = self._targets(spared)
+
+        if not targets:
+            self.logger.muted("nuke requested, no processes to kill")
+            return {"ok": True, "signalled": 0, "killed": 0}
+
+        signalled = self._terminate(targets, signal.SIGTERM)
+        self.logger.error(f"NUKE: SIGTERM sent to {signalled} of {len(targets)} user processes")
+
+        deadline = time.monotonic() + grace
+        while time.monotonic() < deadline:
+            if not self._alive(targets):
+                return {"ok": True, "signalled": signalled, "killed": 0}
+            time.sleep(0.25)
+
+        stubborn = self._alive(targets)
+        killed   = self._terminate(stubborn, signal.SIGKILL)
+        self.logger.error(f"NUKE: SIGKILL sent to {killed} surviving processes")
+
+        return {"ok": True, "signalled": signalled, "killed": killed}

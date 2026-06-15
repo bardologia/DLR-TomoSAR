@@ -15,7 +15,7 @@ from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
 from model_library          import ModelLibrary
 from pipeline_library       import PipelineLibrary
-from process_manager        import ProcessManager
+from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
 from results_browser        import ResultsBrowser
@@ -36,7 +36,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -47,6 +47,7 @@ class RequestRouter:
         self.models      = models
         self.pipelines   = pipelines
         self.processes   = processes
+        self.nuke        = nuke
         self.system      = system
         self.watchdog    = watchdog
         self.tensorboard = tensorboard
@@ -233,6 +234,11 @@ class RequestRouter:
         if path.startswith("/api/jobs/") and path.endswith("/stop"):
             job_id = path[len("/api/jobs/"):-len("/stop")]
             result = self.processes.stop(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/system/nuke":
+            result = self.nuke.nuke()
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
