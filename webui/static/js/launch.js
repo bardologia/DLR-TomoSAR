@@ -12,7 +12,7 @@ class LaunchView {
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
-    ["stage A", /stage_a|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
+    ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
     ["embedding", /embedding/],
     ["probe", /^probe_/],
     ["identifiers", /identifier|output_tag$|^dataset_type$/],
@@ -45,14 +45,14 @@ class LaunchView {
   };
 
   static EXPERIMENT_JEPA_CHOICES = {
-    "jepa.stage_a_mode":    ["frozen", "finetune"],
-    "jepa.target_provider": ["stopgrad", "ema", "live"],
+    "jepa.profile_autoencoder_mode": ["frozen", "finetune"],
+    "jepa.target_provider":          ["stopgrad", "ema", "live"],
   };
 
   static CHOICES = {
     train_jepa: {
-      stage_a_mode:    ["frozen", "finetune"],
-      target_provider: ["stopgrad", "ema", "live"],
+      profile_autoencoder_mode: ["frozen", "finetune"],
+      target_provider:          ["stopgrad", "ema", "live"],
     },
     benchmark:      LaunchView.EXPERIMENT_JEPA_CHOICES,
     cross_validate: LaunchView.EXPERIMENT_JEPA_CHOICES,
@@ -66,7 +66,7 @@ class LaunchView {
 
   static EXPERIMENT_PICKERS = {
     ...LaunchView.DATASET_PICKERS,
-    "jepa.stage_a_run": { mode: "runs", baseFrom: "jepa.stage_a_logdir", checkpointOnly: true },
+    "jepa.profile_autoencoder_run": { mode: "runs", baseFrom: "jepa.profile_autoencoder_logdir", checkpointOnly: true },
   };
 
   static PICKERS = {
@@ -75,7 +75,7 @@ class LaunchView {
     },
     train_backbone:    LaunchView.DATASET_PICKERS,
     train_autoencoder: LaunchView.DATASET_PICKERS,
-    train_jepa:        { ...LaunchView.DATASET_PICKERS, stage_a_run: { mode: "runs", baseFrom: "stage_a_logdir", checkpointOnly: true } },
+    train_jepa:        { ...LaunchView.DATASET_PICKERS, profile_autoencoder_run: { mode: "runs", baseFrom: "profile_autoencoder_logdir", checkpointOnly: true } },
     benchmark:         LaunchView.EXPERIMENT_PICKERS,
     cross_validate:    LaunchView.EXPERIMENT_PICKERS,
     tune:              LaunchView.EXPERIMENT_PICKERS,

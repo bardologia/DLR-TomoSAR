@@ -28,14 +28,14 @@ class ScriptCatalog:
         "train_autoencoder": {
             "title"     : "Train Autoencoder",
             "category"  : "Training",
-            "purpose"   : "Stage-A: train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
+            "purpose"   : "Train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
             "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "train_jepa": {
             "title"     : "Train JEPA",
             "category"  : "Training",
-            "purpose"   : "Stage-B: train the JEPA predictor against a frozen or fine-tuned Stage-A autoencoder in latent space.",
-            "essentials": ["run_name", "model_name", "stage_a_mode", "stage_a_logdir", "stage_a_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+            "purpose"   : "Train the JEPA predictor against a frozen or fine-tuned profile autoencoder in latent space.",
+            "essentials": ["run_name", "model_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
             "title"     : "Inference",
@@ -47,13 +47,13 @@ class ScriptCatalog:
             "title"     : "Benchmark",
             "category"  : "Experiments",
             "purpose"   : "Benchmark inference speed and capacity-matched architecture trade-offs.",
-            "essentials": ["run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "cross_validate": {
             "title"     : "Cross-validate",
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
-            "essentials": ["model_name", "run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["model_name", "run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "physics_check": {
             "title"     : "Physics Check",
@@ -65,7 +65,7 @@ class ScriptCatalog:
             "title"     : "Tune",
             "category"  : "Experiments",
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
-            "essentials": ["run_tag", "gpus", "jepa.stage_a_mode", "jepa.stage_a_run"],
+            "essentials": ["run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run"],
         },
     }
 
@@ -86,7 +86,7 @@ class ScriptCatalog:
         "train": {
             "title"    : "Train",
             "category" : "Training",
-            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the Stage-A profile autoencoder, or the Stage-B JEPA predictor.",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, or the JEPA predictor.",
             "members"  : [
                 ("train_backbone",    "Backbone"),
                 ("train_autoencoder", "Autoencoder"),

@@ -25,24 +25,24 @@ class TrainingPipeline:
 
         base = self.factory.training_trainer_config(logdir=entry_config.logdir)
 
-        if not entry_config.stage_a_run:
-            raise ValueError("JEPA training requires a pretrained Stage-A autoencoder; set stage_a_run to a completed autoencoder run under stage_a_logdir. Training the autoencoder jointly with the backbone is not supported.")
+        if not entry_config.profile_autoencoder_run:
+            raise ValueError("JEPA training requires a pretrained profile autoencoder; set profile_autoencoder_run to a completed autoencoder run under profile_autoencoder_logdir. Training the autoencoder jointly with the backbone is not supported.")
 
-        stage_a_dir = Path(entry_config.stage_a_logdir) / entry_config.stage_a_run
-        if not stage_a_dir.is_dir():
-            raise FileNotFoundError(f"Stage-A run '{entry_config.stage_a_run}' not found under {entry_config.stage_a_logdir}")
+        profile_autoencoder_dir = Path(entry_config.profile_autoencoder_logdir) / entry_config.profile_autoencoder_run
+        if not profile_autoencoder_dir.is_dir():
+            raise FileNotFoundError(f"Profile autoencoder run '{entry_config.profile_autoencoder_run}' not found under {entry_config.profile_autoencoder_logdir}")
 
-        self.stage_a_meta = stage_a_dir / "meta"
-        self.autoencoder_cfg, self.ae_model_name = AutoencoderConfigIO.load(self.stage_a_meta)
+        self.profile_autoencoder_meta = profile_autoencoder_dir / "meta"
+        self.autoencoder_cfg, self.ae_model_name = AutoencoderConfigIO.load(self.profile_autoencoder_meta)
 
         self.trainer_config = JepaTrainerConfig(
-            gaussian           = base.gaussian,
-            autoencoder        = self.autoencoder_cfg,
-            embedding_loss     = entry_config.embedding_loss,
-            stage_a_mode       = entry_config.stage_a_mode,
-            target_provider    = entry_config.target_provider,
-            stage_a_checkpoint = str(stage_a_dir / "best_model.pt"),
-            overfit            = entry_config.overfit,
+            gaussian                       = base.gaussian,
+            autoencoder                    = self.autoencoder_cfg,
+            embedding_loss                 = entry_config.embedding_loss,
+            profile_autoencoder_mode       = entry_config.profile_autoencoder_mode,
+            target_provider                = entry_config.target_provider,
+            profile_autoencoder_checkpoint = str(profile_autoencoder_dir / "best_model.pt"),
+            overfit                        = entry_config.overfit,
         )
         self.trainer_config.inherit_shared_from(base)
         self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
@@ -73,17 +73,17 @@ class TrainingPipeline:
 
     def _load_autoencoder(self):
         autoencoder, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
-        ckpt_path      = self.trainer_config.stage_a_checkpoint
-        self.validate_stage_a_checkpoint(ckpt_path)
+        ckpt_path      = self.trainer_config.profile_autoencoder_checkpoint
+        self.validate_profile_autoencoder_checkpoint(ckpt_path)
 
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         autoencoder.load_state_dict(ckpt["params"])
         return autoencoder
 
     @staticmethod
-    def validate_stage_a_checkpoint(ckpt_path) -> None:
+    def validate_profile_autoencoder_checkpoint(ckpt_path) -> None:
         if not Path(ckpt_path).is_file():
-            raise FileNotFoundError(f"Stage-A checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the selected stage_a_run directory.")
+            raise FileNotFoundError(f"Profile autoencoder checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the selected profile_autoencoder_run directory.")
 
     def _save_metadata(self, run_meta, backbone_cfg, datasets, x_len: int) -> None:
         gaussian_cfg = self.trainer_config.gaussian
@@ -95,7 +95,7 @@ class TrainingPipeline:
         run_meta.save_run_summary(self.model_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len)
 
     def _profile_normalizer(self, run_meta, logger):
-        stats = ProfileStats.load(self.stage_a_meta, logger=logger)
+        stats = ProfileStats.load(self.profile_autoencoder_meta, logger=logger)
         stats.save(run_meta.metadata_directory)
 
         return ProfileNormalizer(stats)

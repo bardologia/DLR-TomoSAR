@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch.nn as nn
 
 from tools.training                   import BaseTrainer
-from pipelines.jepa.training.coupling import StageAMode, TargetProvider
+from pipelines.jepa.training.coupling import ProfileAutoencoderMode, TargetProvider
 from pipelines.jepa.training.loss     import Loss
 
 
@@ -18,8 +18,8 @@ class JepaModule(nn.Module):
 
 
 class Trainer(BaseTrainer):
-    stage_name    = "Stage-B"
-    section_title = "[Stage-B JEPA Predictor Training]"
+    stage_name    = "JEPA"
+    section_title = "[JEPA Predictor Training]"
 
     def __init__(self, model: JepaModule, backbone_cfg, x_axis, config, run_dir, logger, norm_stats, profile_normalizer):
         self.backbone_cfg       = backbone_cfg
@@ -27,23 +27,23 @@ class Trainer(BaseTrainer):
         self.norm_stats         = norm_stats
         self.profile_normalizer = profile_normalizer
 
-        self.stage_a_mode = StageAMode(config.stage_a_mode)
-        self.stage_a_mode.apply(model.autoencoder)
-        self.validate_coupling(self.stage_a_mode, config.target_provider, config.embedding_loss)
+        self.profile_autoencoder_mode = ProfileAutoencoderMode(config.profile_autoencoder_mode)
+        self.profile_autoencoder_mode.apply(model.autoencoder)
+        self.validate_coupling(self.profile_autoencoder_mode, config.target_provider, config.embedding_loss)
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
     @staticmethod
-    def validate_coupling(stage_a_mode: StageAMode, target_provider: str, embedding_cfg) -> None:
-        if target_provider in ("live", "ema") and not stage_a_mode.trainable:
-            raise ValueError(f"target_provider '{target_provider}' requires a trainable Stage-A autoencoder (stage_a_mode 'finetune'), but stage_a_mode is '{stage_a_mode.kind}'.")
+    def validate_coupling(profile_autoencoder_mode: ProfileAutoencoderMode, target_provider: str, embedding_cfg) -> None:
+        if target_provider in ("live", "ema") and not profile_autoencoder_mode.trainable:
+            raise ValueError(f"target_provider '{target_provider}' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_autoencoder_mode.kind}'.")
 
         if target_provider == "live" and not embedding_cfg.use_curve_recon:
             raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'/'ema'.")
 
     def _build_param_groups(self):
         param_groups  = self.backbone_cfg.get_param_groups(self.model.backbone)
-        param_groups += self.stage_a_mode.param_groups(self.model.autoencoder, self.config.ae_finetune_lr, self.config.ae_finetune_wd)
+        param_groups += self.profile_autoencoder_mode.param_groups(self.model.autoencoder, self.config.ae_finetune_lr, self.config.ae_finetune_wd)
         return param_groups
 
     def _build_criterion(self):
@@ -52,11 +52,11 @@ class Trainer(BaseTrainer):
 
     def _set_train_mode(self):
         self.model.backbone.train()
-        if self.stage_a_mode.trainable:
+        if self.profile_autoencoder_mode.trainable:
             self.model.autoencoder.train()
 
     def _on_optimizer_step(self):
-        if self.stage_a_mode.trainable:
+        if self.profile_autoencoder_mode.trainable:
             self.criterion.target_provider.update(self.model.autoencoder.encoder)
 
     def _compute_loss(self, batch):

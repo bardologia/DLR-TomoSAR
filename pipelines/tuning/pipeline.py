@@ -87,16 +87,16 @@ class TuningOrchestrator:
         jepa = self.config.jepa
 
         return JepaEntryConfig(
-            seed            = self.config.tuning.base_seed,
-            n_gaussians     = self.config.n_gaussians,
-            stage_a_logdir  = jepa.stage_a_logdir,
-            stage_a_run     = jepa.stage_a_run,
-            stage_a_mode    = jepa.stage_a_mode,
-            target_provider = jepa.target_provider,
-            embedding_loss  = jepa.embedding_loss,
-            overfit         = self.config.overfit,
-            paths           = self.config.paths,
-            training        = self.config.training,
+            seed                       = self.config.tuning.base_seed,
+            n_gaussians                = self.config.n_gaussians,
+            profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
+            profile_autoencoder_run    = jepa.profile_autoencoder_run,
+            profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
+            target_provider            = jepa.target_provider,
+            embedding_loss             = jepa.embedding_loss,
+            overfit                    = self.config.overfit,
+            paths                      = self.config.paths,
+            training                   = self.config.training,
         )
 
     def _load_layout(self, dataset_path: Path) -> dict:

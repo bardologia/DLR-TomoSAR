@@ -21,11 +21,11 @@ def _default_embedding_loss():
 
 @dataclass
 class JepaTuneConfig:
-    stage_a_logdir  : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
-    stage_a_run     : str | None = None
-    stage_a_mode    : str        = "frozen"
-    target_provider : str        = "stopgrad"
-    embedding_loss  : object     = field(default_factory=_default_embedding_loss)
+    profile_autoencoder_logdir : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
+    profile_autoencoder_run    : str | None = None
+    profile_autoencoder_mode   : str        = "frozen"
+    target_provider            : str        = "stopgrad"
+    embedding_loss             : object     = field(default_factory=_default_embedding_loss)
 
 
 @dataclass

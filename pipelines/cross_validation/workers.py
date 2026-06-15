@@ -98,21 +98,21 @@ class FoldTrainingWorker(CrossValidationWorker):
         jepa = cv.jepa
 
         return JepaEntryConfig(
-            run_name        = run_name,
-            model_name      = cv.model_name,
-            seed            = cv.seed,
-            n_gaussians     = cv.n_gaussians,
-            logdir          = self.run_dir / "folds",
-            model_overrides = cv.model_overrides,
-            stage_a_logdir  = jepa.stage_a_logdir,
-            stage_a_run     = jepa.stage_a_run,
-            stage_a_mode    = jepa.stage_a_mode,
-            target_provider = jepa.target_provider,
-            embedding_loss  = jepa.embedding_loss,
-            overfit         = cv.overfit,
-            geometry        = cv.geometry,
-            paths           = cv.paths,
-            training        = cv.training,
+            run_name                   = run_name,
+            model_name                 = cv.model_name,
+            seed                       = cv.seed,
+            n_gaussians                = cv.n_gaussians,
+            logdir                     = self.run_dir / "folds",
+            model_overrides            = cv.model_overrides,
+            profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
+            profile_autoencoder_run    = jepa.profile_autoencoder_run,
+            profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
+            target_provider            = jepa.target_provider,
+            embedding_loss             = jepa.embedding_loss,
+            overfit                    = cv.overfit,
+            geometry                   = cv.geometry,
+            paths                      = cv.paths,
+            training                   = cv.training,
         )
 
     def _run_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:

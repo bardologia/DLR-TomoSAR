@@ -5,8 +5,8 @@ from pipelines.profile_autoencoder.training.loss import Loss
 
 
 class Trainer(BaseTrainer):
-    stage_name    = "Stage-A"
-    section_title = "[Stage-A Autoencoder Training]"
+    stage_name    = "Profile Autoencoder"
+    section_title = "[Profile Autoencoder Training]"
 
     def __init__(self, model, model_cfg, x_axis, config, run_dir, logger):
         self.model_cfg = model_cfg

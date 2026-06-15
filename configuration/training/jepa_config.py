@@ -37,10 +37,10 @@ class JepaTrainerConfig(SharedSubConfigInheritance):
     autoencoder    : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     embedding_loss : EmbeddingLossConfig   = field(default_factory=EmbeddingLossConfig)
 
-    stage_a_mode       : str        = "frozen"
-    target_provider    : str        = "stopgrad"
-    ema_decay          : float      = 0.996
-    stage_a_checkpoint : str | None = None
+    profile_autoencoder_mode       : str        = "frozen"
+    target_provider                : str        = "stopgrad"
+    ema_decay                      : float      = 0.996
+    profile_autoencoder_checkpoint : str | None = None
 
     ae_finetune_lr : float = 3e-5
     ae_finetune_wd : float = 1e-4
@@ -76,13 +76,13 @@ class JepaEntryConfig:
     gpu             : int        = 0
     seed            : int        = 0
     n_gaussians     : int        = 5
-    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_b")
+    logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa")
     model_overrides : dict       = field(default_factory=dict)
 
-    stage_a_logdir  : Path        = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa_stage_a")
-    stage_a_run     : str | None  = None
-    stage_a_mode    : str         = "frozen"
-    target_provider : str         = "stopgrad"
+    profile_autoencoder_logdir : Path        = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
+    profile_autoencoder_run    : str | None  = None
+    profile_autoencoder_mode   : str         = "frozen"
+    target_provider            : str         = "stopgrad"
 
     embedding_loss : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
     overfit        : OverfitConfig       = field(default_factory=OverfitConfig)

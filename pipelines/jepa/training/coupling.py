@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 
 
-class StageAMode:
+class ProfileAutoencoderMode:
     VALID = ("frozen", "finetune")
 
     def __init__(self, kind: str) -> None:
         if kind not in self.VALID:
-            raise ValueError(f"Unknown stage_a_mode '{kind}'. Available: {list(self.VALID)}. The autoencoder must be imported from a Stage-A run and either frozen or fine-tuned; joint training from scratch is not supported.")
+            raise ValueError(f"Unknown profile_autoencoder_mode '{kind}'. Available: {list(self.VALID)}. The autoencoder must be imported from a profile autoencoder run and either frozen or fine-tuned; joint training from scratch is not supported.")
 
         self.kind = kind
 
@@ -31,7 +31,7 @@ class StageAMode:
         params = [p for p in autoencoder.parameters() if p.requires_grad]
         if not params:
             return []
-        return [{"params": params, "lr": lr, "weight_decay": wd, "name": "stage_a"}]
+        return [{"params": params, "lr": lr, "weight_decay": wd, "name": "profile_autoencoder"}]
 
 
 class TargetProvider:

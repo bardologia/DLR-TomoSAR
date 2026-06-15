@@ -50,19 +50,19 @@ class BenchmarkWorker:
         jepa = self.config.jepa
 
         return JepaEntryConfig(
-            run_name        = model_name,
-            model_name      = model_name,
-            seed            = self.config.seed,
-            n_gaussians     = self.config.n_gaussians,
-            logdir          = logdir,
-            stage_a_logdir  = jepa.stage_a_logdir,
-            stage_a_run     = jepa.stage_a_run,
-            stage_a_mode    = jepa.stage_a_mode,
-            target_provider = jepa.target_provider,
-            embedding_loss  = jepa.embedding_loss,
-            overfit         = overfit,
-            paths           = self.config.paths,
-            training        = self.config.training,
+            run_name                   = model_name,
+            model_name                 = model_name,
+            seed                       = self.config.seed,
+            n_gaussians                = self.config.n_gaussians,
+            logdir                     = logdir,
+            profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
+            profile_autoencoder_run    = jepa.profile_autoencoder_run,
+            profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
+            target_provider            = jepa.target_provider,
+            embedding_loss             = jepa.embedding_loss,
+            overfit                    = overfit,
+            paths                      = self.config.paths,
+            training                   = self.config.training,
         )
 
     def _finalize_overfit(self, result: dict, result_path: Path) -> None:
