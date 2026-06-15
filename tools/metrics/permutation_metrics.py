@@ -59,8 +59,10 @@ class PermutationMetrics:
         best   = sorted_costs[:, :, 0]
         second = sorted_costs[:, :, 1]
 
+        resolved   = best > 1e-6
+
         margin     = (second - best).mean().item()
-        rel_margin = ((second - best) / (best + 1e-8)).mean().item()
+        rel_margin = ((second - best)[resolved] / best[resolved]).mean().item() if resolved.any() else 0.0
         ambiguous  = ((second - best) / (best + 1e-8) < 0.05).float().mean().item()
 
         return {
