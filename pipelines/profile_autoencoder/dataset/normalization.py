@@ -115,7 +115,7 @@ class ProfileNormalizer:
     def denormalize(self, curve):
         if isinstance(curve, torch.Tensor):
             x = curve * self.scale + self.loc
-            return torch.expm1(torch.clamp(x, max=self.EXPM1_CEIL))
+            return torch.expm1(torch.clamp(x, min=0.0, max=self.EXPM1_CEIL))
 
         x = curve * self.scale + self.loc
-        return np.ascontiguousarray(np.expm1(np.minimum(x, self.EXPM1_CEIL)), dtype=np.float32)
+        return np.ascontiguousarray(np.expm1(np.clip(x, 0.0, self.EXPM1_CEIL)), dtype=np.float32)
