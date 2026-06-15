@@ -53,7 +53,6 @@ class ScriptPanel {
 
       if (s.group) {
         const variants = s.variants || [];
-        const chips = variants.map((v) => `<span class="script-card__variant">${v.label}</span>`).join("");
         card.href = `#/launch/${variants[0] ? variants[0].key : s.key}`;
         card.innerHTML =
           `<span class="script-card__glow"></span>` +
@@ -61,7 +60,6 @@ class ScriptPanel {
           `<span class="script-card__file">${s.file}</span></div>` +
           `<h3 class="script-card__title">${s.group_title || s.title}</h3>` +
           `<p class="script-card__purpose">${s.group_purpose || s.purpose}</p>` +
-          `<div class="script-card__variants">${chips}</div>` +
           `<div class="script-card__foot"><span>${variants.length} stages</span>` +
           `<span class="arrow">configure &rarr;</span></div>`;
       } else {
