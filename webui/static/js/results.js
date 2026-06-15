@@ -308,7 +308,7 @@ class ResultsView {
     if (sections.length < 2) return;
 
     const nav = document.createElement("nav");
-    nav.className = "res-index";
+    nav.className = "res-index" + (this.view === "folder" ? " res-index--book" : "");
     nav.setAttribute("aria-label", "Section index");
 
     sections.forEach((section, index) => {
