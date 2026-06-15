@@ -503,6 +503,11 @@ class Metrics:
         metrics["pixel_peak_err_units_p95_gt"]    = float(np.percentile(self.result.pixel_peak_err_idx, 95))  * self.x_step
 
         metrics.update(self._slice_ssim(pred, gt, elev_indices, range_indices, az_indices, prefix="gt"))
+
+        pred_norm = ProfileNormalizer.unit_area(pred)
+        gt_norm   = ProfileNormalizer.unit_area(gt)
+        metrics.update(self._slice_ssim(pred_norm, gt_norm, elev_indices, range_indices, az_indices, prefix="norm"))
+
         metrics.update(self._expand_elev(pred, gt, suffix="gt"))
 
         if param_space:

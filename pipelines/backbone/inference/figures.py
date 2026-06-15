@@ -607,80 +607,157 @@ class FigureComposer:
         logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
 
     def _compose_slices(self, result: Result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
-        slice_plotter = self.plotter.slice
-        meta          = self.meta
-        logger        = self.logger
-        cfg           = self.cfg
-        
+        meta   = self.meta
+        logger = self.logger
+        cfg    = self.cfg
+
+        self._slice_set(
+            pred_cube      = result.pred_curves,
+            gt_cube        = result.gt_curves,
+            full_cube      = run.full_curves,
+            result         = result,
+            x_axis_np      = x_axis_np,
+            indices        = indices,
+            global_metrics = global_metrics,
+            ssim_prefix    = "gt",
+            out_dir        = meta.figures_dir / "slices",
+            stem_prefix    = "",
+            group_suffix   = "",
+            ref_title      = "GT (Gaussian)",
+            pred_title     = "Prediction",
+            err_title      = "|Pred − GT|",
+            full_title     = "Full tomogram (raw)",
+            figure_paths   = figure_paths,
+        )
+
+        pred_norm = ProfileNormalizer.unit_area(result.pred_curves)
+        gt_norm   = ProfileNormalizer.unit_area(result.gt_curves)
+        full_norm = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
+
+        self._slice_set(
+            pred_cube      = pred_norm,
+            gt_cube        = gt_norm,
+            full_cube      = full_norm,
+            result         = result,
+            x_axis_np      = x_axis_np,
+            indices        = indices,
+            global_metrics = global_metrics,
+            ssim_prefix    = "norm",
+            out_dir        = meta.figures_dir / "slices_norm",
+            stem_prefix    = "norm_",
+            group_suffix   = "_norm",
+            ref_title      = "GT (unit-area)",
+            pred_title     = "Prediction (unit-area)",
+            err_title      = "|Pred − GT|",
+            full_title     = "Full tomogram (unit-area)",
+            figure_paths   = figure_paths,
+        )
+
+        logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (denorm + unit-area, gt/pred/error each)")
+
+    def _slice_set(
+        self,
+        pred_cube      : np.ndarray,
+        gt_cube        : np.ndarray,
+        full_cube,
+        result         : Result,
+        x_axis_np      : np.ndarray,
+        indices        : dict,
+        global_metrics : dict,
+        ssim_prefix    : str,
+        out_dir        : Path,
+        stem_prefix    : str,
+        group_suffix   : str,
+        ref_title      : str,
+        pred_title     : str,
+        err_title      : str,
+        full_title     : str,
+        figure_paths   : Dict[str, List[Path]],
+    ) -> None:
+
+        slice_plotter   = self.plotter.slice
         slice_range_idx = indices["slice_range_idx"]
         slice_az_idx    = indices["slice_az_idx"]
         slice_elev_idx  = indices["slice_elev_idx"]
 
-        figure_paths["slices_range"]   = []
-        figure_paths["slices_azimuth"] = []
-        figure_paths["slices_elev"]    = []
+        figure_paths[f"slices_range{group_suffix}"]   = []
+        figure_paths[f"slices_azimuth{group_suffix}"] = []
+        figure_paths[f"slices_elev{group_suffix}"]    = []
 
-        for axis, indices_arr, stem_fn, metric_key, group in (
-            ("range",   slice_range_idx, lambda i: f"range_{int(i) + result.range_offset}",     "ssim_gt_range",   "slices_range"),
-            ("azimuth", slice_az_idx,    lambda i: f"azimuth_{int(i) + result.azimuth_offset}", "ssim_gt_azimuth", "slices_azimuth"),
+        for axis, indices_arr, stem_fn, group in (
+            ("range",   slice_range_idx, lambda i: f"{stem_prefix}range_{int(i) + result.range_offset}",     f"slices_range{group_suffix}"),
+            ("azimuth", slice_az_idx,    lambda i: f"{stem_prefix}azimuth_{int(i) + result.azimuth_offset}", f"slices_azimuth{group_suffix}"),
         ):
             for i in indices_arr:
                 figure_paths[group] += slice_plotter.plot_tomogram_slice(
-                    pred_cube    = result.pred_curves,
-                    gt_cube      = result.gt_curves,
-                    axis         = axis,
-                    index        = int(i),
-                    x_axis       = x_axis_np,
-                    out_dir      = meta.figures_dir / "slices",
-                    stem         = stem_fn(i),
-                    az_offset    = result.azimuth_offset,
-                    rg_offset    = result.range_offset,
-                    ssim_value   = global_metrics[f"{metric_key}_{int(i)}"],
-                    full_cube    = run.full_curves,
+                    pred_cube  = pred_cube,
+                    gt_cube    = gt_cube,
+                    axis       = axis,
+                    index      = int(i),
+                    x_axis     = x_axis_np,
+                    out_dir    = out_dir,
+                    stem       = stem_fn(i),
+                    az_offset  = result.azimuth_offset,
+                    rg_offset  = result.range_offset,
+                    ssim_value = global_metrics[f"ssim_{ssim_prefix}_{axis}_{int(i)}"],
+                    ref_title  = ref_title,
+                    pred_title = pred_title,
+                    err_title  = err_title,
+                    full_cube  = full_cube,
+                    full_title = full_title,
                 )
 
         for i in slice_elev_idx:
-            figure_paths["slices_elev"] += slice_plotter.plot_elevation_intensity_slice(
-                pred_cube    = result.pred_curves,
-                gt_cube      = result.gt_curves,
-                elev_idx     = int(i),
-                x_axis       = x_axis_np,
-                out_dir      = meta.figures_dir / "slices",
-                stem         = f"elev_idx_{int(i)}",
-                az_offset    = result.azimuth_offset,
-                rg_offset    = result.range_offset,
-                ssim_value   = global_metrics[f"ssim_gt_elev_{int(i)}"],
-                full_cube    = run.full_curves,
+            figure_paths[f"slices_elev{group_suffix}"] += slice_plotter.plot_elevation_intensity_slice(
+                pred_cube  = pred_cube,
+                gt_cube    = gt_cube,
+                elev_idx   = int(i),
+                x_axis     = x_axis_np,
+                out_dir    = out_dir,
+                stem       = f"{stem_prefix}elev_idx_{int(i)}",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
+                ssim_value = global_metrics[f"ssim_{ssim_prefix}_elev_{int(i)}"],
+                ref_title  = ref_title,
+                pred_title = pred_title,
+                err_title  = err_title,
+                full_cube  = full_cube,
+                full_title = full_title,
             )
-
-        logger.subsection(f"Slices written : range={cfg.n_range_slices} azimuth={cfg.n_azimuth_slices} elev={cfg.n_elevation_slices} (gt, pred, error each)")
 
     def _compose_ssim(self, result: Result, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
         slice_plotter = self.plotter.slice
         meta          = self.meta
         logger        = self.logger
-        
-        all_range_idx = indices["all_range_idx"]
-        all_az_idx    = indices["all_az_idx"]
-        all_elev_idx  = indices["all_elev_idx"]
-        
+
         _N_elev, _az, _rg = result.pred_curves.shape
+        offsets           = {"range": result.range_offset, "azimuth": result.azimuth_offset}
 
-        for axis, n_slices, indices_arr, offset in (
-            ("range",   _rg,     all_range_idx, result.range_offset),
-            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
-            ("elev",    _N_elev, all_elev_idx,  0),
-        ):
-            figure_paths[f"ssim_{axis}"] = [slice_plotter.plot_ssim_curves(
-                global_metrics = global_metrics,
-                axis           = axis,
-                out_path       = meta.figures_dir / "ssim" / f"{axis}.png",
-                n_slices       = n_slices,
-                slice_indices  = indices_arr,
-                ax_offset      = offset,
-            )]
+        self._ssim_curves_set(
+            global_metrics = global_metrics,
+            indices        = indices,
+            shape          = result.pred_curves.shape,
+            offsets        = offsets,
+            ssim_prefix    = "gt",
+            group_suffix   = "",
+            series_label   = "pred × GT (Gaussian)",
+            out_dir        = meta.figures_dir / "ssim",
+            figure_paths   = figure_paths,
+        )
 
-        logger.subsection(f"SSIM plots : range, azimuth, elev written to {meta.figures_dir / 'ssim'}\n")
+        self._ssim_curves_set(
+            global_metrics = global_metrics,
+            indices        = indices,
+            shape          = result.pred_curves.shape,
+            offsets        = offsets,
+            ssim_prefix    = "norm",
+            group_suffix   = "_norm",
+            series_label   = "pred × GT (unit-area)",
+            out_dir        = meta.figures_dir / "ssim_norm",
+            figure_paths   = figure_paths,
+        )
+
+        logger.subsection(f"SSIM plots : range, azimuth, elev (denorm + unit-area) written to {meta.figures_dir}\n")
 
         figure_paths["elev_metric_curves"] = slice_plotter.plot_elev_metric_curves(
             global_metrics = global_metrics,
@@ -690,6 +767,38 @@ class FigureComposer:
         )
 
         logger.subsection(f"Elev metric curves (MAE, RMSE, R², CE) written to {meta.figures_dir / 'elev_metrics'}\n")
+
+    def _ssim_curves_set(
+        self,
+        global_metrics : dict,
+        indices        : dict,
+        shape          : tuple,
+        offsets        : dict,
+        ssim_prefix    : str,
+        group_suffix   : str,
+        series_label   : str,
+        out_dir        : Path,
+        figure_paths   : Dict[str, List[Path]],
+    ) -> None:
+
+        slice_plotter     = self.plotter.slice
+        _N_elev, _az, _rg = shape
+
+        for axis, n_slices, indices_arr, offset in (
+            ("range",   _rg,     indices["all_range_idx"], offsets["range"]),
+            ("azimuth", _az,     indices["all_az_idx"],    offsets["azimuth"]),
+            ("elev",    _N_elev, indices["all_elev_idx"],  0),
+        ):
+            figure_paths[f"ssim_{axis}{group_suffix}"] = [slice_plotter.plot_ssim_curves(
+                global_metrics = global_metrics,
+                axis           = axis,
+                out_path       = out_dir / f"{axis}.png",
+                n_slices       = n_slices,
+                slice_indices  = indices_arr,
+                ax_offset      = offset,
+                prefix         = ssim_prefix,
+                series_label   = series_label,
+            )]
 
     def compose(
         self,

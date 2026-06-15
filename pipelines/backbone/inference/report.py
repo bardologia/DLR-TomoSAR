@@ -119,8 +119,9 @@ class Report:
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:
         for prefix in (
-            "ssim_gt_elev_", "ssim_gt_range_", "ssim_gt_azimuth_",
-            "ssim_red_elev_", "ssim_red_range_", "ssim_red_azimuth_",
+            "ssim_gt_elev_",   "ssim_gt_range_",   "ssim_gt_azimuth_",
+            "ssim_norm_elev_", "ssim_norm_range_", "ssim_norm_azimuth_",
+            "ssim_red_elev_",  "ssim_red_range_",  "ssim_red_azimuth_",
         ):
             if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
                 return True
@@ -230,11 +231,19 @@ class Report:
         ]))
         out.append("")
 
-        out.append("**SSIM** (mean over all slices of that axis)\n")
+        out.append("**SSIM** (denorm, mean over all slices of that axis)\n")
         out.append(self._three_col_table([
             ("SSIM elev mean",    gm["ssim_gt_elev_mean"],    "H\u00d7W intensity-at-elevation-bin planes"),
             ("SSIM range mean",   gm["ssim_gt_range_mean"],   "n_elev\u00d7H cross-sectional planes"),
             ("SSIM azimuth mean", gm["ssim_gt_azimuth_mean"], "n_elev\u00d7W cross-sectional planes"),
+        ]))
+        out.append("")
+
+        out.append("**SSIM** (unit-area normalised pred vs GT, mean over all slices of that axis)\n")
+        out.append(self._three_col_table([
+            ("SSIM elev mean",    gm["ssim_norm_elev_mean"],    "H\u00d7W intensity-at-elevation-bin planes"),
+            ("SSIM range mean",   gm["ssim_norm_range_mean"],   "n_elev\u00d7H cross-sectional planes"),
+            ("SSIM azimuth mean", gm["ssim_norm_azimuth_mean"], "n_elev\u00d7W cross-sectional planes"),
         ]))
         out.append("")
 
@@ -375,7 +384,8 @@ class Report:
             "3.1 Dataset statistics":             {},
             "3.2 Curve-level (GT)":               {},
             "3.3 Per-pixel (GT)":                 {},
-            "3.4 SSIM summaries":                 {},
+            "3.4 SSIM summaries (denorm)":        {},
+            "3.4b SSIM summaries (normalised)":   {},
             "3.5 Curve-level (reduced vs GT)":    {},
             "3.6 Per-pixel (reduced vs GT)":      {},
             "3.7 SSIM summaries (reduced vs GT)": {},
@@ -400,8 +410,10 @@ class Report:
                     groups["3.5 Curve-level (reduced vs GT)"][k] = v
             elif k.startswith("pixel_"):
                 groups["3.3 Per-pixel (GT)"][k] = v
+            elif k.startswith("ssim_norm"):
+                groups["3.4b SSIM summaries (normalised)"][k] = v
             elif k.startswith("ssim_"):
-                groups["3.4 SSIM summaries"][k] = v
+                groups["3.4 SSIM summaries (denorm)"][k] = v
             else:
                 groups["3.2 Curve-level (GT)"][k] = v
 
@@ -486,9 +498,12 @@ class Report:
         ))
 
         slice_groups = [(key, title) for key, title in (
-            ("slices_range",   "Range cuts"),
-            ("slices_azimuth", "Azimuth cuts"),
-            ("slices_elev",    "Elevation cuts"),
+            ("slices_range",        "Range cuts"),
+            ("slices_azimuth",      "Azimuth cuts"),
+            ("slices_elev",         "Elevation cuts"),
+            ("slices_range_norm",   "Range cuts (unit-area)"),
+            ("slices_azimuth_norm", "Azimuth cuts (unit-area)"),
+            ("slices_elev_norm",    "Elevation cuts (unit-area)"),
         ) if fp.get(key)]
 
         if slice_groups:
@@ -497,20 +512,24 @@ class Report:
                 "GT and prediction share a colour scale; "
                 "error figures are clipped at p99 of that slice. "
                 "SSIM (pred vs GT) is shown in the prediction title. "
-                "The raw full-stack tomogram (the reference the GT Gaussians are fit to) is shown as an extra panel.\n"
+                "The raw full-stack tomogram (the reference the GT Gaussians are fit to) is shown as an extra panel. "
+                "Both denormalised slices and unit-area-normalised slices (each elevation profile normalised to unit area) are shown.\n"
             )
             self._numbered_section(out, "7.", slice_groups)
 
         out.append("\n## 8. SSIM curves\n")
-        out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT.\n")
+        out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT, both denormalised and unit-area-normalised.\n")
         self._section(out, (
-            ("ssim_range",   "8.1 SSIM along range axis"),
-            ("ssim_azimuth", "8.2 SSIM along azimuth axis"),
-            ("ssim_elev",    "8.3 SSIM along elevation axis"),
+            ("ssim_range",        "8.1 SSIM along range axis (denorm)"),
+            ("ssim_azimuth",      "8.2 SSIM along azimuth axis (denorm)"),
+            ("ssim_elev",         "8.3 SSIM along elevation axis (denorm)"),
+            ("ssim_range_norm",   "8.4 SSIM along range axis (unit-area)"),
+            ("ssim_azimuth_norm", "8.5 SSIM along azimuth axis (unit-area)"),
+            ("ssim_elev_norm",    "8.6 SSIM along elevation axis (unit-area)"),
         ))
 
         if fp.get("elev_metric_curves"):
-            out.append("\n### 8.4 Per-elevation-bin metrics (MAE, RMSE, R\u00b2, cross-entropy)\n")
+            out.append("\n### 8.7 Per-elevation-bin metrics (MAE, RMSE, R\u00b2, cross-entropy)\n")
             out.append(
                 "Each panel shows a metric aggregated over all (az\u00d7rg) pixels for every "
                 "elevation bin (pred vs GT). "
