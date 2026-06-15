@@ -108,7 +108,6 @@ class ResultsView {
     this._remember(data.root);
 
     this.expanded = new Set([""]);
-    data.tree.children.forEach((child) => this.expanded.add(child.rel));
 
     this.view        = "folder";
     this.filter      = "";
