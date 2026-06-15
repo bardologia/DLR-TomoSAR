@@ -49,34 +49,38 @@ class LaunchView {
       title  : "Backbone",
       summary: "Supervised regression that maps the SAR image stack straight to the Gaussian-mixture profile parameters.",
       flow   : [
-        { kind: "input",  label: "Image stack",  sub: "primary · secondaries · interferograms" },
-        { kind: "model",  label: "Backbone",     sub: "supervised network" },
-        { kind: "output", label: "Params array", sub: "amp, μ, σ, amp, μ, σ, …" },
+        { kind: "input",  glyph: "stack",  label: "Image stack",  sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "net",    label: "Backbone",     sub: "supervised network" },
+        { kind: "output", glyph: "params", label: "Params array", sub: "amp, μ, σ, amp, μ, σ, …" },
       ],
     },
     autoencoder: {
       title  : "Autoencoder",
       summary: "Learns the latent profile space: encodes the fitted normalized profiles into embeddings and reconstructs them.",
       flow   : [
-        { kind: "input",  label: "Normalized profiles", sub: "fitted targets" },
-        { kind: "model",  label: "Encoder" },
-        { kind: "latent", label: "Normalized embeddings" },
-        { kind: "model",  label: "Decoder" },
-        { kind: "output", label: "Reconstructed profiles" },
+        { kind: "input",  glyph: "curve",   label: "Normalized profiles", sub: "fitted targets" },
+        { kind: "model",  glyph: "encoder", label: "Encoder" },
+        { kind: "latent", glyph: "vector",  label: "Normalized embeddings" },
+        { kind: "model",  glyph: "decoder", label: "Decoder" },
+        { kind: "output", glyph: "curve",   label: "Reconstructed profiles" },
       ],
     },
     jepa: {
       title  : "JEPA",
       summary: "Predicts the profile embedding from the image stack, then decodes it back to normalized profiles through the autoencoder decoder.",
       flow   : [
-        { kind: "input",  label: "Image stack",            sub: "primary · secondaries · interferograms" },
-        { kind: "model",  label: "JEPA",                   sub: "predictor" },
-        { kind: "latent", label: "Normalized embeddings" },
-        { kind: "model",  label: "AE decoder",             sub: "frozen / fine-tuned" },
-        { kind: "output", label: "Normalized profiles" },
+        { kind: "input",  glyph: "stack",   label: "Image stack",         sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "net",     label: "JEPA",                sub: "predictor" },
+        { kind: "latent", glyph: "vector",  label: "Normalized embeddings" },
+        { kind: "model",  glyph: "decoder", label: "AE decoder",          sub: "frozen / fine-tuned" },
+        { kind: "output", glyph: "curve",   label: "Normalized profiles" },
       ],
     },
   };
+
+  static MODEL_COLORS = { input: "#1d4fd8", model: "#16191b", latent: "#a16207", output: "#0f766e" };
+
+  static MODEL_TAGS = { input: "input", model: "network", latent: "latent", output: "output" };
 
   static TYPE_TABS = {
     benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
@@ -313,19 +317,99 @@ class LaunchView {
     }
     card.hidden = false;
 
-    const tags = { input: "input", model: "network", latent: "latent", output: "output" };
-
-    const stages = meaning.flow.map((node, i) => {
-      const arrow = i ? `<span class="modelflow__arrow" aria-hidden="true">&rarr;</span>` : "";
-      const tag   = `<span class="modelflow__tag">${tags[node.kind] || node.kind}</span>`;
-      const sub   = node.sub ? `<span class="modelflow__sub">${node.sub}</span>` : "";
-      return `<span class="modelflow__step">${arrow}<span class="modelflow__node modelflow__node--${node.kind}">${tag}<span class="modelflow__label">${node.label}</span>${sub}</span></span>`;
-    }).join("");
-
     card.innerHTML =
       `<div class="modelcard__head"><span class="modelcard__kicker">What ${meaning.title} does</span>` +
       `<p class="modelcard__summary">${meaning.summary}</p></div>` +
-      `<div class="modelflow">${stages}</div>`;
+      `<div class="modelflow">${this._modelDiagram(meaning.flow)}</div>`;
+  }
+
+  _modelDiagram(flow) {
+    const SLOT = 200, PAD = 26, CY = 88, H = 226;
+    const width = flow.length * SLOT + PAD * 2;
+
+    let arrows = "";
+    let nodes  = "";
+    flow.forEach((node, i) => {
+      const cx    = PAD + i * SLOT + SLOT / 2;
+      const color = LaunchView.MODEL_COLORS[node.kind] || "#16191b";
+
+      if (i) {
+        const prev = PAD + (i - 1) * SLOT + SLOT / 2;
+        arrows += `<line class="mflow-link" x1="${prev + 58}" y1="${CY}" x2="${cx - 58}" y2="${CY}" marker-end="url(#mflow-arrow)"/>`;
+      }
+
+      nodes += this._glyph(node.glyph, cx, CY, color) + this._caption(node, cx, CY, color, SLOT);
+    });
+
+    return `<svg class="mflow-svg" width="${width}" height="${H}" viewBox="0 0 ${width} ${H}" role="img" aria-label="model data flow">` +
+      `<defs><marker id="mflow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
+      `<path d="M0 0L10 5L0 10z" fill="#9aa196"/></marker></defs>` +
+      arrows + nodes + `</svg>`;
+  }
+
+  _caption(node, cx, cy, color, slot) {
+    const tag = LaunchView.MODEL_TAGS[node.kind] || node.kind;
+    const sub = node.sub ? `<span class="mflow-sub">${node.sub}</span>` : "";
+    const w   = slot - 28;
+    return `<foreignObject x="${cx - w / 2}" y="${cy + 56}" width="${w}" height="72">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml" class="mflow-cap">` +
+      `<span class="mflow-tag" style="color:${color}">${tag}</span>` +
+      `<span class="mflow-name">${node.label}</span>${sub}</div></foreignObject>`;
+  }
+
+  _glyph(glyph, cx, cy, color) {
+    const tint = color + "14";
+
+    if (glyph === "stack") {
+      const w = 52, h = 58, x = cx - w / 2, y = cy - h / 2;
+      let rows = "";
+      [18, 32, 46].forEach((dy) => { rows += `<line x1="${x + 10}" y1="${y + dy}" x2="${x + w - 10}" y2="${y + dy}" stroke="${color}" stroke-width="1" opacity="0.45"/>`; });
+      return `<g fill="${tint}" stroke="${color}" stroke-width="1.6">` +
+        `<rect x="${x + 14}" y="${y - 14}" width="${w}" height="${h}" rx="4" opacity="0.4"/>` +
+        `<rect x="${x + 7}"  y="${y - 7}"  width="${w}" height="${h}" rx="4" opacity="0.7"/>` +
+        `<rect x="${x}"      y="${y}"      width="${w}" height="${h}" rx="4"/>${rows}</g>`;
+    }
+
+    if (glyph === "net") {
+      const s = 84, x = cx - s / 2, y = cy - s / 2, lx = cx - 18, rx = cx + 18, rows = [cy - 22, cy, cy + 22];
+      let lines = "", dots = "";
+      rows.forEach((ly) => rows.forEach((ry) => { lines += `<line x1="${lx}" y1="${ly}" x2="${rx}" y2="${ry}" stroke="#fff" stroke-width="0.8" opacity="0.32"/>`; }));
+      rows.forEach((ry) => { dots += `<circle cx="${lx}" cy="${ry}" r="4" fill="#fff"/><circle cx="${rx}" cy="${ry}" r="4" fill="#fff"/>`; });
+      return `<g><rect x="${x}" y="${y}" width="${s}" height="${s}" rx="11" fill="${color}"/>${lines}${dots}</g>`;
+    }
+
+    if (glyph === "encoder" || glyph === "decoder") {
+      const hw = 36, lh = glyph === "encoder" ? 44 : 18, rh = glyph === "encoder" ? 18 : 44;
+      const pts = `${cx - hw},${cy - lh} ${cx + hw},${cy - rh} ${cx + hw},${cy + rh} ${cx - hw},${cy + lh}`;
+      let dots = "";
+      [-14, 0, 14].forEach((dx) => { dots += `<circle cx="${cx + dx}" cy="${cy}" r="3.4" fill="#fff" opacity="0.85"/>`; });
+      return `<g><polygon points="${pts}" fill="${color}"/>${dots}</g>`;
+    }
+
+    if (glyph === "vector") {
+      const w = 32, h = 88, x = cx - w / 2, y = cy - h / 2, cells = 5, ch = h / cells;
+      let segs = "";
+      for (let k = 1; k < cells; k++) segs += `<line x1="${x}" y1="${y + ch * k}" x2="${x + w}" y2="${y + ch * k}" stroke="${color}" stroke-width="1" opacity="0.5"/>`;
+      return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${tint}" stroke="${color}" stroke-width="1.6"/>${segs}</g>`;
+    }
+
+    if (glyph === "params") {
+      const cw = 15, h = 34, y = cy - h / 2, xs = [0, 18, 36, 61, 79, 97].map((o) => cx - 56 + o), op = [1, 0.7, 0.45, 1, 0.7, 0.45];
+      let cells = "";
+      xs.forEach((x, k) => { cells += `<rect x="${x}" y="${y}" width="${cw}" height="${h}" rx="3" fill="${color}" opacity="${op[k]}"/>`; });
+      cells += `<text x="${cx + 64}" y="${cy + 6}" font-family="JetBrains Mono, monospace" font-size="18" fill="${color}">…</text>`;
+      return `<g>${cells}</g>`;
+    }
+
+    if (glyph === "curve") {
+      const ax = cx - 38, ay0 = cy - 32, ay1 = cy + 28, axr = cx + 38;
+      const axis  = `<path d="M${ax} ${ay0} L${ax} ${ay1} L${axr} ${ay1}" fill="none" stroke="${color}" stroke-width="1.2" opacity="0.4"/>`;
+      const curve = `<path d="M${ax + 4} ${ay1 - 2} C ${cx - 16} ${ay1 - 2}, ${cx - 11} ${cy - 30}, ${cx} ${cy - 30} C ${cx + 11} ${cy - 30}, ${cx + 16} ${ay1 - 2}, ${axr - 4} ${ay1 - 2} Z" fill="${tint}" stroke="${color}" stroke-width="2"/>`;
+      return `<g>${axis}${curve}</g>`;
+    }
+
+    const r = 30;
+    return `<rect x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" rx="6" fill="${tint}" stroke="${color}" stroke-width="1.6"/>`;
   }
 
   _renderFacts() {
