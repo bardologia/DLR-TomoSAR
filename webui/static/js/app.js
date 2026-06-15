@@ -171,6 +171,7 @@ class App {
       sources       : document.getElementById("cube-sources"),
       profiles      : document.getElementById("cube-profiles"),
       profAt        : document.getElementById("cube-prof-at"),
+      profMetrics   : document.getElementById("cube-prof-metrics"),
       progress      : document.getElementById("cube-progress"),
       progressFill  : document.getElementById("cube-progress-fill"),
       progressLabel : document.getElementById("cube-progress-label"),
@@ -182,6 +183,7 @@ class App {
         source : root.dataset.source,
         canvas : root.querySelector("canvas"),
         ref    : root.querySelector(".cube-ref"),
+        metric : root.querySelector(".cube-slice__metric"),
       })),
       profPanels    : [...document.querySelectorAll(".cube-prof")].map((root) => ({
         root,

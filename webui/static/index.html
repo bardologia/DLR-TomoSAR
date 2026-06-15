@@ -254,10 +254,10 @@
               <span class="cube-cutgroup__at" data-axis="range"></span>
             </h3>
             <div class="cube-cutgroup__stack">
-              <figure class="cube-slice" data-axis="range" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="range" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="range" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="range" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="range" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="range" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="range" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="range" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
             </div>
           </section>
           <section class="cube-cutgroup" data-axis="azimuth">
@@ -266,10 +266,10 @@
               <span class="cube-cutgroup__at" data-axis="azimuth"></span>
             </h3>
             <div class="cube-cutgroup__stack">
-              <figure class="cube-slice" data-axis="azimuth" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="azimuth" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div></figure>
-              <figure class="cube-slice" data-axis="azimuth" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
             </div>
           </section>
         </div>
@@ -289,6 +289,15 @@
             <figure class="cube-prof" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
             <figure class="cube-prof" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
           </div>
+          <table class="cube-metrics" id="cube-prof-metrics">
+            <thead>
+              <tr><th scope="col">vs ground truth</th><th scope="col">MAE</th><th scope="col">MSE</th><th scope="col">R&sup2;</th></tr>
+            </thead>
+            <tbody>
+              <tr data-source="pred"><th scope="row"><i class="cube-dot" data-source="pred"></i>pred</th><td data-k="mae">&ndash;</td><td data-k="mse">&ndash;</td><td data-k="r2">&ndash;</td></tr>
+              <tr data-source="reduced"><th scope="row"><i class="cube-dot" data-source="reduced"></i>capon reduced</th><td data-k="mae">&ndash;</td><td data-k="mse">&ndash;</td><td data-k="r2">&ndash;</td></tr>
+            </tbody>
+          </table>
         </aside>
       </div>
     </div>

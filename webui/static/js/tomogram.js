@@ -18,6 +18,7 @@ class TomogramView {
     this.sourcesEl = refs.sources;
     this.profilesEl = refs.profiles;
     this.profAt = refs.profAt;
+    this.profMetricsEl = refs.profMetrics;
     this.profModeBtns = refs.profModeBtns;
     this.profPanels = refs.profPanels;
     this.spaceBtns = refs.spaceBtns || [];
@@ -43,6 +44,8 @@ class TomogramView {
     this.profData = null;
     this.profQueued = null;
     this.profFetching = false;
+    this.ssimQueued = null;
+    this.ssimFetching = false;
     this.colors = {};
     this.visible = new Set();
 
@@ -148,9 +151,12 @@ class TomogramView {
       panel.marker = 0;
       panel.queued = null;
       panel.fetching = false;
+      if (panel.metric) panel.metric.textContent = "";
     });
     this.profQueued = null;
     this.profData = null;
+    this.ssimQueued = null;
+    this._clearProfMetrics();
     this.deck.dataset.mode = "map";
     this.back.hidden = true;
     this.cross.hidden = true;
@@ -312,6 +318,11 @@ class TomogramView {
     this.sourcesEl.querySelectorAll(".cube-source").forEach((btn) => {
       btn.classList.toggle("is-active", this.visible.has(btn.dataset.source));
     });
+    if (this.profMetricsEl) {
+      this.profMetricsEl.querySelectorAll("tr[data-source]").forEach((row) => {
+        row.hidden = !this.visible.has(row.dataset.source);
+      });
+    }
     this.slicesEl.style.setProperty("--cube-rows", String(this.visible.size));
   }
 
@@ -442,6 +453,8 @@ class TomogramView {
       if (panel.root.hidden) return;
       this._updatePanel(panel, az, rg);
     });
+
+    this._queueSsim(az, rg);
   }
 
   _updatePanel(panel, az, rg) {
@@ -521,6 +534,53 @@ class TomogramView {
     ctx.setLineDash([]);
   }
 
+  _queueSsim(az, rg) {
+    this.ssimQueued = { az, rg };
+    this._ssimPump();
+  }
+
+  async _ssimPump() {
+    if (this.ssimFetching || !this.ssimQueued) return;
+    this.ssimFetching = true;
+
+    while (this.ssimQueued) {
+      const { az, rg } = this.ssimQueued;
+      this.ssimQueued = null;
+      await this._fetchSsim(az, rg);
+    }
+
+    this.ssimFetching = false;
+  }
+
+  async _fetchSsim(az, rg) {
+    const space = this.space;
+
+    let data;
+    try {
+      data = await window.apiGet(`/api/cubes/ssim?id=${encodeURIComponent(this.selectedId)}&az=${az}&rg=${rg}&space=${space}`);
+    } catch (e) {
+      return;
+    }
+
+    if (!data || !data.ok) return;
+    this._applySsim(data);
+  }
+
+  _applySsim(data) {
+    this.panels.forEach((panel) => {
+      if (!panel.metric) return;
+
+      if (panel.source === "gt") {
+        panel.metric.textContent = "reference";
+        return;
+      }
+
+      const group = data[panel.axis] || {};
+      const value = group[panel.source];
+      panel.metric.textContent = value === undefined || value === null ? "SSIM –" : `SSIM ${value.toFixed(3)}`;
+    });
+  }
+
   _queueProfiles(az, rg) {
     this.profAt.textContent = `profiles at az = ${az} · rg = ${rg}`;
     this.profQueued = { az, rg };
@@ -579,6 +639,57 @@ class TomogramView {
       const series = this.profData.sources[panel.source];
       if (series) this._drawProfile(panel, series, shared);
     });
+
+    this._fillProfMetrics();
+  }
+
+  _fillProfMetrics() {
+    if (!this.profMetricsEl) return;
+
+    const gt = this.profData && this.profData.sources.gt;
+
+    ["pred", "reduced"].forEach((source) => {
+      const row = this.profMetricsEl.querySelector(`tr[data-source="${source}"]`);
+      if (!row) return;
+
+      const series = this.profData && this.profData.sources[source];
+      const scores = gt && series ? this._scoreCurve(series.values, gt.values) : null;
+
+      ["mae", "mse", "r2"].forEach((key) => {
+        const cell = row.querySelector(`td[data-k="${key}"]`);
+        if (cell) cell.textContent = scores ? this._fmtMetric(scores[key], key) : "–";
+      });
+    });
+  }
+
+  _scoreCurve(values, ref) {
+    const n = Math.min(values.length, ref.length);
+    if (!n) return null;
+
+    let sumAbs = 0, sumSq = 0, sumRef = 0;
+    for (let i = 0; i < n; i++) {
+      const d = values[i] - ref[i];
+      sumAbs += Math.abs(d);
+      sumSq  += d * d;
+      sumRef += ref[i];
+    }
+
+    const mean = sumRef / n;
+    let ssTot = 0;
+    for (let i = 0; i < n; i++) ssTot += (ref[i] - mean) ** 2;
+
+    return { mae: sumAbs / n, mse: sumSq / n, r2: 1 - sumSq / (ssTot + 1e-12) };
+  }
+
+  _fmtMetric(value, key) {
+    if (!Number.isFinite(value)) return "–";
+    if (key === "r2") return value.toFixed(3);
+    return this._fmt(value);
+  }
+
+  _clearProfMetrics() {
+    if (!this.profMetricsEl) return;
+    this.profMetricsEl.querySelectorAll("td[data-k]").forEach((cell) => { cell.textContent = "–"; });
   }
 
   _drawProfile(panel, series, shared) {

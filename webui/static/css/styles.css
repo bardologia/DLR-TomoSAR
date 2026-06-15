@@ -2100,6 +2100,18 @@ main { margin-left: var(--navw); }
   pointer-events: none;
 }
 .cube-slice canvas { width: 100%; height: clamp(120px, calc((100vh - 256px) / var(--cube-rows) - 26px), 640px); display: block; background: #fff; border: 1px solid var(--line); }
+.cube-slice__metric { display: block; margin-top: 5px; font-family: var(--mono); font-size: 11px; line-height: 1.2; color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* per-source error metrics under the profiles */
+.cube-metrics { width: 100%; margin-top: 16px; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
+.cube-metrics th, .cube-metrics td { padding: 6px 6px; text-align: right; white-space: nowrap; }
+.cube-metrics thead th { font-weight: 500; color: var(--ink-faint); border-bottom: 1px solid var(--line); }
+.cube-metrics thead th:first-child { text-align: left; }
+.cube-metrics tbody th { text-align: left; font-weight: 500; color: var(--ink); }
+.cube-metrics tbody th .cube-dot { vertical-align: middle; margin-right: 7px; }
+.cube-metrics tbody td { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.cube-metrics tbody tr[hidden] { display: none; }
+.cube-metrics tbody tr + tr th, .cube-metrics tbody tr + tr td { border-top: 1px solid var(--line); }
 
 /* loading states */
 @keyframes cube-shimmer { 0% { background-position: 180% 0; } 100% { background-position: -80% 0; } }

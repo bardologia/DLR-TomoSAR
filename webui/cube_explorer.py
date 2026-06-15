@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from skimage.metrics import structural_similarity as ssim
 
 from project_paths import ProjectPaths
 from web_logger    import WebLogger
@@ -103,6 +104,55 @@ class CubeExplorer:
             sources[source]  = {"heights": heights.tolist(), "values": values.astype(float).tolist()}
 
         return {"ok": True, "az": az, "rg": rg, "sources": sources}
+
+    def slice_ssim(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+            entries = self.loaded["entries"]
+            meta    = self.loaded["meta"]
+
+        gt = entries.get("gt")
+        if gt is None:
+            return {"ok": True, "az": int(az), "rg": int(rg), "range": {}, "azimuth": {}}
+
+        az = int(np.clip(az, 0, meta["n_az"] - 1))
+        rg = int(np.clip(rg, 0, meta["n_rg"] - 1))
+
+        gt_cube = gt["cube"]
+        out     = {"range": {}, "azimuth": {}}
+
+        for source in ("pred", "reduced", "full"):
+            entry = entries.get(source)
+            if entry is None or entry["cube"].shape != gt_cube.shape:
+                continue
+
+            cube = entry["cube"]
+            out["range"][source]   = self._ssim_score(cube[:, :, rg], gt_cube[:, :, rg], space)
+            out["azimuth"][source] = self._ssim_score(cube[:, az, :], gt_cube[:, az, :], space)
+
+        return {"ok": True, "az": az, "rg": rg, "range": out["range"], "azimuth": out["azimuth"]}
+
+    @staticmethod
+    def _ssim_score(cur: np.ndarray, ref: np.ndarray, space: str) -> float | None:
+        cur = np.nan_to_num(np.asarray(cur, dtype=np.float64))
+        ref = np.nan_to_num(np.asarray(ref, dtype=np.float64))
+
+        if space == "normalized":
+            cur = cur / np.where((p := cur.max(axis=0, keepdims=True)) > 1e-12, p, 1.0)
+            ref = ref / np.where((p := ref.max(axis=0, keepdims=True)) > 1e-12, p, 1.0)
+
+        data_range = float(ref.max() - ref.min())
+        if data_range <= 0.0:
+            return None
+
+        min_side = min(cur.shape)
+        win_size = min(7, min_side if min_side % 2 == 1 else min_side - 1)
+        if win_size < 3:
+            return None
+
+        value = float(ssim(ref, cur, data_range=data_range, win_size=win_size))
+        return value if np.isfinite(value) else None
 
     def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical") -> bytes | None:
         entry = self._entry(cube_id, source)

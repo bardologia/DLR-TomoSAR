@@ -121,6 +121,16 @@ class RequestRouter:
             )
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/cubes/ssim":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.cubes.slice_ssim(
+                cube_id = (query.get("id") or [""])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+                space   = (query.get("space") or ["physical"])[0],
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
+            return
         if path == "/api/cubes/slice":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.slice_png(
