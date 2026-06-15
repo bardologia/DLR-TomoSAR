@@ -138,9 +138,6 @@ class TransUNet(nn.Module):
         tokens = self.transformer_norm(tokens)
         x      = tokens_to_feature_map(tokens, grid_height, grid_width)
 
-        if x.shape[2:] != skip_connections[-1].shape[2:]:
-            x = match_spatial_size(source=x, reference=skip_connections[-1])
-
         for upsample, decoder_block, skip in zip(
             self.upsample_layers, self.decoder_blocks, reversed(skip_connections)
         ):
