@@ -1942,12 +1942,12 @@ main { margin-left: var(--navw); }
 
 .cube-deck {
   display: grid;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.85fr) minmax(0, 0.0001fr);
+  grid-template-columns: minmax(340px, 1.2fr) minmax(0, 1.8fr) minmax(0, 0.0001fr);
   gap: 0 26px; align-items: start;
   transition: grid-template-columns 0.55s var(--ease);
 }
 .cube-deck > * { min-width: 0; }
-.cube-deck[data-mode="slices"] { grid-template-columns: minmax(0, 0.0001fr) minmax(0, 1.85fr) minmax(300px, 0.9fr); }
+.cube-deck[data-mode="slices"] { grid-template-columns: minmax(0, 0.0001fr) minmax(0, 1.8fr) minmax(340px, 1.2fr); }
 
 .cube-panel-title { font-family: var(--display); font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; margin: 0; }
 
