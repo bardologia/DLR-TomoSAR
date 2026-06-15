@@ -16,6 +16,16 @@ class BenchmarkWorker:
         self.run_dir = Path(config.paths.log_base_dir) / run_tag
         self.factory = ConfigFactory(config)
 
+    def _size_overrides(self, model_name: str) -> dict:
+        size_match_path = self.run_dir / "pipeline" / "size_match.json"
+        if not size_match_path.exists():
+            return {}
+
+        records = FileIO.load_json(size_match_path)
+
+        entry = records.get(model_name, {})
+        return entry.get("overrides", {})
+
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(
             enabled        = False,
@@ -156,7 +166,12 @@ class OverfitWorker(BenchmarkWorker):
 
         stage_dir    = self.run_dir / "overfit"
         result_path  = stage_dir / model_name / "overfit_result.json"
-        model_config = OverfitModelPreparer(CONFIG_REGISTRY[model_name]()).prepare()
+        model_config = CONFIG_REGISTRY[model_name]()
+
+        for attribute, value in self._size_overrides(model_name).items():
+            setattr(model_config, attribute, value)
+
+        model_config = OverfitModelPreparer(model_config).prepare()
 
         def run_body():
             pipeline = TrainingPipeline(
@@ -220,16 +235,6 @@ class OverfitWorker(BenchmarkWorker):
 
 
 class TrainingWorker(BenchmarkWorker):
-    def _size_overrides(self, model_name: str) -> dict:
-        size_match_path = self.run_dir / "pipeline" / "size_match.json"
-        if not size_match_path.exists():
-            return {}
-
-        records = FileIO.load_json(size_match_path)
-
-        entry = records.get(model_name, {})
-        return entry.get("overrides", {})
-
     def run(self, model_name: str) -> None:
         if self.config.training_type == "autoencoder":
             from configuration.training.runtime_config           import OverfitConfig

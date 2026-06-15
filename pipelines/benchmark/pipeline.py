@@ -94,14 +94,14 @@ class BenchmarkPipeline:
         }, title="Configuration")
 
         try:
+            if self.config.runs_size_match():
+                self._run_size_match()
+
             gate_passed = self._run_overfit_gate()
             if not gate_passed and self.config.overfit.abort_on_fail:
                 self._mark_stage("pipeline", "aborted")
                 self.logger.error("Overfit gate failed — pipeline aborted. See the overfit report before retrying.")
                 raise SystemExit(1)
-
-            if self.config.runs_size_match():
-                self._run_size_match()
 
             training_results  = self._run_training()
             inference_results = self._run_inference() if self.config.runs_inference() else []
