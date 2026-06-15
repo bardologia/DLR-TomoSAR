@@ -308,9 +308,23 @@ class ResultsView {
     if (sections.length < 2) return;
 
     const nav = document.createElement("nav");
-    nav.className = "res-index" + (this.view === "folder" ? " res-index--book" : "");
     nav.setAttribute("aria-label", "Section index");
 
+    if (this.view === "folder") {
+      nav.className = "res-index res-index--book";
+      this._buildBookIndex(nav, sections);
+    } else {
+      nav.className = "res-index";
+      this._buildChipIndex(nav, sections);
+    }
+
+    if (!nav.children.length) return;
+
+    body.prepend(nav);
+    this._positionIndex();
+  }
+
+  _buildChipIndex(nav, sections) {
     sections.forEach((section, index) => {
       const cap = section.querySelector(".res-section__cap");
       if (!cap) return;
@@ -326,30 +340,63 @@ class ResultsView {
         false,
         false,
       ));
-
-      const md = section.querySelector(".res-md");
-      if (!md) return;
-
-      md.querySelectorAll("h2, h3").forEach((head, hi) => {
-        const text = head.textContent.trim();
-        if (!text) return;
-
-        head.id = `res-sec-${index}-h${hi}`;
-        head.classList.add("res-index__anchor");
-        nav.appendChild(this._indexLink(
-          text,
-          "",
-          () => head.scrollIntoView({ behavior: "smooth", block: "start" }),
-          true,
-          head.tagName === "H3",
-        ));
-      });
     });
+  }
 
-    if (!nav.children.length) return;
+  _buildBookIndex(nav, sections) {
+    sections.forEach((section, index) => {
+      const cap = section.querySelector(".res-section__cap");
+      if (!cap) return;
 
-    body.prepend(nav);
-    this._positionIndex();
+      section.id   = `res-sec-${index}`;
+      const source = cap.querySelector("button") || cap;
+      const tally  = cap.querySelector("span");
+      const heads  = [...section.querySelectorAll(".res-md h2, .res-md h3")].filter((h) => h.textContent.trim());
+
+      const group = document.createElement("div");
+      group.className = "res-index__group";
+
+      const head = document.createElement("div");
+      head.className = "res-index__grouphead";
+
+      const caret = document.createElement("button");
+      caret.type      = "button";
+      caret.className = "res-index__caret" + (heads.length ? "" : " res-index__caret--none");
+      caret.textContent = "▸";
+      if (heads.length) caret.addEventListener("click", () => {
+        caret.classList.toggle("is-open", group.classList.toggle("is-open"));
+        this._positionIndex();
+      });
+      head.appendChild(caret);
+
+      head.appendChild(this._indexLink(
+        this._indexLabel(source.textContent),
+        tally ? tally.textContent.trim() : "",
+        () => section.scrollIntoView({ behavior: "smooth", block: "start" }),
+        false,
+        false,
+      ));
+      group.appendChild(head);
+
+      if (heads.length) {
+        const subs = document.createElement("div");
+        subs.className = "res-index__subs";
+        heads.forEach((h, hi) => {
+          h.id = `res-sec-${index}-h${hi}`;
+          h.classList.add("res-index__anchor");
+          subs.appendChild(this._indexLink(
+            h.textContent.trim(),
+            "",
+            () => h.scrollIntoView({ behavior: "smooth", block: "start" }),
+            true,
+            h.tagName === "H3",
+          ));
+        });
+        group.appendChild(subs);
+      }
+
+      nav.appendChild(group);
+    });
   }
 
   _indexLabel(text) {
