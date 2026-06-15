@@ -178,7 +178,9 @@ class ResultsView {
       if (!datasets.error && !datasets.items.length) this._renderNote("no datasets found", false);
       datasets.items.forEach((dataset) => {
         this._renderEntry(dataset.name, dataset.path, "preprocess", 0);
-        dataset.params.forEach((param) => this._renderEntry(param.name, param.path, "params", 1));
+
+        const active = this.root && (this.root.root === dataset.path || dataset.params.some((param) => param.path === this.root.root));
+        if (active) dataset.params.forEach((param) => this._renderEntry(param.name, param.path, "params", 1));
       });
 
       const runs = this.catalog.runs;
