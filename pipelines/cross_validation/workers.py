@@ -46,7 +46,7 @@ class FoldCollector(TrialCollector):
 
         return {
             "inference_dir" : inference_dir,
-            "metrics"       : self._load_json(inference_dir / "metrics.json"),
+            "metrics"       : FileIO.load_json(inference_dir / "metrics.json"),
             "figures"       : sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else [],
             "animations"    : sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else [],
             "report_path"   : report_path if report_path.exists() else None,
