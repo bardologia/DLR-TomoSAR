@@ -35,7 +35,7 @@ class ConfigBrowser {
 
     const remembered = this.flat.find((c) => c.id === this.activeId);
     const first      = remembered || this.flat[0];
-    if (first) this._select(first.id);
+    if (first) this._select(first.id, false);
   }
 
   _bindSearch() {
@@ -105,7 +105,6 @@ class ConfigBrowser {
 
     const titles = this.groups.map((g) => g.title);
     this.open    = new Set(Array.isArray(openTitles) ? openTitles.filter((t) => titles.includes(t)) : []);
-    if (!this.open.size && titles.length) this.open.add(titles[0]);
     if (activeId && this.flat.some((c) => c.id === activeId)) this.activeId = activeId;
   }
 
@@ -228,14 +227,14 @@ class ConfigBrowser {
       return;
     }
 
-    if (!visible.find((c) => c.id === this.activeId)) this._select(visible[0].id);
+    if (!visible.find((c) => c.id === this.activeId)) this._select(visible[0].id, false);
     else this._renderDetail();
   }
 
-  _select(id) {
+  _select(id, expand = true) {
     this.activeId = id;
     const cls = this.flat.find((c) => c.id === id);
-    if (cls && !this.query && !this.open.has(cls.group)) {
+    if (expand && cls && !this.query && !this.open.has(cls.group)) {
       this.open.add(cls.group);
       this._renderList();
     }
