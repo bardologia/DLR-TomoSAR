@@ -147,7 +147,6 @@ class ConfigFactory:
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
 
             training = TrainingLoopConfig(
-                device               = "gpu",
                 epochs               = 10000,
                 validation_frequency = 9999,
             ),
