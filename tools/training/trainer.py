@@ -229,6 +229,9 @@ class BaseTrainer:
         try:
             data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
 
+            if self.overfitter.enabled:
+                self.lr_scheduler.set_total_epochs(self.overfitter.planned_epochs())
+
             self._before_training(data_loader)
 
             with self.logger.live_monitor("Training Progress") as live_mon:

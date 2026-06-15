@@ -93,11 +93,15 @@ class Scheduler:
         self.scheduler_type = self.config.scheduler.type
 
         self._epoch_offset  = 0
+        self._t_max_override = None
 
         self._log_scheduler_info()
 
+    def set_total_epochs(self, epochs: int) -> None:
+        self._t_max_override = max(1, int(epochs))
+
     def _cosine_annealing(self, epoch: int) -> float:
-        T_max         = self.config.scheduler.epochs
+        T_max         = self._t_max_override if self._t_max_override is not None else self.config.scheduler.epochs
         eta_min       = float(self.config.scheduler.eta_min)
         base_lr       = self.base_lrs[0]
         eta_min_ratio = eta_min / max(base_lr, 1e-12)

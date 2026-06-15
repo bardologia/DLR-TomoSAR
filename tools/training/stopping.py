@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 
 
@@ -80,6 +82,9 @@ class OverfitManager:
         test_loader_out = [single_batch]
 
         return data_loader, val_loader_out, test_loader_out
+
+    def planned_epochs(self) -> int:
+        return math.ceil(self.max_steps / max(1, self._epoch_steps))
 
     def check_stop(self, train_loss: float) -> bool:
         if not self.enabled:
