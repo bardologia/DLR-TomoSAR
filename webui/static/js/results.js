@@ -353,50 +353,72 @@ class ResultsView {
       const tally  = cap.querySelector("span");
       const heads  = [...section.querySelectorAll(".res-md h2, .res-md h3")].filter((h) => h.textContent.trim());
 
-      const group = document.createElement("div");
-      group.className = "res-index__group";
+      const tree = [];
+      heads.forEach((h, hi) => {
+        h.id = `res-sec-${index}-h${hi}`;
+        h.classList.add("res-index__anchor");
 
-      const head = document.createElement("div");
-      head.className = "res-index__grouphead";
-
-      const caret = document.createElement("button");
-      caret.type      = "button";
-      caret.className = "res-index__caret" + (heads.length ? "" : " res-index__caret--none");
-      caret.textContent = "▸";
-      if (heads.length) caret.addEventListener("click", () => {
-        caret.classList.toggle("is-open", group.classList.toggle("is-open"));
-        this._positionIndex();
+        const last = tree[tree.length - 1];
+        if (h.tagName === "H3" && last && last.head.tagName === "H2") last.children.push(h);
+        else tree.push({ head: h, children: [] });
       });
-      head.appendChild(caret);
 
-      head.appendChild(this._indexLink(
+      const subGroups = tree.map((node) => {
+        const label = this._headingLink(node.head, true);
+        const deep  = node.children.map((child) => this._headingLink(child, true, true));
+        return this._indexGroup(label, deep);
+      });
+
+      const mainLabel = this._indexLink(
         this._indexLabel(source.textContent),
         tally ? tally.textContent.trim() : "",
         () => section.scrollIntoView({ behavior: "smooth", block: "start" }),
         false,
         false,
-      ));
-      group.appendChild(head);
+      );
 
-      if (heads.length) {
-        const subs = document.createElement("div");
-        subs.className = "res-index__subs";
-        heads.forEach((h, hi) => {
-          h.id = `res-sec-${index}-h${hi}`;
-          h.classList.add("res-index__anchor");
-          subs.appendChild(this._indexLink(
-            h.textContent.trim(),
-            "",
-            () => h.scrollIntoView({ behavior: "smooth", block: "start" }),
-            true,
-            h.tagName === "H3",
-          ));
-        });
-        group.appendChild(subs);
-      }
-
-      nav.appendChild(group);
+      nav.appendChild(this._indexGroup(mainLabel, subGroups));
     });
+  }
+
+  _headingLink(head, isSub, isDeep = false) {
+    return this._indexLink(
+      head.textContent.trim(),
+      "",
+      () => head.scrollIntoView({ behavior: "smooth", block: "start" }),
+      isSub,
+      isDeep || head.tagName === "H3",
+    );
+  }
+
+  _indexGroup(label, children) {
+    const group = document.createElement("div");
+    group.className = "res-index__group";
+
+    const head = document.createElement("div");
+    head.className = "res-index__grouphead";
+
+    const caret = document.createElement("button");
+    caret.type      = "button";
+    caret.className = "res-index__caret" + (children.length ? "" : " res-index__caret--none");
+    caret.textContent = "▸";
+    if (children.length) caret.addEventListener("click", () => {
+      caret.classList.toggle("is-open", group.classList.toggle("is-open"));
+      this._positionIndex();
+    });
+
+    head.appendChild(caret);
+    head.appendChild(label);
+    group.appendChild(head);
+
+    if (children.length) {
+      const subs = document.createElement("div");
+      subs.className = "res-index__subs";
+      children.forEach((child) => subs.appendChild(child));
+      group.appendChild(subs);
+    }
+
+    return group;
   }
 
   _indexLabel(text) {
