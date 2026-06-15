@@ -52,6 +52,9 @@ class TrainingQueueConfig:
     test_azimuth         : tuple[int, int] = (14500, 16000)
     log_all_losses       : bool            = False
 
+    use_amp                     : bool = False
+    gradient_accumulation_steps : int  = 1
+
 
 @dataclass
 class InferenceQueueConfig:

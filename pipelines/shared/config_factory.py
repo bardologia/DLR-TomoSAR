@@ -121,8 +121,8 @@ class ConfigFactory:
             training = TrainingLoopConfig(
                 epochs                      = training.epochs,
                 validation_frequency        = training.validation_frequency,
-                use_amp                     = False,
-                gradient_accumulation_steps = 1,
+                use_amp                     = training.use_amp,
+                gradient_accumulation_steps = training.gradient_accumulation_steps,
                 log_all_losses              = training.log_all_losses,
             ),
 

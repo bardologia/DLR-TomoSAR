@@ -16,7 +16,7 @@ class LaunchView {
     ["embedding", /embedding/],
     ["probe", /^probe_/],
     ["identifiers", /identifier|output_tag$|^dataset_type$/],
-    ["data", /batch|worker|patch|stride|azimuth|dataset/],
+    ["data", /batch|worker|patch|stride|azimuth|dataset|^use_amp$|accumulation/],
     ["model", /model|gauss/],
     ["source", /fusar|track_selection|polarisation|^base_directory$/],
     ["run", /^run_|^gpu|^seed$|^device|^log|dir|path/],
