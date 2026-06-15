@@ -9,6 +9,7 @@ import torch
 
 from tools.data.gaussians    import GaussianMixture
 from tools.data.io           import FileIO
+from tools.data.transforms   import Log1pTransform
 from tools.monitoring.logger import Logger
 
 
@@ -96,7 +97,6 @@ class ProfileStatsComputer:
 
 class ProfileNormalizer:
     SCALE_FLOOR = 1e-6
-    EXPM1_CEIL  = 80.0
 
     def __init__(self, stats: ProfileStats) -> None:
         self.stats     = stats
@@ -105,17 +105,19 @@ class ProfileNormalizer:
         self.inv_scale = 1.0 / self.scale
 
     def normalize(self, curve):
-        if isinstance(curve, torch.Tensor):
-            x = torch.log1p(torch.clamp(curve, min=0.0))
-            return (x - self.loc) * self.inv_scale
+        x   = Log1pTransform.compress(curve)
+        out = (x - self.loc) * self.inv_scale
 
-        x = np.log1p(np.maximum(curve, 0.0))
-        return np.ascontiguousarray((x - self.loc) * self.inv_scale, dtype=np.float32)
+        if isinstance(curve, torch.Tensor):
+            return out
+
+        return np.ascontiguousarray(out, dtype=np.float32)
 
     def denormalize(self, curve):
-        if isinstance(curve, torch.Tensor):
-            x = curve * self.scale + self.loc
-            return torch.expm1(torch.clamp(x, min=0.0, max=self.EXPM1_CEIL))
+        x   = curve * self.scale + self.loc
+        out = Log1pTransform.decompress(x)
 
-        x = curve * self.scale + self.loc
-        return np.ascontiguousarray(np.expm1(np.clip(x, 0.0, self.EXPM1_CEIL)), dtype=np.float32)
+        if isinstance(curve, torch.Tensor):
+            return out
+
+        return np.ascontiguousarray(out, dtype=np.float32)

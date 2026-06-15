@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Subset
 from configuration.data.norm_config    import ChannelStats, ChannelStrategy, NormMethod
 from configuration.data.dataset_config import InputConfig, OutputConfig
 from tools.data.io                     import FileIO
+from tools.data.transforms             import Log1pTransform
 from tools.monitoring.logger           import Logger
 from tools.reporting.ranges            import RangeFormatter
 
@@ -383,8 +384,6 @@ class StatsComputer:
 
 
 class Normalizer:
-    EXPM1_INPUT_CEIL = 80.0
-
     def __init__(self, stats: Stats) -> None:
         self.stats = stats
 
@@ -427,11 +426,11 @@ class Normalizer:
             log1p     = torch.as_tensor(vectors["log1p"],     device=device).reshape(shape)
 
             if not inverse:
-                x   = torch.where(log1p, torch.log1p(torch.clamp(tensor, min=0.0)), tensor)
+                x   = torch.where(log1p, Log1pTransform.compress(tensor), tensor)
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
-                out = torch.where(log1p, torch.expm1(torch.clamp(x, min=0.0, max=self.EXPM1_INPUT_CEIL)), x)
+                out = torch.where(log1p, Log1pTransform.decompress(x), x)
 
             return out
 
@@ -441,11 +440,11 @@ class Normalizer:
         log1p     = vectors["log1p"].reshape(shape)
 
         if not inverse:
-            x   = np.where(log1p, np.log1p(np.maximum(tensor, 0.0)), tensor)
+            x   = np.where(log1p, Log1pTransform.compress(tensor), tensor)
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
-            out = np.where(log1p, np.expm1(np.clip(x, 0.0, self.EXPM1_INPUT_CEIL)), x)
+            out = np.where(log1p, Log1pTransform.decompress(x), x)
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
