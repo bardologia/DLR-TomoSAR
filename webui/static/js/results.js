@@ -346,7 +346,7 @@ class ResultsView {
   _buildBookIndex(nav, sections) {
     sections.forEach((section, index) => {
       const cap = section.querySelector(".res-section__cap");
-      if (!cap) return;
+      if (!cap || section.querySelector(".res-cfg")) return;
 
       section.id   = `res-sec-${index}`;
       const source = cap.querySelector("button") || cap;
