@@ -6,7 +6,6 @@ from pathlib import Path
 import optuna
 from optuna.trial import TrialState
 
-from configuration.experiments.benchmark_config import TrainingQueueConfig
 from configuration.data.dataset_config          import DatasetConfig
 from configuration.data.dataset_config          import PatchConfig
 from configuration.data.dataset_config          import SplitRegions
@@ -103,7 +102,7 @@ class TuningOrchestrator:
         return FileIO.load_json(dataset_path / "data" / "dataset.json")
 
     def _split_regions(self, global_crop: CropRegion) -> SplitRegions:
-        canonical = TrainingQueueConfig()
+        canonical = self.config.training
 
         return SplitRegions(
             train = CropRegion(canonical.train_azimuth[0], canonical.train_azimuth[1], global_crop.range_start, global_crop.range_end),
