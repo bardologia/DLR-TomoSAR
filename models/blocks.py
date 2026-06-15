@@ -340,6 +340,18 @@ class Decoder(nn.Module):
         return x
 
 
+def scaled_dot_product(query, key, value, scale, attention_dropout, attention_bias=None):
+    attention_weights = (query @ key.transpose(-2, -1)) * scale
+
+    if attention_bias is not None:
+        attention_weights = attention_weights + attention_bias
+
+    attention_weights = attention_weights.softmax(dim=-1)
+    attention_weights = attention_dropout(attention_weights)
+
+    return attention_weights @ value
+
+
 class MultiHeadSelfAttention(nn.Module):
     def __init__(
         self,
@@ -367,11 +379,7 @@ class MultiHeadSelfAttention(nn.Module):
         qkv = qkv.permute(2, 0, 3, 1, 4)
         query, key, value = qkv.unbind(0)
 
-        attention_weights = (query @ key.transpose(-2, -1)) * self.scale
-        attention_weights = attention_weights.softmax(dim=-1)
-        attention_weights = self.attention_dropout(attention_weights)
-
-        attended  = (attention_weights @ value).transpose(1, 2)
+        attended  = scaled_dot_product(query, key, value, self.scale, self.attention_dropout).transpose(1, 2)
         attended  = attended.reshape(batch_size, sequence_length, embedding_dim)
         projected = self.output_projection(attended)
         return self.output_dropout(projected)

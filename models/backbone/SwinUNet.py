@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.model.models_config import SwinUNetConfig
-from ..blocks                          import DropPath, build_activation, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                          import DropPath, build_activation, initialize_weights, match_spatial_size, scaled_dot_product, tokens_to_feature_map
 
 
 class WindowAttention(nn.Module):
@@ -53,26 +53,20 @@ class WindowAttention(nn.Module):
         qkv = qkv.permute(2, 0, 3, 1, 4)
         query, key, value = qkv.unbind(0)
 
-        attention_weights = (query @ key.transpose(-2, -1)) * self.scale
-
         relative_bias = self.relative_position_bias_table[
             self.relative_position_index.view(-1)
         ].view(self.window_size ** 2, self.window_size ** 2, -1)
-        relative_bias     = relative_bias.permute(2, 0, 1).contiguous()
-        attention_weights = attention_weights + relative_bias.unsqueeze(0)
+        relative_bias  = relative_bias.permute(2, 0, 1).contiguous()
+        attention_bias = relative_bias.unsqueeze(0)
 
         if attention_mask is not None:
-            num_windows = attention_mask.shape[0]
-            attention_weights = attention_weights.view(
-                batch_windows // num_windows, num_windows, self.num_heads, sequence_length, sequence_length
-            )
-            attention_weights = attention_weights + attention_mask.unsqueeze(1).unsqueeze(0)
-            attention_weights = attention_weights.view(-1, self.num_heads, sequence_length, sequence_length)
+            num_windows    = attention_mask.shape[0]
+            mask_bias       = attention_mask.view(1, num_windows, 1, sequence_length, sequence_length)
+            mask_bias       = mask_bias.expand(batch_windows // num_windows, num_windows, 1, sequence_length, sequence_length)
+            mask_bias       = mask_bias.reshape(batch_windows, 1, sequence_length, sequence_length)
+            attention_bias  = attention_bias + mask_bias
 
-        attention_weights = attention_weights.softmax(dim=-1)
-        attention_weights = self.attention_dropout(attention_weights)
-
-        attended  = (attention_weights @ value).transpose(1, 2)
+        attended  = scaled_dot_product(query, key, value, self.scale, self.attention_dropout, attention_bias).transpose(1, 2)
         attended  = attended.reshape(batch_windows, sequence_length, embedding_dim)
         projected = self.output_projection(attended)
         return self.output_dropout(projected)
