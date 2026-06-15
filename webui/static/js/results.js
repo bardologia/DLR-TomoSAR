@@ -252,28 +252,18 @@ class ResultsView {
   }
 
   _renderNode(node, depth) {
-    const total  = node.counts.markdown + node.counts.images + node.counts.animations + node.counts.configs;
-    const isOpen = this.expanded.has(node.rel);
+    const total   = node.counts.markdown + node.counts.images + node.counts.animations + node.counts.configs;
+    const isOpen  = this.expanded.has(node.rel);
+    const hasKids = node.children.length > 0;
 
     const row = document.createElement("div");
-    row.className = "res-tree__row" + (node.rel === this.activeRel && this.view === "folder" ? " is-active" : "");
+    row.className = "res-tree__row" + (hasKids && isOpen ? " is-open" : "") + (node.rel === this.activeRel && this.view === "folder" ? " is-active" : "");
     row.style.paddingLeft = `${8 + depth * 14}px`;
-
-    const caret = document.createElement("span");
-    caret.className = "res-tree__caret" + (node.children.length ? (isOpen ? " is-open" : "") : " is-leaf");
-    caret.textContent = node.children.length ? "▸" : "";
-    caret.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (isOpen) this.expanded.delete(node.rel);
-      else this.expanded.add(node.rel);
-      this._renderSidebar();
-    });
 
     const name = document.createElement("span");
     name.className = "res-tree__name";
     name.textContent = node.rel === "" ? "/" : node.name;
-
-    row.append(caret, name);
+    row.appendChild(name);
 
     if (total) {
       const badge = document.createElement("span");
@@ -282,7 +272,13 @@ class ResultsView {
       row.appendChild(badge);
     }
 
-    row.addEventListener("click", () => this.selectFolder(node.rel));
+    row.addEventListener("click", () => {
+      if (hasKids) {
+        if (isOpen) this.expanded.delete(node.rel);
+        else this.expanded.add(node.rel);
+      }
+      this.selectFolder(node.rel);
+    });
     this.listEl.appendChild(row);
 
     if (isOpen) node.children.forEach((child) => this._renderNode(child, depth + 1));

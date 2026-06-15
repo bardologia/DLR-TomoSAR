@@ -1843,9 +1843,7 @@ main { margin-left: var(--navw); }
 }
 .res-tree__row:hover { background: var(--surface-2); }
 .res-tree__row.is-active { background: rgba(29, 79, 216, 0.07); color: var(--accent-deep); }
-.res-tree__caret { width: 12px; flex: none; font-size: 10px; color: var(--ink-faint); transition: transform 0.15s var(--ease); }
-.res-tree__caret.is-open { transform: rotate(90deg); }
-.res-tree__caret.is-leaf { visibility: hidden; }
+.res-tree__row.is-open { color: var(--accent-deep); }
 .res-tree__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .res-tree__count {
   flex: none;
