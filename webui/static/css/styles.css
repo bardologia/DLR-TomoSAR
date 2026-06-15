@@ -911,6 +911,23 @@ main { margin-left: var(--navw); }
 .launch__variant.is-active { background: var(--accent); color: #fff; cursor: default; }
 .launch__variant:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.modelcard { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-card); padding: 20px 22px; margin-bottom: 22px; }
+.modelcard__head { margin-bottom: 18px; }
+.modelcard__kicker { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.modelcard__summary { font-size: 14px; color: var(--ink); margin: 6px 0 0; max-width: 80ch; line-height: 1.55; }
+.modelflow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.modelflow__step { display: inline-flex; align-items: stretch; gap: 10px; }
+.modelflow__node { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 11px 15px; border: 1px solid var(--line); border-top: 2px solid var(--line-strong); border-radius: var(--r-card); background: var(--surface-2); }
+.modelflow__node--input  { border-top-color: var(--accent); }
+.modelflow__node--latent { border-top-color: var(--warn); }
+.modelflow__node--output { border-top-color: var(--accent-2); }
+.modelflow__node--model  { background: var(--ink); border-color: var(--ink); border-top-color: var(--ink); }
+.modelflow__label { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.modelflow__node--model .modelflow__label { color: #fff; }
+.modelflow__sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; color: var(--ink-dim); }
+.modelflow__node--model .modelflow__sub { color: var(--glass-dim); }
+.modelflow__arrow { align-self: center; font-size: 16px; color: var(--ink-faint); }
+
 
 .launch__pane { display: none; }
 .launch__pane.is-active { display: block; }
@@ -1236,6 +1253,34 @@ main { margin-left: var(--navw); }
 .master__detail.is-swap { animation: swapIn 0.4s var(--ease); }
 @keyframes swapIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
+/* ---------- Architectures: dark theme ---------- */
+.page[data-page="architectures"] {
+  --bg:          #0c1015;
+  --bg-1:        #141a21;
+  --bg-2:        #1a212a;
+  --surface:     #121820;
+  --surface-2:   #1b222c;
+  --line:        #283039;
+  --line-strong: #3c4651;
+  --ink:         #e7edf1;
+  --ink-dim:     #aeb8bf;
+  --ink-faint:   #79838b;
+  --accent:      #6f9bff;
+  --accent-2:    #2dd4bf;
+  --accent-deep: #9bb8ff;
+  --focus:       rgba(111, 155, 255, 0.30);
+  color: var(--ink);
+}
+.page[data-page="architectures"].is-active::before {
+  content: ""; position: fixed; inset: 0; left: var(--navw);
+  background: radial-gradient(135% 90% at 82% -12%, #18202b 0%, #0b0e13 68%);
+  z-index: -1; pointer-events: none;
+}
+.page[data-page="architectures"] .master__detail { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
+.page[data-page="architectures"] .mlist__item.is-active { background: rgba(111, 155, 255, 0.12); }
+.page[data-page="architectures"] .mdetail__note-body code { background: rgba(111, 155, 255, 0.10); }
+.page[data-page="architectures"] .spec { background: rgba(111, 155, 255, 0.05); }
+
 /* ---------- Model list ---------- */
 .mlist__group { margin-bottom: 12px; }
 .mlist__label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); padding: 8px 12px 6px; }
@@ -1263,19 +1308,19 @@ main { margin-left: var(--navw); }
 .dgm-fig { margin: 0; display: flex; flex-direction: column; }
 .dgm-frame {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line); border-radius: var(--r-card);
+  border: 1px solid var(--glass-line); border-radius: var(--r-card);
   padding: 16px 14px;
   position: relative; overflow: hidden;
-  background-color: #edf0f4;
+  background-color: #0c1015;
   background-image:
-    radial-gradient(125% 90% at 50% -12%, rgba(29, 79, 216, 0.08), rgba(29, 79, 216, 0) 62%),
-    radial-gradient(95% 85% at 96% 112%, rgba(15, 118, 110, 0.07), rgba(15, 118, 110, 0) 58%),
-    linear-gradient(rgba(29, 79, 216, 0.050) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(29, 79, 216, 0.050) 1px, transparent 1px),
-    linear-gradient(rgba(29, 79, 216, 0.024) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(29, 79, 216, 0.024) 1px, transparent 1px);
+    radial-gradient(125% 90% at 50% -12%, rgba(111, 155, 255, 0.18), rgba(111, 155, 255, 0) 60%),
+    radial-gradient(95% 85% at 96% 112%, rgba(45, 212, 191, 0.14), rgba(45, 212, 191, 0) 56%),
+    linear-gradient(rgba(111, 155, 255, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111, 155, 255, 0.11) 1px, transparent 1px),
+    linear-gradient(rgba(111, 155, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111, 155, 255, 0.05) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 78px 78px, 78px 78px, 13px 13px, 13px 13px;
-  box-shadow: inset 0 1px 3px rgba(15, 20, 26, 0.035);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
 }
 .dgm-frame--net { padding: 18px; }
 .dgm-fig figcaption { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 9px; font-style: italic; line-height: 1.4; }
@@ -1380,12 +1425,12 @@ main { margin-left: var(--navw); }
 }
 
 /* ---------- Diagram SVG ---------- */
-.dgm-t { fill: #16191b; font-family: "JetBrains Mono", monospace; font-size: 12px; text-anchor: middle; }
-.dgm-s { fill: #5a646a; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
-.dgm-sum { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; text-anchor: middle; }
-.dgm-deco { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 8px; text-anchor: middle; }
-.dgm-lbl { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
-.dgm-lbl--flow { fill: #5a646a; }
+.dgm-t { fill: #e7edf1; font-family: "JetBrains Mono", monospace; font-size: 12px; text-anchor: middle; }
+.dgm-s { fill: #98a2a9; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
+.dgm-sum { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; text-anchor: middle; }
+.dgm-deco { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 8px; text-anchor: middle; }
+.dgm-lbl { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
+.dgm-lbl--flow { fill: #98a2a9; }
 .dgm-flow { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 0.4 13; opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .dgm-block { opacity: 0; animation: dgmPop 0.4s var(--ease) forwards; }

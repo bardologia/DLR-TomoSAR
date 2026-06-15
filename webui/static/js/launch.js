@@ -38,6 +38,46 @@ class LaunchView {
     ["jepa", "JEPA"],
   ];
 
+  static MODEL_KEY_TYPE = {
+    train_backbone:    "backbone",
+    train_autoencoder: "autoencoder",
+    train_jepa:        "jepa",
+  };
+
+  static MODEL_MEANINGS = {
+    backbone: {
+      title  : "Backbone",
+      summary: "Supervised regression that maps the SAR image stack straight to the Gaussian-mixture profile parameters.",
+      flow   : [
+        { kind: "input",  label: "Image stack",  sub: "primary · secondaries · interferograms" },
+        { kind: "model",  label: "Backbone",     sub: "supervised network" },
+        { kind: "output", label: "Params array", sub: "amp, μ, σ, amp, μ, σ, …" },
+      ],
+    },
+    autoencoder: {
+      title  : "Autoencoder",
+      summary: "Learns the latent profile space: encodes the fitted normalized profiles into embeddings and reconstructs them.",
+      flow   : [
+        { kind: "input",  label: "Normalized profiles", sub: "fitted targets" },
+        { kind: "model",  label: "Encoder" },
+        { kind: "latent", label: "Normalized embeddings" },
+        { kind: "model",  label: "Decoder" },
+        { kind: "output", label: "Reconstructed profiles" },
+      ],
+    },
+    jepa: {
+      title  : "JEPA",
+      summary: "Predicts the profile embedding from the image stack, then decodes it back to normalized profiles through the autoencoder decoder.",
+      flow   : [
+        { kind: "input",  label: "Image stack",            sub: "primary · secondaries · interferograms" },
+        { kind: "model",  label: "JEPA",                   sub: "predictor" },
+        { kind: "latent", label: "Normalized embeddings" },
+        { kind: "model",  label: "AE decoder",             sub: "frozen / fine-tuned" },
+        { kind: "output", label: "Normalized profiles" },
+      ],
+    },
+  };
+
   static TYPE_TABS = {
     benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
     cross_validate: { field: "training_type", options: LaunchView.TRAINING_TYPES },
@@ -245,11 +285,44 @@ class LaunchView {
       tab.addEventListener("click", () => {
         this._setValue(leaf, value);
         paint();
+        this._paintModelCard(value);
       });
       host.appendChild(tab);
     });
 
     paint();
+  }
+
+  _buildModelCard(type) {
+    const card = document.createElement("section");
+    card.className = "modelcard";
+    card.id = "launch-model-card";
+    this.modelCardEl = card;
+    this._paintModelCard(type);
+    return card;
+  }
+
+  _paintModelCard(type) {
+    const card = this.modelCardEl;
+    if (!card) return;
+
+    const meaning = LaunchView.MODEL_MEANINGS[type];
+    if (!meaning) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+
+    const stages = meaning.flow.map((node, i) => {
+      const arrow = i ? `<span class="modelflow__arrow" aria-hidden="true">&rarr;</span>` : "";
+      const sub   = node.sub ? `<span class="modelflow__sub">${node.sub}</span>` : "";
+      return `<span class="modelflow__step">${arrow}<span class="modelflow__node modelflow__node--${node.kind}"><span class="modelflow__label">${node.label}</span>${sub}</span></span>`;
+    }).join("");
+
+    card.innerHTML =
+      `<div class="modelcard__head"><span class="modelcard__kicker">What ${meaning.title} does</span>` +
+      `<p class="modelcard__summary">${meaning.summary}</p></div>` +
+      `<div class="modelflow">${stages}</div>`;
   }
 
   _renderFacts() {
@@ -419,12 +492,16 @@ class LaunchView {
       return;
     }
 
-    host.appendChild(this._buildToolbar(cfg));
-
     const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
 
     const typeTab  = LaunchView.TYPE_TABS[this.key];
     const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
+
+    const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
+    if (modelType) host.appendChild(this._buildModelCard(modelType));
+
+    host.appendChild(this._buildToolbar(cfg));
+
     if (typeLeaf) this._renderTypeTab(typeTab, typeLeaf);
 
     const modelNameLeaf = byPath.get("model_name");
