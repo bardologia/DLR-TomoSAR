@@ -313,10 +313,13 @@ class LaunchView {
     }
     card.hidden = false;
 
+    const tags = { input: "input", model: "network", latent: "latent", output: "output" };
+
     const stages = meaning.flow.map((node, i) => {
       const arrow = i ? `<span class="modelflow__arrow" aria-hidden="true">&rarr;</span>` : "";
+      const tag   = `<span class="modelflow__tag">${tags[node.kind] || node.kind}</span>`;
       const sub   = node.sub ? `<span class="modelflow__sub">${node.sub}</span>` : "";
-      return `<span class="modelflow__step">${arrow}<span class="modelflow__node modelflow__node--${node.kind}"><span class="modelflow__label">${node.label}</span>${sub}</span></span>`;
+      return `<span class="modelflow__step">${arrow}<span class="modelflow__node modelflow__node--${node.kind}">${tag}<span class="modelflow__label">${node.label}</span>${sub}</span></span>`;
     }).join("");
 
     card.innerHTML =
