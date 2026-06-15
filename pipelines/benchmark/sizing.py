@@ -13,11 +13,13 @@ from tools.monitoring.logger                    import Logger
 @dataclass
 class WidthRule:
     attribute : str
-    divisor   : int
+    divisor   : float
+    is_float  : bool = False
 
 
 class WidthScaler:
-    def __init__(self) -> None:
+    def __init__(self, locked: tuple[str, ...]) -> None:
+        self.locked   = frozenset(locked)
         feature_rules = [WidthRule(attribute="features", divisor=8)]
 
         self.rules : dict[str, list[WidthRule]] = {
@@ -31,11 +33,11 @@ class WidthScaler:
             "attention_unet"      : feature_rules,
             "unetplusplus"        : feature_rules,
             "linknet"             : feature_rules,
-            "swin_unet"           : [WidthRule(attribute="embedding_dim", divisor=10)],
+            "swin_unet"           : [WidthRule(attribute="mlp_ratio", divisor=0.25, is_float=True)],
             "transunet"           : [WidthRule(attribute="cnn_features",  divisor=8)],
-            "unetr"               : [WidthRule(attribute="embedding_dim", divisor=8), WidthRule(attribute="decoder_features", divisor=8)],
+            "unetr"               : [WidthRule(attribute="decoder_features", divisor=8)],
             "deeplabv3plus"       : feature_rules,
-            "segformer"           : [WidthRule(attribute="embedding_dims", divisor=8), WidthRule(attribute="decoder_channels", divisor=8)],
+            "segformer"           : [WidthRule(attribute="decoder_channels", divisor=8)],
             "convnext_unet"       : feature_rules,
             "dense_unet"          : [WidthRule(attribute="growth_rate", divisor=2)],
             "hrnet"               : [WidthRule(attribute="base_channels", divisor=8)],
@@ -43,6 +45,17 @@ class WidthScaler:
             "fpn"                 : feature_rules + [WidthRule(attribute="pyramid_channels", divisor=8)],
             "u2net"               : feature_rules,
         }
+
+        self._enforce_locked()
+
+    def _enforce_locked(self) -> None:
+        for model_name, rules in self.rules.items():
+            if not rules:
+                raise ValueError(f"Model '{model_name}' has no width rule; size matching has nothing to scale once locked parameters are removed.")
+
+            for rule in rules:
+                if rule.attribute in self.locked:
+                    raise ValueError(f"Width rule for '{model_name}' targets locked hyperparameter '{rule.attribute}'. Locked parameters may not be scaled: {sorted(self.locked)}.")
 
     def overrides(self, model_name: str, scale: float) -> dict:
         if model_name not in self.rules:
@@ -55,9 +68,9 @@ class WidthScaler:
             base = getattr(defaults, rule.attribute)
 
             if isinstance(base, list):
-                overrides[rule.attribute] = [self._round(value, scale, rule.divisor) for value in base]
+                overrides[rule.attribute] = [self._round(value, scale, rule) for value in base]
             else:
-                overrides[rule.attribute] = self._round(base, scale, rule.divisor)
+                overrides[rule.attribute] = self._round(base, scale, rule)
 
         return overrides
 
@@ -69,9 +82,11 @@ class WidthScaler:
 
         return config
 
-    def _round(self, value: int, scale: float, divisor: int) -> int:
-        scaled = int(round(value * scale / divisor)) * divisor
-        return max(divisor, scaled)
+    def _round(self, value: float, scale: float, rule: WidthRule) -> float:
+        scaled  = round(value * scale / rule.divisor) * rule.divisor
+        floored = max(rule.divisor, scaled)
+
+        return floored if rule.is_float else int(floored)
 
 
 @dataclass
@@ -91,7 +106,6 @@ class DegeneracyAuditor:
     def __init__(self, config, scaler: WidthScaler) -> None:
         self.config = config
         self.scaler = scaler
-        self.floors = {"embedding_dim": 32, "embedding_dims": 32}
 
     def _scale_flags(self, result: SizeMatchResult) -> list[str]:
         flags = []
@@ -113,8 +127,6 @@ class DegeneracyAuditor:
 
             if minimum <= rule.divisor:
                 flags.append(f"{rule.attribute} clamped at the rounding minimum {rule.divisor}")
-            elif rule.attribute in self.floors and minimum < self.floors[rule.attribute]:
-                flags.append(f"{rule.attribute} {minimum} below the floor {self.floors[rule.attribute]}")
 
         return flags
 
@@ -132,7 +144,7 @@ class SizeMatcher:
     def __init__(self, config: BenchmarkConfig, logger: Logger) -> None:
         self.config      = config
         self.logger      = logger
-        self.scaler      = WidthScaler()
+        self.scaler      = WidthScaler(locked=config.size_match.locked_params)
         self.auditor     = DegeneracyAuditor(config=config.size_match, scaler=self.scaler)
         self.image_size  = config.training.patch_size[0]
         self.in_channels = config.size_match.in_channels
