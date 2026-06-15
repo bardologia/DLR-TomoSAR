@@ -1976,7 +1976,7 @@ main { margin-left: var(--navw); }
 
 /* vertical profile rail */
 .cube-profiles {
-  position: sticky; top: 24px;
+  align-self: center; margin-top: 126px;
   background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--accent);
   border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
   padding: 16px;
@@ -2075,7 +2075,8 @@ main { margin-left: var(--navw); }
   .cube-deck, .cube-deck[data-mode="slices"] { grid-template-columns: 1fr; gap: 22px; }
   .cube-deck[data-mode="slices"] .cube-map { display: none; }
   .cube-deck:not([data-mode="slices"]) .cube-profiles { display: none; }
-  .cube-map, .cube-profiles { position: static; }
+  .cube-map { position: static; }
+  .cube-profiles { align-self: stretch; margin-top: 0; }
 }
 
 /* ---------- Shared card treatment ---------- */
