@@ -314,6 +314,7 @@ class ExperimentBuilder {
     { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
     { key: "warmup",     label: "warmup only", hint: "curriculum disabled, each warmup loss trains alone" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
+    { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
   ];
 
   static STRATEGIES = [
@@ -343,13 +344,16 @@ class ExperimentBuilder {
     this.gpusLeaf     = byPath.get("gpus");
 
     this.secondary = new Map();
+    this.patch     = new Map();
     byPath.forEach((leaf) => {
       if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "patch_trials")     this.patch.set(leaf.path.split(".").pop(), leaf);
     });
 
     this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
     if (this.modeLeaf) this.claimed.push("trials_mode");
     this.secondary.forEach((leaf) => this.claimed.push(leaf.path));
+    this.patch.forEach((leaf) => this.claimed.push(leaf.path));
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -364,6 +368,8 @@ class ExperimentBuilder {
     this.strategySelect = null;
     this.strategyNoteEl = null;
     this.secondaryRows  = [];
+    this.patchEl        = null;
+    this.patchSizesEl   = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -400,6 +406,7 @@ class ExperimentBuilder {
     body.appendChild(columns);
 
     if (this.modeLeaf && this.secondary.size) body.appendChild(this._secondaryPanel());
+    if (this.modeLeaf && this.patch.size)     body.appendChild(this._patchPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -426,6 +433,7 @@ class ExperimentBuilder {
     if (this._paintSwitch) this._paintSwitch();
     this._paintMode();
     this._paintSecondary();
+    this._paintPatch();
     this._paintSummary();
     this._paintNames();
   }
@@ -543,6 +551,134 @@ class ExperimentBuilder {
     return row;
   }
 
+  _patchPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-patch";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">patch sweep</span>`;
+
+    const ratioLeaf = this.patch.get("stride_ratio");
+    if (ratioLeaf) head.appendChild(this._patchRatio(ratioLeaf));
+
+    head.appendChild(LaunchWidgetDom.mini("Add size", () => {
+      const sizes = this._patchSizes();
+      sizes.push(sizes.length ? sizes[sizes.length - 1] : 64);
+      this._emitPatchSizes(sizes);
+    }));
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "each size trains the same model end to end; stride = round(size x stride_ratio)";
+
+    const sizes     = document.createElement("div");
+    sizes.className = "exp-patch__sizes";
+    this.patchSizesEl = sizes;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(sizes);
+    this.patchEl = panel;
+
+    const sizesLeaf = this.patch.get("sizes");
+    if (sizesLeaf) this.view.controls[sizesLeaf.path] = { leaf: sizesLeaf, reset: () => this._paintPatch() };
+    return panel;
+  }
+
+  _patchRatio(leaf) {
+    const wrap     = document.createElement("label");
+    wrap.className = "exp-patch__ratio";
+    wrap.title     = `--${leaf.path}`;
+    wrap.innerHTML = `<span>stride ratio</span>`;
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input";
+    input.type       = "number";
+    input.step       = "any";
+    input.min        = "0";
+    input.max        = "1";
+    input.spellcheck = false;
+    input.value      = leaf.value;
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
+      this.view._setValue(leaf, input.value);
+    });
+
+    wrap.appendChild(input);
+    this.view.controls[leaf.path] = { leaf, reset: () => {
+      input.value = leaf.value;
+      input.classList.remove("is-dirty");
+    } };
+    return wrap;
+  }
+
+  _patchSizes() {
+    const leaf = this.patch.get("sizes");
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  }
+
+  _emitPatchSizes(sizes) {
+    const leaf = this.patch.get("sizes");
+    if (!leaf) return;
+
+    const clean = sizes.map((value) => Math.round(Number(value))).filter((value) => Number.isFinite(value) && value >= 1);
+    this.view._setValue(leaf, PythonLiteral.render(clean));
+
+    this._paintPatch();
+    this._paintSummary();
+    this._paintNames();
+  }
+
+  _patchChip(size, index, sizes) {
+    const chip     = document.createElement("div");
+    chip.className = "exp-patch__chip";
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input exp-patch__size";
+    input.type       = "number";
+    input.step       = "1";
+    input.min        = "1";
+    input.spellcheck = false;
+    input.value      = String(size);
+    input.title      = "patch size in pixels (square)";
+    input.addEventListener("change", () => {
+      const next  = sizes.slice();
+      next[index] = Number(input.value);
+      this._emitPatchSizes(next);
+    });
+
+    const remove = LaunchWidgetDom.mini("×", () => {
+      const next = sizes.slice();
+      next.splice(index, 1);
+      this._emitPatchSizes(next);
+    });
+    remove.classList.add("exp-patch__remove");
+    remove.title = "Remove size";
+
+    chip.appendChild(input);
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _paintPatch() {
+    if (!this.patchSizesEl) return;
+
+    const sizes = this._patchSizes();
+    this.patchSizesEl.innerHTML = "";
+    sizes.forEach((size, index) => this.patchSizesEl.appendChild(this._patchChip(size, index, sizes)));
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -550,9 +686,10 @@ class ExperimentBuilder {
     if (this.modeEl) this.modeEl.classList.toggle("is-dirty", this.view.dirty[this.modeLeaf.path] !== undefined);
     if (this.hintEl) this.hintEl.textContent = ExperimentBuilder.MODES.find((entry) => entry.key === mode).hint;
 
-    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary";
+    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary" || mode === "patch";
     if (this.columnEls.complete) this.columnEls.complete.hidden = mode !== "curriculum";
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
+    if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
   }
 
   _paintSecondary() {
@@ -712,6 +849,7 @@ class ExperimentBuilder {
     if (this._paintSwitch) this._paintSwitch();
     this._paintMode();
     this._paintSecondary();
+    this._paintPatch();
     this._paintAll();
   }
 
@@ -856,6 +994,12 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "patch") {
+      const n = this._patchSizes().length;
+      this.summaryEl.textContent = `${n} patch size${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
   }
 
@@ -878,7 +1022,9 @@ class ExperimentBuilder {
     }
 
     const names = [];
-    if (mode === "warmup") {
+    if (mode === "patch") {
+      this._patchSizes().forEach((size) => names.push(`${model}_p-${size}`));
+    } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {
       this.variants.warmup.forEach((w) => {

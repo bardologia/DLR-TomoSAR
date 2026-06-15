@@ -1049,6 +1049,7 @@ main { margin-left: var(--navw); }
 .model-chip__meta { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
 
 .exp-builder { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); margin: 0 0 16px; }
+.exp-builder .special-head { flex-wrap: wrap; row-gap: 8px; }
 .exp-builder__summary { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: nowrap; }
 .exp-builder:not(.is-trials) .exp-builder__body { display: none; }
 .exp-builder__body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }

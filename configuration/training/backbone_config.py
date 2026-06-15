@@ -59,6 +59,12 @@ def _default_complete_losses() -> dict:
 
 
 @dataclass
+class PatchTrialsConfig:
+    sizes        : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
+    stride_ratio : float     = 0.5
+
+
+@dataclass
 class SecondaryTrialsConfig:
     strategy      : str          = "consecutive"
     n_secondaries : int          = 4
@@ -99,5 +105,6 @@ class BackboneEntryConfig:
     warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
     complete_losses  : dict                  = field(default_factory=_default_complete_losses)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
+    patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
     poll_interval_s  : float                 = 5.0

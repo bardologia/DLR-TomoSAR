@@ -55,6 +55,41 @@ class WarmupTrialPlanner(TrialPlanner):
         return plans
 
 
+class PatchSizeTrialPlanner:
+    def __init__(self, model_name: str, trials) -> None:
+        self.model_name = model_name
+        self.trials     = trials
+
+        self._validate()
+
+    def _validate(self) -> None:
+        if not self.trials.sizes:
+            raise ValueError("patch_trials.sizes must list at least one patch size")
+
+        if any(size < 1 for size in self.trials.sizes):
+            raise ValueError(f"patch_trials.sizes must all be positive integers, got {self.trials.sizes}")
+
+        if not 0 < self.trials.stride_ratio <= 1:
+            raise ValueError(f"patch_trials.stride_ratio={self.trials.stride_ratio} must be in (0, 1]")
+
+    def summary(self) -> dict:
+        return {
+            "Patch sizes"  : list(self.trials.sizes),
+            "Stride ratio" : self.trials.stride_ratio,
+        }
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for size in self.trials.sizes:
+            stride    = max(1, int(round(size * self.trials.stride_ratio)))
+            run_name  = f"{self.model_name}_p-{size}"
+            overrides = {"training.patch_size": (size, size), "training.patch_stride": stride}
+            plans.append((run_name, overrides))
+
+        return plans
+
+
 class SecondaryTrialPlanner:
 
     STRATEGIES   = ("uniform", "gaussian", "consecutive", "spaced")

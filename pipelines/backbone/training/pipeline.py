@@ -15,7 +15,7 @@ from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from tools.orchestration                     import ExperimentStage, GpuJob
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
-from pipelines.backbone.training.experiments import CurriculumTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
+from pipelines.backbone.training.experiments import CurriculumTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.run_metadata           import TrainingRunMetadata
 from tools.runtime.config_cli                import ConfigCli
@@ -189,7 +189,7 @@ class SingleTrainRunner:
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "secondary_trials", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "secondary_trials", "patch_trials", "gpus", "poll_interval_s")
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path, stage: str) -> None:
         self.config       = config
@@ -212,8 +212,10 @@ class TrainScheduler:
             return WarmupTrialPlanner(self.config.model_name, self.config.warmup_losses)
         if mode == "secondary":
             return SecondaryTrialPlanner.from_dataset(self.config.model_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
+        if mode == "patch":
+            return PatchSizeTrialPlanner(self.config.model_name, self.config.patch_trials)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup' or 'secondary'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'secondary' or 'patch'")
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
         argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name})
