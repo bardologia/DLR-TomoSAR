@@ -120,6 +120,16 @@ class ResultsView {
     this.selectFolder("");
   }
 
+  close() {
+    this.root        = null;
+    this.activeRel   = null;
+    this.folderData  = null;
+    this.galleryData = null;
+    this.pathInput.value = "";
+    this.detailEl.innerHTML = `<div class="res-empty">Pick a dataset, parameter extraction or run.</div>`;
+    this._renderSidebar();
+  }
+
   async selectFolder(rel) {
     this.activeRel = rel;
     this.view      = "folder";
@@ -229,7 +239,7 @@ class ResultsView {
     row.style.paddingLeft = `${8 + depth * 14}px`;
     row.title = path;
     row.innerHTML = `<span class="res-cat__name">${this._esc(name)}</span><span class="res-cat__stage">${this._esc(stage)}</span>`;
-    row.addEventListener("click", () => isOpen ? this.selectFolder("") : this.open(path));
+    row.addEventListener("click", () => isOpen ? this.close() : this.open(path));
     this.listEl.appendChild(row);
 
     if (isOpen) this.root.tree.children.forEach((child) => this._renderNode(child, depth + 1));
@@ -423,12 +433,23 @@ class ResultsView {
 
   _indexLabel(text) {
     const clean = text.replace(/\s+\d+(\s+of\s+\d+)?\s*$/, "").trim();
+    return this._relLabel(clean) || "section";
+  }
 
-    const cut = clean.lastIndexOf("figures/");
-    if (cut !== -1) return clean.slice(cut + "figures/".length) || "figures";
-    if (clean === "figures" || clean.endsWith("/figures")) return "figures";
+  _relLabel(rel) {
+    const roots = ["figures", "images", "animations"];
 
-    return clean || "section";
+    let best = -1;
+    let mlen = 0;
+    roots.forEach((root) => {
+      const at = rel.lastIndexOf(`${root}/`);
+      if (at > best) { best = at; mlen = root.length + 1; }
+    });
+
+    if (best !== -1) return rel.slice(best + mlen) || rel.slice(best, best + mlen - 1);
+    if (roots.some((root) => rel === root || rel.endsWith(`/${root}`))) return rel.slice(rel.lastIndexOf("/") + 1);
+
+    return rel;
   }
 
   _indexLink(label, count, onClick, isSub, isDeep) {
@@ -587,7 +608,7 @@ class ResultsView {
       if (!items.length) return;
 
       total += items.length;
-      const label = group.rel === "" ? "/" : group.rel;
+      const label = group.rel === "" ? "/" : this._relLabel(group.rel);
 
       html += `<section class="res-section">`;
       html += `<h4 class="res-section__cap res-section__cap--link"><button type="button" data-rel="${this._esc(group.rel)}" title="Open this folder">${this._esc(label)}</button> <span>${items.length}</span></h4>`;
