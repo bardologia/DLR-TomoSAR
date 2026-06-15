@@ -41,7 +41,7 @@ class CondaJobDispatcher:
     def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:
         self.env_name  = env_name
         self.logger    = logger
-        self.repo_root = repo_root if repo_root is not None else Path(__file__).resolve().parents[1]
+        self.repo_root = repo_root if repo_root is not None else Path(__file__).resolve().parents[2]
 
     def dispatch(self, entry_relative_path: str, spec_payload: dict, spec_path: Path) -> None:
         FileIO.save_json(spec_payload, spec_path)
