@@ -8,29 +8,17 @@ from project_paths import ProjectPaths
 
 class ConfigRegistry:
 
-    MODULE_TITLES = {
-        "processing_config"       : "Processing",
-        "param_extraction_config" : "Parameter Extraction",
-        "dataset_config"          : "Dataset",
-        "norm_config"             : "Normalization",
-        "training_config"         : "Training",
-        "models_config"           : "Models",
-        "inference_config"        : "Inference",
-        "tuning_config"           : "Tuning",
-        "physics_check_config"    : "Physics Check",
+    SECTION_TITLES = {
+        "sar"         : "SAR Processing",
+        "param"       : "Parameter Extraction",
+        "data"        : "Dataset",
+        "model"       : "Models",
+        "training"    : "Training",
+        "inference"   : "Inference",
+        "experiments" : "Experiments",
     }
 
-    MODULE_ORDER = [
-        "processing_config",
-        "param_extraction_config",
-        "dataset_config",
-        "norm_config",
-        "training_config",
-        "models_config",
-        "inference_config",
-        "tuning_config",
-        "physics_check_config",
-    ]
+    SECTION_ORDER = ["sar", "param", "data", "model", "training", "inference", "experiments"]
 
     def __init__(self, paths: ProjectPaths) -> None:
         self.paths = paths
@@ -112,18 +100,33 @@ class ConfigRegistry:
         except Exception:
             return "?"
 
+    def _sections(self) -> list[str]:
+        root  = self.paths.config_dir
+        found = [p.name for p in sorted(root.iterdir()) if p.is_dir() and not p.name.startswith(("_", "."))]
+        known = [s for s in self.SECTION_ORDER if s in found]
+        extra = [s for s in found if s not in self.SECTION_ORDER]
+        return known + extra
+
+    def _section_files(self, section: str) -> list[Path]:
+        section_dir = self.paths.config_dir / section
+        return [p for p in sorted(section_dir.glob("*.py")) if p.name != "__init__.py"]
+
+    def _rel_module(self, path: Path) -> str:
+        return path.relative_to(self.paths.config_dir).with_suffix("").as_posix()
+
     def collect(self) -> list[dict]:
         groups = []
-        for module in self.MODULE_ORDER:
-            path = self.paths.config_dir / f"{module}.py"
-            if not path.exists():
-                continue
-            classes = self._parse_module(path)
+        for section in self._sections():
+            classes = []
+            for path in self._section_files(section):
+                for cls in self._parse_module(path):
+                    cls["module"] = self._rel_module(path)
+                    classes.append(cls)
             if not classes:
                 continue
             groups.append({
-                "module" : module,
-                "title"  : self.MODULE_TITLES.get(module, module),
+                "module" : section,
+                "title"  : self.SECTION_TITLES.get(section, section.replace("_", " ").title()),
                 "classes": classes,
             })
         return groups

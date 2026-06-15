@@ -25,7 +25,7 @@ class ConfigBrowser {
 
     this.groups.forEach((g) => {
       g.classes.forEach((c) => {
-        this.flat.push({ id: `${g.module}::${c.name}`, group: g.title, module: g.module, name: c.name, fields: c.fields });
+        this.flat.push({ id: `${c.module || g.module}::${c.name}`, group: g.title, module: c.module || g.module, name: c.name, fields: c.fields });
       });
     });
 
