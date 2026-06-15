@@ -64,6 +64,7 @@ class FPNNet(nn.Module):
                     activation      = config.activation,
                     normalization   = config.normalization,
                     bias            = config.conv_bias,
+                    first_unit      = (index == 0),
                 )
             )
             channels = feature_size
