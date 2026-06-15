@@ -50,6 +50,8 @@ class ResultsView {
       const path = this.pathInput.value.trim();
       if (path) this.open(path);
     });
+
+    window.addEventListener("resize", () => this._positionIndex());
   }
 
   enter() {
@@ -295,8 +297,55 @@ class ResultsView {
       this._fillConfigs(body);
     }
 
+    if (this.view !== "compare") this._buildIndex(body);
+
     this._collectFigures(body);
     this._bindBody(body);
+  }
+
+  _buildIndex(body) {
+    const sections = [...body.querySelectorAll(".res-section")];
+    if (sections.length < 2) return;
+
+    const nav = document.createElement("nav");
+    nav.className = "res-index";
+    nav.setAttribute("aria-label", "Section index");
+
+    sections.forEach((section, index) => {
+      const cap = section.querySelector(".res-section__cap");
+      if (!cap) return;
+
+      section.id = `res-sec-${index}`;
+
+      const source = cap.querySelector("button") || cap;
+      const label  = source.textContent.replace(/\s+\d+(\s+of\s+\d+)?\s*$/, "").trim() || `Section ${index + 1}`;
+      const tally  = cap.querySelector("span");
+
+      const link = document.createElement("button");
+      link.type      = "button";
+      link.className = "res-index__link";
+      link.innerHTML = `${this._esc(label)}${tally ? `<span>${this._esc(tally.textContent.trim())}</span>` : ""}`;
+      link.addEventListener("click", () => section.scrollIntoView({ behavior: "smooth", block: "start" }));
+      nav.appendChild(link);
+    });
+
+    if (!nav.children.length) return;
+
+    body.prepend(nav);
+    this._positionIndex();
+  }
+
+  _positionIndex() {
+    const nav = this.detailEl.querySelector(".res-index");
+    const bar = this.detailEl.querySelector(".res-bar");
+    if (!nav || !bar) return;
+
+    nav.style.top = `${bar.offsetHeight}px`;
+
+    const margin = bar.offsetHeight + nav.offsetHeight + 12;
+    this.detailEl.querySelectorAll(".res-section").forEach((section) => {
+      section.style.scrollMarginTop = `${margin}px`;
+    });
   }
 
   _toolbarHtml() {
