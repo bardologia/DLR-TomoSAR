@@ -64,9 +64,12 @@ class CurveLoss:
         p2 = F.avg_pool1d(p * p, window, stride=1) * window
         t2 = F.avg_pool1d(t * t, window, stride=1) * window
 
-        coh = (pt.abs() / (p2 * t2).clamp(min=1e-16).sqrt()).clamp(0.0, 1.0)
+        floor = 1e-6
+        valid = ((p2 > floor) & (t2 > floor)).float()
+        coh   = (pt.abs() / (p2.clamp(min=floor) * t2.clamp(min=floor)).sqrt()).clamp(0.0, 1.0)
+        n     = valid.sum().clamp(min=1.0)
 
-        return (1.0 - coh).mean()
+        return ((1.0 - coh) * valid).sum() / n
 
     @staticmethod
     def ssim(
