@@ -1088,6 +1088,13 @@ main { margin-left: var(--navw); }
 .exp-secondary__note { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); margin: 0; padding: 10px 12px 0; }
 .exp-secondary__grid { padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 32px; }
 
+.exp-patch__ratio { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); }
+.exp-patch__ratio input { width: 84px; }
+.exp-patch__sizes { padding: 12px; display: flex; flex-wrap: wrap; gap: 10px; }
+.exp-patch__chip { display: flex; align-items: center; gap: 6px; }
+.exp-patch__size { width: 76px; }
+.exp-patch__remove { padding: 2px 8px; }
+
 .rail-override__change { overflow-wrap: anywhere; }
 .cfg-edit__row--dependent .cfg-edit__name { color: var(--ink-dim); }
 
@@ -2113,13 +2120,50 @@ main { margin-left: var(--navw); }
 .cube-metrics tbody tr[hidden] { display: none; }
 .cube-metrics tbody tr + tr th, .cube-metrics tbody tr + tr td { border-top: 1px solid var(--line); }
 
+/* sub-view tabs + elevation sweep */
+.cube-modes { display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); }
+.cube-mode {
+  padding: 7px 16px;
+  background: transparent; border: 0; border-radius: var(--r-pill);
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.cube-mode:hover { color: var(--ink); }
+.cube-mode.is-active { color: var(--accent-deep); background: rgba(29, 79, 216, 0.08); }
+.cube-view[hidden] { display: none; }
+
+.cube-elev__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; min-height: 36px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.cube-elev__at { font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep); }
+
+.cube-elev__track { position: relative; height: 4px; margin: 14px 0 20px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.cube-elev__fill { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.12s linear; }
+
+.cube-elev__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 1040px) { .cube-elev__grid { grid-template-columns: 1fr; } }
+
+.cube-eplane {
+  margin: 0; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--line-strong);
+  border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+  padding: 6px;
+}
+.cube-eplane[hidden] { display: none; }
+.cube-eplane[data-source="pred"]    { border-top-color: var(--src-pred); }
+.cube-eplane[data-source="gt"]      { border-top-color: var(--src-gt); }
+.cube-eplane[data-source="reduced"] { border-top-color: var(--src-reduced); }
+.cube-eplane[data-source="full"]    { border-top-color: var(--src-full); }
+.cube-eplane__media { position: relative; line-height: 0; }
+.cube-eplane canvas { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--line); image-rendering: pixelated; }
+
 /* loading states */
 @keyframes cube-shimmer { 0% { background-position: 180% 0; } 100% { background-position: -80% 0; } }
 @keyframes cube-sheen   { to { transform: translateX(100%); } }
 @keyframes cube-pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.42; } }
 
 .cube-map__wrap.is-loading::after,
-.cube-slice.is-loading .cube-slice__media::after {
+.cube-slice.is-loading .cube-slice__media::after,
+.cube-eplane.is-loading .cube-eplane__media::after {
   content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
   border: 1px solid var(--line);
   background: linear-gradient(100deg, var(--surface-2) 28%, rgba(255, 255, 255, 0.72) 50%, var(--surface-2) 72%);
@@ -2139,7 +2183,8 @@ main { margin-left: var(--navw); }
 
 @media (prefers-reduced-motion: reduce) {
   .cube-map__wrap.is-loading::after,
-  .cube-slice.is-loading .cube-slice__media::after { animation: none; background: var(--surface-2); }
+  .cube-slice.is-loading .cube-slice__media::after,
+  .cube-eplane.is-loading .cube-eplane__media::after { animation: none; background: var(--surface-2); }
   .cube-progress__fill::after { display: none; }
   .cube-hint.is-loading { animation: none; }
 }

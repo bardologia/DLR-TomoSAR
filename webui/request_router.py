@@ -131,6 +131,16 @@ class RequestRouter:
             )
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/cubes/plane":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.plane_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                frac    = float((query.get("frac") or ["0"])[0]),
+                space   = (query.get("space") or ["physical"])[0],
+            )
+            self._send_png(handler, png)
+            return
         if path == "/api/cubes/slice":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.slice_png(

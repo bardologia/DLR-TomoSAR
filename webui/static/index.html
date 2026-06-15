@@ -222,6 +222,12 @@
     </div>
 
     <div class="cube-stage" id="cube-stage" hidden>
+      <div class="cube-modes" role="tablist" aria-label="Cube view">
+        <button type="button" class="cube-mode is-active" data-view="explorer">Cuts</button>
+        <button type="button" class="cube-mode" data-view="elevation">Elevation sweep</button>
+      </div>
+
+      <div class="cube-view" data-view="explorer">
       <div class="cube-deck" id="cube-deck" data-mode="map">
         <aside class="cube-map" id="cube-map">
           <div class="cube-map__head">
@@ -299,6 +305,26 @@
             </tbody>
           </table>
         </aside>
+      </div>
+      </div>
+
+      <div class="cube-view" data-view="elevation" hidden>
+        <div class="cube-elev">
+          <div class="cube-elev__bar">
+            <span class="cube-elev__at" id="cube-elev-at">Scroll over a panel to sweep the tomograms through elevation.</span>
+            <div class="cube-spaces" role="group" aria-label="Value space">
+              <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+              <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+            </div>
+          </div>
+          <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-elev-fill"></i></div>
+          <div class="cube-elev__grid" id="cube-elev-grid">
+            <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
+            <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
+            <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
+          </div>
+        </div>
       </div>
     </div>
   </section>

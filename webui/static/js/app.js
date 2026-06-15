@@ -177,6 +177,16 @@ class App {
       progressLabel : document.getElementById("cube-progress-label"),
       spaceBtns     : [...document.querySelectorAll(".cube-space[data-space]")],
       profModeBtns  : [...document.querySelectorAll("#cube-prof-mode .cube-space")],
+      modeBtns      : [...document.querySelectorAll(".cube-mode[data-view]")],
+      views         : [...document.querySelectorAll(".cube-view[data-view]")],
+      elevGrid      : document.getElementById("cube-elev-grid"),
+      elevAt        : document.getElementById("cube-elev-at"),
+      elevFill      : document.getElementById("cube-elev-fill"),
+      ePanels       : [...document.querySelectorAll(".cube-eplane")].map((root) => ({
+        root,
+        source : root.dataset.source,
+        canvas : root.querySelector("canvas"),
+      })),
       panels        : [...document.querySelectorAll(".cube-slice")].map((root) => ({
         root,
         axis   : root.dataset.axis,

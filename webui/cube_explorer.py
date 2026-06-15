@@ -184,6 +184,30 @@ class CubeExplorer:
         plt.imsave(buf, data, cmap="jet", vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
+    def plane_png(self, cube_id: str, source: str, frac: float, space: str = "physical") -> bytes | None:
+        entry = self._entry(cube_id, source)
+        if entry is None:
+            return None
+
+        cube   = entry["cube"]
+        n_elev = cube.shape[0]
+        order  = np.argsort(entry["x_axis"])
+        pos    = int(round(float(np.clip(frac, 0.0, 1.0)) * (n_elev - 1)))
+        elev   = int(order[pos])
+
+        data = np.asarray(cube[elev], dtype=np.float32)
+
+        if space == "normalized":
+            peak = float(np.nanmax(data)) if np.isfinite(data).any() else 0.0
+            data = data / (peak if peak > 1e-12 else 1.0)
+            vmin, vmax = 0.0, 1.0
+        else:
+            vmin, vmax = entry["vmin"], entry["vmax"]
+
+        buf = io.BytesIO()
+        plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap="jet", vmin=vmin, vmax=vmax, format="png")
+        return buf.getvalue()
+
     def _entry(self, cube_id: str, source: str) -> dict | None:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
@@ -273,6 +297,8 @@ class CubeExplorer:
             "n_az"    : n_az,
             "n_rg"    : n_rg,
             "n_elev"  : {s: int(entries[s]["cube"].shape[0]) for s in entries},
+            "x_min"   : float(curve_axis[0]),
+            "x_max"   : float(curve_axis[-1]),
         }
         return entries, meta, primary
 

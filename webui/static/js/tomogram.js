@@ -22,6 +22,12 @@ class TomogramView {
     this.profModeBtns = refs.profModeBtns;
     this.profPanels = refs.profPanels;
     this.spaceBtns = refs.spaceBtns || [];
+    this.modeBtns = refs.modeBtns || [];
+    this.viewEls = refs.views || [];
+    this.elevGrid = refs.elevGrid;
+    this.elevAt = refs.elevAt;
+    this.elevFill = refs.elevFill;
+    this.ePanels = refs.ePanels || [];
     this.progress = refs.progress;
     this.progressFill = refs.progressFill;
     this.progressLabel = refs.progressLabel;
@@ -46,6 +52,9 @@ class TomogramView {
     this.profFetching = false;
     this.ssimQueued = null;
     this.ssimFetching = false;
+    this.view = "explorer";
+    this.elev = 0;
+    this.elevSteps = 1;
     this.colors = {};
     this.visible = new Set();
 
@@ -71,6 +80,12 @@ class TomogramView {
     this.profModeBtns.forEach((btn) => {
       btn.addEventListener("click", () => this._setProfMode(btn.dataset.mode));
     });
+    this.modeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => this._setView(btn.dataset.view));
+    });
+    if (this.elevGrid) {
+      this.elevGrid.addEventListener("wheel", (ev) => this._onElevWheel(ev), { passive: false });
+    }
   }
 
   async enter() {
@@ -260,7 +275,18 @@ class TomogramView {
     this.mapWrap.classList.add("is-loading");
     this.topdown.src = `/api/cubes/primary?id=${encodeURIComponent(this.selectedId)}`;
 
+    this.elevSteps = Math.max(1, meta.n_elev[meta.sources.includes("pred") ? "pred" : meta.sources[0]] || 1);
+    this.elev = Math.floor((this.elevSteps - 1) / 2);
+    this.ePanels.forEach((panel) => {
+      panel.root.hidden = !meta.sources.includes(panel.source);
+      panel.bitmap = null;
+      panel.queued = null;
+      panel.fetching = false;
+    });
+
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
+
+    if (this.view === "elevation") this._renderElev();
   }
 
   _setSpace(space) {
@@ -268,8 +294,88 @@ class TomogramView {
     this.space = space;
     this._syncSpaceBtns();
 
-    if (!this.meta || !this.point) return;
-    this._drawSlices(this.point.az, this.point.rg);
+    if (!this.meta) return;
+    if (this.view === "elevation") this._renderElev();
+    if (this.point) this._drawSlices(this.point.az, this.point.rg);
+  }
+
+  _setView(view) {
+    if (!["explorer", "elevation"].includes(view) || view === this.view) return;
+    this.view = view;
+
+    this.modeBtns.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
+    this.viewEls.forEach((el) => { el.hidden = el.dataset.view !== view; });
+
+    if (view === "elevation" && this.meta) this._renderElev();
+  }
+
+  _onElevWheel(ev) {
+    if (!this.meta) return;
+    ev.preventDefault();
+
+    const step = ev.deltaY > 0 ? 1 : -1;
+    const next = Math.min(this.elevSteps - 1, Math.max(0, this.elev + step));
+    if (next === this.elev) return;
+
+    this.elev = next;
+    this._renderElev();
+  }
+
+  _renderElev() {
+    const frac   = this.elevSteps > 1 ? this.elev / (this.elevSteps - 1) : 0;
+    const height = this.meta.x_min + frac * (this.meta.x_max - this.meta.x_min);
+
+    this.elevAt.textContent = `elevation ≈ ${this._fmt(height)} · bin ${this.elev + 1} / ${this.elevSteps} · scroll to sweep`;
+    if (this.elevFill) this.elevFill.style.width = `${frac * 100}%`;
+
+    this.ePanels.forEach((panel) => {
+      if (panel.root.hidden) return;
+      panel.queued = frac;
+      this._elevPump(panel);
+    });
+  }
+
+  async _elevPump(panel) {
+    if (panel.fetching) return;
+    panel.fetching = true;
+
+    while (panel.queued !== null && panel.queued !== undefined) {
+      const frac = panel.queued;
+      panel.queued = null;
+      await this._fetchPlane(panel, frac);
+    }
+
+    panel.fetching = false;
+  }
+
+  async _fetchPlane(panel, frac) {
+    const space = this.space;
+    const url   = `/api/cubes/plane?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&frac=${frac}&space=${space}`;
+    const skeletonTimer = panel.bitmap ? null : setTimeout(() => panel.root.classList.add("is-loading"), 120);
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+
+      panel.bitmap = await createImageBitmap(await res.blob());
+      this._paintPlane(panel);
+    } catch (e) {
+    } finally {
+      if (skeletonTimer) clearTimeout(skeletonTimer);
+      panel.root.classList.remove("is-loading");
+    }
+  }
+
+  _paintPlane(panel) {
+    const bitmap = panel.bitmap;
+    const canvas = panel.canvas;
+
+    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+    }
+
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
   }
 
   _setProfMode(mode) {
