@@ -101,7 +101,8 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path == "/api/cubes":
-            self._send_json(handler, {"cubes": self.cubes.list_cubes()})
+            query = parse_qs(urlparse(handler.path).query)
+            self._send_json(handler, self.cubes.list_cubes((query.get("base") or [""])[0]))
             return
         if path == "/api/cubes/status":
             self._send_json(handler, self.cubes.load_status())

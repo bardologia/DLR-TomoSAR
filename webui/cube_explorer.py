@@ -20,28 +20,34 @@ class CubeExplorer:
     SOURCES = ("pred", "gt", "reduced", "full")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths     = paths
-        self.logger    = logger
-        self.logs_root = (paths.repo_root / "logs").resolve()
-        self.lock      = threading.Lock()
-        self.loaded    = None
-        self.status    = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
+        self.paths  = paths
+        self.logger = logger
+        self.roots  = set()
+        self.lock   = threading.Lock()
+        self.loaded = None
+        self.status = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
 
-    def list_cubes(self) -> list[dict]:
+    def list_cubes(self, base: str) -> dict:
+        root, error = self._catalog_root(base)
+        if error:
+            return {"ok": False, "error": error, "cubes": []}
+
+        self.roots.add(str(root))
+
         cubes = []
-        for cube_file in sorted(self.logs_root.rglob("inference/*/cubes/pred_curves.npy")):
+        for cube_file in sorted(root.rglob("inference/*/cubes/pred_curves.npy")):
             stamp_dir = cube_file.parent.parent
             run_dir   = stamp_dir.parent.parent
 
             cubes.append({
-                "id"    : str(stamp_dir.relative_to(self.logs_root)),
+                "id"    : str(stamp_dir),
                 "run"   : run_dir.name,
-                "group" : str(run_dir.relative_to(self.logs_root).parent),
+                "group" : str(run_dir.relative_to(root).parent),
                 "stamp" : stamp_dir.name,
             })
 
         cubes.sort(key=lambda c: c["id"], reverse=True)
-        return cubes
+        return {"ok": True, "root": str(root), "cubes": cubes}
 
     def start_load(self, cube_id: str) -> dict:
         stamp_dir = self._stamp_dir(cube_id)
@@ -135,12 +141,30 @@ class CubeExplorer:
             return self.loaded["entries"].get(source)
 
     def _stamp_dir(self, cube_id: str) -> Path | None:
-        stamp_dir = (self.logs_root / cube_id).resolve()
-        if not str(stamp_dir).startswith(str(self.logs_root)):
+        if not cube_id:
+            return None
+
+        stamp_dir = Path(cube_id).resolve()
+        if not any(stamp_dir.is_relative_to(root) for root in self.roots):
             return None
         if not (stamp_dir / "cubes" / "pred_curves.npy").is_file():
             return None
         return stamp_dir
+
+    def _catalog_root(self, raw: str) -> tuple[Path | None, str]:
+        raw = (raw or "").strip()
+        if not raw:
+            return None, "set the runs directory in the Results tab first"
+
+        root = Path(raw).expanduser()
+        if not root.is_absolute():
+            return None, "an absolute path is required"
+
+        root = root.resolve()
+        if not root.is_dir():
+            return None, f"not a directory: {root}"
+
+        return root, ""
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:

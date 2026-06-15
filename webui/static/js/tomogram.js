@@ -83,7 +83,7 @@ class TomogramView {
 
     let data;
     try {
-      data = await window.apiGet("/api/cubes");
+      data = await window.apiGet(`/api/cubes?base=${encodeURIComponent(this._runsBase())}`);
     } catch (e) {
       this.hint.classList.remove("is-loading");
       this.hint.textContent = "Backend unreachable.";
@@ -95,7 +95,7 @@ class TomogramView {
     this._renderStrip();
 
     if (!this.cubes.length) {
-      this.hint.textContent = "No saved cubes found. Run an inference with save_cubes=True first.";
+      this.hint.textContent = data.error || "No saved cubes found. Run an inference with save_cubes=True first.";
       this.hint.hidden = false;
       this.stage.hidden = true;
       return;
@@ -103,6 +103,15 @@ class TomogramView {
 
     this.hint.textContent = "Select a cube directory to load it into memory.";
     this.hint.hidden = false;
+  }
+
+  _runsBase() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
+      return raw.logs || "";
+    } catch (e) {
+      return "";
+    }
   }
 
   _renderStrip() {
