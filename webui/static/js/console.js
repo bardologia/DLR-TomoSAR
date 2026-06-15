@@ -95,8 +95,8 @@ class ConsoleTile {
       this.term.writeln(data.text);
     } else if (data.type === "status") {
       if (data.status === "running") {
-        this._note(`process started (pid ${data.pid})`, "36");
-        this.metaEl.textContent = `pid ${data.pid}`;
+        this._note(data.detached ? `running detached (pid ${data.pid}) — stop still kills it` : `process started (pid ${data.pid})`, "36");
+        this.metaEl.textContent = data.detached ? `pid ${data.pid} · detached` : `pid ${data.pid}`;
         this.setStatus("running");
       } else if (data.status === "scheduled") {
         this._note(`scheduled to run after ${data.after || "the current job"}`, "33");

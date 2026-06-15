@@ -50,6 +50,7 @@ class JobStream:
 class ProcessManager:
 
     OVERRIDE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
+    DETACHED_PID  = re.compile(r"detached .* as pid (\d+)")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths   = paths
@@ -214,6 +215,10 @@ class ProcessManager:
         fd      = process.stdout.fileno()
         decoder = codecs.getincrementaldecoder("utf-8")("replace")
 
+        with self.lock:
+            detached = bool(self.jobs.get(job_id, {}).get("detach"))
+        head = ""
+
         while True:
             chunk = os.read(fd, 4096)
             if not chunk:
@@ -221,13 +226,22 @@ class ProcessManager:
             text = decoder.decode(chunk)
             if text:
                 stream.publish({"type": "chunk", "data": text})
+                if detached and len(head) < 4096:
+                    head += text
 
         tail = decoder.decode(b"", final=True)
         if tail:
             stream.publish({"type": "chunk", "data": tail})
+            if detached and len(head) < 4096:
+                head += tail
 
         process.wait()
         code = process.returncode
+
+        detached_pid = self._parse_detached_pid(head) if detached else None
+        if detached_pid and code == 0:
+            self._adopt_detached(job_id, detached_pid, stream)
+            return
 
         with self.lock:
             record = self.jobs.get(job_id)
@@ -243,6 +257,53 @@ class ProcessManager:
         self.logger.muted(f"job {job_id} exited with code {code}")
         stream.publish({"type": "status", "status": record["status"], "code": code, "verdict": verdict})
         stream.publish({"type": "end"})
+
+    def _parse_detached_pid(self, text: str) -> int | None:
+        match = self.DETACHED_PID.search(text)
+        return int(match.group(1)) if match else None
+
+    def _adopt_detached(self, job_id: str, pid: int, stream: JobStream) -> None:
+        with self.lock:
+            record = self.jobs.get(job_id)
+            if record is None:
+                return
+            record["status"]           = "running"
+            record["pid"]              = pid
+            record["detached_running"] = True
+
+        self.logger.ok(f"job {job_id} detached, now tracking live pid {pid}")
+        stream.publish({"type": "status", "status": "running", "pid": pid, "detached": True})
+
+        watcher = threading.Thread(target=self._watch_detached, args=(job_id, pid, stream), daemon=True)
+        watcher.start()
+
+    def _watch_detached(self, job_id: str, pid: int, stream: JobStream) -> None:
+        while self._pid_alive(pid):
+            time.sleep(2.0)
+            with self.lock:
+                if self.jobs.get(job_id) is None:
+                    return
+
+        with self.lock:
+            record = self.jobs.get(job_id)
+            if record is None:
+                return
+            record["status"]    = "finished"
+            record["exit_code"] = None
+
+        self.logger.muted(f"detached job {job_id} (pid {pid}) exited")
+        stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "ok"})
+        stream.publish({"type": "end"})
+
+    def _pid_alive(self, pid: int) -> bool:
+        try:
+            stat = open(f"/proc/{pid}/stat").read()
+        except OSError:
+            return False
+        try:
+            return stat[stat.rindex(")") + 2] != "Z"
+        except (ValueError, IndexError):
+            return False
 
     def stop(self, job_id: str) -> dict:
         with self.lock:
