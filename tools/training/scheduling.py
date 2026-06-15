@@ -98,10 +98,18 @@ class Scheduler:
         self._log_scheduler_info()
 
     def set_total_epochs(self, epochs: int) -> None:
-        self._t_max_override = max(1, int(epochs))
+        resolved = max(1, int(epochs))
+        if resolved == self._resolved_t_max():
+            return
+
+        self._t_max_override = resolved
+        self._log_scheduler_info()
+
+    def _resolved_t_max(self) -> int:
+        return self._t_max_override if self._t_max_override is not None else self.config.scheduler.epochs
 
     def _cosine_annealing(self, epoch: int) -> float:
-        T_max         = self._t_max_override if self._t_max_override is not None else self.config.scheduler.epochs
+        T_max         = self._resolved_t_max()
         eta_min       = float(self.config.scheduler.eta_min)
         base_lr       = self.base_lrs[0]
         eta_min_ratio = eta_min / max(base_lr, 1e-12)
@@ -145,7 +153,7 @@ class Scheduler:
         }
 
         if self.scheduler_type == "cosine_annealing":
-            info["T_max"]   = self.config.scheduler.epochs
+            info["T_max"]   = self._resolved_t_max()
             info["Eta Min"] = self.config.scheduler.eta_min
 
         info["Warmup Enabled"] = self.warmup.enabled if self.warmup else False
