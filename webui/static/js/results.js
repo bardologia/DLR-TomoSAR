@@ -383,7 +383,9 @@ class ResultsView {
         false,
       );
 
-      nav.appendChild(this._indexGroup(mainLabel, subGroups));
+      const mainGroup = this._indexGroup(mainLabel, subGroups, true);
+      if (subGroups.length) mainGroup.classList.add("res-index__group--wide");
+      nav.appendChild(mainGroup);
     });
   }
 
@@ -397,16 +399,16 @@ class ResultsView {
     );
   }
 
-  _indexGroup(label, children) {
+  _indexGroup(label, children, open = false) {
     const group = document.createElement("div");
-    group.className = "res-index__group";
+    group.className = "res-index__group" + (open && children.length ? " is-open" : "");
 
     const head = document.createElement("div");
     head.className = "res-index__grouphead";
 
     const caret = document.createElement("button");
     caret.type      = "button";
-    caret.className = "res-index__caret" + (children.length ? "" : " res-index__caret--none");
+    caret.className = "res-index__caret" + (children.length ? (open ? " is-open" : "") : " res-index__caret--none");
     caret.textContent = "▸";
     if (children.length) caret.addEventListener("click", () => {
       caret.classList.toggle("is-open", group.classList.toggle("is-open"));

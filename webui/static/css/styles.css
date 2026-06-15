@@ -1628,6 +1628,10 @@ main { margin-left: var(--navw); }
 .res-index__caret--none { visibility: hidden; cursor: default; }
 .res-index__subs { display: none; padding-left: 15px; }
 .res-index__group.is-open > .res-index__subs { display: block; }
+.res-index--book > .res-index__group--wide { grid-column: 1 / -1; }
+.res-index--book > .res-index__group.is-open > .res-index__subs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; align-items: start;
+}
 
 .res-index--book .res-index__link {
   display: flex; justify-content: space-between; gap: 10px; width: 100%;
