@@ -315,24 +315,60 @@ class ResultsView {
       const cap = section.querySelector(".res-section__cap");
       if (!cap) return;
 
-      section.id = `res-sec-${index}`;
-
+      section.id   = `res-sec-${index}`;
       const source = cap.querySelector("button") || cap;
-      const label  = source.textContent.replace(/\s+\d+(\s+of\s+\d+)?\s*$/, "").trim() || `Section ${index + 1}`;
       const tally  = cap.querySelector("span");
 
-      const link = document.createElement("button");
-      link.type      = "button";
-      link.className = "res-index__link";
-      link.innerHTML = `${this._esc(label)}${tally ? `<span>${this._esc(tally.textContent.trim())}</span>` : ""}`;
-      link.addEventListener("click", () => section.scrollIntoView({ behavior: "smooth", block: "start" }));
-      nav.appendChild(link);
+      nav.appendChild(this._indexLink(
+        this._indexLabel(source.textContent),
+        tally ? tally.textContent.trim() : "",
+        () => section.scrollIntoView({ behavior: "smooth", block: "start" }),
+        false,
+        false,
+      ));
+
+      const md = section.querySelector(".res-md");
+      if (!md) return;
+
+      md.querySelectorAll("h2, h3").forEach((head, hi) => {
+        const text = head.textContent.trim();
+        if (!text) return;
+
+        head.id = `res-sec-${index}-h${hi}`;
+        head.classList.add("res-index__anchor");
+        nav.appendChild(this._indexLink(
+          text,
+          "",
+          () => head.scrollIntoView({ behavior: "smooth", block: "start" }),
+          true,
+          head.tagName === "H3",
+        ));
+      });
     });
 
     if (!nav.children.length) return;
 
     body.prepend(nav);
     this._positionIndex();
+  }
+
+  _indexLabel(text) {
+    const clean = text.replace(/\s+\d+(\s+of\s+\d+)?\s*$/, "").trim();
+
+    const cut = clean.lastIndexOf("figures/");
+    if (cut !== -1) return clean.slice(cut + "figures/".length) || "figures";
+    if (clean === "figures" || clean.endsWith("/figures")) return "figures";
+
+    return clean || "section";
+  }
+
+  _indexLink(label, count, onClick, isSub, isDeep) {
+    const link = document.createElement("button");
+    link.type      = "button";
+    link.className = "res-index__link" + (isSub ? " res-index__link--sub" : "") + (isDeep ? " res-index__link--deep" : "");
+    link.innerHTML = `${this._esc(label)}${count ? `<span>${this._esc(count)}</span>` : ""}`;
+    link.addEventListener("click", onClick);
+    return link;
   }
 
   _positionIndex() {
@@ -343,8 +379,8 @@ class ResultsView {
     nav.style.top = `${bar.offsetHeight}px`;
 
     const margin = bar.offsetHeight + nav.offsetHeight + 12;
-    this.detailEl.querySelectorAll(".res-section").forEach((section) => {
-      section.style.scrollMarginTop = `${margin}px`;
+    this.detailEl.querySelectorAll(".res-section, .res-index__anchor").forEach((el) => {
+      el.style.scrollMarginTop = `${margin}px`;
     });
   }
 

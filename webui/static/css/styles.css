@@ -1592,8 +1592,9 @@ main { margin-left: var(--navw); }
 
 .res-index {
   position: sticky; z-index: 5;
-  display: flex; flex-wrap: wrap; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   margin: 0 -22px 18px; padding: 10px 22px;
+  max-height: 38vh; overflow-y: auto;
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .res-index__link {
@@ -1604,6 +1605,13 @@ main { margin-left: var(--navw); }
 }
 .res-index__link:hover { color: var(--accent-deep); border-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 .res-index__link span { color: var(--ink-faint); margin-left: 5px; }
+.res-index__link--sub {
+  background: none; border-color: transparent; color: var(--ink-dim);
+  padding: 4px 8px; font-size: 11px;
+}
+.res-index__link--sub:hover { color: var(--accent-deep); border-color: transparent; background: var(--surface-2); }
+.res-index__link--deep { color: var(--ink-faint); font-size: 10.5px; padding-left: 14px; }
+.res-index__link--deep::before { content: "·"; margin-right: 5px; color: var(--ink-faint); }
 
 .res-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
 .res-crumbs button {
@@ -1898,6 +1906,8 @@ main { margin-left: var(--navw); }
 /* stage: sliding deck of map, slices and profiles */
 .cube-stage[hidden], .cube-slices[hidden], .cube-progress[hidden] { display: none; }
 
+[data-page="cube"]:has(#cube-stage:not([hidden])) .page__head { display: none; }
+
 .cube-deck {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.85fr) minmax(0, 0.0001fr);
@@ -1910,14 +1920,14 @@ main { margin-left: var(--navw); }
 .cube-panel-title { font-family: var(--display); font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; margin: 0; }
 
 .cube-map {
-  position: sticky; top: 24px;
+  align-self: center; margin-top: 126px;
   background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--accent);
   border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
   padding: 16px;
   overflow: hidden;
   transition: opacity 0.3s var(--ease), padding 0.55s var(--ease), border-width 0.55s var(--ease);
 }
-.cube-deck[data-mode="slices"] .cube-map { opacity: 0; pointer-events: none; padding: 0; border-width: 0; }
+.cube-deck[data-mode="slices"] .cube-map { opacity: 0; pointer-events: none; padding: 0; border-width: 0; max-height: 0; }
 .cube-map__head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 
 .cube-spaces { display: inline-flex; padding: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); }
@@ -1984,7 +1994,7 @@ main { margin-left: var(--navw); }
   opacity: 0; pointer-events: none;
   transition: opacity 0.3s var(--ease) 0.2s, padding 0.55s var(--ease), border-width 0.55s var(--ease);
 }
-.cube-deck:not([data-mode="slices"]) .cube-profiles { padding: 0; border-width: 0; }
+.cube-deck:not([data-mode="slices"]) .cube-profiles { padding: 0; border-width: 0; max-height: 0; }
 .cube-deck[data-mode="slices"] .cube-profiles { opacity: 1; pointer-events: auto; }
 
 .cube-profiles__head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
@@ -2075,8 +2085,7 @@ main { margin-left: var(--navw); }
   .cube-deck, .cube-deck[data-mode="slices"] { grid-template-columns: 1fr; gap: 22px; }
   .cube-deck[data-mode="slices"] .cube-map { display: none; }
   .cube-deck:not([data-mode="slices"]) .cube-profiles { display: none; }
-  .cube-map { position: static; }
-  .cube-profiles { align-self: stretch; margin-top: 0; }
+  .cube-map, .cube-profiles { align-self: stretch; margin-top: 0; }
 }
 
 /* ---------- Shared card treatment ---------- */
