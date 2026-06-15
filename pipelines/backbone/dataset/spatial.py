@@ -120,7 +120,7 @@ class Cropper:
 
     def _load_tomogram(self, az_slice: slice, rg_slice: slice) -> np.ndarray:
         tomogram = np.load(str(self.layout.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
-        return np.ascontiguousarray(tomogram[:, az_slice, rg_slice].astype(np.float32))
+        return np.ascontiguousarray(np.abs(tomogram[:, az_slice, rg_slice]).astype(np.float32))
 
     def _log_crop(self, inputs_split: np.ndarray, dem_split: np.ndarray, parameters_split: np.ndarray, tomogram_split: Optional[np.ndarray], n_secondaries: int, n_interferograms: int) -> None:
         self.logger.section("[Crop Loaded]")
