@@ -106,7 +106,7 @@ class GradientClipper:
         self.tracker.log_scalar("train/grad_clip_ratio",       clip_ratio,  global_step)
         self.tracker.log_scalar("train/grad_clip_threshold",   threshold,   global_step)
 
-        return norm_after
+        return norm_before
 
     def record(self, grad_norm_value: float, global_step: int):
         self.history.append(float(grad_norm_value))
