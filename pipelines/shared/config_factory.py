@@ -143,11 +143,11 @@ class ConfigFactory:
 
             early_stopping = EarlyStoppingConfig(patience=9999, restore_best=False),
             warmup         = WarmupConfig(warmup_enabled=False),
-            scheduler      = SchedulerConfig(type="constant"),
+            scheduler      = SchedulerConfig(type="cosine_annealing", epochs=overfit.max_steps, eta_min=1e-6),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
 
             training = TrainingLoopConfig(
-                epochs               = 10000,
+                epochs               = overfit.max_steps,
                 validation_frequency = 9999,
             ),
 

@@ -14,7 +14,7 @@ class BenchmarkPathsConfig:
 
 @dataclass
 class OverfitGateConfig:
-    max_steps           : int   = 10000
+    max_steps           : int   = 30000
     stop_threshold      : float = 1e-3
     batch_size          : int   = 9
     azimuth_start       : int   = 1000
