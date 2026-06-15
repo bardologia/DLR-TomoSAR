@@ -1,6 +1,9 @@
 "use strict";
 
 class ResultsView {
+  static DEFAULT_DATASETS = "/ste/rnd/User/vice_vi/Dataset";
+  static DEFAULT_RUNS     = "/ste/rnd/User/vice_vi/DLR-TomoSAR/runs";
+
   constructor(listEl, detailEl) {
     this.listEl    = listEl;
     this.detailEl  = detailEl;
@@ -676,9 +679,12 @@ class ResultsView {
   _loadSources() {
     try {
       const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
-      return { datasets: raw.datasets || "", logs: raw.logs || "" };
+      return {
+        datasets : raw.datasets || ResultsView.DEFAULT_DATASETS,
+        logs     : raw.logs     || ResultsView.DEFAULT_RUNS,
+      };
     } catch (e) {
-      return { datasets: "", logs: "" };
+      return { datasets: ResultsView.DEFAULT_DATASETS, logs: ResultsView.DEFAULT_RUNS };
     }
   }
 

@@ -108,9 +108,9 @@ class TomogramView {
   _runsBase() {
     try {
       const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
-      return raw.logs || "";
+      return raw.logs || ResultsView.DEFAULT_RUNS;
     } catch (e) {
-      return "";
+      return ResultsView.DEFAULT_RUNS;
     }
   }
 
