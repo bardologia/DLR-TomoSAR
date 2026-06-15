@@ -59,32 +59,31 @@ window.FLOW_SKETCHES = {
   crossprod: {
     tip: "Conjugating the deramped secondary against the master subtracts its phase, and because conjugation flips the DEM sign the term phi_DEM is effectively removed from arg(c_i).",
     build(svg) { svg.innerHTML = `
-      <circle cx="80" cy="74" r="36" class="skl-axis" style="fill:none"/>
-      <line class="skl-axis" x1="44" y1="74" x2="116" y2="74"/>
-      <line class="skl-axis" x1="80" y1="38" x2="80" y2="110"/>
-      <line class="skl-draw c-meas" x1="80" y1="74" x2="108" y2="52"/>
-      <text x="110" y="50" style="fill:#6ea8ff;font-size:8px">s0</text>
-      <line class="skl-draw c-mid" x1="80" y1="74" x2="100" y2="98"/>
-      <text x="100" y="110" style="fill:#f5b971;font-size:8px">s_i</text>
-      <text x="150" y="78" style="fill:#7e8aa0;font-size:14px">=</text>
-      <circle cx="190" cy="74" r="20" class="skl-axis" style="fill:none;opacity:.4"/>
-      <line class="skl-draw c-cal" x1="190" y1="74" x2="210" y2="58"/>
-      <text x="198" y="104" style="fill:#4fd6c4;font-size:8px">c_i</text>`; },
+      <circle cx="120" cy="78" r="44" class="skl-axis" style="fill:none;opacity:.5"/>
+      <line class="skl-axis" x1="68" y1="78" x2="172" y2="78"/>
+      <line class="skl-axis" x1="120" y1="30" x2="120" y2="126"/>
+      <line class="skl-draw c-meas" x1="120" y1="78" x2="143" y2="41"/>
+      <circle cx="143" cy="41" r="3.2" class="skl-pop f-meas"/>
+      <text x="147" y="40" style="fill:#6ea8ff;font-size:8px">s0</text>
+      <line class="skl-draw c-mid" x1="120" y1="78" x2="165" y2="71"/>
+      <circle cx="165" cy="71" r="3.2" class="skl-pop f-mid"/>
+      <text x="169" y="80" style="fill:#f5b971;font-size:8px">s_i*</text>
+      <path class="skl-draw c-cal" d="M147.6 73.6 A28 28 0 0 0 134.8 54.3" style="fill:none;stroke-width:1.6"/>
+      <text x="150" y="60" style="fill:#4fd6c4;font-size:8px">c_i</text>`; },
     anim: null,
   },
 
   phasor: {
     tip: "Dividing by |c_i| floored at 1e-30 collapses every cross-product onto the unit circle, equalising inter-pass amplitude while null pixels go to zero instead of NaN.",
     build(svg) { svg.innerHTML = `
-      <circle class="sk-live skl-pop f-faint" cx="120" cy="76" r="42" style="fill:none;stroke:#4a5a6b;stroke-width:1.4;stroke-dasharray:3 4;opacity:1"/>
-      <line class="skl-axis" x1="70" y1="76" x2="170" y2="76"/>
-      <line class="skl-axis" x1="120" y1="30" x2="120" y2="122"/>
-      <line class="skl-draw c-mid" x1="120" y1="76" x2="150" y2="46"/>
-      <line class="skl-draw c-mid" x1="120" y1="76" x2="84" y2="98"/>
-      <line class="skl-draw c-mid" x1="120" y1="76" x2="156" y2="98"/>
-      <circle cx="150" cy="46" r="3.5" class="skl-pop f-cal"/>
-      <circle cx="84" cy="98" r="3.5" class="skl-pop f-cal"/>
-      <circle cx="156" cy="98" r="3.5" class="skl-pop f-cal"/>`; },
+      <circle cx="120" cy="76" r="46" class="skl-axis" style="fill:none;opacity:.55"/>
+      <line class="skl-axis" x1="66" y1="76" x2="174" y2="76"/>
+      <line class="skl-axis" x1="120" y1="26" x2="120" y2="126"/>
+      <line x1="120" y1="76" x2="150" y2="58" style="stroke:#4a5a6b;stroke-width:1.4"/>
+      <circle cx="150" cy="58" r="3" class="skl-pop f-faint"/>
+      <line class="sk-live skl-draw c-cal" x1="120" y1="76" x2="159" y2="53" style="opacity:1"/>
+      <circle class="sk-live skl-pop f-cal" cx="159" cy="53" r="3.6" style="opacity:1"/>
+      <text x="150" y="44" style="fill:#4fd6c4;font-size:8px">|c| = 1</text>`; },
     anim: pulse,
   },
 
@@ -106,13 +105,15 @@ window.FLOW_SKETCHES = {
   interf: {
     tip: "The clipped amplitude A_i is re-attached as the modulus of the unit phasor, producing an interferogram whose argument is the residual elevation phase and whose magnitude is a bounded SNR proxy.",
     build(svg) { svg.innerHTML = `
-      <line class="skl-axis" x1="74" y1="76" x2="166" y2="76"/>
-      <line class="skl-axis" x1="120" y1="32" x2="120" y2="120"/>
-      <circle cx="120" cy="76" r="20" class="skl-axis" style="fill:none;opacity:.4"/>
-      <circle cx="120" cy="76" r="40" class="skl-dash c-faint" style="fill:none;opacity:.4"/>
-      <line class="skl-draw c-cal" x1="120" y1="76" x2="152" y2="54"/>
-      <circle cx="152" cy="54" r="3.5" class="skl-pop f-cal"/>
-      <text x="148" y="118" text-anchor="middle" style="fill:#4fd6c4;font-size:8px">A_i p_i</text>`; },
+      <circle cx="120" cy="76" r="40" class="skl-axis" style="fill:none;opacity:.5"/>
+      <line class="skl-axis" x1="72" y1="76" x2="168" y2="76"/>
+      <line class="skl-axis" x1="120" y1="30" x2="120" y2="122"/>
+      <text x="120" y="30" text-anchor="middle" style="fill:#7e8aa0;font-size:7px">A_i</text>
+      <line class="skl-draw c-cal" x1="120" y1="76" x2="153" y2="54"/>
+      <circle cx="153" cy="54" r="3.5" class="skl-pop f-cal"/>
+      <path class="skl-dash c-mid" d="M141 76 A21 21 0 0 0 137 64" style="fill:none"/>
+      <text x="148" y="66" style="fill:#f5b971;font-size:8px">phi</text>
+      <text x="120" y="118" text-anchor="middle" style="fill:#4fd6c4;font-size:8px">A_i &#8736; phi</text>`; },
     anim: null,
   },
 
@@ -367,15 +368,15 @@ window.FLOW_SKETCHES = {
   diagnostics: {
     tip: "Post-hoc only, the relative margin between the runner-up score and L_K* flags ambiguous pixels, and the peak-to-floor contrast uses the lowest-quartile bins as its noise floor.",
     build(svg) { svg.innerHTML = `
-      <text x="30" y="26" style="fill:#c4a3ff;font-size:8px">m_rel</text>
-      <rect x="30" y="32" width="80" height="14" class="skl-pop f-faint" style="opacity:.3"/>
-      <rect x="30" y="32" width="46" height="14" class="skl-pop f-fin"/>
-      <line class="skl-axis" x1="128" y1="120" x2="214" y2="120"/>
-      <line class="skl-dash c-faint" x1="128" y1="104" x2="214" y2="104"/>
-      <text x="128" y="100" style="fill:#7e8aa0;font-size:7px">floor (Q1)</text>
-      <path class="skl-draw c-meas" d="M128 118 L156 50 L172 112 L200 116 L214 118" style="fill:none"/>
-      <line class="skl-draw c-cal" x1="156" y1="104" x2="156" y2="50" style="stroke-width:1.6"/>
-      <text x="160" y="74" style="fill:#4fd6c4;font-size:7px">C_dB</text>`; },
+      <text x="34" y="30" style="fill:#c4a3ff;font-size:8px">m_rel</text>
+      <rect x="34" y="36" width="92" height="12" rx="2" class="skl-pop f-faint" style="opacity:.3"/>
+      <rect x="34" y="36" width="52" height="12" rx="2" class="skl-pop f-fin"/>
+      <line class="skl-axis" x1="132" y1="120" x2="214" y2="120"/>
+      <line class="skl-dash c-faint" x1="132" y1="96" x2="214" y2="96"/>
+      <text x="214" y="92" text-anchor="end" style="fill:#7e8aa0;font-size:7px">floor (Q1)</text>
+      <path class="skl-draw c-cal" d="M134 120 C152 50, 180 50, 198 120" style="fill:rgba(79,214,196,0.10)"/>
+      <line class="skl-dash c-cal" x1="166" y1="96" x2="166" y2="62" style="stroke-width:1.4"/>
+      <text x="171" y="82" style="fill:#4fd6c4;font-size:7px">C_dB</text>`; },
     anim: null,
   },
 
@@ -472,16 +473,18 @@ window.FLOW_SKETCHES = {
   represent: {
     tip: "By default an SLC pass keeps its magnitude |p| and an interferogram keeps its phase angle, while magnitude-normalised channels divide by m = max(|p|, 1) to guard zero magnitude.",
     build(svg) { svg.innerHTML = `
-      <circle cx="62" cy="64" r="30" class="skl-axis" style="fill:none"/>
-      <line class="skl-axis" x1="32" y1="64" x2="92" y2="64"/>
-      <line class="skl-axis" x1="62" y1="34" x2="62" y2="94"/>
-      <line class="skl-draw c-meas" x1="62" y1="64" x2="86" y2="44" style="stroke-width:2"/>
-      <path class="skl-draw c-mid" d="M82 64 A20 20 0 0 0 77 50" style="fill:none"/>
-      <text x="62" y="108" text-anchor="middle" style="fill:#7e8aa0;font-size:7px">complex p</text>
-      <rect x="140" y="40" width="44" height="14" class="skl-pop f-cal"/>
-      <text x="190" y="51" style="fill:#4fd6c4;font-size:7px">|p|</text>
-      <rect x="140" y="62" width="30" height="14" class="skl-pop f-mid"/>
-      <text x="176" y="73" style="fill:#f5b971;font-size:7px">ang</text>`; },
+      <circle cx="64" cy="70" r="32" class="skl-axis" style="fill:none;opacity:.5"/>
+      <line class="skl-axis" x1="26" y1="70" x2="102" y2="70"/>
+      <line class="skl-axis" x1="64" y1="34" x2="64" y2="106"/>
+      <line class="skl-draw c-meas" x1="64" y1="70" x2="90" y2="52"/>
+      <circle cx="90" cy="52" r="3.2" class="skl-pop f-meas"/>
+      <path class="skl-dash c-mid" d="M82 70 A18 18 0 0 0 77 56" style="fill:none"/>
+      <text x="64" y="118" text-anchor="middle" style="fill:#7e8aa0;font-size:7px">complex p</text>
+      <text x="120" y="74" style="fill:#7e8aa0;font-size:13px">&#8594;</text>
+      <rect x="146" y="42" width="44" height="15" rx="2" class="skl-pop f-cal"/>
+      <text x="196" y="53" style="fill:#4fd6c4;font-size:7px">|p|</text>
+      <rect x="146" y="64" width="30" height="15" rx="2" class="skl-pop f-mid"/>
+      <text x="182" y="75" style="fill:#f5b971;font-size:7px">ang</text>`; },
     anim: null,
   },
 
@@ -685,18 +688,17 @@ window.FLOW_SKETCHES = {
   physgeom: {
     tip: "The vertical wavenumber kz scales the master-relative perpendicular baseline by the monostatic 4-pi-over-lambda-r0 factor to build the steering phasors.",
     build(svg) { svg.innerHTML = `
-      <line class="skl-axis" x1="40" y1="120" x2="40" y2="24"/>
-      <line class="skl-axis" x1="40" y1="120" x2="210" y2="120"/>
-      <circle cx="40" cy="40" r="3" class="skl-pop f-faint"/>
-      <line class="skl-dash c-mid" x1="40" y1="40" x2="120" y2="64"/>
-      <circle cx="120" cy="64" r="3" class="skl-pop f-meas"/>
-      <text x="78" y="46" style="fill:#f5b971;font-size:7px">b_perp</text>
-      <circle cx="166" cy="98" r="18" class="skl-axis" style="fill:none;opacity:.3"/>
-      <line class="skl-draw c-cal" x1="166" y1="98" x2="184" y2="98"/>
-      <line class="skl-draw c-cal" x1="166" y1="98" x2="178" y2="84"/>
-      <line class="skl-draw c-cal" x1="166" y1="98" x2="166" y2="80"/>
-      <line class="skl-draw c-cal" x1="166" y1="98" x2="154" y2="84"/>
-      <text x="150" y="128" style="fill:#4fd6c4;font-size:7px">exp(j kz xi)</text>`; },
+      <line class="skl-axis" x1="40" y1="120" x2="40" y2="28"/>
+      <line class="skl-axis" x1="40" y1="120" x2="120" y2="120"/>
+      <circle cx="40" cy="44" r="3" class="skl-pop f-faint"/>
+      <line class="skl-dash c-mid" x1="40" y1="44" x2="116" y2="70"/>
+      <circle cx="116" cy="70" r="3" class="skl-pop f-meas"/>
+      <text x="62" y="50" style="fill:#f5b971;font-size:7px">b_perp</text>
+      <text x="146" y="76" style="fill:#7e8aa0;font-size:12px">&#8594;</text>
+      <circle cx="190" cy="80" r="24" class="skl-axis" style="fill:none;opacity:.5"/>
+      <line class="skl-draw c-cal" x1="190" y1="80" x2="207" y2="63"/>
+      <circle cx="207" cy="63" r="3.2" class="skl-pop f-cal"/>
+      <text x="158" y="124" style="fill:#4fd6c4;font-size:7px">exp(j kz xi)</text>`; },
     anim: null,
   },
 
@@ -718,10 +720,10 @@ window.FLOW_SKETCHES = {
     build(svg) {
       const m = grid(3, (r, c) => { const x = 132 + c * 26, y = 36 + r * 26; const cl = r === c ? "sk-live skl-pop f-mid" : "skl-pop f-faint"; const op = r === c ? 1 : 0.3; return `<rect class="${cl}" x="${x}" y="${y}" width="22" height="22" rx="2" style="opacity:${op}"/>`; });
       svg.innerHTML = `
-        <circle cx="70" cy="62" r="26" class="skl-axis" style="fill:none;opacity:.4"/>
-        <line class="skl-draw c-cal" x1="70" y1="62" x2="92" y2="48"/>
-        <line class="skl-draw c-meas" x1="70" y1="62" x2="88" y2="44"/>
-        <text x="50" y="102" style="fill:#7e8aa0;font-size:7px">gamma_P vs T</text>
+        <line class="skl-axis" x1="34" y1="104" x2="110" y2="104"/>
+        <path class="skl-draw c-cal" d="M40 104 C56 56, 72 56, 90 104" style="fill:none"/>
+        <path class="skl-dash c-mid" d="M46 104 C62 70, 80 70, 100 104" style="fill:none"/>
+        <text x="38" y="44" style="fill:#7e8aa0;font-size:7px">gamma_P vs T</text>
         ${m}
         <text x="171" y="128" text-anchor="middle" style="fill:#f5b971;font-size:7px">R[P-T]</text>`;
     },
