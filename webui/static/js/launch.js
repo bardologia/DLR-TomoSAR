@@ -16,6 +16,7 @@ class LaunchView {
     ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
     ["embedding", /embedding/],
     ["probe", /^probe_/],
+    ["outputs", /^save_(cubes|plots|animations)$/],
     ["identifiers", /identifier|output_tag$|^dataset_type$/],
     ["data", /batch|worker|patch|stride|azimuth|dataset|^use_amp$|accumulation/],
     ["model", /model|gauss/],

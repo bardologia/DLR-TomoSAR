@@ -170,6 +170,7 @@ class ConfigFactory:
             stitch_window      = inference.stitch_window,
             save_cubes         = inference.save_cubes,
             save_plots         = inference.save_plots,
+            save_animations    = inference.save_animations,
             n_best_profiles    = inference.n_best_profiles,
             n_worst_profiles   = inference.n_worst_profiles,
             n_random_profiles  = inference.n_random_profiles,

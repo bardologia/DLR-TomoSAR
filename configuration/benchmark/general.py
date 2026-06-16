@@ -76,9 +76,10 @@ class InferenceQueueConfig:
     num_workers     : int        = 4
     cpu_workers     : int        = 16
 
-    save_plots    : bool = False
-    save_cubes    : bool = False
-    stitch_window : str  = "hann"
+    save_plots      : bool = False
+    save_animations : bool = False
+    save_cubes      : bool = False
+    stitch_window   : str  = "hann"
 
     n_best_profiles   : int = 12
     n_worst_profiles  : int = 12

@@ -198,18 +198,25 @@ class InferencePipeline:
 
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
 
-        if cfg.save_plots:
+        figure_paths = {}
+        gif_paths    = {}
+
+        if cfg.save_plots or cfg.save_animations:
             composer = FigureComposer(plotter=plotter, meta=meta, logger=logger, cfg=cfg)
 
-            logger.section("[Inference: Plots]")
-            figure_paths = self._compose_figures(composer, result, run, global_metrics, x_axis_np, indices)
+            if cfg.save_plots:
+                logger.section("[Inference: Plots]")
+                figure_paths = self._compose_figures(composer, result, run, global_metrics, x_axis_np, indices)
+            else:
+                logger.section("[Inference: Plots skipped]")
 
-            logger.section("[Inference: Animations]")
-            gif_paths = composer.animate(result, run, x_axis_np)
+            if cfg.save_animations:
+                logger.section("[Inference: Animations]")
+                gif_paths = composer.animate(result, run, x_axis_np)
+            else:
+                logger.section("[Inference: Animations skipped]")
         else:
             logger.section("[Inference: Plots and animations skipped]")
-            figure_paths = {}
-            gif_paths    = {}
 
         logger.section("[Inference: Report]")
         report_path = self._build_report(
