@@ -175,6 +175,7 @@ class SegFormerLite(nn.Module):
             fused.append(features)
 
         x = self.fuse(torch.cat(fused, dim=1))
+        x = self.output_head(x)
         x = functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
 
-        return self.output_head(x)
+        return x
