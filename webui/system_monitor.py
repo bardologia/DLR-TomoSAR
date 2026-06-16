@@ -169,13 +169,13 @@ class SystemMonitor:
             grouped.setdefault(cells[2], []).append({
                 "pid"   : pid,
                 "mem"   : mem,
-                "owner" : self._pid_owner(pid),
+                "owner" : self.pid_owner(pid),
                 "cmd"   : self._pid_cmd(pid),
             })
 
         return grouped
 
-    def _pid_owner(self, pid: int) -> str | None:
+    def pid_owner(self, pid: int) -> str | None:
         try:
             uid   = os.stat(f"/proc/{pid}").st_uid
             stat  = open(f"/proc/{pid}/stat").read()

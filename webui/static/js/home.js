@@ -337,33 +337,55 @@ class StatusBoard {
 
     if (typeof guard.count === "number") {
       if (this._guardCount == null) this._guardCount = guard.count;
-      else if (guard.count > this._guardCount) { this._guardCount = guard.count; this._alarm(); }
+      else if (guard.count > this._guardCount) { this._guardCount = guard.count; this._alarm(false); }
+    }
+    if (typeof guard.critical === "number") {
+      if (this._critCount == null) this._critCount = guard.critical;
+      else if (guard.critical > this._critCount) { this._critCount = guard.critical; this._alarm(true); }
     }
 
     const active = guard.active || [];
-    const events = (guard.events || []).slice(-4).reverse();
+    const gpus = guard.gpus || [];
+    const events = (guard.events || []).slice(-5).reverse();
+    const crit = active.filter((a) => a.status === "critical").length;
 
     if (!active.length && !events.length) {
       box.hidden = true;
       box.innerHTML = "";
-      box.classList.remove("is-firing");
+      box.classList.remove("is-firing", "is-critical");
       return;
     }
 
-    const chips = active.map((a) =>
-      `<span class="alert alert--danger">gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> invaded by <b>${this._esc(a.user)}</b> &middot; pid ${a.pid} &middot; ${Math.round(a.mem_mib)} MiB &middot; clashing with your pids ${this._esc((a.mine_pids || []).join(", "))}</span>`
-    ).join("");
-    const log = events.map((e) =>
-      `<span class="alert alert--event"><b>${this._esc((e.since || "").replace("T", " "))}</b> ${this._esc(e.user)} on gpu ${e.gpu_index} (pid ${e.pid})</span>`
-    ).join("");
+    const context = gpus.length
+      ? `<div class="gpuctx">` + gpus.map((g) => {
+          const who = g.free ? "free" : (g.holders || []).map((h) => this._esc(h.user)).join(", ");
+          const kind = g.free ? "is-free" : g.others ? (g.mine ? "is-clash" : "is-others") : "is-mine";
+          return `<span class="gpuctx__cell ${kind}" title="gpu ${g.index} &middot; ${Math.round(g.util || 0)}% util">gpu ${g.index} &middot; ${who}</span>`;
+        }).join("") + `</div>`
+      : "";
+
+    const chips = active.map((a) => {
+      if (a.status === "critical") {
+        return `<span class="alert alert--critical">&#9760; CRITICAL &middot; your pid(s) <b>${this._esc((a.dead_pids || a.mine_pids || []).join(", "))}</b> on gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> DIED after <b>${this._esc(a.user)}</b> (pid ${a.pid}) invaded it</span>`;
+      }
+      return `<span class="alert alert--danger">gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> invaded by <b>${this._esc(a.user)}</b> &middot; pid ${a.pid} &middot; ${Math.round(a.mem_mib)} MiB &middot; clashing with your pids ${this._esc((a.mine_pids || []).join(", "))}</span>`;
+    }).join("");
+
+    const log = events.map((e) => {
+      const stamp = (e.critical_at || e.since || "").replace("T", " ");
+      const tag = e.status === "critical" ? `<b class="alert__crit">process killed &middot;</b> ` : "";
+      return `<span class="alert alert--event"><b>${this._esc(stamp)}</b> ${tag}${this._esc(e.user)} on gpu ${e.gpu_index} (pid ${e.pid})</span>`;
+    }).join("");
 
     box.hidden = false;
     box.classList.toggle("is-firing", active.length > 0);
-    box.innerHTML = `<header class="sboard__cap"><span>&#9888; gpu intrusion alarm</span><span class="sboard__n">${active.length} active</span></header><div class="alert__list">${chips}${log}</div>`;
+    box.classList.toggle("is-critical", crit > 0);
+    const cap = crit ? `${crit} critical &middot; ${active.length} active` : `${active.length} active`;
+    box.innerHTML = `<header class="sboard__cap"><span>&#9888; gpu intrusion alarm</span><span class="sboard__n">${cap}</span></header>${context}<div class="alert__list">${chips}${log}</div>`;
   }
 
-  _alarm() {
-    window.toast && window.toast("GPU intrusion: another user is on a GPU you are using", "error");
+  _alarm(critical) {
+    window.toast && window.toast(critical ? "CRITICAL: your process died after a GPU intrusion" : "GPU intrusion: another user is on a GPU you are using", "error");
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -371,18 +393,20 @@ class StatusBoard {
       const ctx = this._actx;
       if (ctx.state === "suspended") ctx.resume();
       const t0 = ctx.currentTime;
-      [0, 0.2, 0.4].forEach((dt) => {
+      const beeps = critical ? [0, 0.16, 0.32, 0.48, 0.64] : [0, 0.2, 0.4];
+      const freq = critical ? 1320 : 880;
+      beeps.forEach((dt) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "square";
-        osc.frequency.setValueAtTime(880, t0 + dt);
+        osc.frequency.setValueAtTime(freq, t0 + dt);
         gain.gain.setValueAtTime(0.0001, t0 + dt);
-        gain.gain.exponentialRampToValueAtTime(0.22, t0 + dt + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.16);
+        gain.gain.exponentialRampToValueAtTime(0.25, t0 + dt + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.13);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(t0 + dt);
-        osc.stop(t0 + dt + 0.18);
+        osc.stop(t0 + dt + 0.15);
       });
     } catch (e) {}
   }
