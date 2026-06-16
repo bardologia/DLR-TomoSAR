@@ -153,6 +153,9 @@ class App {
 
     this.tensorboardView = new window.TensorboardView();
 
+    this.feedTuner = new window.FeedTuner();
+    window.feedTuner = this.feedTuner;
+
     this.resultsView = new window.ResultsView(
       document.getElementById("results-list"),
       document.getElementById("results-detail")
@@ -249,6 +252,7 @@ class App {
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
     if (route === "results") this.resultsView.enter();
+    if (route === "feedtuner") this.feedTuner.enter();
     if (route === "cube") this.tomogramView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);

@@ -73,6 +73,12 @@ class ScriptCatalog:
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
             "essentials": ["run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run"],
         },
+        "tune_dataloader": {
+            "title"     : "Feed Tuner",
+            "category"  : "Experiments",
+            "purpose"   : "Sweep DataLoader settings (batch size, workers, prefetch, pin-memory) per training mode and recommend the configuration that keeps the GPU fed, ending data starvation.",
+            "essentials": ["mode", "gpu", "batch_sizes", "worker_counts", "prefetch_factors", "timed_batches", "paths.dataset_path", "paths.parameters_path"],
+        },
     }
 
     ORDER = [
@@ -86,6 +92,7 @@ class ScriptCatalog:
         "benchmark",
         "cross_validate",
         "tune",
+        "tune_dataloader",
         "physics_check",
     ]
 
