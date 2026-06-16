@@ -126,6 +126,7 @@ class GpuFeedBenchmark:
         dataset        : Dataset,
         model          : nn.Module,
         to_model_input : Callable[[object, torch.device], torch.Tensor],
+        forward_loss   : Callable[[nn.Module, torch.Tensor], torch.Tensor],
         device         : torch.device,
         use_amp        : bool          = False,
         seed           : int           = 0,
@@ -137,6 +138,7 @@ class GpuFeedBenchmark:
         self.dataset        = dataset
         self.model          = model.to(device)
         self.to_model_input = to_model_input
+        self.forward_loss   = forward_loss
         self.device         = device
         self.use_amp        = bool(use_amp)
         self.seed           = int(seed)
@@ -147,7 +149,6 @@ class GpuFeedBenchmark:
         if cpu_threads is not None:
             torch.set_num_threads(max(1, int(cpu_threads)))
 
-        self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4)
 
     @staticmethod
@@ -209,8 +210,7 @@ class GpuFeedBenchmark:
         self.optimizer.zero_grad(set_to_none=True)
 
         with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
-            reconstruction, _ = self.model.reconstruct(model_input)
-            loss              = self.criterion(reconstruction, model_input)
+            loss = self.forward_loss(self.model, model_input)
 
         loss.backward()
         self.optimizer.step()

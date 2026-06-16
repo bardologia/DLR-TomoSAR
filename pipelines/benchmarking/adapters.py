@@ -6,17 +6,19 @@ from typing      import Callable
 
 import numpy as np
 import torch
+import torch.nn.functional as functional
 from torch.utils.data import Dataset
 
 from tools.data.gaussians import GaussianMixture
 
 
-FEED_MODES = ("synthetic", "profile_autoencoder", "image_autoencoder")
+FEED_MODES = ("synthetic", "profile_autoencoder", "image_autoencoder", "backbone")
 
 DEFAULT_MODEL = {
     "synthetic"           : "mlp_ae",
     "profile_autoencoder" : "mlp_ae",
     "image_autoencoder"   : "conv2d_ae",
+    "backbone"            : "resunet",
 }
 
 
@@ -25,10 +27,23 @@ class FeedTarget:
     dataset        : Dataset
     model          : torch.nn.Module
     to_model_input : Callable[[object, torch.device], torch.Tensor]
+    forward_loss   : Callable[[torch.nn.Module, torch.Tensor], torch.Tensor]
     model_name     : str
     sample_text    : str
     item_source    : str
     config_hint    : str
+
+
+class FeedLosses:
+    @staticmethod
+    def reconstruction(model: torch.nn.Module, model_input: torch.Tensor) -> torch.Tensor:
+        reconstruction, _ = model.reconstruct(model_input)
+        return functional.mse_loss(reconstruction, model_input)
+
+    @staticmethod
+    def supervised(model: torch.nn.Module, model_input: torch.Tensor) -> torch.Tensor:
+        prediction = model(model_input)
+        return functional.mse_loss(prediction, torch.zeros_like(prediction))
 
 
 class SyntheticCurveDataset(Dataset):
@@ -101,6 +116,7 @@ class ProfileFeedAdapter:
             dataset        = dataset,
             model          = model,
             to_model_input = self.to_model_input,
+            forward_loss   = FeedLosses.reconstruction,
             model_name     = self.model_name,
             sample_text    = f"profile curves, length {profile_length}, {len(dataset):,} samples",
             item_source    = "ProfileDataset.__getitem__ (per-profile GaussianMixture.evaluate_batch synthesis)",
@@ -164,6 +180,7 @@ class ImageFeedAdapter:
             dataset        = dataset,
             model          = model,
             to_model_input = self.to_model_input,
+            forward_loss   = FeedLosses.reconstruction,
             model_name     = self.model_name,
             sample_text    = f"patches {tuple(sample.shape)}, {len(dataset):,} samples, {input_channels} channels",
             item_source    = "PatchDataset.__getitem__ (patch extraction + complex->representation conversion)",
@@ -191,6 +208,7 @@ class SyntheticFeedAdapter:
             dataset        = dataset,
             model          = model,
             to_model_input = self.to_model_input,
+            forward_loss   = FeedLosses.reconstruction,
             model_name     = self.model_name,
             sample_text    = f"synthetic curves, length {self.config.synthetic_length}, {len(dataset):,} samples",
             item_source    = "SyntheticCurveDataset.__getitem__ (in-process Gaussian synthesis)",
@@ -198,10 +216,79 @@ class SyntheticFeedAdapter:
         )
 
 
+class BackboneFeedAdapter:
+    def __init__(self, config, work_dir: Path, logger) -> None:
+        self.config     = config
+        self.work_dir   = Path(work_dir)
+        self.logger     = logger
+        self.model_name = config.model_name or DEFAULT_MODEL["backbone"]
+
+    @staticmethod
+    def to_model_input(batch, device: torch.device) -> torch.Tensor:
+        return batch[0].to(device, non_blocking=True)
+
+    def _config_factory(self):
+        from configuration.training          import BackboneEntryConfig
+        from pipelines.shared.config_factory import ConfigFactory
+
+        entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed, n_gaussians=self.config.n_gaussians)
+        entry.paths = self.config.paths
+
+        return ConfigFactory(entry)
+
+    def _dataset(self, factory):
+        from pipelines.backbone.dataset.pipeline import DatasetPipeline
+
+        dataset_config = factory.training_dataset_config()
+        gaussian_cfg   = factory.training_trainer_config(logdir=self.work_dir).gaussian
+
+        dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
+
+        dataset_pipeline = DatasetPipeline(dataset_config, self.work_dir, logger=self.logger, seed=self.config.seed)
+        profile_length   = dataset_pipeline.profile_length
+
+        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
+
+        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
+
+        return datasets["train"], dataset_config, gaussian_cfg
+
+    def _model(self, dataset, dataset_config, gaussian_cfg):
+        from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+
+        in_channels  = dataset.input_channels
+        out_channels = gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians
+
+        overrides = {"in_channels": in_channels, "out_channels": out_channels}
+        if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:
+            overrides["image_size"] = dataset_config.patch.size[0]
+
+        model, _ = get_backbone(self.model_name, config=BACKBONE_CONFIG_REGISTRY[self.model_name](), **overrides)
+        return model, in_channels
+
+    def build(self) -> FeedTarget:
+        dataset, dataset_config, gaussian_cfg = self._dataset(self._config_factory())
+        model, input_channels                 = self._model(dataset, dataset_config, gaussian_cfg)
+
+        sample = np.asarray(dataset[0][0])
+
+        return FeedTarget(
+            dataset        = dataset,
+            model          = model,
+            to_model_input = self.to_model_input,
+            forward_loss   = FeedLosses.supervised,
+            model_name     = self.model_name,
+            sample_text    = f"patches {tuple(sample.shape)}, {len(dataset):,} samples, {input_channels} channels",
+            item_source    = "PatchDataset.__getitem__ (patch extraction + complex->representation conversion)",
+            config_hint    = "configuration/dataset/general/dataset.py DatasetConfig",
+        )
+
+
 FEED_ADAPTERS = {
     "synthetic"           : SyntheticFeedAdapter,
     "profile_autoencoder" : ProfileFeedAdapter,
     "image_autoencoder"   : ImageFeedAdapter,
+    "backbone"            : BackboneFeedAdapter,
 }
 
 

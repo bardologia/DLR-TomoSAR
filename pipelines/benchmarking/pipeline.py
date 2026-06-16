@@ -47,6 +47,7 @@ class DataLoaderTuningPipeline:
             dataset        = target.dataset,
             model          = target.model,
             to_model_input = target.to_model_input,
+            forward_loss   = target.forward_loss,
             device         = device,
             use_amp        = self.config.use_amp,
             seed           = self.config.seed,
