@@ -11,8 +11,15 @@ from .autoencoder import (
     get_autoencoder,
 )
 
+def config_registry(training_type: str) -> dict:
+    if training_type == "autoencoder":
+        return AE_CONFIG_REGISTRY
+    return CONFIG_REGISTRY
+
+
 __all__ = [
     "CONFIG_REGISTRY",
+    "config_registry",
     "MODEL_REGISTRY",
     "IMAGE_SIZE_MODELS",
     "get_model",

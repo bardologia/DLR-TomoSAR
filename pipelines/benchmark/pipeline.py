@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib  import Path
 
 from configuration.experiments.benchmark_config import BenchmarkConfig
-from models                                     import CONFIG_REGISTRY
+from models                                     import config_registry
 from tools.data.io                              import FileIO
 from tools.runtime.config_cli                   import ConfigCli
 from tools.monitoring.logger                    import Logger
@@ -30,10 +30,7 @@ class BenchmarkPipeline:
         self.state  = {"run_tag": self.run_tag, "stages": {}}
 
     def _registry(self) -> dict:
-        if self.config.training_type == "autoencoder":
-            from models.autoencoder import AE_CONFIG_REGISTRY
-            return AE_CONFIG_REGISTRY
-        return CONFIG_REGISTRY
+        return config_registry(self.config.training_type)
 
     def _run_overfit_gate(self) -> bool:
         stage   = OverfitStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)

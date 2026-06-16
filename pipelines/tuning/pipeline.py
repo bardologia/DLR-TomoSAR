@@ -16,7 +16,7 @@ from configuration.training.optimization_config import EarlyStoppingConfig, Grad
 from configuration.training.runtime_config      import IOConfig, TrainingLoopConfig
 from configuration.training.training_config     import TrainerConfig
 from configuration.experiments.tuning_config    import TuningConfig
-from models                                     import CONFIG_REGISTRY
+from models                                     import config_registry, CONFIG_REGISTRY
 from tools                                      import FileIO
 from tools                                      import GpuJob
 from tools                                      import GpuQueue
@@ -57,10 +57,7 @@ class TuningOrchestrator:
         return f"{model_name}_{self.tag}"
 
     def _registry(self) -> dict:
-        if self.config.training_type == "autoencoder":
-            from models.autoencoder import AE_CONFIG_REGISTRY
-            return AE_CONFIG_REGISTRY
-        return CONFIG_REGISTRY
+        return config_registry(self.config.training_type)
 
     def _search_space(self, model_name: str) -> dict:
         config_cls = self._registry()[model_name]
