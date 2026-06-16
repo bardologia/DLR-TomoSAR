@@ -30,9 +30,10 @@ class FtChart {
     this.h = height;
   }
 
-  _frame(yMax, xLabels) {
+  _frame(yMax, xLabels, rotateX) {
     const ctx = this.ctx;
-    const { l, r, t, b } = this.pad;
+    const { l, r, t } = this.pad;
+    const b = rotateX ? 60 : this.pad.b;
     const plotW = this.w - l - r;
     const plotH = this.h - t - b;
 
@@ -50,13 +51,25 @@ class FtChart {
       ctx.lineTo(l + plotW, y);
       ctx.stroke();
       ctx.textAlign = "right";
+      ctx.textBaseline = "alphabetic";
       ctx.fillText(this._fmt(yMax * (1 - i / rows)), l - 8, y + 3);
     }
 
-    ctx.textAlign = "center";
     xLabels.forEach((label, i) => {
       const x = xLabels.length === 1 ? l + plotW / 2 : l + (plotW * i) / (xLabels.length - 1);
-      ctx.fillText(label, x, t + plotH + 18);
+      if (rotateX) {
+        ctx.save();
+        ctx.translate(x, t + plotH + 8);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      } else {
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText(label, x, t + plotH + 18);
+      }
     });
 
     return { l, t, plotW, plotH };
@@ -143,7 +156,7 @@ class FtChart {
 
     const ordered = main.slice().sort((a, b) => a.batch_size - b.batch_size || a.num_workers - b.num_workers);
     const labels = ordered.map((row) => `${row.batch_size}/${row.num_workers}`);
-    const geo = this._frame(100, labels);
+    const geo = this._frame(100, labels, true);
     const ctx = this.ctx;
 
     const yAt = (value) => geo.t + geo.plotH * (1 - value / 100);
