@@ -222,7 +222,37 @@ class FeedTuner {
 
   enter() {
     if (!this.ready) this._wire();
+    this._loadGpus();
     requestAnimationFrame(() => this._draw());
+  }
+
+  async _loadGpus() {
+    const select = this.inputs.gpu;
+    const previous = select.value;
+
+    let gpus = [];
+    try {
+      const sys = await window.apiGet("/api/system");
+      gpus = (sys && sys.gpus) || [];
+    } catch (e) {
+      gpus = [];
+    }
+
+    if (!gpus.length) {
+      select.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<option value="${i}">GPU ${i}</option>`).join("");
+    } else {
+      select.innerHTML = gpus
+        .map((gpu) => {
+          const index = gpu.index != null ? gpu.index : 0;
+          const free = gpu.mem_total != null && gpu.mem_used != null ? Math.max(0, gpu.mem_total - gpu.mem_used) : null;
+          const mem = free != null ? ` · ${free.toLocaleString()} MB free` : "";
+          const tag = gpu.others ? " · in use" : gpu.mine ? " · yours" : "";
+          return `<option value="${index}">GPU ${index} · ${gpu.name || "GPU"}${mem}${tag}</option>`;
+        })
+        .join("");
+    }
+
+    if ([...select.options].some((option) => option.value === previous)) select.value = previous;
   }
 
   _wire() {

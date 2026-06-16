@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260616k" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260616l" />
 </head>
 <body>
 
@@ -370,7 +370,9 @@
         <div class="ft-grid2">
           <label class="ft-field">
             <span class="ft-field__label">GPU</span>
-            <input class="ft-input" id="ft-gpu" type="number" min="0" step="1" value="0" />
+            <select class="ft-input ft-select" id="ft-gpu" aria-label="GPU device">
+              <option value="0">GPU 0</option>
+            </select>
           </label>
           <label class="ft-field">
             <span class="ft-field__label">Model</span>
@@ -567,7 +569,7 @@
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/feed_tuner.js?v=20260616a"></script>
+<script src="/static/js/feed_tuner.js?v=20260616b"></script>
 <script src="/static/js/app.js?v=20260616b"></script>
 </body>
 </html>
