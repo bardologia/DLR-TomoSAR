@@ -9,6 +9,7 @@ import torch
 
 from tools.data.gaussians    import GaussianMixture
 from tools.data.io           import FileIO
+from tools.data.sampling     import Sampler
 from tools.data.transforms   import Log1pTransform
 from tools.monitoring.logger import Logger
 
@@ -52,16 +53,7 @@ class ProfileStats:
 class ProfileStatsComputer:
     @staticmethod
     def _sample_indices(dataset, max_samples: int) -> np.ndarray:
-        n_total = len(dataset)
-        n_use   = min(n_total, max_samples) if max_samples > 0 else n_total
-
-        if n_use < n_total:
-            rng     = np.random.default_rng(42)
-            indices = rng.choice(n_total, size=n_use, replace=False)
-            indices.sort()
-            return indices
-
-        return np.arange(n_total, dtype=np.int64)
+        return Sampler.deterministic_indices(len(dataset), max_samples)
 
     @staticmethod
     def _evaluate_curves(dataset, indices: np.ndarray) -> np.ndarray:

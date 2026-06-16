@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Subset
 from configuration.data.norm_config    import ChannelStats, ChannelStrategy, NormMethod
 from configuration.data.dataset_config import InputConfig, OutputConfig
 from tools.data.io                     import FileIO
+from tools.data.sampling               import Sampler
 from tools.data.transforms             import Log1pTransform
 from tools.monitoring.logger           import Logger
 from tools.reporting.ranges            import RangeFormatter
@@ -89,15 +90,10 @@ class StatsComputer:
     @staticmethod
     def _get_subset(dataset, max_samples : int) -> tuple:
         n_total = len(dataset)
-        n_use   = min(n_total, max_samples) if max_samples > 0 else n_total
+        indices = Sampler.deterministic_indices(n_total, max_samples)
+        n_use   = len(indices)
 
-        if n_use < n_total:
-            rng     = np.random.default_rng(42)
-            indices = rng.choice(n_total, size=n_use, replace=False)
-            indices.sort()
-            subset  = Subset(dataset, indices.tolist())
-        else:
-            subset  = dataset
+        subset = Subset(dataset, indices.tolist()) if n_use < n_total else dataset
 
         return subset, n_use, n_total
 
