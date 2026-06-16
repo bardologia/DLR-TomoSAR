@@ -81,16 +81,17 @@ class ProfileDatasetPipeline:
         test_ds = self._build_dataset("test", x_axis, normalizer=normalizer)
 
         train_loader, val_loader, test_loader = Loader.build(
-            train_dataset = train_ds,
-            val_dataset   = val_ds,
-            test_dataset  = test_ds,
-            batch_size    = self.config.batch_size,
-            num_workers   = self.config.num_workers,
-            pin_memory    = self.config.pin_memory,
-            shuffle_train = self.config.shuffle_train,
-            seed          = self.seed,
-            logger        = self.logger,
-            section_label = "[Profile Loaders]",
+            train_dataset   = train_ds,
+            val_dataset     = val_ds,
+            test_dataset    = test_ds,
+            batch_size      = self.config.batch_size,
+            num_workers     = self.config.num_workers,
+            prefetch_factor = self.config.prefetch_factor,
+            pin_memory      = self.config.pin_memory,
+            shuffle_train   = self.config.shuffle_train,
+            seed            = self.seed,
+            logger          = self.logger,
+            section_label   = "[Profile Loaders]",
         )
 
         datasets = {"train": train_ds, "val": val_ds, "test": test_ds}

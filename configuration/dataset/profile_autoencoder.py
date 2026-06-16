@@ -32,10 +32,11 @@ class ProfileDatasetConfig:
     keep_empty_frac : float = 0.05
     amp_zero_thr    : float = 1e-3
 
-    batch_size    : int  = 256
-    num_workers   : int  = 8
-    pin_memory    : bool = True
-    shuffle_train : bool = True
+    batch_size      : int  = 1024
+    num_workers     : int  = 32
+    prefetch_factor : int  = 2
+    pin_memory      : bool = True
+    shuffle_train   : bool = True
 
     stats_max_samples           : int   = 100_000
 

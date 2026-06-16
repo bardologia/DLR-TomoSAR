@@ -57,6 +57,7 @@ class TrainingPipeline:
             keep_empty_frac             = self.entry.keep_empty_frac,
             batch_size                  = ds.batch_size,
             num_workers                 = ds.num_workers,
+            prefetch_factor             = ds.prefetch_factor,
             pin_memory                  = ds.pin_memory,
             shuffle_train               = ds.shuffle_train,
             augmentation                = self.entry.profile_augmentation,
