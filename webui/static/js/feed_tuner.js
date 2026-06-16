@@ -12,10 +12,11 @@ const FT_AXIS = "#7d858b";
 const FT_CUSTOM = "__custom__";
 
 class FtChart {
-  constructor(canvas) {
+  constructor(canvas, legendEl) {
     this.canvas = canvas;
+    this.legendEl = legendEl;
     this.ctx = canvas.getContext("2d");
-    this.pad = { l: 54, r: 16, t: 16, b: 34 };
+    this.pad = { l: 50, r: 14, t: 14, b: 32 };
   }
 
   _resize() {
@@ -29,7 +30,7 @@ class FtChart {
     this.h = height;
   }
 
-  _frame(yMax, yLabel, xLabels) {
+  _frame(yMax, xLabels) {
     const ctx = this.ctx;
     const { l, r, t, b } = this.pad;
     const plotW = this.w - l - r;
@@ -58,14 +59,6 @@ class FtChart {
       ctx.fillText(label, x, t + plotH + 18);
     });
 
-    ctx.save();
-    ctx.translate(13, t + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#3f474c";
-    ctx.fillText(yLabel, 0, 0);
-    ctx.restore();
-
     return { l, t, plotW, plotH };
   }
 
@@ -82,6 +75,14 @@ class FtChart {
     this.ctx.font = '12px "JetBrains Mono", monospace';
     this.ctx.textAlign = "center";
     this.ctx.fillText(message, this.w / 2, this.h / 2);
+    this._renderLegend([]);
+  }
+
+  _renderLegend(items) {
+    if (!this.legendEl) return;
+    this.legendEl.innerHTML = items
+      .map((item) => `<span class="ft-legend__item"><i style="background:${item.color}"></i>${item.label}</span>`)
+      .join("");
   }
 
   throughput(rows) {
@@ -96,7 +97,7 @@ class FtChart {
     const workers = [...new Set(main.map((row) => row.num_workers))].sort((a, b) => a - b);
     const yMax = Math.max(...main.map((row) => row.end_to_end_samples_per_s)) * 1.1 || 1;
 
-    const geo = this._frame(yMax, "samples / s", batches.map(String));
+    const geo = this._frame(yMax, batches.map(String));
     const ctx = this.ctx;
 
     const xAt = (batch) => {
@@ -129,7 +130,7 @@ class FtChart {
       });
     });
 
-    this._legend(workers.map((worker, wi) => ({ label: `${worker}w`, color: FT_WORKER_COLORS[wi % FT_WORKER_COLORS.length] })), geo);
+    this._renderLegend(workers.map((worker, wi) => ({ label: `${worker} workers`, color: FT_WORKER_COLORS[wi % FT_WORKER_COLORS.length] })));
   }
 
   utilization(rows) {
@@ -142,7 +143,7 @@ class FtChart {
 
     const ordered = main.slice().sort((a, b) => a.batch_size - b.batch_size || a.num_workers - b.num_workers);
     const labels = ordered.map((row) => `${row.batch_size}/${row.num_workers}`);
-    const geo = this._frame(100, "percent", labels);
+    const geo = this._frame(100, labels);
     const ctx = this.ctx;
 
     const yAt = (value) => geo.t + geo.plotH * (1 - value / 100);
@@ -177,25 +178,10 @@ class FtChart {
       ctx.fill();
     });
 
-    this._legend([
-      { label: "GPU util", color: "#0f766e" },
+    this._renderLegend([
+      { label: "GPU utilization", color: "#0f766e" },
       { label: "data wait", color: "#b45309" },
-    ], geo);
-  }
-
-  _legend(items, geo) {
-    const ctx = this.ctx;
-    ctx.font = '10px "JetBrains Mono", monospace';
-    ctx.textAlign = "left";
-    let x = geo.l + 4;
-    const y = geo.t + 6;
-    items.forEach((item) => {
-      ctx.fillStyle = item.color;
-      ctx.fillRect(x, y - 6, 9, 3);
-      ctx.fillStyle = "#3f474c";
-      ctx.fillText(item.label, x + 13, y);
-      x += 22 + ctx.measureText(item.label).width;
-    });
+    ]);
   }
 }
 
@@ -306,8 +292,8 @@ class FeedTuner {
     this.tableBody = document.getElementById("ft-table-body");
     this.log = document.getElementById("ft-log");
 
-    this.throughputChart = new FtChart(document.getElementById("ft-chart-throughput"));
-    this.utilChart = new FtChart(document.getElementById("ft-chart-util"));
+    this.throughputChart = new FtChart(document.getElementById("ft-chart-throughput"), document.getElementById("ft-legend-throughput"));
+    this.utilChart = new FtChart(document.getElementById("ft-chart-util"), document.getElementById("ft-legend-util"));
     this.gauges = {
       util: new FtGauge(document.getElementById("ft-dial-util"), () => "#0f766e"),
       eff: new FtGauge(document.getElementById("ft-dial-eff"), () => "#1d4fd8"),

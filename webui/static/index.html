@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260616m" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260616n" />
 </head>
 <body>
 
@@ -447,11 +447,13 @@
 
         <div class="ft-charts">
           <figure class="ft-chart">
-            <figcaption class="ft-chart__cap">Throughput vs batch size <span>line per worker count</span></figcaption>
+            <figcaption class="ft-chart__cap">Throughput vs batch size <span>samples / s</span></figcaption>
+            <div class="ft-chart__legend" id="ft-legend-throughput"></div>
             <div class="ft-chart__media"><canvas id="ft-chart-throughput"></canvas></div>
           </figure>
           <figure class="ft-chart">
-            <figcaption class="ft-chart__cap">GPU utilization &amp; data wait <span>per swept configuration</span></figcaption>
+            <figcaption class="ft-chart__cap">GPU utilization &amp; data wait <span>percent</span></figcaption>
+            <div class="ft-chart__legend" id="ft-legend-util"></div>
             <div class="ft-chart__media"><canvas id="ft-chart-util"></canvas></div>
           </figure>
         </div>
@@ -581,7 +583,7 @@
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/feed_tuner.js?v=20260616c"></script>
+<script src="/static/js/feed_tuner.js?v=20260616d"></script>
 <script src="/static/js/app.js?v=20260616b"></script>
 </body>
 </html>

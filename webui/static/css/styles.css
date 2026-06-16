@@ -2631,3 +2631,8 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .ft-log:empty { display: none; }
 
 @media (max-width: 1100px) { .ft { grid-template-columns: 1fr; } .ft-charts { grid-template-columns: 1fr; } }
+
+.ft-chart__legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
+.ft-chart__legend:empty { display: none; }
+.ft-legend__item { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--ink-dim); }
+.ft-legend__item i { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
