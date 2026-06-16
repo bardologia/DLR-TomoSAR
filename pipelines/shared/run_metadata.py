@@ -10,7 +10,7 @@ from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  #
 from torch.utils.tensorboard                      import SummaryWriter
 
 from configuration.training.training_config import TrainerConfig
-from tools.data.io                          import FileIO, ModelConfigIO
+from tools.data.io                          import FileIO, BackboneModelConfigIO
 from tools.monitoring.logger                import Logger
 
 
@@ -70,7 +70,7 @@ class TrainingRunMetadata:
         return out_path
 
     def save_model_config(self, model_config, model_name: str) -> Path:
-        out_path = ModelConfigIO.save(model_config, model_name, self.metadata_directory)
+        out_path = BackboneModelConfigIO.save(model_config, model_name, self.metadata_directory)
         self.logger.info(f"Model config saved: {out_path}")
 
         return out_path

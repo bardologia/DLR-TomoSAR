@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260616h" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260616i" />
 </head>
 <body>
 
@@ -97,9 +97,14 @@
     <div class="page__head">
       <h2 class="page__title">Architectures</h2>
       <p class="page__lead">
-        Ten interchangeable backbones, all mapping an input patch to per-pixel Gaussian
-        parameters. Pick one to see its topology.
+        Three model zoos: the supervised backbones, the profile autoencoders, and the image
+        autoencoder. Pick a zoo, then a model to see its design.
       </p>
+      <div class="model-zoo" id="model-zoo">
+        <button class="model-zoo__btn is-active" data-zoo="backbone" data-endpoint="/api/backbones">Backbone</button>
+        <button class="model-zoo__btn" data-zoo="autoencoder" data-endpoint="/api/profile-autoencoders">Profile AE</button>
+        <button class="model-zoo__btn" data-zoo="image_autoencoder" data-endpoint="/api/image-autoencoders">Image AE</button>
+      </div>
     </div>
     <div class="master master--stack">
       <aside class="master__list" id="model-list" aria-label="Model list"></aside>
@@ -426,16 +431,16 @@
 <script src="/static/js/flow_sketches.js?v=20260623d"></script>
 <script src="/static/js/flow_view.js?v=20260623c"></script>
 <script src="/static/js/pipelines.js?v=20260606r"></script>
-<script src="/static/js/models.js?v=20260617a"></script>
+<script src="/static/js/models.js?v=20260616a"></script>
 <script src="/static/js/configs.js?v=20260606r"></script>
 <script src="/static/js/scripts.js?v=20260606r"></script>
-<script src="/static/js/launch_widgets.js?v=20260609q"></script>
+<script src="/static/js/launch_widgets.js?v=20260616a"></script>
 <script src="/static/js/launch_pickers.js?v=20260609p"></script>
-<script src="/static/js/launch.js?v=20260609q"></script>
+<script src="/static/js/launch.js?v=20260616a"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/app.js?v=20260617b"></script>
+<script src="/static/js/app.js?v=20260616a"></script>
 </body>
 </html>

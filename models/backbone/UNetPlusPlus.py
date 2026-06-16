@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.models_config import UNetPlusPlusConfig
+from configuration.model.backbone_models_config import UNetPlusPlusConfig
 from ..blocks                          import ConvBlock, initialize_weights, match_spatial_size
 
 class UNetPlusPlus(nn.Module):

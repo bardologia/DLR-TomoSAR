@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.models_config import ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, UNetSkipConfig
+from configuration.model.backbone_models_config import ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, UNetSkipConfig
 from ..blocks                          import build_upsample, initialize_weights
 from ..blocks                          import GaussianHeadsMixin, ResidualConvBlock, match_spatial_size
 

@@ -83,7 +83,7 @@ class JepaDefaults:
 @dataclass
 class JepaEntryConfig:
     run_name        : str | None = None
-    model_name      : str        = "resunet"
+    backbone_name   : str        = "resunet"
     gpu             : int        = 0
     seed            : int        = 0
     n_gaussians     : int        = 5

@@ -7,8 +7,10 @@ from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
-from model_library          import ModelLibrary
+from backbone_model_library          import BackboneModelLibrary
+from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
+from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from request_router         import RequestRouter
@@ -48,7 +50,9 @@ class WebUIServer:
         self.configs     = ConfigRegistry(self.paths)
         self.equations   = EquationLibrary()
         self.flows       = FlowLibrary()
-        self.models      = ModelLibrary()
+        self.models           = BackboneModelLibrary()
+        self.profile_ae_models = ProfileAutoencoderModelLibrary()
+        self.image_ae_models   = ImageAutoencoderModelLibrary()
         self.pipelines   = PipelineLibrary()
         self.processes   = ProcessManager(self.paths, self.logger)
         self.nuke        = ProcessNuke(self.logger)
@@ -68,6 +72,8 @@ class WebUIServer:
             equations   = self.equations,
             flows       = self.flows,
             models      = self.models,
+            profile_ae_models = self.profile_ae_models,
+            image_ae_models   = self.image_ae_models,
             pipelines   = self.pipelines,
             processes   = self.processes,
             nuke        = self.nuke,

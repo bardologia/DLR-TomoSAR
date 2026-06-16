@@ -45,7 +45,7 @@ class AeCvConfig:
 class CrossValidationConfig:
     training_type   : str  = "backbone"
 
-    model_name      : str  = "resunet"
+    backbone_name   : str  = "resunet"
     model_overrides : dict = field(default_factory=dict)
 
     paths      : BenchmarkPathsConfig   = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/cross_validation")))

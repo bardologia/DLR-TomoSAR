@@ -61,7 +61,7 @@ class BenchmarkWorker:
 
         return JepaEntryConfig(
             run_name                   = model_name,
-            model_name                 = model_name,
+            backbone_name              = model_name,
             seed                       = self.config.seed,
             n_gaussians                = self.config.n_gaussians,
             logdir                     = logdir,
@@ -161,12 +161,12 @@ class OverfitWorker(BenchmarkWorker):
             self._run_jepa(model_name)
             return
 
-        from models                               import CONFIG_REGISTRY
+        from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "overfit"
         result_path  = stage_dir / model_name / "overfit_result.json"
-        model_config = CONFIG_REGISTRY[model_name]()
+        model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
 
         for attribute, value in self._size_overrides(model_name).items():
             setattr(model_config, attribute, value)
@@ -177,7 +177,7 @@ class OverfitWorker(BenchmarkWorker):
             pipeline = TrainingPipeline(
                 trainer_config = self.factory.overfit_trainer_config(logdir=stage_dir),
                 dataset_config = self.factory.overfit_dataset_config(),
-                model_name     = model_name,
+                backbone_name  = model_name,
                 model_config   = model_config,
                 seed           = self.config.overfit.seed,
                 run_name       = model_name,
@@ -251,11 +251,11 @@ class TrainingWorker(BenchmarkWorker):
             TrainingPipeline(entry).run()
             return
 
-        from models                               import CONFIG_REGISTRY
+        from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "training"
-        model_config = CONFIG_REGISTRY[model_name]()
+        model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
 
         for attribute, value in self._size_overrides(model_name).items():
             setattr(model_config, attribute, value)
@@ -263,7 +263,7 @@ class TrainingWorker(BenchmarkWorker):
         pipeline = TrainingPipeline(
             trainer_config = self.factory.training_trainer_config(logdir=stage_dir),
             dataset_config = self.factory.training_dataset_config(),
-            model_name     = model_name,
+            backbone_name  = model_name,
             model_config   = model_config,
             seed           = self.config.seed,
             run_name       = model_name,

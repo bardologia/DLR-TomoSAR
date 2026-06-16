@@ -232,7 +232,7 @@ class JepaTuner:
         sampled = self.sampler.sample(trial, self.space)
 
         entry                 = copy.deepcopy(self.entry_template)
-        entry.model_name      = self.model_name
+        entry.backbone_name   = self.model_name
         entry.model_overrides = sampled
         entry.run_name        = f"trial_{trial.number:04d}"
         entry.seed            = self.tune_cfg.base_seed + trial.number

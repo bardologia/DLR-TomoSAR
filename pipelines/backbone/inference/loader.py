@@ -13,11 +13,11 @@ from configuration.data.dataset_config        import DatasetConfig, InputConfig,
 from configuration.inference.inference_config import InferenceConfig
 from tools.data.regions                       import CropRegion
 from configuration.sar.gaussian_config        import GaussianConfig
-from models                                   import IMAGE_SIZE_MODELS, get_model
+from models                                   import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.datasets      import PatchDataset
 from pipelines.backbone.dataset.normalization import Normalizer, Stats
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
-from tools.data.io                            import FileIO, ModelConfigIO
+from tools.data.io                            import FileIO, BackboneModelConfigIO
 from tools.data.gaussians                     import GaussianClamp
 from tools.monitoring.logger                  import Logger
 from tools.baselines                          import TrackBaselines, TrackProfiles
@@ -100,7 +100,7 @@ class ModelWrapper:
 @dataclass
 class Run:
     model            : object
-    model_name       : str
+    backbone_name       : str
     in_channels      : int
     out_channels     : int
     x_axis           : np.ndarray
@@ -167,15 +167,15 @@ class RunLoader:
             pin_memory                  = bool(payload["pin_memory"]),
         )
 
-    def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        model_config, _ = ModelConfigIO.load(self.meta_directory)
+    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
+        model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
 
-        if model_name in IMAGE_SIZE_MODELS:
+        if backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
 
-        model, _ = get_model(model_name, config=model_config, **overrides)
+        model, _ = get_backbone(backbone_name, config=model_config, **overrides)
 
         return model
 
@@ -279,13 +279,13 @@ class RunLoader:
             num_workers = num_workers,
         )
 
-        model_name   = str(run_summary["model_name"])
+        backbone_name   = str(run_summary["model_name"])
         in_channels  = int(run_summary["in_channels"])
         out_channels = int(run_summary["out_channels"])
         n_gaussians  = out_channels // 3
 
         ckpt_path = self.run_directory / checkpoint_name
-        model     = self._build_model(model_name, in_channels, out_channels, dataset_config.patch.size[0])
+        model     = self._build_model(backbone_name, in_channels, out_channels, dataset_config.patch.size[0])
         model     = model.to(device)
 
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
@@ -315,7 +315,7 @@ class RunLoader:
             drop_last   = False,
         )
 
-        self.logger.section(f"[Model]         : '{model_name}'")
+        self.logger.section(f"[Model]         : '{backbone_name}'")
         self.logger.kv_table({
             "Checkpoint":  ckpt_path,
             "In channels":  in_channels,
@@ -333,7 +333,7 @@ class RunLoader:
 
         return Run(
             model            = model,
-            model_name       = model_name,
+            backbone_name       = backbone_name,
             in_channels      = in_channels,
             out_channels     = out_channels,
             x_axis           = x_axis,

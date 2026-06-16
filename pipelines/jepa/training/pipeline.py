@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 from configuration.training.jepa_config                  import JepaTrainerConfig
-from models                                              import IMAGE_SIZE_MODELS, get_model
+from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from models.autoencoder                                  import get_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
@@ -70,7 +70,7 @@ class TrainingPipeline:
         if split_regions is not None:
             self.dataset_config.split_regions = split_regions
 
-        self.model_name = entry_config.model_name
+        self.backbone_name = entry_config.backbone_name
 
     @staticmethod
     def _resolve_ae_run(logdir, run, label):
@@ -109,11 +109,11 @@ class TrainingPipeline:
 
     def _build_backbone(self, in_channels: int, out_channels: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.model_name in IMAGE_SIZE_MODELS:
+        if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
         for k, v in self.entry.model_overrides.items():
             overrides[k] = v
-        return get_model(self.model_name, **overrides)
+        return get_backbone(self.backbone_name, **overrides)
 
     def _load_profile_autoencoder(self):
         autoencoder, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
@@ -143,14 +143,14 @@ class TrainingPipeline:
         in_channels  = datasets["train"].input_channels
 
         run_meta.save_trainer_config()
-        run_meta.save_model_config(backbone_cfg, self.model_name)
+        run_meta.save_model_config(backbone_cfg, self.backbone_name)
 
         if self.autoencoder_cfg is not None:
             AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         if self.image_ae_cfg is not None:
             ImageAutoencoderConfigIO.save(self.image_ae_cfg, self.image_ae_model_name, run_meta.metadata_directory)
 
-        run_meta.save_run_summary(self.model_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len)
+        run_meta.save_run_summary(self.backbone_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len)
 
     def _profile_normalizer(self, run_meta, logger):
         if self.autoencoder_cfg is None:
@@ -176,7 +176,7 @@ class TrainingPipeline:
         return results, run_meta.run_directory
 
     def run(self):
-        run_meta = TrainingRunMetadata(self.trainer_config, self.model_name, Path(self.trainer_config.io.logdir), self.entry.run_name)
+        run_meta = TrainingRunMetadata(self.trainer_config, self.backbone_name, Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
         loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()

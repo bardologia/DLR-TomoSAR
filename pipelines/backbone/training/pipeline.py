@@ -8,7 +8,7 @@ from pathlib     import Path
 import numpy as np
 import torch
 
-from models                                  import IMAGE_SIZE_MODELS
+from models                                  import BACKBONE_IMAGE_SIZE_MODELS
 from configuration.data.dataset_config       import DatasetConfig
 from configuration.training.training_config  import TrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
@@ -28,7 +28,7 @@ class TrainingPipeline:
         self,
         trainer_config : TrainerConfig,
         dataset_config : DatasetConfig,
-        model_name     : str,
+        backbone_name  : str,
         model_config   = None,
         seed           : int = 0,
         run_name       : str | None = None,
@@ -38,7 +38,7 @@ class TrainingPipeline:
 
         self.trainer_config = trainer_config
         self.dataset_config = dataset_config
-        self.model_name     = model_name
+        self.backbone_name     = backbone_name
         self.model_config   = model_config
         self.image_size     = patch_height
         self.seed           = seed
@@ -47,7 +47,7 @@ class TrainingPipeline:
 
         self.run_metadata = TrainingRunMetadata(
             trainer_config = trainer_config,
-            model_name     = model_name,
+            model_name     = backbone_name,
             base_logdir    = Path(trainer_config.io.logdir),
             run_name       = run_name,
         )
@@ -61,18 +61,18 @@ class TrainingPipeline:
         )
 
     def _build_model(self, in_channels: int, out_channels: int):
-        from models import get_model
+        from models import get_backbone
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.model_name in IMAGE_SIZE_MODELS:
+        if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
-        model, model_cfg = get_model(self.model_name, config=self.model_config, **overrides)
+        model, model_cfg = get_backbone(self.backbone_name, config=self.model_config, **overrides)
 
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
         self.logger.section("[Model Built]")
-        self.logger.subsection(f"Architecture : {self.model_name}")
+        self.logger.subsection(f"Architecture : {self.backbone_name}")
         self.logger.subsection(f"In Channels  : {in_channels}")
         self.logger.subsection(f"Out Channels : {out_channels}")
         self.logger.subsection(f"Parameters   : {n_params:,}")
@@ -110,10 +110,10 @@ class TrainingPipeline:
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
-        self.run_metadata.save_model_config(model_cfg, self.model_name)
+        self.run_metadata.save_model_config(model_cfg, self.backbone_name)
 
         self.run_metadata.save_run_summary(
-            model_name    = self.model_name,
+            model_name    = self.backbone_name,
             in_channels   = in_channels,
             out_channels  = out_channels,
             x_axis_length = x_axis_length,
@@ -157,21 +157,21 @@ class SingleTrainRunner:
         return InferencePipeline(inference_config).run()
 
     def run(self):
-        from models import CONFIG_REGISTRY
+        from models import BACKBONE_CONFIG_REGISTRY
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.overfit    = self.config.overfit
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
-        model_config = CONFIG_REGISTRY[self.config.model_name]()
+        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
         for attribute, value in self.config.model_overrides.items():
             setattr(model_config, attribute, value)
 
         pipeline = TrainingPipeline(
             trainer_config = trainer_config,
             dataset_config = self.factory.training_dataset_config(),
-            model_name     = self.config.model_name,
+            backbone_name  = self.config.backbone_name,
             model_config   = model_config,
             seed           = self.config.seed,
             run_name       = self.config.run_name,
@@ -205,13 +205,13 @@ class TrainScheduler:
         mode = self.config.trials_mode
 
         if mode == "curriculum":
-            return CurriculumTrialPlanner(self.config.model_name, self.config.warmup_losses, self.config.complete_losses)
+            return CurriculumTrialPlanner(self.config.backbone_name, self.config.warmup_losses, self.config.complete_losses)
         if mode == "warmup":
-            return WarmupTrialPlanner(self.config.model_name, self.config.warmup_losses)
+            return WarmupTrialPlanner(self.config.backbone_name, self.config.warmup_losses)
         if mode == "secondary":
-            return SecondaryTrialPlanner.from_dataset(self.config.model_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
+            return SecondaryTrialPlanner.from_dataset(self.config.backbone_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "patch":
-            return PatchSizeTrialPlanner(self.config.model_name, self.config.patch_trials)
+            return PatchSizeTrialPlanner(self.config.backbone_name, self.config.patch_trials)
 
         raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'secondary' or 'patch'")
 
@@ -230,7 +230,7 @@ class TrainScheduler:
 
         self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
-            "Model"         : self.config.model_name,
+            "Model"         : self.config.backbone_name,
             "Mode"          : self.config.trials_mode,
             **planner.summary(),
             "Trials"        : len(experiments),

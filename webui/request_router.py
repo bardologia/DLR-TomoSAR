@@ -13,8 +13,10 @@ from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
-from model_library          import ModelLibrary
+from backbone_model_library          import BackboneModelLibrary
+from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
+from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
@@ -36,7 +38,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: ModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -45,6 +47,8 @@ class RequestRouter:
         self.equations   = equations
         self.flows       = flows
         self.models      = models
+        self.profile_ae_models = profile_ae_models
+        self.image_ae_models   = image_ae_models
         self.pipelines   = pipelines
         self.processes   = processes
         self.nuke        = nuke
@@ -163,12 +167,34 @@ class RequestRouter:
         if path == "/api/flows":
             self._send_json(handler, {"flows": self.flows.collect()})
             return
-        if path == "/api/models":
+        if path == "/api/backbones":
             self._send_json(handler, {"families": self.models.collect()})
             return
-        if path.startswith("/api/models/") and path.endswith("/note"):
-            key  = path[len("/api/models/"):-len("/note")]
+        if path.startswith("/api/backbones/") and path.endswith("/note"):
+            key  = path[len("/api/backbones/"):-len("/note")]
             note = self.models.note(key)
+            if note is None:
+                self._send_json(handler, {"error": "not found"}, 404)
+            else:
+                self._send_json(handler, note)
+            return
+        if path == "/api/profile-autoencoders":
+            self._send_json(handler, {"families": self.profile_ae_models.collect()})
+            return
+        if path.startswith("/api/profile-autoencoders/") and path.endswith("/note"):
+            key  = path[len("/api/profile-autoencoders/"):-len("/note")]
+            note = self.profile_ae_models.note(key)
+            if note is None:
+                self._send_json(handler, {"error": "not found"}, 404)
+            else:
+                self._send_json(handler, note)
+            return
+        if path == "/api/image-autoencoders":
+            self._send_json(handler, {"families": self.image_ae_models.collect()})
+            return
+        if path.startswith("/api/image-autoencoders/") and path.endswith("/note"):
+            key  = path[len("/api/image-autoencoders/"):-len("/note")]
+            note = self.image_ae_models.note(key)
             if note is None:
                 self._send_json(handler, {"error": "not found"}, 404)
             else:

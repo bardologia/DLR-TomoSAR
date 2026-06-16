@@ -3,13 +3,13 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from models                                              import IMAGE_SIZE_MODELS, get_model
+from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from models.autoencoder                                  import get_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.backbone.inference.loader                 import ModelWrapper, RunLoader
 from pipelines.jepa.training.trainer                     import JepaModule
-from tools.data.io                                       import AutoencoderConfigIO, ImageAutoencoderConfigIO, ModelConfigIO
+from tools.data.io                                       import AutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 
 
 
@@ -34,16 +34,16 @@ class JepaRunLoader(RunLoader):
         image_autoencoder, _  = get_image_autoencoder(image_name, image_cfg)
         return image_autoencoder, image_cfg.embedding_dim
 
-    def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
+    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
         ae_cfg, ae_name = AutoencoderConfigIO.load(self.meta_directory)
-        model_config, _ = ModelConfigIO.load(self.meta_directory)
+        model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
 
         image_autoencoder, backbone_in = self._image_frontend(in_channels)
 
         overrides = {"in_channels": backbone_in, "out_channels": ae_cfg.embedding_dim}
-        if model_name in IMAGE_SIZE_MODELS:
+        if backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
-        backbone, _ = get_model(model_name, config=model_config, **overrides)
+        backbone, _ = get_backbone(backbone_name, config=model_config, **overrides)
 
         profile_autoencoder, _  = get_autoencoder(ae_name, ae_cfg)
         self.profile_normalizer = ProfileNormalizer(ProfileStats.load(self.meta_directory))
@@ -57,14 +57,14 @@ class JepaRunLoader(RunLoader):
 
 
 class JepaParamRunLoader(RunLoader):
-    def _build_model(self, model_name: str, in_channels: int, out_channels: int, image_size: int):
-        model_config, _       = ModelConfigIO.load(self.meta_directory)
+    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
+        model_config, _       = BackboneModelConfigIO.load(self.meta_directory)
         image_cfg, image_name = ImageAutoencoderConfigIO.load(self.meta_directory)
         image_autoencoder, _  = get_image_autoencoder(image_name, image_cfg)
 
         overrides = {"in_channels": image_cfg.embedding_dim, "out_channels": out_channels}
-        if model_name in IMAGE_SIZE_MODELS:
+        if backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
-        backbone, _ = get_model(model_name, config=model_config, **overrides)
+        backbone, _ = get_backbone(backbone_name, config=model_config, **overrides)
 
         return JepaModule(backbone, profile_autoencoder=None, image_autoencoder=image_autoencoder)

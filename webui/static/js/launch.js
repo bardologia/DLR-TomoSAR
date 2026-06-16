@@ -288,14 +288,20 @@ class LaunchView {
     }
     this.config = cfg;
 
-    if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "model_name")) {
-      const models = await window.apiGet("/api/models");
+    if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "backbone_name" || leaf.path === "ae_model_name")) {
+      const models = await window.apiGet(this._modelFamiliesEndpoint());
       if (seq !== this.loadSeq) return;
       this.modelFamilies = (models && models.families) || [];
     }
 
     this._renderConfig(cfg);
     this._refresh();
+  }
+
+  _modelFamiliesEndpoint() {
+    if (this.key === "train_image_autoencoder")   return "/api/image-autoencoders";
+    if (this.key === "train_profile_autoencoder") return "/api/profile-autoencoders";
+    return "/api/backbones";
   }
 
   leave() {
@@ -753,12 +759,12 @@ class LaunchView {
 
     if (typeLeaf) this._renderTypeTab(typeTab, typeLeaf);
 
-    const modelNameLeaf = byPath.get("model_name");
+    const modelNameLeaf = byPath.get("backbone_name") || byPath.get("ae_model_name");
     const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
 
-    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === "model_name")).filter((leaf) => !(typeLeaf && leaf.path === typeLeaf.path));
+    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && modelNameLeaf && leaf.path === modelNameLeaf.path)).filter((leaf) => !(typeLeaf && leaf.path === typeLeaf.path));
     const claimed = new Set(pinned.map((leaf) => leaf.path));
-    if (cardPanel) claimed.add("model_name");
+    if (cardPanel) claimed.add(modelNameLeaf.path);
     if (typeLeaf) claimed.add(typeLeaf.path);
 
     const modelLeaf  = byPath.get("skip_models");

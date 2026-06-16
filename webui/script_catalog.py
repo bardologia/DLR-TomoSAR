@@ -23,7 +23,7 @@ class ScriptCatalog:
             "title"     : "Train Backbone",
             "category"  : "Training",
             "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
-            "essentials": ["run_name", "model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_name", "backbone_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "train_profile_autoencoder": {
             "title"     : "Train Profile Autoencoder",
@@ -41,7 +41,7 @@ class ScriptCatalog:
             "title"     : "Train JEPA",
             "category"  : "Training",
             "purpose"   : "Train the JEPA predictor in latent space. Operates in three modes depending on which autoencoder runs are selected: backbone + profile autoencoder, image autoencoder + backbone, or image autoencoder + backbone + profile autoencoder. Each autoencoder is imported pretrained and either frozen or fine-tuned.",
-            "essentials": ["run_name", "model_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "image_autoencoder_mode", "image_autoencoder_logdir", "image_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_name", "backbone_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "image_autoencoder_mode", "image_autoencoder_logdir", "image_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
             "title"     : "Inference",
@@ -59,7 +59,7 @@ class ScriptCatalog:
             "title"     : "Cross-validate",
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
-            "essentials": ["model_name", "run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["backbone_name", "run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "physics_check": {
             "title"     : "Physics Check",

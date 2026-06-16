@@ -1,16 +1,25 @@
 "use strict";
 
 class ModelGallery {
-  constructor(listEl, detailEl) {
+  constructor(listEl, detailEl, endpoint = "/api/backbones", kind = "backbone") {
     this.listEl = listEl;
     this.detailEl = detailEl;
+    this.endpoint = endpoint;
+    this.kind = kind;
     this.families = [];
     this.flat = [];
     this.activeKey = null;
   }
 
+  async reload(endpoint, kind) {
+    this.endpoint = endpoint;
+    this.kind = kind;
+    this.activeKey = null;
+    await this.load();
+  }
+
   async load() {
-    const data = await window.apiGet("/api/models");
+    const data = await window.apiGet(this.endpoint);
     this.families = data.families || [];
     this.flat = this.families.flatMap((f) => f.models.map((m) => ({ ...m, family: f.family })));
     this._renderList();
@@ -48,21 +57,28 @@ class ModelGallery {
   _renderDetail(m) {
     this._pops = this._pops || [];
     this._closeFrom(0);
-    const built = window.ModelDiagram.build(m);
-    this.blockMap = built.blocks;
-    const legend = this._legend(m);
+
+    const isAe    = this.kind !== "backbone";
+    const built   = isAe ? null : window.ModelDiagram.build(m);
+    this.blockMap = built ? built.blocks : null;
+    const diagram = isAe ? this._aeDiagram(m) : built.network;
+    const legend  = isAe ? "" : this._legend(m);
+    const keyLabel = isAe ? "model key" : "backbone key";
+    const specA    = isAe ? "encoder / decoder" : "skip mechanism";
+    const specB    = isAe ? "latent" : "output head";
+
     this.detailEl.innerHTML =
       `<div class="mdetail__head">` +
       `<div><span class="mdetail__family">${m.family}</span>` +
-      `<h3 class="mdetail__name">${m.name}${m.recommended ? '<span class="mdetail__best">best in benchmark</span>' : ""}</h3></div>` +
+      `<h3 class="mdetail__name">${m.name}${m.recommended ? `<span class="mdetail__best">${isAe ? "default" : "best in benchmark"}</span>` : ""}</h3></div>` +
       `<span class="mdetail__params">${m.params} params</span>` +
       `</div>` +
-      `<div class="mdetail__diagram">${built.network}</div>` +
+      `<div class="mdetail__diagram">${diagram}</div>` +
       legend +
       `<div class="mdetail__specs">` +
-      `<div class="spec"><span class="spec__k">backbone key</span><span class="spec__v mono">${m.key}</span></div>` +
-      `<div class="spec"><span class="spec__k">skip mechanism</span><span class="spec__v">${m.skip}</span></div>` +
-      `<div class="spec"><span class="spec__k">output head</span><span class="spec__v">${m.head}</span></div>` +
+      `<div class="spec"><span class="spec__k">${keyLabel}</span><span class="spec__v mono">${m.key}</span></div>` +
+      `<div class="spec"><span class="spec__k">${specA}</span><span class="spec__v">${m.skip}</span></div>` +
+      `<div class="spec"><span class="spec__k">${specB}</span><span class="spec__v">${m.head}</span></div>` +
       `</div>` +
       `<div class="mdetail__notes" data-note-host><span class="mdetail__when-label">Architecture notes</span>` +
       `<div class="mdetail__note-body"><span class="mdetail__note-loading">loading notes...</span></div></div>`;
@@ -70,15 +86,35 @@ class ModelGallery {
     this.detailEl.classList.remove("is-swap");
     void this.detailEl.offsetWidth;
     this.detailEl.classList.add("is-swap");
-    this._wireSchema();
+    if (!isAe) this._wireSchema();
     this._loadNote(m);
+  }
+
+  _aeDiagram(m) {
+    const isImage = this.kind === "image_autoencoder";
+    const inLabel  = isImage ? "Image stack" : "Profile";
+    const outLabel = isImage ? "Reconstructed stack" : "Reconstructed profile";
+    const latLabel = isImage ? "2D embedding" : "Embedding";
+    const stages = [
+      { t: inLabel,  s: "input",   kind: "io" },
+      { t: "Encoder", s: m.skip,   kind: "net" },
+      { t: latLabel,  s: "latent", kind: "latent" },
+      { t: "Decoder", s: "reconstruction", kind: "net" },
+      { t: outLabel,  s: "output", kind: "io" },
+    ];
+    const node = (st) =>
+      `<div class="ae-node ae-node--${st.kind}"><span class="ae-node__title">${st.t}</span></div>`;
+    const arrow = `<div class="ae-arrow" aria-hidden="true">&rarr;</div>`;
+    const flow = stages.map(node).join(arrow);
+    return `<figure class="dgm-net"><div class="dgm-frame dgm-frame--net"><div class="ae-flow">${flow}</div></div>` +
+      `<figcaption class="dgm-hint">Encoder maps the input to the latent; the decoder reconstructs it</figcaption></figure>`;
   }
 
   async _loadNote(m) {
     const host = this.detailEl.querySelector("[data-note-host] .mdetail__note-body");
     if (!host) return;
     try {
-      const data = await window.apiGet(`/api/models/${m.key}/note`);
+      const data = await window.apiGet(`${this.endpoint}/${m.key}/note`);
       if (this.activeKey !== m.key) return;
       host.innerHTML = this._mdToHtml(data.markdown, data.links || {});
       host.querySelectorAll("[data-model-link]").forEach((el) => {

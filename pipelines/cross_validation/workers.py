@@ -64,10 +64,10 @@ class CrossValidationWorker(BenchmarkWorker):
 
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, split_regions: SplitRegions) -> None:
-        from models                               import CONFIG_REGISTRY
+        from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
-        model_config = CONFIG_REGISTRY[self.config.model_name]()
+        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
 
         for attribute, value in self.config.model_overrides.items():
             setattr(model_config, attribute, value)
@@ -78,7 +78,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         pipeline = TrainingPipeline(
             trainer_config = self.factory.training_trainer_config(logdir=self.run_dir / "folds"),
             dataset_config = dataset_config,
-            model_name     = self.config.model_name,
+            backbone_name  = self.config.backbone_name,
             model_config   = model_config,
             seed           = self.config.seed,
             run_name       = self.fold_name(fold_index),
@@ -99,7 +99,7 @@ class FoldTrainingWorker(CrossValidationWorker):
 
         return JepaEntryConfig(
             run_name                   = run_name,
-            model_name                 = cv.model_name,
+            backbone_name              = cv.backbone_name,
             seed                       = cv.seed,
             n_gaussians                = cv.n_gaussians,
             logdir                     = self.run_dir / "folds",

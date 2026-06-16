@@ -1,5 +1,5 @@
 from .backbone import *  # noqa: F401,F403
-from .backbone import CONFIG_REGISTRY, IMAGE_SIZE_MODELS, MODEL_REGISTRY, get_model
+from .backbone import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, BACKBONE_MODEL_REGISTRY, get_backbone
 from .blocks   import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .autoencoder import (
     AE_CONFIG_REGISTRY,
@@ -23,15 +23,15 @@ def config_registry(training_type: str) -> dict:
         return AE_CONFIG_REGISTRY
     if training_type == "image_autoencoder":
         return IMAGE_AE_CONFIG_REGISTRY
-    return CONFIG_REGISTRY
+    return BACKBONE_CONFIG_REGISTRY
 
 
 __all__ = [
-    "CONFIG_REGISTRY",
+    "BACKBONE_CONFIG_REGISTRY",
     "config_registry",
-    "MODEL_REGISTRY",
-    "IMAGE_SIZE_MODELS",
-    "get_model",
+    "BACKBONE_MODEL_REGISTRY",
+    "BACKBONE_IMAGE_SIZE_MODELS",
+    "get_backbone",
     "DropPath",
     "build_activation",
     "build_norm2d",

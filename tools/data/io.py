@@ -109,17 +109,17 @@ class ConfigIO:
         return config, raw_name
 
 
-class ModelConfigIO(ConfigIO):
+class BackboneModelConfigIO(ConfigIO):
     FILENAME     = "model_config.json"
-    NAME_KEY     = "model_name"
-    MISSING_NOUN = "model"
+    NAME_KEY     = "backbone_name"
+    MISSING_NOUN = "backbone"
     UNKNOWN_NOUN = "architecture"
     EXCLUDED     = {"shape_logger_types"}
 
     @classmethod
     def _registry(cls) -> dict:
-        from models import CONFIG_REGISTRY
-        return CONFIG_REGISTRY
+        from models import BACKBONE_CONFIG_REGISTRY
+        return BACKBONE_CONFIG_REGISTRY
 
     @classmethod
     def _serialize(cls, config) -> dict:

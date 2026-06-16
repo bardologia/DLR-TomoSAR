@@ -70,7 +70,7 @@ class CrossValidationPipeline:
         self.logger.section("Cross-validation pipeline")
         self.logger.kv_table({
             "Run tag"          : self.run_tag,
-            "Model"            : self.config.model_name,
+            "Model"            : self.config.backbone_name,
             "Folds"            : self.config.folds.n_folds,
             "Azimuth extent"   : f"[{self.config.folds.azimuth_start}, {self.config.folds.azimuth_end})",
             "Inference splits" : ", ".join(self.config.inference_splits),

@@ -14,7 +14,7 @@ class ReportPayloadBuilder:
     @staticmethod
     def run_summary(run, x_axis_np: np.ndarray) -> Dict[str, Any]:
         return {
-            "model_name"        : run.model_name,
+            "model_name"        : run.backbone_name,
             "in_channels"       : run.in_channels,
             "out_channels"      : run.out_channels,
             "n_gaussians"       : run.n_gaussians,

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from configuration.experiments.benchmark_config import BenchmarkConfig
 from configuration.sar.gaussian_config          import GaussianConfig
-from models                                     import CONFIG_REGISTRY, IMAGE_SIZE_MODELS, get_model
+from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from tools.monitoring.logger                    import Logger
 
 
@@ -61,7 +61,7 @@ class WidthScaler:
         if model_name not in self.rules:
             raise ValueError(f"No width rule registered for model '{model_name}'. Available: {list(self.rules.keys())}")
 
-        defaults  = CONFIG_REGISTRY[model_name]()
+        defaults  = BACKBONE_CONFIG_REGISTRY[model_name]()
         overrides = {}
 
         for rule in self.rules[model_name]:
@@ -75,7 +75,7 @@ class WidthScaler:
         return overrides
 
     def scaled_config(self, model_name: str, scale: float):
-        config = CONFIG_REGISTRY[model_name]()
+        config = BACKBONE_CONFIG_REGISTRY[model_name]()
 
         for attribute, value in self.overrides(model_name, scale).items():
             setattr(config, attribute, value)
@@ -154,7 +154,7 @@ class SizeMatcher:
 
     def reference_count(self) -> int:
         reference = self.config.size_match.reference_model
-        return self._count(reference, CONFIG_REGISTRY[reference]())
+        return self._count(reference, BACKBONE_CONFIG_REGISTRY[reference]())
 
     def match(self, model_name: str, target: int) -> SizeMatchResult:
         size_match = self.config.size_match
@@ -207,10 +207,10 @@ class SizeMatcher:
 
     def _count(self, model_name: str, model_config) -> int:
         overrides = {"in_channels": self.in_channels, "out_channels": self.out_channels}
-        if model_name in IMAGE_SIZE_MODELS:
+        if model_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
-        model, _   = get_model(model_name, config=model_config, **overrides)
+        model, _   = get_backbone(model_name, config=model_config, **overrides)
         parameters = sum(p.numel() for p in model.parameters())
 
         del model

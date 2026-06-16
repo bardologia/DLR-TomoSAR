@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-class ModelLibrary:
+class BackboneModelLibrary:
 
     OPERATIONAL_PAREN   = re.compile(r"\s*\([^()]*(?:\d{4}-\d{2}-\d{2}|referee|first[- ]pass|regression|corrected|reviewed|audit)[^()]*\)", re.IGNORECASE)
     OPERATIONAL_MARKERS = re.compile(r"\d{4}-\d{2}-\d{2}|referee|first[- ]pass|smoke[- ]test|regression|review date|reviewed|corrected on|correction|audit|flagged", re.IGNORECASE)
@@ -124,7 +124,7 @@ class ModelLibrary:
         return families
 
     def _resolve_defaults(self) -> dict[str, tuple[str, str]]:
-        module   = self._import_models_config()
+        module   = self._import_backbone_models_config()
         resolved = {}
 
         for key, class_name in self.CONFIG_CLASSES.items():
@@ -135,16 +135,16 @@ class ModelLibrary:
 
         return resolved
 
-    def _import_models_config(self):
+    def _import_backbone_models_config(self):
         config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
         path       = str(config_dir)
 
         if path not in sys.path:
             sys.path.insert(0, path)
 
-        import models_config
+        import backbone_models_config
 
-        return models_config
+        return backbone_models_config
 
     def _families(self) -> list[dict]:
         return [

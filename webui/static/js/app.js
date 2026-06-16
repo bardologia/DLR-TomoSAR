@@ -142,6 +142,7 @@ class App {
       document.getElementById("model-detail")
     );
     this.modelGallery.load();
+    this._initModelZoo();
 
     this.configBrowser = new window.ConfigBrowser(
       document.getElementById("config-list"),
@@ -200,6 +201,18 @@ class App {
         source : root.dataset.source,
         canvas : root.querySelector("canvas"),
       })),
+    });
+  }
+
+  _initModelZoo() {
+    const wrap = document.getElementById("model-zoo");
+    if (!wrap) return;
+    wrap.querySelectorAll(".model-zoo__btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("is-active")) return;
+        wrap.querySelectorAll(".model-zoo__btn").forEach((b) => b.classList.toggle("is-active", b === btn));
+        this.modelGallery.reload(btn.dataset.endpoint, btn.dataset.zoo);
+      });
     });
   }
 

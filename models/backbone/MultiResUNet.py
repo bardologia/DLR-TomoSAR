@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.models_config import MultiResUNetConfig
+from configuration.model.backbone_models_config import MultiResUNetConfig
 from ..blocks                          import build_activation, build_norm2d, build_upsample, initialize_weights
 from ..blocks                          import match_spatial_size
 

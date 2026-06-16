@@ -1,4 +1,4 @@
-from configuration.model.models_config import (
+from configuration.model.backbone_models_config import (
     AttentionUNetConfig,
     ConvNeXtUNetConfig,
     DeepLabV3PlusConfig,
@@ -39,7 +39,7 @@ from .MultiResUNet  import MultiResUNet
 from .FPNNet        import FPNNet
 from .U2NetLite     import U2NetLite
 
-MODEL_REGISTRY: dict[str, type] = {
+BACKBONE_MODEL_REGISTRY: dict[str, type] = {
     "unet"                : UNet,
     "unet_multihead"      : UNetMultiHead,
     "unet_pergaussian"    : UNetPerGaussian,
@@ -63,7 +63,7 @@ MODEL_REGISTRY: dict[str, type] = {
     "u2net"               : U2NetLite,
 }
 
-CONFIG_REGISTRY: dict[str, type] = {
+BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
     "unet"                : UNetConfig,
     "unet_multihead"      : UNetMultiHeadConfig,
     "unet_pergaussian"    : UNetPerGaussianConfig,
@@ -88,20 +88,20 @@ CONFIG_REGISTRY: dict[str, type] = {
 }
 
 
-IMAGE_SIZE_MODELS: frozenset[str] = frozenset({"swin_unet", "transunet", "unetr"})
+BACKBONE_IMAGE_SIZE_MODELS: frozenset[str] = frozenset({"swin_unet", "transunet", "unetr"})
 
 
-def get_model(name: str, config=None, **overrides):
+def get_backbone(name: str, config=None, **overrides):
     key = name.lower().replace("-", "_").replace(" ", "_")
-    if key not in MODEL_REGISTRY:
-        raise ValueError(f"Unknown model '{name}'. Available: {list(MODEL_REGISTRY.keys())}")
+    if key not in BACKBONE_MODEL_REGISTRY:
+        raise ValueError(f"Unknown backbone '{name}'. Available: {list(BACKBONE_MODEL_REGISTRY.keys())}")
     if config is None:
-        config = CONFIG_REGISTRY[key](**overrides)
+        config = BACKBONE_CONFIG_REGISTRY[key](**overrides)
     elif overrides:
         for k, v in overrides.items():
             if hasattr(config, k):
                 setattr(config, k, v)
-    return MODEL_REGISTRY[key](config), config
+    return BACKBONE_MODEL_REGISTRY[key](config), config
 
 
 __all__ = [
@@ -147,10 +147,10 @@ __all__ = [
     "MultiResUNetConfig",
     "FPNNetConfig",
     "U2NetLiteConfig",
-    "get_model",
-    "MODEL_REGISTRY",
-    "CONFIG_REGISTRY",
-    "IMAGE_SIZE_MODELS",
+    "get_backbone",
+    "BACKBONE_MODEL_REGISTRY",
+    "BACKBONE_CONFIG_REGISTRY",
+    "BACKBONE_IMAGE_SIZE_MODELS",
     "build_activation",
     "build_norm2d",
     "build_upsample",

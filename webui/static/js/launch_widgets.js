@@ -231,9 +231,12 @@ class ModelCardPanel {
     const root     = document.createElement("section");
     root.className = "model-panel";
 
+    const isAe     = this.leaf.path === "ae_model_name";
     const head     = document.createElement("header");
     head.className = "special-head";
-    head.innerHTML = `<h3 class="special-head__name">Model</h3><span class="special-head__hint">the architecture to train</span>`;
+    head.innerHTML = isAe
+      ? `<h3 class="special-head__name">Autoencoder</h3><span class="special-head__hint">the autoencoder to train</span>`
+      : `<h3 class="special-head__name">Model</h3><span class="special-head__hint">the architecture to train</span>`;
 
     const current   = document.createElement("span");
     current.className = "model-panel__count";
@@ -340,7 +343,7 @@ class ExperimentBuilder {
     this.modeLeaf     = byPath.get("trials_mode");
     this.warmupLeaf   = byPath.get("warmup_losses");
     this.completeLeaf = byPath.get("complete_losses");
-    this.modelLeaf    = byPath.get("model_name");
+    this.modelLeaf    = byPath.get("backbone_name");
     this.gpusLeaf     = byPath.get("gpus");
 
     this.secondary = new Map();

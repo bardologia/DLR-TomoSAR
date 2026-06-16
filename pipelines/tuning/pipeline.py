@@ -16,7 +16,7 @@ from configuration.training.optimization_config import EarlyStoppingConfig, Grad
 from configuration.training.runtime_config      import IOConfig, TrainingLoopConfig
 from configuration.training.training_config     import TrainerConfig
 from configuration.experiments.tuning_config    import TuningConfig
-from models                                     import config_registry, CONFIG_REGISTRY
+from models                                     import config_registry, BACKBONE_CONFIG_REGISTRY
 from tools                                      import FileIO
 from tools                                      import GpuJob
 from tools                                      import GpuQueue
@@ -341,7 +341,7 @@ class TuningOrchestrator:
         elif self.config.training_type == "jepa":
             tuner = JepaTuner(
                 model_name       = model_name,
-                model_config_cls = CONFIG_REGISTRY[model_name],
+                model_config_cls = BACKBONE_CONFIG_REGISTRY[model_name],
                 entry_template   = self._jepa_entry_template(),
                 tune_cfg         = tune_cfg,
                 log_dir          = str(self.run_dir / model_name),
@@ -352,7 +352,7 @@ class TuningOrchestrator:
 
             tuner = Tuner(
                 model_name          = model_name,
-                model_config_cls    = CONFIG_REGISTRY[model_name],
+                model_config_cls    = BACKBONE_CONFIG_REGISTRY[model_name],
                 base_trainer_config = trainer_cfg,
                 base_dataset_config = dataset_cfg,
                 tune_cfg            = tune_cfg,
