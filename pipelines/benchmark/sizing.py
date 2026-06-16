@@ -15,6 +15,7 @@ class WidthRule:
     attribute : str
     divisor   : float
     is_float  : bool = False
+    unlock    : bool = False
 
 
 class WidthScaler:
@@ -37,7 +38,7 @@ class WidthScaler:
             "transunet"           : [WidthRule(attribute="cnn_features",  divisor=8)],
             "unetr"               : [WidthRule(attribute="decoder_features", divisor=8)],
             "deeplabv3plus"       : feature_rules,
-            "segformer"           : [WidthRule(attribute="decoder_channels", divisor=8)],
+            "segformer"           : [WidthRule(attribute="embedding_dims", divisor=8, unlock=True), WidthRule(attribute="decoder_channels", divisor=8)],
             "convnext_unet"       : feature_rules,
             "dense_unet"          : [WidthRule(attribute="growth_rate", divisor=2)],
             "hrnet"               : [WidthRule(attribute="base_channels", divisor=8)],
@@ -54,7 +55,7 @@ class WidthScaler:
                 raise ValueError(f"Model '{model_name}' has no width rule; size matching has nothing to scale once locked parameters are removed.")
 
             for rule in rules:
-                if rule.attribute in self.locked:
+                if rule.attribute in self.locked and not rule.unlock:
                     raise ValueError(f"Width rule for '{model_name}' targets locked hyperparameter '{rule.attribute}'. Locked parameters may not be scaled: {sorted(self.locked)}.")
 
     def overrides(self, model_name: str, scale: float) -> dict:
