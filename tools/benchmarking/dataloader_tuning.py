@@ -132,6 +132,7 @@ class GpuFeedBenchmark:
         warmup_batches : int           = 8,
         timed_batches  : int           = 60,
         gpu_index      : Optional[int] = None,
+        cpu_threads    : Optional[int] = None,
     ) -> None:
         self.dataset        = dataset
         self.model          = model.to(device)
@@ -143,8 +144,15 @@ class GpuFeedBenchmark:
         self.timed_batches  = int(timed_batches)
         self.gpu_index      = gpu_index
 
+        if cpu_threads is not None:
+            torch.set_num_threads(max(1, int(cpu_threads)))
+
         self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4)
+
+    @staticmethod
+    def _worker_init(worker_id: int) -> None:
+        torch.set_num_threads(1)
 
     @staticmethod
     def _iterate(loader: DataLoader, n_batches: int):
@@ -174,6 +182,7 @@ class GpuFeedBenchmark:
         if spec.num_workers > 0:
             loader_kwargs["persistent_workers"] = spec.persistent_workers
             loader_kwargs["prefetch_factor"]    = spec.prefetch_factor
+            loader_kwargs["worker_init_fn"]     = GpuFeedBenchmark._worker_init
 
         return DataLoader(self.dataset, **loader_kwargs)
 

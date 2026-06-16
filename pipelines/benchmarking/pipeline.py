@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib  import Path
 
 import torch
@@ -52,13 +53,24 @@ class DataLoaderTuningPipeline:
             warmup_batches = self.config.warmup_batches,
             timed_batches  = self.config.timed_batches,
             gpu_index      = self.config.gpu,
+            cpu_threads    = self.config.cpu_threads,
         ), device
+
+    def _worker_counts(self) -> list[int]:
+        cores   = os.cpu_count() or 8
+        kept    = [workers for workers in self.config.worker_counts if workers <= cores]
+        dropped = [workers for workers in self.config.worker_counts if workers > cores]
+
+        if dropped:
+            self.logger.subsection(f"Skipping worker counts above {cores} cores: {dropped}")
+
+        return kept or [min(self.config.worker_counts) if self.config.worker_counts else 0]
 
     def _main_specs(self) -> list[LoaderSpec]:
         return [
             LoaderSpec(batch_size=batch_size, num_workers=workers, prefetch_factor=self.config.reference_prefetch, pin_memory=True, persistent_workers=True)
             for batch_size in self.config.batch_sizes
-            for workers in self.config.worker_counts
+            for workers in self._worker_counts()
         ]
 
     def _run_sweep(self, benchmark, specs, phase: str) -> list[dict]:

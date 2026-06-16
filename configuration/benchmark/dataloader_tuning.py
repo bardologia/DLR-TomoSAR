@@ -25,6 +25,7 @@ class DataLoaderTuningEntryConfig:
     reference_prefetch : int = 4
     warmup_batches     : int = 8
     timed_batches      : int = 60
+    cpu_threads        : int = 8
 
     data_wait_target : float = 0.05
 
