@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260616l" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260616m" />
 </head>
 <body>
 
@@ -348,7 +348,6 @@
     </div>
     <div class="ft">
       <aside class="ft__deck" id="ft-deck">
-        <div class="ft-deck__scan" aria-hidden="true"></div>
         <h3 class="ft-deck__title">Target</h3>
         <div class="ft-modes" id="ft-modes" role="tablist" aria-label="Tuning mode">
           <button class="ft-mode is-active" data-mode="synthetic" role="tab">Synthetic</button>
@@ -357,14 +356,18 @@
         </div>
 
         <div class="ft-paths" id="ft-paths" hidden>
-          <label class="ft-field">
-            <span class="ft-field__label">Dataset path</span>
-            <input class="ft-input" id="ft-dataset" type="text" spellcheck="false" placeholder="/path/to/preprocessing/run" />
-          </label>
-          <label class="ft-field">
-            <span class="ft-field__label">Parameters path</span>
-            <input class="ft-input" id="ft-params" type="text" spellcheck="false" placeholder="/path/to/parameters.npy" />
-          </label>
+          <div class="ft-field">
+            <span class="ft-field__label">Dataset</span>
+            <select class="ft-input ft-select" id="ft-dataset-select" aria-label="Dataset"></select>
+            <input class="ft-input ft-custom" id="ft-dataset-custom" type="text" spellcheck="false" placeholder="absolute path" hidden />
+            <span class="ft-note" id="ft-dataset-note"></span>
+          </div>
+          <div class="ft-field">
+            <span class="ft-field__label">Parameters</span>
+            <select class="ft-input ft-select" id="ft-params-select" aria-label="Parameters"></select>
+            <input class="ft-input ft-custom" id="ft-params-custom" type="text" spellcheck="false" placeholder="absolute path" hidden />
+            <span class="ft-note" id="ft-params-note"></span>
+          </div>
         </div>
 
         <div class="ft-grid2">
@@ -422,13 +425,22 @@
       </aside>
 
       <div class="ft__stage">
-        <div class="ft-readout" id="ft-readout">
+        <div class="ft-card ft-readout" id="ft-readout">
           <div class="ft-readout__idle" id="ft-readout-idle">Configure a target and run a sweep to populate live telemetry.</div>
           <div class="ft-chips" id="ft-chips" hidden></div>
           <div class="ft-progress" id="ft-progress" hidden>
             <div class="ft-progress__track"><i class="ft-progress__fill" id="ft-progress-fill"></i></div>
             <span class="ft-progress__label" id="ft-progress-label"></span>
           </div>
+        </div>
+
+        <div class="ft-dials" id="ft-dials" hidden>
+          <div class="ft-dials__grid">
+            <figure class="ft-dial"><div class="ft-dial__media"><canvas id="ft-dial-util"></canvas></div><figcaption>GPU utilization</figcaption></figure>
+            <figure class="ft-dial"><div class="ft-dial__media"><canvas id="ft-dial-eff"></canvas></div><figcaption>GPU efficiency</figcaption></figure>
+            <figure class="ft-dial"><div class="ft-dial__media"><canvas id="ft-dial-wait"></canvas></div><figcaption>Data wait</figcaption></figure>
+          </div>
+          <span class="ft-dials__at" id="ft-dials-at">waiting for the first measurement&hellip;</span>
         </div>
 
         <div class="ft-reco" id="ft-reco" hidden></div>
@@ -569,7 +581,7 @@
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/feed_tuner.js?v=20260616b"></script>
+<script src="/static/js/feed_tuner.js?v=20260616c"></script>
 <script src="/static/js/app.js?v=20260616b"></script>
 </body>
 </html>
