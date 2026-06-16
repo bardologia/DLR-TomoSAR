@@ -28,10 +28,20 @@ class MaxBatchProbe:
         self.measure_steps = config.max_batch.measure_steps
         self.seed          = config.max_batch.seed
 
-        self.device   = torch.device("cuda")
-        self.work_dir = Path(config.paths.log_base_dir) / "max_batch_probe" / model_name
+        self.device     = torch.device("cuda")
+        self.context_gb = 0.0
+        self.work_dir   = Path(config.paths.log_base_dir) / "max_batch_probe" / model_name
         self.work_dir.mkdir(parents=True, exist_ok=True)
-        self.logger   = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
+        self.logger     = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
+
+    def _measure_context(self) -> float:
+        warm = torch.zeros(1, device=self.device)
+        del warm
+        torch.cuda.empty_cache()
+
+        free_bytes, total_bytes = torch.cuda.mem_get_info(self.device)
+
+        return (total_bytes - free_bytes) / (1024.0 ** 3)
 
     def _build_context(self):
         factory        = ConfigFactory(self.config)
@@ -114,11 +124,11 @@ class MaxBatchProbe:
             loss.backward()
             trainer.optimizer.step()
 
-        peak = torch.cuda.max_memory_allocated(self.device)
+        peak_reserved = torch.cuda.max_memory_reserved(self.device)
 
         del loss, batch, iterator, loader
 
-        return peak / (1024.0 ** 3)
+        return self.context_gb + peak_reserved / (1024.0 ** 3)
 
     def run(self) -> dict:
         result = {
@@ -134,6 +144,9 @@ class MaxBatchProbe:
 
         try:
             Reproducibility.seed_everything(self.seed)
+
+            self.context_gb = self._measure_context()
+            self.logger.subsection(f"CUDA context: {self.context_gb:.2f} GB")
 
             trainer_config, dataset_config, dataset, gaussian_cfg = self._build_context()
 
