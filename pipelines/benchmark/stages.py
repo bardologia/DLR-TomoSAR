@@ -129,6 +129,116 @@ class OverfitStage(ExperimentStage):
         return results
 
 
+class MaxBatchStage(ExperimentStage):
+    def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
+        super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
+        self.models       = models
+        self.stage_dir    = self.run_dir / "max_batch"
+        self.records_path = self.run_dir / "pipeline" / "max_batch.json"
+        self.report_path  = self.run_dir / "pipeline" / "max_batch_report.md"
+
+    def _result_path(self, model_name: str) -> Path:
+        return self.stage_dir / model_name / "max_batch_result.json"
+
+    def _has_result(self, model_name: str) -> bool:
+        return self.config.resume and self._result_path(model_name).exists()
+
+    def _job(self, model_name: str) -> GpuJob:
+        return GpuJob(
+            name     = model_name,
+            command  = [sys.executable, str(self.entry_script), "--worker", "maxbatch", "--model", model_name, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
+            log_path = self.stage_dir / model_name / "worker.log",
+        )
+
+    def _load_result(self, model_name: str) -> dict:
+        path = self._result_path(model_name)
+
+        if not path.exists():
+            return {
+                "model"      : model_name,
+                "status"     : "FAIL",
+                "batch_size" : None,
+                "peak_gb"    : None,
+                "budget_gb"  : self.config.max_batch.vram_budget_gb,
+                "ceiling"    : self.config.max_batch.max_batch,
+                "trials"     : [],
+                "error"      : f"missing result file: {path}",
+            }
+
+        return FileIO.load_json(path)
+
+    def _write_report(self, records: dict) -> None:
+        budget   = self.config.max_batch.vram_budget_gb
+        ceiling  = self.config.max_batch.max_batch
+        failed   = [m for m in records if records[m]["status"] != "PASS"]
+
+        lines = [
+            "# Maximum Batch Size Report",
+            f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  —  run tag `{self.run_tag}`_\n",
+            f"Largest power-of-two batch size whose peak training memory stays under **{budget:g} GB** and below **{ceiling}**.",
+            f"Measured at patch size {self.config.training.patch_size[0]} with {self.config.size_match.in_channels} input channels.\n",
+            "## Results\n",
+            "| Model | Max batch | Peak (GB) | Status | Error |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+
+        for model_name in self.models:
+            record     = records[model_name]
+            batch_size = record["batch_size"] if record["batch_size"] is not None else "—"
+            peak_gb    = f"{record['peak_gb']:.2f}" if record.get("peak_gb") is not None else "—"
+            error      = (record.get("error") or "—").strip().splitlines()[-1]
+            lines.append(f"| `{model_name}` | {batch_size} | {peak_gb} | {record['status']} | {error} |")
+
+        lines.append("")
+
+        self.report_path.write_text("\n".join(lines), encoding="utf-8")
+        self.logger.info(f"Report written to: {self.report_path}")
+
+    def _log_summary(self, records: dict) -> None:
+        passed = [m for m in records if records[m]["status"] == "PASS"]
+        failed = [m for m in records if records[m]["status"] != "PASS"]
+
+        self.logger.subsection("Max batch summary")
+        self.logger.kv_table({
+            "Total"  : len(records),
+            "Passed" : len(passed),
+            "Failed" : len(failed),
+        }, title=f"{len(passed)}/{len(records)} measured")
+
+        for model_name in passed:
+            self.logger.info(f"{model_name:<18} batch {records[model_name]['batch_size']:>4}  peak {records[model_name]['peak_gb']:.2f} GB")
+
+        for model_name in failed:
+            self.logger.error(f"FAILED  {model_name}")
+
+    def run(self) -> dict:
+        self.logger.section("Maximum batch size")
+        self.logger.kv_table({
+            "Models"        : len(self.models),
+            "VRAM budget"   : f"{self.config.max_batch.vram_budget_gb:g} GB",
+            "Ceiling"       : self.config.max_batch.max_batch,
+            "Measure steps" : self.config.max_batch.measure_steps,
+            "GPUs"          : self.config.gpus,
+        }, title="Configuration")
+
+        cached  = [m for m in self.models if self._has_result(m)]
+        pending = [m for m in self.models if m not in cached]
+
+        for model_name in cached:
+            self.logger.info(f"{model_name}: cached result reused")
+
+        if pending:
+            self._run_queue([self._job(m) for m in pending])
+
+        records = {m: self._load_result(m) for m in self.models}
+
+        self._write_results(records, self.records_path)
+        self._write_report(records)
+        self._log_summary(records)
+
+        return records
+
+
 class SizeMatchStage(ExperimentStage):
     def __init__(self, config: BenchmarkConfig, run_tag: str, models: list[str], logger: Logger) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger)

@@ -26,6 +26,22 @@ class BenchmarkWorker:
         entry = records.get(model_name, {})
         return entry.get("overrides", {})
 
+    def _max_batch_size(self, model_name: str) -> int | None:
+        path = self.run_dir / "pipeline" / "max_batch.json"
+        if not path.exists():
+            return None
+
+        records = FileIO.load_json(path)
+
+        if model_name not in records:
+            raise SystemExit(f"max_batch.json present but missing an entry for '{model_name}'")
+
+        entry = records[model_name]
+        if entry.get("status") != "PASS" or not entry.get("batch_size"):
+            raise SystemExit(f"model '{model_name}' has no usable measured batch size: {entry}")
+
+        return int(entry["batch_size"])
+
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(
             enabled        = False,
@@ -233,6 +249,22 @@ class OverfitWorker(BenchmarkWorker):
         self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
 
 
+class MaxBatchWorker(BenchmarkWorker):
+    def run(self, model_name: str) -> None:
+        from pipelines.benchmark.batch_probe import MaxBatchProbe
+
+        stage_dir   = self.run_dir / "max_batch"
+        result_path = stage_dir / model_name / "max_batch_result.json"
+
+        probe  = MaxBatchProbe(config=self.config, model_name=model_name, overrides=self._size_overrides(model_name))
+        result = probe.run()
+
+        FileIO.save_json(result, result_path, indent=2)
+
+        if result["status"] == "FAIL":
+            raise SystemExit(1)
+
+
 class TrainingWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
         if self.config.training_type == "profile_autoencoder":
@@ -259,6 +291,10 @@ class TrainingWorker(BenchmarkWorker):
 
         for attribute, value in self._size_overrides(model_name).items():
             setattr(model_config, attribute, value)
+
+        measured_batch = self._max_batch_size(model_name)
+        if measured_batch is not None:
+            self.config.training.batch_size = measured_batch
 
         pipeline = TrainingPipeline(
             trainer_config = self.factory.training_trainer_config(logdir=stage_dir),

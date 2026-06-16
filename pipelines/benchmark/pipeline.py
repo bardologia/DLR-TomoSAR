@@ -9,7 +9,7 @@ from tools.data.io                              import FileIO
 from tools.runtime.config_cli                   import ConfigCli
 from tools.monitoring.logger                    import Logger
 
-from pipelines.benchmark.stages import ComparisonStage, InferenceStage, OverfitStage, SizeMatchStage, TrainingStage
+from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatchStage, OverfitStage, SizeMatchStage, TrainingStage
 
 
 class BenchmarkPipeline:
@@ -39,6 +39,13 @@ class BenchmarkPipeline:
 
         self._mark_stage("overfit", "completed" if passed else "failed")
         return passed
+
+    def _run_max_batch(self) -> dict:
+        stage   = MaxBatchStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)
+        records = stage.run()
+
+        self._mark_stage("max_batch", "completed")
+        return records
 
     def _run_size_match(self) -> dict:
         stage   = SizeMatchStage(config=self.config, run_tag=self.run_tag, models=self.models, logger=self.logger)
@@ -99,6 +106,9 @@ class BenchmarkPipeline:
                 self._mark_stage("pipeline", "aborted")
                 self.logger.error("Overfit gate failed — pipeline aborted. See the overfit report before retrying.")
                 raise SystemExit(1)
+
+            if self.config.runs_max_batch():
+                self._run_max_batch()
 
             training_results  = self._run_training()
             inference_results = self._run_inference() if self.config.runs_inference() else []

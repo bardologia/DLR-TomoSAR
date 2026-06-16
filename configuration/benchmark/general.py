@@ -28,6 +28,14 @@ class OverfitGateConfig:
 
 
 @dataclass
+class MaxBatchConfig:
+    vram_budget_gb : float = 40.0
+    max_batch      : int   = 512
+    measure_steps  : int   = 3
+    seed           : int   = 42
+
+
+@dataclass
 class SizeMatchConfig:
     reference_model : str         = "unet"
     tolerance       : float       = 0.05
@@ -101,6 +109,7 @@ class BenchmarkConfig:
 
     paths      : BenchmarkPathsConfig   = field(default_factory=BenchmarkPathsConfig)
     overfit    : OverfitGateConfig      = field(default_factory=OverfitGateConfig)
+    max_batch  : MaxBatchConfig         = field(default_factory=MaxBatchConfig)
     size_match : SizeMatchConfig        = field(default_factory=SizeMatchConfig)
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
@@ -120,6 +129,9 @@ class BenchmarkConfig:
     poll_interval_s : float      = 5.0
 
     def runs_size_match(self) -> bool:
+        return self.training_type == "backbone"
+
+    def runs_max_batch(self) -> bool:
         return self.training_type == "backbone"
 
     def runs_inference(self) -> bool:
