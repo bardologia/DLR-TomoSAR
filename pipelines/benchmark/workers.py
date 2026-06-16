@@ -187,20 +187,25 @@ class OverfitWorker(BenchmarkWorker):
 
         self._execute_overfit(model_name, self.config.overfit.stop_threshold, result_path, run_body)
 
+    def _overfit_config(self):
+        from configuration.training.runtime_config import OverfitConfig
+
+        gate = self.config.overfit
+        return OverfitConfig(
+            enabled        = True,
+            max_steps      = gate.max_steps,
+            stop_threshold = gate.stop_threshold,
+            batch_size     = gate.batch_size,
+        )
+
     def _run_ae(self, model_name: str) -> None:
-        from configuration.training.runtime_config           import OverfitConfig
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
         result_path = stage_dir / model_name / "overfit_result.json"
 
-        overfit = OverfitConfig(
-            enabled        = True,
-            max_steps      = gate.max_steps,
-            stop_threshold = gate.stop_threshold,
-            batch_size     = gate.batch_size,
-        )
+        overfit = self._overfit_config()
 
         def run_body():
             entry                   = self._ae_entry_config(model_name, stage_dir, overfit)
@@ -211,19 +216,13 @@ class OverfitWorker(BenchmarkWorker):
         self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
 
     def _run_jepa(self, model_name: str) -> None:
-        from configuration.training.runtime_config import OverfitConfig
-        from pipelines.jepa.training.pipeline      import TrainingPipeline
+        from pipelines.jepa.training.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
         result_path = stage_dir / model_name / "overfit_result.json"
 
-        overfit = OverfitConfig(
-            enabled        = True,
-            max_steps      = gate.max_steps,
-            stop_threshold = gate.stop_threshold,
-            batch_size     = gate.batch_size,
-        )
+        overfit = self._overfit_config()
 
         def run_body():
             entry                   = self._jepa_entry_config(model_name, stage_dir, overfit)
