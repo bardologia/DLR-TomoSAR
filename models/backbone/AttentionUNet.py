@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
 
 from configuration.model.models_config import AttentionUNetConfig
 from ..blocks                          import ConvBlock, build_norm2d, build_upsample, initialize_weights, match_spatial_size
@@ -60,21 +59,11 @@ class AttentionGate(nn.Module):
         projected_gate = self.gate_projection(gate_signal)
         projected_skip = self.skip_projection(skip_connection)
 
-        if projected_gate.shape[2:] != projected_skip.shape[2:]:
-            projected_gate = functional.interpolate(
-                input         = projected_gate,
-                size          = projected_skip.shape[2:],
-                mode          = "bilinear",
-                align_corners = False,
-            )
+        projected_gate = match_spatial_size(source=projected_gate, reference=projected_skip)
 
         attention_weights = self.attention_score(self.relu(projected_gate + projected_skip))
-        attention_weights = functional.interpolate(
-            input         = attention_weights,
-            size          = skip_connection.shape[2:],
-            mode          = "bilinear",
-            align_corners = False,
-        )
+        attention_weights = match_spatial_size(source=attention_weights, reference=skip_connection)
+
         return self.output_transform(skip_connection * attention_weights)
 
 class AttentionUNet(nn.Module):
