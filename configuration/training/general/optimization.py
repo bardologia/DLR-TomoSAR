@@ -9,6 +9,7 @@ class OptimizerConfig:
     betas        : tuple = (0.9, 0.999)
     eps          : float = 1e-8
     weight_decay : float = 0.1
+    lr_scale     : float = 1.0
 
 
 @dataclass

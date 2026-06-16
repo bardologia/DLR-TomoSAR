@@ -41,7 +41,14 @@ class BaseTrainer:
         self.accumulation_steps   = config.training.gradient_accumulation_steps
         self.use_amp              = config.training.use_amp
 
-        param_groups   = self._build_param_groups()
+        param_groups = self._build_param_groups()
+
+        lr_scale = self.config.optimizer.lr_scale
+        if lr_scale != 1.0:
+            for pg in param_groups:
+                pg["lr"] = float(pg["lr"]) * lr_scale
+            self.logger.subsection(f"Linear LR scaling x{lr_scale:.4f} applied to {len(param_groups)} param groups (batch-size rule).")
+
         self.base_lrs  = [float(pg["lr"]) for pg in param_groups]
         self.optimizer = self._build_optimizer(param_groups)
 

@@ -67,6 +67,9 @@ class TrainingQueueConfig:
     use_amp                     : bool = False
     gradient_accumulation_steps : int  = 1
 
+    scale_lr_with_batch     : bool = True
+    lr_reference_batch_size : int  = 256
+
 
 @dataclass
 class InferenceQueueConfig:

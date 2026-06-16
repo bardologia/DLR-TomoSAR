@@ -100,6 +100,7 @@ class ConfigFactory:
     def training_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
         training         = self.config.training
         scheduler_epochs = training.scheduler_epochs if training.scheduler_epochs is not None else training.epochs
+        lr_scale         = training.batch_size / training.lr_reference_batch_size if training.scale_lr_with_batch else 1.0
 
         return BackboneTrainerConfig(
             **self._base_trainer_kwargs(logdir),
@@ -107,7 +108,7 @@ class ConfigFactory:
             early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, restore_best=True),
             warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
             scheduler      = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
-            optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
+            optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, lr_scale=lr_scale),
 
             training = TrainingLoopConfig(
                 epochs                      = training.epochs,
