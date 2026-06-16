@@ -27,9 +27,7 @@ def _worker(stage: str, fold_index: int, split: str | None, gpu_id: int, run_tag
     from pipelines.cross_validation.workers                import FoldInferenceWorker, FoldTrainingWorker
     from tools.runtime.config_cli                          import ConfigCli
 
-    config        = CrossValidationConfig()
-    resolved_path = Path(run_dir) / "pipeline" / "resolved_config.json" if run_dir else Path(config.paths.log_base_dir) / run_tag / "pipeline" / "resolved_config.json"
-    config        = ConfigCli.load_resolved(config, resolved_path)
+    config = ConfigCli.load_worker_config(CrossValidationConfig(), run_tag, run_dir)
 
     if stage == "train":
         FoldTrainingWorker(config=config, run_tag=run_tag).run(fold_index=fold_index)
