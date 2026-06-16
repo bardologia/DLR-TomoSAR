@@ -169,6 +169,7 @@ class ConfigFactory:
             num_workers        = inference.num_workers,
             stitch_window      = inference.stitch_window,
             save_cubes         = inference.save_cubes,
+            save_plots         = inference.save_plots,
             n_best_profiles    = inference.n_best_profiles,
             n_worst_profiles   = inference.n_worst_profiles,
             n_random_profiles  = inference.n_random_profiles,

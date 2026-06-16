@@ -96,11 +96,7 @@ class SystemMonitor:
             self.prev_proc[pid] = jiff
             seen.add(pid)
 
-            try:
-                raw = open(f"/proc/{pid}/cmdline", "rb").read()
-                cmd = raw.replace(b"\x00", b" ").decode(errors="replace").strip()
-            except OSError:
-                cmd = ""
+            cmd = self._pid_cmd(pid)
 
             rows.append({
                 "pid"   : pid,
@@ -117,20 +113,49 @@ class SystemMonitor:
         rows.sort(key=lambda r: (-r["cpu"], -r["gpu"], -r["rss"]))
         return rows[: self.PROC_LIMIT]
 
-    def _gpu_procs(self) -> tuple[dict, dict]:
+    def _gpu_devices(self) -> list[dict]:
+        try:
+            out = subprocess.run(
+                ["nvidia-smi", f"--query-gpu={self.GPU_QUERY}", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=3,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+
+        if out.returncode != 0:
+            return []
+
+        devices = []
+        for line in out.stdout.strip().splitlines():
+            cells = [c.strip() for c in line.split(",")]
+            if len(cells) < 9:
+                continue
+            devices.append({
+                "index"       : self._num(cells[0]),
+                "name"        : cells[1],
+                "util"        : self._num(cells[2]),
+                "mem_used"    : self._num(cells[3]),
+                "mem_total"   : self._num(cells[4]),
+                "temp"        : self._num(cells[5]),
+                "power"       : self._num(cells[6]),
+                "power_limit" : self._num(cells[7]),
+                "uuid"        : cells[8],
+            })
+        return devices
+
+    def _compute_apps(self) -> dict:
         try:
             out = subprocess.run(
                 ["nvidia-smi", "--query-compute-apps=pid,used_gpu_memory,gpu_uuid", "--format=csv,noheader,nounits"],
                 capture_output=True, text=True, timeout=3,
             )
         except (OSError, subprocess.TimeoutExpired):
-            return {}, {}
+            return {}
 
         if out.returncode != 0:
-            return {}, {}
+            return {}
 
-        usage = {}
-        users = {}
+        grouped = {}
         for line in out.stdout.strip().splitlines():
             cells = [c.strip() for c in line.split(",")]
             if len(cells) < 3:
@@ -141,23 +166,14 @@ class SystemMonitor:
             except ValueError:
                 continue
 
-            usage[pid] = usage.get(pid, 0) + mem
+            grouped.setdefault(cells[2], []).append({
+                "pid"   : pid,
+                "mem"   : mem,
+                "owner" : self._pid_owner(pid),
+                "cmd"   : self._pid_cmd(pid),
+            })
 
-            entry = users.setdefault(cells[2], {"mine": False, "others": False, "stale": False, "names": []})
-            owner = self._pid_owner(pid)
-
-            if owner is None:
-                entry["stale"] = True
-            elif owner == self.user:
-                entry["mine"] = True
-                if owner not in entry["names"]:
-                    entry["names"].append(owner)
-            else:
-                entry["others"] = True
-                if owner not in entry["names"]:
-                    entry["names"].append(owner)
-
-        return usage, users
+        return grouped
 
     def _pid_owner(self, pid: int) -> str | None:
         try:
@@ -174,6 +190,17 @@ class SystemMonitor:
             return pwd.getpwuid(uid).pw_name
         except KeyError:
             return str(uid)
+
+    def _pid_cmd(self, pid: int) -> str:
+        try:
+            raw = open(f"/proc/{pid}/cmdline", "rb").read()
+        except OSError:
+            return ""
+        return raw.replace(b"\x00", b" ").decode(errors="replace").strip()
+
+    def gpu_occupancy(self) -> list[dict]:
+        apps = self._compute_apps()
+        return [{**device, "procs": apps.get(device["uuid"], [])} for device in self._gpu_devices()]
 
     def _memory(self) -> dict:
         info = {}
@@ -245,39 +272,49 @@ class SystemMonitor:
         except (OSError, ValueError, IndexError):
             return 0.0
 
-    def _gpus(self, gpu_users: dict | None = None) -> list[dict]:
-        try:
-            out = subprocess.run(
-                ["nvidia-smi", f"--query-gpu={self.GPU_QUERY}", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=3,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return []
+    def _gpu_cards(self, occupancy: list[dict]) -> list[dict]:
+        cards = []
+        for device in occupancy:
+            mine    = False
+            others  = False
+            stale   = False
+            holders = []
 
-        if out.returncode != 0:
-            return []
+            for proc in device["procs"]:
+                owner = proc["owner"]
+                if owner is None:
+                    stale = True
+                elif owner == self.user:
+                    mine = True
+                    if owner not in holders:
+                        holders.append(owner)
+                else:
+                    others = True
+                    if owner not in holders:
+                        holders.append(owner)
 
-        gpus = []
-        for line in out.stdout.strip().splitlines():
-            cells = [c.strip() for c in line.split(",")]
-            if len(cells) < 9:
-                continue
-            occupancy = (gpu_users or {}).get(cells[8], {})
-            gpus.append({
-                "index"       : self._num(cells[0]),
-                "name"        : cells[1],
-                "util"        : self._num(cells[2]),
-                "mem_used"    : self._num(cells[3]),
-                "mem_total"   : self._num(cells[4]),
-                "temp"        : self._num(cells[5]),
-                "power"       : self._num(cells[6]),
-                "power_limit" : self._num(cells[7]),
-                "mine"        : bool(occupancy.get("mine")),
-                "others"      : bool(occupancy.get("others")),
-                "stale"       : bool(occupancy.get("stale")),
-                "holders"     : occupancy.get("names", []),
+            cards.append({
+                "index"       : device["index"],
+                "name"        : device["name"],
+                "util"        : device["util"],
+                "mem_used"    : device["mem_used"],
+                "mem_total"   : device["mem_total"],
+                "temp"        : device["temp"],
+                "power"       : device["power"],
+                "power_limit" : device["power_limit"],
+                "mine"        : mine,
+                "others"      : others,
+                "stale"       : stale,
+                "holders"     : holders,
             })
-        return gpus
+        return cards
+
+    def _gpu_mem_by_pid(self, occupancy: list[dict]) -> dict:
+        usage = {}
+        for device in occupancy:
+            for proc in device["procs"]:
+                usage[proc["pid"]] = usage.get(proc["pid"], 0) + proc["mem"]
+        return usage
 
     def _num(self, raw: str):
         try:
@@ -287,7 +324,8 @@ class SystemMonitor:
         return int(value) if value.is_integer() else value
 
     def snapshot(self) -> dict:
-        gpu_mem, gpu_users = self._gpu_procs()
+        occupancy = self.gpu_occupancy()
+        gpu_mem   = self._gpu_mem_by_pid(occupancy)
 
         with self.lock:
             cores, total = self._cpu_percents()
@@ -300,6 +338,6 @@ class SystemMonitor:
             "cpu"    : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
             "mem"    : self._memory(),
             "disk"   : self._disk(),
-            "gpus"   : self._gpus(gpu_users),
+            "gpus"   : self._gpu_cards(occupancy),
             "procs"  : procs,
         }

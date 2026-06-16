@@ -76,6 +76,7 @@ class InferenceQueueConfig:
     num_workers     : int        = 4
     cpu_workers     : int        = 16
 
+    save_plots    : bool = False
     save_cubes    : bool = False
     stitch_window : str  = "hann"
 

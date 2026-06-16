@@ -13,6 +13,7 @@ from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
+from gpu_watchdog            import GpuWatchdog
 from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
@@ -38,7 +39,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -54,6 +55,7 @@ class RequestRouter:
         self.nuke        = nuke
         self.system      = system
         self.watchdog    = watchdog
+        self.gpu_guard   = gpu_guard
         self.tensorboard = tensorboard
         self.results     = results
         self.cubes       = cubes
@@ -229,8 +231,9 @@ class RequestRouter:
             self._send_json(handler, {"instances": self.tensorboard.list_instances()})
             return
         if path == "/api/system":
-            payload           = self.system.snapshot()
-            payload["alerts"] = self.watchdog.state()
+            payload              = self.system.snapshot()
+            payload["alerts"]    = self.watchdog.state()
+            payload["gpu_guard"] = self.gpu_guard.state()
             self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):

@@ -51,6 +51,8 @@ class ProjectPaths:
         self.scripts_dir = self.repo_root / "scripts"
         self.config_dir  = self.repo_root / "configuration"
         self.static_dir  = self.webui_root / "static"
+        self.logs_dir    = self.repo_root / "logs"
+        self.gpu_guard_dir = self.logs_dir / "gpu_guard"
 
     def script_entry(self, key: str) -> dict:
         override  = self.ENTRY_OVERRIDES.get(key, {})

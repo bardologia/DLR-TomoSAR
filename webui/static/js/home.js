@@ -71,6 +71,8 @@ class StatusBoard {
     this.els.board.innerHTML =
       `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
 
+      `<section class="sboard sboard--gpualarm" id="sb-gpu-guard" aria-label="GPU intrusion alarm" hidden></section>` +
+
       `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
       `<div class="wd__state">` +
       `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
@@ -180,6 +182,7 @@ class StatusBoard {
     if (window.serverScene && window.serverScene.feed) window.serverScene.feed(sys);
     this._renderWatchdog(sys.alerts || {});
     this._renderAlerts(sys.alerts || {});
+    this._renderGpuGuard(sys.gpu_guard || {});
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
     const disk = sys.disk || {};
@@ -326,6 +329,62 @@ class StatusBoard {
 
     box.hidden = false;
     box.innerHTML = `<header class="sboard__cap"><span>alerts</span><span class="sboard__n">${active.length} active</span></header><div class="alert__list">${chips}${log}</div>`;
+  }
+
+  _renderGpuGuard(guard) {
+    const box = document.getElementById("sb-gpu-guard");
+    if (!box) return;
+
+    if (typeof guard.count === "number") {
+      if (this._guardCount == null) this._guardCount = guard.count;
+      else if (guard.count > this._guardCount) { this._guardCount = guard.count; this._alarm(); }
+    }
+
+    const active = guard.active || [];
+    const events = (guard.events || []).slice(-4).reverse();
+
+    if (!active.length && !events.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      box.classList.remove("is-firing");
+      return;
+    }
+
+    const chips = active.map((a) =>
+      `<span class="alert alert--danger">gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> invaded by <b>${this._esc(a.user)}</b> &middot; pid ${a.pid} &middot; ${Math.round(a.mem_mib)} MiB &middot; clashing with your pids ${this._esc((a.mine_pids || []).join(", "))}</span>`
+    ).join("");
+    const log = events.map((e) =>
+      `<span class="alert alert--event"><b>${this._esc((e.since || "").replace("T", " "))}</b> ${this._esc(e.user)} on gpu ${e.gpu_index} (pid ${e.pid})</span>`
+    ).join("");
+
+    box.hidden = false;
+    box.classList.toggle("is-firing", active.length > 0);
+    box.innerHTML = `<header class="sboard__cap"><span>&#9888; gpu intrusion alarm</span><span class="sboard__n">${active.length} active</span></header><div class="alert__list">${chips}${log}</div>`;
+  }
+
+  _alarm() {
+    window.toast && window.toast("GPU intrusion: another user is on a GPU you are using", "error");
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this._actx = this._actx || new Ctx();
+      const ctx = this._actx;
+      if (ctx.state === "suspended") ctx.resume();
+      const t0 = ctx.currentTime;
+      [0, 0.2, 0.4].forEach((dt) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(880, t0 + dt);
+        gain.gain.setValueAtTime(0.0001, t0 + dt);
+        gain.gain.exponentialRampToValueAtTime(0.22, t0 + dt + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0 + dt);
+        osc.stop(t0 + dt + 0.18);
+      });
+    } catch (e) {}
   }
 
   _renderProcs(procs) {

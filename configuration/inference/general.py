@@ -30,6 +30,7 @@ class InferenceConfig:
     cpu_workers     : int           = 80
     gif_workers     : int           = 40
 
+    save_plots    : bool = True
     save_cubes    : bool = True
     stitch_window : str  = "hann"
     cube_dtype    : str  = "float32"

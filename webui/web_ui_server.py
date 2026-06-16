@@ -7,6 +7,7 @@ from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
+from gpu_watchdog            import GpuWatchdog
 from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
@@ -58,6 +59,7 @@ class WebUIServer:
         self.nuke        = ProcessNuke(self.logger)
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
+        self.gpu_guard   = GpuWatchdog(self.system, self.paths, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
         self.results     = ResultsBrowser(self.logger)
         self.cubes       = CubeExplorer(self.paths, self.logger)
@@ -79,6 +81,7 @@ class WebUIServer:
             nuke        = self.nuke,
             system      = self.system,
             watchdog    = self.watchdog,
+            gpu_guard   = self.gpu_guard,
             tensorboard = self.tensorboard,
             results     = self.results,
             cubes       = self.cubes,
@@ -88,6 +91,7 @@ class WebUIServer:
     def serve(self) -> None:
         self._report_ready()
         self.watchdog.start()
+        self.gpu_guard.start()
 
         server        = ThreadingHTTPServer((self.host, self.port), _Handler)
         server.router = self.router
