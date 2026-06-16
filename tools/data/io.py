@@ -48,43 +48,53 @@ class FileIO:
         return path
 
 
-class ModelConfigIO:
-    FILENAME = "model_config.json"
-    EXCLUDED = {"shape_logger_types"}
+class ConfigIO:
+    FILENAME     : str
+    NAME_KEY     : str
+    MISSING_NOUN : str
+    UNKNOWN_NOUN : str
 
     @staticmethod
     def _normalize(name: str) -> str:
         return name.lower().replace("-", "_").replace(" ", "_")
 
     @classmethod
-    def save(cls, model_config, model_name: str, meta_directory: Path) -> Path:
-        from dataclasses import fields
+    def _registry(cls) -> dict:
+        raise NotImplementedError
 
-        serializable = {f.name: getattr(model_config, f.name) for f in fields(model_config) if f.name not in cls.EXCLUDED}
+    @classmethod
+    def _serialize(cls, config) -> dict:
+        raise NotImplementedError
 
+    @classmethod
+    def exists(cls, meta_directory: Path) -> bool:
+        return (Path(meta_directory) / cls.FILENAME).is_file()
+
+    @classmethod
+    def save(cls, config, model_name: str, meta_directory: Path) -> Path:
         payload = {
-            "model_name" : model_name,
-            "config_type": type(model_config).__name__,
-            "config"     : serializable,
+            cls.NAME_KEY  : model_name,
+            "config_type" : type(config).__name__,
+            "config"      : cls._serialize(config),
         }
 
         return FileIO.save_json(payload, Path(meta_directory) / cls.FILENAME)
 
     @classmethod
     def load(cls, meta_directory: Path):
-        from models import CONFIG_REGISTRY
-
         path = Path(meta_directory) / cls.FILENAME
         if not path.is_file():
-            raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the model architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
+            raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the {cls.MISSING_NOUN} architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
 
-        payload    = FileIO.load_json(path)
-        model_name = cls._normalize(str(payload["model_name"]))
+        payload  = FileIO.load_json(path)
+        raw_name = payload[cls.NAME_KEY]
+        name     = cls._normalize(str(raw_name))
 
-        if model_name not in CONFIG_REGISTRY:
-            raise ValueError(f"Persisted model_name '{model_name}' is not a known architecture: {list(CONFIG_REGISTRY.keys())}")
+        registry = cls._registry()
+        if name not in registry:
+            raise ValueError(f"Persisted {cls.NAME_KEY} '{name}' is not a known {cls.UNKNOWN_NOUN}: {list(registry.keys())}")
 
-        config = CONFIG_REGISTRY[model_name]()
+        config = registry[name]()
 
         for key, value in payload["config"].items():
             if not hasattr(config, key):
@@ -96,50 +106,38 @@ class ModelConfigIO:
 
             setattr(config, key, value)
 
-        return config, payload["model_name"]
+        return config, raw_name
 
 
-class AutoencoderConfigIO:
-    FILENAME = "autoencoder_config.json"
-
-    @staticmethod
-    def _normalize(name: str) -> str:
-        return name.lower().replace("-", "_").replace(" ", "_")
-
-    @classmethod
-    def save(cls, config, model_name: str, meta_directory: Path) -> Path:
-        payload = {
-            "ae_model_name" : model_name,
-            "config_type"   : type(config).__name__,
-            "config"        : asdict(config),
-        }
-
-        return FileIO.save_json(payload, Path(meta_directory) / cls.FILENAME)
+class ModelConfigIO(ConfigIO):
+    FILENAME     = "model_config.json"
+    NAME_KEY     = "model_name"
+    MISSING_NOUN = "model"
+    UNKNOWN_NOUN = "architecture"
+    EXCLUDED     = {"shape_logger_types"}
 
     @classmethod
-    def load(cls, meta_directory: Path):
+    def _registry(cls) -> dict:
+        from models import CONFIG_REGISTRY
+        return CONFIG_REGISTRY
+
+    @classmethod
+    def _serialize(cls, config) -> dict:
+        from dataclasses import fields
+        return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
+
+
+class AutoencoderConfigIO(ConfigIO):
+    FILENAME     = "autoencoder_config.json"
+    NAME_KEY     = "ae_model_name"
+    MISSING_NOUN = "autoencoder"
+    UNKNOWN_NOUN = "autoencoder"
+
+    @classmethod
+    def _registry(cls) -> dict:
         from models.autoencoder import AE_CONFIG_REGISTRY
-
-        path = Path(meta_directory) / cls.FILENAME
-        if not path.is_file():
-            raise FileNotFoundError(f"No {cls.FILENAME} under {meta_directory}; the autoencoder architecture was not persisted at training time and the checkpoint cannot be reconstructed faithfully. Retrain to regenerate it.")
-
-        payload = FileIO.load_json(path)
-        ae_name = cls._normalize(str(payload["ae_model_name"]))
-
-        if ae_name not in AE_CONFIG_REGISTRY:
-            raise ValueError(f"Persisted ae_model_name '{ae_name}' is not a known autoencoder: {list(AE_CONFIG_REGISTRY.keys())}")
-
-        config = AE_CONFIG_REGISTRY[ae_name]()
-
-        for key, value in payload["config"].items():
-            if not hasattr(config, key):
-                raise ValueError(f"Persisted field '{key}' is not an attribute of {type(config).__name__}; the architecture definition changed since this checkpoint was trained")
-
-            setattr(config, key, value)
-
-        return config, payload["ae_model_name"]
+        return AE_CONFIG_REGISTRY
 
     @classmethod
-    def exists(cls, meta_directory: Path) -> bool:
-        return (Path(meta_directory) / cls.FILENAME).is_file()
+    def _serialize(cls, config) -> dict:
+        return asdict(config)
