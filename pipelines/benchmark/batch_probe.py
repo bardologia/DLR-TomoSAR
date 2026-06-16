@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import gc
 import traceback
+from pathlib import Path
 
+import numpy as np
 import torch
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
-from configuration.benchmark import BenchmarkConfig
-from configuration.sar.gaussian_config          import GaussianConfig
-from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from configuration.benchmark            import BenchmarkConfig
+from models                             import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from pipelines.backbone.dataset.pipeline import DatasetPipeline
+from pipelines.backbone.training.trainer import Trainer
+from pipelines.shared.config_factory     import ConfigFactory
+from tools.monitoring.logger             import Logger
+from tools.runtime.reproducibility       import Reproducibility
 
 
 class MaxBatchProbe:
@@ -22,56 +28,95 @@ class MaxBatchProbe:
         self.measure_steps = config.max_batch.measure_steps
         self.seed          = config.max_batch.seed
 
-        self.image_size  = config.training.patch_size[0]
-        self.in_channels = config.size_match.in_channels
-        self.device      = torch.device("cuda")
+        self.device   = torch.device("cuda")
+        self.work_dir = Path(config.paths.log_base_dir) / "max_batch_probe" / model_name
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+        self.logger   = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
 
-        gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
-        self.out_channels = gaussian_cfg.params_per_gaussian * config.n_gaussians
+    def _build_context(self):
+        factory        = ConfigFactory(self.config)
+        dataset_config = factory.training_dataset_config()
+        trainer_config = factory.training_trainer_config(logdir=self.work_dir)
 
-    def _candidates(self) -> list[int]:
-        sizes = []
-        size  = 1
+        gaussian_cfg               = trainer_config.gaussian
+        dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
 
-        while size < self.ceiling:
-            sizes.append(size)
-            size *= 2
+        dataset_pipeline = DatasetPipeline(config=dataset_config, training_run_directory=self.work_dir, logger=self.logger, seed=self.seed)
 
-        return sizes
+        profile_length        = dataset_pipeline.layout.profile_length
+        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
 
-    def _build_model(self):
+        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
+
+        return trainer_config, dataset_config, datasets["train"], gaussian_cfg
+
+    def _build_model(self, dataset_config, dataset, gaussian_cfg):
         model_config = BACKBONE_CONFIG_REGISTRY[self.model_name]()
 
         for attribute, value in self.overrides.items():
             setattr(model_config, attribute, value)
 
-        overrides = {"in_channels": self.in_channels, "out_channels": self.out_channels}
+        in_channels  = dataset.input_channels
+        out_channels = gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians
+
+        overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = self.image_size
+            overrides["image_size"] = dataset_config.patch.size[0]
 
-        model, _ = get_backbone(self.model_name, config=model_config, **overrides)
+        return get_backbone(self.model_name, config=model_config, **overrides)
 
-        return model.to(self.device).train()
+    def _build_trainer(self, trainer_config, dataset_config, model, model_cfg, dataset):
+        trainer = Trainer(
+            model      = model,
+            model_cfg  = model_cfg,
+            x_axis     = dataset_config.x_axis,
+            config     = trainer_config,
+            run_dir    = self.work_dir,
+            logger     = self.logger,
+            norm_stats = dataset.normalizer,
+            emit_docs  = False,
+        )
 
-    def _trial(self, model, optimizer, batch_size: int) -> float:
+        trainer.criterion.set_curriculum(trainer_config.curriculum.complete)
+        trainer.model.train()
+
+        return trainer
+
+    def _candidates(self) -> list[int]:
+        sizes = []
+        size  = 1
+
+        while size <= self.ceiling:
+            sizes.append(size)
+            size *= 2
+
+        return sizes
+
+    def _trial(self, trainer, dataset, batch_size: int) -> float:
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats(self.device)
 
-        inputs  = torch.randn(batch_size, self.in_channels,  self.image_size, self.image_size, device=self.device)
-        targets = torch.randn(batch_size, self.out_channels, self.image_size, self.image_size, device=self.device)
+        loader   = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=True, num_workers=0)
+        iterator = iter(loader)
 
         for _ in range(self.measure_steps):
-            optimizer.zero_grad(set_to_none=True)
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                iterator = iter(loader)
+                batch    = next(iterator)
 
-            outputs = model(inputs)
-            loss    = F.mse_loss(outputs, targets)
+            trainer.optimizer.zero_grad(set_to_none=True)
+
+            with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=trainer.use_amp):
+                loss = trainer._compute_loss(batch)["total_loss"]
 
             loss.backward()
-            optimizer.step()
+            trainer.optimizer.step()
 
         peak = torch.cuda.max_memory_allocated(self.device)
 
-        del inputs, targets, outputs, loss
+        del loss, batch, iterator, loader
 
         return peak / (1024.0 ** 3)
 
@@ -88,22 +133,28 @@ class MaxBatchProbe:
         }
 
         try:
-            torch.manual_seed(self.seed)
+            Reproducibility.seed_everything(self.seed)
 
-            model     = self._build_model()
-            optimizer = torch.optim.Adam(model.parameters())
-            best      = None
+            trainer_config, dataset_config, dataset, gaussian_cfg = self._build_context()
+
+            model, model_cfg = self._build_model(dataset_config, dataset, gaussian_cfg)
+            trainer          = self._build_trainer(trainer_config, dataset_config, model, model_cfg, dataset)
+
+            best = None
 
             for batch_size in self._candidates():
                 try:
-                    peak_gb = self._trial(model, optimizer, batch_size)
+                    peak_gb = self._trial(trainer, dataset, batch_size)
                 except torch.cuda.OutOfMemoryError:
+                    trainer.optimizer.zero_grad(set_to_none=True)
                     torch.cuda.empty_cache()
                     result["trials"].append({"batch_size": batch_size, "peak_gb": None, "status": "OOM"})
+                    self.logger.subsection(f"batch {batch_size:>5} -> OOM")
                     break
 
                 fits = peak_gb <= self.budget_gb
                 result["trials"].append({"batch_size": batch_size, "peak_gb": peak_gb, "status": "FIT" if fits else "OVER"})
+                self.logger.subsection(f"batch {batch_size:>5} -> {peak_gb:.2f} GB {'FIT' if fits else 'OVER'}")
 
                 if not fits:
                     break
@@ -117,11 +168,13 @@ class MaxBatchProbe:
                 result["batch_size"], result["peak_gb"] = best
                 result["status"]                        = "PASS"
 
-            del model, optimizer
+            del trainer, model
             gc.collect()
             torch.cuda.empty_cache()
         except Exception:
             result["status"] = "FAIL"
             result["error"]  = traceback.format_exc()
+
+        self.logger.close()
 
         return result
