@@ -12,7 +12,7 @@ from configuration.training.jepa_config               import JepaEntryConfig
 class TrainEntryConfig:
     mode : str = "backbone"
 
-    backbone          : BackboneEntryConfig  = field(default_factory=BackboneEntryConfig)
-    jepa              : JepaEntryConfig       = field(default_factory=JepaEntryConfig)
-    autoencoder       : ProfileAeEntryConfig  = field(default_factory=ProfileAeEntryConfig)
-    image_autoencoder : ImageAeEntryConfig    = field(default_factory=ImageAeEntryConfig)
+    backbone            : BackboneEntryConfig  = field(default_factory=BackboneEntryConfig)
+    jepa                : JepaEntryConfig       = field(default_factory=JepaEntryConfig)
+    profile_autoencoder : ProfileAeEntryConfig  = field(default_factory=ProfileAeEntryConfig)
+    image_autoencoder   : ImageAeEntryConfig    = field(default_factory=ImageAeEntryConfig)

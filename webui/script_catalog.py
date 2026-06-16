@@ -25,8 +25,8 @@ class ScriptCatalog:
             "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
             "essentials": ["run_name", "model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
-        "train_autoencoder": {
-            "title"     : "Train Autoencoder",
+        "train_profile_autoencoder": {
+            "title"     : "Train Profile Autoencoder",
             "category"  : "Training",
             "purpose"   : "Train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
             "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
@@ -79,7 +79,7 @@ class ScriptCatalog:
         "pre_process",
         "extract_params",
         "train_backbone",
-        "train_autoencoder",
+        "train_profile_autoencoder",
         "train_image_autoencoder",
         "train_jepa",
         "infer",
@@ -95,10 +95,10 @@ class ScriptCatalog:
             "category" : "Training",
             "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, or the JEPA predictor.",
             "members"  : [
-                ("train_backbone",          "Backbone"),
-                ("train_autoencoder",       "Autoencoder"),
-                ("train_image_autoencoder", "Image AE"),
-                ("train_jepa",              "JEPA"),
+                ("train_backbone",            "Backbone"),
+                ("train_profile_autoencoder", "Profile AE"),
+                ("train_image_autoencoder",   "Image AE"),
+                ("train_jepa",                "JEPA"),
             ],
         },
     }

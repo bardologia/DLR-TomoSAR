@@ -19,9 +19,9 @@ class ProjectPaths:
             "config_module" : "configuration.training.backbone_config",
             "config_class"  : "BackboneEntryConfig",
         },
-        "train_autoencoder": {
+        "train_profile_autoencoder": {
             "file"          : "train",
-            "args"          : ["--mode", "autoencoder"],
+            "args"          : ["--mode", "profile_autoencoder"],
             "config_module" : "configuration.training.autoencoder_config",
             "config_class"  : "ProfileAeEntryConfig",
         },

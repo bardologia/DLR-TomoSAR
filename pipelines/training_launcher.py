@@ -9,7 +9,7 @@ from tools.runtime.config_cli import ConfigCli
 
 class TrainingLauncher:
 
-    MODES = ("backbone", "jepa", "autoencoder", "image_autoencoder")
+    MODES = ("backbone", "jepa", "profile_autoencoder", "image_autoencoder")
 
     def __init__(self, entry_script: Path) -> None:
         self.entry_script = Path(entry_script)
@@ -42,7 +42,7 @@ class TrainingLauncher:
         config = ConfigCli(config, description="JEPA predictor training").apply(argv)
         SingleTrainRunner(config).run()
 
-    def _autoencoder(self, config, argv: list[str]) -> None:
+    def _profile_autoencoder(self, config, argv: list[str]) -> None:
         from pipelines.profile_autoencoder.training.pipeline import SingleTrainRunner
 
         config = ConfigCli(config, description="Profile autoencoder training").apply(argv)
@@ -63,9 +63,9 @@ class TrainingLauncher:
         sub   = getattr(entry, mode)
 
         dispatch = {
-            "backbone"          : self._backbone,
-            "jepa"              : self._jepa,
-            "autoencoder"       : self._autoencoder,
-            "image_autoencoder" : self._image_autoencoder,
+            "backbone"           : self._backbone,
+            "jepa"               : self._jepa,
+            "profile_autoencoder": self._profile_autoencoder,
+            "image_autoencoder"  : self._image_autoencoder,
         }
         dispatch[mode](sub, argv)

@@ -35,15 +35,15 @@ class LaunchView {
 
   static TRAINING_TYPES = [
     ["backbone", "Backbone"],
-    ["autoencoder", "Autoencoder"],
+    ["autoencoder", "Profile AE"],
     ["jepa", "JEPA"],
   ];
 
   static MODEL_KEY_TYPE = {
-    train_backbone:          "backbone",
-    train_autoencoder:       "autoencoder",
-    train_image_autoencoder: "image_autoencoder",
-    train_jepa:              "jepa",
+    train_backbone:             "backbone",
+    train_profile_autoencoder:  "autoencoder",
+    train_image_autoencoder:    "image_autoencoder",
+    train_jepa:                 "jepa",
   };
 
   static JEPA_MEANINGS = {
@@ -95,8 +95,8 @@ class LaunchView {
       ],
     },
     autoencoder: {
-      title  : "Autoencoder",
-      summary: "Learns the latent profile space: encodes the fitted normalized profiles into embeddings and reconstructs them.",
+      title  : "Profile autoencoder",
+      summary: "Learns the latent profile (output) space: encodes the fitted normalized profiles into embeddings and reconstructs them.",
       flow   : [
         { kind: "input",  glyph: "curve",   label: "Normalized profiles", sub: "fitted targets" },
         { kind: "model",  glyph: "encoder", label: "Encoder" },
@@ -193,9 +193,9 @@ class LaunchView {
     extract_params: {
       dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
     },
-    train_backbone:          LaunchView.DATASET_PICKERS,
-    train_autoencoder:       LaunchView.DATASET_PICKERS,
-    train_image_autoencoder: LaunchView.DATASET_PICKERS,
+    train_backbone:             LaunchView.DATASET_PICKERS,
+    train_profile_autoencoder:  LaunchView.DATASET_PICKERS,
+    train_image_autoencoder:    LaunchView.DATASET_PICKERS,
     train_jepa:              {
       ...LaunchView.DATASET_PICKERS,
       profile_autoencoder_run: { mode: "runs", baseFrom: "profile_autoencoder_logdir", checkpointOnly: true },
