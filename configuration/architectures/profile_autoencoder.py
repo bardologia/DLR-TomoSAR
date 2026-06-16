@@ -45,15 +45,15 @@ class ProfileAutoencoderBaseConfig:
 
 @dataclass
 class MlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
-    hidden_dim : int   = 128
-    depth      : int   = 2
+    hidden_dim : int   = 512
+    depth      : int   = 4
     dropout    : float = 0.0
 
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "hidden_dim" : {"type": "categorical", "choices": [64, 128, 256]},
-            "depth"      : {"type": "categorical", "choices": [1, 2, 3]},
+            "hidden_dim" : {"type": "categorical", "choices": [256, 512, 768, 1024]},
+            "depth"      : {"type": "categorical", "choices": [3, 4, 6, 8]},
             "activation" : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
             "dropout"    : {"type": "float",       "low": 0.0, "high": 0.3},
         }
