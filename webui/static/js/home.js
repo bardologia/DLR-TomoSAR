@@ -15,6 +15,19 @@ class StatusBoard {
     setInterval(() => { if (!document.hidden) this._poll(); }, 2500);
     this._pollJobs();
     setInterval(() => { if (!document.hidden) this._pollJobs(); }, 5000);
+    this._pollGuardHistory();
+    setInterval(() => { if (!document.hidden) this._pollGuardHistory(); }, 20000);
+  }
+
+  async _pollGuardHistory() {
+    let data;
+    try {
+      data = await window.apiGet("/api/gpu-guard/history?limit=100");
+    } catch (e) {
+      return;
+    }
+    this._guardHistory = data || {};
+    this._renderGuardPanel();
   }
 
   async _poll() {
@@ -72,6 +85,8 @@ class StatusBoard {
       `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
 
       `<section class="sboard sboard--gpualarm" id="sb-gpu-guard" aria-label="GPU intrusion alarm" hidden></section>` +
+
+      `<section class="sboard sboard--gpuguard" id="sb-gpu-guard-panel" aria-label="GPU guard"></section>` +
 
       `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
       `<div class="wd__state">` +
@@ -332,16 +347,19 @@ class StatusBoard {
   }
 
   _renderGpuGuard(guard) {
+    this._guardState = guard;
+    this._renderGuardPanel();
+
     const box = document.getElementById("sb-gpu-guard");
     if (!box) return;
 
     if (typeof guard.count === "number") {
       if (this._guardCount == null) this._guardCount = guard.count;
-      else if (guard.count > this._guardCount) { this._guardCount = guard.count; this._alarm(false); }
+      else if (guard.count > this._guardCount) { this._guardCount = guard.count; this._alarm(false); this._pollGuardHistory(); }
     }
     if (typeof guard.critical === "number") {
       if (this._critCount == null) this._critCount = guard.critical;
-      else if (guard.critical > this._critCount) { this._critCount = guard.critical; this._alarm(true); }
+      else if (guard.critical > this._critCount) { this._critCount = guard.critical; this._alarm(true); this._pollGuardHistory(); }
     }
 
     const active = guard.active || [];
@@ -382,6 +400,59 @@ class StatusBoard {
     box.classList.toggle("is-critical", crit > 0);
     const cap = crit ? `${crit} critical &middot; ${active.length} active` : `${active.length} active`;
     box.innerHTML = `<header class="sboard__cap"><span>&#9888; gpu intrusion alarm</span><span class="sboard__n">${cap}</span></header>${context}<div class="alert__list">${chips}${log}</div>`;
+  }
+
+  _renderGuardPanel() {
+    const panel = document.getElementById("sb-gpu-guard-panel");
+    if (!panel) return;
+
+    const g = this._guardState || {};
+    const h = this._guardHistory || {};
+    const active = (g.active || []);
+    const crit = active.filter((a) => a.status === "critical").length;
+    const total = h.total != null ? h.total : (g.count || 0);
+
+    let statusTxt, statusCls;
+    if (crit) { statusTxt = `${crit} critical`; statusCls = "is-critical"; }
+    else if (active.length) { statusTxt = `${active.length} active`; statusCls = "is-active"; }
+    else if (g.armed) { statusTxt = "all clear"; statusCls = "is-clear"; }
+    else { statusTxt = "offline"; statusCls = "is-off"; }
+
+    const records = h.records || [];
+    const rows = records.length
+      ? records.map((r) => {
+          const kind = r.kind === "critical" ? "critical" : "intrusion";
+          const stamp = (r.critical_at || r.detected_at || "").replace("T", " ");
+          const intr = r.intruder || {};
+          const gpu = r.gpu || {};
+          const label = kind === "critical" ? "process killed" : "intrusion";
+          const extra = kind === "critical" && r.dead_pids ? ` (your pid ${this._esc(r.dead_pids.join(", "))} died)` : "";
+          return (
+            `<div class="ghist__row is-${kind}" title="${this._esc(this._guardCtx(r.all_gpus))}">` +
+            `<span class="ghist__time">${this._esc(stamp)}</span>` +
+            `<span class="ghist__kind">${label}</span>` +
+            `<span class="ghist__user">${this._esc(intr.user || "?")}</span>` +
+            `<span class="ghist__gpu">gpu ${gpu.index != null ? gpu.index : "?"}</span>` +
+            `<span class="ghist__mem">${intr.mem_mib != null ? Math.round(intr.mem_mib) + " MiB" : "--"}</span>` +
+            `<span class="ghist__cmd" title="${this._esc(intr.cmd || "")}">${this._esc(intr.cmd || "")}${extra}</span>` +
+            `</div>`
+          );
+        }).join("")
+      : `<div class="sboard__empty">no infractions on record</div>`;
+
+    panel.innerHTML =
+      `<header class="sboard__cap"><span>gpu guard</span>` +
+      `<span class="ggd__status ${statusCls}"><i class="ggd__light"></i>${statusTxt}</span></header>` +
+      `<div class="ghist__meta"><span>${total} infraction${total === 1 ? "" : "s"} on record</span><span class="ghist__path" title="${this._esc(h.log_path || "")}">${this._esc(h.log_path || "")}</span></div>` +
+      `<div class="ghist"><div class="ghist__row ghist__row--head"><span>time</span><span>event</span><span>user</span><span>gpu</span><span>mem</span><span>command</span></div><div class="ghist__body">${rows}</div></div>`;
+  }
+
+  _guardCtx(gpus) {
+    if (!gpus || !gpus.length) return "";
+    return "context · " + gpus.map((x) => {
+      const who = x.free ? "free" : (x.mine && x.others ? "you+others" : (x.mine ? "you" : ((x.holders || [])[0] || {}).user || "others"));
+      return `gpu${x.index}:${who}`;
+    }).join("  ");
   }
 
   _alarm(critical) {

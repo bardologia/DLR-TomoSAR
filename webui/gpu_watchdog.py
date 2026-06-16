@@ -53,6 +53,24 @@ class GpuWatchdog:
                 "log_path" : str(self.log_path),
             }
 
+    def history(self, limit: int = 100) -> dict:
+        records = []
+        try:
+            with open(self.log_path, encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        records.append(json.loads(line))
+                    except ValueError:
+                        continue
+        except FileNotFoundError:
+            records = []
+
+        records.reverse()
+        return {"records": records[:limit], "total": len(records), "log_path": str(self.log_path)}
+
     def _watch(self) -> None:
         while True:
             time.sleep(self.INTERVAL)

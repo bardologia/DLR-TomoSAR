@@ -230,6 +230,11 @@ class RequestRouter:
         if path == "/api/tensorboard":
             self._send_json(handler, {"instances": self.tensorboard.list_instances()})
             return
+        if path == "/api/gpu-guard/history":
+            query  = parse_qs(urlparse(handler.path).query)
+            limit  = int((query.get("limit") or ["100"])[0])
+            self._send_json(handler, self.gpu_guard.history(limit))
+            return
         if path == "/api/system":
             payload              = self.system.snapshot()
             payload["alerts"]    = self.watchdog.state()
