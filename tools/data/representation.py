@@ -62,17 +62,6 @@ class Representation(Enum):
 
         raise ValueError(f"Unsupported representation: {self}")
 
-    def convert(self, data: np.ndarray) -> np.ndarray:
-        n_samples, n_passes, h, w = data.shape
-        cpp      = _CHANNELS_PER_PASS[self.value]
-        channels = self._channels(data)
-
-        out = np.empty((n_samples, n_passes * cpp, h, w), dtype=np.float32)
-        for c, arr in enumerate(channels):
-            out[:, c::cpp] = arr
-
-        return out
-
     def convert_into(self, out: np.ndarray, data: np.ndarray) -> None:
         cpp      = _CHANNELS_PER_PASS[self.value]
         channels = self._channels(data)

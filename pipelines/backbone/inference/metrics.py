@@ -21,9 +21,7 @@ from tools.metrics.scoring    import R2, RelativeImprovement
 class ReducedComparison:
     reduced_curves : np.ndarray
     gt_norm        : np.ndarray
-    pred_norm      : np.ndarray
     reduced_norm   : np.ndarray
-    err_pred       : np.ndarray
     err_reduced    : np.ndarray
     improvement    : np.ndarray
     metrics        : Dict[str, float]
@@ -561,9 +559,7 @@ class Metrics:
         return ReducedComparison(
             reduced_curves = reduced_curves,
             gt_norm        = gt_n,
-            pred_norm      = pred_n,
             reduced_norm   = red_n,
-            err_pred       = err_pred,
             err_reduced    = err_reduced,
             improvement    = improvement,
             metrics        = out,

@@ -60,62 +60,6 @@ class Tracker:
         except (ValueError, RuntimeError):
             pass
 
-    def log_image(self, tag, img, step=None, dataformats="CHW") -> None:
-        self._emit("add_image", tag, np.asarray(img), step, dataformats=dataformats)
-
-    def log_images(self, tag, imgs, step=None, dataformats="NCHW") -> None:
-        self._emit("add_images", tag, np.asarray(imgs), step, dataformats=dataformats)
-
-    def log_figure(self, tag, fig, step=None, close=True) -> None:
-        if self.writer is None:
-            if close:
-                import matplotlib.pyplot as plt
-                plt.close(fig)
-            return
-        self._emit("add_figure", tag, fig, step, close=close)
-
-    def log_text(self, tag, text, step=None) -> None:
-        self._emit("add_text", tag, str(text), step)
-
-    def log_pr_curve(self, tag, labels, predictions, step=None) -> None:
-        if self.writer is None:
-            return
-        self.writer.add_pr_curve(self._tag(tag), labels, predictions, self._resolve(step))
-
-    def log_hparams(self, hparams: Mapping[str, Any], metrics: Mapping[str, Any]) -> None:
-        if self.writer is None:
-            return
-
-        clean_h = {k: (v if isinstance(v, (int, float, str, bool)) else str(v)) for k, v in hparams.items()}
-        clean_m = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
-
-        try:
-            self.writer.add_hparams(clean_h, clean_m)
-        except (ValueError, TypeError):
-            pass
-
-    def log_graph(self, model, input_to_model) -> None:
-        if self.writer is None:
-            return
-        try:
-            self.writer.add_graph(model, input_to_model)
-        except Exception:
-            pass
-
-    def log_param_stats(self, name, tensor, step=None) -> None:
-        t = np.asarray(tensor, dtype=np.float32).ravel()
-        if t.size == 0:
-            return
-
-        stats = {
-            "mean" : float(t.mean()),
-            "std"  : float(t.std()),
-            "min"  : float(t.min()),
-            "max"  : float(t.max()),
-            "norm" : float(np.linalg.norm(t)),
-        }
-        self.log_metrics(name, stats, step)
-
     def log_memory(self, step=None, device=None) -> None:
         import torch
 
