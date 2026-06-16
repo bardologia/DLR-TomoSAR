@@ -25,6 +25,12 @@ class ProjectPaths:
             "config_module" : "configuration.training.autoencoder_config",
             "config_class"  : "ProfileAeEntryConfig",
         },
+        "train_image_autoencoder": {
+            "file"          : "train",
+            "args"          : ["--mode", "image_autoencoder"],
+            "config_module" : "configuration.training.image_autoencoder_config",
+            "config_class"  : "ImageAeEntryConfig",
+        },
         "train_jepa": {
             "file"          : "train",
             "args"          : ["--mode", "jepa"],

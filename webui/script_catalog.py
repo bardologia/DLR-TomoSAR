@@ -31,11 +31,17 @@ class ScriptCatalog:
             "purpose"   : "Train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
             "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
+        "train_image_autoencoder": {
+            "title"     : "Train Image Autoencoder",
+            "category"  : "Training",
+            "purpose"   : "Train the 2D image autoencoder that learns the latent input embedding consumed as a JEPA front-end.",
+            "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+        },
         "train_jepa": {
             "title"     : "Train JEPA",
             "category"  : "Training",
-            "purpose"   : "Train the JEPA predictor against a frozen or fine-tuned profile autoencoder in latent space.",
-            "essentials": ["run_name", "model_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+            "purpose"   : "Train the JEPA predictor in latent space. Operates in three modes depending on which autoencoder runs are selected: backbone + profile autoencoder, image autoencoder + backbone, or image autoencoder + backbone + profile autoencoder. Each autoencoder is imported pretrained and either frozen or fine-tuned.",
+            "essentials": ["run_name", "model_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "image_autoencoder_mode", "image_autoencoder_logdir", "image_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer": {
             "title"     : "Inference",
@@ -74,6 +80,7 @@ class ScriptCatalog:
         "extract_params",
         "train_backbone",
         "train_autoencoder",
+        "train_image_autoencoder",
         "train_jepa",
         "infer",
         "benchmark",
@@ -86,11 +93,12 @@ class ScriptCatalog:
         "train": {
             "title"    : "Train",
             "category" : "Training",
-            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, or the JEPA predictor.",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, or the JEPA predictor.",
             "members"  : [
-                ("train_backbone",    "Backbone"),
-                ("train_autoencoder", "Autoencoder"),
-                ("train_jepa",        "JEPA"),
+                ("train_backbone",          "Backbone"),
+                ("train_autoencoder",       "Autoencoder"),
+                ("train_image_autoencoder", "Image AE"),
+                ("train_jepa",              "JEPA"),
             ],
         },
     }

@@ -12,6 +12,7 @@ class LaunchView {
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
+    ["image autoencoder", /image_autoencoder|image_ae_finetune/],
     ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
     ["embedding", /embedding/],
     ["probe", /^probe_/],
@@ -39,9 +40,48 @@ class LaunchView {
   ];
 
   static MODEL_KEY_TYPE = {
-    train_backbone:    "backbone",
-    train_autoencoder: "autoencoder",
-    train_jepa:        "jepa",
+    train_backbone:          "backbone",
+    train_autoencoder:       "autoencoder",
+    train_image_autoencoder: "image_autoencoder",
+    train_jepa:              "jepa",
+  };
+
+  static JEPA_MEANINGS = {
+    profile_only: {
+      title  : "JEPA · backbone + profile autoencoder",
+      summary: "Predicts the profile embedding from the raw image stack, then decodes it back to normalized profiles through the profile autoencoder decoder. Select a profile autoencoder run; leave the image autoencoder unset.",
+      flow   : [
+        { kind: "input",  glyph: "stack",   label: "Image stack",          sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "net",     label: "Backbone",             sub: "predictor" },
+        { kind: "latent", glyph: "vector",  label: "Normalized embeddings" },
+        { kind: "model",  glyph: "decoder", label: "Profile AE decoder",   sub: "frozen / fine-tuned" },
+        { kind: "output", glyph: "curve",   label: "Normalized profiles" },
+      ],
+    },
+    image_only: {
+      title  : "JEPA · image autoencoder + backbone",
+      summary: "Encodes the image stack with the image autoencoder front-end, then the backbone maps that latent straight to the Gaussian-mixture profile parameters. Select an image autoencoder run; leave the profile autoencoder unset.",
+      flow   : [
+        { kind: "input",  glyph: "stack",   label: "Image stack",        sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "encoder", label: "Image AE encoder",   sub: "frozen / fine-tuned" },
+        { kind: "latent", glyph: "vector",  label: "Image embedding",    sub: "2D latent" },
+        { kind: "model",  glyph: "net",     label: "Backbone",           sub: "predictor" },
+        { kind: "output", glyph: "params",  label: "Params array",       sub: "amp, μ, σ, amp, μ, σ, …" },
+      ],
+    },
+    image_profile: {
+      title  : "JEPA · image autoencoder + backbone + profile autoencoder",
+      summary: "Encodes the image stack with the image autoencoder front-end, the backbone predicts the profile embedding from that latent, and the profile autoencoder decoder reconstructs the normalized profiles. Select both an image and a profile autoencoder run.",
+      flow   : [
+        { kind: "input",  glyph: "stack",   label: "Image stack",          sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "encoder", label: "Image AE encoder",     sub: "frozen / fine-tuned" },
+        { kind: "latent", glyph: "vector",  label: "Image embedding",      sub: "2D latent" },
+        { kind: "model",  glyph: "net",     label: "Backbone",             sub: "predictor" },
+        { kind: "latent", glyph: "vector",  label: "Normalized embeddings" },
+        { kind: "model",  glyph: "decoder", label: "Profile AE decoder",   sub: "frozen / fine-tuned" },
+        { kind: "output", glyph: "curve",   label: "Normalized profiles" },
+      ],
+    },
   };
 
   static MODEL_MEANINGS = {
@@ -65,17 +105,18 @@ class LaunchView {
         { kind: "output", glyph: "curve",   label: "Reconstructed profiles" },
       ],
     },
-    jepa: {
-      title  : "JEPA",
-      summary: "Predicts the profile embedding from the image stack, then decodes it back to normalized profiles through the autoencoder decoder.",
+    image_autoencoder: {
+      title  : "Image autoencoder",
+      summary: "Learns the latent input space: encodes the SAR image stack into a 2D embedding and reconstructs it. The encoder later serves as a JEPA front-end.",
       flow   : [
-        { kind: "input",  glyph: "stack",   label: "Image stack",         sub: "primary · secondaries · interferograms" },
-        { kind: "model",  glyph: "net",     label: "JEPA",                sub: "predictor" },
-        { kind: "latent", glyph: "vector",  label: "Normalized embeddings" },
-        { kind: "model",  glyph: "decoder", label: "AE decoder",          sub: "frozen / fine-tuned" },
-        { kind: "output", glyph: "curve",   label: "Normalized profiles" },
+        { kind: "input",  glyph: "stack",   label: "Image stack",            sub: "primary · secondaries · interferograms" },
+        { kind: "model",  glyph: "encoder", label: "Encoder" },
+        { kind: "latent", glyph: "vector",  label: "Image embedding",        sub: "2D latent" },
+        { kind: "model",  glyph: "decoder", label: "Decoder" },
+        { kind: "output", glyph: "stack",   label: "Reconstructed stack" },
       ],
     },
+    jepa: LaunchView.JEPA_MEANINGS.profile_only,
   };
 
   static MODEL_COLORS = { input: "#1d4fd8", model: "#16191b", latent: "#a16207", output: "#0f766e", calc: "#7c3aed" };
@@ -130,6 +171,7 @@ class LaunchView {
   static CHOICES = {
     train_jepa: {
       profile_autoencoder_mode: ["frozen", "finetune"],
+      image_autoencoder_mode:   ["frozen", "finetune"],
       target_provider:          ["stopgrad", "ema", "live"],
     },
     benchmark:      LaunchView.EXPERIMENT_JEPA_CHOICES,
@@ -151,9 +193,14 @@ class LaunchView {
     extract_params: {
       dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
     },
-    train_backbone:    LaunchView.DATASET_PICKERS,
-    train_autoencoder: LaunchView.DATASET_PICKERS,
-    train_jepa:        { ...LaunchView.DATASET_PICKERS, profile_autoencoder_run: { mode: "runs", baseFrom: "profile_autoencoder_logdir", checkpointOnly: true } },
+    train_backbone:          LaunchView.DATASET_PICKERS,
+    train_autoencoder:       LaunchView.DATASET_PICKERS,
+    train_image_autoencoder: LaunchView.DATASET_PICKERS,
+    train_jepa:              {
+      ...LaunchView.DATASET_PICKERS,
+      profile_autoencoder_run: { mode: "runs", baseFrom: "profile_autoencoder_logdir", checkpointOnly: true },
+      image_autoencoder_run:   { mode: "runs", baseFrom: "image_autoencoder_logdir",   checkpointOnly: true },
+    },
     benchmark:         LaunchView.EXPERIMENT_PICKERS,
     cross_validate:    LaunchView.EXPERIMENT_PICKERS,
     tune:              LaunchView.EXPERIMENT_PICKERS,
@@ -667,7 +714,15 @@ class LaunchView {
     const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
 
     const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
-    const meaning   = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
+    let meaning     = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
+
+    if (this.key === "train_jepa") {
+      meaning       = this._jepaMeaning();
+      const repaint = () => this._paintModelCard(this._jepaMeaning());
+      this._onDependency("profile_autoencoder_run", repaint);
+      this._onDependency("image_autoencoder_run", repaint);
+    }
+
     if (meaning) host.appendChild(this._buildModelCard(meaning));
 
     host.appendChild(this._buildToolbar(cfg));
@@ -1216,6 +1271,24 @@ class LaunchView {
 
   _effective(leaf) {
     return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
+  }
+
+  _effectiveByPath(path) {
+    const leaf = this._leafByPath(path);
+    return leaf ? this._effective(leaf) : "";
+  }
+
+  _jepaRunSet(path) {
+    const value = String(this._effectiveByPath(path) || "").trim();
+    return value !== "" && value !== "None";
+  }
+
+  _jepaMeaning() {
+    const profile = this._jepaRunSet("profile_autoencoder_run");
+    const image   = this._jepaRunSet("image_autoencoder_run");
+    if (image && profile) return LaunchView.JEPA_MEANINGS.image_profile;
+    if (image)            return LaunchView.JEPA_MEANINGS.image_only;
+    return LaunchView.JEPA_MEANINGS.profile_only;
   }
 
   _leafByPath(path) {
