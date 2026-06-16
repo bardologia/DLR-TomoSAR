@@ -4,6 +4,7 @@ const FT_DEFAULTS = {
   synthetic:           { batch: "512,1024,2048,4096", workers: "0,2,4,6,8", prefetch: "2,4,8,16", timed: 60, warmup: 8, paths: false },
   profile_autoencoder: { batch: "256,512,1024,2048,4096", workers: "0,2,4,6,8", prefetch: "2,4,8,16", timed: 80, warmup: 8, paths: true },
   image_autoencoder:   { batch: "4,8,16,32,64", workers: "0,4,8,12,16", prefetch: "2,4,8", timed: 40, warmup: 5, paths: true },
+  backbone:            { batch: "4,8,16,32,64", workers: "0,4,8,12,16", prefetch: "2,4,8", timed: 40, warmup: 5, paths: true },
 };
 
 const FT_WORKER_COLORS = ["#1d4fd8", "#0f766e", "#0891b2", "#7c3aed", "#b45309", "#be123c"];
