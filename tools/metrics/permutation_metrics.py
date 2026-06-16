@@ -41,19 +41,22 @@ class PermutationMetrics:
         return ((~has_violation) & multi_active).sum().item() / denom
 
     @staticmethod
-    def _assignment_cost_margin(pred_params: torch.Tensor, gt_params: torch.Tensor, ppg: int) -> dict[str, float]:
+    def _perm_costs(pred_params: torch.Tensor, gt_params: torch.Tensor, ppg: int) -> tuple[torch.Tensor, torch.Tensor]:
         B, C, H, W = pred_params.shape
         G          = C // ppg
 
-        p    = pred_params.reshape(B, G, ppg, H, W)
-        g    = gt_params.reshape(  B, G, ppg, H, W)
-        p_mu = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
-        g_mu = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        p_mu = pred_params.reshape(B, G, ppg, H, W)[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
+        g_mu = gt_params.reshape(  B, G, ppg, H, W)[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
 
-        cost_mat   = torch.nan_to_num(torch.cdist(p_mu, g_mu), nan=1e9, posinf=1e9)
-        perms      = torch.tensor(list(itertools.permutations(range(G))), dtype=torch.long, device=pred_params.device)
-        perm_mask  = torch.nn.functional.one_hot(perms, num_classes=G).to(cost_mat.dtype)
-        perm_costs = torch.einsum("bsij,pij->bsp", cost_mat, perm_mask)
+        cost_mat  = torch.nan_to_num(torch.cdist(p_mu, g_mu), nan=1e9, posinf=1e9)
+        perms     = torch.tensor(list(itertools.permutations(range(G))), dtype=torch.long, device=pred_params.device)
+        perm_mask = torch.nn.functional.one_hot(perms, num_classes=G).to(cost_mat.dtype)
+
+        return torch.einsum("bsij,pij->bsp", cost_mat, perm_mask), perms
+
+    @staticmethod
+    def _assignment_cost_margin(pred_params: torch.Tensor, gt_params: torch.Tensor, ppg: int) -> dict[str, float]:
+        perm_costs, _ = PermutationMetrics._perm_costs(pred_params, gt_params, ppg)
 
         sorted_costs, _ = perm_costs.sort(dim=-1)
         best   = sorted_costs[:, :, 0]
@@ -194,18 +197,9 @@ class PermutationMetrics:
         gt_params: torch.Tensor,
         ppg: int,
     ) -> dict[str, float]:
-        B, C, H, W = pred_params.shape
-        G          = C // ppg
+        B = pred_params.shape[0]
 
-        p    = pred_params.reshape(B, G, ppg, H, W)
-        g    = gt_params.reshape(  B, G, ppg, H, W)
-        p_mu = p[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
-        g_mu = g[:, :, 1].permute(0, 2, 3, 1).reshape(B, H * W, G, 1)
-
-        cost_mat   = torch.nan_to_num(torch.cdist(p_mu, g_mu), nan=1e9, posinf=1e9)
-        perms      = torch.tensor(list(itertools.permutations(range(G))), dtype=torch.long, device=pred_params.device)
-        perm_mask  = torch.nn.functional.one_hot(perms, num_classes=G).to(cost_mat.dtype)
-        perm_costs = torch.einsum("bsij,pij->bsp", cost_mat, perm_mask)
+        perm_costs, perms = PermutationMetrics._perm_costs(pred_params, gt_params, ppg)
 
         best_perm_idx = perm_costs.argmin(dim=-1)
 
