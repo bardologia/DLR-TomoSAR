@@ -5,7 +5,7 @@ import numpy as np
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 
 
-class ProfileDatasetPreparation:
+class BackboneDatasetPreparation:
     def __init__(self, dataset_config, trainer_config, run_meta, logger, seed) -> None:
         self.dataset_config = dataset_config
         self.trainer_config = trainer_config

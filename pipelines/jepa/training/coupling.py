@@ -6,14 +6,15 @@ import torch
 import torch.nn as nn
 
 
-class ProfileAutoencoderMode:
+class CouplingMode:
     VALID = ("frozen", "finetune")
 
-    def __init__(self, kind: str) -> None:
+    def __init__(self, kind: str, name: str) -> None:
         if kind not in self.VALID:
-            raise ValueError(f"Unknown profile_autoencoder_mode '{kind}'. Available: {list(self.VALID)}. The autoencoder must be imported from a profile autoencoder run and either frozen or fine-tuned; joint training from scratch is not supported.")
+            raise ValueError(f"Unknown {name} mode '{kind}'. Available: {list(self.VALID)}. The autoencoder must be imported from a pretrained {name} run and either frozen or fine-tuned; joint training from scratch is not supported.")
 
         self.kind = kind
+        self.name = name
 
     @property
     def trainable(self) -> bool:
@@ -31,7 +32,7 @@ class ProfileAutoencoderMode:
         params = [p for p in autoencoder.parameters() if p.requires_grad]
         if not params:
             return []
-        return [{"params": params, "lr": lr, "weight_decay": wd, "name": "profile_autoencoder"}]
+        return [{"params": params, "lr": lr, "weight_decay": wd, "name": self.name}]
 
 
 class TargetProvider:

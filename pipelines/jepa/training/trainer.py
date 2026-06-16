@@ -3,17 +3,21 @@ from __future__ import annotations
 import torch.nn as nn
 
 from tools.training                   import BaseTrainer
-from pipelines.jepa.training.coupling import ProfileAutoencoderMode, TargetProvider
-from pipelines.jepa.training.loss     import Loss
+from pipelines.jepa.training.coupling import CouplingMode, TargetProvider
+from pipelines.jepa.training.loss     import Loss as EmbeddingLoss
+from pipelines.backbone.training.loss import Loss as ParameterLoss
 
 
 class JepaModule(nn.Module):
-    def __init__(self, backbone: nn.Module, autoencoder: nn.Module) -> None:
+    def __init__(self, backbone: nn.Module, profile_autoencoder: nn.Module | None = None, image_autoencoder: nn.Module | None = None) -> None:
         super().__init__()
-        self.backbone    = backbone
-        self.autoencoder = autoencoder
+        self.backbone            = backbone
+        self.profile_autoencoder = profile_autoencoder
+        self.image_autoencoder   = image_autoencoder
 
     def forward(self, images):
+        if self.image_autoencoder is not None:
+            images = self.image_autoencoder.encode_features(images, out_hw=images.shape[-2:])
         return self.backbone(images)
 
 
@@ -27,41 +31,57 @@ class Trainer(BaseTrainer):
         self.norm_stats         = norm_stats
         self.profile_normalizer = profile_normalizer
 
-        self.profile_autoencoder_mode = ProfileAutoencoderMode(config.profile_autoencoder_mode)
-        self.profile_autoencoder_mode.apply(model.autoencoder)
-        self.validate_coupling(self.profile_autoencoder_mode, config.target_provider, config.embedding_loss)
+        self.has_profile = model.profile_autoencoder is not None
+        self.has_image   = model.image_autoencoder   is not None
+
+        self.image_mode = CouplingMode(config.image_autoencoder_mode, "image autoencoder") if self.has_image else None
+        if self.has_image:
+            self.image_mode.apply(model.image_autoencoder)
+
+        self.profile_mode = CouplingMode(config.profile_autoencoder_mode, "profile autoencoder") if self.has_profile else None
+        if self.has_profile:
+            self.profile_mode.apply(model.profile_autoencoder)
+            self.validate_coupling(self.profile_mode, config.target_provider, config.embedding_loss)
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
     @staticmethod
-    def validate_coupling(profile_autoencoder_mode: ProfileAutoencoderMode, target_provider: str, embedding_cfg) -> None:
-        if target_provider in ("live", "ema") and not profile_autoencoder_mode.trainable:
-            raise ValueError(f"target_provider '{target_provider}' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_autoencoder_mode.kind}'.")
+    def validate_coupling(profile_mode: CouplingMode, target_provider: str, embedding_cfg) -> None:
+        if target_provider in ("live", "ema") and not profile_mode.trainable:
+            raise ValueError(f"target_provider '{target_provider}' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_mode.kind}'.")
 
         if target_provider == "live" and not embedding_cfg.use_curve_recon:
             raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'/'ema'.")
 
     def _build_param_groups(self):
-        param_groups  = self.backbone_cfg.get_param_groups(self.model.backbone)
-        param_groups += self.profile_autoencoder_mode.param_groups(self.model.autoencoder, self.config.ae_finetune_lr, self.config.ae_finetune_wd)
+        param_groups = self.backbone_cfg.get_param_groups(self.model.backbone)
+        if self.has_profile:
+            param_groups += self.profile_mode.param_groups(self.model.profile_autoencoder, self.config.ae_finetune_lr, self.config.ae_finetune_wd)
+        if self.has_image:
+            param_groups += self.image_mode.param_groups(self.model.image_autoencoder, self.config.image_ae_finetune_lr, self.config.image_ae_finetune_wd)
         return param_groups
 
     def _build_criterion(self):
-        target_provider = TargetProvider(self.config.target_provider, self.model.autoencoder.encoder, self.config.ema_decay).to(self.device)
-        return Loss(self.model.autoencoder, target_provider, self.config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian, self.profile_normalizer)
+        if self.has_profile:
+            target_provider = TargetProvider(self.config.target_provider, self.model.profile_autoencoder.encoder, self.config.ema_decay).to(self.device)
+            return EmbeddingLoss(self.model.profile_autoencoder, target_provider, self.config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian, self.profile_normalizer)
+
+        return ParameterLoss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.config.param_loss, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses)
 
     def _set_train_mode(self):
         self.model.backbone.train()
-        if self.profile_autoencoder_mode.trainable:
-            self.model.autoencoder.train()
+        if self.has_profile and self.profile_mode.trainable:
+            self.model.profile_autoencoder.train()
+        if self.has_image and self.image_mode.trainable:
+            self.model.image_autoencoder.train()
 
     def _on_optimizer_step(self):
-        if self.profile_autoencoder_mode.trainable:
-            self.criterion.target_provider.update(self.model.autoencoder.encoder)
+        if self.has_profile and self.profile_mode.trainable:
+            self.criterion.target_provider.update(self.model.profile_autoencoder.encoder)
 
     def _compute_loss(self, batch):
         images    = batch[0].to(self.device)
         gt_params = batch[1].to(self.device)
-        z_hat     = self.model(images)
-       
-        return self.criterion(z_hat, gt_params)
+        pred      = self.model(images)
+
+        return self.criterion(pred, gt_params)

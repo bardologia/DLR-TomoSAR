@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.experiments.benchmark_config    import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
-from configuration.inference.inference_config      import InferenceConfig
-from configuration.sar.geometry_config             import GeometryConfig
-from configuration.training.optimization_config    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.runtime_config         import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
-from configuration.training.trainer_config         import SharedSubConfigInheritance
+from configuration.experiments.benchmark_config          import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.model.autoencoder_models_config       import AutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.model.image_autoencoder_models_config import ImageAutoencoderBaseConfig
+from configuration.inference.inference_config            import InferenceConfig
+from configuration.sar.geometry_config                   import GeometryConfig
+from configuration.training.loss_config                  import LossConfig
+from configuration.training.optimization_config          import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.training.runtime_config               import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.trainer_config               import SharedSubConfigInheritance
 
 
 @dataclass
@@ -34,8 +36,8 @@ class EmbeddingLossConfig:
 @dataclass
 class JepaTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder    : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    embedding_loss : EmbeddingLossConfig   = field(default_factory=EmbeddingLossConfig)
+    autoencoder    : AutoencoderBaseConfig | None = None
+    embedding_loss : EmbeddingLossConfig          = field(default_factory=EmbeddingLossConfig)
 
     profile_autoencoder_mode       : str        = "frozen"
     target_provider                : str        = "stopgrad"
@@ -44,6 +46,15 @@ class JepaTrainerConfig(SharedSubConfigInheritance):
 
     ae_finetune_lr : float = 3e-5
     ae_finetune_wd : float = 1e-4
+
+    image_autoencoder            : ImageAutoencoderBaseConfig | None = None
+    image_autoencoder_mode       : str                              = "frozen"
+    image_autoencoder_checkpoint : str | None                       = None
+
+    image_ae_finetune_lr : float = 3e-5
+    image_ae_finetune_wd : float = 1e-4
+
+    param_loss : LossConfig = field(default_factory=lambda: LossConfig(use_param_l1=True, weight_param_l1=1.0))
 
     geometry         : GeometryConfig        = field(default_factory=GeometryConfig)
     early_stopping   : EarlyStoppingConfig   = field(default_factory=EarlyStoppingConfig)
@@ -84,7 +95,12 @@ class JepaEntryConfig:
     profile_autoencoder_mode   : str         = "frozen"
     target_provider            : str         = "stopgrad"
 
+    image_autoencoder_logdir : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/image_autoencoder")
+    image_autoencoder_run    : str | None  = None
+    image_autoencoder_mode   : str         = "frozen"
+
     embedding_loss : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
+    param_loss     : LossConfig          = field(default_factory=lambda: LossConfig(use_param_l1=True, weight_param_l1=1.0))
     overfit        : OverfitConfig       = field(default_factory=OverfitConfig)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
