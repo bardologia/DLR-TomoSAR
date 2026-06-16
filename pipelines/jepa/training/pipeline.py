@@ -6,14 +6,14 @@ import torch
 
 from configuration.training.jepa_config                  import JepaTrainerConfig
 from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from models.autoencoder                                  import get_autoencoder
+from models.profile_autoencoder                                  import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.shared.config_factory                     import ConfigFactory
 from pipelines.shared.run_metadata                       import TrainingRunMetadata
 from pipelines.shared.dataset_prep                        import BackboneDatasetPreparation
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
-from tools.data.io                                       import AutoencoderConfigIO, ImageAutoencoderConfigIO
+from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                       import Reproducibility
 
 
@@ -38,7 +38,7 @@ class TrainingPipeline:
         profile_checkpoint            = None
         if profile_dir is not None:
             self.profile_autoencoder_meta            = profile_dir / "meta"
-            self.autoencoder_cfg, self.ae_model_name = AutoencoderConfigIO.load(self.profile_autoencoder_meta)
+            self.autoencoder_cfg, self.ae_model_name = ProfileAutoencoderConfigIO.load(self.profile_autoencoder_meta)
             profile_checkpoint                       = str(profile_dir / "best_model.pt")
 
         self.image_autoencoder_meta = None
@@ -116,7 +116,7 @@ class TrainingPipeline:
         return get_backbone(self.backbone_name, **overrides)
 
     def _load_profile_autoencoder(self):
-        autoencoder, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+        autoencoder, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
         ckpt_path      = self.trainer_config.profile_autoencoder_checkpoint
         self.validate_checkpoint(ckpt_path, "profile")
 
@@ -146,7 +146,7 @@ class TrainingPipeline:
         run_meta.save_model_config(backbone_cfg, self.backbone_name)
 
         if self.autoencoder_cfg is not None:
-            AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
+            ProfileAutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         if self.image_ae_cfg is not None:
             ImageAutoencoderConfigIO.save(self.image_ae_cfg, self.image_ae_model_name, run_meta.metadata_directory)
 

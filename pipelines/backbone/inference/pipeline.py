@@ -26,11 +26,11 @@ class InferenceComponents:
 class InferenceComponentsResolver:
     @staticmethod
     def for_run(run_directory: Path) -> InferenceComponents:
-        from tools.data.io import AutoencoderConfigIO, ImageAutoencoderConfigIO
+        from tools.data.io import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 
         meta = Path(run_directory) / "meta"
 
-        if AutoencoderConfigIO.exists(meta):
+        if ProfileAutoencoderConfigIO.exists(meta):
             from pipelines.jepa.inference.pipeline import JEPA_INFERENCE_COMPONENTS
             return JEPA_INFERENCE_COMPONENTS
 

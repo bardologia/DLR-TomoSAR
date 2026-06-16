@@ -9,10 +9,10 @@ from configuration.experiments.benchmark_config import (
     InferenceQueueConfig,
     TrainingQueueConfig,
 )
-from configuration.training.autoencoder_config     import AutoencoderLossConfig
+from configuration.training.profile_autoencoder_config     import ProfileAeLossConfig
 from configuration.sar.geometry_config             import GeometryConfig
 from configuration.training.jepa_config            import EmbeddingLossConfig
-from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.model.profile_autoencoder_models_config import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.training.runtime_config         import OverfitConfig
 
 
@@ -35,8 +35,8 @@ class JepaCvConfig:
 @dataclass
 class AeCvConfig:
     ae_model_name   : str                   = "mlp_ae"
-    autoencoder     : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    ae_loss         : AutoencoderLossConfig = field(default_factory=AutoencoderLossConfig)
+    autoencoder     : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
+    ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     pixel_subsample : float                 = 1.0
     keep_empty_frac : float                 = 0.05
 
@@ -69,4 +69,4 @@ class CrossValidationConfig:
     poll_interval_s : float      = 5.0
 
     def runs_inference(self) -> bool:
-        return self.training_type != "autoencoder"
+        return self.training_type != "profile_autoencoder"

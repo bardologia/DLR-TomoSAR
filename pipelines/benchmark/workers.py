@@ -36,8 +36,8 @@ class BenchmarkWorker:
         )
 
     def _ae_entry_config(self, model_name: str, logdir: Path, overfit):
-        from configuration.training.autoencoder_config import ProfileAeEntryConfig
-        from models.autoencoder                        import AE_CONFIG_REGISTRY
+        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
+        from models.profile_autoencoder                        import PROFILE_AE_CONFIG_REGISTRY
 
         return ProfileAeEntryConfig(
             run_name        = model_name,
@@ -47,7 +47,7 @@ class BenchmarkWorker:
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
             ae_model_name   = model_name,
-            autoencoder     = AE_CONFIG_REGISTRY[model_name](),
+            autoencoder     = PROFILE_AE_CONFIG_REGISTRY[model_name](),
             ae_loss         = self.config.ae_loss,
             overfit         = overfit,
             paths           = self.config.paths,
@@ -154,7 +154,7 @@ class OverfitWorker(BenchmarkWorker):
         self._finalize_overfit(result, result_path)
 
     def run(self, model_name: str) -> None:
-        if self.config.training_type == "autoencoder":
+        if self.config.training_type == "profile_autoencoder":
             self._run_ae(model_name)
             return
         if self.config.training_type == "jepa":
@@ -235,7 +235,7 @@ class OverfitWorker(BenchmarkWorker):
 
 class TrainingWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
-        if self.config.training_type == "autoencoder":
+        if self.config.training_type == "profile_autoencoder":
             from configuration.training.runtime_config           import OverfitConfig
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 

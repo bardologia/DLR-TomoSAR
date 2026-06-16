@@ -6,7 +6,7 @@ import torch.nn as nn
 from models.blocks import EmbeddingNorm, build_activation, initialize_weights
 
 
-class AutoencoderBlocks:
+class ProfileAutoencoderBlocks:
     @staticmethod
     def conv1x1(in_ch: int, out_ch: int) -> nn.Conv2d:
         return nn.Conv2d(in_ch, out_ch, kernel_size=1, bias=True)
@@ -17,13 +17,13 @@ class AutoencoderBlocks:
         prev = in_ch
 
         for _ in range(max(1, depth)):
-            layers.append(AutoencoderBlocks.conv1x1(prev, hidden))
+            layers.append(ProfileAutoencoderBlocks.conv1x1(prev, hidden))
             layers.append(build_activation(activation))
             if dropout > 0.0:
                 layers.append(nn.Dropout2d(dropout))
             prev = hidden
 
-        layers.append(AutoencoderBlocks.conv1x1(prev, out_ch))
+        layers.append(ProfileAutoencoderBlocks.conv1x1(prev, out_ch))
         return nn.Sequential(*layers)
 
     @staticmethod
@@ -39,7 +39,7 @@ class AutoencoderBlocks:
         return seq.reshape(B, H, W, L_out).permute(0, 3, 1, 2).contiguous()
 
 
-class AutoencoderBase(EmbeddingNorm, nn.Module):
+class ProfileAutoencoderBase(EmbeddingNorm, nn.Module):
     def __init__(self, config, encoder: nn.Module, decoder: nn.Module) -> None:
         super().__init__()
         self.config = config

@@ -88,7 +88,7 @@ class ProfileAutoencoderModelLibrary:
         return families
 
     def _resolve_defaults(self) -> dict[str, tuple[str, str]]:
-        module   = self._import_autoencoder_models_config()
+        module   = self._import_profile_autoencoder_models_config()
         resolved = {}
 
         for key, class_name in self.CONFIG_CLASSES.items():
@@ -99,16 +99,16 @@ class ProfileAutoencoderModelLibrary:
 
         return resolved
 
-    def _import_autoencoder_models_config(self):
+    def _import_profile_autoencoder_models_config(self):
         config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
         path       = str(config_dir)
 
         if path not in sys.path:
             sys.path.insert(0, path)
 
-        import autoencoder_models_config
+        import profile_autoencoder_models_config
 
-        return autoencoder_models_config
+        return profile_autoencoder_models_config
 
     def _families(self) -> list[dict]:
         return [

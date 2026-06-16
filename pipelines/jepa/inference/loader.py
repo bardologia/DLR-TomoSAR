@@ -4,12 +4,12 @@ import torch
 import torch.nn as nn
 
 from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from models.autoencoder                                  import get_autoencoder
+from models.profile_autoencoder                                  import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.backbone.inference.loader                 import ModelWrapper, RunLoader
 from pipelines.jepa.training.trainer                     import JepaModule
-from tools.data.io                                       import AutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
+from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 
 
 
@@ -35,7 +35,7 @@ class JepaRunLoader(RunLoader):
         return image_autoencoder, image_cfg.embedding_dim
 
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
-        ae_cfg, ae_name = AutoencoderConfigIO.load(self.meta_directory)
+        ae_cfg, ae_name = ProfileAutoencoderConfigIO.load(self.meta_directory)
         model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
 
         image_autoencoder, backbone_in = self._image_frontend(in_channels)
@@ -45,7 +45,7 @@ class JepaRunLoader(RunLoader):
             overrides["image_size"] = image_size
         backbone, _ = get_backbone(backbone_name, config=model_config, **overrides)
 
-        profile_autoencoder, _  = get_autoencoder(ae_name, ae_cfg)
+        profile_autoencoder, _  = get_profile_autoencoder(ae_name, ae_cfg)
         self.profile_normalizer = ProfileNormalizer(ProfileStats.load(self.meta_directory))
 
         return JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)

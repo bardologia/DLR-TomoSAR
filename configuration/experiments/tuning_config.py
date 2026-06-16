@@ -8,9 +8,9 @@ from configuration.training.runtime_config      import OverfitConfig
 
 
 def _default_ae_loss():
-    from configuration.training.autoencoder_config import AutoencoderLossConfig
+    from configuration.training.profile_autoencoder_config import ProfileAeLossConfig
 
-    return AutoencoderLossConfig()
+    return ProfileAeLossConfig()
 
 
 def _default_embedding_loss():

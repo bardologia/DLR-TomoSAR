@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.data.profile_config              import ProfileDatasetConfig
-from configuration.training.autoencoder_config      import ProfileAeTrainerConfig
-from models.autoencoder                             import get_autoencoder
+from configuration.training.profile_autoencoder_config      import ProfileAeTrainerConfig
+from models.profile_autoencoder                             import get_profile_autoencoder
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
 from pipelines.shared.config_factory                import ConfigFactory
 from pipelines.shared.run_metadata                  import TrainingRunMetadata
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from tools.data.io                                  import AutoencoderConfigIO
+from tools.data.io                                  import ProfileAutoencoderConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
 
@@ -39,7 +39,7 @@ class TrainingPipeline:
 
     def _build_model(self, x_len: int):
         self.autoencoder_cfg.profile_length = x_len
-        model, _ = get_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+        model, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
         return model
 
     def _profile_dataset_config(self) -> ProfileDatasetConfig:
@@ -64,7 +64,7 @@ class TrainingPipeline:
 
     def _save_metadata(self, run_meta, x_len: int) -> None:
         run_meta.save_trainer_config()
-        AutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
+        ProfileAutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
 
     def _make_trainer(self, run_meta, logger, model, x_axis) -> Trainer:

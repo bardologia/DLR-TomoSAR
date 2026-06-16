@@ -6,7 +6,7 @@ import torch.nn as nn
 
 
 @dataclass
-class AutoencoderBaseConfig:
+class ProfileAutoencoderBaseConfig:
     profile_length : int   = 256
 
     embedding_dim  : int = 24
@@ -44,7 +44,7 @@ class AutoencoderBaseConfig:
 
 
 @dataclass
-class MlpAutoencoderConfig(AutoencoderBaseConfig):
+class MlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
     hidden_dim : int   = 128
     depth      : int   = 2
     dropout    : float = 0.0
@@ -60,7 +60,7 @@ class MlpAutoencoderConfig(AutoencoderBaseConfig):
 
 
 @dataclass
-class Conv1dAutoencoderConfig(AutoencoderBaseConfig):
+class Conv1dAutoencoderConfig(ProfileAutoencoderBaseConfig):
     seq_channels    : int = 32
     seq_kernel_size : int = 5
 
@@ -74,7 +74,7 @@ class Conv1dAutoencoderConfig(AutoencoderBaseConfig):
 
 
 @dataclass
-class Transformer1dAutoencoderConfig(AutoencoderBaseConfig):
+class Transformer1dAutoencoderConfig(ProfileAutoencoderBaseConfig):
     hidden_dim : int   = 128
     depth      : int   = 2
     num_heads  : int   = 4

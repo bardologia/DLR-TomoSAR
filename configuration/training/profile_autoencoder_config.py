@@ -5,7 +5,7 @@ from pathlib     import Path
 
 from configuration.data.profile_config             import ProfileAugmentationConfig
 from configuration.experiments.benchmark_config    import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.autoencoder_models_config import AutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.model.profile_autoencoder_models_config import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config             import GeometryConfig
 from configuration.training.optimization_config    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.runtime_config         import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
@@ -13,7 +13,7 @@ from configuration.training.trainer_config         import SharedSubConfigInherit
 
 
 @dataclass
-class AutoencoderLossConfig:
+class ProfileAeLossConfig:
     curve_kind      : str   = "mse"
     huber_delta     : float = 1.0
     charbonnier_eps : float = 1e-3
@@ -22,8 +22,8 @@ class AutoencoderLossConfig:
 @dataclass
 class ProfileAeTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder      : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    ae_loss          : AutoencoderLossConfig = field(default_factory=AutoencoderLossConfig)
+    autoencoder      : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
+    ae_loss          : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     geometry         : GeometryConfig        = field(default_factory=GeometryConfig)
     early_stopping   : EarlyStoppingConfig   = field(default_factory=EarlyStoppingConfig)
     warmup           : WarmupConfig          = field(default_factory=WarmupConfig)
@@ -51,8 +51,8 @@ class ProfileAeEntryConfig:
     profile_augmentation : ProfileAugmentationConfig = field(default_factory=ProfileAugmentationConfig)
 
     ae_model_name : str                   = "mlp_ae"
-    autoencoder   : AutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    ae_loss       : AutoencoderLossConfig = field(default_factory=AutoencoderLossConfig)
+    autoencoder   : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
+    ae_loss       : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     overfit       : OverfitConfig         = field(default_factory=OverfitConfig)
     geometry      : GeometryConfig        = field(default_factory=GeometryConfig)
 

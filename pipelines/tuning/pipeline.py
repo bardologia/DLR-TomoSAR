@@ -64,7 +64,7 @@ class TuningOrchestrator:
         return {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
 
     def _ae_entry_template(self):
-        from configuration.training.autoencoder_config import ProfileAeEntryConfig
+        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
 
         return ProfileAeEntryConfig(
             seed            = self.config.tuning.base_seed,
@@ -327,12 +327,12 @@ class TuningOrchestrator:
             "Storage"    : storage_url,
         })
 
-        if self.config.training_type == "autoencoder":
-            from models.autoencoder import AE_CONFIG_REGISTRY
+        if self.config.training_type == "profile_autoencoder":
+            from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
 
             tuner = AeTuner(
                 model_name     = model_name,
-                config_cls     = AE_CONFIG_REGISTRY[model_name],
+                config_cls     = PROFILE_AE_CONFIG_REGISTRY[model_name],
                 entry_template = self._ae_entry_template(),
                 tune_cfg       = tune_cfg,
                 log_dir        = str(self.run_dir / model_name),

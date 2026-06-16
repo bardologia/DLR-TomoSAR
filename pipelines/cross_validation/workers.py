@@ -115,13 +115,13 @@ class FoldTrainingWorker(CrossValidationWorker):
             training                   = cv.training,
         )
 
-    def _run_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:
+    def _run_profile_autoencoder(self, fold_index: int, split_regions: SplitRegions) -> None:
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
         TrainingPipeline(self._ae_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
     def _ae_entry_config(self, run_name: str):
-        from configuration.training.autoencoder_config import ProfileAeEntryConfig
+        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
 
         cv = self.config
         ae = cv.autoencoder
@@ -146,7 +146,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         dispatch = {
             "backbone"    : self._run_backbone,
             "jepa"        : self._run_jepa,
-            "autoencoder" : self._run_autoencoder,
+            "profile_autoencoder" : self._run_profile_autoencoder,
         }
 
         training_type = self.config.training_type

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.experiments.benchmark_config          import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.autoencoder_models_config       import AutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.model.profile_autoencoder_models_config       import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.model.image_autoencoder_models_config import ImageAutoencoderBaseConfig
 from configuration.inference.inference_config            import InferenceConfig
 from configuration.sar.geometry_config                   import GeometryConfig
@@ -36,7 +36,7 @@ class EmbeddingLossConfig:
 @dataclass
 class JepaTrainerConfig(SharedSubConfigInheritance):
     gaussian            : object
-    autoencoder    : AutoencoderBaseConfig | None = None
+    autoencoder    : ProfileAutoencoderBaseConfig | None = None
     embedding_loss : EmbeddingLossConfig          = field(default_factory=EmbeddingLossConfig)
 
     profile_autoencoder_mode       : str        = "frozen"

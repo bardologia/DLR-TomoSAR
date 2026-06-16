@@ -127,16 +127,16 @@ class BackboneModelConfigIO(ConfigIO):
         return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
 
 
-class AutoencoderConfigIO(ConfigIO):
-    FILENAME     = "autoencoder_config.json"
+class ProfileAutoencoderConfigIO(ConfigIO):
+    FILENAME     = "profile_autoencoder_config.json"
     NAME_KEY     = "ae_model_name"
-    MISSING_NOUN = "autoencoder"
-    UNKNOWN_NOUN = "autoencoder"
+    MISSING_NOUN = "profile autoencoder"
+    UNKNOWN_NOUN = "profile autoencoder"
 
     @classmethod
     def _registry(cls) -> dict:
-        from models.autoencoder import AE_CONFIG_REGISTRY
-        return AE_CONFIG_REGISTRY
+        from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
+        return PROFILE_AE_CONFIG_REGISTRY
 
     @classmethod
     def _serialize(cls, config) -> dict:

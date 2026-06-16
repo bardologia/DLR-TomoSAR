@@ -35,13 +35,13 @@ class LaunchView {
 
   static TRAINING_TYPES = [
     ["backbone", "Backbone"],
-    ["autoencoder", "Profile AE"],
+    ["profile_autoencoder", "Profile AE"],
     ["jepa", "JEPA"],
   ];
 
   static MODEL_KEY_TYPE = {
     train_backbone:             "backbone",
-    train_profile_autoencoder:  "autoencoder",
+    train_profile_autoencoder:  "profile_autoencoder",
     train_image_autoencoder:    "image_autoencoder",
     train_jepa:                 "jepa",
   };
@@ -97,7 +97,7 @@ class LaunchView {
         { kind: "output", glyph: "params", label: "Params array", sub: "amp, μ, σ, amp, μ, σ, …" },
       ],
     },
-    autoencoder: {
+    profile_autoencoder: {
       title  : "Profile autoencoder",
       summary: "Learns the latent profile (output) space: encodes the fitted normalized profiles into embeddings and reconstructs them.",
       flow   : [

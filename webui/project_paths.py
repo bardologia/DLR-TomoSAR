@@ -22,7 +22,7 @@ class ProjectPaths:
         "train_profile_autoencoder": {
             "file"          : "train",
             "args"          : ["--mode", "profile_autoencoder"],
-            "config_module" : "configuration.training.autoencoder_config",
+            "config_module" : "configuration.training.profile_autoencoder_config",
             "config_class"  : "ProfileAeEntryConfig",
         },
         "train_image_autoencoder": {

@@ -3,8 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.autoencoder_models_config import Conv1dAutoencoderConfig
-from models.autoencoder.base                       import AutoencoderBase, AutoencoderBlocks
+from configuration.model.profile_autoencoder_models_config import Conv1dAutoencoderConfig
+from models.profile_autoencoder.base                       import ProfileAutoencoderBase, ProfileAutoencoderBlocks
 from models.blocks                                 import build_activation
 
 
@@ -22,10 +22,10 @@ class Conv1dEncoder(nn.Module):
         self.head = nn.Linear(config.seq_channels, config.embedding_dim)
 
     def forward(self, curve: torch.Tensor) -> torch.Tensor:
-        seq, dims = AutoencoderBlocks.to_sequence(curve)
+        seq, dims = ProfileAutoencoderBlocks.to_sequence(curve)
         feats = self.body(seq.unsqueeze(1))
         z     = self.head(feats.squeeze(-1))
-        return AutoencoderBlocks.from_sequence(z, dims)
+        return ProfileAutoencoderBlocks.from_sequence(z, dims)
 
 
 class Conv1dDecoder(nn.Module):
@@ -42,13 +42,13 @@ class Conv1dDecoder(nn.Module):
         )
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
-        seq, dims = AutoencoderBlocks.to_sequence(z)
+        seq, dims = ProfileAutoencoderBlocks.to_sequence(z)
         feats = self.project(seq).reshape(-1, self.seq_channels, self.length)
         curve = self.body(feats).squeeze(1)
-        return AutoencoderBlocks.from_sequence(curve, dims)
+        return ProfileAutoencoderBlocks.from_sequence(curve, dims)
 
 
-class Conv1dAutoencoder(AutoencoderBase):
+class Conv1dAutoencoder(ProfileAutoencoderBase):
     def __init__(self, config: Conv1dAutoencoderConfig | None = None) -> None:
         config = config if config is not None else Conv1dAutoencoderConfig()
         super().__init__(config, Conv1dEncoder(config), Conv1dDecoder(config))

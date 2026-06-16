@@ -125,7 +125,7 @@ class CrossValidationReportStage(ExperimentStage):
         self.logger.section("Cross-validation reports")
 
         splits     = self.config.inference_splits if self.config.runs_inference() else []
-        model_name = self.config.backbone_name if self.config.training_type != "autoencoder" else "profile_ae"
+        model_name = self.config.backbone_name if self.config.training_type != "profile_autoencoder" else "profile_ae"
 
         collector = FoldCollector(run_dir=self.run_dir, splits=splits, logger=self.logger)
         base_records, records_by_split = collector.collect_by_split()
