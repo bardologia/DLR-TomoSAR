@@ -72,6 +72,14 @@ class SplitRegions:
     def regions(self, split_name: str) -> list[CropRegion]:
         return self.as_list(dict(self.items())[split_name])
 
+    def region_rows(self) -> list[dict]:
+        rows = []
+        for name, regions in self.region_lists():
+            for index, region in enumerate(regions):
+                label = name if len(regions) == 1 else f"{name}[{index}]"
+                rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
+        return rows
+
     def bounding_global_crop(self) -> CropRegion:
         regions = [region for _, region_list in self.region_lists() for region in region_list]
 

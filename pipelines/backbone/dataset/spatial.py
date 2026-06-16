@@ -45,6 +45,11 @@ class Layout:
 
         return self.data_directory / self.artifacts[artifact_key]
 
+    @property
+    def profile_length(self) -> int:
+        tomogram = np.load(str(self.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
+        return int(tomogram.shape[0])
+
     def secondary_indices(self, secondary_labels) -> list | None:
         if secondary_labels is None:
             return None
@@ -65,12 +70,7 @@ class Cropper:
 
         self.logger.section("[Cropper Initialized]")
         self.logger.subsection(f"Secondary selection : {', '.join(self.secondary_labels) if self.secondary_labels else 'all passes'}")
-        rows = []
-        for name, regions in split_regions.region_lists():
-            for index, region in enumerate(regions):
-                label = name if len(regions) == 1 else f"{name}[{index}]"
-                rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
-        self.logger.metrics_table(rows, ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
+        self.logger.metrics_table(split_regions.region_rows(), ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
 
     def _resolve_labels(self, secondary_labels) -> list | None:
         if self.secondary_indices is None:

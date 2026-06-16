@@ -4,7 +4,6 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Optional, Tuple
 
-import numpy as np
 from torch.utils.data import DataLoader
 
 from configuration.data.dataset_config        import DatasetConfig
@@ -105,9 +104,7 @@ class DatasetPipeline:
 
     @property
     def profile_length(self) -> int:
-        tomo_path = self.layout.artifact_path("tomogram_full")
-        tomo_mmap = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
-        return int(tomo_mmap.shape[0])
+        return self.layout.profile_length
 
     def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None):
         regions  = self.config.split_regions.regions(split_name)

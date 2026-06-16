@@ -14,18 +14,10 @@ class ParameterCropper:
         self.logger        = logger
 
         self.logger.section("[ParameterCropper Initialized]")
-        rows = []
-        for name, regions in split_regions.region_lists():
-            for index, region in enumerate(regions):
-                label = name if len(regions) == 1 else f"{name}[{index}]"
-                rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
-        self.logger.metrics_table(rows, ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
+        self.logger.metrics_table(split_regions.region_rows(), ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])
 
     def profile_length(self) -> int:
-        tomo_path = self.layout.artifact_path("tomogram_full")
-        tomo_mmap = np.load(str(tomo_path), mmap_mode="r", allow_pickle=False)
-
-        return int(tomo_mmap.shape[0])
+        return self.layout.profile_length
 
     def load_split(self, split_name: str) -> list[np.ndarray]:
         regions    = self.split_regions.regions(split_name)
