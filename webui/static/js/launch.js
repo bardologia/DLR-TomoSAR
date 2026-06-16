@@ -166,6 +166,24 @@ class LaunchView {
     tune:           { field: "training_type", options: LaunchView.TRAINING_TYPES },
   };
 
+  static OPTION_GATES = {
+    benchmark: { field: "training_type", sections: {
+      jepa:       ["jepa"],
+      ae_loss:    ["profile_autoencoder"],
+      size_match: ["backbone"],
+      inference:  ["backbone", "jepa"],
+    } },
+    cross_validate: { field: "training_type", sections: {
+      jepa:        ["jepa"],
+      autoencoder: ["profile_autoencoder"],
+      inference:   ["backbone", "jepa"],
+    } },
+    tune: { field: "training_type", sections: {
+      jepa:    ["jepa"],
+      ae_loss: ["profile_autoencoder"],
+    } },
+  };
+
   static EXPERIMENT_JEPA_CHOICES = {
     "jepa.profile_autoencoder_mode": ["frozen", "finetune"],
     "jepa.target_provider":          ["stopgrad", "ema", "live"],
@@ -1307,6 +1325,20 @@ class LaunchView {
     return this.config ? this.config.leaves.find((leaf) => leaf.path === path) : null;
   }
 
+  _optionGate() {
+    return LaunchView.OPTION_GATES[this.key] || null;
+  }
+
+  _optionValue(gate) {
+    const leaf = this._leafByPath(gate.field);
+    return leaf ? this._effective(leaf) : null;
+  }
+
+  _sectionOptionGated(section, gate, value) {
+    const allowed = gate.sections[section.split(".")[0]];
+    return Boolean(allowed) && !allowed.includes(value);
+  }
+
   _pickerSpec(leaf) {
     const specs = LaunchView.PICKERS[this.key];
     return specs ? specs[leaf.path] : null;
@@ -1445,6 +1477,18 @@ class LaunchView {
         gate.sections.forEach((section) => this.gatedSections.add(section));
       }
     });
+
+    const optionGate = this._optionGate();
+    if (optionGate) {
+      const value = this._optionValue(optionGate);
+      this.states.forEach(({ leaf, row }) => {
+        if (this._sectionOptionGated(leaf.section, optionGate, value)) row.dataset.gated = "1";
+      });
+      [...this.panels.keys()].forEach((section) => {
+        if (this._sectionOptionGated(section, optionGate, value)) this.gatedSections.add(section);
+      });
+    }
+
     this._applyVisibility();
   }
 
