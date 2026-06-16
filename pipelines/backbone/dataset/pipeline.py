@@ -178,15 +178,16 @@ class DatasetPipeline:
         test_ds,  test_patcher = self._build_dataset("test", normalizer=normalizer)
 
         train_loader, val_loader, test_loader = Loader.build(
-            train_dataset = train_ds,
-            val_dataset   = val_ds,
-            test_dataset  = test_ds,
-            batch_size    = self.config.batch_size,
-            num_workers   = self.config.num_workers,
-            pin_memory    = self.config.pin_memory,
-            shuffle_train = self.config.shuffle_train,
-            seed          = self.seed,
-            logger        = self.logger,
+            train_dataset   = train_ds,
+            val_dataset     = val_ds,
+            test_dataset    = test_ds,
+            batch_size      = self.config.batch_size,
+            num_workers     = self.config.num_workers,
+            pin_memory      = self.config.pin_memory,
+            shuffle_train   = self.config.shuffle_train,
+            prefetch_factor = self.config.prefetch_factor,
+            seed            = self.seed,
+            logger          = self.logger,
         )
 
         self.metadata_writer.save_dataset_configuration(self.config)

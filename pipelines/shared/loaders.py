@@ -14,22 +14,24 @@ class Loader:
         train_dataset : Dataset,
         val_dataset   : Dataset,
         test_dataset  : Dataset,
-        batch_size    : int,
-        num_workers   : int,
-        logger        : Logger,
-        pin_memory    : bool = True,
-        shuffle_train : bool = True,
-        seed          : int  = 0,
-        section_label : str  = "[Loaders]",
+        batch_size      : int,
+        num_workers     : int,
+        logger          : Logger,
+        pin_memory      : bool = True,
+        shuffle_train   : bool = True,
+        seed            : int  = 0,
+        prefetch_factor : int  = 8,
+        section_label   : str  = "[Loaders]",
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
         logger.section(section_label)
         logger.kv_table({
-            "Batch size":    batch_size,
-            "Num workers":   num_workers,
-            "Pin memory":    pin_memory,
-            "Shuffle train": shuffle_train,
-            "Seed":          seed,
+            "Batch size":      batch_size,
+            "Num workers":     num_workers,
+            "Pin memory":      pin_memory,
+            "Prefetch factor": prefetch_factor,
+            "Shuffle train":   shuffle_train,
+            "Seed":            seed,
         })
 
         worker_init = Reproducibility.worker_init(seed) if num_workers > 0 else None
@@ -39,7 +41,7 @@ class Loader:
             num_workers        = num_workers,
             pin_memory         = pin_memory,
             persistent_workers = num_workers > 0,
-            prefetch_factor    = 8 if num_workers > 0 else None,
+            prefetch_factor    = prefetch_factor if num_workers > 0 else None,
             worker_init_fn     = worker_init,
         )
 

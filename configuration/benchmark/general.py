@@ -45,6 +45,7 @@ class TrainingQueueConfig:
     validation_frequency : int             = 1
     batch_size           : int             = 256
     num_workers          : int             = 4
+    prefetch_factor      : int             = 8
     warmup_steps         : int             = 200
     eta_min              : float           = 1e-6
     early_stop_patience  : int             = 30

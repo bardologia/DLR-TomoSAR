@@ -50,12 +50,13 @@ class ConfigFactory:
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
             secondary_labels            = self._secondary_labels(),
-            patch         = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
-            input_config  = self.benchmark_input_config(),
-            batch_size    = training.batch_size,
-            num_workers   = training.num_workers,
-            shuffle_train = True,
-            pin_memory    = True,
+            patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
+            input_config    = self.benchmark_input_config(),
+            batch_size      = training.batch_size,
+            num_workers     = training.num_workers,
+            prefetch_factor = training.prefetch_factor,
+            shuffle_train   = True,
+            pin_memory      = True,
         )
 
     def overfit_dataset_config(self) -> DatasetConfig:

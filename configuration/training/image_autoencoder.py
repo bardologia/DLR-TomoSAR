@@ -51,4 +51,4 @@ class ImageAeEntryConfig:
     geometry          : GeometryConfig             = field(default_factory=GeometryConfig)
 
     paths    : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
-    training : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
+    training : TrainingQueueConfig  = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
