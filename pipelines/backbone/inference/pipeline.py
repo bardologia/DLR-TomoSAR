@@ -6,7 +6,7 @@ from typing      import Dict, List, Type
 
 import numpy as np
 
-from configuration.inference.inference_config import InferenceConfig
+from configuration.inference import InferenceConfig
 from pipelines.backbone.inference.figures     import FigureComposer
 from pipelines.backbone.inference.loader      import InferenceMetadata, RunLoader
 from pipelines.backbone.inference.metrics     import Metrics

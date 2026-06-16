@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib     import Path
 
-from configuration.experiments.cross_validation_config import CrossValidationConfig
+from configuration.cross_validation import CrossValidationConfig
 from pipelines.benchmark.results                       import TrialCollector, TrialRecord
 from pipelines.benchmark.workers                       import BenchmarkWorker
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
@@ -92,7 +92,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         TrainingPipeline(self._jepa_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
     def _jepa_entry_config(self, run_name: str):
-        from configuration.training.jepa_config import JepaEntryConfig
+        from configuration.training import JepaEntryConfig
 
         cv   = self.config
         jepa = cv.jepa
@@ -121,7 +121,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         TrainingPipeline(self._ae_entry_config(self.fold_name(fold_index)), split_regions=split_regions).run()
 
     def _ae_entry_config(self, run_name: str):
-        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
+        from configuration.training import ProfileAeEntryConfig
 
         cv = self.config
         ae = cv.autoencoder

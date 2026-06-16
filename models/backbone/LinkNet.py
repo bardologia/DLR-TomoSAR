@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.backbone_models_config import LinkNetConfig
+from configuration.architectures import LinkNetConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights, match_spatial_size
 
 class ResidualEncoderBlock(nn.Module):

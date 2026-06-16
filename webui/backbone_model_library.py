@@ -136,15 +136,15 @@ class BackboneModelLibrary:
         return resolved
 
     def _import_backbone_models_config(self):
-        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
+        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "architectures"
         path       = str(config_dir)
 
         if path not in sys.path:
             sys.path.insert(0, path)
 
-        import backbone_models_config
+        import backbone
 
-        return backbone_models_config
+        return backbone
 
     def _families(self) -> list[dict]:
         return [

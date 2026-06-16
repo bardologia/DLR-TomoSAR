@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.backbone_models_config import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig
+from configuration.architectures import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig
 from ..blocks                          import initialize_weights
 from ..blocks                          import ConvBlock, Decoder, Encoder, GaussianHeadsMixin
 

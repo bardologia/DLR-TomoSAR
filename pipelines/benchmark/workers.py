@@ -3,7 +3,7 @@ from __future__ import annotations
 import traceback
 from pathlib import Path
 
-from configuration.experiments.benchmark_config import BenchmarkConfig
+from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config_factory            import ConfigFactory
 from tools.data.io                              import FileIO
 from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
@@ -36,7 +36,7 @@ class BenchmarkWorker:
         )
 
     def _ae_entry_config(self, model_name: str, logdir: Path, overfit):
-        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
+        from configuration.training import ProfileAeEntryConfig
         from models.profile_autoencoder                        import PROFILE_AE_CONFIG_REGISTRY
 
         return ProfileAeEntryConfig(
@@ -55,7 +55,7 @@ class BenchmarkWorker:
         )
 
     def _jepa_entry_config(self, model_name: str, logdir: Path, overfit):
-        from configuration.training.jepa_config import JepaEntryConfig
+        from configuration.training import JepaEntryConfig
 
         jepa = self.config.jepa
 
@@ -188,7 +188,7 @@ class OverfitWorker(BenchmarkWorker):
         self._execute_overfit(model_name, self.config.overfit.stop_threshold, result_path, run_body)
 
     def _overfit_config(self):
-        from configuration.training.runtime_config import OverfitConfig
+        from configuration.training import OverfitConfig
 
         gate = self.config.overfit
         return OverfitConfig(
@@ -236,7 +236,7 @@ class OverfitWorker(BenchmarkWorker):
 class TrainingWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
         if self.config.training_type == "profile_autoencoder":
-            from configuration.training.runtime_config           import OverfitConfig
+            from configuration.training import OverfitConfig
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
             entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
@@ -244,7 +244,7 @@ class TrainingWorker(BenchmarkWorker):
             return
 
         if self.config.training_type == "jepa":
-            from configuration.training.runtime_config import OverfitConfig
+            from configuration.training import OverfitConfig
             from pipelines.jepa.training.pipeline      import TrainingPipeline
 
             entry = self._jepa_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))

@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from pathlib  import Path
 
-from configuration.experiments.cross_validation_config import CrossValidationConfig
+from configuration.cross_validation import CrossValidationConfig
 from pipelines.cross_validation.cv_report              import CrossValidationReport
 from pipelines.cross_validation.folds                  import FoldNaming, FoldPlanner
 from pipelines.cross_validation.workers                import FoldCollector

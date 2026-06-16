@@ -10,7 +10,7 @@ from _bootstrap import EnvironmentPinner
 def _scheduler() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.experiments.benchmark_config import BenchmarkConfig
+    from configuration.benchmark import BenchmarkConfig
     from pipelines.benchmark.pipeline               import BenchmarkPipeline
     from tools.runtime.config_cli                   import ConfigCli
 
@@ -23,7 +23,7 @@ def _scheduler() -> None:
 def _worker(stage: str, model_name: str, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
     EnvironmentPinner.gpu(gpu_id)
 
-    from configuration.experiments.benchmark_config import BenchmarkConfig
+    from configuration.benchmark import BenchmarkConfig
     from pipelines.benchmark.workers                import InferenceWorker, OverfitWorker, TrainingWorker
     from tools.runtime.config_cli                   import ConfigCli
 

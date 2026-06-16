@@ -6,16 +6,11 @@ from pathlib import Path
 import optuna
 from optuna.trial import TrialState
 
-from configuration.data.dataset_config          import DatasetConfig
-from configuration.data.dataset_config          import PatchConfig
-from configuration.data.dataset_config          import SplitRegions
+from configuration.dataset import DatasetConfig, PatchConfig, SplitRegions
+from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, TrainingLoopConfig, BackboneTrainerConfig
+from configuration.tuning import TuningConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
-from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
-from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.runtime_config      import IOConfig, TrainingLoopConfig
-from configuration.training.training_config     import TrainerConfig
-from configuration.experiments.tuning_config    import TuningConfig
 from models                                     import config_registry, BACKBONE_CONFIG_REGISTRY
 from tools                                      import FileIO
 from tools                                      import GpuJob
@@ -64,7 +59,7 @@ class TuningOrchestrator:
         return {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
 
     def _ae_entry_template(self):
-        from configuration.training.profile_autoencoder_config import ProfileAeEntryConfig
+        from configuration.training import ProfileAeEntryConfig
 
         return ProfileAeEntryConfig(
             seed            = self.config.tuning.base_seed,
@@ -78,7 +73,7 @@ class TuningOrchestrator:
         )
 
     def _jepa_entry_template(self):
-        from configuration.training.jepa_config import JepaEntryConfig
+        from configuration.training import JepaEntryConfig
 
         jepa = self.config.jepa
 
@@ -120,8 +115,8 @@ class TuningOrchestrator:
             pin_memory                  = True,
         )
 
-    def _trainer_config(self, dataset_path: Path, secondary_labels) -> TrainerConfig:
-        return TrainerConfig(
+    def _trainer_config(self, dataset_path: Path, secondary_labels) -> BackboneTrainerConfig:
+        return BackboneTrainerConfig(
             gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
             geometry         = GeometryConfig().resolved(dataset_path, secondary_labels=secondary_labels),
             early_stopping   = EarlyStoppingConfig(patience=8, restore_best=True),

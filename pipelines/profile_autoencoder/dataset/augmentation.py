@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from configuration.data.profile_config import ProfileAugmentationConfig
+from configuration.dataset import ProfileAugmentationConfig
 
 
 class ProfileAugmenter:

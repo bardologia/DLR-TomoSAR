@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-from configuration.model.backbone_models_config import U2NetLiteConfig
+from configuration.architectures import U2NetLiteConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.training.image_autoencoder_config import ImageAeTrainerConfig
+from configuration.training import ImageAeTrainerConfig
 from models.image_autoencoder                        import get_image_autoencoder
 from pipelines.shared.config_factory                 import ConfigFactory
 from pipelines.shared.dataset_prep                   import BackboneDatasetPreparation

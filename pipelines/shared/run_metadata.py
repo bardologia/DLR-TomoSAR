@@ -9,13 +9,13 @@ import torch
 from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
 from torch.utils.tensorboard                      import SummaryWriter
 
-from configuration.training.training_config import TrainerConfig
+from configuration.training import BackboneTrainerConfig
 from tools.data.io                          import FileIO, BackboneModelConfigIO
 from tools.monitoring.logger                import Logger
 
 
 class TrainingRunMetadata:
-    def __init__(self, trainer_config : TrainerConfig, model_name : str, base_logdir : Path, run_name : str | None = None, logger : Logger | None = None) -> None:
+    def __init__(self, trainer_config : BackboneTrainerConfig, model_name : str, base_logdir : Path, run_name : str | None = None, logger : Logger | None = None) -> None:
         self.trainer_config = trainer_config
         self.model_name     = model_name
         self.base_logdir    = Path(base_logdir)

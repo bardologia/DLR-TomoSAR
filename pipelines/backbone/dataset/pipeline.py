@@ -6,7 +6,7 @@ from typing      import Optional, Tuple
 
 from torch.utils.data import DataLoader
 
-from configuration.data.dataset_config        import DatasetConfig
+from configuration.dataset import DatasetConfig
 from tools.data.regions                       import CropRegion
 from pipelines.backbone.dataset.augmentation  import SpatialAugmenter
 from pipelines.backbone.dataset.datasets      import MultiRegionDataset, PatchDataset

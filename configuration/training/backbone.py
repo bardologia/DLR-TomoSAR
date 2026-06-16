@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.benchmark.general            import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.inference.general            import InferenceConfig
+from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
-from configuration.inference.inference_config   import InferenceConfig
-from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
-from configuration.training.runtime_config      import OverfitConfig
+from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
+from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, PermutationMetricsConfig, ResourceConfig, TrainingLoopConfig
 
 
 def _default_curriculum() -> LossCurriculumConfig:
@@ -74,6 +76,24 @@ class SecondaryTrialsConfig:
     block_step    : int          = 1
     spacing       : int          = 2
     seed          : int          = 0
+
+
+@dataclass
+class BackboneTrainerConfig:
+    gaussian            : GaussianConfig
+    geometry            : GeometryConfig           = field(default_factory=GeometryConfig)
+    early_stopping      : EarlyStoppingConfig      = field(default_factory=EarlyStoppingConfig)
+    warmup              : WarmupConfig             = field(default_factory=WarmupConfig)
+    scheduler           : SchedulerConfig          = field(default_factory=SchedulerConfig)
+    io                  : IOConfig                 = field(default_factory=IOConfig)
+    optimizer           : OptimizerConfig          = field(default_factory=OptimizerConfig)
+    training            : TrainingLoopConfig       = field(default_factory=TrainingLoopConfig)
+    overfit             : OverfitConfig            = field(default_factory=OverfitConfig)
+    curriculum          : LossCurriculumConfig     = field(default_factory=LossCurriculumConfig)
+    resources           : ResourceConfig           = field(default_factory=ResourceConfig)
+    memory              : MemoryConfig             = field(default_factory=MemoryConfig)
+    gradient_clipper    : GradientClipperConfig    = field(default_factory=GradientClipperConfig)
+    permutation_metrics : PermutationMetricsConfig = field(default_factory=PermutationMetricsConfig)
 
 
 @dataclass

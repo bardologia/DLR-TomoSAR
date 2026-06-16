@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
+
+def downsample_stages(downsample_factor: int) -> int:
+    if downsample_factor < 1:
+        raise ValueError(f"downsample_factor must be >= 1, got {downsample_factor}")
+
+    stages = math.log2(downsample_factor)
+    if stages != int(stages):
+        raise ValueError(f"downsample_factor must be a power of two (1, 2, 4, 8, ...), got {downsample_factor}")
+
+    return int(stages)
 
 
 class EmbeddingNorm:
@@ -220,6 +232,47 @@ class ResidualConvBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.layers(x) + self.shortcut(x)
+
+
+class ChannelLayerNorm(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+        self.norm = nn.LayerNorm(channels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm(x)
+        return x.permute(0, 3, 1, 2)
+
+
+class ConvNeXtBlock(nn.Module):
+    def __init__(self, channels: int, ffn_ratio: float, drop_path: float, ffn_activation: str, layer_scale_init: float):
+        super().__init__()
+        hidden = int(channels * ffn_ratio)
+
+        self.dwconv     = nn.Conv2d(channels, channels, kernel_size=7, padding=3, groups=channels)
+        self.norm       = nn.LayerNorm(channels)
+        self.fc1        = nn.Linear(channels, hidden)
+        self.activation = build_activation(ffn_activation)
+        self.fc2        = nn.Linear(hidden, channels)
+        self.drop_path  = DropPath(drop_path)
+
+        self.gamma = nn.Parameter(layer_scale_init * torch.ones(channels)) if layer_scale_init > 0 else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x
+
+        x = self.dwconv(x)
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 3, 1, 2)
+
+        return residual + self.drop_path(x)
 
 
 class PixelMLP(nn.Module):

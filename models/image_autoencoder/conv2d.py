@@ -1,30 +1,17 @@
 from __future__ import annotations
 
-import math
-
 import torch
 import torch.nn as nn
 
-from configuration.model.image_autoencoder_models_config import Conv2dImageAutoencoderConfig
+from configuration.architectures import Conv2dImageAutoencoderConfig
 from models.image_autoencoder.base                       import ImageAutoencoderBase
-from models.blocks                                       import ConvBlock, build_activation, build_norm2d, build_upsample
-
-
-def _downsample_stages(downsample_factor: int) -> int:
-    if downsample_factor < 1:
-        raise ValueError(f"downsample_factor must be >= 1, got {downsample_factor}")
-
-    stages = math.log2(downsample_factor)
-    if stages != int(stages):
-        raise ValueError(f"downsample_factor must be a power of two (1, 2, 4, 8, ...), got {downsample_factor}")
-
-    return int(stages)
+from models.blocks                                       import ConvBlock, build_activation, build_norm2d, build_upsample, downsample_stages
 
 
 class Conv2dImageEncoder(nn.Module):
     def __init__(self, config: Conv2dImageAutoencoderConfig) -> None:
         super().__init__()
-        n_stages = _downsample_stages(config.downsample_factor)
+        n_stages = downsample_stages(config.downsample_factor)
 
         stem = [ConvBlock(config.in_channels, config.base_channels, config.dropout, config.activation, config.normalization)]
         for _ in range(max(0, config.depth - 1)):
@@ -54,7 +41,7 @@ class Conv2dImageEncoder(nn.Module):
 class Conv2dImageDecoder(nn.Module):
     def __init__(self, config: Conv2dImageAutoencoderConfig, bottleneck_channels: int) -> None:
         super().__init__()
-        n_stages = _downsample_stages(config.downsample_factor)
+        n_stages = downsample_stages(config.downsample_factor)
 
         self.from_embedding = nn.Conv2d(config.embedding_dim, bottleneck_channels, kernel_size=1)
 

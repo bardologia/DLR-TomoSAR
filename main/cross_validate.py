@@ -10,7 +10,7 @@ from _bootstrap import EnvironmentPinner
 def _scheduler() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.experiments.cross_validation_config import CrossValidationConfig
+    from configuration.cross_validation import CrossValidationConfig
     from pipelines.cross_validation.pipeline               import CrossValidationPipeline
     from tools.runtime.config_cli                          import ConfigCli
 
@@ -23,7 +23,7 @@ def _scheduler() -> None:
 def _worker(stage: str, fold_index: int, split: str | None, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
     EnvironmentPinner.gpu(gpu_id)
 
-    from configuration.experiments.cross_validation_config import CrossValidationConfig
+    from configuration.cross_validation import CrossValidationConfig
     from pipelines.cross_validation.workers                import FoldInferenceWorker, FoldTrainingWorker
     from tools.runtime.config_cli                          import ConfigCli
 

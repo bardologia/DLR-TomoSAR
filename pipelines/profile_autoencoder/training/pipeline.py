@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.data.profile_config              import ProfileDatasetConfig
-from configuration.training.profile_autoencoder_config      import ProfileAeTrainerConfig
+from configuration.dataset import ProfileDatasetConfig
+from configuration.training import ProfileAeTrainerConfig
 from models.profile_autoencoder                             import get_profile_autoencoder
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
 from pipelines.shared.config_factory                import ConfigFactory

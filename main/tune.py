@@ -26,7 +26,7 @@ def main() -> None:
     else:
         EnvironmentPinner.threads()
 
-    from configuration.experiments.tuning_config import TuningEntryConfig
+    from configuration.tuning import TuningEntryConfig
     from pipelines.tuning.pipeline               import TuningOrchestrator
     from tools.runtime.config_cli                import ConfigCli
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from configuration.training.profile_autoencoder_config       import ProfileAeEntryConfig
-from configuration.training.backbone_config           import BackboneEntryConfig
-from configuration.training.image_autoencoder_config  import ImageAeEntryConfig
-from configuration.training.jepa_config               import JepaEntryConfig
+from configuration.training.profile_autoencoder import ProfileAeEntryConfig
+from configuration.training.backbone            import BackboneEntryConfig
+from configuration.training.image_autoencoder   import ImageAeEntryConfig
+from configuration.training.jepa                import JepaEntryConfig
 
 
 @dataclass

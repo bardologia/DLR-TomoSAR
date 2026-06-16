@@ -55,7 +55,7 @@ class TrainingLauncher:
         SingleTrainRunner(config).run()
 
     def run(self) -> None:
-        from configuration.training.train_config import TrainEntryConfig
+        from configuration.training import TrainEntryConfig
 
         argv  = sys.argv[1:]
         entry = TrainEntryConfig()

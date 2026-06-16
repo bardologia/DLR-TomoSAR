@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from configuration.training.jepa_config                  import JepaTrainerConfig
+from configuration.training import JepaTrainerConfig
 from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from models.profile_autoencoder                                  import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder

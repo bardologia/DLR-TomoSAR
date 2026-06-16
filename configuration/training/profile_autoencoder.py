@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.data.profile_config             import ProfileAugmentationConfig
-from configuration.experiments.benchmark_config    import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.model.profile_autoencoder_models_config import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
-from configuration.sar.geometry_config             import GeometryConfig
-from configuration.training.optimization_config    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.runtime_config         import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
-from configuration.training.trainer_config         import SharedSubConfigInheritance
+from configuration.dataset.profile_autoencoder       import ProfileAugmentationConfig
+from configuration.benchmark.general                 import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.sar.geometry_config               import GeometryConfig
+from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
+from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.trainer          import SharedSubConfigInheritance
 
 
 @dataclass

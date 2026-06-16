@@ -15,7 +15,7 @@ import numpy             as np
 from PIL  import Image
 from tqdm import tqdm
 
-from configuration.inference.inference_config import InferenceConfig
+from configuration.inference import InferenceConfig
 from pipelines.backbone.inference.loader      import InferenceMetadata
 from pipelines.backbone.inference.metrics     import Metrics, Result
 from pipelines.backbone.inference.plots       import PlotTools, Ploter

@@ -89,3 +89,77 @@ class Transformer1dAutoencoderConfig(ProfileAutoencoderBaseConfig):
             "dropout"    : {"type": "float",       "low": 0.0, "high": 0.3},
             "activation" : {"type": "categorical", "choices": ["relu", "gelu"]},
         }
+
+
+@dataclass
+class ResMlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
+    hidden_dim : int   = 128
+    depth      : int   = 3
+    dropout    : float = 0.0
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "hidden_dim" : {"type": "categorical", "choices": [64, 128, 256]},
+            "depth"      : {"type": "categorical", "choices": [2, 3, 4, 6]},
+            "activation" : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
+            "dropout"    : {"type": "float",       "low": 0.0, "high": 0.3},
+        }
+
+
+@dataclass
+class TcnAutoencoderConfig(ProfileAutoencoderBaseConfig):
+    seq_channels    : int = 32
+    seq_kernel_size : int = 3
+    depth           : int = 3
+    dropout         : float = 0.0
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "seq_channels"    : {"type": "categorical", "choices": [16, 32, 64]},
+            "seq_kernel_size" : {"type": "categorical", "choices": [3, 5, 7]},
+            "depth"           : {"type": "categorical", "choices": [2, 3, 4, 5]},
+            "activation"      : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
+            "dropout"         : {"type": "float",       "low": 0.0, "high": 0.3},
+        }
+
+
+@dataclass
+class GruAutoencoderConfig(ProfileAutoencoderBaseConfig):
+    hidden_dim    : int  = 64
+    depth         : int  = 1
+    bidirectional : bool = True
+    dropout       : float = 0.0
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "hidden_dim"    : {"type": "categorical", "choices": [32, 64, 128]},
+            "depth"         : {"type": "categorical", "choices": [1, 2, 3]},
+            "bidirectional" : {"type": "categorical", "choices": [True, False]},
+            "dropout"       : {"type": "float",       "low": 0.0, "high": 0.3},
+        }
+
+
+@dataclass
+class CnnAttnAutoencoderConfig(ProfileAutoencoderBaseConfig):
+    seq_channels    : int = 32
+    seq_kernel_size : int = 5
+    patch_size      : int = 8
+    hidden_dim      : int = 128
+    depth           : int = 2
+    num_heads       : int = 4
+    dropout         : float = 0.0
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "seq_channels"    : {"type": "categorical", "choices": [16, 32, 64]},
+            "seq_kernel_size" : {"type": "categorical", "choices": [3, 5, 7]},
+            "patch_size"      : {"type": "categorical", "choices": [4, 8, 16]},
+            "hidden_dim"      : {"type": "categorical", "choices": [64, 128, 256]},
+            "depth"           : {"type": "categorical", "choices": [1, 2, 4]},
+            "num_heads"       : {"type": "categorical", "choices": [2, 4, 8]},
+            "dropout"         : {"type": "float",       "low": 0.0, "high": 0.3},
+        }

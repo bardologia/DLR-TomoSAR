@@ -3,29 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.experiments.benchmark_config import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.training.runtime_config      import OverfitConfig
+from configuration.benchmark.general        import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.tuning.jepa              import JepaTuneConfig
+from configuration.training.general.runtime import OverfitConfig
 
 
 def _default_ae_loss():
-    from configuration.training.profile_autoencoder_config import ProfileAeLossConfig
+    from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
     return ProfileAeLossConfig()
-
-
-def _default_embedding_loss():
-    from configuration.training.jepa_config import EmbeddingLossConfig
-
-    return EmbeddingLossConfig()
-
-
-@dataclass
-class JepaTuneConfig:
-    profile_autoencoder_logdir : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
-    profile_autoencoder_run    : str | None = None
-    profile_autoencoder_mode   : str        = "frozen"
-    target_provider            : str        = "stopgrad"
-    embedding_loss             : object     = field(default_factory=_default_embedding_loss)
 
 
 @dataclass

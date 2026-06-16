@@ -9,16 +9,19 @@ from project_paths import ProjectPaths
 class ConfigRegistry:
 
     SECTION_TITLES = {
-        "sar"         : "SAR Processing",
-        "param"       : "Parameter Extraction",
-        "data"        : "Dataset",
-        "model"       : "Models",
-        "training"    : "Training",
-        "inference"   : "Inference",
-        "experiments" : "Experiments",
+        "sar"              : "SAR Processing",
+        "param"            : "Parameter Extraction",
+        "normalization"    : "Normalization",
+        "dataset"          : "Dataset",
+        "architectures"    : "Model Architectures",
+        "training"         : "Training",
+        "inference"        : "Inference",
+        "benchmark"        : "Benchmark",
+        "cross_validation" : "Cross-validation",
+        "tuning"           : "Tuning",
     }
 
-    SECTION_ORDER = ["sar", "param", "data", "model", "training", "inference", "experiments"]
+    SECTION_ORDER = ["sar", "param", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "tuning"]
 
     def __init__(self, paths: ProjectPaths) -> None:
         self.paths = paths
@@ -109,7 +112,7 @@ class ConfigRegistry:
 
     def _section_files(self, section: str) -> list[Path]:
         section_dir = self.paths.config_dir / section
-        return [p for p in sorted(section_dir.glob("*.py")) if p.name != "__init__.py"]
+        return [p for p in sorted(section_dir.rglob("*.py")) if p.name != "__init__.py"]
 
     def _rel_module(self, path: Path) -> str:
         return path.relative_to(self.paths.config_dir).with_suffix("").as_posix()

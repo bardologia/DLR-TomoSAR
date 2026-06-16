@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.model.profile_autoencoder_models_config import Transformer1dAutoencoderConfig
+from configuration.architectures import Transformer1dAutoencoderConfig
 from models.profile_autoencoder.base                       import ProfileAutoencoderBase, ProfileAutoencoderBlocks
 
 

@@ -61,17 +61,3 @@ class InferenceConfig:
     save_dpi            : int  = 300
 
     paths               : InferencePaths = field(default_factory=InferencePaths)
-
-
-@dataclass
-class InferenceEntryConfig:
-    logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
-    run_filter : List[str] = field(default_factory=list)
-    gpu        : int       = 0
-
-    inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
-        run_directory = Path("."),
-        save_cubes    = True,
-        cpu_workers   = 16,
-        gif_axes      = ["elevation", "range", "azimuth"],
-    ))

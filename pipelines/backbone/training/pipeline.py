@@ -9,8 +9,8 @@ import numpy as np
 import torch
 
 from models                                  import BACKBONE_IMAGE_SIZE_MODELS
-from configuration.data.dataset_config       import DatasetConfig
-from configuration.training.training_config  import TrainerConfig
+from configuration.dataset import DatasetConfig
+from configuration.training import BackboneTrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from tools.orchestration                     import ExperimentStage, GpuJob
@@ -26,7 +26,7 @@ from tools.runtime.reproducibility           import Reproducibility
 class TrainingPipeline:
     def __init__(
         self,
-        trainer_config : TrainerConfig,
+        trainer_config : BackboneTrainerConfig,
         dataset_config : DatasetConfig,
         backbone_name  : str,
         model_config   = None,

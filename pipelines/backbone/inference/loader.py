@@ -9,8 +9,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.data.dataset_config        import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.inference.inference_config import InferenceConfig
+from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.inference import InferenceConfig
 from tools.data.regions                       import CropRegion
 from configuration.sar.gaussian_config        import GaussianConfig
 from models                                   import BACKBONE_IMAGE_SIZE_MODELS, get_backbone

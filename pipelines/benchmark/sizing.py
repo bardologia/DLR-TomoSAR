@@ -3,7 +3,7 @@ from __future__ import annotations
 import gc
 from dataclasses import dataclass, field
 
-from configuration.experiments.benchmark_config import BenchmarkConfig
+from configuration.benchmark import BenchmarkConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from tools.monitoring.logger                    import Logger

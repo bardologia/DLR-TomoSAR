@@ -6,7 +6,7 @@ from typing      import Literal, Optional, Sequence, Tuple
 
 import numpy as np
 
-from configuration.data.norm_config import ChannelStrategy
+from configuration.normalization.general import ChannelStrategy
 from tools.data.representation      import Representation
 from tools.data.regions             import SplitRegions
 

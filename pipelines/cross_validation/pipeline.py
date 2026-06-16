@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib  import Path
 
-from configuration.experiments.cross_validation_config import CrossValidationConfig
+from configuration.cross_validation import CrossValidationConfig
 from tools.runtime.config_cli                          import ConfigCli
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldPlanner
 from pipelines.cross_validation.stages                 import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage

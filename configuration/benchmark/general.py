@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
+from configuration.benchmark.jepa import JepaBenchConfig
+
 
 @dataclass
 class BenchmarkPathsConfig:
@@ -87,24 +89,9 @@ class ComparisonReportConfig:
 
 
 def _default_ae_loss():
-    from configuration.training.profile_autoencoder_config import ProfileAeLossConfig
+    from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
     return ProfileAeLossConfig()
-
-
-def _default_embedding_loss():
-    from configuration.training.jepa_config import EmbeddingLossConfig
-
-    return EmbeddingLossConfig()
-
-
-@dataclass
-class JepaBenchConfig:
-    profile_autoencoder_logdir : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
-    profile_autoencoder_run    : str | None = None
-    profile_autoencoder_mode   : str        = "frozen"
-    target_provider            : str        = "stopgrad"
-    embedding_loss  : object     = field(default_factory=_default_embedding_loss)
 
 
 @dataclass
@@ -136,6 +123,3 @@ class BenchmarkConfig:
 
     def runs_inference(self) -> bool:
         return self.training_type in ("backbone", "jepa")
-
-
-

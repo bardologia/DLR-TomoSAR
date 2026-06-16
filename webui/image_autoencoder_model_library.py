@@ -12,11 +12,19 @@ class ImageAutoencoderModelLibrary:
     OPERATIONAL_HEADING = re.compile(r"correction|checkpoint continuity|review", re.IGNORECASE)
 
     CONFIG_CLASSES = {
-        "conv2d_ae" : "Conv2dImageAutoencoderConfig",
+        "conv2d_ae"     : "Conv2dImageAutoencoderConfig",
+        "resnet2d_ae"   : "ResNet2dImageAutoencoderConfig",
+        "convnext2d_ae" : "ConvNeXt2dImageAutoencoderConfig",
+        "dilated2d_ae"  : "DilatedConv2dImageAutoencoderConfig",
+        "vit_ae"        : "ViTImageAutoencoderConfig",
     }
 
     NOTE_FILES = {
-        "conv2d_ae" : "Conv2D Image Autoencoder.md",
+        "conv2d_ae"     : "Conv2D Image Autoencoder.md",
+        "resnet2d_ae"   : "ResNet2D Image Autoencoder.md",
+        "convnext2d_ae" : "ConvNeXt2D Image Autoencoder.md",
+        "dilated2d_ae"  : "Dilated2D Image Autoencoder.md",
+        "vit_ae"        : "ViT Image Autoencoder.md",
     }
 
     FALLBACK_ACTIVATION    = "gelu"
@@ -96,15 +104,15 @@ class ImageAutoencoderModelLibrary:
         return resolved
 
     def _import_image_autoencoder_models_config(self):
-        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
+        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "architectures"
         path       = str(config_dir)
 
         if path not in sys.path:
             sys.path.insert(0, path)
 
-        import image_autoencoder_models_config
+        import image_autoencoder
 
-        return image_autoencoder_models_config
+        return image_autoencoder
 
     def _families(self) -> list[dict]:
         return [
@@ -116,6 +124,26 @@ class ImageAutoencoderModelLibrary:
                         "key": "conv2d_ae", "name": "Conv2D Image Autoencoder", "skip": "2D conv encoder/decoder",
                         "head": "Conv to 2D embedding", "params": "~48.4K", "recommended": True,
                         "when": "The default image autoencoder. A small 2D convolutional encoder downsamples the SAR image stack to a spatial embedding and a mirrored decoder reconstructs it; the encoder is reused as the pretrained JEPA image front-end.",
+                    },
+                    {
+                        "key": "resnet2d_ae", "name": "ResNet2D Image Autoencoder", "skip": "Residual 2D conv",
+                        "head": "Residual conv to 2D embedding", "params": "~208.2K", "recommended": False,
+                        "when": "A deeper, residual alternative to the default. Pre-activation residual blocks with strided downsampling give a more expressive encoder that trains stably at greater depth, at a higher parameter cost.",
+                    },
+                    {
+                        "key": "convnext2d_ae", "name": "ConvNeXt2D Image Autoencoder", "skip": "ConvNeXt blocks",
+                        "head": "ConvNeXt to 2D embedding", "params": "~143.3K", "recommended": False,
+                        "when": "A modern convolutional design. Depthwise 7x7 convolutions, layer normalisation and inverted bottlenecks capture wider spatial context than plain 3x3 stacks while staying parameter-efficient.",
+                    },
+                    {
+                        "key": "dilated2d_ae", "name": "Dilated2D Image Autoencoder", "skip": "Atrous residual conv",
+                        "head": "Dilated conv to 2D embedding", "params": "~113.3K", "recommended": False,
+                        "when": "Preserves full spatial resolution. Stacked dilated residual convolutions grow the receptive field without downsampling, so the embedding keeps the input grid size; best when fine spatial detail must survive the bottleneck.",
+                    },
+                    {
+                        "key": "vit_ae", "name": "ViT Image Autoencoder", "skip": "Patch attention",
+                        "head": "Transformer to 2D embedding", "params": "~3.6M", "recommended": False,
+                        "when": "The most expressive image model. Patches are tokenised and related by a transformer encoder and decoder with convolutional position encoding, modelling global structure across the stack at the highest parameter cost.",
                     },
                 ],
             },

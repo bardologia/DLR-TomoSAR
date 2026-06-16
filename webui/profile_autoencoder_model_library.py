@@ -15,12 +15,20 @@ class ProfileAutoencoderModelLibrary:
         "mlp_ae"           : "MlpAutoencoderConfig",
         "conv1d_ae"        : "Conv1dAutoencoderConfig",
         "transformer1d_ae" : "Transformer1dAutoencoderConfig",
+        "resmlp_ae"        : "ResMlpAutoencoderConfig",
+        "tcn_ae"           : "TcnAutoencoderConfig",
+        "gru_ae"           : "GruAutoencoderConfig",
+        "cnn_attn_ae"      : "CnnAttnAutoencoderConfig",
     }
 
     NOTE_FILES = {
         "mlp_ae"           : "MLP Autoencoder.md",
         "conv1d_ae"        : "Conv1D Autoencoder.md",
         "transformer1d_ae" : "Transformer1D Autoencoder.md",
+        "resmlp_ae"        : "ResMLP Autoencoder.md",
+        "tcn_ae"           : "TCN Autoencoder.md",
+        "gru_ae"           : "GRU Autoencoder.md",
+        "cnn_attn_ae"      : "Conv-Attention Autoencoder.md",
     }
 
     FALLBACK_ACTIVATION    = "gelu"
@@ -100,15 +108,15 @@ class ProfileAutoencoderModelLibrary:
         return resolved
 
     def _import_profile_autoencoder_models_config(self):
-        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "model"
+        config_dir = Path(__file__).resolve().parent.parent / "configuration" / "architectures"
         path       = str(config_dir)
 
         if path not in sys.path:
             sys.path.insert(0, path)
 
-        import profile_autoencoder_models_config
+        import profile_autoencoder
 
-        return profile_autoencoder_models_config
+        return profile_autoencoder
 
     def _families(self) -> list[dict]:
         return [
@@ -130,6 +138,26 @@ class ProfileAutoencoderModelLibrary:
                         "key": "transformer1d_ae", "name": "Transformer1D Autoencoder", "skip": "Self-attention",
                         "head": "Transformer to embedding", "params": "~602.1K", "recommended": False,
                         "when": "Long-range dependencies along the profile. A self-attention encoder and decoder model interactions between distant elevation bins, at a higher parameter cost.",
+                    },
+                    {
+                        "key": "resmlp_ae", "name": "ResMLP Autoencoder", "skip": "Residual MLP",
+                        "head": "Dense to embedding", "params": "~271.9K", "recommended": False,
+                        "when": "A deeper dense alternative to the MLP baseline. Pre-norm residual blocks let the encoder and decoder go deeper without optimisation trouble, trading parameters for capacity while keeping the flat-vector treatment of the profile.",
+                    },
+                    {
+                        "key": "tcn_ae", "name": "TCN Autoencoder", "skip": "Dilated 1D conv",
+                        "head": "Dilated conv to embedding", "params": "~243.1K", "recommended": False,
+                        "when": "Multi-scale local structure. Stacked dilated residual convolutions grow the receptive field exponentially over the range axis, capturing both narrow and broad elevation features without the cost of attention.",
+                    },
+                    {
+                        "key": "gru_ae", "name": "GRU Autoencoder", "skip": "Recurrent",
+                        "head": "BiGRU to embedding", "params": "~55.4K", "recommended": False,
+                        "when": "A compact recurrent option. A bidirectional GRU sweeps the profile sequentially and a GRU decoder unrolls the embedding back into the curve; the cheapest model that still models ordering explicitly.",
+                    },
+                    {
+                        "key": "cnn_attn_ae", "name": "Conv-Attention Autoencoder", "skip": "Conv tokens + attention",
+                        "head": "Tokenized transformer to embedding", "params": "~907.5K", "recommended": False,
+                        "when": "The most expressive profile model. A convolutional tokenizer splits the profile into patches that a real multi-token self-attention stack relates to one another, combining local convolution with global attention at the highest parameter cost.",
                     },
                 ],
             },

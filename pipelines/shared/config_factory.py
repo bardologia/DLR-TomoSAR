@@ -2,26 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.experiments.benchmark_config import BenchmarkConfig
-from configuration.inference.inference_config   import InferenceConfig
+from configuration.benchmark import BenchmarkConfig
+from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
+from configuration.inference import InferenceConfig
+from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion
 
-from configuration.data.dataset_config import (
-    AugmentationConfig,
-    DatasetConfig,
-    InputConfig,
-    PatchConfig,
-    Representation,
-    SplitRegions,
-)
 
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
-from configuration.training.loss_config         import LossConfig, LossCurriculumConfig
-from configuration.training.optimization_config import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.runtime_config      import IOConfig, OverfitConfig, TrainingLoopConfig
-from configuration.training.training_config     import TrainerConfig
 
 
 class ConfigFactory:
@@ -106,11 +96,11 @@ class ConfigFactory:
             "io"               : IOConfig(logdir=str(logdir)),
         }
 
-    def training_trainer_config(self, logdir: Path) -> TrainerConfig:
+    def training_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
         training         = self.config.training
         scheduler_epochs = training.scheduler_epochs if training.scheduler_epochs is not None else training.epochs
 
-        return TrainerConfig(
+        return BackboneTrainerConfig(
             **self._base_trainer_kwargs(logdir),
 
             early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, restore_best=True),
@@ -135,10 +125,10 @@ class ConfigFactory:
             ),
         )
 
-    def overfit_trainer_config(self, logdir: Path) -> TrainerConfig:
+    def overfit_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
         overfit = self.config.overfit
 
-        return TrainerConfig(
+        return BackboneTrainerConfig(
             **self._base_trainer_kwargs(logdir),
 
             early_stopping = EarlyStoppingConfig(patience=9999, restore_best=False),

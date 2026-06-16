@@ -9,7 +9,7 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.gpu()
 
-    from configuration.inference.inference_config import InferenceEntryConfig
+    from configuration.inference import InferenceEntryConfig
     from pipelines.backbone.inference.pipeline    import InferencePipeline
     from tools.runtime.config_cli                 import ConfigCli
     from tools.monitoring.logger                  import Logger

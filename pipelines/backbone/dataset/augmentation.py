@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from configuration.data.dataset_config import AugmentationConfig
+from configuration.dataset import AugmentationConfig
 
 
 class SpatialAugmenter:

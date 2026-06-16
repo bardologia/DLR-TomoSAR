@@ -1,26 +1,4 @@
-from configuration.model.backbone_models_config import (
-    AttentionUNetConfig,
-    ConvNeXtUNetConfig,
-    DeepLabV3PlusConfig,
-    DenseUNetConfig,
-    FPNNetConfig,
-    HRNetLiteConfig,
-    LinkNetConfig,
-    MultiResUNetConfig,
-    ResUNetConfig,
-    ResUNetMultiHeadConfig,
-    ResUNetPerGaussianConfig,
-    SegFormerLiteConfig,
-    SwinUNetConfig,
-    TransUNetConfig,
-    U2NetLiteConfig,
-    UNETRConfig,
-    UNetConfig,
-    UNetMultiHeadConfig,
-    UNetPerGaussianConfig,
-    UNetPlusPlusConfig,
-    UNetSkipConfig,
-)
+from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, MultiResUNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSkipConfig
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .unet          import UNet, UNetMultiHead, UNetPerGaussian
 from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
