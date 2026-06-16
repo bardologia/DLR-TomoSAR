@@ -926,6 +926,13 @@ main { margin-left: var(--navw); }
 .modelcard__kicker { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
 .modelcard__summary { font-size: 14.5px; color: var(--ink); margin: 8px 0 0; max-width: 80ch; line-height: 1.55; }
 
+.modelmodes { display: flex; flex-direction: column; gap: 14px; }
+.modelmode { position: relative; padding-top: 14px; border-top: 1px solid var(--line); }
+.modelmode:first-child { padding-top: 4px; border-top: 0; }
+.modelmode__head { margin-bottom: 4px; }
+.modelmode__label { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.modelmode__sub { display: block; font-size: 12.5px; color: var(--ink-dim); margin-top: 3px; max-width: 80ch; line-height: 1.5; }
+
 .modelflow { position: relative; overflow-x: auto; padding: 2px 0; }
 .mflow-svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 .mflow-link { stroke: #9aa196; stroke-width: 1.6; stroke-dasharray: 5 4; }

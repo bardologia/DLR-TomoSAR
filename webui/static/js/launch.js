@@ -49,6 +49,7 @@ class LaunchView {
   static JEPA_MEANINGS = {
     profile_only: {
       title  : "JEPA · backbone + profile autoencoder",
+      label  : "Backbone + profile autoencoder",
       summary: "Predicts the profile embedding from the raw image stack, then decodes it back to normalized profiles through the profile autoencoder decoder. Select a profile autoencoder run; leave the image autoencoder unset.",
       flow   : [
         { kind: "input",  glyph: "stack",   label: "Image stack",          sub: "primary · secondaries · interferograms" },
@@ -60,6 +61,7 @@ class LaunchView {
     },
     image_only: {
       title  : "JEPA · image autoencoder + backbone",
+      label  : "Image autoencoder + backbone",
       summary: "Encodes the image stack with the image autoencoder front-end, then the backbone maps that latent straight to the Gaussian-mixture profile parameters. Select an image autoencoder run; leave the profile autoencoder unset.",
       flow   : [
         { kind: "input",  glyph: "stack",   label: "Image stack",        sub: "primary · secondaries · interferograms" },
@@ -71,6 +73,7 @@ class LaunchView {
     },
     image_profile: {
       title  : "JEPA · image autoencoder + backbone + profile autoencoder",
+      label  : "Image autoencoder + backbone + profile autoencoder",
       summary: "Encodes the image stack with the image autoencoder front-end, the backbone predicts the profile embedding from that latent, and the profile autoencoder decoder reconstructs the normalized profiles. Select both an image and a profile autoencoder run.",
       flow   : [
         { kind: "input",  glyph: "stack",   label: "Image stack",          sub: "primary · secondaries · interferograms" },
@@ -384,6 +387,33 @@ class LaunchView {
     card.id = "launch-model-card";
     this.modelCardEl = card;
     this._paintModelCard(meaning);
+    return card;
+  }
+
+  _buildJepaModesCard() {
+    const card = document.createElement("section");
+    card.className = "modelcard";
+    card.id = "launch-model-card";
+    this.modelCardEl = card;
+
+    const modes = [
+      LaunchView.JEPA_MEANINGS.profile_only,
+      LaunchView.JEPA_MEANINGS.image_only,
+      LaunchView.JEPA_MEANINGS.image_profile,
+    ];
+
+    const rows = modes.map((mode) =>
+      `<div class="modelmode">` +
+      `<div class="modelmode__head"><span class="modelmode__label">${mode.label}</span>` +
+      `<span class="modelmode__sub">${mode.summary}</span></div>` +
+      `<div class="modelflow">${this._modelDiagram(mode.flow)}</div></div>`
+    ).join("");
+
+    card.innerHTML =
+      `<div class="modelcard__head"><span class="modelcard__kicker">What JEPA can do</span>` +
+      `<p class="modelcard__summary">JEPA trains in three modes, selected by which autoencoder runs you provide. All three possibilities are shown below.</p></div>` +
+      `<div class="modelmodes">${rows}</div>`;
+
     return card;
   }
 
@@ -714,16 +744,10 @@ class LaunchView {
     const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
 
     const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
-    let meaning     = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
+    const meaning   = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
 
-    if (this.key === "train_jepa") {
-      meaning       = this._jepaMeaning();
-      const repaint = () => this._paintModelCard(this._jepaMeaning());
-      this._onDependency("profile_autoencoder_run", repaint);
-      this._onDependency("image_autoencoder_run", repaint);
-    }
-
-    if (meaning) host.appendChild(this._buildModelCard(meaning));
+    if (this.key === "train_jepa") host.appendChild(this._buildJepaModesCard());
+    else if (meaning)              host.appendChild(this._buildModelCard(meaning));
 
     host.appendChild(this._buildToolbar(cfg));
 
@@ -1271,24 +1295,6 @@ class LaunchView {
 
   _effective(leaf) {
     return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
-  }
-
-  _effectiveByPath(path) {
-    const leaf = this._leafByPath(path);
-    return leaf ? this._effective(leaf) : "";
-  }
-
-  _jepaRunSet(path) {
-    const value = String(this._effectiveByPath(path) || "").trim();
-    return value !== "" && value !== "None";
-  }
-
-  _jepaMeaning() {
-    const profile = this._jepaRunSet("profile_autoencoder_run");
-    const image   = this._jepaRunSet("image_autoencoder_run");
-    if (image && profile) return LaunchView.JEPA_MEANINGS.image_profile;
-    if (image)            return LaunchView.JEPA_MEANINGS.image_only;
-    return LaunchView.JEPA_MEANINGS.profile_only;
   }
 
   _leafByPath(path) {
