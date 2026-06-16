@@ -10,10 +10,19 @@ from .autoencoder import (
     Transformer1dAutoencoder,
     get_autoencoder,
 )
+from .image_autoencoder import (
+    IMAGE_AE_CONFIG_REGISTRY,
+    IMAGE_AE_MODEL_REGISTRY,
+    Conv2dImageAutoencoder,
+    ImageAutoencoderBase,
+    get_image_autoencoder,
+)
 
 def config_registry(training_type: str) -> dict:
     if training_type == "autoencoder":
         return AE_CONFIG_REGISTRY
+    if training_type == "image_autoencoder":
+        return IMAGE_AE_CONFIG_REGISTRY
     return CONFIG_REGISTRY
 
 
@@ -35,4 +44,9 @@ __all__ = [
     "Conv1dAutoencoder",
     "Transformer1dAutoencoder",
     "get_autoencoder",
+    "IMAGE_AE_CONFIG_REGISTRY",
+    "IMAGE_AE_MODEL_REGISTRY",
+    "ImageAutoencoderBase",
+    "Conv2dImageAutoencoder",
+    "get_image_autoencoder",
 ]

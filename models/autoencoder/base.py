@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from models.blocks import build_activation, initialize_weights
-
-
-_EMBEDDING_NORMS = ("none", "l2", "layernorm")
+from models.blocks import EmbeddingNorm, build_activation, initialize_weights
 
 
 class AutoencoderBlocks:
@@ -43,29 +39,18 @@ class AutoencoderBlocks:
         return seq.reshape(B, H, W, L_out).permute(0, 3, 1, 2).contiguous()
 
 
-class AutoencoderBase(nn.Module):
+class AutoencoderBase(EmbeddingNorm, nn.Module):
     def __init__(self, config, encoder: nn.Module, decoder: nn.Module) -> None:
         super().__init__()
         self.config = config
 
-        if config.embedding_norm not in _EMBEDDING_NORMS:
-            raise ValueError(f"Unknown embedding_norm '{config.embedding_norm}'. Available: {list(_EMBEDDING_NORMS)}")
+        if config.embedding_norm not in self.EMBEDDING_NORMS:
+            raise ValueError(f"Unknown embedding_norm '{config.embedding_norm}'. Available: {list(self.EMBEDDING_NORMS)}")
 
         self.encoder = encoder
         self.decoder = decoder
 
         initialize_weights(module=self, mode=config.init_mode)
-
-    def normalize_embedding(self, z: torch.Tensor) -> torch.Tensor:
-        kind = self.config.embedding_norm
-        if kind == "none":
-            return z
-        if kind == "l2":
-            return F.normalize(z, dim=1, eps=1e-6)
-
-        mean = z.mean(dim=1, keepdim=True)
-        var  = z.var(dim=1, keepdim=True, unbiased=False)
-        return (z - mean) / torch.sqrt(var + 1e-6)
 
     def encode(self, curve: torch.Tensor) -> torch.Tensor:
         return self.normalize_embedding(self.encoder(curve))

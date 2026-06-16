@@ -141,3 +141,19 @@ class AutoencoderConfigIO(ConfigIO):
     @classmethod
     def _serialize(cls, config) -> dict:
         return asdict(config)
+
+
+class ImageAutoencoderConfigIO(ConfigIO):
+    FILENAME     = "image_autoencoder_config.json"
+    NAME_KEY     = "image_ae_model_name"
+    MISSING_NOUN = "image autoencoder"
+    UNKNOWN_NOUN = "image autoencoder"
+
+    @classmethod
+    def _registry(cls) -> dict:
+        from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
+        return IMAGE_AE_CONFIG_REGISTRY
+
+    @classmethod
+    def _serialize(cls, config) -> dict:
+        return asdict(config)

@@ -6,6 +6,21 @@ import torch.nn.functional as functional
 
 
 
+class EmbeddingNorm:
+    EMBEDDING_NORMS = ("none", "l2", "layernorm")
+
+    def normalize_embedding(self, z: torch.Tensor) -> torch.Tensor:
+        kind = self.config.embedding_norm
+        if kind == "none":
+            return z
+        if kind == "l2":
+            return functional.normalize(z, dim=1, eps=1e-6)
+
+        mean = z.mean(dim=1, keepdim=True)
+        var  = z.var(dim=1, keepdim=True, unbiased=False)
+        return (z - mean) / torch.sqrt(var + 1e-6)
+
+
 class DropPath(nn.Module):
     def __init__(self, drop_prob: float = 0.0):
         super().__init__()
