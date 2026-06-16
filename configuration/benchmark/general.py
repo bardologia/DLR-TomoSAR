@@ -51,7 +51,7 @@ class TrainingQueueConfig:
     epochs               : int             = 200
     scheduler_epochs     : int | None      = 200
     validation_frequency : int             = 1
-    batch_size           : int             = 512
+    batch_size           : int             = 256
     num_workers          : int             = 4
     prefetch_factor      : int             = 2
     warmup_steps         : int             = 200
