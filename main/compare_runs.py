@@ -5,15 +5,8 @@ from pathlib import Path
 
 from _bootstrap import EnvironmentPinner
 
-EnvironmentPinner.threads()
 
-from configuration.benchmark import BenchmarkConfig
-from pipelines.benchmark.stages                 import ComparisonStage
-from tools.runtime.config_cli                   import ConfigCli
-from tools.monitoring.logger                    import Logger
-
-
-def _resolve_run_tag(config: BenchmarkConfig) -> str:
+def _resolve_run_tag(config) -> str:
     if config.run_tag is not None:
         return config.run_tag
 
@@ -27,6 +20,13 @@ def _resolve_run_tag(config: BenchmarkConfig) -> str:
 
 
 def main() -> None:
+    EnvironmentPinner.threads()
+
+    from configuration.benchmark import BenchmarkConfig
+    from pipelines.benchmark.stages                 import ComparisonStage
+    from tools.runtime.config_cli                   import ConfigCli
+    from tools.monitoring.logger                    import Logger
+
     config = ConfigCli(BenchmarkConfig(), description="Standalone benchmark comparison").apply()
     tag    = _resolve_run_tag(config)
 
