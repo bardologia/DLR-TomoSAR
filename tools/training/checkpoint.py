@@ -49,7 +49,7 @@ class Checkpoint:
             self.logger.warning("No improving checkpoint was saved; leaving the model in its final-epoch state.")
             return
 
-        checkpoint = torch.load(self.save_path, map_location=device)
+        checkpoint = torch.load(self.save_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["params"])
 
         self.logger.subsection(f"Restored best parameters from epoch {self.best_epoch + 1} (val_loss={self.best_val_loss:.4f}).")
