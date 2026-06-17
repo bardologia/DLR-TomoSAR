@@ -50,7 +50,7 @@ class FileIO:
 
 class ConfigIO:
     FILENAME     : str
-    NAME_KEY     : str
+    NAME_KEY     = "model_name"
     MISSING_NOUN : str
     UNKNOWN_NOUN : str
 
@@ -111,7 +111,6 @@ class ConfigIO:
 
 class BackboneModelConfigIO(ConfigIO):
     FILENAME     = "model_config.json"
-    NAME_KEY     = "backbone_name"
     MISSING_NOUN = "backbone"
     UNKNOWN_NOUN = "architecture"
     EXCLUDED     = {"shape_logger_types"}
@@ -129,7 +128,6 @@ class BackboneModelConfigIO(ConfigIO):
 
 class ProfileAutoencoderConfigIO(ConfigIO):
     FILENAME     = "profile_autoencoder_config.json"
-    NAME_KEY     = "ae_model_name"
     MISSING_NOUN = "profile autoencoder"
     UNKNOWN_NOUN = "profile autoencoder"
 
@@ -145,7 +143,6 @@ class ProfileAutoencoderConfigIO(ConfigIO):
 
 class ImageAutoencoderConfigIO(ConfigIO):
     FILENAME     = "image_autoencoder_config.json"
-    NAME_KEY     = "image_ae_model_name"
     MISSING_NOUN = "image autoencoder"
     UNKNOWN_NOUN = "image autoencoder"
 
