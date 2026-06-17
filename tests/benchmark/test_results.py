@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import torch
+
+from pipelines.benchmark.results import ComparisonReport, TrialCollector, TrialRecord
+
+from tools.data.io import FileIO
+
+
+class _SilentLogger:
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: None
+
+
+@pytest.fixture
+def logger_stub():
+    return _SilentLogger()
+
+
+def _write_json(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_trial_record_has_inference_reflects_inference_dir(tmp_path):
+    record = TrialRecord(name="unet", run_dir=tmp_path)
+    assert record.has_inference is False
+
+    record.inference_dir = tmp_path / "inf"
+    assert record.has_inference is True
+
+
+def test_collector_returns_empty_without_training_dir(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "overfit_results.json", [])
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    assert records == []
+
+
+def test_collector_parses_parameters_from_model_doc(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "size_match.json", {})
+    _write_json(tmp_path / "pipeline" / "overfit_results.json", [])
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    trial_docs = tmp_path / "training" / "unet" / "docs"
+    trial_docs.mkdir(parents=True)
+    (trial_docs / "model_doc.md").write_text("**Total Parameters:** `12,345,678`\n", encoding="utf-8")
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    assert len(records) == 1
+    assert records[0].parameters == 12345678
+
+
+def test_collector_falls_back_to_size_match_parameters(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "size_match.json", {"unet": {"parameters": 999}})
+    _write_json(tmp_path / "pipeline" / "overfit_results.json", [])
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    (tmp_path / "training" / "unet").mkdir(parents=True)
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    assert records[0].parameters == 999
+
+
+def test_collector_reads_checkpoint_with_weights_only_false(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "size_match.json", {})
+    _write_json(tmp_path / "pipeline" / "overfit_results.json", [])
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    trial_dir = tmp_path / "training" / "unet"
+    trial_dir.mkdir(parents=True)
+
+    checkpoint = {
+        "best_val_loss" : 0.123,
+        "best_epoch"    : 7,
+        "epoch"         : 9,
+        "global_step"   : 900,
+        "train_losses"  : [1.0, 0.5, 0.123],
+        "val_losses"    : [1.1, 0.6],
+    }
+    torch.save(checkpoint, trial_dir / "best_model.pt")
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    assert records[0].checkpoint["best_val_loss"]  == pytest.approx(0.123)
+    assert records[0].checkpoint["best_epoch"]     == 7
+    assert records[0].checkpoint["n_train_epochs"] == 3
+    assert records[0].checkpoint["n_val_epochs"]   == 2
+
+
+def test_collector_attaches_inference_metrics_and_media(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "size_match.json", {})
+    _write_json(tmp_path / "pipeline" / "overfit_results.json", [])
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    (tmp_path / "training" / "unet").mkdir(parents=True)
+
+    inference_dir = tmp_path / "training" / "unet" / "inference" / "run_a"
+    (inference_dir / "figures").mkdir(parents=True)
+    (inference_dir / "animations").mkdir(parents=True)
+    _write_json(inference_dir / "metrics.json", {"curve_rmse_gt": 0.5})
+    (inference_dir / "figures" / "profiles_1.png").write_bytes(b"x")
+    (inference_dir / "animations" / "elev.gif").write_bytes(b"x")
+    (inference_dir / "report.md").write_text("ok", encoding="utf-8")
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    record = records[0]
+    assert record.has_inference
+    assert record.metrics["curve_rmse_gt"] == 0.5
+    assert [p.name for p in record.figures]    == ["profiles_1.png"]
+    assert [p.name for p in record.animations] == ["elev.gif"]
+    assert record.report_path is not None
+
+
+def _records_with_metrics(out_dir):
+    a = TrialRecord(name="unet", run_dir=out_dir / "unet")
+    b = TrialRecord(name="resunet", run_dir=out_dir / "resunet")
+
+    a.inference_dir = out_dir / "unet" / "inf"
+    b.inference_dir = out_dir / "resunet" / "inf"
+
+    a.metrics = {"curve_rmse_gt": 0.1, "overall_r2_gt": 0.9, "psnr_db_gt": 40.0}
+    b.metrics = {"curve_rmse_gt": 0.5, "overall_r2_gt": 0.5, "psnr_db_gt": 20.0}
+
+    return [a, b]
+
+
+def _report(records, out_dir, logger_stub, rank=True):
+    return ComparisonReport(
+        records         = records,
+        out_dir         = out_dir,
+        reference_model = "unet",
+        embed_images    = False,
+        logger          = logger_stub,
+        rank_models     = rank,
+    )
+
+
+def test_leaderboard_ranks_better_model_first(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = _report(records, tmp_path, logger_stub)
+
+    lines = "\n".join(report._leaderboard())
+
+    unet_pos    = lines.index("`unet`")
+    resunet_pos = lines.index("`resunet`")
+    assert unet_pos < resunet_pos
+
+
+def test_leaderboard_dominant_model_has_lower_mean_rank(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = _report(records, tmp_path, logger_stub)
+
+    lines = [line for line in report._leaderboard() if line.startswith("| ")]
+    data  = [line for line in lines if "`unet`" in line or "`resunet`" in line]
+
+    unet_rank    = float([line for line in data if "`unet`" in line][0].split("|")[3])
+    resunet_rank = float([line for line in data if "`resunet`" in line][0].split("|")[3])
+
+    assert unet_rank < resunet_rank
+
+
+def test_leaderboard_empty_without_metrics(tmp_path, logger_stub):
+    records = [TrialRecord(name="unet", run_dir=tmp_path / "unet")]
+    report  = _report(records, tmp_path, logger_stub)
+
+    lines = report._leaderboard()
+
+    assert any("No inference metrics" in line for line in lines)
+
+
+def test_metric_table_bolds_best_value(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = _report(records, tmp_path, logger_stub)
+
+    lines = "\n".join(report._metric_table(["overall_r2_gt"], records))
+
+    assert "**0.9**" in lines
+
+
+def test_metric_table_does_not_bold_in_fold_mode(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = _report(records, tmp_path, logger_stub, rank=False)
+
+    lines = "\n".join(report._metric_table(["overall_r2_gt"], records))
+
+    assert "**" not in lines
+
+
+def test_capacity_table_renders_defaults_marker(tmp_path, logger_stub):
+    record = TrialRecord(name="unet", run_dir=tmp_path / "unet", parameters=1000)
+    report = _report([record], tmp_path, logger_stub)
+
+    lines = "\n".join(report._capacity_table())
+
+    assert "1,000" in lines
+    assert "_(defaults)_" in lines
+
+
+def test_write_all_round_trips_summary_json(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    out_dir = tmp_path / "comparison"
+    report  = _report(records, out_dir, logger_stub)
+
+    written = report.write_all()
+
+    summary_path = out_dir / "comparison_summary.json"
+    assert summary_path in written
+
+    payload = FileIO.load_json(summary_path)
+    names   = {entry["name"] for entry in payload}
+    assert names == {"unet", "resunet"}
+    assert (out_dir / "benchmark_overview.md").exists()
+    assert (out_dir / "metrics_comparison.md").exists()

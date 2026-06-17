@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from tools.training.aggregation import MetricAggregator
+
+
+def _loss_dict(components, weighted, monitor):
+    return {"components": components, "weighted": weighted, "monitor": monitor}
+
+
+def test_single_add_reduces_to_same_values():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({"a": 2.0}, {"a": 4.0}, {"m": 6.0}))
+
+    assert agg.count                == 1
+    assert agg.reduce_components()  == {"a": 2.0}
+    assert agg.reduce_weighted()    == {"a": 4.0}
+    assert agg.reduce_monitor()     == {"m": 6.0}
+
+
+def test_mean_over_multiple_batches():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({"a": 1.0}, {"a": 10.0}, {"m": 100.0}))
+    agg.add(_loss_dict({"a": 3.0}, {"a": 20.0}, {"m": 200.0}))
+    agg.add(_loss_dict({"a": 5.0}, {"a": 30.0}, {"m": 300.0}))
+
+    assert agg.count                  == 3
+    assert agg.reduce_components()["a"] == pytest.approx(3.0)
+    assert agg.reduce_weighted()["a"]   == pytest.approx(20.0)
+    assert agg.reduce_monitor()["m"]    == pytest.approx(200.0)
+
+
+def test_disjoint_keys_accumulate_independently():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({"a": 2.0}, {}, {}))
+    agg.add(_loss_dict({"b": 4.0}, {}, {}))
+
+    reduced = agg.reduce_components()
+    assert reduced["a"] == pytest.approx(1.0)
+    assert reduced["b"] == pytest.approx(2.0)
+
+
+def test_reduce_on_empty_uses_count_floor_of_one():
+    agg = MetricAggregator()
+    assert agg.count               == 0
+    assert agg.reduce_components()  == {}
+    assert agg.reduce_extra()       == {}
+
+
+def test_add_extra_skips_nan_values():
+    agg = MetricAggregator()
+    agg.count = 2
+    agg.add_extra({"p": float("nan"), "q": 8.0})
+
+    reduced = agg.reduce_extra()
+    assert reduced["p"] == pytest.approx(0.0)
+    assert reduced["q"] == pytest.approx(4.0)
+
+
+def test_add_extra_accumulates_across_calls():
+    agg = MetricAggregator()
+    agg.add_extra({"p": 1.0})
+    agg.add_extra({"p": 3.0})
+    agg.count = 4
+
+    assert agg.reduce_extra()["p"] == pytest.approx(1.0)
+
+
+def test_int_values_coerced_to_float():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({"a": 2}, {"a": 6}, {"m": 8}))
+
+    assert isinstance(agg.components_sum["a"], float)
+    assert agg.components_sum["a"] == 2.0

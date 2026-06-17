@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from configuration.benchmark import BenchmarkConfig
+from pipelines.shared.config_factory import ConfigFactory
+from pipelines.shared.run_metadata import TrainingRunMetadata
+
+
+@pytest.fixture
+def trainer_config(test_data_dir, tmp_path):
+    config = BenchmarkConfig()
+    config.paths.dataset_path = str(test_data_dir)
+    return ConfigFactory(config).training_trainer_config(tmp_path / "seed_logdir")
+
+
+@pytest.fixture
+def metadata(trainer_config, tmp_path):
+    meta = TrainingRunMetadata(
+        trainer_config = trainer_config,
+        model_name     = "resunet",
+        base_logdir    = tmp_path / "runs",
+        run_name       = "unit_run",
+    )
+    yield meta
+    meta.close()
+
+
+@pytest.mark.real_data
+def test_run_directory_uses_run_name(metadata, tmp_path):
+    assert metadata.run_directory == tmp_path / "runs" / "unit_run"
+
+
+@pytest.mark.real_data
+def test_subdirectories_created(metadata):
+    assert metadata.run_directory.is_dir()
+    assert metadata.tensorboard_dir.is_dir()
+    assert metadata.docs_directory.is_dir()
+    assert metadata.logs_directory.is_dir()
+    assert metadata.metadata_directory.is_dir()
+    assert metadata.checkpoint_dir.is_dir()
+
+
+@pytest.mark.real_data
+def test_subdirectories_nested_under_run_directory(metadata):
+    assert metadata.tensorboard_dir.parent    == metadata.run_directory
+    assert metadata.docs_directory.parent      == metadata.run_directory
+    assert metadata.checkpoint_dir.parent      == metadata.run_directory
+    assert metadata.metadata_directory.parent  == metadata.run_directory
+
+
+@pytest.mark.real_data
+def test_writer_attached_to_trainer_io(metadata, trainer_config):
+    assert trainer_config.io.writer is metadata.writer
+    assert trainer_config.io.logdir == str(metadata.run_directory)
+
+
+@pytest.mark.real_data
+def test_default_run_name_includes_model(trainer_config, tmp_path):
+    meta = TrainingRunMetadata(
+        trainer_config = trainer_config,
+        model_name     = "unet",
+        base_logdir    = tmp_path / "runs",
+    )
+    try:
+        assert meta.run_directory.name.startswith("run_unet_")
+    finally:
+        meta.close()
+
+
+@pytest.mark.real_data
+def test_save_trainer_config_serializes_without_writer(metadata):
+    out_path = metadata.save_trainer_config()
+
+    assert out_path == metadata.docs_directory / "trainer_config.json"
+    payload = json.loads(out_path.read_text())
+    assert payload["io"]["writer"] is None
+
+
+@pytest.mark.real_data
+def test_save_run_summary_payload(metadata):
+    out_path = metadata.save_run_summary(
+        model_name    = "resunet",
+        in_channels   = 9,
+        out_channels  = 15,
+        x_axis_length = 256,
+        param_match   = "size",
+    )
+
+    payload = json.loads(out_path.read_text())
+    assert payload["model_name"]    == "resunet"
+    assert payload["in_channels"]   == 9
+    assert payload["out_channels"]  == 15
+    assert payload["x_axis_length"] == 256
+    assert payload["param_match"]   == "size"
+    assert payload["framework"]     == "pytorch"
+    assert payload["run_directory"] == str(metadata.run_directory)
+
+
+@pytest.mark.real_data
+def test_context_manager_closes_writer(trainer_config, tmp_path):
+    with TrainingRunMetadata(trainer_config, "resunet", tmp_path / "runs", run_name="ctx") as meta:
+        assert meta.writer is not None
+
+    assert meta.writer is not None
+
+
+@pytest.mark.real_data
+def test_owns_logger_when_none_passed(metadata):
+    assert metadata._owns_logger is True
+
+
+@pytest.mark.real_data
+def test_does_not_own_external_logger(trainer_config, tmp_path):
+    from tools.monitoring.logger import Logger
+
+    logger = Logger(log_dir=str(tmp_path / "ext_logs"), name="external")
+    try:
+        meta = TrainingRunMetadata(trainer_config, "resunet", tmp_path / "runs", run_name="ext", logger=logger)
+        assert meta._owns_logger is False
+        assert meta.logger is logger
+        meta.close()
+    finally:
+        logger.close()

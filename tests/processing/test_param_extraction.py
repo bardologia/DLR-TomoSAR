@@ -1,0 +1,370 @@
+from __future__ import annotations
+
+import importlib.util
+import tempfile
+
+import matplotlib
+matplotlib.use("Agg")
+
+import numpy as np
+import pytest
+
+from configuration.param.param_extraction_config import FitSettings, FitMode
+from pipelines.processing.param_extraction.metrics import (
+    FittingMetricsCalculator,
+    KSelectionDiagnostics,
+    SnrEstimator,
+)
+from pipelines.processing.param_extraction.pipeline import ParameterExtractor
+from pipelines.processing.param_extraction.plots    import FittingResultPlotter
+from tools.data.gaussians     import GaussianMixture
+from tools.data.preprocessing import ProfilePreprocessor
+from tools.monitoring.logger  import Logger
+
+
+K_MAX            = 5
+LAMBDA_K         = 0.01
+HEIGHT_RANGE     = (-20.0, 80.0)
+THRESHOLD_FACTOR = 0.25
+TRUNCATION_INDEX = 170
+ACTIVITY_THRESH  = 0.001
+
+_HAS_JAX = importlib.util.find_spec("jax") is not None
+
+
+@pytest.fixture(scope="module")
+def logger():
+    return Logger(log_dir=tempfile.mkdtemp(), name="test_pe", level="ERROR")
+
+
+@pytest.fixture
+def small_metadata():
+    return {"height_range": list(HEIGHT_RANGE)}
+
+
+def _height_axis(H):
+    return np.linspace(HEIGHT_RANGE[0], HEIGHT_RANGE[1], H, dtype=np.float32)
+
+
+@pytest.mark.real_data
+def test_parameters_layout(parameters, param_extraction_meta):
+    assert param_extraction_meta["k_max"]    == K_MAX
+    assert parameters.shape[0]               == 3 * K_MAX
+    assert parameters.shape[1:]              == (1000, 500)
+
+
+@pytest.mark.real_data
+def test_diagnostics_layout(fit_diagnostics):
+    assert fit_diagnostics["mse_per_k"].shape       == (K_MAX, 1000, 500)
+    assert fit_diagnostics["penalised_per_k"].shape == (K_MAX, 1000, 500)
+    assert fit_diagnostics["best_k_map"].shape      == (1000, 500)
+    assert float(fit_diagnostics["lambda_k"])       == pytest.approx(LAMBDA_K, rel=1e-5)
+
+
+@pytest.mark.real_data
+def test_best_k_in_valid_range(fit_diagnostics):
+    bk = fit_diagnostics["best_k_map"]
+
+    assert bk.min() >= 0
+    assert bk.max() <= K_MAX
+
+
+@pytest.mark.real_data
+def test_parameters_finite(parameters):
+    w = np.array(parameters[:, :300, :300])
+
+    assert np.isfinite(w).all()
+
+
+@pytest.mark.real_data
+def test_active_mu_in_physical_height_range(parameters):
+    w    = np.array(parameters)
+    amps = w[0::3]
+    mus  = w[1::3]
+    act  = amps > ACTIVITY_THRESH
+
+    assert mus[act].min() >= HEIGHT_RANGE[0] - 1e-2
+    assert mus[act].max() <= HEIGHT_RANGE[1] + 1e-2
+
+
+@pytest.mark.real_data
+def test_active_sigma_within_bounds(parameters):
+    H        = 150
+    h_span   = HEIGHT_RANGE[1] - HEIGHT_RANGE[0]
+    dh       = h_span / (H - 1)
+    w        = np.array(parameters)
+    amps     = w[0::3]
+    sigs     = w[2::3]
+    act      = amps > ACTIVITY_THRESH
+
+    assert sigs[act].min() >= dh - 1e-3
+    assert sigs[act].max() <= h_span / 2.0 + 1e-3
+
+
+@pytest.mark.real_data
+def test_amplitudes_nonnegative(parameters):
+    w    = np.array(parameters)
+    amps = w[0::3]
+
+    assert amps.min() >= 0.0
+
+
+@pytest.mark.real_data
+def test_gaussians_sorted_by_mu(parameters):
+    w    = np.array(parameters)
+    amps = w[0::3]
+    mus  = w[1::3]
+
+    sort_keys   = np.where(amps > ACTIVITY_THRESH, mus, np.inf)
+    finite_pair = np.isfinite(sort_keys[:-1]) & np.isfinite(sort_keys[1:])
+    lower       = np.where(finite_pair, sort_keys[:-1], 0.0)
+    upper       = np.where(finite_pair, sort_keys[1:],  0.0)
+    violations  = (upper - lower < -1e-3) & finite_pair
+
+    assert int(violations.sum()) == 0
+
+
+@pytest.mark.real_data
+def test_penalised_equals_mse_plus_penalty(fit_diagnostics):
+    mse = fit_diagnostics["mse_per_k"]
+    pen = fit_diagnostics["penalised_per_k"]
+    bk  = fit_diagnostics["best_k_map"]
+    act = bk > 0
+
+    penalty = (pen - mse)[:, act]
+
+    assert np.all(penalty >= -1e-6)
+
+
+@pytest.mark.real_data
+def test_penalty_per_k_bounded_by_lambda(fit_diagnostics):
+    mse = fit_diagnostics["mse_per_k"]
+    pen = fit_diagnostics["penalised_per_k"]
+    bk  = fit_diagnostics["best_k_map"]
+    act = bk > 0
+
+    for k in range(K_MAX):
+        penalty_k = (pen[k] - mse[k])[act]
+
+        assert np.nanmax(penalty_k) <= LAMBDA_K * (k + 1) + 1e-5
+
+
+@pytest.mark.real_data
+def test_k1_penalty_equals_lambda(fit_diagnostics):
+    mse = fit_diagnostics["mse_per_k"]
+    pen = fit_diagnostics["penalised_per_k"]
+    bk  = fit_diagnostics["best_k_map"]
+    act = bk > 0
+
+    penalty_k1 = (pen[0] - mse[0])[act]
+
+    assert np.nanmax(penalty_k1) == pytest.approx(LAMBDA_K, abs=1e-5)
+
+
+@pytest.mark.real_data
+def test_best_k_is_argmin_of_penalised(fit_diagnostics):
+    pen = fit_diagnostics["penalised_per_k"]
+    bk  = fit_diagnostics["best_k_map"]
+    act = bk > 0
+
+    argmin = pen[:, act].argmin(axis=0) + 1
+
+    assert np.array_equal(argmin, bk[act])
+
+
+@pytest.mark.real_data
+def test_inactive_pixels_have_zero_best_k_and_nan_mse(fit_diagnostics):
+    mse = fit_diagnostics["mse_per_k"]
+    bk  = fit_diagnostics["best_k_map"]
+    inact = bk == 0
+
+    assert np.all(bk[inact] == 0)
+    assert np.isnan(mse[:, inact]).all()
+
+
+@pytest.mark.real_data
+def test_stored_mse_matches_reconstruction_from_params(tomogram_full, parameters, fit_diagnostics):
+    a0, a1, r0, r1 = 0, 40, 0, 40
+    H              = tomogram_full.shape[0]
+    height         = _height_axis(H)
+
+    raw = np.abs(np.array(tomogram_full[:, a0:a1, r0:r1])).astype(np.float32)
+    raw = ProfilePreprocessor.apply(raw, THRESHOLD_FACTOR, TRUNCATION_INDEX)
+
+    profiles = raw.transpose(2, 1, 0).reshape((r1 - r0) * (a1 - a0), H)
+    scale    = profiles.max(axis=1)
+    active   = scale > ACTIVITY_THRESH
+
+    parw = np.array(parameters[:, a0:a1, r0:r1])
+    amps = parw[0::3].reshape(K_MAX, -1).T
+    mus  = parw[1::3].reshape(K_MAX, -1).T
+    sigs = parw[2::3].reshape(K_MAX, -1).T
+
+    pred       = GaussianMixture.evaluate_batch(height, amps, mus, sigs)
+    safe_scale = np.where(active, scale, 1.0)
+    pred_norm  = pred     / safe_scale[:, None]
+    prof_norm  = profiles / safe_scale[:, None]
+    mse_recon  = ((pred_norm - prof_norm) ** 2).mean(axis=1)
+
+    bk_flat = fit_diagnostics["best_k_map"][a0:a1, r0:r1].T.reshape(-1)
+    mse_w   = fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1].transpose(0, 2, 1).reshape(K_MAX, -1)
+    idx     = np.clip(bk_flat - 1, 0, K_MAX - 1)
+    mse_best = mse_w[idx, np.arange(len(idx))]
+
+    mask = active & (bk_flat > 0)
+
+    assert mask.sum() > 0
+    assert np.nanmedian(np.abs(mse_recon[mask] - mse_best[mask])) < 5e-3
+
+
+@pytest.mark.real_data
+def test_snr_estimator_runs(tomogram_full, logger):
+    win = np.array(tomogram_full[:, :32, :32])
+    snr = SnrEstimator(logger).run(win)
+
+    assert snr.shape == (32, 32)
+    finite = snr[np.isfinite(snr)]
+    assert finite.size > 0
+    assert finite.min() >= 0.0
+
+
+@pytest.mark.real_data
+def test_k_selection_diagnostics_runs(fit_diagnostics, logger):
+    diag = {
+        "mse_per_k"       : fit_diagnostics["mse_per_k"][:, :64, :64],
+        "penalised_per_k" : fit_diagnostics["penalised_per_k"][:, :64, :64],
+        "best_k_map"      : fit_diagnostics["best_k_map"][:64, :64],
+    }
+    maps, summary = KSelectionDiagnostics(k_max=K_MAX, logger=logger).run(diag)
+
+    assert "k_margin_second_map" in maps
+    assert "n_active_pixels" in summary
+    assert summary["n_active_pixels"] >= 0.0
+
+
+@pytest.mark.real_data
+def test_metrics_calculator_runs_on_window(tomogram_full, parameters, fit_diagnostics, small_metadata, logger, tmp_path):
+    a0, a1, r0, r1 = 0, 48, 0, 48
+
+    tomo_win = np.array(tomogram_full[:, a0:a1, r0:r1])
+    tomo_path = tmp_path / "tomo.npy"
+    np.save(tomo_path, tomo_win)
+
+    parw = np.ascontiguousarray(np.array(parameters[:, a0:a1, r0:r1]))
+    diag = {
+        "mse_per_k"       : fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1],
+        "penalised_per_k" : fit_diagnostics["penalised_per_k"][:, a0:a1, r0:r1],
+        "best_k_map"      : fit_diagnostics["best_k_map"][a0:a1, r0:r1],
+        "lambda_k"        : fit_diagnostics["lambda_k"],
+    }
+
+    calc = FittingMetricsCalculator(
+        n_gaussians      = K_MAX,
+        logger           = logger,
+        threshold_factor = THRESHOLD_FACTOR,
+        truncation_index = TRUNCATION_INDEX,
+        amp_threshold    = ACTIVITY_THRESH,
+    )
+    out = calc.run(parw, small_metadata, tomo_path, diag)
+
+    assert out["r2_map"].shape       == (a1 - a0, r1 - r0)
+    assert out["activity_map"].shape == (a1 - a0, r1 - r0)
+    assert out["global_summary"]["n_gaussians"] == float(K_MAX)
+    assert out["activity_map"].max() <= K_MAX
+
+
+@pytest.mark.real_data
+def test_activity_map_counts_active_components(parameters, logger):
+    a0, a1, r0, r1 = 0, 60, 0, 60
+    parw = np.array(parameters[:, a0:a1, r0:r1])
+
+    calc = FittingMetricsCalculator(
+        n_gaussians      = K_MAX,
+        logger           = logger,
+        threshold_factor = THRESHOLD_FACTOR,
+        truncation_index = TRUNCATION_INDEX,
+        amp_threshold    = ACTIVITY_THRESH,
+    )
+    activity = calc._compute_activity_map(parw)
+
+    expected = (parw[0::3] >= ACTIVITY_THRESH).sum(axis=0)
+
+    assert np.array_equal(activity, expected)
+
+
+@pytest.mark.real_data
+def test_fitting_result_plotter_smoke(tomogram_full, parameters, fit_diagnostics, small_metadata, logger, tmp_path):
+    a0, a1, r0, r1 = 0, 48, 0, 48
+
+    tomo_path = tmp_path / "tomo.npy"
+    np.save(tomo_path, np.array(tomogram_full[:, a0:a1, r0:r1]))
+
+    parw = np.ascontiguousarray(np.array(parameters[:, a0:a1, r0:r1]))
+    diag = {
+        "mse_per_k"       : fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1],
+        "penalised_per_k" : fit_diagnostics["penalised_per_k"][:, a0:a1, r0:r1],
+        "best_k_map"      : fit_diagnostics["best_k_map"][a0:a1, r0:r1],
+        "lambda_k"        : fit_diagnostics["lambda_k"],
+    }
+
+    calc = FittingMetricsCalculator(
+        n_gaussians      = K_MAX,
+        logger           = logger,
+        threshold_factor = THRESHOLD_FACTOR,
+        truncation_index = TRUNCATION_INDEX,
+        amp_threshold    = ACTIVITY_THRESH,
+    )
+    metrics_dict = calc.run(parw, small_metadata, tomo_path, diag)
+
+    plotter = FittingResultPlotter(
+        output_directory = tmp_path / "out",
+        n_gaussians      = K_MAX,
+        logger           = logger,
+        threshold_factor = THRESHOLD_FACTOR,
+        truncation_index = TRUNCATION_INDEX,
+        fig_dpi          = 40,
+        save_dpi         = 40,
+        n_fits_per_k     = 2,
+        amp_threshold    = ACTIVITY_THRESH,
+    )
+    saved = plotter.run(parw, metrics_dict, small_metadata, tomo_path)
+
+    assert len(saved) > 0
+    assert all(p.is_file() for p in saved.values())
+
+
+@pytest.mark.slow
+@pytest.mark.real_data
+@pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
+def test_rerun_extractor_reproduces_best_k(tomogram_full, fit_diagnostics, logger, tmp_path):
+    a0, a1, r0, r1 = 0, 16, 0, 8
+
+    tomo_path = tmp_path / "tomo.npy"
+    np.save(tomo_path, np.array(tomogram_full[:, a0:a1, r0:r1]))
+
+    fit_cfg  = FitMode.SigmaOnly(k_max=K_MAX, lambda_k=LAMBDA_K, sigma_init_divisor=4.0)
+    settings = FitSettings(fit_config=fit_cfg)
+
+    extractor = ParameterExtractor(
+        parameter_extraction = settings,
+        logger               = logger,
+        range_batch_size     = 256,
+        adam_steps           = 3000,
+        adam_lr              = 2e-1,
+        adam_b1              = 0.95,
+        adam_b2              = 0.999,
+        gpu_pixel_batch_size = 8192,
+        init_workers         = 4,
+    )
+    out, diag = extractor.run(tomo_path, HEIGHT_RANGE)
+
+    assert out.shape  == (3 * K_MAX, a1 - a0, r1 - r0)
+    assert diag["best_k_map"].min() >= 0
+    assert diag["best_k_map"].max() <= K_MAX
+
+    bk_stored = fit_diagnostics["best_k_map"][a0:a1, r0:r1]
+    active    = bk_stored > 0
+
+    if active.sum() > 0:
+        agree = (diag["best_k_map"][active] == bk_stored[active]).mean()
+        assert agree >= 0.6

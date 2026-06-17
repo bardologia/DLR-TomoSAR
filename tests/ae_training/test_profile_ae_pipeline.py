@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+import types
+from pathlib import Path
+
+import numpy as np
+import pytest
+import torch
+from torch.utils.data import DataLoader
+
+from configuration.architectures.profile_autoencoder import MlpAutoencoderConfig
+from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
+from configuration.training.profile_autoencoder import ProfileAeLossConfig, ProfileAeTrainerConfig
+from pipelines.profile_autoencoder.training import pipeline as profile_pipeline
+from pipelines.shared.run_metadata import TrainingRunMetadata
+
+
+pytestmark = pytest.mark.slow
+
+
+PROFILE_LENGTH = 16
+EMBEDDING_DIM  = 8
+
+
+@pytest.fixture(autouse=True)
+def _force_cpu(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+
+def _trainer_config(cfg):
+    tc                         = ProfileAeTrainerConfig(gaussian=None, autoencoder=cfg, ae_loss=ProfileAeLossConfig(curve_kind="mse"))
+    tc.training                = TrainingLoopConfig(epochs=1, validation_frequency=1, use_amp=False)
+    tc.resources               = ResourceConfig(enabled=False)
+    tc.early_stopping.patience = 1000
+    tc.warmup.warmup_steps     = 0
+    return tc
+
+
+def _pipeline(cfg):
+    pipe                 = profile_pipeline.TrainingPipeline.__new__(profile_pipeline.TrainingPipeline)
+    pipe.trainer_config  = _trainer_config(cfg)
+    pipe.autoencoder_cfg = cfg
+    pipe.ae_model_name   = "mlp_ae"
+    pipe.entry           = types.SimpleNamespace(run_name="profile_ae_test", seed=0)
+    return pipe
+
+
+def _build_cfg():
+    cfg            = MlpAutoencoderConfig(profile_length=PROFILE_LENGTH, embedding_dim=EMBEDDING_DIM)
+    cfg.hidden_dim = 16
+    cfg.depth      = 2
+    return cfg
+
+
+def _loader(n=8, batch_size=4, seed=0):
+    g = torch.Generator().manual_seed(seed)
+    x = torch.randn(n, PROFILE_LENGTH, generator=g)
+    return DataLoader(x, batch_size=batch_size)
+
+
+def test_build_model_sets_profile_length():
+    cfg  = _build_cfg()
+    pipe = _pipeline(cfg)
+
+    model = pipe._build_model(PROFILE_LENGTH)
+
+    assert isinstance(model, torch.nn.Module)
+    assert cfg.profile_length == PROFILE_LENGTH
+
+
+def test_orchestration_produces_checkpoint_and_metadata(tmp_path):
+    cfg  = _build_cfg()
+    pipe = _pipeline(cfg)
+
+    run_meta = TrainingRunMetadata(pipe.trainer_config, "profile_ae", tmp_path, "profile_ae_test")
+    model    = pipe._build_model(PROFILE_LENGTH)
+    x_axis   = np.linspace(0.0, 1.0, PROFILE_LENGTH, dtype=np.float32)
+
+    pipe._save_metadata(run_meta, PROFILE_LENGTH)
+
+    loader            = _loader()
+    results, run_dir  = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader)
+
+    train_losses, val_losses, best = results
+
+    assert np.isfinite(best)
+    assert len(train_losses) == 1
+
+    run_dir = Path(run_dir)
+    assert (run_dir / "best_model.pt").is_file()
+    assert (run_meta.metadata_directory / "profile_autoencoder_config.json").is_file()
+    assert (run_meta.metadata_directory / "run_summary.json").is_file()
+    assert (run_meta.docs_directory / "trainer_config.json").is_file()
+
+
+def test_saved_checkpoint_is_loadable(tmp_path):
+    cfg  = _build_cfg()
+    pipe = _pipeline(cfg)
+
+    run_meta = TrainingRunMetadata(pipe.trainer_config, "profile_ae", tmp_path, "profile_ae_test")
+    model    = pipe._build_model(PROFILE_LENGTH)
+    x_axis   = np.linspace(0.0, 1.0, PROFILE_LENGTH, dtype=np.float32)
+
+    loader            = _loader()
+    _results, run_dir = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader)
+
+    ckpt = torch.load(Path(run_dir) / "best_model.pt", map_location="cpu", weights_only=False)
+
+    fresh = pipe._build_model(PROFILE_LENGTH)
+    fresh.load_state_dict(ckpt["params"])

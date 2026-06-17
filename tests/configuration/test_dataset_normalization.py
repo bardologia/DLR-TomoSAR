@@ -1,0 +1,163 @@
+from __future__ import annotations
+
+import dataclasses
+
+import pytest
+
+from configuration.dataset import (
+    InputConfig,
+    OutputConfig,
+    PatchConfig,
+    AugmentationConfig,
+    DatasetConfig,
+    ProfileAugmentationConfig,
+    ProfileDatasetConfig,
+)
+from configuration.normalization import (
+    NormMethod,
+    ChannelStrategy,
+    Presets,
+    ChannelStats,
+)
+from configuration.normalization.general import _SLOT_STRATEGIES
+
+from tools.data.representation import Representation
+
+from tests.configuration._helpers import make_split_regions
+
+
+def test_input_config_defaults_channel_counts():
+    cfg = InputConfig()
+    assert cfg.primary_channels_per_pass        >= 0
+    assert cfg.secondaries_channels_per_pass    == 0
+    assert cfg.interferograms_channels_per_pass >= 0
+
+
+def test_input_config_total_channels_consistent():
+    cfg   = InputConfig(use_primary=True, use_secondaries=True, use_interferograms=True, use_dem=True)
+    total = cfg.total_channels(n_secondaries=4, n_interferograms=4)
+    keys  = cfg.channel_group_keys(n_secondaries=4, n_interferograms=4)
+    assert total == len(keys)
+
+
+def test_input_config_round_trips_through_dict():
+    cfg     = InputConfig(use_secondaries=True, secondaries_representation=Representation.MAG_ANGLE)
+    rebuilt = InputConfig.from_dict(cfg.as_dict())
+    assert rebuilt == cfg
+
+
+def test_input_config_dem_adds_one_channel():
+    base = InputConfig(use_dem=False)
+    dem  = InputConfig(use_dem=True)
+    assert dem.total_channels(0, 0) == base.total_channels(0, 0) + 1
+
+
+def test_output_config_role_names_and_params():
+    cfg = OutputConfig()
+    assert cfg.role_names == ["a", "mu", "sig"]
+    assert cfg.params_per_gaussian == 3
+    assert cfg.total_channels(5) == 15
+
+
+def test_output_config_selected_indices():
+    cfg = OutputConfig(use_mu=False)
+    assert cfg.role_names == ["a", "sig"]
+    assert cfg.selected_indices(2) == [0, 2, 3, 5]
+
+
+def test_output_config_round_trips_through_dict():
+    cfg     = OutputConfig()
+    rebuilt = OutputConfig.from_dict(cfg.as_dict())
+    assert rebuilt.use_amplitude == cfg.use_amplitude
+    assert set(rebuilt.output_strategies) == set(cfg.output_strategies)
+
+
+def test_output_config_strategy_for_known_key():
+    cfg = OutputConfig()
+    assert isinstance(cfg.strategy_for("out/amp"), ChannelStrategy)
+
+
+def test_patch_config_defaults():
+    cfg = PatchConfig()
+    assert cfg.size[0] > 0 and cfg.size[1] > 0
+    assert cfg.stride > 0
+    assert isinstance(cfg.size, tuple)
+
+
+def test_augmentation_config_probabilities_in_range():
+    cfg = AugmentationConfig()
+    for name in ("p_flip_h", "p_flip_v", "p_rot90", "p_amp_scale", "p_noise"):
+        assert 0.0 <= getattr(cfg, name) <= 1.0
+
+
+def test_dataset_config_requires_run_dir_and_split():
+    cfg = DatasetConfig(preprocessing_run_directory="/tmp/run", split_regions=make_split_regions())
+    assert cfg.batch_size > 0
+    assert cfg.num_workers >= 0
+    assert isinstance(cfg.patch, PatchConfig)
+    assert isinstance(cfg.input_config, InputConfig)
+    assert isinstance(cfg.output_config, OutputConfig)
+    assert cfg.n_gaussians > 0
+
+
+def test_dataset_config_secondary_labels_default():
+    cfg = DatasetConfig(preprocessing_run_directory="/tmp/run", split_regions=make_split_regions())
+    assert cfg.secondary_labels == ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
+
+
+def test_profile_augmentation_defaults():
+    cfg = ProfileAugmentationConfig()
+    assert 0.0 <= cfg.p_amp_scale <= 1.0
+    assert cfg.max_shift >= 0
+    assert cfg.amp_scale_range[0] <= cfg.amp_scale_range[1]
+
+
+def test_profile_dataset_config_defaults():
+    cfg = ProfileDatasetConfig(preprocessing_run_directory="/tmp/run", split_regions=make_split_regions())
+    assert cfg.n_gaussians > 0
+    assert cfg.batch_size > 0
+    assert 0.0 < cfg.pixel_subsample <= 1.0
+    assert isinstance(cfg.augmentation, ProfileAugmentationConfig)
+
+
+def test_norm_method_enum_values():
+    assert {m.value for m in NormMethod} == {
+        "min_max_p999", "robust_iqr", "fixed_div_pi", "zscore",
+    }
+
+
+@pytest.mark.parametrize("preset_name", [
+    "MIN_MAX", "MIN_MAX_LOG1P", "ROBUST_IQR", "ROBUST_IQR_LOG1P",
+    "FIXED_DIV_PI", "ZSCORE", "ZSCORE_LOG1P",
+])
+def test_presets_are_channel_strategies(preset_name):
+    preset = getattr(Presets, preset_name)
+    assert isinstance(preset, ChannelStrategy)
+    assert isinstance(preset.norm_method, NormMethod)
+
+
+def test_channel_strategy_round_trips_through_dict():
+    strat   = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=True)
+    rebuilt = ChannelStrategy.from_dict(strat.as_dict())
+    assert rebuilt == strat
+
+
+def test_channel_strategy_from_slot_known_keys():
+    for key in _SLOT_STRATEGIES:
+        assert isinstance(ChannelStrategy.from_slot(key), ChannelStrategy)
+
+
+def test_channel_stats_round_trips():
+    stats = ChannelStats(
+        loc            = [0.0, 1.0],
+        scale          = [1.0, 2.0],
+        names          = ["c0", "c1"],
+        strategies     = [Presets.ZSCORE, Presets.ROBUST_IQR],
+        log1p_channels = [0],
+    )
+    rebuilt = ChannelStats.from_dict(stats.as_dict())
+    assert rebuilt.n_channels == stats.n_channels
+    assert rebuilt.loc == stats.loc
+    assert rebuilt.scale == stats.scale
+    assert rebuilt.names == stats.names
+    assert rebuilt.log1p_channels == stats.log1p_channels

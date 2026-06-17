@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+import json
+
+import matplotlib
+matplotlib.use("Agg")
+
+import numpy as np
+import pytest
+
+from configuration.sar.processing_config import ProcessingConfig, PathConfig
+from pipelines.processing.generation.plots     import StackPlotter
+from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
+from tools.data.regions import CropRegion
+from tools.monitoring.logger import Logger
+
+
+CLIP = 1.25
+
+
+@pytest.fixture(scope="module")
+def logger():
+    import tempfile
+    return Logger(log_dir=tempfile.mkdtemp(), name="test_gen", level="ERROR")
+
+
+@pytest.fixture
+def crop_from_state(config_state_json):
+    c = config_state_json["crop"]
+    return CropRegion(c["azimuth_start"], c["azimuth_end"], c["range_start"], c["range_end"])
+
+
+@pytest.mark.real_data
+def test_shapes_consistent_across_inputs(primary, secondaries, interferograms, dem_full):
+    Az, R = primary.shape
+
+    assert dem_full.shape       == (Az, R)
+    assert secondaries.shape    == (28, Az, R)
+    assert interferograms.shape == (28, Az, R)
+
+
+@pytest.mark.real_data
+def test_input_dtypes(primary, secondaries, interferograms, dem_full):
+    assert primary.dtype        == np.complex64
+    assert secondaries.dtype    == np.complex64
+    assert interferograms.dtype == np.complex64
+    assert dem_full.dtype       == np.float32
+
+
+@pytest.mark.real_data
+def test_interferogram_amplitude_is_clipped_secondary(secondaries, interferograms, small_window):
+    az, rg = small_window
+
+    for s in range(interferograms.shape[0]):
+        ifg_amp = np.abs(np.array(interferograms[s][az, rg]))
+        sec_amp = np.abs(np.array(secondaries[s][az, rg]))
+        clipped = np.clip(sec_amp, 0.0, CLIP)
+
+        assert np.allclose(ifg_amp, clipped, atol=1e-5)
+
+
+@pytest.mark.real_data
+def test_interferogram_amplitude_never_exceeds_clip(interferograms, small_window):
+    az, rg = small_window
+
+    for s in range(interferograms.shape[0]):
+        amp = np.abs(np.array(interferograms[s][az, rg]))
+
+        assert amp.max() <= CLIP + 1e-5
+
+
+@pytest.mark.real_data
+def test_interferogram_phase_within_pi(interferograms, small_window):
+    az, rg = small_window
+    phase  = np.angle(np.array(interferograms[0][az, rg]))
+
+    assert phase.min() >= -np.pi - 1e-5
+    assert phase.max() <=  np.pi + 1e-5
+
+
+@pytest.mark.real_data
+def test_interferogram_phasor_unit_magnitude_where_active(secondaries, interferograms, small_window):
+    az, rg   = small_window
+    ifg      = np.array(interferograms[0][az, rg])
+    sec_amp  = np.clip(np.abs(np.array(secondaries[0][az, rg])), 0.0, CLIP)
+    active   = sec_amp > 1e-6
+
+    recovered_phasor_mag = np.abs(ifg[active]) / sec_amp[active]
+
+    assert np.allclose(recovered_phasor_mag, 1.0, atol=1e-4)
+
+
+@pytest.mark.real_data
+def test_artifact_filenames_match_dataset_json(dataset_json, crop_from_state, logger):
+    config   = ProcessingConfig(crop=crop_from_state, paths=PathConfig(run_subdirectory="x"))
+    registry = ArtifactRegistry(config, logger)
+
+    assert registry.artifact_filenames() == dataset_json["artifacts"]
+
+
+@pytest.mark.real_data
+def test_dataset_layout_roundtrip(tmp_path, dataset_json, crop_from_state, logger):
+    paths   = PathConfig(main_directory=tmp_path, run_subdirectory="run")
+    config  = ProcessingConfig(crop=crop_from_state, paths=paths)
+    manager = MetadataManager(config, logger)
+
+    out_path = manager.save_dataset_layout(pass_labels=dataset_json["pass_labels"])
+    loaded   = json.loads(out_path.read_text())
+
+    assert loaded["global_crop"]  == list(crop_from_state.as_tuple())
+    assert loaded["dataset_type"] == "FSAR"
+    assert loaded["pass_labels"]  == dataset_json["pass_labels"]
+    assert loaded["artifacts"]    == dataset_json["artifacts"]
+
+
+@pytest.mark.real_data
+def test_config_state_roundtrip(tmp_path, crop_from_state, logger):
+    paths   = PathConfig(main_directory=tmp_path, run_subdirectory="run")
+    config  = ProcessingConfig(crop=crop_from_state, paths=paths)
+    manager = MetadataManager(config, logger)
+
+    dump_path = manager.save_pipeline_configuration()
+    loaded    = json.loads(dump_path.read_text())
+
+    assert loaded["crop"]["azimuth_start"]               == crop_from_state.azimuth_start
+    assert loaded["tomogram_config"]["max_amplitude_clip"] == CLIP
+    assert loaded["dataset_type"]                        == "FSAR"
+
+
+@pytest.mark.real_data
+def test_inputs_metadata_roundtrip(tmp_path, crop_from_state, logger):
+    paths   = PathConfig(main_directory=tmp_path, run_subdirectory="run")
+    config  = ProcessingConfig(crop=crop_from_state, paths=paths)
+    manager = MetadataManager(config, logger)
+
+    entries = manager.build_inputs_metadata(
+        primary_path         = tmp_path / "p.npy",
+        secondaries_path     = tmp_path / "s.npy",
+        interferograms_path  = tmp_path / "i.npy",
+        primary_shape        = (1000, 500),
+        secondaries_shape    = (28, 1000, 500),
+        interferograms_shape = (28, 1000, 500),
+    )
+    meta_path = manager.save_stage_metadata("inputs", entries)
+
+    assert meta_path.is_file()
+    text = meta_path.read_text()
+    assert "primary_shape" in text
+
+
+@pytest.mark.real_data
+def test_stackplotter_smoke(tmp_path, primary, secondaries, interferograms, dem_full, crop_from_state, pass_labels, logger):
+    az, rg = slice(0, 24), slice(0, 24)
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True)
+
+    primary_path        = data_dir / "primary.npy"
+    secondaries_path    = data_dir / "secondaries.npy"
+    interferograms_path = data_dir / "interferograms.npy"
+    dem_path            = data_dir / "dem.npy"
+
+    np.save(primary_path,        np.array(primary[az, rg]))
+    np.save(secondaries_path,    np.array(secondaries[:3, az, rg]))
+    np.save(interferograms_path, np.array(interferograms[:3, az, rg]))
+    np.save(dem_path,            np.array(dem_full[az, rg]))
+
+    paths   = PathConfig(main_directory=tmp_path, run_subdirectory="run")
+    config  = ProcessingConfig(crop=crop_from_state, paths=paths)
+    plotter = StackPlotter(config, logger, fig_dpi=40, save_dpi=40)
+
+    saved = plotter.run(primary_path, secondaries_path, interferograms_path, dem_path, pass_labels=pass_labels[:4])
+
+    assert "primary" in saved
+    assert "dem_full" in saved
+    assert all(p.is_file() for p in saved.values())

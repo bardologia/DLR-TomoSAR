@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from configuration.cross_validation import CrossValidationConfig, FoldConfig
+from pipelines.cross_validation.folds   import FoldNaming
+from pipelines.cross_validation.workers import (
+    CrossValidationWorker,
+    FoldCollector,
+    FoldInferenceWorker,
+    FoldTrainingWorker,
+)
+from tools.data.io           import FileIO
+from tools.data.regions      import SplitRegions
+from tools.monitoring.logger import Logger
+
+
+def make_logger(tmp_path: Path) -> Logger:
+    return Logger(log_dir=str(tmp_path / "logs"), name="workers_test")
+
+
+def worker_config(test_data_dir: Path, training_type: str = "backbone") -> CrossValidationConfig:
+    config                    = CrossValidationConfig(training_type=training_type)
+    config.paths.dataset_path = test_data_dir
+    config.folds              = FoldConfig(n_folds=5, azimuth_start=1000, azimuth_end=2000)
+    return config
+
+
+def build_run_dir(tmp_path: Path, fold_names: list[str], inference_folds: dict[str, dict]) -> Path:
+    run_dir = tmp_path / "run"
+
+    (run_dir / "pipeline").mkdir(parents=True)
+    for name in fold_names:
+        (run_dir / "folds" / name).mkdir(parents=True)
+
+    training_results = [{"name": name, "status": "DONE", "duration_s": 10.0} for name in fold_names]
+    FileIO.save_json(training_results, run_dir / "pipeline" / "training_results.json")
+
+    for name, split_metrics in inference_folds.items():
+        for split, metrics in split_metrics.items():
+            inference_dir = run_dir / "folds" / name / "inference" / split
+            inference_dir.mkdir(parents=True)
+            FileIO.save_json(metrics, inference_dir / "metrics.json")
+
+    return run_dir
+
+
+def test_collector_points_at_folds_subdir(tmp_path):
+    run_dir   = build_run_dir(tmp_path, ["fold_0", "fold_1"], {})
+    collector = FoldCollector(run_dir=run_dir, splits=["test"], logger=make_logger(tmp_path))
+
+    assert collector.training_dir == run_dir / "folds"
+    assert collector.splits       == ["test"]
+
+
+def test_collector_collects_every_fold(tmp_path):
+    names     = [FoldNaming.name(i) for i in range(5)]
+    run_dir   = build_run_dir(tmp_path, names, {})
+    collector = FoldCollector(run_dir=run_dir, splits=["test"], logger=make_logger(tmp_path))
+
+    base, by_split = collector.collect_by_split()
+
+    assert [record.name for record in base] == names
+    assert set(by_split)                     == {"test"}
+    assert len(by_split["test"])             == 5
+
+
+def test_collector_attaches_training_results(tmp_path):
+    run_dir   = build_run_dir(tmp_path, ["fold_0", "fold_1"], {})
+    collector = FoldCollector(run_dir=run_dir, splits=[], logger=make_logger(tmp_path))
+
+    base, _ = collector.collect_by_split()
+
+    assert base[0].training_result["status"]     == "DONE"
+    assert base[0].training_result["duration_s"] == 10.0
+
+
+def test_collector_split_view_loads_metrics_when_present(tmp_path):
+    run_dir   = build_run_dir(tmp_path, ["fold_0", "fold_1"], {"fold_0": {"test": {"curve_rmse_gt": 2.5}}})
+    collector = FoldCollector(run_dir=run_dir, splits=["test"], logger=make_logger(tmp_path))
+
+    _, by_split = collector.collect_by_split()
+    records     = by_split["test"]
+
+    assert records[0].metrics                 == {"curve_rmse_gt": 2.5}
+    assert records[0].inference_dir           is not None
+    assert records[0].inference_dir.name      == "test"
+
+
+def test_collector_split_view_empty_when_metrics_absent(tmp_path):
+    run_dir   = build_run_dir(tmp_path, ["fold_0", "fold_1"], {"fold_0": {"test": {"curve_rmse_gt": 2.5}}})
+    collector = FoldCollector(run_dir=run_dir, splits=["test"], logger=make_logger(tmp_path))
+
+    _, by_split = collector.collect_by_split()
+    records     = by_split["test"]
+
+    assert records[1].metrics       == {}
+    assert records[1].inference_dir is None
+    assert records[1].figures       == []
+
+
+def test_collector_multiple_splits_independent(tmp_path):
+    run_dir = build_run_dir(
+        tmp_path,
+        ["fold_0", "fold_1"],
+        {"fold_0": {"val": {"curve_rmse_gt": 1.0}, "test": {"curve_rmse_gt": 2.0}}},
+    )
+    collector = FoldCollector(run_dir=run_dir, splits=["val", "test"], logger=make_logger(tmp_path))
+
+    _, by_split = collector.collect_by_split()
+
+    assert by_split["val"][0].metrics  == {"curve_rmse_gt": 1.0}
+    assert by_split["test"][0].metrics == {"curve_rmse_gt": 2.0}
+
+
+@pytest.mark.real_data
+def test_cross_validation_worker_fold_name(test_data_dir):
+    worker = CrossValidationWorker(worker_config(test_data_dir), run_tag="rt")
+
+    assert worker.fold_name(0) == "fold_0"
+    assert worker.fold_name(4) == "fold_4"
+
+
+@pytest.mark.real_data
+def test_training_worker_dispatches_to_backbone(test_data_dir, monkeypatch):
+    worker = FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt")
+
+    captured = {}
+
+    def fake_backbone(self, fold_index, split_regions):
+        captured["fold"]    = fold_index
+        captured["regions"] = split_regions
+
+    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone", fake_backbone, raising=True)
+
+    worker.run(2)
+
+    assert captured["fold"] == 2
+    assert isinstance(captured["regions"], SplitRegions)
+
+
+@pytest.mark.real_data
+def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch):
+    worker = FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt")
+
+    captured = {}
+    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone", lambda self, i, sr: captured.update(sr=sr), raising=True)
+
+    worker.run(2)
+
+    train = sorted((r.azimuth_start, r.azimuth_end) for r in captured["sr"].regions("train"))
+    assert train                                        == [(1000, 1400), (1800, 2000)]
+    assert worker.factory.planner().plan(2).split_regions.regions("test")[0].azimuth_start == 1400
+
+
+@pytest.mark.real_data
+def test_training_worker_dispatch_routes_by_type(test_data_dir, monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone",            lambda self, i, sr: seen.update(kind="backbone"), raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_jepa",               lambda self, i, sr: seen.update(kind="jepa"),     raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_profile_autoencoder", lambda self, i, sr: seen.update(kind="ae"),       raising=True)
+
+    FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt").run(0)
+    assert seen["kind"] == "backbone"
+
+    FoldTrainingWorker(worker_config(test_data_dir, "jepa"), run_tag="rt").run(0)
+    assert seen["kind"] == "jepa"
+
+    FoldTrainingWorker(worker_config(test_data_dir, "profile_autoencoder"), run_tag="rt").run(0)
+    assert seen["kind"] == "ae"
+
+
+@pytest.mark.real_data
+def test_training_worker_rejects_unknown_type(test_data_dir):
+    config = worker_config(test_data_dir)
+    config.training_type = "bogus"
+
+    worker = FoldTrainingWorker(config, run_tag="rt")
+
+    with pytest.raises(ValueError, match="Unknown training_type"):
+        worker.run(0)
+
+
+@pytest.mark.real_data
+def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
+    worker = FoldInferenceWorker(worker_config(test_data_dir), run_tag="rt")
+
+    captured = {}
+
+    class FakePipeline:
+        def __init__(self, inference_config):
+            captured["config"] = inference_config
+
+        def run(self):
+            captured["ran"] = True
+
+    import pipelines.backbone.inference.pipeline as pipeline_module
+    monkeypatch.setattr(pipeline_module, "InferencePipeline", FakePipeline, raising=True)
+
+    worker.run(1, "test")
+
+    expected_dir = worker.run_dir / "folds" / "fold_1"
+    assert captured["ran"]                       is True
+    assert captured["config"].run_directory      == expected_dir
+    assert captured["config"].split              == "test"
+    assert captured["config"].output_subdir      == "test"
