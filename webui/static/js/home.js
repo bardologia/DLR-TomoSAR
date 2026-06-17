@@ -86,8 +86,6 @@ class StatusBoard {
 
       `<section class="sboard sboard--gpualarm" id="sb-gpu-guard" aria-label="GPU intrusion alarm" hidden></section>` +
 
-      `<section class="sboard sboard--gpuguard" id="sb-gpu-guard-panel" aria-label="GPU guard"></section>` +
-
       `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
       `<div class="wd__state">` +
       `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
@@ -148,7 +146,9 @@ class StatusBoard {
       `<section class="sboard sboard--jobs" aria-label="Jobs">` +
       `<header class="sboard__cap"><span>jobs</span><span class="sboard__n" id="sb-jobs-n">0</span></header>` +
       `<ul class="sboard__jobs" id="sb-jobs"><li class="sboard__empty">no runs yet</li></ul>` +
-      `</section>`;
+      `</section>` +
+
+      `<section class="sboard sboard--gpuguard" id="sb-gpu-guard-panel" aria-label="GPU guard"></section>`;
 
     this.gpuEls = [...this.els.board.querySelectorAll(".gcard")].map((card) => ({
       pct: card.querySelector(".gcard__pct"),
@@ -375,31 +375,60 @@ class StatusBoard {
     }
 
     const context = gpus.length
-      ? `<div class="gpuctx">` + gpus.map((g) => {
+      ? `<div class="alarm__sect"><span class="alarm__sect-cap">contested devices</span>` +
+        `<div class="gpuctx">` + gpus.map((g) => {
           const who = g.free ? "free" : (g.holders || []).map((h) => this._esc(h.user)).join(", ");
           const kind = g.free ? "is-free" : g.others ? (g.mine ? "is-clash" : "is-others") : "is-mine";
           return `<span class="gpuctx__cell ${kind}" title="gpu ${g.index} &middot; ${Math.round(g.util || 0)}% util">gpu ${g.index} &middot; ${who}</span>`;
-        }).join("") + `</div>`
+        }).join("") + `</div></div>`
       : "";
 
-    const chips = active.map((a) => {
+    const cards = active.map((a) => {
       if (a.status === "critical") {
-        return `<span class="alert alert--critical">&#9760; CRITICAL &middot; your pid(s) <b>${this._esc((a.dead_pids || a.mine_pids || []).join(", "))}</b> on gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> DIED after <b>${this._esc(a.user)}</b> (pid ${a.pid}) invaded it</span>`;
+        const dead = this._esc((a.dead_pids || a.mine_pids || []).join(", "));
+        return (
+          `<div class="aint aint--critical">` +
+          `<span class="aint__sev">&#9760; critical</span>` +
+          `<div class="aint__main">` +
+          `<span class="aint__head">gpu ${a.gpu_index}<i>${this._esc(a.gpu_name || "")}</i></span>` +
+          `<span class="aint__detail">your pid(s) <b>${dead}</b> died after <b>${this._esc(a.user)}</b> (pid ${a.pid}) invaded</span>` +
+          `</div></div>`
+        );
       }
-      return `<span class="alert alert--danger">gpu ${a.gpu_index} <b>${this._esc(a.gpu_name || "")}</b> invaded by <b>${this._esc(a.user)}</b> &middot; pid ${a.pid} &middot; ${Math.round(a.mem_mib)} MiB &middot; clashing with your pids ${this._esc((a.mine_pids || []).join(", "))}</span>`;
+      return (
+        `<div class="aint aint--danger">` +
+        `<span class="aint__sev">intrusion</span>` +
+        `<div class="aint__main">` +
+        `<span class="aint__head">gpu ${a.gpu_index}<i>${this._esc(a.gpu_name || "")}</i></span>` +
+        `<span class="aint__detail">intruder <b>${this._esc(a.user)}</b> &middot; pid ${a.pid} &middot; ${Math.round(a.mem_mib)} MiB &middot; clashes with your pids ${this._esc((a.mine_pids || []).join(", "))}</span>` +
+        `</div></div>`
+      );
     }).join("");
+    const activeSect = cards
+      ? `<div class="alarm__sect"><span class="alarm__sect-cap">live intrusions</span><div class="alarm__active">${cards}</div></div>`
+      : "";
 
     const log = events.map((e) => {
       const stamp = (e.critical_at || e.since || "").replace("T", " ");
-      const tag = e.status === "critical" ? `<b class="alert__crit">process killed &middot;</b> ` : "";
-      return `<span class="alert alert--event"><b>${this._esc(stamp)}</b> ${tag}${this._esc(e.user)} on gpu ${e.gpu_index} (pid ${e.pid})</span>`;
+      const tag = e.status === "critical" ? `<b class="alert__crit">killed</b>` : `<b>seen</b>`;
+      return `<span class="alarm__evt">${tag}<span class="alarm__evt-time">${this._esc(stamp)}</span><span>${this._esc(e.user)} &middot; gpu ${e.gpu_index} &middot; pid ${e.pid}</span></span>`;
     }).join("");
+    const logSect = log
+      ? `<div class="alarm__sect"><span class="alarm__sect-cap">recent events</span><div class="alarm__log">${log}</div></div>`
+      : "";
 
     box.hidden = false;
     box.classList.toggle("is-firing", active.length > 0);
     box.classList.toggle("is-critical", crit > 0);
     const cap = crit ? `${crit} critical &middot; ${active.length} active` : `${active.length} active`;
-    box.innerHTML = `<header class="sboard__cap"><span>&#9888; gpu intrusion alarm</span><span class="sboard__n">${cap}</span></header>${context}<div class="alert__list">${chips}${log}</div>`;
+    box.innerHTML =
+      `<div class="alarm__bar">` +
+      `<span class="alarm__beacon" aria-hidden="true"></span>` +
+      `<span class="alarm__title">gpu intrusion ${active.length ? "detected" : "log"}</span>` +
+      `<span class="alarm__count">${cap}</span>` +
+      `</div>` +
+      `<span class="alarm__sweep" aria-hidden="true"></span>` +
+      `${context}${activeSect}${logSect}`;
   }
 
   _renderGuardPanel() {

@@ -358,19 +358,120 @@ main { margin-left: var(--navw); }
   font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
   padding: 5px 10px; border-radius: 3px; border: 1px solid;
 }
-.sboard--gpualarm { grid-column: 1 / -1; border-color: rgba(185, 28, 28, 0.5); }
-.sboard--gpualarm .sboard__cap { color: var(--danger); }
-.sboard--gpualarm.is-firing { border-color: rgba(185, 28, 28, 0.95); background: rgba(185, 28, 28, 0.08); }
+.sboard--gpualarm {
+  grid-column: 1 / -1; position: relative; overflow: hidden;
+  border-color: rgba(185, 28, 28, 0.5);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sboard--gpualarm.is-firing { border-color: rgba(185, 28, 28, 0.95); background: rgba(185, 28, 28, 0.06); }
 @media (prefers-reduced-motion: no-preference) {
-  .sboard--gpualarm.is-firing { animation: gpualarm-flash 1.1s steps(1, end) infinite; }
-  .sboard--gpualarm.is-critical { animation: gpualarm-flash 0.6s steps(1, end) infinite; }
+  .sboard--gpualarm.is-firing { animation: gpualarm-flash 1.4s ease-in-out infinite; }
+  .sboard--gpualarm.is-critical { animation: gpualarm-flash 0.7s ease-in-out infinite; }
 }
 @keyframes gpualarm-flash {
-  0%, 100% { background: rgba(185, 28, 28, 0.05); border-color: rgba(185, 28, 28, 0.45); }
-  50%      { background: rgba(185, 28, 28, 0.17); border-color: rgba(185, 28, 28, 0.95); }
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.25), 0 0 0 0 rgba(185, 28, 28, 0); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.75), 0 0 22px -4px rgba(185, 28, 28, 0.45); }
 }
 
-.gpuctx { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+/* alarm header bar */
+.alarm__bar {
+  display: flex; align-items: center; gap: 11px;
+  font-family: var(--mono);
+}
+.alarm__beacon {
+  width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--danger);
+}
+.alarm__title {
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--danger);
+}
+.alarm__count {
+  margin-left: auto; font-size: 11px; letter-spacing: 0.04em;
+  color: var(--danger); opacity: 0.85;
+}
+.sboard--gpualarm.is-critical .alarm__title { letter-spacing: 0.2em; }
+
+/* scanning sweep line */
+.alarm__sweep {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 38%;
+  pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(185, 28, 28, 0.13), transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sboard--gpualarm.is-firing .alarm__beacon { animation: alarm-beacon 1.4s ease-out infinite; }
+  .sboard--gpualarm.is-critical .alarm__beacon { animation: alarm-beacon 0.7s ease-out infinite; }
+  .sboard--gpualarm.is-firing .alarm__sweep { animation: alarm-sweep 2.6s linear infinite; }
+}
+@keyframes alarm-beacon {
+  0%   { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.55), 0 0 0 0 rgba(185, 28, 28, 0.35); }
+  70%  { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0), 0 0 0 16px rgba(185, 28, 28, 0); }
+  100% { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0), 0 0 0 16px rgba(185, 28, 28, 0); }
+}
+@keyframes alarm-sweep {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(360%); opacity: 0; }
+}
+
+/* alarm sections */
+.alarm__sect { display: flex; flex-direction: column; gap: 7px; }
+.alarm__sect-cap {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* live intrusion cards */
+.alarm__active { display: flex; flex-direction: column; gap: 7px; }
+.aint {
+  display: flex; align-items: stretch; gap: 0; overflow: hidden;
+  border: 1px solid; border-radius: 4px;
+}
+.aint__sev {
+  display: flex; align-items: center; flex: 0 0 auto;
+  padding: 0 12px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+}
+.aint__main {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 7px 12px; flex: 1 1 auto;
+}
+.aint__head { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+.aint__head i { font-style: normal; color: var(--ink-faint); margin-left: 8px; font-weight: 400; }
+.aint__detail {
+  font-family: var(--mono); font-size: 11px; line-height: 1.45; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aint__detail b { font-weight: 600; }
+.aint--danger { border-color: rgba(185, 28, 28, 0.4); background: rgba(185, 28, 28, 0.05); }
+.aint--danger .aint__sev { color: var(--danger); border-right: 1px solid rgba(185, 28, 28, 0.3); }
+.aint--danger .aint__detail b { color: var(--danger); }
+.aint--critical { border-color: rgba(127, 12, 12, 0.85); background: rgba(185, 28, 28, 0.1); }
+.aint--critical .aint__sev { color: #fff; background: var(--danger); }
+.aint--critical .aint__head, .aint--critical .aint__detail { color: var(--ink); }
+.aint--critical .aint__detail b { color: var(--danger); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+  .aint--critical .aint__sev { animation: pulse 0.9s ease-in-out infinite; }
+}
+
+/* recent events log */
+.alarm__log { display: flex; flex-direction: column; gap: 2px; }
+.alarm__evt {
+  display: flex; align-items: baseline; gap: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  padding: 3px 2px;
+}
+.alarm__evt > b {
+  flex: 0 0 auto; width: 46px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.alarm__evt .alert__crit { color: var(--danger); }
+.alarm__evt-time { flex: 0 0 auto; color: var(--ink-faint); }
+
+.gpuctx { display: flex; flex-wrap: wrap; gap: 6px; }
 .gpuctx__cell {
   font-family: var(--mono); font-size: 11px; line-height: 1.4;
   padding: 3px 9px; border-radius: 3px; border: 1px solid var(--line);
