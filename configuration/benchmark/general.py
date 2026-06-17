@@ -48,8 +48,8 @@ class SizeMatchConfig:
 
 @dataclass
 class TrainingQueueConfig:
-    epochs               : int             = 200
-    scheduler_epochs     : int | None      = 200
+    epochs               : int             = 100
+    scheduler_epochs     : int | None      = 100
     validation_frequency : int             = 1
     batch_size           : int             = 256
     num_workers          : int             = 4
