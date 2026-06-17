@@ -1,0 +1,1 @@
+from configuration.maintenance.general import ModelConfigMigrationConfig
