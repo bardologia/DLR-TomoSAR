@@ -1,6 +1,7 @@
 logs/
 runs/
 result_storage/
+test_data/
 presentations/
 scripts/sweep_results/
 notebooks/figures/
