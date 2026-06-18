@@ -8,6 +8,7 @@ class LaunchView {
   static FIELD_TAXONOMY = [
     ["curve space", /curve|spectral|ssim/],
     ["param space", /^param/],
+    ["slot presence", /presence|focal|active_normalization|active_weight|inactive_weight/],
     ["regularization", /smooth|_tv$/],
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
@@ -1186,17 +1187,21 @@ class LaunchView {
 
     const termCount = [...blocks.values()].filter(isTermBlock).length;
 
+    const SLOT_PRESENCE = /presence|focal|active_normalization|active_weight|inactive_weight/;
+
     if (termCount >= 2) {
-      const buckets = { curve: [], param: [], reg: [], general: [] };
+      const buckets = { curve: [], param: [], slot: [], reg: [], general: [] };
       blocks.forEach((blockLeaves) => {
         if (!isTermBlock(blockLeaves)) {
           if (shortName(blockLeaves[0]).startsWith("param")) buckets.param.push(blockLeaves);
+          else if (SLOT_PRESENCE.test(shortName(blockLeaves[0]))) buckets.slot.push(blockLeaves);
           else buckets.general.push(blockLeaves);
           return;
         }
         const label = shortName(blockLeaves[0]).slice(4);
         if (label.startsWith("param")) buckets.param.push(blockLeaves);
         else if (/curve|spectral|ssim/.test(label)) buckets.curve.push(blockLeaves);
+        else if (SLOT_PRESENCE.test(label)) buckets.slot.push(blockLeaves);
         else buckets.reg.push(blockLeaves);
       });
 
@@ -1204,6 +1209,7 @@ class LaunchView {
       const named = new Map();
       named.set("curve space", makeGroup("curve space", buckets.curve));
       named.set("param space", makeGroup("param space", buckets.param));
+      named.set("slot presence", makeGroup("slot presence", buckets.slot));
       named.set("regularization", makeGroup("regularization", buckets.reg));
       named.set("general", makeGroup("general", buckets.general));
       appendWithStack(named);
