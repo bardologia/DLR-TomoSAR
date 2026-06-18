@@ -321,6 +321,11 @@ class ExperimentBuilder {
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
   ];
 
+  static PRESENCE_MATCHES = [
+    { label: "sort", strategy: "sort_gt_by_mu" },
+    { label: "hung", strategy: "hungarian_active" },
+  ];
+
   static STRATEGIES = [
     { key: "uniform",     note: "each trial samples n_secondaries distinct tracks uniformly, n_trials distinct sets" },
     { key: "gaussian",    note: "indices drawn from Normal(mean, sigma) over the secondary list, mean and sigma required" },
@@ -445,6 +450,7 @@ class ExperimentBuilder {
     this._paintMode();
     this._paintSecondary();
     this._paintPatch();
+    this._paintPresence();
     this._paintSummary();
     this._paintNames();
   }
@@ -721,35 +727,132 @@ class ExperimentBuilder {
     const head     = document.createElement("div");
     head.className = "exp-col__head";
     head.innerHTML = `<span class="exp-col__name">slot-presence ablation</span>`;
+    const reset    = LaunchWidgetDom.mini("reset matrix", () => this._resetPresence());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Loss-term cells crossed with both matching strategies, one training run each. The matrix is defined in code (_default_presence_trials / _default_presence_match_strategies); edit it there or via the presence_trials / presence_match_strategies overrides.";
+    note.textContent = "Toggle matching strategies and drop cells to trim the fan-out. Cell weights and adding new cells live in code (_default_presence_trials); use reset matrix to restore the full default.";
 
-    const cells     = document.createElement("div");
-    cells.className = "exp-builder__names exp-presence__cells";
-    this._presenceCells().forEach((cell) => {
-      const chip       = document.createElement("span");
-      chip.className   = "exp-name";
-      chip.textContent = cell;
-      cells.appendChild(chip);
-    });
+    const matchHead       = document.createElement("div");
+    matchHead.className    = "exp-presence__sub";
+    matchHead.textContent  = "matching strategies";
 
-    const strategies     = document.createElement("div");
-    strategies.className = "exp-builder__names exp-presence__strategies";
-    Object.entries(this._presenceMatchMap()).forEach(([label, strategy]) => {
-      const chip       = document.createElement("span");
-      chip.className   = "exp-name";
-      chip.textContent = `${label} · ${strategy}`;
-      strategies.appendChild(chip);
-    });
+    const strategies          = document.createElement("div");
+    strategies.className      = "exp-builder__names exp-presence__strategies";
+    this.presenceStrategiesEl = strategies;
+
+    const cellHead       = document.createElement("div");
+    cellHead.className    = "exp-presence__sub";
+    cellHead.textContent  = "loss-term cells";
+
+    const cells          = document.createElement("div");
+    cells.className      = "exp-builder__names exp-presence__cells";
+    this.presenceCellsEl = cells;
 
     panel.appendChild(head);
     panel.appendChild(note);
-    panel.appendChild(cells);
+    panel.appendChild(matchHead);
     panel.appendChild(strategies);
+    panel.appendChild(cellHead);
+    panel.appendChild(cells);
     this.presenceEl = panel;
+
+    if (this.presenceTrialsLeaf) this.view.controls[this.presenceTrialsLeaf.path] = { leaf: this.presenceTrialsLeaf, reset: () => this._repaintPresence() };
+    if (this.presenceMatchLeaf)  this.view.controls[this.presenceMatchLeaf.path]  = { leaf: this.presenceMatchLeaf,  reset: () => this._repaintPresence() };
+
+    this._paintPresence();
     return panel;
+  }
+
+  _paintPresence() {
+    if (this.presenceStrategiesEl) {
+      this.presenceStrategiesEl.innerHTML = "";
+      const active = this._presenceMatchMap();
+      ExperimentBuilder.PRESENCE_MATCHES.forEach(({ label, strategy }) => {
+        const on   = Object.prototype.hasOwnProperty.call(active, label);
+        const chip = document.createElement("button");
+        chip.type        = "button";
+        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+        chip.textContent = `${label} · ${strategy}`;
+        chip.title       = on ? "Click to drop this matching strategy" : "Click to add this matching strategy";
+        chip.addEventListener("click", () => this._toggleStrategy(label));
+        this.presenceStrategiesEl.appendChild(chip);
+      });
+    }
+
+    if (this.presenceCellsEl) {
+      this.presenceCellsEl.innerHTML = "";
+      this._presenceCells().forEach((cell) => this.presenceCellsEl.appendChild(this._presenceCellChip(cell)));
+    }
+  }
+
+  _presenceCellChip(cell) {
+    const chip     = document.createElement("span");
+    chip.className = "exp-name exp-presence__cell";
+
+    const label       = document.createElement("span");
+    label.textContent = cell;
+    chip.appendChild(label);
+
+    const remove = LaunchWidgetDom.mini("×", () => this._removeCell(cell));
+    remove.classList.add("exp-presence__remove");
+    remove.title = "Remove cell";
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _emitPresence(leaf, value) {
+    this.view._setValue(leaf, PythonLiteral.render(value));
+    this._paintPresence();
+    this._paintSummary();
+    this._paintNames();
+  }
+
+  _removeCell(cell) {
+    if (!this.presenceTrialsLeaf) return;
+    let raw;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
+    } catch (e) {
+      return;
+    }
+    if (!raw || typeof raw !== "object" || Object.keys(raw).length <= 1) return;
+    delete raw[cell];
+    this._emitPresence(this.presenceTrialsLeaf, raw);
+  }
+
+  _toggleStrategy(label) {
+    if (!this.presenceMatchLeaf) return;
+    let raw;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(this.presenceMatchLeaf));
+    } catch (e) {
+      raw = {};
+    }
+    if (!raw || typeof raw !== "object") raw = {};
+
+    if (Object.prototype.hasOwnProperty.call(raw, label)) {
+      if (Object.keys(raw).length <= 1) return;
+      delete raw[label];
+    } else {
+      const canon = ExperimentBuilder.PRESENCE_MATCHES.find((entry) => entry.label === label);
+      if (canon) raw[label] = canon.strategy;
+    }
+    this._emitPresence(this.presenceMatchLeaf, raw);
+  }
+
+  _resetPresence() {
+    if (this.presenceTrialsLeaf) this.view._setValue(this.presenceTrialsLeaf, this.presenceTrialsLeaf.value);
+    if (this.presenceMatchLeaf)  this.view._setValue(this.presenceMatchLeaf,  this.presenceMatchLeaf.value);
+    this._repaintPresence();
+  }
+
+  _repaintPresence() {
+    this._paintPresence();
+    this._paintSummary();
+    this._paintNames();
   }
 
   _paintMode() {

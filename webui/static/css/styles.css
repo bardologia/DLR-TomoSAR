@@ -1335,9 +1335,14 @@ main { margin-left: var(--navw); }
 .exp-patch__size { width: 76px; }
 .exp-patch__remove { padding: 2px 8px; }
 
-.exp-presence__cells { padding: 12px 12px 4px; }
-.exp-presence__strategies { padding: 4px 12px 12px; }
-.exp-presence__strategies .exp-name { border-style: dashed; color: var(--ink-dim); }
+.exp-presence__sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); padding: 10px 12px 0; }
+.exp-presence__reset { margin-left: auto; }
+.exp-presence__strategies { padding: 6px 12px 4px; }
+.exp-presence__cells { padding: 6px 12px 12px; }
+.exp-presence__toggle { cursor: pointer; border-style: dashed; color: var(--ink-dim); background: var(--bg-1); }
+.exp-presence__toggle.is-on { border-style: solid; color: var(--accent); border-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
+.exp-presence__cell { display: inline-flex; align-items: center; gap: 6px; }
+.exp-presence__remove { padding: 0 6px; line-height: 1.4; }
 
 .rail-override__change { overflow-wrap: anywhere; }
 .cfg-edit__row--dependent .cfg-edit__name { color: var(--ink-dim); }
