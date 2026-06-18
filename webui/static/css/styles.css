@@ -1335,6 +1335,10 @@ main { margin-left: var(--navw); }
 .exp-patch__size { width: 76px; }
 .exp-patch__remove { padding: 2px 8px; }
 
+.exp-presence__cells { padding: 12px 12px 4px; }
+.exp-presence__strategies { padding: 4px 12px 12px; }
+.exp-presence__strategies .exp-name { border-style: dashed; color: var(--ink-dim); }
+
 .rail-override__change { overflow-wrap: anywhere; }
 .cfg-edit__row--dependent .cfg-edit__name { color: var(--ink-dim); }
 

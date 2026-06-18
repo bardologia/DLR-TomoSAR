@@ -318,6 +318,7 @@ class ExperimentBuilder {
     { key: "warmup",     label: "warmup only", hint: "curriculum disabled, each warmup loss trains alone" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
+    { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
   ];
 
   static STRATEGIES = [
@@ -346,6 +347,9 @@ class ExperimentBuilder {
     this.modelLeaf    = byPath.get("backbone_name");
     this.gpusLeaf     = byPath.get("gpus");
 
+    this.presenceTrialsLeaf = byPath.get("presence_trials");
+    this.presenceMatchLeaf  = byPath.get("presence_match_strategies");
+
     this.secondary = new Map();
     this.patch     = new Map();
     byPath.forEach((leaf) => {
@@ -357,6 +361,8 @@ class ExperimentBuilder {
     if (this.modeLeaf) this.claimed.push("trials_mode");
     this.secondary.forEach((leaf) => this.claimed.push(leaf.path));
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
+    if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
+    if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -373,6 +379,7 @@ class ExperimentBuilder {
     this.secondaryRows  = [];
     this.patchEl        = null;
     this.patchSizesEl   = null;
+    this.presenceEl     = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -408,8 +415,9 @@ class ExperimentBuilder {
     this.columnEls.complete = columns.appendChild(this._column("complete", "complete losses"));
     body.appendChild(columns);
 
-    if (this.modeLeaf && this.secondary.size) body.appendChild(this._secondaryPanel());
-    if (this.modeLeaf && this.patch.size)     body.appendChild(this._patchPanel());
+    if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
+    if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
+    if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -682,6 +690,68 @@ class ExperimentBuilder {
     sizes.forEach((size, index) => this.patchSizesEl.appendChild(this._patchChip(size, index, sizes)));
   }
 
+  _presenceMatchMap() {
+    if (!this.presenceMatchLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.presenceMatchLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _presenceStrategies() {
+    return Object.keys(this._presenceMatchMap());
+  }
+
+  _presenceCells() {
+    if (!this.presenceTrialsLeaf) return [];
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? Object.keys(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _presencePanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">slot-presence ablation</span>`;
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Loss-term cells crossed with both matching strategies, one training run each. The matrix is defined in code (_default_presence_trials / _default_presence_match_strategies); edit it there or via the presence_trials / presence_match_strategies overrides.";
+
+    const cells     = document.createElement("div");
+    cells.className = "exp-builder__names exp-presence__cells";
+    this._presenceCells().forEach((cell) => {
+      const chip       = document.createElement("span");
+      chip.className   = "exp-name";
+      chip.textContent = cell;
+      cells.appendChild(chip);
+    });
+
+    const strategies     = document.createElement("div");
+    strategies.className = "exp-builder__names exp-presence__strategies";
+    Object.entries(this._presenceMatchMap()).forEach(([label, strategy]) => {
+      const chip       = document.createElement("span");
+      chip.className   = "exp-name";
+      chip.textContent = `${label} · ${strategy}`;
+      strategies.appendChild(chip);
+    });
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(cells);
+    panel.appendChild(strategies);
+    this.presenceEl = panel;
+    return panel;
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -689,10 +759,11 @@ class ExperimentBuilder {
     if (this.modeEl) this.modeEl.classList.toggle("is-dirty", this.view.dirty[this.modeLeaf.path] !== undefined);
     if (this.hintEl) this.hintEl.textContent = ExperimentBuilder.MODES.find((entry) => entry.key === mode).hint;
 
-    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary" || mode === "patch";
+    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary" || mode === "patch" || mode === "presence";
     if (this.columnEls.complete) this.columnEls.complete.hidden = mode !== "curriculum";
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
+    if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
   }
 
   _paintSecondary() {
@@ -1003,6 +1074,14 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "presence") {
+      const cells = this._presenceCells().length;
+      const strat = this._presenceStrategies().length;
+      const total = cells * strat;
+      this.summaryEl.textContent = `${cells} cell${cells === 1 ? "" : "s"} x ${strat} matching = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
   }
 
@@ -1027,6 +1106,10 @@ class ExperimentBuilder {
     const names = [];
     if (mode === "patch") {
       this._patchSizes().forEach((size) => names.push(`${model}_p-${size}`));
+    } else if (mode === "presence") {
+      this._presenceCells().forEach((cell) => {
+        this._presenceStrategies().forEach((strategy) => names.push(`${model}_pr-${cell}-${strategy}`));
+      });
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {
