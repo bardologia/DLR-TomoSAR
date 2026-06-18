@@ -1053,7 +1053,221 @@ class ExperimentBuilder {
 }
 
 
+class NumberField {
+
+  static SPECS = [
+    { re: /(^|_)(lr|learning_rate)$/,                       log: true, min: 1e-6, max: 1e-1, presets: [1e-5, 5e-5, 1e-4, 3e-4, 1e-3, 1e-2] },
+    { re: /weight_decay$|_wd$/,                             log: true, min: 1e-8, max: 1e-1, presets: [0, 1e-6, 1e-5, 1e-4, 1e-3] },
+    { re: /eta_min$/,                                       log: true, min: 1e-9, max: 1e-2, presets: [0, 1e-7, 1e-6, 1e-5] },
+    { re: /(^|_)epochs?$/,                                  int: true, min: 1,    max: 1000,  presets: [10, 50, 100, 200, 500] },
+    { re: /warmup.*epoch|warmup_steps|^warmup$/,            int: true, min: 0,    max: 200,   presets: [0, 5, 10, 20, 50] },
+    { re: /batch(_size)?$/,                                 int: true, min: 1,    max: 1024,  presets: [8, 16, 32, 64, 128, 256] },
+    { re: /(num_)?workers$|n_workers$/,                     int: true, min: 0,    max: 64,    presets: [0, 2, 4, 8, 16, 32] },
+    { re: /accumulation|grad_accum/,                        int: true, min: 1,    max: 64,    presets: [1, 2, 4, 8, 16] },
+    { re: /patience$/,                                      int: true, min: 1,    max: 200,   presets: [5, 10, 20, 50, 100] },
+    { re: /(patch|window|win|tile)(_size)?$/,               int: true, min: 8,    max: 512,   presets: [16, 32, 64, 96, 128, 256] },
+    { re: /stride$/,                                        int: true, min: 1,    max: 512,   presets: [8, 16, 32, 64, 128] },
+    { re: /seed$/,                                          int: true, min: 0,    max: 9999,  presets: [0, 1, 42, 123, 2024] },
+    { re: /dropout|drop_rate|drop_path/,                    min: 0,    max: 1,    step: 0.01, presets: [0, 0.1, 0.2, 0.3, 0.5] },
+    { re: /momentum$/,                                      min: 0,    max: 1,    step: 0.01, presets: [0, 0.9, 0.95, 0.99] },
+    { re: /ema_decay|momentum_decay/,                       min: 0.9,  max: 1,    step: 0.001, presets: [0.99, 0.995, 0.999, 0.9999] },
+    { re: /(ratio|fraction|frac|subsample|keep|prob|pct|percent)$/, min: 0, max: 1, step: 0.01, presets: [0.1, 0.25, 0.5, 0.75, 1.0] },
+    { re: /^weight_|_weight$|^lambda|_lambda$|coeff|_scale$|gamma$|beta$/, min: 0, max: 10, step: 0.1, presets: [0, 0.1, 0.5, 1, 2, 5] },
+    { re: /sigma$|_std$/,                                   min: 0,    max: 5,    step: 0.05, presets: [0.5, 1, 1.5, 2, 3] },
+    { re: /dpi$/,                                           int: true, min: 72,   max: 600,   presets: [100, 150, 200, 300, 600] },
+  ];
+
+  constructor(view, leaf, short) {
+    this.view    = view;
+    this.leaf    = leaf;
+    this.short   = short || leaf.path.split(".").pop();
+    this.integer = leaf.type === "int";
+    this.default = Number.isFinite(Number(leaf.value)) ? Number(leaf.value) : 0;
+    this.log     = false;
+    this.range   = this._infer();
+    this.logMin  = 0;
+    this.logMax  = 0;
+    this.input   = null;
+    this.slider  = null;
+    this.chips   = new Map();
+    this.reset   = () => this._paint();
+  }
+
+  build() {
+    const el     = document.createElement("div");
+    el.className = "numfield";
+
+    const top     = document.createElement("div");
+    top.className = "numfield__top";
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input numfield__input";
+    input.type       = "number";
+    input.step       = this.integer ? "1" : "any";
+    input.spellcheck = false;
+    this.input       = input;
+
+    const slider     = document.createElement("input");
+    slider.className = "numfield__slider";
+    slider.type      = "range";
+    this.slider      = slider;
+    this._configureSlider();
+
+    input.addEventListener("input", () => {
+      const raw = input.value;
+      const v   = Number(raw);
+      if (raw !== "" && Number.isFinite(v)) slider.value = String(this._toSlider(v));
+      const out = raw === "" ? "" : (v === this.default ? this.leaf.value : raw);
+      this.view._setValue(this.leaf, out);
+      this._mark();
+    });
+    slider.addEventListener("input", () => {
+      const v   = this._fromSlider();
+      input.value = this._fmt(v);
+      const out = v === this.default ? this.leaf.value : this._fmt(v);
+      this.view._setValue(this.leaf, out);
+      this._mark();
+    });
+
+    top.appendChild(input);
+    top.appendChild(slider);
+    el.appendChild(top);
+
+    const presets     = document.createElement("div");
+    presets.className = "numfield__presets";
+    this.range.presets.forEach((value) => presets.appendChild(this._chip(value)));
+    el.appendChild(presets);
+
+    this._paint();
+    return { el, input, reset: this.reset };
+  }
+
+  _infer() {
+    const spec = NumberField.SPECS.find((s) => s.re.test(this.short) || s.re.test(this.leaf.path));
+    const r    = spec
+      ? { min: spec.min, max: spec.max, step: spec.step || 1, log: Boolean(spec.log), presets: spec.presets.slice() }
+      : this._fallback();
+
+    this.log = r.log;
+    r.min = Math.min(r.min, this.default);
+    r.max = Math.max(r.max, this.default);
+    r.presets.push(this.default);
+    r.presets = this._cleanPresets(r.presets, r);
+    return r;
+  }
+
+  _fallback() {
+    if (!this.integer && this.default > 0 && this.default <= 1) {
+      return { min: 0, max: 1, step: 0.01, log: false, presets: [0, 0.25, 0.5, 0.75, 1] };
+    }
+    const base    = Math.abs(this.default) || (this.integer ? 10 : 1);
+    const max     = this._nice(base * 4);
+    const min     = this.default < 0 ? -max : 0;
+    const span    = max - min || 1;
+    const step    = this.integer ? 1 : Math.pow(10, Math.floor(Math.log10(span)) - 2) || 0.01;
+    const presets = [min, min + span * 0.25, min + span * 0.5, min + span * 0.75, max].map((x) => (this.integer ? Math.round(x) : this._nice(x)));
+    return { min, max, step, log: false, presets };
+  }
+
+  _nice(x) {
+    if (x === 0) return 0;
+    const unit = Math.pow(10, Math.floor(Math.log10(Math.abs(x)))) / 10;
+    return Math.round(x / unit) * unit;
+  }
+
+  _cleanPresets(list, r) {
+    const within = list.filter((x) => Number.isFinite(x) && x >= r.min - 1e-9 && x <= r.max + 1e-9);
+    const seen   = new Map();
+    within.forEach((x) => {
+      const key = this.integer ? String(Math.round(x)) : this._fmt(x);
+      if (!seen.has(key)) seen.set(key, Number(key));
+    });
+    return [...seen.values()].sort((a, b) => a - b).slice(0, 8);
+  }
+
+  _configureSlider() {
+    if (this.range.log) {
+      this.logMin = this.range.min > 0 ? this.range.min : this.range.max / 1e6;
+      this.logMax = this.range.max;
+      this.slider.min  = "0";
+      this.slider.max  = "1000";
+      this.slider.step = "1";
+      return;
+    }
+    this.slider.min  = String(this.range.min);
+    this.slider.max  = String(this.range.max);
+    this.slider.step = String(this.range.step);
+  }
+
+  _toSlider(v) {
+    if (this.range.log) {
+      if (v <= 0) return 0;
+      const lo = Math.log(this.logMin);
+      const hi = Math.log(this.logMax);
+      const t  = 1000 * (Math.log(this._clamp(v, this.logMin, this.logMax)) - lo) / (hi - lo);
+      return Math.round(this._clamp(t, 0, 1000));
+    }
+    return this._clamp(v, this.range.min, this.range.max);
+  }
+
+  _fromSlider() {
+    if (this.range.log) {
+      const lo = Math.log(this.logMin);
+      const hi = Math.log(this.logMax);
+      return Math.exp(lo + (Number(this.slider.value) / 1000) * (hi - lo));
+    }
+    return Number(this.slider.value);
+  }
+
+  _fmt(v) {
+    if (this.integer) return String(Math.round(v));
+    if (v === 0) return "0";
+    return String(Number(v.toPrecision(this.log ? 2 : 6)));
+  }
+
+  _clamp(x, a, b) {
+    return Math.min(b, Math.max(a, x));
+  }
+
+  _chip(value) {
+    const chip       = document.createElement("button");
+    chip.type        = "button";
+    chip.className   = "numfield__chip";
+    chip.textContent = this._fmt(value);
+    chip.title       = `set ${this.short} = ${this._fmt(value)}`;
+    chip.addEventListener("click", () => {
+      this.input.value  = this._fmt(value);
+      this.slider.value = String(this._toSlider(value));
+      const out = value === this.default ? this.leaf.value : this._fmt(value);
+      this.view._setValue(this.leaf, out);
+      this._mark();
+    });
+    this.chips.set(value, chip);
+    return chip;
+  }
+
+  _mark() {
+    const cur   = Number(this.view._effective(this.leaf));
+    const dirty = this.view.dirty[this.leaf.path] !== undefined;
+    this.input.classList.toggle("is-dirty", dirty);
+    this.chips.forEach((chip, key) => {
+      const tol = this.integer ? 0.5 : Math.max(1e-12, Math.abs(cur) * 1e-6);
+      chip.classList.toggle("is-active", Number.isFinite(cur) && Math.abs(Number(key) - cur) < tol);
+    });
+  }
+
+  _paint() {
+    const eff = this.view._effective(this.leaf);
+    const v   = Number(eff);
+    this.input.value = eff === "None" ? "" : eff;
+    if (Number.isFinite(v)) this.slider.value = String(this._toSlider(v));
+    this._mark();
+  }
+}
+
+
 window.PythonLiteral     = PythonLiteral;
+window.NumberField       = NumberField;
 window.LaunchWidgetDom   = LaunchWidgetDom;
 window.ModelTogglePanel  = ModelTogglePanel;
 window.ModelCardPanel    = ModelCardPanel;

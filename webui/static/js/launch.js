@@ -1364,7 +1364,8 @@ class LaunchView {
     } else if (leaf.type === "bool") {
       control = this._switchControl(leaf);
     } else if (leaf.type === "int" || leaf.type === "float") {
-      control = this._numberControl(leaf);
+      control = new window.NumberField(this, leaf, short).build();
+      row.classList.add("cfg-edit__row--num");
     } else {
       control = this._textControl(leaf);
     }
