@@ -60,6 +60,27 @@ def _default_complete_losses() -> dict:
     return losses
 
 
+def _default_presence_trials() -> dict:
+    active_norm = {"use_active_normalization": True}
+    balance     = {"presence_balance": True}
+    presence    = {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0}
+
+    return {
+        "none"       : {},
+        "A"          : {**active_norm},
+        "B"          : {**balance},
+        "P"          : {**presence},
+        "AB"         : {**active_norm, **balance},
+        "AP"         : {**active_norm, **presence},
+        "BP"         : {**balance, **presence},
+        "ABP"        : {**active_norm, **balance, **presence},
+        "ABP-bce0.5" : {**active_norm, **balance, "predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 0.5},
+        "ABP-bce2"   : {**active_norm, **balance, "predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 2.0},
+        "ABP-bman4"  : {**active_norm, **presence, "presence_balance": False, "active_weight": 4.0, "inactive_weight": 1.0},
+        "ABP-bman8"  : {**active_norm, **presence, "presence_balance": False, "active_weight": 8.0, "inactive_weight": 1.0},
+    }
+
+
 @dataclass
 class PatchTrialsConfig:
     sizes        : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
@@ -125,6 +146,7 @@ class BackboneEntryConfig:
     trials_mode      : str                   = "curriculum"
     warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
     complete_losses  : dict                  = field(default_factory=_default_complete_losses)
+    presence_trials  : dict                  = field(default_factory=_default_presence_trials)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])

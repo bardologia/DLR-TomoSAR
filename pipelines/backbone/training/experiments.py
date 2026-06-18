@@ -55,6 +55,38 @@ class WarmupTrialPlanner(TrialPlanner):
         return plans
 
 
+class SlotPresenceTrialPlanner:
+
+    ENTRY_KEYS = ("predict_presence",)
+
+    def __init__(self, model_name: str, presence_trials: dict) -> None:
+        self.model_name      = model_name
+        self.presence_trials = presence_trials
+
+    def summary(self) -> dict:
+        return {"Presence trials": len(self.presence_trials)}
+
+    def _overrides(self, spec: dict) -> dict:
+        overrides = {"curriculum.enabled": False}
+
+        for key, value in spec.items():
+            if key in self.ENTRY_KEYS:
+                overrides[key] = value
+            else:
+                overrides[f"curriculum.warmup.{key}"] = value
+
+        return overrides
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for label, spec in self.presence_trials.items():
+            run_name = f"{self.model_name}_pr-{label}"
+            plans.append((run_name, self._overrides(spec)))
+
+        return plans
+
+
 class PatchSizeTrialPlanner:
     def __init__(self, model_name: str, trials) -> None:
         self.model_name = model_name

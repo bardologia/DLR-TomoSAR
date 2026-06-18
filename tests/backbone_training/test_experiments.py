@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig
+from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_presence_trials
 from pipelines.backbone.training.experiments import (
     CurriculumTrialPlanner,
     PatchSizeTrialPlanner,
     SecondaryTrialPlanner,
+    SlotPresenceTrialPlanner,
     WarmupTrialPlanner,
 )
 
@@ -42,6 +43,40 @@ def test_warmup_planner_disables_curriculum():
     assert all(overrides["curriculum.enabled"] is False for _, overrides in plans)
     assert plans[0][0] == "unet_nc-a"
     assert plans[0][1]["curriculum.warmup.use_param_l1"] is True
+
+
+def test_presence_planner_routes_entry_and_loss_keys():
+    planner = SlotPresenceTrialPlanner(
+        "resunet",
+        {"P": {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0, "use_active_normalization": True}},
+    )
+
+    plans = planner.plan()
+
+    assert len(plans) == 1
+    assert planner.summary() == {"Presence trials": 1}
+
+    name, overrides = plans[0]
+    assert name == "resunet_pr-P"
+    assert overrides["curriculum.enabled"] is False
+    assert overrides["predict_presence"]  is True
+    assert overrides["curriculum.warmup.use_presence_bce"]         is True
+    assert overrides["curriculum.warmup.weight_presence_bce"]      == 1.0
+    assert overrides["curriculum.warmup.use_active_normalization"] is True
+
+
+def test_presence_planner_default_matrix_sets_bce_weight():
+    planner = SlotPresenceTrialPlanner("resunet", _default_presence_trials())
+
+    plans = dict((name, overrides) for name, overrides in planner.plan())
+
+    assert "resunet_pr-none" in plans
+    assert plans["resunet_pr-none"] == {"curriculum.enabled": False}
+
+    for name, overrides in plans.items():
+        if overrides.get("predict_presence"):
+            assert overrides["curriculum.warmup.use_presence_bce"] is True
+            assert overrides["curriculum.warmup.weight_presence_bce"] > 0.0
 
 
 def test_patch_planner_emits_size_and_stride():
