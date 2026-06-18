@@ -226,6 +226,19 @@ class Loss:
         for g in range(gt_slot.shape[0]):
             out[f"occupancy/gt_active_slot{g}"]   = gt_slot[g]
 
+        pred_count = pred_active.sum(dim=1)
+        gt_count   = gt_active.sum(dim=1)
+
+        out["count/exact_frac"] = (pred_count == gt_count).to(pred_amp.dtype).mean()
+        out["count/under_frac"] = (pred_count <  gt_count).to(pred_amp.dtype).mean()
+        out["count/over_frac"]  = (pred_count >  gt_count).to(pred_amp.dtype).mean()
+
+        for k in range(1, gt_active.shape[1] + 1):
+            mask_k = gt_count == k
+            denom  = mask_k.sum()
+            if denom > 0:
+                out[f"count/acc_gt{k}"] = ((pred_count == gt_count) & mask_k).to(pred_amp.dtype).sum() / denom.to(pred_amp.dtype)
+
         if presence_logits is not None:
             head_active = (torch.sigmoid(presence_logits) > cfg.presence_gate_thr).to(pred_amp.dtype)
             head_slot   = head_active.mean(dim=(0, 2, 3))

@@ -147,6 +147,36 @@ def test_occupancy_absent_when_no_slot_presence_knobs():
     assert not any(key.startswith("occupancy/") for key in out["monitor"])
 
 
+def test_count_metrics_exact_when_pred_matches_gt():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, presence_balance=True)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
+    gt   = valid_param_tensor(2, 2, 5, 5, seed=31)
+
+    out  = loss(gt.clone(), gt)
+
+    assert out["monitor"]["count/exact_frac"].item() == pytest.approx(1.0)
+    assert out["monitor"]["count/under_frac"].item() == pytest.approx(0.0)
+    assert out["monitor"]["count/over_frac"].item()  == pytest.approx(0.0)
+    assert out["monitor"]["count/acc_gt2"].item()    == pytest.approx(1.0)
+    assert "count/acc_gt1" not in out["monitor"]
+
+
+def test_count_metrics_under_when_pred_drops_a_slot():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, presence_balance=True)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
+    gt   = valid_param_tensor(2, 2, 5, 5, seed=32)
+    pred = gt.clone()
+
+    pred[:, 3] = 0.0
+
+    out  = loss(pred, gt)
+
+    assert out["monitor"]["count/under_frac"].item() == pytest.approx(1.0)
+    assert out["monitor"]["count/exact_frac"].item() == pytest.approx(0.0)
+    assert out["monitor"]["count/over_frac"].item()  == pytest.approx(0.0)
+    assert out["monitor"]["count/acc_gt2"].item()    == pytest.approx(0.0)
+
+
 def test_presence_bce_without_head_raises():
     cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_presence_bce=True, weight_presence_bce=1.0)
     loss = build_loss(n_gaussians=2, loss_cfg=cfg)
