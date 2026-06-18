@@ -1121,22 +1121,13 @@ class NumberField {
       this.view._setValue(this.leaf, out);
       this._mark();
     });
-    slider.addEventListener("input", () => {
-      const v   = this._fromSlider();
-      input.value = this._fmt(v);
-      const out = v === this.default ? this.leaf.value : this._fmt(v);
-      this.view._setValue(this.leaf, out);
-      this._mark();
-    });
-
     top.appendChild(input);
-    top.appendChild(slider);
     el.appendChild(top);
 
     const presets     = document.createElement("div");
     presets.className = "numfield__presets";
     this.range.presets.forEach((value) => presets.appendChild(this._chip(value)));
-    el.appendChild(presets);
+    top.appendChild(presets);
 
     this._paint();
     return { el, input, reset: this.reset };
