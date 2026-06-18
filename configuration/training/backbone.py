@@ -22,10 +22,11 @@ def _default_curriculum() -> LossCurriculumConfig:
 
 def _default_inference() -> InferenceConfig:
     return InferenceConfig(
-        run_directory = Path("."),
-        save_cubes    = True,
-        cpu_workers   = 16,
-        gif_axes      = ["elevation", "range", "azimuth"],
+        run_directory   = Path("."),
+        save_cubes      = True,
+        cpu_workers     = 16,
+        gif_axes        = ["elevation", "range", "azimuth"],
+        compute_reduced = False,
     )
 
 
