@@ -1053,7 +1053,7 @@ class LaunchView {
     if (isOverride) {
       const note = document.createElement("p");
       note.className = "sub-panel__note";
-      note.textContent = "Inherits the complete stage; only the fields that differ are listed here.";
+      note.textContent = "Inherits the complete stage; fields edited here override the complete values.";
       el.appendChild(note);
     }
     el.appendChild(body);
@@ -1569,13 +1569,15 @@ class LaunchView {
   _applyVisibility(sync = false) {
     const rowVisible = new Map();
     this.states.forEach(({ leaf, row, pinned }) => {
-      const matches   = !this.query || leaf.path.toLowerCase().includes(this.query);
-      const dirty     = this.dirty[leaf.path] !== undefined;
-      const identical = this.overrideSections.identical.has(leaf.path);
+      const matches    = !this.query || leaf.path.toLowerCase().includes(this.query);
+      const dirty      = this.dirty[leaf.path] !== undefined;
+      const identical  = this.overrideSections.identical.has(leaf.path);
+      const inOverride = this.overrideSections.sections.has(leaf.section);
 
       let disclosed;
       if (this.query)            disclosed = matches;
       else if (dirty || pinned)  disclosed = true;
+      else if (inOverride)       disclosed = true;
       else if (identical)        disclosed = false;
       else                       disclosed = this.showAll;
 
