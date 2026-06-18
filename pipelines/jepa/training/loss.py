@@ -74,4 +74,4 @@ class Loss:
             weighted["curve_recon"]   = w * c_val
             total = total + w * c_val
 
-        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": {}}
+        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": {}, "occupancy": {}}

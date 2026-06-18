@@ -218,13 +218,13 @@ class Loss:
         gt_slot   = gt_active.mean(dim=(0, 2, 3))
 
         out : dict = {}
-        out["occupancy/gt_active_frac"]   = gt_active.mean()
-        out["occupancy/pred_active_frac"] = pred_active.mean()
+        out["gt_active_frac"]   = gt_active.mean()
+        out["pred_active_frac"] = pred_active.mean()
 
         for g in range(pred_slot.shape[0]):
-            out[f"occupancy/pred_active_slot{g}"] = pred_slot[g]
+            out[f"pred_active_slot{g}"] = pred_slot[g]
         for g in range(gt_slot.shape[0]):
-            out[f"occupancy/gt_active_slot{g}"]   = gt_slot[g]
+            out[f"gt_active_slot{g}"]   = gt_slot[g]
 
         pred_count = pred_active.sum(dim=1)
         gt_count   = gt_active.sum(dim=1)
@@ -243,9 +243,9 @@ class Loss:
             head_active = (torch.sigmoid(presence_logits) > cfg.presence_gate_thr).to(pred_amp.dtype)
             head_slot   = head_active.mean(dim=(0, 2, 3))
 
-            out["occupancy/pred_presence_frac"] = head_active.mean()
+            out["pred_presence_frac"] = head_active.mean()
             for g in range(head_slot.shape[0]):
-                out[f"occupancy/pred_presence_slot{g}"] = head_slot[g]
+                out[f"pred_presence_slot{g}"] = head_slot[g]
 
         return out
 
@@ -264,6 +264,7 @@ class Loss:
         components : dict = {}
         weighted   : dict = {}
         monitor    : dict = {}
+        occupancy  : dict = {}
         total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
         weight_sum:    float  = 0.0
 
@@ -335,7 +336,7 @@ class Loss:
                 monitor["presence_bce_logit"] = presence_val
 
         if self.slot_presence_active:
-            monitor.update(self._occupancy(pred_params_phys, gt_phys, presence_logits))
+            occupancy = self._occupancy(pred_params_phys, gt_phys, presence_logits)
 
         if weight_sum > 0.0:
             total_loss = total_loss / weight_sum
@@ -345,4 +346,5 @@ class Loss:
             "components" : components,
             "weighted"   : weighted,
             "monitor"    : monitor,
+            "occupancy"  : occupancy,
         }

@@ -3,6 +3,7 @@ class MetricAggregator:
         self.components_sum : dict = {}
         self.weighted_sum   : dict = {}
         self.monitor_sum    : dict = {}
+        self.occupancy_sum  : dict = {}
         self.extra_sum      : dict = {}
         self.count                = 0
 
@@ -15,6 +16,9 @@ class MetricAggregator:
 
         for k, v in loss_dict["monitor"].items():
             self.monitor_sum[k] = self.monitor_sum.get(k, 0.0) + float(v)
+
+        for k, v in loss_dict["occupancy"].items():
+            self.occupancy_sum[k] = self.occupancy_sum.get(k, 0.0) + float(v)
 
         self.count += 1
 
@@ -34,6 +38,9 @@ class MetricAggregator:
 
     def reduce_monitor(self) -> dict:
         return self._reduce(self.monitor_sum)
+
+    def reduce_occupancy(self) -> dict:
+        return self._reduce(self.occupancy_sum)
 
     def reduce_extra(self) -> dict:
         return self._reduce(self.extra_sum)

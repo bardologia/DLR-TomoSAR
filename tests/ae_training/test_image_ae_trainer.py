@@ -144,7 +144,7 @@ def test_non_finite_loss_raises(tmp_path, monkeypatch):
     loader     = _loader()
 
     def _nan_loss(batch):
-        return {"total_loss": torch.tensor(float("nan")), "components": {}, "weighted": {}, "monitor": {}}
+        return {"total_loss": torch.tensor(float("nan")), "components": {}, "weighted": {}, "monitor": {}, "occupancy": {}}
 
     monkeypatch.setattr(trainer, "_compute_loss", _nan_loss)
 

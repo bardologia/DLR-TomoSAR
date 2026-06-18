@@ -32,7 +32,7 @@ def test_forward_returns_finite_scalar_total():
 
     out  = loss(pred, gt)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor"}
+    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy"}
     assert out["total_loss"].ndim == 0
     assert torch.isfinite(out["total_loss"]).item()
 
@@ -129,12 +129,12 @@ def test_slot_presence_knobs_log_occupancy():
 
     out  = loss(pred, gt)
 
-    assert "occupancy/gt_active_frac"   in out["monitor"]
-    assert "occupancy/pred_active_frac" in out["monitor"]
-    assert "occupancy/pred_active_slot0" in out["monitor"]
-    assert "occupancy/pred_active_slot1" in out["monitor"]
-    assert "occupancy/gt_active_slot0"   in out["monitor"]
-    assert out["monitor"]["occupancy/gt_active_frac"].item() == pytest.approx(1.0)
+    assert "gt_active_frac"    in out["occupancy"]
+    assert "pred_active_frac"  in out["occupancy"]
+    assert "pred_active_slot0" in out["occupancy"]
+    assert "pred_active_slot1" in out["occupancy"]
+    assert "gt_active_slot0"   in out["occupancy"]
+    assert out["occupancy"]["gt_active_frac"].item() == pytest.approx(1.0)
 
 
 def test_occupancy_absent_when_no_slot_presence_knobs():
@@ -144,7 +144,7 @@ def test_occupancy_absent_when_no_slot_presence_knobs():
 
     out  = loss(pred, gt)
 
-    assert not any(key.startswith("occupancy/") for key in out["monitor"])
+    assert out["occupancy"] == {}
 
 
 def test_count_metrics_exact_when_pred_matches_gt():
@@ -154,11 +154,11 @@ def test_count_metrics_exact_when_pred_matches_gt():
 
     out  = loss(gt.clone(), gt)
 
-    assert out["monitor"]["count/exact_frac"].item() == pytest.approx(1.0)
-    assert out["monitor"]["count/under_frac"].item() == pytest.approx(0.0)
-    assert out["monitor"]["count/over_frac"].item()  == pytest.approx(0.0)
-    assert out["monitor"]["count/acc_gt2"].item()    == pytest.approx(1.0)
-    assert "count/acc_gt1" not in out["monitor"]
+    assert out["occupancy"]["count/exact_frac"].item() == pytest.approx(1.0)
+    assert out["occupancy"]["count/under_frac"].item() == pytest.approx(0.0)
+    assert out["occupancy"]["count/over_frac"].item()  == pytest.approx(0.0)
+    assert out["occupancy"]["count/acc_gt2"].item()    == pytest.approx(1.0)
+    assert "count/acc_gt1" not in out["occupancy"]
 
 
 def test_count_metrics_under_when_pred_drops_a_slot():
@@ -171,10 +171,10 @@ def test_count_metrics_under_when_pred_drops_a_slot():
 
     out  = loss(pred, gt)
 
-    assert out["monitor"]["count/under_frac"].item() == pytest.approx(1.0)
-    assert out["monitor"]["count/exact_frac"].item() == pytest.approx(0.0)
-    assert out["monitor"]["count/over_frac"].item()  == pytest.approx(0.0)
-    assert out["monitor"]["count/acc_gt2"].item()    == pytest.approx(0.0)
+    assert out["occupancy"]["count/under_frac"].item() == pytest.approx(1.0)
+    assert out["occupancy"]["count/exact_frac"].item() == pytest.approx(0.0)
+    assert out["occupancy"]["count/over_frac"].item()  == pytest.approx(0.0)
+    assert out["occupancy"]["count/acc_gt2"].item()    == pytest.approx(0.0)
 
 
 def test_presence_bce_without_head_raises():
@@ -199,7 +199,7 @@ def test_presence_bce_with_head_logs_component_and_occupancy():
 
     assert "presence_bce" in out["components"]
     assert "presence_bce" in out["weighted"]
-    assert "occupancy/pred_presence_frac" in out["monitor"]
+    assert "pred_presence_frac" in out["occupancy"]
 
 
 def test_curriculum_swap_changes_active_terms():

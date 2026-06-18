@@ -7,8 +7,8 @@ import pytest
 from tools.training.aggregation import MetricAggregator
 
 
-def _loss_dict(components, weighted, monitor):
-    return {"components": components, "weighted": weighted, "monitor": monitor}
+def _loss_dict(components, weighted, monitor, occupancy=None):
+    return {"components": components, "weighted": weighted, "monitor": monitor, "occupancy": occupancy or {}}
 
 
 def test_single_add_reduces_to_same_values():
@@ -31,6 +31,14 @@ def test_mean_over_multiple_batches():
     assert agg.reduce_components()["a"] == pytest.approx(3.0)
     assert agg.reduce_weighted()["a"]   == pytest.approx(20.0)
     assert agg.reduce_monitor()["m"]    == pytest.approx(200.0)
+
+
+def test_occupancy_channel_reduces_independently():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({}, {}, {}, {"count/exact_frac": 0.4}))
+    agg.add(_loss_dict({}, {}, {}, {"count/exact_frac": 0.6}))
+
+    assert agg.reduce_occupancy()["count/exact_frac"] == pytest.approx(0.5)
 
 
 def test_disjoint_keys_accumulate_independently():

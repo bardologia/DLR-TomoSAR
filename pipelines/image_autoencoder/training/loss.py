@@ -24,4 +24,5 @@ class Loss:
             "components"  : {"image_recon": val},
             "weighted"    : {"image_recon": val},
             "monitor"     : {},
+            "occupancy"   : {},
         }

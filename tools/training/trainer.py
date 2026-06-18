@@ -188,6 +188,10 @@ class BaseTrainer:
         if monitor:
             self.tracker.log_metrics("loss_all/train", monitor, epoch)
 
+        occupancy = aggregator.reduce_occupancy()
+        if occupancy:
+            self.tracker.log_metrics("occupancy/train", occupancy, epoch)
+
         self.tracker.log_memory(epoch)
         self._log_train_epoch_extra(avg, epoch)
         return avg
@@ -217,6 +221,8 @@ class BaseTrainer:
             self.tracker.log_metrics(f"loss_weighted/{stage}", aggregator.reduce_weighted(), epoch)
             if aggregator.monitor_sum:
                 self.tracker.log_metrics(f"loss_all/{stage}", aggregator.reduce_monitor(), epoch)
+            if aggregator.occupancy_sum:
+                self.tracker.log_metrics(f"occupancy/{stage}", aggregator.reduce_occupancy(), epoch)
             if aggregator.extra_sum:
                 self.tracker.log_metrics(f"permutation/{stage}", aggregator.reduce_extra(), epoch)
         finally:

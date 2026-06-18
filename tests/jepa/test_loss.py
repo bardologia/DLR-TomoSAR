@@ -35,7 +35,7 @@ def test_loss_returns_finite_scalar(autoencoder, x_axis, norm_stats, profile_nor
 
     out = loss(z_hat, gt)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor"}
+    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy"}
     assert out["total_loss"].ndim == 0
     assert torch.isfinite(out["total_loss"])
     assert "embedding_mse" in out["components"]

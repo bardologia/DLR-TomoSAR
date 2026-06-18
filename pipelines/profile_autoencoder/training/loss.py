@@ -28,4 +28,5 @@ class Loss:
             "components": {"curve_recon": val},
             "weighted":   {"curve_recon": val},
             "monitor":    {},
+            "occupancy":  {},
         }
