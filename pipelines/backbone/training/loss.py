@@ -6,7 +6,7 @@ import torch
 
 from tools.data.gaussians     import GaussianClamp, GaussianCurve, GaussianHead
 from tools.loss.curve_loss    import CurveLoss
-from tools.loss.param_loss    import ParamLoss
+from tools.loss.param_loss    import ParamLoss, ParamMatcher
 from tools.loss.physical_loss import PhysicalLoss
 from tools.sar.tomo_geometry  import TomoGeometry
 
@@ -126,7 +126,7 @@ class Loss:
         gt      = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
         gt_phys = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
 
-        pred, pred_phys, gt, gt_phys = ParamLoss.match(self.match_strategy, pred, pred_phys, gt, gt_phys)
+        pred, pred_phys, gt, gt_phys = ParamMatcher.match(self.match_strategy, pred, pred_phys, gt, gt_phys)
 
         effective_gaussians = min(num_gaussians, gt_gaussians)
 

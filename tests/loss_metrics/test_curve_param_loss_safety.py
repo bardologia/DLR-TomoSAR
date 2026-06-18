@@ -7,6 +7,7 @@ import torch
 from tools.data.gaussians  import GaussianClamp, GaussianCurve
 from tools.loss.curve_loss import CurveLoss as CL
 from tools.loss.param_loss import ParamLoss as PL
+from tools.loss.param_loss import ParamMatcher as PM
 
 PPG     = 3
 AMP_MAX = 1000.0
@@ -285,7 +286,7 @@ def test_match_sorts_gt_by_mu_among_active_and_leaves_pred_unchanged():
     gt_phys[:, :, 0] = torch.tensor([2.0, 0.0, 3.0, 0.0, 1.0]).reshape(1, 5, 1, 1)
     gt[:, :, 1]      = torch.tensor([5.0, 9.0, 1.0, 8.0, 3.0]).reshape(1, 5, 1, 1)
 
-    pr, _, g, gp = PL.match("sort_gt_by_mu", pred, pred_phys, gt, gt_phys)
+    pr, _, g, gp = PM.match("sort_gt_by_mu", pred, pred_phys, gt, gt_phys)
 
     assert torch.equal(pr, pred)
 
@@ -298,8 +299,8 @@ def test_match_is_idempotent():
     gt        = torch.randn(1, 5, 3, 3, 3)
     gt_phys   = torch.rand(1, 5, 3, 3, 3) + 0.5
 
-    once  = PL.match("sort_gt_by_mu", pred, pred.clone(), gt, gt_phys)
-    twice = PL.match("sort_gt_by_mu", once[0], once[1], once[2], once[3])
+    once  = PM.match("sort_gt_by_mu", pred, pred.clone(), gt, gt_phys)
+    twice = PM.match("sort_gt_by_mu", once[0], once[1], once[2], once[3])
 
     assert torch.equal(once[2], twice[2])
     assert torch.equal(once[3], twice[3])
@@ -310,7 +311,7 @@ def test_match_noop_strategy_returns_inputs_unchanged():
     gt      = torch.randn(1, 5, 3, 2, 2)
     gt_phys = torch.rand(1, 5, 3, 2, 2)
 
-    pr, prp, g, gp = PL.match("none", pred, pred.clone(), gt, gt_phys)
+    pr, prp, g, gp = PM.match("none", pred, pred.clone(), gt, gt_phys)
 
     assert torch.equal(g, gt)
     assert torch.equal(gp, gt_phys)

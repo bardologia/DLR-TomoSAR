@@ -6,33 +6,38 @@ import torch
 import torch.nn.functional as F
 
 
-class ParamLoss:
-    MAX_MATCH_GAUSSIANS = 6
-    ACTIVE_AMP_THR      = 1e-3
-    DENOM_FLOOR         = 1e-6
+class ParamMatcher:
+    MAX_GAUSSIANS  = 6
+    ACTIVE_AMP_THR = 1e-3
 
     @staticmethod
-    def match(
-        strategy  : str,
+    def sort_gt_by_mu(
         pred      : torch.Tensor,
         pred_phys : torch.Tensor,
         gt        : torch.Tensor,
         gt_phys   : torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        if strategy == "sort_gt_by_mu":
-            gt, gt_phys = ParamLoss._sort_gt_by_mu(gt, gt_phys)
-
-        elif strategy == "hungarian_active":
-            gt, gt_phys         = ParamLoss._sort_gt_by_mu(gt, gt_phys)
-            pred, pred_phys     = ParamLoss._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
+        gt, gt_phys = ParamMatcher._sort_gt(gt, gt_phys)
 
         return pred, pred_phys, gt, gt_phys
 
     @staticmethod
-    def _sort_gt_by_mu(gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def hungarian_active(
+        pred      : torch.Tensor,
+        pred_phys : torch.Tensor,
+        gt        : torch.Tensor,
+        gt_phys   : torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        gt, gt_phys     = ParamMatcher._sort_gt(gt, gt_phys)
+        pred, pred_phys = ParamMatcher._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
+
+        return pred, pred_phys, gt, gt_phys
+
+    @staticmethod
+    def _sort_gt(gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         gt_phys_amp = gt_phys[:, :, 0]
         gt_mu       = gt[:, :, 1]
-        is_active   = gt_phys_amp > ParamLoss.ACTIVE_AMP_THR
+        is_active   = gt_phys_amp > ParamMatcher.ACTIVE_AMP_THR
         sort_key    = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float("inf")))
         gt_index    = torch.argsort(sort_key, dim=1)
         gt_idx_b    = gt_index[:, :, None, :, :].expand_as(gt)
@@ -46,10 +51,10 @@ class ParamLoss:
         if gt.shape[1] != G:
             raise ValueError(f"hungarian_active requires equal pred/gt gaussian counts, got {G} and {gt.shape[1]}")
 
-        if G > ParamLoss.MAX_MATCH_GAUSSIANS:
-            raise ValueError(f"hungarian_active enumerates G! permutations; G={G} exceeds MAX_MATCH_GAUSSIANS={ParamLoss.MAX_MATCH_GAUSSIANS}")
+        if G > ParamMatcher.MAX_GAUSSIANS:
+            raise ValueError(f"hungarian_active enumerates G! permutations; G={G} exceeds MAX_GAUSSIANS={ParamMatcher.MAX_GAUSSIANS}")
 
-        active = (gt_phys[:, :, 0] > ParamLoss.ACTIVE_AMP_THR).to(pred.dtype)
+        active = (gt_phys[:, :, 0] > ParamMatcher.ACTIVE_AMP_THR).to(pred.dtype)
 
         pred_e = pred.permute(0, 3, 4, 1, 2)[:, :, :, :, None, :]
         gt_e   = gt.permute(  0, 3, 4, 1, 2)[:, :, :, None, :, :]
@@ -69,6 +74,26 @@ class ParamLoss:
         idx_b  = chosen[:, :, None, :, :].expand(B, G, P, H, W)
 
         return torch.gather(pred, dim=1, index=idx_b), torch.gather(pred_phys, dim=1, index=idx_b)
+
+    @staticmethod
+    def match(
+        strategy  : str,
+        pred      : torch.Tensor,
+        pred_phys : torch.Tensor,
+        gt        : torch.Tensor,
+        gt_phys   : torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        if strategy == "sort_gt_by_mu":
+            return ParamMatcher.sort_gt_by_mu(pred, pred_phys, gt, gt_phys)
+
+        if strategy == "hungarian_active":
+            return ParamMatcher.hungarian_active(pred, pred_phys, gt, gt_phys)
+
+        return pred, pred_phys, gt, gt_phys
+
+
+class ParamLoss:
+    DENOM_FLOOR = 1e-6
 
     @staticmethod
     def presence_scale(active: torch.Tensor, balance: bool, active_weight: float, inactive_weight: float) -> torch.Tensor:
