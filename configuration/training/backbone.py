@@ -64,20 +64,36 @@ def _default_presence_trials() -> dict:
     active_norm = {"use_active_normalization": True}
     balance     = {"presence_balance": True}
     presence    = {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0}
+    focal       = {"amp_focal_gamma": 2.0}
 
     return {
-        "none"       : {},
-        "A"          : {**active_norm},
-        "B"          : {**balance},
-        "P"          : {**presence},
-        "AB"         : {**active_norm, **balance},
-        "AP"         : {**active_norm, **presence},
-        "BP"         : {**balance, **presence},
-        "ABP"        : {**active_norm, **balance, **presence},
-        "ABP-bce0.5" : {**active_norm, **balance, "predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 0.5},
-        "ABP-bce2"   : {**active_norm, **balance, "predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 2.0},
-        "ABP-bman4"  : {**active_norm, **presence, "presence_balance": False, "active_weight": 4.0, "inactive_weight": 1.0},
-        "ABP-bman8"  : {**active_norm, **presence, "presence_balance": False, "active_weight": 8.0, "inactive_weight": 1.0},
+        "none"        : {},
+        "A"           : {**active_norm},
+        "B"           : {**balance},
+        "P"           : {**presence},
+        "F"           : {**focal},
+        "AB"          : {**active_norm, **balance},
+        "AP"          : {**active_norm, **presence},
+        "AF"          : {**active_norm, **focal},
+        "BP"          : {**balance, **presence},
+        "BF"          : {**balance, **focal},
+        "PF"          : {**presence, **focal},
+        "ABP"         : {**active_norm, **balance, **presence},
+        "ABF"         : {**active_norm, **balance, **focal},
+        "APF"         : {**active_norm, **presence, **focal},
+        "BPF"         : {**balance, **presence, **focal},
+        "ABPF"        : {**active_norm, **balance, **presence, **focal},
+        "ABPF-bce0.5" : {**active_norm, **balance, **presence, **focal, "weight_presence_bce": 0.5},
+        "ABPF-bce2"   : {**active_norm, **balance, **presence, **focal, "weight_presence_bce": 2.0},
+        "ABPF-fg1"    : {**active_norm, **balance, **presence, **focal, "amp_focal_gamma": 1.0},
+        "ABPF-fg3"    : {**active_norm, **balance, **presence, **focal, "amp_focal_gamma": 3.0},
+    }
+
+
+def _default_presence_match_strategies() -> dict:
+    return {
+        "sort" : "sort_gt_by_mu",
+        "hung" : "hungarian_active",
     }
 
 
@@ -147,6 +163,7 @@ class BackboneEntryConfig:
     warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
     complete_losses  : dict                  = field(default_factory=_default_complete_losses)
     presence_trials  : dict                  = field(default_factory=_default_presence_trials)
+    presence_match_strategies : dict         = field(default_factory=_default_presence_match_strategies)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_presence_trials
+from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_presence_trials, _default_presence_match_strategies
 from pipelines.backbone.training.experiments import (
     CurriculumTrialPlanner,
     PatchSizeTrialPlanner,
@@ -45,38 +45,48 @@ def test_warmup_planner_disables_curriculum():
     assert plans[0][1]["curriculum.warmup.use_param_l1"] is True
 
 
-def test_presence_planner_routes_entry_and_loss_keys():
+def test_presence_planner_crosses_trials_and_matching():
     planner = SlotPresenceTrialPlanner(
         "resunet",
         {"P": {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0, "use_active_normalization": True}},
+        {"sort": "sort_gt_by_mu", "hung": "hungarian_active"},
     )
 
     plans = planner.plan()
 
-    assert len(plans) == 1
-    assert planner.summary() == {"Presence trials": 1}
+    assert len(plans) == 2
+    assert [name for name, _ in plans] == ["resunet_pr-P-sort", "resunet_pr-P-hung"]
+    assert planner.summary()["Total runs"] == 2
 
-    name, overrides = plans[0]
-    assert name == "resunet_pr-P"
-    assert overrides["curriculum.enabled"] is False
-    assert overrides["predict_presence"]  is True
-    assert overrides["curriculum.warmup.use_presence_bce"]         is True
-    assert overrides["curriculum.warmup.weight_presence_bce"]      == 1.0
-    assert overrides["curriculum.warmup.use_active_normalization"] is True
+    by_name = dict(plans)
+    sort_ov = by_name["resunet_pr-P-sort"]
+    hung_ov = by_name["resunet_pr-P-hung"]
+
+    assert sort_ov["curriculum.enabled"] is False
+    assert sort_ov["predict_presence"]  is True
+    assert sort_ov["curriculum.warmup.param_match"]               == "sort_gt_by_mu"
+    assert hung_ov["curriculum.warmup.param_match"]               == "hungarian_active"
+    assert sort_ov["curriculum.warmup.use_presence_bce"]          is True
+    assert sort_ov["curriculum.warmup.weight_presence_bce"]       == 1.0
+    assert sort_ov["curriculum.warmup.use_active_normalization"]  is True
 
 
-def test_presence_planner_default_matrix_sets_bce_weight():
-    planner = SlotPresenceTrialPlanner("resunet", _default_presence_trials())
+def test_presence_planner_default_matrix_full_cross():
+    planner = SlotPresenceTrialPlanner("resunet", _default_presence_trials(), _default_presence_match_strategies())
 
-    plans = dict((name, overrides) for name, overrides in planner.plan())
+    plans = dict(planner.plan())
 
-    assert "resunet_pr-none" in plans
-    assert plans["resunet_pr-none"] == {"curriculum.enabled": False}
+    assert len(plans) == 40
+    assert "resunet_pr-none-sort" in plans
+    assert "resunet_pr-none-hung" in plans
+    assert plans["resunet_pr-none-sort"] == {"curriculum.enabled": False, "curriculum.warmup.param_match": "sort_gt_by_mu"}
 
     for name, overrides in plans.items():
         if overrides.get("predict_presence"):
             assert overrides["curriculum.warmup.use_presence_bce"] is True
             assert overrides["curriculum.warmup.weight_presence_bce"] > 0.0
+        if overrides.get("curriculum.warmup.amp_focal_gamma"):
+            assert overrides["curriculum.warmup.amp_focal_gamma"] > 0.0
 
 
 def test_patch_planner_emits_size_and_stride():

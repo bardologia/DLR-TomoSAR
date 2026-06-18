@@ -190,7 +190,7 @@ class SingleTrainRunner:
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "presence_match_strategies", "secondary_trials", "patch_trials", "gpus", "poll_interval_s")
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path, stage: str) -> None:
         self.config       = config
@@ -212,7 +212,7 @@ class TrainScheduler:
         if mode == "warmup":
             return WarmupTrialPlanner(self.config.backbone_name, self.config.warmup_losses)
         if mode == "presence":
-            return SlotPresenceTrialPlanner(self.config.backbone_name, self.config.presence_trials)
+            return SlotPresenceTrialPlanner(self.config.backbone_name, self.config.presence_trials, self.config.presence_match_strategies)
         if mode == "secondary":
             return SecondaryTrialPlanner.from_dataset(self.config.backbone_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "patch":
