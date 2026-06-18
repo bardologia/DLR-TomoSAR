@@ -247,6 +247,8 @@ class LaunchView {
     this.gatedSections = new Set();
     this.classColors = new Map();
     this.query = "";
+    this.showAll = false;
+    this.overrideSections = { suppressed: new Set(), labels: new Map() };
     this.modelFamilies = null;
     this.pinsEl = null;
     this.builder = null;
@@ -279,6 +281,8 @@ class LaunchView {
     this.gatedSections = new Set();
     this.classColors = new Map();
     this.query = "";
+    this.showAll = false;
+    this.overrideSections = { suppressed: new Set(), labels: new Map() };
     this.modelFamilies = null;
     this.pinsEl = null;
     this.builder = null;
@@ -765,6 +769,8 @@ class LaunchView {
 
     const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
 
+    this.overrideSections = this._detectOverrideSections(cfg.leaves);
+
     const typeTab  = LaunchView.TYPE_TABS[this.key];
     const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
 
@@ -849,12 +855,22 @@ class LaunchView {
     search.spellcheck = false;
     search.addEventListener("input", () => {
       this.query = search.value.trim().toLowerCase();
-      this._applyVisibility();
+      this._applyVisibility(true);
     });
 
     const count = document.createElement("span");
     count.className = "cfg-toolbar__count";
     this.countEl = count;
+
+    const showAll = document.createElement("button");
+    showAll.className = "btn btn--mini cfg-showall";
+    this.showAllBtn = showAll;
+    this.totalFields = cfg.leaves.length - this.overrideSections.identical.size;
+    showAll.addEventListener("click", () => {
+      this.showAll = !this.showAll;
+      this._refreshShowAll();
+      this._applyVisibility(true);
+    });
 
     const reset = document.createElement("button");
     reset.className = "btn btn--mini";
@@ -863,8 +879,38 @@ class LaunchView {
 
     bar.appendChild(search);
     bar.appendChild(count);
+    bar.appendChild(showAll);
     bar.appendChild(reset);
+    this._refreshShowAll();
     return bar;
+  }
+
+  _refreshShowAll() {
+    if (!this.showAllBtn) return;
+    this.showAllBtn.classList.toggle("is-on", this.showAll);
+    this.showAllBtn.textContent = this.showAll ? "Essentials only" : `Show all ${this.totalFields} fields`;
+  }
+
+  _detectOverrideSections(leaves) {
+    const byPath   = new Map(leaves.map((l) => [l.path, l.value]));
+    const identical = new Set();
+    const sections  = new Set();
+    const differ    = new Map();
+
+    leaves.forEach((leaf) => {
+      if (!/\.warmup(\.|$)/.test(leaf.path)) return;
+      const counterpart = leaf.path.replace(/\.warmup(\.|$)/, ".complete$1");
+      if (!byPath.has(counterpart)) return;
+      sections.add(leaf.section);
+      if (byPath.get(counterpart) === leaf.value) identical.add(leaf.path);
+      else differ.set(leaf.section, (differ.get(leaf.section) || 0) + 1);
+    });
+
+    return { identical, sections, differ };
+  }
+
+  _shownCount(leaves) {
+    return leaves.filter((l) => !this.overrideSections.identical.has(l.path)).length;
   }
 
   _buildPins(pinned) {
@@ -894,7 +940,7 @@ class LaunchView {
 
   _buildBand(key, bandSections, grouped) {
     const ordered = [...bandSections].sort((a, b) => a.split(".").length - b.split(".").length);
-    const nFields = bandSections.reduce((n, s) => n + grouped.get(s).length, 0);
+    const nFields = bandSections.reduce((n, s) => n + this._shownCount(grouped.get(s)), 0);
     const rootClass = grouped.get(ordered[0])[0].section_class;
 
     const band = document.createElement("section");
@@ -959,13 +1005,26 @@ class LaunchView {
     head.setAttribute("aria-expanded", String(open));
   }
 
+  _setBandOpen(band, head, open) {
+    band.classList.toggle("is-open", open);
+    head.setAttribute("aria-expanded", String(open));
+  }
+
+  _sectionEdited(section) {
+    return this.states.some(({ leaf }) => leaf.section === section && this.dirty[leaf.path] !== undefined);
+  }
+
   _buildSubPanel(section, leaves) {
-    const label = section.split(".").pop();
+    const isOverride = this.overrideSections.sections.has(section);
+    const name  = section.split(".").pop();
+    const label = isOverride ? `${name} overrides` : name;
+    const shown = this._shownCount(leaves);
 
     const el = document.createElement("section");
     el.className = "sub-panel";
+    if (isOverride) el.classList.add("sub-panel--override");
     el.dataset.section = section;
-    el.title = section;
+    el.title = isOverride ? `${section} — only the fields that differ from complete` : section;
     el.style.setProperty("--cc", this._classColor(leaves[0].section_class));
 
     const head = document.createElement("button");
@@ -978,7 +1037,7 @@ class LaunchView {
       `<h4 class="sub-panel__name">${label}</h4>` +
       `<span class="edit-badge" hidden></span>` +
       `<span class="sub-panel__class">${leaves[0].section_class}</span>` +
-      `<span class="sub-panel__count">${leaves.length} fields</span>`;
+      `<span class="sub-panel__count">${shown}${isOverride ? " differ" : " fields"}</span>`;
     head.addEventListener("click", () => {
       const open = el.classList.toggle("is-open");
       head.setAttribute("aria-expanded", String(open));
@@ -990,6 +1049,12 @@ class LaunchView {
     children.className = "band-children band-children--nested";
 
     el.appendChild(head);
+    if (isOverride) {
+      const note = document.createElement("p");
+      note.className = "sub-panel__note";
+      note.textContent = "Inherits the complete stage; only the fields that differ are listed here.";
+      el.appendChild(note);
+    }
     el.appendChild(body);
     el.appendChild(children);
     return { el, badge: head.querySelector(".edit-badge"), children };
@@ -1273,7 +1338,8 @@ class LaunchView {
 
     const label = document.createElement("div");
     label.className = "cfg-edit__name";
-    label.innerHTML = `${short}<span>${leaf.type}</span>`;
+    label.textContent = short;
+    label.title = `${leaf.type} · --${leaf.path}`;
     row.appendChild(label);
 
     let control;
@@ -1493,17 +1559,27 @@ class LaunchView {
     this._applyVisibility();
   }
 
-  _applyVisibility() {
+  _applyVisibility(sync = false) {
     const rowVisible = new Map();
-    this.states.forEach(({ leaf, row }) => {
-      const hit = !this.query || leaf.path.toLowerCase().includes(this.query);
-      if (hit && row.dataset.gated !== "1") rowVisible.set(row, true);
+    this.states.forEach(({ leaf, row, pinned }) => {
+      const matches   = !this.query || leaf.path.toLowerCase().includes(this.query);
+      const dirty     = this.dirty[leaf.path] !== undefined;
+      const identical = this.overrideSections.identical.has(leaf.path);
+
+      let disclosed;
+      if (this.query)            disclosed = matches;
+      else if (dirty || pinned)  disclosed = true;
+      else if (identical)        disclosed = false;
+      else                       disclosed = this.showAll;
+
+      if (matches && disclosed && row.dataset.gated !== "1") rowVisible.set(row, true);
       else if (!rowVisible.has(row)) rowVisible.set(row, false);
     });
     rowVisible.forEach((visible, row) => (row.hidden = !visible));
 
     const sectionHasRows = new Map();
-    this.states.forEach(({ leaf, row }) => {
+    this.states.forEach(({ leaf, row, pinned }) => {
+      if (pinned) return;
       const prior = sectionHasRows.get(leaf.section) || false;
       sectionHasRows.set(leaf.section, prior || rowVisible.get(row));
     });
@@ -1516,7 +1592,12 @@ class LaunchView {
       sectionVisible.set(section, visible);
       const el = this.panels.get(section).el;
       el.hidden = !visible;
-      if (this.query && visible && el.classList.contains("sub-panel")) el.classList.add("is-open");
+      if (el.classList.contains("sub-panel")) {
+        const subWant = visible && (Boolean(this.query) || this.showAll || this._sectionEdited(section) || childVisible);
+        const subHead = el.querySelector(".sub-panel__head");
+        if (sync) { el.classList.toggle("is-open", subWant); if (subHead) subHead.setAttribute("aria-expanded", String(subWant)); }
+        else if (subWant) { el.classList.add("is-open"); if (subHead) subHead.setAttribute("aria-expanded", "true"); }
+      }
     });
 
     let anyVisible = false;
@@ -1524,7 +1605,11 @@ class LaunchView {
       const visible = band.sections.some((section) => sectionVisible.get(section));
       band.el.hidden = !visible;
       anyVisible = anyVisible || visible;
-      if (this.query && visible && !band.el.classList.contains("is-open")) this._toggleBand(band.el, band.head);
+
+      const edited   = band.sections.some((section) => this._sectionEdited(section));
+      const wantOpen = visible && (Boolean(this.query) || this.showAll || edited);
+      if (sync) this._setBandOpen(band.el, band.head, wantOpen);
+      else if (wantOpen && !band.el.classList.contains("is-open")) this._setBandOpen(band.el, band.head, true);
     });
 
     if (this.pinsEl) {

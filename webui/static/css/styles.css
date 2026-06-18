@@ -1149,6 +1149,8 @@ main { margin-left: var(--navw); }
 .sub-panel__name { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .sub-panel__class { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--cc, var(--ink-dim)); }
 .sub-panel__count { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); white-space: nowrap; }
+.sub-panel__note { margin: 0; padding: 4px 14px 0; font-size: 11.5px; color: var(--ink-faint); }
+.sub-panel--override:not(.is-open) .sub-panel__note { display: none; }
 .sub-panel__body { padding: 12px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 9px 30px; align-items: start; border-top: 1px solid color-mix(in srgb, var(--cc, #5a646a) 20%, transparent); }
 .sub-panel__body[hidden] { display: none; }
 .sub-panel:not(.is-open) .sub-panel__body, .sub-panel:not(.is-open) .band-children--nested { display: none; }
@@ -1199,6 +1201,8 @@ main { margin-left: var(--navw); }
 .cfg-search:focus { outline: none; border-color: var(--accent); }
 .cfg-search::placeholder { color: var(--ink-faint); }
 .cfg-toolbar__count { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; margin-left: auto; }
+.cfg-showall { white-space: nowrap; }
+.cfg-showall.is-on { color: var(--accent); border-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 
 .cfg-edit__input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .cfg-edit__input::-webkit-outer-spin-button, .cfg-edit__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
