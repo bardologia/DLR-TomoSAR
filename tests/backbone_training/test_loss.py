@@ -121,6 +121,57 @@ def test_log_all_losses_populates_monitor():
     assert len(out["monitor"]) > len(out["components"])
 
 
+def test_slot_presence_knobs_log_occupancy():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, presence_balance=True, active_weight=2.0, inactive_weight=0.5)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
+    pred = valid_param_tensor(2, 2, 5, 5, seed=21)
+    gt   = valid_param_tensor(2, 2, 5, 5, seed=22)
+
+    out  = loss(pred, gt)
+
+    assert "occupancy/gt_active_frac"   in out["monitor"]
+    assert "occupancy/pred_active_frac" in out["monitor"]
+    assert "occupancy/pred_active_slot0" in out["monitor"]
+    assert "occupancy/pred_active_slot1" in out["monitor"]
+    assert "occupancy/gt_active_slot0"   in out["monitor"]
+    assert out["monitor"]["occupancy/gt_active_frac"].item() == pytest.approx(1.0)
+
+
+def test_occupancy_absent_when_no_slot_presence_knobs():
+    loss = build_loss(n_gaussians=2)
+    pred = valid_param_tensor(2, 2, 5, 5, seed=23)
+    gt   = valid_param_tensor(2, 2, 5, 5, seed=24)
+
+    out  = loss(pred, gt)
+
+    assert not any(key.startswith("occupancy/") for key in out["monitor"])
+
+
+def test_presence_bce_without_head_raises():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_presence_bce=True, weight_presence_bce=1.0)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
+    pred = valid_param_tensor(2, 2, 5, 5, seed=25)
+    gt   = valid_param_tensor(2, 2, 5, 5, seed=26)
+
+    with pytest.raises(ValueError, match="predict_presence"):
+        loss(pred, gt)
+
+
+def test_presence_bce_with_head_logs_component_and_occupancy():
+    cfg          = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_presence_bce=True, weight_presence_bce=1.0)
+    loss         = build_loss(n_gaussians=2, loss_cfg=cfg)
+    params       = valid_param_tensor(2, 2, 5, 5, seed=27)
+    presence     = torch.zeros(2, 2, 5, 5, dtype=torch.float32)
+    pred         = torch.cat([params, presence], dim=1)
+    gt           = valid_param_tensor(2, 2, 5, 5, seed=28)
+
+    out          = loss(pred, gt)
+
+    assert "presence_bce" in out["components"]
+    assert "presence_bce" in out["weighted"]
+    assert "occupancy/pred_presence_frac" in out["monitor"]
+
+
 def test_curriculum_swap_changes_active_terms():
     loss = build_loss(n_gaussians=2)
 

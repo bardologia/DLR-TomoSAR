@@ -61,6 +61,11 @@ class Loss:
 
         self.log_active_terms(cfg, title="Active Terms")
 
+    @property
+    def slot_presence_active(self) -> bool:
+        cfg = self.loss_cfg
+        return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or cfg.use_presence_bce or self.log_all_losses)
+
     def log_active_terms(self, cfg, title: str) -> None:
         active_rows = []
 
@@ -195,6 +200,42 @@ class Loss:
 
         return ParamLoss.presence_bce(presence_logits, active_srt, cfg.presence_bce_balance)
 
+    @torch.no_grad()
+    def _occupancy(self, pred_params_phys, gt_phys, presence_logits) -> dict:
+        cfg = self.loss_cfg
+        ppg = self.gaussian_cfg.params_per_gaussian
+        thr = cfg.amp_zero_thr
+
+        Bp, Cp, Hp, Wp = pred_params_phys.shape
+        pred_amp       = pred_params_phys.reshape(Bp, Cp // ppg, ppg, Hp, Wp)[:, :, 0]
+        pred_active    = (pred_amp > thr).to(pred_amp.dtype)
+
+        Bg, Cg, Hg, Wg = gt_phys.shape
+        gt_amp         = gt_phys.reshape(Bg, Cg // ppg, ppg, Hg, Wg)[:, :, 0]
+        gt_active      = (gt_amp > thr).to(gt_amp.dtype)
+
+        pred_slot = pred_active.mean(dim=(0, 2, 3))
+        gt_slot   = gt_active.mean(dim=(0, 2, 3))
+
+        out : dict = {}
+        out["occupancy/gt_active_frac"]   = gt_active.mean()
+        out["occupancy/pred_active_frac"] = pred_active.mean()
+
+        for g in range(pred_slot.shape[0]):
+            out[f"occupancy/pred_active_slot{g}"] = pred_slot[g]
+        for g in range(gt_slot.shape[0]):
+            out[f"occupancy/gt_active_slot{g}"]   = gt_slot[g]
+
+        if presence_logits is not None:
+            head_active = (torch.sigmoid(presence_logits) > cfg.presence_gate_thr).to(pred_amp.dtype)
+            head_slot   = head_active.mean(dim=(0, 2, 3))
+
+            out["occupancy/pred_presence_frac"] = head_active.mean()
+            for g in range(head_slot.shape[0]):
+                out[f"occupancy/pred_presence_slot{g}"] = head_slot[g]
+
+        return out
+
     def __call__(self, pred_output, gt_params):
         cfg = self.loss_cfg
 
@@ -260,6 +301,9 @@ class Loss:
             for pname, pval in per_param_l1.items():
                 monitor[f"param_l1/{pname}_norm"] = pval
 
+        if cfg.use_presence_bce and presence_logits is None:
+            raise ValueError("use_presence_bce is enabled but the model head emits no presence channels; set predict_presence=True so the Gaussian head produces presence logits.")
+
         if presence_logits is not None and (cfg.use_presence_bce or self.log_all_losses):
             if cfg.use_presence_bce:
                 presence_val = self._presence_term(presence_logits, gt_phys)
@@ -276,6 +320,9 @@ class Loss:
 
             if self.log_all_losses:
                 monitor["presence_bce_logit"] = presence_val
+
+        if self.slot_presence_active:
+            monitor.update(self._occupancy(pred_params_phys, gt_phys, presence_logits))
 
         if weight_sum > 0.0:
             total_loss = total_loss / weight_sum
