@@ -1595,7 +1595,8 @@ class LaunchView {
     const sectionVisible = new Map();
     orderedSections.forEach((section) => {
       const childVisible = orderedSections.some((other) => other !== section && other.startsWith(section ? `${section}.` : ".") && sectionVisible.get(other));
-      const visible = !this.gatedSections.has(section) && ((sectionHasRows.get(section) || false) || childVisible);
+      const isOverride = this.overrideSections.sections.has(section);
+      const visible = !this.gatedSections.has(section) && ((sectionHasRows.get(section) || false) || childVisible || isOverride);
       sectionVisible.set(section, visible);
       const el = this.panels.get(section).el;
       el.hidden = !visible;
