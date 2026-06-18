@@ -387,6 +387,45 @@ class Metrics:
 
         return out
 
+    def _active_count_stats(self) -> Dict[str, float]:
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+        out: Dict[str, float] = {}
+
+        H, W       = pg.shape[-2:]
+        gt_count   = np.zeros((H, W), dtype=np.int32)
+        pred_count = np.zeros((H, W), dtype=np.int32)
+
+        for k in range(n_K):
+            gt_active   = pg[3 * k] >= 1e-3
+            pred_active = pp[3 * k] >= 1e-3
+
+            out[f"slot_{k}_active_gt_frac"]   = float(gt_active.mean())
+            out[f"slot_{k}_active_pred_frac"] = float(pred_active.mean())
+
+            gt_count   += gt_active.astype(np.int32)
+            pred_count += pred_active.astype(np.int32)
+
+        out["active_frac_gt"]   = float(gt_count.sum(dtype=np.float64)   / (n_K * H * W))
+        out["active_frac_pred"] = float(pred_count.sum(dtype=np.float64) / (n_K * H * W))
+
+        out["active_count_gt_mean"]   = float(gt_count.mean(dtype=np.float64))
+        out["active_count_pred_mean"] = float(pred_count.mean(dtype=np.float64))
+
+        exact = pred_count == gt_count
+        out["count_exact_frac"] = float(exact.mean())
+        out["count_under_frac"] = float((pred_count < gt_count).mean())
+        out["count_over_frac"]  = float((pred_count > gt_count).mean())
+
+        for k in range(1, n_K + 1):
+            mask_k = gt_count == k
+            denom  = int(mask_k.sum())
+            if denom > 0:
+                out[f"count_acc_gt{k}"] = float((exact & mask_k).sum() / denom)
+
+        return out
+
     def _mu_ordering_rate(self) -> float:
         pp  = self.result.params_pred
         n_K = self.n_gaussians
@@ -512,6 +551,7 @@ class Metrics:
             metrics.update(self._gaussian_param_metrics())
             metrics.update(self._slot_mu_stats())
             metrics.update(self._placeholder_detection())
+            metrics.update(self._active_count_stats())
 
             metrics["mu_ordering_rate"] = self._mu_ordering_rate()
             metrics.update(self._permutation_consensus())

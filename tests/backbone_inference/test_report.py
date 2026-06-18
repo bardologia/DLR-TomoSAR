@@ -144,6 +144,37 @@ def test_report_assemble_writes_markdown(tmp_path):
     assert "unet" in text
 
 
+def test_report_includes_slot_occupancy_section(tmp_path):
+    gm = _global_metrics()
+
+    report = Report(
+        output_dir       = tmp_path,
+        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
+        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
+        checkpoint_meta  = {"epoch": 0, "best_epoch": 0, "best_val_loss": 1.0},
+        global_metrics   = gm,
+        figure_paths     = {},
+        gif_paths        = {},
+        report_path      = tmp_path / "report.md",
+    )
+
+    text  = report.assemble().read_text(encoding="utf-8")
+    lines = report._build_full_metrics()
+
+    assert "active_frac_gt" in gm
+    assert "Slot occupancy (GT vs Pred)" in text
+    assert "Active-count agreement" in text
+    assert "3.9 Slot occupancy & active count" in "\n".join(lines)
+
+
+def test_report_is_occupancy_key_classifier():
+    assert Report._is_occupancy_key("active_frac_gt")         is True
+    assert Report._is_occupancy_key("count_exact_frac")       is True
+    assert Report._is_occupancy_key("slot_0_active_pred_frac") is True
+    assert Report._is_occupancy_key("slot_0_mu_pred_mean")    is False
+    assert Report._is_occupancy_key("curve_mse_gt")           is False
+
+
 def test_report_is_per_slice_ssim_classifier():
     assert Report._is_per_slice_ssim("ssim_gt_elev_3")    is True
     assert Report._is_per_slice_ssim("elev_mae_gt_7")     is True

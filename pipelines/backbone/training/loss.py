@@ -60,6 +60,7 @@ class Loss:
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
 
         self.log_active_terms(cfg, title="Active Terms")
+        self.log_slot_presence_config(cfg, title="Slot-Presence Loss Config")
 
     @property
     def slot_presence_active(self) -> bool:
@@ -79,6 +80,20 @@ class Loss:
 
         self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title=title)
 
+    def log_slot_presence_config(self, cfg, title: str) -> None:
+        self.logger.kv_table({
+            "presence_balance":         cfg.presence_balance,
+            "active_weight":            cfg.active_weight,
+            "inactive_weight":          cfg.inactive_weight,
+            "amp_focal_gamma":          cfg.amp_focal_gamma,
+            "amp_focal_delta":          cfg.amp_focal_delta,
+            "use_active_normalization": cfg.use_active_normalization,
+            "use_presence_bce":         cfg.use_presence_bce,
+            "weight_presence_bce":      cfg.weight_presence_bce,
+            "presence_bce_balance":     cfg.presence_bce_balance,
+            "presence_gate_thr":        cfg.presence_gate_thr,
+        }, title=title)
+
     def set_curriculum(self, complete_cfg) -> None:
         self.loss_cfg       = complete_cfg
         self.match_strategy = complete_cfg.param_match
@@ -86,6 +101,7 @@ class Loss:
 
         self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
         self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
+        self.log_slot_presence_config(complete_cfg, title="Slot-Presence Loss Config (curriculum complete)")
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         return GaussianCurve.reconstruct(params, self.x_axis, self.gaussian_cfg.params_per_gaussian)

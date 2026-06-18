@@ -272,6 +272,47 @@ def test_placeholder_detection_perfect_classification():
     assert out["placeholder_f1"]        == pytest.approx(1.0, abs=1e-4)
 
 
+def test_active_count_stats_identical_perfect_agreement():
+    H, W   = 6, 6
+    params = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    params[0] = 1.0
+    params[3] = 1.0
+    params[6] = 0.0
+
+    res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=params.copy(), params_gt=params.copy())
+    out = Metrics(res, _x_axis(), N_GAUSSIANS)._active_count_stats()
+
+    assert out["count_exact_frac"]    == pytest.approx(1.0)
+    assert out["count_under_frac"]    == pytest.approx(0.0)
+    assert out["count_over_frac"]     == pytest.approx(0.0)
+    assert out["active_count_gt_mean"] == pytest.approx(2.0)
+    assert out["slot_0_active_gt_frac"] == pytest.approx(1.0)
+    assert out["slot_2_active_gt_frac"] == pytest.approx(0.0)
+    assert out["count_acc_gt2"]       == pytest.approx(1.0)
+    assert "count_acc_gt1" not in out
+
+
+def test_active_count_stats_undercount_when_pred_drops_slot():
+    H, W   = 4, 4
+    gt     = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0] = 1.0
+    gt[3] = 1.0
+
+    pred       = gt.copy()
+    pred[3]    = 0.0
+
+    res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt)
+    out = Metrics(res, _x_axis(), N_GAUSSIANS)._active_count_stats()
+
+    assert out["count_under_frac"]      == pytest.approx(1.0)
+    assert out["count_exact_frac"]      == pytest.approx(0.0)
+    assert out["active_count_pred_mean"] == pytest.approx(1.0)
+    assert out["active_frac_pred"]      == pytest.approx(1.0 / N_GAUSSIANS)
+    assert out["count_acc_gt2"]         == pytest.approx(0.0)
+
+
 def test_mu_ordering_rate_all_ordered():
     H, W   = 5, 5
     params = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)

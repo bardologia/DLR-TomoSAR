@@ -114,6 +114,16 @@ class Report:
         return "\n".join(table.render())
 
     @staticmethod
+    def _gt_pred_table(
+        rows   : List[Tuple[str, Any, Any, str]],
+        header : Tuple[str, str, str, str] = ("Metric", "GT", "Pred", "Description"),
+    ) -> str:
+        table = MarkdownTable(header)
+        for label, gt_val, pred_val, desc in rows:
+            table.add_row(label, Report._fmt(gt_val), Report._fmt(pred_val), desc)
+        return "\n".join(table.render())
+
+    @staticmethod
     def _padded_column(payload: Dict[str, Any], key: str, n_tracks: int) -> list:
         values = payload[key]
         return values if len(values) == n_tracks else [float("nan")] * n_tracks
@@ -260,9 +270,48 @@ class Report:
         ]))
         out.append("")
 
+        out += self._build_active_count_headline()
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
         out += self._build_reduced_headline()
+
+        return out
+
+    def _build_active_count_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "active_frac_gt" not in gm:
+            return []
+
+        n_K = self.run_summary["n_gaussians"]
+        out = ["\n### 2.4 Slot occupancy (GT vs Pred)\n"]
+        out.append(
+            "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude ≥ 1e-3), "
+            "ground truth versus prediction, over the full stitched test cube.\n"
+        )
+
+        rows = [
+            ("Active fraction (all slots)", gm["active_frac_gt"],       gm["active_frac_pred"],       "Share of slot-pixels that are active"),
+            ("Mean active count / pixel",   gm["active_count_gt_mean"], gm["active_count_pred_mean"], "Average number of active Gaussians per pixel"),
+        ]
+        for k in range(n_K):
+            rows.append((f"Slot {k} active fraction", gm[f"slot_{k}_active_gt_frac"], gm[f"slot_{k}_active_pred_frac"], "Active-pixel fraction for this slot"))
+
+        out.append(self._gt_pred_table(rows))
+        out.append("")
+
+        out.append("**Active-count agreement** (predicted vs GT number of active Gaussians per pixel)\n")
+        agree_rows = [
+            ("Exact count", gm["count_exact_frac"], "Pixels where pred count == GT count"),
+            ("Undercount",  gm["count_under_frac"], "Pixels where pred count < GT count"),
+            ("Overcount",   gm["count_over_frac"],  "Pixels where pred count > GT count"),
+        ]
+        for k in range(1, n_K + 1):
+            key = f"count_acc_gt{k}"
+            if key in gm:
+                agree_rows.append((f"Accuracy | GT count = {k}", gm[key], f"Fraction correct among pixels whose GT has {k} active"))
+
+        out.append(self._three_col_table(agree_rows, header=("Metric", "Fraction", "Description")))
+        out.append("")
 
         return out
 
@@ -380,6 +429,10 @@ class Report:
     def _is_reduced_key(k: str) -> bool:
         return ("_red" in k) or k.startswith("ssim_red") or ("predn" in k)
 
+    @staticmethod
+    def _is_occupancy_key(k: str) -> bool:
+        return k.startswith("active_frac") or k.startswith("active_count") or k.startswith("count_") or (k.startswith("slot_") and "_active_" in k)
+
     def _build_full_metrics(self) -> List[str]:
         gm  = self.global_metrics
         out = ["\n## 3. Full metric tables\n"]
@@ -394,6 +447,7 @@ class Report:
             "3.6 Per-pixel (reduced vs GT)":      {},
             "3.7 SSIM summaries (reduced vs GT)": {},
             "3.8 NN improvement over baseline":   {},
+            "3.9 Slot occupancy & active count":  {},
         }
 
         for k, v in sorted(gm.items()):
@@ -403,6 +457,8 @@ class Report:
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
+            elif self._is_occupancy_key(k):
+                groups["3.9 Slot occupancy & active count"][k] = v
             elif self._is_improvement_key(k):
                 groups["3.8 NN improvement over baseline"][k] = v
             elif self._is_reduced_key(k):
