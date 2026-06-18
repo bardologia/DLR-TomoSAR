@@ -1290,7 +1290,7 @@ main { margin-left: var(--navw); }
 .exp-builder { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); margin: 0 0 16px; }
 .exp-builder .special-head { flex-wrap: wrap; row-gap: 8px; }
 .exp-builder__summary { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: nowrap; }
-.exp-builder:not(.is-trials) .exp-builder__body { display: none; }
+.exp-builder:not(.is-trials) .exp-builder__preview { display: none; }
 .exp-builder__body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
 .exp-builder__columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; align-items: start; }
 .exp-col { background: var(--bg-1); border: 1px solid var(--line); border-radius: 2px; }
