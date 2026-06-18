@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from pipelines.backbone.dataset.pipeline import DatasetPipeline
+from pipelines.dataset_pipeline.pipeline import DatasetPipeline
 
 
-class BackboneDatasetPreparation:
+class ProfileDatasetPreparation:
     def __init__(self, dataset_config, trainer_config, run_meta, logger, seed) -> None:
         self.dataset_config = dataset_config
         self.trainer_config = trainer_config
