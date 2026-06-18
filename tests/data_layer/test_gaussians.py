@@ -7,9 +7,38 @@ import torch
 from tools.data.gaussians import (
     GaussianClamp,
     GaussianCurve,
+    GaussianHead,
     GaussianMixture,
     GaussianReconstructor,
 )
+
+
+def test_head_total_channels():
+    assert GaussianHead.total_channels(3, 4, predict_presence=False) == 12
+    assert GaussianHead.total_channels(3, 4, predict_presence=True)  == 16
+
+
+def test_head_split_with_presence():
+    out              = torch.randn(2, 16, 3, 3)
+    params, presence = GaussianHead.split(out, ppg=3, n_gaussians=4)
+    assert params.shape[1]   == 12
+    assert presence.shape[1] == 4
+
+
+def test_head_split_without_presence_returns_none():
+    out              = torch.randn(2, 12, 3, 3)
+    params, presence = GaussianHead.split(out, ppg=3, n_gaussians=4)
+    assert params.shape[1] == 12
+    assert presence is None
+
+
+def test_head_gate_zeros_absent_amplitudes_only():
+    params = torch.ones(1, 12, 1, 1)
+    logits = torch.tensor([10.0, -10.0, 10.0, -10.0]).reshape(1, 4, 1, 1)
+    gated  = GaussianHead.gate(params, logits, ppg=3, n_gaussians=4, threshold=0.5).reshape(1, 4, 3, 1, 1)
+
+    assert gated[0, :, 0, 0, 0].tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert torch.allclose(gated[0, :, 1:], torch.ones(1, 4, 2, 1, 1))
 
 
 def test_safe_sigma_sq_floor():

@@ -101,8 +101,9 @@ class BackboneEntryConfig:
     run_name        : str | None = None
     backbone_name   : str        = "resunet"
     gpu             : int        = 0
-    seed            : int        = 0
-    n_gaussians     : int        = 5
+    seed             : int        = 0
+    n_gaussians      : int        = 5
+    predict_presence : bool       = False
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 

@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from tools                            import PermutationMetrics
+from tools.data.gaussians             import GaussianHead
 from tools.training                   import BaseTrainer, MetricAggregator
 from pipelines.backbone.training.loss import Loss
 from pipelines.backbone.training.docs import TrainingDocs
@@ -125,12 +126,13 @@ class Trainer(BaseTrainer):
         images    = batch[0].to(self.device)
         gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
 
-        pred_params = self.model(images)
-        loss_dict   = self.criterion(pred_params, gt_params)
+        pred_output = self.model(images)
+        loss_dict   = self.criterion(pred_output, gt_params)
 
         if gt_params is not None:
-            pred_phys = self.norm_stats.denormalize_output(pred_params)
-            gt_phys   = self.norm_stats.denormalize_output(gt_params)
+            pred_params, _ = GaussianHead.split(pred_output, self.gaussian_cfg.params_per_gaussian, self.gaussian_cfg.n_default_gaussians)
+            pred_phys      = self.norm_stats.denormalize_output(pred_params)
+            gt_phys        = self.norm_stats.denormalize_output(gt_params)
 
             perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), self.gaussian_cfg.params_per_gaussian)
             aggregator.add_extra(perm_m)

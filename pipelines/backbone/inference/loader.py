@@ -18,7 +18,7 @@ from pipelines.backbone.dataset.datasets      import PatchDataset
 from pipelines.backbone.dataset.normalization import Normalizer, Stats
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
 from tools.data.io                            import FileIO, BackboneModelConfigIO
-from tools.data.gaussians                     import GaussianClamp
+from tools.data.gaussians                     import GaussianClamp, GaussianHead
 from tools.monitoring.logger                  import Logger
 from tools.baselines                          import TrackBaselines, TrackProfiles
 
@@ -62,6 +62,9 @@ class ModelWrapper:
         normalizer=None,
         x_axis: torch.Tensor | None = None,
         amp_max: float | None = None,
+        n_gaussians: int = 0,
+        predict_presence: bool = False,
+        presence_gate_thr: float = 0.5,
     ) -> None:
 
         self._model               = model
@@ -70,6 +73,9 @@ class ModelWrapper:
         self._normalizer          = normalizer
         self._x_axis              = x_axis
         self._amp_max             = amp_max
+        self._n_gaussians         = n_gaussians
+        self._predict_presence    = predict_presence
+        self._presence_gate_thr   = presence_gate_thr
 
     def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
         if self._normalizer is not None:
@@ -92,7 +98,12 @@ class ModelWrapper:
         with torch.no_grad():
             out = self._model(x_t)
 
-        out = self.denormalize_output(out)
+        if self._predict_presence:
+            params, presence_logits = GaussianHead.split(out, self._params_per_gaussian, self._n_gaussians)
+            params_phys             = self.denormalize_output(params)
+            out                     = GaussianHead.gate(params_phys, presence_logits, self._params_per_gaussian, self._n_gaussians, self._presence_gate_thr)
+        else:
+            out = self.denormalize_output(out)
 
         return out.cpu().numpy()
 
@@ -192,7 +203,7 @@ class RunLoader:
 
         return ckpt, x_axis, meta
 
-    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
+    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float, n_gaussians: int, predict_presence: bool) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
@@ -200,6 +211,8 @@ class RunLoader:
             normalizer          = Normalizer(norm_stats),
             x_axis              = torch.from_numpy(x_axis),
             amp_max             = amp_max,
+            n_gaussians         = n_gaussians,
+            predict_presence    = predict_presence,
         )
 
     def _build_dataset(self, dataset_config : DatasetConfig, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
@@ -279,13 +292,15 @@ class RunLoader:
             num_workers = num_workers,
         )
 
-        backbone_name   = str(run_summary["model_name"])
-        in_channels  = int(run_summary["in_channels"])
-        out_channels = int(run_summary["out_channels"])
-        n_gaussians  = out_channels // 3
+        backbone_name      = str(run_summary["model_name"])
+        in_channels        = int(run_summary["in_channels"])
+        out_channels_total = int(run_summary["out_channels"])
+        predict_presence   = bool(run_summary.get("predict_presence", False))
+        n_gaussians        = int(run_summary["n_gaussians"]) if predict_presence else out_channels_total // 3
+        out_channels       = 3 * n_gaussians
 
         ckpt_path = self.run_directory / checkpoint_name
-        model     = self._build_model(backbone_name, in_channels, out_channels, dataset_config.patch.size[0])
+        model     = self._build_model(backbone_name, in_channels, out_channels_total, dataset_config.patch.size[0])
         model     = model.to(device)
 
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
@@ -294,7 +309,7 @@ class RunLoader:
         model.eval()
         norm_stats = Stats.load(self.run_directory / "meta", self.logger)
         gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
-        model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
+        model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max, n_gaussians, predict_presence)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(
             dataset_config = dataset_config,

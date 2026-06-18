@@ -20,6 +20,7 @@ class LossNormalizationConfig:
     coherence_resyn   : float = 1.000000
     covariance_match  : float = 1.000000
     capon_cycle       : float = 1.000000
+    presence_bce      : float = 1.000000
 
 
 @dataclass
@@ -63,6 +64,18 @@ class LossConfig:
 
     param_weights : tuple = (1.0, 1.0, 1.0)
     param_match   : str   = "sort_gt_by_mu"
+
+    use_active_normalization : bool  = False
+    presence_balance         : bool  = False
+    active_weight            : float = 1.0
+    inactive_weight          : float = 1.0
+    amp_focal_gamma          : float = 0.0
+    amp_focal_delta          : float = 0.5
+
+    use_presence_bce     : bool  = False
+    weight_presence_bce  : float = 0.0
+    presence_bce_balance : bool  = True
+    presence_gate_thr    : float = 0.5
 
     amp_zero_thr       : float = 1e-3
     amp_zero_thr_torch : float = 1e-7

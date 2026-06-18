@@ -123,6 +123,32 @@ class GaussianCurve:
         return curves
 
 
+class GaussianHead:
+    @staticmethod
+    def total_channels(ppg: int, n_gaussians: int, predict_presence: bool) -> int:
+        return ppg * n_gaussians + (n_gaussians if predict_presence else 0)
+
+    @staticmethod
+    def split(output: torch.Tensor, ppg: int, n_gaussians: int) -> tuple:
+        param_channels = ppg * n_gaussians
+        params         = output[:, :param_channels]
+        presence       = output[:, param_channels:] if output.shape[1] > param_channels else None
+
+        return params, presence
+
+    @staticmethod
+    def gate(params: torch.Tensor, presence_logits: torch.Tensor, ppg: int, n_gaussians: int, threshold: float = 0.5) -> torch.Tensor:
+        B, C, H, W = params.shape
+
+        p    = params.reshape(B, n_gaussians, ppg, H, W)
+        keep = (torch.sigmoid(presence_logits) > threshold).to(params.dtype).reshape(B, n_gaussians, 1, H, W)
+
+        amp_gated = p[:, :, 0:1] * keep
+        gated     = torch.cat([amp_gated, p[:, :, 1:]], dim=2)
+
+        return gated.reshape(B, C, H, W)
+
+
 class GaussianClamp:
     @staticmethod
     def apply(

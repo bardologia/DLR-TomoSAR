@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as functional
 from torch.utils.data import Dataset
 
-from tools.data.gaussians import GaussianMixture
+from tools.data.gaussians import GaussianHead, GaussianMixture
 
 
 FEED_MODES = ("synthetic", "profile_autoencoder", "image_autoencoder", "backbone")
@@ -257,7 +257,7 @@ class BackboneFeedAdapter:
         from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 
         in_channels  = dataset.input_channels
-        out_channels = gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians
+        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians, gaussian_cfg.predict_presence)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:

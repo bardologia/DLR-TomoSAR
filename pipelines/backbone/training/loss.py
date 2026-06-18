@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import torch
 
-from tools.data.gaussians     import GaussianClamp, GaussianCurve
+from tools.data.gaussians     import GaussianClamp, GaussianCurve, GaussianHead
 from tools.loss.curve_loss    import CurveLoss
 from tools.loss.param_loss    import ParamLoss
 from tools.loss.physical_loss import PhysicalLoss
@@ -100,11 +100,17 @@ class Loss:
         param_mask = torch.ones_like(pred)
         param_mask[:, :, 1:] = active.expand_as(pred[:, :, 1:])
 
+        presence = ParamLoss.presence_scale(active, cfg.presence_balance, cfg.active_weight, cfg.inactive_weight)
+        focal    = ParamLoss.focal_scale(pred[:, :, 0:1], gt[:, :, 0:1], cfg.amp_focal_gamma, cfg.amp_focal_delta)
+
+        elem_w               = weights * param_mask * presence
+        elem_w[:, :, 0:1]    = elem_w[:, :, 0:1] * focal
+
         if kind == "l1":
-            return ParamLoss.l1(pred, gt, weights * param_mask, ["amp", "mu", "sigma"])
+            return ParamLoss.l1(pred, gt, elem_w, ["amp", "mu", "sigma"], cfg.use_active_normalization)
 
         if kind == "huber":
-            return ParamLoss.huber(pred, gt, weights * param_mask, cfg.param_huber_delta), {}
+            return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}
 
         raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1' or 'huber'.")
 
@@ -172,8 +178,27 @@ class Loss:
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
         }
 
-    def __call__(self, pred_params, gt_params):
+    def _presence_term(self, presence_logits, gt_phys):
         cfg = self.loss_cfg
+        ppg = self.gaussian_cfg.params_per_gaussian
+
+        B, C, H, W = gt_phys.shape
+        G          = presence_logits.shape[1]
+        gt         = gt_phys.reshape(B, G, ppg, H, W)
+
+        amp        = gt[:, :, 0]
+        mu         = gt[:, :, 1]
+        active     = amp > cfg.amp_zero_thr
+        sort_key   = torch.where(active, mu, torch.full_like(mu, float("inf")))
+        sort_idx   = torch.argsort(sort_key, dim=1)
+        active_srt = torch.gather(active.to(presence_logits.dtype), dim=1, index=sort_idx)
+
+        return ParamLoss.presence_bce(presence_logits, active_srt, cfg.presence_bce_balance)
+
+    def __call__(self, pred_output, gt_params):
+        cfg = self.loss_cfg
+
+        pred_params, presence_logits = GaussianHead.split(pred_output, self.gaussian_cfg.params_per_gaussian, self.gaussian_cfg.n_default_gaussians)
 
         pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_params, gt_params)
 
@@ -234,6 +259,23 @@ class Loss:
         if self.log_all_losses:
             for pname, pval in per_param_l1.items():
                 monitor[f"param_l1/{pname}_norm"] = pval
+
+        if presence_logits is not None and (cfg.use_presence_bce or self.log_all_losses):
+            if cfg.use_presence_bce:
+                presence_val = self._presence_term(presence_logits, gt_phys)
+            else:
+                with torch.no_grad():
+                    presence_val = self._presence_term(presence_logits, gt_phys)
+
+            if cfg.use_presence_bce:
+                eff_w                      = cfg.eff("weight_presence_bce")
+                components["presence_bce"] = presence_val
+                weighted["presence_bce"]   = eff_w * presence_val
+                total_loss                 = total_loss + weighted["presence_bce"]
+                weight_sum                += eff_w
+
+            if self.log_all_losses:
+                monitor["presence_bce_logit"] = presence_val
 
         if weight_sum > 0.0:
             total_loss = total_loss / weight_sum

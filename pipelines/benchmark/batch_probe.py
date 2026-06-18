@@ -13,6 +13,7 @@ from models                             import BACKBONE_CONFIG_REGISTRY, BACKBON
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 from pipelines.backbone.training.trainer import Trainer
 from pipelines.shared.config_factory     import ConfigFactory
+from tools.data.gaussians                import GaussianHead
 from tools.monitoring.logger             import Logger
 from tools.runtime.reproducibility       import Reproducibility
 
@@ -67,7 +68,7 @@ class MaxBatchProbe:
             setattr(model_config, attribute, value)
 
         in_channels  = dataset.input_channels
-        out_channels = gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians
+        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians, gaussian_cfg.predict_presence)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:

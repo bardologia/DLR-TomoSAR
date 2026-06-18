@@ -136,6 +136,120 @@ def test_match_sort_gt_by_mu_pushes_inactive_last():
     assert last_amp.item() == 0.0
 
 
+def test_match_hungarian_active_realigns_pred():
+    b, g, h, w = 2, 3, 4, 4
+    gt      = _params(20, b, g, h, w)
+    gt_phys = gt.clone()
+    gt_phys[:, :, 0] = 1.0
+
+    perm      = [2, 0, 1]
+    pred      = gt[:, perm].clone()
+    pred_phys = gt_phys[:, perm].clone()
+
+    matched, _, sorted_gt, _ = ParamLoss.match("hungarian_active", pred, pred_phys, gt, gt_phys)
+    assert (matched - sorted_gt).abs().max().item() < 1e-9
+
+
+def test_match_hungarian_active_ignores_inactive_gt():
+    b, g, h, w = 2, 3, 4, 4
+    gt      = _params(21, b, g, h, w)
+    gt_phys = gt.clone()
+    gt_phys[:, :, 0] = 1.0
+    gt_phys[:, 2, :] = 0.0
+
+    perm    = [2, 0, 1]
+    matched, _, sorted_gt, sorted_phys = ParamLoss.match("hungarian_active", gt[:, perm].clone(), gt_phys[:, perm].clone(), gt, gt_phys)
+    active  = sorted_phys[:, :, 0] > 1e-3
+    err     = ((matched - sorted_gt).abs().sum(2) * active)[active.bool()]
+    assert err.max().item() < 1e-9
+
+
+def test_match_hungarian_active_rejects_large_g():
+    b, g, h, w = 1, ParamLoss.MAX_MATCH_GAUSSIANS + 1, 1, 1
+    t = _params(22, b, g, h, w)
+    with pytest.raises(ValueError):
+        ParamLoss.match("hungarian_active", t, t.clone(), t, t.clone())
+
+
+def test_presence_scale_inverse_frequency_upweights_rare_active():
+    b, g, h, w = 2, 3, 4, 4
+    active = torch.zeros(b, g, 1, h, w, dtype=torch.float64)
+    active[:, 0] = 1.0
+
+    scale  = ParamLoss.presence_scale(active, balance=True, active_weight=1.0, inactive_weight=1.0)
+    w_act  = scale[active.bool().expand_as(scale)][0].item()
+    w_inact = scale[(active == 0).expand_as(scale)][0].item()
+    assert w_act > w_inact
+
+
+def test_presence_scale_default_is_identity():
+    active = torch.tensor([1.0, 0.0]).reshape(1, 2, 1, 1, 1)
+    scale  = ParamLoss.presence_scale(active, balance=False, active_weight=1.0, inactive_weight=1.0)
+    assert torch.allclose(scale, torch.ones_like(scale))
+
+
+def test_focal_scale_downweights_easy_zeros():
+    amp_pred  = torch.zeros(1, 1, 1, 1, 1, dtype=torch.float64)
+    amp_big   = torch.ones_like(amp_pred)
+    amp_small = torch.full_like(amp_pred, 1e-3)
+
+    hard = ParamLoss.focal_scale(amp_pred, amp_big,   gamma=2.0, delta=0.5)
+    easy = ParamLoss.focal_scale(amp_pred, amp_small, gamma=2.0, delta=0.5)
+    assert hard.item() > easy.item()
+    assert easy.item() < 1e-3
+
+
+def test_focal_scale_gamma_zero_is_identity():
+    amp_pred = torch.zeros(1, 1, 1, 1, 1, dtype=torch.float64)
+    amp_gt   = torch.ones_like(amp_pred)
+    scale    = ParamLoss.focal_scale(amp_pred, amp_gt, gamma=0.0, delta=0.5)
+    assert torch.allclose(scale, torch.ones_like(scale))
+
+
+def test_active_norm_matches_mean_for_uniform_weights():
+    pred = _params(23)
+    gt   = _params(24)
+    w    = _weights()
+    t_mean, _ = ParamLoss.l1(pred, gt, w, PARAM_NAMES, active_norm=False)
+    t_norm, _ = ParamLoss.l1(pred, gt, w, PARAM_NAMES, active_norm=True)
+    assert abs(t_mean.item() - t_norm.item()) < 1e-9
+
+
+def test_active_norm_rescales_by_active_fraction():
+    pred = _params(25)
+    gt   = _params(26)
+    w    = _weights()
+    w[:, 2:] = 0.0
+
+    t_mean, _ = ParamLoss.l1(pred, gt, w, PARAM_NAMES, active_norm=False)
+    t_norm, _ = ParamLoss.l1(pred, gt, w, PARAM_NAMES, active_norm=True)
+    assert t_norm.item() > t_mean.item()
+
+
+def test_presence_bce_zero_on_confident_correct():
+    logits = torch.tensor([20.0, -20.0, 20.0, -20.0]).reshape(1, 4, 1, 1)
+    target = torch.tensor([1.0, 0.0, 1.0, 0.0]).reshape(1, 4, 1, 1)
+    val    = ParamLoss.presence_bce(logits, target, balance=False)
+    assert val.item() < 1e-6
+
+
+def test_presence_bce_balance_upweights_rare_positive():
+    logits = torch.full((1, 4, 4, 4), -10.0, dtype=torch.float64)
+    target = torch.zeros(1, 4, 4, 4, dtype=torch.float64)
+    target[:, 0] = 1.0
+
+    plain    = ParamLoss.presence_bce(logits, target, balance=False)
+    balanced = ParamLoss.presence_bce(logits, target, balance=True)
+    assert balanced.item() > plain.item()
+
+
+def test_presence_bce_gradient_flow():
+    logits = torch.randn(2, 4, 3, 3, dtype=torch.float64, requires_grad=True)
+    target = (torch.rand(2, 4, 3, 3) > 0.5).double()
+    ParamLoss.presence_bce(logits, target, balance=True).backward()
+    assert torch.isfinite(logits.grad).all()
+
+
 @pytest.mark.real_data
 def test_param_loss_on_real_parameters(parameters):
     win = np.asarray(parameters[:, :8, :8]).astype(np.float64)

@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from models                                  import BACKBONE_IMAGE_SIZE_MODELS
+from tools.data.gaussians                    import GaussianHead
 from configuration.dataset import DatasetConfig
 from configuration.training import BackboneTrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
@@ -104,7 +105,7 @@ class TrainingPipeline:
         train_dataset = datasets["train"]
         in_channels   = train_dataset.input_channels
         n_gaussians   = gaussian_cfg.n_default_gaussians
-        out_channels  = gaussian_cfg.params_per_gaussian * n_gaussians
+        out_channels  = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, n_gaussians, gaussian_cfg.predict_presence)
         x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
 
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
@@ -113,11 +114,13 @@ class TrainingPipeline:
         self.run_metadata.save_model_config(model_cfg, self.backbone_name)
 
         self.run_metadata.save_run_summary(
-            model_name    = self.backbone_name,
-            in_channels   = in_channels,
-            out_channels  = out_channels,
-            x_axis_length = x_axis_length,
-            param_match   = self.trainer_config.curriculum.warmup.param_match,
+            model_name       = self.backbone_name,
+            in_channels      = in_channels,
+            out_channels     = out_channels,
+            x_axis_length    = x_axis_length,
+            param_match      = self.trainer_config.curriculum.warmup.param_match,
+            n_gaussians      = n_gaussians,
+            predict_presence = gaussian_cfg.predict_presence,
         )
 
         trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)
