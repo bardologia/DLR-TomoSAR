@@ -397,10 +397,15 @@ class Metrics:
         out["count_over_frac"]  = float((pred_count > gt_count).mean())
 
         for k in range(1, n_K + 1):
-            mask_k = gt_count == k
-            denom  = int(mask_k.sum())
-            if denom > 0:
-                out[f"count_acc_gt{k}"] = float((exact & mask_k).sum() / denom)
+            gt_mask_k = gt_count == k
+            gt_denom  = int(gt_mask_k.sum())
+            if gt_denom > 0:
+                out[f"count_acc_gt{k}"] = float((exact & gt_mask_k).sum() / gt_denom)
+
+            pred_mask_k = pred_count == k
+            pred_denom  = int(pred_mask_k.sum())
+            if pred_denom > 0:
+                out[f"count_acc_pred{k}"] = float((exact & pred_mask_k).sum() / pred_denom)
 
         return out
 

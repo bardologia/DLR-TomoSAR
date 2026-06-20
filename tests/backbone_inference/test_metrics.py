@@ -290,7 +290,9 @@ def test_active_count_stats_identical_perfect_agreement():
     assert out["slot_0_active_gt_frac"] == pytest.approx(1.0)
     assert out["slot_2_active_gt_frac"] == pytest.approx(0.0)
     assert out["count_acc_gt2"]       == pytest.approx(1.0)
+    assert out["count_acc_pred2"]     == pytest.approx(1.0)
     assert "count_acc_gt1" not in out
+    assert "count_acc_pred1" not in out
 
 
 def test_active_count_stats_undercount_when_pred_drops_slot():

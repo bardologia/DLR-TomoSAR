@@ -31,6 +31,10 @@ class ComparisonReport:
         ("reduced",             "Classical baseline"),
     ]
 
+    SLOT_ALIGNED_SUBDIRS = frozenset({
+        "param_maps", "param_distributions", "param_scatter", "param_error_maps", "slots",
+    })
+
     HEADLINE_METRICS = [
         ("curve_rmse_gt",                "RMSE"),
         ("curve_mae_gt",                 "MAE"),
@@ -188,6 +192,13 @@ class ComparisonReport:
 
         lines  = self.assets.header(f"Figure Comparison – {title}")
         lines += [f"> Figures from the `{subdir}/` directory. Only trials with a completed inference run are shown.\n"]
+        if subdir in self.SLOT_ALIGNED_SUBDIRS:
+            lines += [
+                "> **Slot-aligned (sort-only).** These figures pair predicted slot k with GT slot k, so they are "
+                "only meaningful for sort-matched trials; for Hungarian-matched trials they show the slot "
+                "relabelling, not the error. Compare matching strategies via the permutation-invariant matched "
+                "metrics, not these panels.\n"
+            ]
 
         for name in sorted_names:
             lines.append(f"## `{name}`\n")
