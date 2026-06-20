@@ -235,9 +235,7 @@ class LaunchView {
     },
   };
 
-  static GPU_FIELDS = {
-    infer: ["gpus"],
-  };
+  static GPU_FIELDS = ["gpu", "gpus", "gpu_device_ids"];
 
   constructor(runConsole, project) {
     this.runConsole = runConsole;
@@ -1429,8 +1427,8 @@ class LaunchView {
   }
 
   _isGpuField(leaf) {
-    const fields = LaunchView.GPU_FIELDS[this.key];
-    return fields ? fields.includes(leaf.path) : false;
+    if (leaf.type !== "list" && leaf.type !== "int") return false;
+    return LaunchView.GPU_FIELDS.includes(leaf.path.split(".").pop());
   }
 
   _choicesFor(leaf) {

@@ -261,6 +261,7 @@ class FeedTuner {
     this.paramsPath = "";
     this.configPromise = null;
     this.datasetBase = "";
+    this.gpuCards = null;
   }
 
   enter() {
@@ -329,32 +330,15 @@ class FeedTuner {
   }
 
   async _loadGpus() {
-    const select = this.inputs.gpu;
-    const previous = select.value;
+    const previous = this.gpuCards ? this.gpuCards.value() : [0];
 
-    let gpus = [];
-    try {
-      const sys = await window.apiGet("/api/system");
-      gpus = (sys && sys.gpus) || [];
-    } catch (e) {
-      gpus = [];
-    }
-
-    if (!gpus.length) {
-      select.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<option value="${i}">GPU ${i}</option>`).join("");
+    if (!this.gpuCards) {
+      this.gpuCards = new window.GpuCardSelect(this.inputs.gpu, { multi: false, initial: previous });
     } else {
-      select.innerHTML = gpus
-        .map((gpu) => {
-          const index = gpu.index != null ? gpu.index : 0;
-          const free = gpu.mem_total != null && gpu.mem_used != null ? Math.max(0, gpu.mem_total - gpu.mem_used) : null;
-          const mem = free != null ? ` · ${free.toLocaleString()} MB free` : "";
-          const tag = gpu.others ? " · in use" : gpu.mine ? " · yours" : "";
-          return `<option value="${index}">GPU ${index} · ${gpu.name || "GPU"}${mem}${tag}</option>`;
-        })
-        .join("");
+      this.gpuCards.set(previous);
     }
 
-    if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+    await this.gpuCards.load();
   }
 
   _selectMode(mode) {
@@ -473,7 +457,7 @@ class FeedTuner {
   _overrides() {
     const overrides = {
       mode: this.mode,
-      gpu: String(this.inputs.gpu.value || "0"),
+      gpu: String((this.gpuCards ? this.gpuCards.value()[0] : 0) || 0),
       batch_sizes: this.inputs.batch.value,
       worker_counts: this.inputs.workers.value,
       prefetch_factors: this.inputs.prefetch.value,

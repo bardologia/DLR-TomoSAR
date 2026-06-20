@@ -1299,6 +1299,8 @@ main { margin-left: var(--navw); }
 .gpu-chip[data-tone="busy"] .gpu-chip__id::after  { content: " busy";  color: var(--warn); }
 .gpu-chip[data-tone="mine"] .gpu-chip__id::after  { content: " mine";  color: var(--accent); }
 .gpu-chip[data-tone="offline"] .gpu-chip__id::after { content: " offline"; color: var(--ink-dim); }
+.ft-gpu-board { width: 100%; }
+.ft-gpu-board.gpu-picker__board--chips { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
 
 .exp-builder { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); margin: 0 0 16px; }
 .exp-builder .special-head { flex-wrap: wrap; row-gap: 8px; }
