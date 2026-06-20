@@ -12,9 +12,10 @@ from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
-from tools.data.io            import FileIO
-from tools.data.preprocessing import ProfileNormalizer
-from tools.metrics.scoring    import R2, RelativeImprovement
+from tools.data.io               import FileIO
+from tools.data.preprocessing    import ProfileNormalizer
+from tools.metrics.gaussian_matching import GaussianMatcher
+from tools.metrics.scoring       import R2, RelativeImprovement
 
 
 @dataclass
@@ -493,7 +494,8 @@ class Metrics:
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
-        BIG = 1e7
+
+        sel = GaussianMatcher().assignment(pp, pg, n_K)
 
         amp_pred = np.stack([pp[3 * k]     for k in range(n_K)], axis=0).reshape(n_K, -1)
         mu_pred  = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
@@ -506,12 +508,8 @@ class Metrics:
         act_gt   = amp_gt   >= 1e-3
         gt_count = act_gt.sum(axis=0).astype(np.int64)
 
-        perm_arr   = np.asarray(list(permutations(range(n_K))))
-        perms      = [tuple(p) for p in perm_arr]
-        n_pixels   = gt_count.size
-        chunk_size = 250_000
-
         n_buckets        = n_K + 1
+        rows             = np.arange(gt_count.size)
         sum_mu_ae        = np.zeros(n_buckets, dtype=np.float64)
         sum_mu_se        = np.zeros(n_buckets, dtype=np.float64)
         sum_sig_ae       = np.zeros(n_buckets, dtype=np.float64)
@@ -519,41 +517,25 @@ class Metrics:
         n_matched_bucket = np.zeros(n_buckets, dtype=np.float64)
         tp_bucket        = np.zeros(n_buckets, dtype=np.float64)
 
-        for start in range(0, n_pixels, chunk_size):
-            sl   = slice(start, start + chunk_size)
-            mp   = mu_pred [:, sl].T
-            mg   = mu_gt   [:, sl].T
-            sp   = sig_pred[:, sl].T
-            sg   = sig_gt  [:, sl].T
-            ap   = act_pred[:, sl].T
-            ag   = act_gt  [:, sl].T
-            cnt  = gt_count[sl]
-            rows = np.arange(mp.shape[0])
+        for i in range(n_K):
+            j       = sel[:, i]
+            matched = act_pred[i] & act_gt[j, rows]
+            if not matched.any():
+                continue
 
-            base = np.nan_to_num(np.abs(mp[:, :, None] - mg[:, None, :]), nan=BIG, posinf=BIG)
-            pair = ap[:, :, None] & ag[:, None, :]
-            cost = np.where(pair, base, BIG)
+            jm   = j[matched]
+            rm   = rows[matched]
+            dmu  = np.abs(mu_pred [i, matched] - mu_gt [jm, rm])
+            dsig = np.abs(sig_pred[i, matched] - sig_gt[jm, rm])
+            ck   = gt_count[matched]
+            tp   = ck[dmu <= match_tol]
 
-            sel = perm_arr[self._best_perm_bruteforce(cost, perms, n_K)]
-
-            for i in range(n_K):
-                j       = sel[:, i]
-                matched = ap[:, i] & ag[rows, j]
-                if not matched.any():
-                    continue
-
-                jm   = j[matched]
-                dmu  = np.abs(mp[matched, i] - mg[matched, jm])
-                dsig = np.abs(sp[matched, i] - sg[matched, jm])
-                ck   = cnt[matched]
-                tp   = ck[dmu <= match_tol]
-
-                sum_mu_ae        += np.bincount(ck, weights=dmu,          minlength=n_buckets)
-                sum_mu_se        += np.bincount(ck, weights=dmu * dmu,    minlength=n_buckets)
-                sum_sig_ae       += np.bincount(ck, weights=dsig,         minlength=n_buckets)
-                sum_sig_se       += np.bincount(ck, weights=dsig * dsig,  minlength=n_buckets)
-                n_matched_bucket += np.bincount(ck,                       minlength=n_buckets)
-                tp_bucket        += np.bincount(tp,                       minlength=n_buckets)
+            sum_mu_ae        += np.bincount(ck, weights=dmu,         minlength=n_buckets)
+            sum_mu_se        += np.bincount(ck, weights=dmu * dmu,   minlength=n_buckets)
+            sum_sig_ae       += np.bincount(ck, weights=dsig,        minlength=n_buckets)
+            sum_sig_se       += np.bincount(ck, weights=dsig * dsig, minlength=n_buckets)
+            n_matched_bucket += np.bincount(ck,                      minlength=n_buckets)
+            tp_bucket        += np.bincount(tp,                      minlength=n_buckets)
 
         out: Dict[str, float] = {}
 

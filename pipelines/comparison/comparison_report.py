@@ -32,7 +32,7 @@ class ComparisonReport:
     ]
 
     SLOT_ALIGNED_SUBDIRS = frozenset({
-        "param_maps", "param_distributions", "param_scatter", "param_error_maps", "slots",
+        "param_maps", "param_distributions", "slots",
     })
 
     HEADLINE_METRICS = [

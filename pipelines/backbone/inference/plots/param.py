@@ -10,6 +10,7 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 from pipelines.backbone.inference.plots.base import PlotTools
+from tools.metrics.gaussian_matching          import GaussianMatcher
 
 
 class ParamPlotter(PlotTools):
@@ -167,57 +168,35 @@ class ParamPlotter(PlotTools):
         seed        : int = 0,
     ) -> List[Path]:
 
-        paths = []
+        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        paths   = []
 
         for k in range(n_gaussians):
-            amp_ch         = 3 * k
-            gt_amp_flat    = params_gt[amp_ch].reshape(-1)
-            is_active      = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
-            is_placeholder = np.isfinite(gt_amp_flat) & (gt_amp_flat <  1e-3)
+            gt_amp_flat = params_gt[3 * k].reshape(-1)
+            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
 
             for j, (fname, lbl) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j
                 short = self.PARAM_SHORT[j]
 
-                if ch >= params_gt.shape[0] or ch >= params_pred.shape[0]:
+                if ch >= params_gt.shape[0] or ch >= aligned.shape[0]:
                     continue
 
-                gt_all   = params_gt  [ch].reshape(-1)
-                pred_all = params_pred[ch].reshape(-1)
+                gt_all   = params_gt[ch].reshape(-1)
+                pred_all = aligned  [ch].reshape(-1)
+                matched  = is_active & np.isfinite(pred_all)
+
+                gt, pred = self._paired_subsample([gt_all[matched], pred_all[matched]], max_points, seed)
+                if gt.size == 0:
+                    continue
 
                 fig, ax = plt.subplots(figsize=(4.6, 4.2))
-
-                if j == 0:
-                    g_act,  p_act  = self._paired_subsample([gt_all[is_active],      pred_all[is_active]],      max_points, seed)
-                    g_phld, p_phld = self._paired_subsample([gt_all[is_placeholder], pred_all[is_placeholder]], max_points, seed)
-
-                    if g_act.size == 0 and g_phld.size == 0:
-                        plt.close(fig)
-                        continue
-
-                    if g_act.size > 0:
-                        self._scatter_panel(ax, g_act, p_act, "active")
-
-                    if g_phld.size > 0:
-                        ax.scatter(g_phld, p_phld, s=2, alpha=0.35, color="C1", rasterized=True, label=f"placeholder (n={g_phld.size})")
-
-                    self._identity_line(ax, np.concatenate([g_act, g_phld]), np.concatenate([p_act, p_phld]))
-                    ax.set_title(f"g{k + 1} — {lbl}", fontsize=10)
-
-                else:
-                    gt, pred = self._paired_subsample([gt_all[is_active], pred_all[is_active]], max_points, seed)
-
-                    if gt.size == 0:
-                        plt.close(fig)
-                        continue
-
-                    self._scatter_panel(ax, gt, pred, "active")
-                    self._identity_line(ax, gt, pred)
-                    r2_str = self._r2_value(gt, pred)
-                    ax.set_title(f"g{k + 1} — {lbl}  (R²={r2_str:.3f}, active only)", fontsize=10)
-
+                self._scatter_panel(ax, gt, pred, "matched")
+                self._identity_line(ax, gt, pred)
+                r2_str = self._r2_value(gt, pred)
+                ax.set_title(f"GT g{k + 1} — {lbl}  (matched, R²={r2_str:.3f})", fontsize=10)
                 ax.set_xlabel(f"GT {short}")
-                ax.set_ylabel(f"Pred {short}")
+                ax.set_ylabel(f"Matched pred {short}")
                 ax.legend(fontsize=7, framealpha=0.9)
                 ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
                 fig.tight_layout()
@@ -243,19 +222,22 @@ class ParamPlotter(PlotTools):
         rg_offset   : int,
     ) -> List[Path]:
 
-        H, W   = params_pred.shape[-2:]
-        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
-        paths  = []
+        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        H, W    = params_pred.shape[-2:]
+        extent  = [rg_offset, rg_offset + W, az_offset + H, az_offset]
+        paths   = []
 
         for k in range(n_gaussians):
+            gt_active = params_gt[3 * k] >= 1e-3
+
             for j, (fname, _) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j
                 short = self.PARAM_SHORT[j]
 
-                if ch >= params_gt.shape[0] or ch >= params_pred.shape[0]:
+                if ch >= params_gt.shape[0] or ch >= aligned.shape[0]:
                     continue
 
-                err       = np.abs(params_pred[ch] - params_gt[ch]).astype(np.float32)
+                err       = np.where(gt_active, np.abs(aligned[ch] - params_gt[ch]), np.nan).astype(np.float32)
                 valid_err = err[np.isfinite(err)]
                 if valid_err.size == 0:
                     continue
@@ -264,7 +246,7 @@ class ParamPlotter(PlotTools):
 
                 paths.append(self._imshow_panel(
                     data       = err,
-                    title      = f"|Δ{short}| — g{k + 1}  (p99={vmax:.3g})",
+                    title      = f"|Δ{short}| — GT g{k + 1}  (matched, p99={vmax:.3g})",
                     x_label    = "range index",
                     y_label    = "azimuth index",
                     cbar_label = f"|Δ{short}|",
