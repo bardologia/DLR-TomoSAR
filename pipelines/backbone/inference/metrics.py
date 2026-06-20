@@ -506,7 +506,109 @@ class Metrics:
 
         return best_idx
 
-    def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None, param_space : bool = True) -> Dict[str, float]:
+    def _matched_gaussian_metrics(self, match_tol: float = 5.0) -> Dict[str, float]:
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+        BIG = 1e7
+
+        amp_pred = np.stack([pp[3 * k]     for k in range(n_K)], axis=0).reshape(n_K, -1)
+        mu_pred  = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
+        sig_pred = np.stack([pp[3 * k + 2] for k in range(n_K)], axis=0).reshape(n_K, -1)
+        amp_gt   = np.stack([pg[3 * k]     for k in range(n_K)], axis=0).reshape(n_K, -1)
+        mu_gt    = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
+        sig_gt   = np.stack([pg[3 * k + 2] for k in range(n_K)], axis=0).reshape(n_K, -1)
+
+        act_pred = amp_pred >= 1e-3
+        act_gt   = amp_gt   >= 1e-3
+        gt_count = act_gt.sum(axis=0).astype(np.int64)
+
+        perm_arr   = np.asarray(list(permutations(range(n_K))))
+        perms      = [tuple(p) for p in perm_arr]
+        n_pixels   = gt_count.size
+        chunk_size = 250_000
+
+        n_buckets        = n_K + 1
+        sum_mu_ae        = np.zeros(n_buckets, dtype=np.float64)
+        sum_mu_se        = np.zeros(n_buckets, dtype=np.float64)
+        sum_sig_ae       = np.zeros(n_buckets, dtype=np.float64)
+        sum_sig_se       = np.zeros(n_buckets, dtype=np.float64)
+        n_matched_bucket = np.zeros(n_buckets, dtype=np.float64)
+        tp_bucket        = np.zeros(n_buckets, dtype=np.float64)
+
+        for start in range(0, n_pixels, chunk_size):
+            sl   = slice(start, start + chunk_size)
+            mp   = mu_pred [:, sl].T
+            mg   = mu_gt   [:, sl].T
+            sp   = sig_pred[:, sl].T
+            sg   = sig_gt  [:, sl].T
+            ap   = act_pred[:, sl].T
+            ag   = act_gt  [:, sl].T
+            cnt  = gt_count[sl]
+            rows = np.arange(mp.shape[0])
+
+            base = np.nan_to_num(np.abs(mp[:, :, None] - mg[:, None, :]), nan=BIG, posinf=BIG)
+            pair = ap[:, :, None] & ag[:, None, :]
+            cost = np.where(pair, base, BIG)
+
+            sel = perm_arr[self._best_perm_bruteforce(cost, perms, n_K)]
+
+            for i in range(n_K):
+                j       = sel[:, i]
+                matched = ap[:, i] & ag[rows, j]
+                if not matched.any():
+                    continue
+
+                jm   = j[matched]
+                dmu  = np.abs(mp[matched, i] - mg[matched, jm])
+                dsig = np.abs(sp[matched, i] - sg[matched, jm])
+                ck   = cnt[matched]
+                tp   = ck[dmu <= match_tol]
+
+                sum_mu_ae        += np.bincount(ck, weights=dmu,          minlength=n_buckets)
+                sum_mu_se        += np.bincount(ck, weights=dmu * dmu,    minlength=n_buckets)
+                sum_sig_ae       += np.bincount(ck, weights=dsig,         minlength=n_buckets)
+                sum_sig_se       += np.bincount(ck, weights=dsig * dsig,  minlength=n_buckets)
+                n_matched_bucket += np.bincount(ck,                       minlength=n_buckets)
+                tp_bucket        += np.bincount(tp,                       minlength=n_buckets)
+
+        out: Dict[str, float] = {}
+
+        total_matched = float(n_matched_bucket.sum())
+        total_gt      = float(act_gt.sum())
+        total_pred    = float(act_pred.sum())
+        total_tp      = float(tp_bucket.sum())
+
+        out["matched_mu_mae"]   = float(sum_mu_ae.sum()  / total_matched)          if total_matched > 0 else float("nan")
+        out["matched_mu_rmse"]  = float(np.sqrt(sum_mu_se.sum()  / total_matched)) if total_matched > 0 else float("nan")
+        out["matched_sig_mae"]  = float(sum_sig_ae.sum() / total_matched)          if total_matched > 0 else float("nan")
+        out["matched_sig_rmse"] = float(np.sqrt(sum_sig_se.sum() / total_matched)) if total_matched > 0 else float("nan")
+
+        recall    = total_tp / total_gt   if total_gt   > 0 else float("nan")
+        precision = total_tp / total_pred if total_pred > 0 else float("nan")
+        denom_f1  = recall + precision
+
+        out["matched_recall"]    = float(recall)
+        out["matched_precision"] = float(precision)
+        out["matched_f1"]        = float(2.0 * recall * precision / denom_f1) if denom_f1 > 0 else float("nan")
+        out["matched_n_pairs"]   = total_matched
+        out["matched_tol"]       = float(match_tol)
+
+        pixel_count_hist = np.bincount(gt_count, minlength=n_buckets).astype(np.float64)
+
+        for k in range(1, n_buckets):
+            n_k = n_matched_bucket[k]
+            if n_k > 0:
+                out[f"matched_mu_mae_gt{k}"]  = float(sum_mu_ae[k]  / n_k)
+                out[f"matched_sig_mae_gt{k}"] = float(sum_sig_ae[k] / n_k)
+
+            gt_active_k = k * pixel_count_hist[k]
+            if gt_active_k > 0:
+                out[f"matched_recall_gt{k}"] = float(tp_bucket[k] / gt_active_k)
+
+        return out
+
+    def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None, param_space : bool = True, match_tol : float = 5.0) -> Dict[str, float]:
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
 
@@ -555,6 +657,7 @@ class Metrics:
 
             metrics["mu_ordering_rate"] = self._mu_ordering_rate()
             metrics.update(self._permutation_consensus())
+            metrics.update(self._matched_gaussian_metrics(match_tol=match_tol))
 
         return metrics
 

@@ -271,9 +271,46 @@ class Report:
         out.append("")
 
         out += self._build_active_count_headline()
+        out += self._build_matched_headline()
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
         out += self._build_reduced_headline()
+
+        return out
+
+    def _build_matched_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "matched_mu_mae" not in gm:
+            return []
+
+        n_K = self.run_summary["n_gaussians"]
+        out = ["\n### 2.5 Permutation-invariant matched Gaussian errors\n"]
+        out.append(
+            "Each pixel's predicted Gaussians are Hungarian-matched to its GT Gaussians on |Δμ| before "
+            "scoring, so the errors are independent of slot ordering. A match counts as a detection hit when "
+            f"|Δμ| ≤ {self._fmt(gm['matched_tol'])} elevation units.\n"
+        )
+        out.append(self._three_col_table([
+            ("Matched μ MAE",   gm["matched_mu_mae"],    "Mean |Δμ| over matched pairs (all counts)"),
+            ("Matched μ RMSE",  gm["matched_mu_rmse"],   "Root mean squared Δμ"),
+            ("Matched σ MAE",   gm["matched_sig_mae"],   "Mean |Δσ| over matched pairs"),
+            ("Detection recall",     gm["matched_recall"],    "Share of GT Gaussians matched within tolerance"),
+            ("Detection precision",  gm["matched_precision"], "Share of predicted Gaussians matching a GT within tolerance"),
+            ("Detection F1",         gm["matched_f1"],        "Harmonic mean of recall and precision"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        rows = []
+        for k in range(1, n_K + 1):
+            mae_key = f"matched_mu_mae_gt{k}"
+            rec_key = f"matched_recall_gt{k}"
+            if mae_key in gm or rec_key in gm:
+                rows.append((f"GT count = {k}", gm.get(mae_key, float("nan")), gm.get(rec_key, float("nan")), f"Matched μ MAE and recall among pixels with {k} GT Gaussians"))
+
+        if rows:
+            out.append("**By GT count** (does deep-count recovery place Gaussians correctly, or just fill slots?)\n")
+            out.append(self._gt_pred_table(rows, header=("Stratum", "Matched μ MAE", "Recall", "Description")))
+            out.append("")
 
         return out
 
@@ -448,6 +485,7 @@ class Report:
             "3.7 SSIM summaries (reduced vs GT)": {},
             "3.8 NN improvement over baseline":   {},
             "3.9 Slot occupancy & active count":  {},
+            "3.10 Matched Gaussian errors (permutation-invariant)": {},
         }
 
         for k, v in sorted(gm.items()):
@@ -457,6 +495,8 @@ class Report:
                 continue
             if k in self._DATASET_KEYS:
                 groups["3.1 Dataset statistics"][k] = v
+            elif k.startswith("matched_"):
+                groups["3.10 Matched Gaussian errors (permutation-invariant)"][k] = v
             elif self._is_occupancy_key(k):
                 groups["3.9 Slot occupancy & active count"][k] = v
             elif self._is_improvement_key(k):

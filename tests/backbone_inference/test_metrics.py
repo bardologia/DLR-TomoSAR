@@ -372,6 +372,74 @@ def test_best_perm_bruteforce_picks_identity():
     assert all_perms[int(best[0])] == (0, 1, 2)
 
 
+def _reorder_groups(params: np.ndarray, order: list) -> np.ndarray:
+    K       = len(order)
+    grouped = params.reshape(K, 3, *params.shape[1:])
+    return grouped[order].reshape(K * 3, *params.shape[1:])
+
+
+def _matched(pred, gt, n_gaussians=N_GAUSSIANS, tol=5.0):
+    res = _make_result(np.zeros((N_ELEV, *pred.shape[1:]), np.float32), np.zeros((N_ELEV, *pred.shape[1:]), np.float32), params_pred=pred, params_gt=gt)
+    return Metrics(res, _x_axis(), n_gaussians)._matched_gaussian_metrics(match_tol=tol)
+
+
+def test_matched_identical_is_perfect():
+    H, W   = 6, 6
+    params = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    for k in range(N_GAUSSIANS):
+        params[3 * k]     = 1.0
+        params[3 * k + 1] = float(k * 12)
+        params[3 * k + 2] = 3.0
+
+    out = _matched(params.copy(), params.copy())
+
+    assert out["matched_mu_mae"]  == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_sig_mae"] == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_recall"]    == pytest.approx(1.0, abs=1e-6)
+    assert out["matched_precision"] == pytest.approx(1.0, abs=1e-6)
+
+
+def test_matched_is_invariant_to_pred_slot_permutation():
+    rng    = np.random.default_rng(21)
+    H, W   = 8, 8
+    params = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    for k in range(N_GAUSSIANS):
+        params[3 * k]     = 1.0
+        params[3 * k + 1] = float(k * 20)
+        params[3 * k + 2] = 3.0
+
+    pred = params.copy()
+    for k in range(N_GAUSSIANS):
+        pred[3 * k + 1] += 0.5 * rng.standard_normal((H, W)).astype(np.float32)
+        pred[3 * k + 2] += 0.2 * rng.standard_normal((H, W)).astype(np.float32)
+
+    base = _matched(pred.copy(),                          params.copy())
+    reor = _matched(_reorder_groups(pred, [2, 0, 4, 1, 3]), params.copy())
+
+    assert reor["matched_mu_mae"]  == pytest.approx(base["matched_mu_mae"],  rel=1e-5)
+    assert reor["matched_sig_mae"] == pytest.approx(base["matched_sig_mae"], rel=1e-5)
+    assert reor["matched_recall"]  == pytest.approx(base["matched_recall"],  rel=1e-5)
+
+
+def test_matched_recall_penalises_filler_far_from_gt():
+    H, W = 4, 4
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+    pred = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0], gt[1], gt[2] = 1.0, 0.0,  3.0
+    gt[3], gt[4], gt[5] = 1.0, 40.0, 3.0
+
+    pred[0], pred[1], pred[2] = 1.0, 0.0, 3.0
+    pred[3], pred[4], pred[5] = 1.0, 5.0, 3.0
+
+    out = _matched(pred, gt, tol=5.0)
+
+    assert out["matched_recall_gt2"] == pytest.approx(0.5, abs=1e-6)
+    assert out["matched_mu_mae_gt2"] == pytest.approx((0.0 + 35.0) / 2.0, abs=1e-5)
+
+
 @pytest.mark.real_data
 def test_metrics_identical_real_parameter_window_is_perfect(parameters):
     params = np.asarray(parameters[:, :16, :16], dtype=np.float32)
