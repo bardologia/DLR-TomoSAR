@@ -436,8 +436,9 @@ def test_matched_recall_penalises_filler_far_from_gt():
 
     out = _matched(pred, gt, tol=5.0)
 
-    assert out["matched_recall_gt2"] == pytest.approx(0.5, abs=1e-6)
-    assert out["matched_mu_mae_gt2"] == pytest.approx((0.0 + 35.0) / 2.0, abs=1e-5)
+    assert out["matched_recall_gt2"]    == pytest.approx(0.5, abs=1e-6)
+    assert out["matched_precision_gt2"] == pytest.approx(0.5, abs=1e-6)
+    assert out["matched_mu_mae_gt2"]    == pytest.approx((0.0 + 35.0) / 2.0, abs=1e-5)
 
 
 @pytest.mark.real_data

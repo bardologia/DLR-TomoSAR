@@ -300,16 +300,19 @@ class Report:
         ], header=("Metric", "Value", "Description")))
         out.append("")
 
-        rows = []
-        for k in range(1, n_K + 1):
-            mae_key = f"matched_mu_mae_gt{k}"
-            rec_key = f"matched_recall_gt{k}"
-            if mae_key in gm or rec_key in gm:
-                rows.append((f"GT count = {k}", gm.get(mae_key, float("nan")), gm.get(rec_key, float("nan")), f"Matched μ MAE and recall among pixels with {k} GT Gaussians"))
+        present = [k for k in range(1, n_K + 1) if f"matched_recall_gt{k}" in gm or f"matched_mu_mae_gt{k}" in gm]
 
-        if rows:
-            out.append("**By GT count** (does deep-count recovery place Gaussians correctly, or just fill slots?)\n")
-            out.append(self._gt_pred_table(rows, header=("Stratum", "Matched μ MAE", "Recall", "Description")))
+        if present:
+            out.append("**By GT count** (recall = recovery; precision = filler-free; μ MAE = placement)\n")
+            table = MarkdownTable(("GT count", "Recall ↑", "Precision ↑", "Matched μ MAE ↓"))
+            for k in present:
+                table.add_row(
+                    str(k),
+                    self._fmt(gm.get(f"matched_recall_gt{k}",    float("nan"))),
+                    self._fmt(gm.get(f"matched_precision_gt{k}", float("nan"))),
+                    self._fmt(gm.get(f"matched_mu_mae_gt{k}",    float("nan"))),
+                )
+            out += table.render()
             out.append("")
 
         return out

@@ -121,6 +121,16 @@ class ComparisonReport:
 
         lines  = self.assets.header("Metrics Comparison")
         lines += ["> Best value per metric in **bold** (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
+        lines += [
+            "> **Reading guide.** Sections marked *slot-aligned, sort-only* (Gaussian Parameter Errors, "
+            "Slot Statistics, Placeholder Detection) pair predicted slot k with GT slot k, so they are only "
+            "valid for sort-matched models and are not comparable across matching strategies — for Hungarian "
+            "runs they report the slot relabelling, not the error. Use the *Matched Gaussian "
+            "(Permutation-Invariant)* section for ordering-independent Gaussian accuracy. `count_acc_gt{k}` is "
+            "exact-count agreement (calibration), not scatterer recovery — use `matched_recall_gt{k}`. "
+            "Precision and F1 reward under-prediction (a model that collapses slots to placeholder has few "
+            "false positives), so do not rank trials on them; read them alongside recall.\n"
+        ]
 
         if not scored:
             lines += ["_No inference metrics available._\n"]

@@ -594,7 +594,9 @@ class Metrics:
         out["matched_n_pairs"]   = total_matched
         out["matched_tol"]       = float(match_tol)
 
-        pixel_count_hist = np.bincount(gt_count, minlength=n_buckets).astype(np.float64)
+        pixel_count_hist  = np.bincount(gt_count, minlength=n_buckets).astype(np.float64)
+        pred_active       = act_pred.sum(axis=0).astype(np.float64)
+        pred_active_bucket = np.bincount(gt_count, weights=pred_active, minlength=n_buckets)
 
         for k in range(1, n_buckets):
             n_k = n_matched_bucket[k]
@@ -605,6 +607,9 @@ class Metrics:
             gt_active_k = k * pixel_count_hist[k]
             if gt_active_k > 0:
                 out[f"matched_recall_gt{k}"] = float(tp_bucket[k] / gt_active_k)
+
+            if pred_active_bucket[k] > 0:
+                out[f"matched_precision_gt{k}"] = float(tp_bucket[k] / pred_active_bucket[k])
 
         return out
 
