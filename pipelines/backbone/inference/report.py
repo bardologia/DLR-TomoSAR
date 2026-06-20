@@ -590,12 +590,13 @@ class Report:
 
         out.append("\n## 6. Gaussian parameter analysis\n")
         out.append(
-            "Caveat: figures 6.1, 6.2 and 6.5–6.7 compare predicted slot k against GT slot k, so they assume the "
+            "Caveat: figures 6.1 and 6.5–6.7 compare predicted slot k against GT slot k, so they assume the "
             "canonical (μ-sorted) slot alignment and are only meaningful for sort-matched models — for a "
-            "Hungarian-matched run they show the slot relabelling, not the error. The parameter scatter (6.3), "
-            "parameter error maps (6.4) and active-count map (6.8) are permutation-invariant: the scatter and "
-            "error maps Hungarian-match predicted Gaussians to GT Gaussians per pixel before scoring, so they are "
-            "valid for both matching strategies. For aggregate ordering-independent accuracy see §2.5.\n"
+            "Hungarian-matched run they show the slot relabelling, not the error. The parameter distributions "
+            "(6.2), parameter scatter (6.3), parameter error maps (6.4) and active-count map (6.8) are "
+            "permutation-invariant: the distributions, scatter and error maps Hungarian-match predicted Gaussians "
+            "to GT Gaussians per pixel before scoring, so they are valid for both matching strategies. For "
+            "aggregate ordering-independent accuracy see §2.5.\n"
         )
         self._section(out, (
             ("param_maps",             "6.1 Parameter spatial maps (pred vs GT)"),

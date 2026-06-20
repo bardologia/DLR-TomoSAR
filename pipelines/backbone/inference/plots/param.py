@@ -74,11 +74,13 @@ class ParamPlotter(PlotTools):
         bins        : int = 80,
     ) -> List[Path]:
 
-        paths = []
+        matched     = params_gt is not None
+        pred_source = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians) if matched else params_pred
+        paths       = []
 
         for k in range(n_gaussians):
             amp_ch = 3 * k
-            if params_gt is not None and amp_ch < params_gt.shape[0]:
+            if matched and amp_ch < params_gt.shape[0]:
                 gt_amp_flat = params_gt[amp_ch].reshape(-1)
                 active_mask = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
             else:
@@ -88,7 +90,7 @@ class ParamPlotter(PlotTools):
                 ch    = 3 * k + j
                 short = self.PARAM_SHORT[j]
 
-                pred_flat = params_pred[ch].reshape(-1)
+                pred_flat = pred_source[ch].reshape(-1)
                 if active_mask is not None:
                     pred_flat = pred_flat[active_mask]
                 pred = pred_flat[np.isfinite(pred_flat)]
@@ -127,14 +129,18 @@ class ParamPlotter(PlotTools):
                     ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
 
                 if has_pred:
-                    ax.hist(pred, bins=bin_edges, density=True, color="C3", alpha=0.55, label="Pred", edgecolor="none")
-                    ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med Pred={np.median(pred):.3g}")
+                    pred_label = "Matched pred" if matched else "Pred"
+                    ax.hist(pred, bins=bin_edges, density=True, color="C3", alpha=0.55, label=pred_label, edgecolor="none")
+                    ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med {pred_label}={np.median(pred):.3g}")
+
+                tag   = "GT g" if matched else "g"
+                scope = "matched, active" if matched else "pred only"
 
                 if is_amp:
                     ax.set_xscale("log")
-                    ax.set_title(f"g{k + 1} — {lbl}  (active pixels, full range, max={float(combined.max()):.3g})", fontsize=10)
+                    ax.set_title(f"{tag}{k + 1} — {lbl}  ({scope}, max={float(combined.max()):.3g})", fontsize=10)
                 else:
-                    ax.set_title(f"g{k + 1} — {lbl}  (active pixels only)", fontsize=10)
+                    ax.set_title(f"{tag}{k + 1} — {lbl}  ({scope})", fontsize=10)
 
                 ax.set_xlabel(short)
                 ax.set_ylabel("density")
