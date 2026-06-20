@@ -230,6 +230,9 @@ class LaunchView {
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
+    compare_trials: {
+      run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
+    },
   };
 
   constructor(runConsole, project) {

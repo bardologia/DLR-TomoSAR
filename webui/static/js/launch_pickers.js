@@ -4,8 +4,9 @@ class DatasetPicker {
   static CUSTOM = "__custom__";
 
   static MULTI_MODES = {
-    datasets: { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "nothing selected = every dataset is processed", badge: (d) => (d.has_params ? null : { text: "no params", tone: "warn" }) },
-    runs:     { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "nothing selected = every run is processed",     badge: (d) => (!d.has_checkpoint ? { text: "no checkpoint", tone: "warn" } : d.has_inference ? { text: "inferred", tone: "ok" } : null) },
+    datasets:     { endpoint: "/api/fs/datasets", key: "datasets", noun: "datasets", hint: "nothing selected = every dataset is processed", badge: (d) => (d.has_params ? null : { text: "no params", tone: "warn" }) },
+    runs:         { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "nothing selected = every run is processed",     badge: (d) => (!d.has_checkpoint ? { text: "no checkpoint", tone: "warn" } : d.has_inference ? { text: "inferred", tone: "ok" } : null) },
+    runs_compare: { endpoint: "/api/fs/runs",     key: "runs",     noun: "runs",     hint: "select 2 or more runs to compare",            badge: (d) => (d.has_inference ? { text: "inferred", tone: "ok" } : { text: "no inference", tone: "warn" }) },
   };
 
   constructor(view, leaf, spec) {
