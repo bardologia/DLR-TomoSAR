@@ -1,45 +1,54 @@
 from __future__ import annotations
 
+import argparse
+import sys
 from dataclasses import replace
 from pathlib     import Path
 
 from _bootstrap import EnvironmentPinner
 
 
+def _scheduler() -> None:
+    EnvironmentPinner.threads()
+
+    from configuration.inference                import InferenceEntryConfig
+    from pipelines.backbone.inference.scheduler import InferenceScheduler
+    from tools.runtime.config_cli               import ConfigCli
+
+    config = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected, fanned out across the selected GPUs").apply()
+
+    results = InferenceScheduler(config=config, entry_script=Path(__file__).resolve()).run()
+
+    if any(result.status != "DONE" for result in results):
+        sys.exit(1)
+
+
+def _worker(run_dir: str, config_path: str, gpu_id: int) -> None:
+    EnvironmentPinner.gpu(gpu_id)
+
+    from configuration.inference               import InferenceEntryConfig
+    from pipelines.backbone.inference.pipeline  import InferencePipeline
+    from tools.runtime.config_cli               import ConfigCli
+
+    config   = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
+    pipeline = InferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None))
+    pipeline.run()
+
+
 def main() -> None:
-    from configuration.inference import InferenceEntryConfig
-    from tools.runtime.config_cli import ConfigCli
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--worker",  action="store_true")
+    parser.add_argument("--run-dir", type=str, default=None)
+    parser.add_argument("--config",  type=str, default=None)
+    parser.add_argument("--gpu",     type=int, default=0)
+    args, _ = parser.parse_known_args()
 
-    config = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected").apply()
-
-    EnvironmentPinner.gpus(config.gpus)
-
-    from pipelines.backbone.inference.pipeline import InferencePipeline
-    from tools.monitoring.logger              import Logger
-
-    logs_dir = Path(config.logs_dir)
-
-    run_dirs = sorted(
-        [d for d in logs_dir.iterdir() if d.is_dir()]
-        if not config.run_filter
-        else [logs_dir / name for name in config.run_filter]
-    )
-
-    with Logger(log_dir=str(logs_dir), name="inference") as logger:
-        logger.section("Inference")
-        logger.kv_table({
-            "Runs"     : len(run_dirs),
-            "Logs dir" : str(logs_dir),
-            "Filter"   : config.run_filter or "all run directories",
-        }, title="Configuration")
-
-        for run_dir in run_dirs:
-            logger.subsection(run_dir.name)
-
-            pipeline    = InferencePipeline(replace(config.inference, run_directory=run_dir, output_subdir=None))
-            report_path = pipeline.run()
-
-            logger.info(f"{run_dir.name}  :  {report_path}")
+    if args.worker:
+        if not args.run_dir or not args.config:
+            sys.exit("ERROR: --worker requires --run-dir and --config")
+        _worker(run_dir=args.run_dir, config_path=args.config, gpu_id=args.gpu)
+    else:
+        _scheduler()
 
 
 if __name__ == "__main__":

@@ -9,9 +9,10 @@ from configuration.inference.general import InferenceConfig
 
 @dataclass
 class InferenceEntryConfig:
-    logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
-    run_filter : List[str] = field(default_factory=list)
-    gpus       : List[int] = field(default_factory=lambda: [0])
+    logs_dir        : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter      : List[str] = field(default_factory=list)
+    gpus            : List[int] = field(default_factory=lambda: [0])
+    poll_interval_s : float     = 5.0
 
     inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
         run_directory = Path("."),
