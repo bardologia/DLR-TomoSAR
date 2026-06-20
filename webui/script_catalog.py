@@ -61,6 +61,12 @@ class ScriptCatalog:
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
             "essentials": ["backbone_name", "run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
+        "compare_trials": {
+            "title"     : "Compare Trials",
+            "category"  : "Analysis",
+            "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
+            "essentials": ["runs_dir", "run_tags"],
+        },
         "physics_check": {
             "title"     : "Physics Check",
             "category"  : "Analysis",
@@ -93,6 +99,7 @@ class ScriptCatalog:
         "cross_validate",
         "tune",
         "tune_dataloader",
+        "compare_trials",
         "physics_check",
     ]
 

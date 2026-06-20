@@ -1,0 +1,1 @@
+from configuration.comparison.general import TrialComparisonConfig
