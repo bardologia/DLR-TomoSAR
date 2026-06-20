@@ -134,27 +134,29 @@ class ComparisonReport:
         return out
 
     def _metric_table(self, keys: list[str], scored: list[TrialRecord]) -> list[str]:
-        table = MarkdownTable(["Metric", *[f"`{r.name}`" for r in scored]])
+        headers = ["Run"]
+        best    : dict[str, float | None] = {}
 
         for key in keys:
             direction = MetricOrientation.direction(key)
             arrow     = {"higher": " ↑", "lower": " ↓", None: ""}[direction]
-            values    = [r.metrics.get(key) for r in scored]
-            numeric   = [v for v in (FiniteScalar.coerce(value) for value in values) if v is not None]
+            headers.append(f"`{key}`{arrow}")
 
-            best = None
-            if direction is not None and numeric:
-                best = max(numeric) if direction == "higher" else min(numeric)
+            numeric = [v for v in (FiniteScalar.coerce(r.metrics.get(key)) for r in scored) if v is not None]
+            best[key] = (max(numeric) if direction == "higher" else min(numeric)) if direction is not None and numeric else None
 
-            cells = []
-            for value in values:
+        table = MarkdownTable(headers)
+
+        for r in scored:
+            cells = [f"`{r.name}`"]
+            for key in keys:
+                value  = r.metrics.get(key)
                 cell   = ScalarFormatter.format_scalar(value)
                 finite = FiniteScalar.coerce(value)
-                if best is not None and finite is not None and finite == best:
+                if best[key] is not None and finite is not None and finite == best[key]:
                     cell = f"**{cell}**"
                 cells.append(cell)
-
-            table.add_row(f"`{key}`{arrow}", *cells)
+            table.add_row(*cells)
 
         return [*table.render(), ""]
 
