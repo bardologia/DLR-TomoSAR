@@ -206,10 +206,10 @@ def test_gaussian_param_metrics_identical_zero_error():
 
     out = m._gaussian_param_metrics()
 
-    assert out["gauss_all_mu_mae"]  == pytest.approx(0.0, abs=1e-6)
-    assert out["gauss_all_sig_mae"] == pytest.approx(0.0, abs=1e-6)
     for k in range(N_GAUSSIANS):
         assert out[f"gauss_{k}_n_valid"] == H * W
+        assert out[f"gauss_{k}_mu_mae"]  == pytest.approx(0.0, abs=1e-6)
+        assert out[f"gauss_{k}_sig_mae"] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_gaussian_param_metrics_more_perturbation_worse():
@@ -233,7 +233,7 @@ def test_gaussian_param_metrics_more_perturbation_worse():
     m_lo = Metrics(_make_result(curve, curve, params_pred=pred_lo, params_gt=params), _x_axis(), N_GAUSSIANS)
     m_hi = Metrics(_make_result(curve, curve, params_pred=pred_hi, params_gt=params), _x_axis(), N_GAUSSIANS)
 
-    assert m_lo._gaussian_param_metrics()["gauss_all_mu_mae"] < m_hi._gaussian_param_metrics()["gauss_all_mu_mae"]
+    assert m_lo._gaussian_param_metrics()["gauss_0_mu_mae"] < m_hi._gaussian_param_metrics()["gauss_0_mu_mae"]
 
 
 def test_gaussian_param_metrics_placeholder_excluded():

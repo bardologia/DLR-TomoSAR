@@ -269,13 +269,10 @@ class Metrics:
         }
 
     def _gaussian_param_metrics(self) -> Dict[str, float]:
-        out    : Dict[str, float] = {}
+        out : Dict[str, float] = {}
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
-
-        all_mu_ae  : list[np.ndarray] = []
-        all_sig_ae : list[np.ndarray] = []
 
         for k in range(n_K):
             gt_amp = pg[3 * k]
@@ -286,35 +283,16 @@ class Metrics:
             sg_pred = np.where(valid, pp[3 * k + 2], np.nan)
             sg_gt   = np.where(valid, pg[3 * k + 2], np.nan)
 
-            mu_ae  = np.abs(mu_pred  - mu_gt)
-            sig_ae = np.abs(sg_pred  - sg_gt)
-            mu_se  = (mu_pred  - mu_gt)  ** 2
-            sig_se = (sg_pred  - sg_gt)  ** 2
+            mu_se  = (mu_pred - mu_gt)  ** 2
+            sig_se = (sg_pred - sg_gt)  ** 2
 
             n_valid = int(np.sum(valid))
 
-            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(mu_ae,  dtype=np.float64))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))  if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(sig_ae, dtype=np.float64)) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64))) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(np.abs(mu_pred - mu_gt), dtype=np.float64)) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))         if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(np.abs(sg_pred - sg_gt), dtype=np.float64)) if n_valid > 0 else float("nan")
+            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64)))         if n_valid > 0 else float("nan")
             out[f"gauss_{k}_n_valid"]  = n_valid
-
-            if n_valid > 0:
-                all_mu_ae .append(mu_ae [valid])
-                all_sig_ae.append(sig_ae[valid])
-
-        if all_mu_ae:
-            cat_mu  = np.concatenate(all_mu_ae)
-            cat_sig = np.concatenate(all_sig_ae)
-            out["gauss_all_mu_mae"]   = float(cat_mu .mean(dtype=np.float64))
-            out["gauss_all_mu_rmse"]  = float(np.sqrt((cat_mu  ** 2).mean(dtype=np.float64)))
-            out["gauss_all_sig_mae"]  = float(cat_sig.mean(dtype=np.float64))
-            out["gauss_all_sig_rmse"] = float(np.sqrt((cat_sig ** 2).mean(dtype=np.float64)))
-        else:
-            out["gauss_all_mu_mae"]   = float("nan")
-            out["gauss_all_mu_rmse"]  = float("nan")
-            out["gauss_all_sig_mae"]  = float("nan")
-            out["gauss_all_sig_rmse"] = float("nan")
 
         return out
 
