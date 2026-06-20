@@ -235,6 +235,10 @@ class LaunchView {
     },
   };
 
+  static GPU_FIELDS = {
+    infer: ["gpus"],
+  };
+
   constructor(runConsole, project) {
     this.runConsole = runConsole;
     this.project = project;
@@ -1354,7 +1358,10 @@ class LaunchView {
     let control;
     const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
     const choices    = leaf.editable ? this._choicesFor(leaf) : null;
-    if (pickerSpec && window.DatasetPicker) {
+    if (leaf.editable && this._isGpuField(leaf) && window.GpuPicker) {
+      control = new window.GpuPicker(this, leaf).build();
+      row.classList.add("cfg-edit__row--board");
+    } else if (pickerSpec && window.DatasetPicker) {
       control = new window.DatasetPicker(this, leaf, pickerSpec).build();
       row.classList.add(pickerSpec.multi ? "cfg-edit__row--board" : "cfg-edit__row--wide");
     } else if (choices) {
@@ -1419,6 +1426,11 @@ class LaunchView {
   _pickerSpec(leaf) {
     const specs = LaunchView.PICKERS[this.key];
     return specs ? specs[leaf.path] : null;
+  }
+
+  _isGpuField(leaf) {
+    const fields = LaunchView.GPU_FIELDS[this.key];
+    return fields ? fields.includes(leaf.path) : false;
   }
 
   _choicesFor(leaf) {

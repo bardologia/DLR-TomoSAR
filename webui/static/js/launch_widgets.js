@@ -1443,7 +1443,166 @@ class NumberField {
 }
 
 
+class GpuPicker {
+  constructor(view, leaf) {
+    this.view    = view;
+    this.leaf    = leaf;
+    this.el      = null;
+    this.board   = null;
+    this.note    = null;
+    this.manual  = null;
+    this.gpus    = [];
+    this.chips   = new Map();
+    this._doReset = () => this._paint();
+    this.reset    = () => this._doReset();
+  }
+
+  build() {
+    this.el        = document.createElement("div");
+    this.el.className = "picker gpu-picker";
+
+    const board     = document.createElement("div");
+    board.className = "gpu-picker__board";
+    this.board      = board;
+
+    const note     = document.createElement("p");
+    note.className = "picker__note";
+    note.textContent = "detecting GPUs...";
+    this.note      = note;
+
+    this.el.appendChild(board);
+    this.el.appendChild(note);
+
+    this._load();
+    return { el: this.el, input: this.el, reset: this.reset };
+  }
+
+  async _load() {
+    let payload = null;
+    try {
+      payload = await window.apiGet("/api/system");
+    } catch (e) {
+      payload = null;
+    }
+    this.gpus = payload && Array.isArray(payload.gpus) ? payload.gpus : [];
+    this._render();
+  }
+
+  _selected() {
+    try {
+      const parsed = PythonLiteral.parse(this.view._effective(this.leaf));
+      return new Set(Array.isArray(parsed) ? parsed.map(Number).filter(Number.isFinite) : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  _indices() {
+    const detected = this.gpus.map((gpu) => Number(gpu.index)).filter(Number.isFinite);
+    const merged   = new Set([...detected, ...this._selected()]);
+    return [...merged].sort((a, b) => a - b);
+  }
+
+  _render() {
+    this.board.innerHTML = "";
+    this.chips.clear();
+
+    const indices = this._indices();
+    if (!indices.length) {
+      this._renderManual();
+      return;
+    }
+
+    this.board.classList.add("gpu-picker__board--chips");
+    indices.forEach((index) => this.board.appendChild(this._chip(index)));
+    this._doReset = () => this._paint();
+    this._paint();
+  }
+
+  _chip(index) {
+    const info = this.gpus.find((gpu) => Number(gpu.index) === index) || null;
+
+    const chip       = document.createElement("button");
+    chip.type        = "button";
+    chip.className   = "gpu-chip";
+    chip.title       = `--${this.leaf.path} · cuda:${index}`;
+    chip.dataset.tone = info ? (info.others ? "busy" : info.mine ? "mine" : "free") : "offline";
+
+    const name = info ? info.name : "not detected";
+    const meta = [];
+    if (info && info.util != null)     meta.push(`${info.util}%`);
+    if (info && info.mem_total != null) meta.push(`${Math.round(info.mem_used || 0)}/${Math.round(info.mem_total)} MiB`);
+
+    chip.innerHTML =
+      `<span class="gpu-chip__id">GPU ${index}</span>` +
+      `<span class="gpu-chip__name">${name}</span>` +
+      `<span class="gpu-chip__meta">${meta.join("  ·  ")}</span>`;
+
+    chip.addEventListener("click", () => this._toggle(index));
+    this.chips.set(index, chip);
+    return chip;
+  }
+
+  _toggle(index) {
+    const selected = this._selected();
+    if (selected.has(index)) {
+      if (selected.size <= 1) return;
+      selected.delete(index);
+    } else {
+      selected.add(index);
+    }
+    this._emit(selected);
+  }
+
+  _emit(selected) {
+    const ordered = [...selected].sort((a, b) => a - b);
+    this.view._setValue(this.leaf, PythonLiteral.render(ordered));
+    this._paint();
+  }
+
+  _paint() {
+    const selected = this._selected();
+
+    this.chips.forEach((chip, index) => {
+      const on = selected.has(index);
+      chip.classList.toggle("is-on", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+
+    if (!this.note) return;
+    const ordered = [...selected].sort((a, b) => a - b);
+    this.note.textContent = ordered.length
+      ? `${ordered.length} GPU${ordered.length === 1 ? "" : "s"} selected · CUDA_VISIBLE_DEVICES=${ordered.join(",")}`
+      : "select at least one GPU";
+    this.note.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
+  }
+
+  _renderManual() {
+    this.board.classList.remove("gpu-picker__board--chips");
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input";
+    input.value      = this.view._effective(this.leaf);
+    input.spellcheck = false;
+    input.title      = "no GPUs detected on this host — enter device indices, e.g. [0, 1]";
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== this.leaf.value);
+      this.view._setValue(this.leaf, input.value);
+    });
+
+    this.manual = input;
+    this.board.appendChild(input);
+    this._doReset = () => {
+      input.value = this.leaf.value;
+      input.classList.remove("is-dirty");
+    };
+    if (this.note) this.note.textContent = "no GPUs detected on this host";
+  }
+}
+
+
 window.PythonLiteral     = PythonLiteral;
+window.GpuPicker         = GpuPicker;
 window.NumberField       = NumberField;
 window.LaunchWidgetDom   = LaunchWidgetDom;
 window.ModelTogglePanel  = ModelTogglePanel;

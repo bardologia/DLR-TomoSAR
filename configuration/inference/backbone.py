@@ -11,7 +11,7 @@ from configuration.inference.general import InferenceConfig
 class InferenceEntryConfig:
     logs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     run_filter : List[str] = field(default_factory=list)
-    gpu        : int       = 0
+    gpus       : List[int] = field(default_factory=lambda: [0])
 
     inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(
         run_directory = Path("."),

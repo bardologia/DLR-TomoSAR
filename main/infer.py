@@ -7,14 +7,16 @@ from _bootstrap import EnvironmentPinner
 
 
 def main() -> None:
-    EnvironmentPinner.gpu()
-
     from configuration.inference import InferenceEntryConfig
-    from pipelines.backbone.inference.pipeline    import InferencePipeline
-    from tools.runtime.config_cli                 import ConfigCli
-    from tools.monitoring.logger                  import Logger
+    from tools.runtime.config_cli import ConfigCli
 
-    config   = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected").apply()
+    config = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected").apply()
+
+    EnvironmentPinner.gpus(config.gpus)
+
+    from pipelines.backbone.inference.pipeline import InferencePipeline
+    from tools.monitoring.logger              import Logger
+
     logs_dir = Path(config.logs_dir)
 
     run_dirs = sorted(
