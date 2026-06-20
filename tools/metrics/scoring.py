@@ -41,7 +41,7 @@ class R2:
 
 class MetricOrientation:
 
-    _NEUTRAL_PATTERN = re.compile(r"^(n_pixels|n_elevation|x_axis_|gt_|pred_|slot_\d+_mu_)|_n_valid$|placeholder_(gt|pred)_rate$")
+    _NEUTRAL_PATTERN = re.compile(r"^(n_pixels|n_elevation|x_axis_|gt_|pred_|slot_\d+_mu_)|_n_valid$|placeholder_(gt|pred)_rate$|^matched_(n_pairs|tol)$")
     _LOWER_TOKENS    = ("distance", "_dist", "error", "_err", "loss", "_mse", "_mae", "_rmse")
     _HIGHER_TOKENS   = ("r2", "ssim", "psnr", "cosine", "precision", "recall", "f1", "consensus", "ordering")
 

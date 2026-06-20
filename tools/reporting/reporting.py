@@ -64,6 +64,7 @@ class MetricSectionGrouper:
         ("Slot Statistics",              re.compile(r"^slot_")),
         ("Placeholder Detection",        re.compile(r"^placeholder_")),
         ("Permutation and Ordering",     re.compile(r"^(permutation_|mu_ordering)")),
+        ("Matched Gaussian (Permutation-Invariant)", re.compile(r"^matched_")),
     ]
 
     LEFTOVER_TITLE = "Other Metrics"
