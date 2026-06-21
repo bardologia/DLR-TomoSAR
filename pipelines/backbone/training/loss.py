@@ -73,13 +73,11 @@ class Loss:
 
         for term in LOSS_TERMS:
             if getattr(cfg, term.use_flag):
-                alpha  = getattr(cfg, term.weight_key)
-                eff    = cfg.eff(term.weight_key)
-                factor = getattr(cfg.norm, term.weight_key.removeprefix("weight_"), 1.0)
+                weight = getattr(cfg, term.weight_key)
                 extra  = f"  [axis={cfg.ssim_axis}]" if term.name == "ssim_curve" else ""
-                active_rows.append({"Term": term.name, "Alpha": f"{alpha:g}", "Norm": f"{factor:g}", "Eff": f"{eff:g}{extra}"})
+                active_rows.append({"Term": term.name, "Weight": f"{weight:g}{extra}"})
 
-        self.logger.metrics_table(active_rows, ["Term", "Alpha", "Norm", "Eff"], title=title)
+        self.logger.metrics_table(active_rows, ["Term", "Weight"], title=title)
 
     def log_slot_presence_config(self, cfg, title: str) -> None:
         self.logger.kv_table({
@@ -314,7 +312,7 @@ class Loss:
                     continue
 
             if is_used:
-                eff_w                  = cfg.eff(term.weight_key)
+                eff_w                  = getattr(cfg, term.weight_key)
                 components[term.name] = val
                 weighted[term.name]   = eff_w * val
                 total_loss             = total_loss + weighted[term.name]
@@ -327,7 +325,7 @@ class Loss:
                 monitor[f"{term.name}_{term.space}"] = val
 
         if cfg.use_param_l1:
-            eff_w = cfg.eff("weight_param_l1")
+            eff_w = cfg.weight_param_l1
             for pname, pval in per_param_l1.items():
                 components[f"param_l1/{pname}"] = pval
                 weighted[f"param_l1/{pname}"]   = eff_w * pval
@@ -347,7 +345,7 @@ class Loss:
                     presence_val = self._presence_term(presence_logits, gt_phys)
 
             if cfg.use_presence_bce:
-                eff_w                      = cfg.eff("weight_presence_bce")
+                eff_w                      = cfg.weight_presence_bce
                 components["presence_bce"] = presence_val
                 weighted["presence_bce"]   = eff_w * presence_val
                 total_loss                 = total_loss + weighted["presence_bce"]

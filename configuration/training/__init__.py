@@ -10,7 +10,6 @@ from configuration.training.general import (
     MemoryConfig,
     ResourceConfig,
     PermutationMetricsConfig,
-    LossNormalizationConfig,
     LossConfig,
     LossCurriculumConfig,
     SharedSubConfigInheritance,

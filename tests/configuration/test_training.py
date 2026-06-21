@@ -20,7 +20,6 @@ from configuration.training.general.runtime import (
     PermutationMetricsConfig,
 )
 from configuration.training.general.loss import (
-    LossNormalizationConfig,
     LossConfig,
     LossCurriculumConfig,
 )
@@ -66,7 +65,6 @@ SIMPLE_DEFAULT_CONFIGS = [
     MemoryConfig,
     ResourceConfig,
     PermutationMetricsConfig,
-    LossNormalizationConfig,
     LossConfig,
     LossCurriculumConfig,
     EmbeddingLossConfig,
@@ -131,21 +129,16 @@ def test_early_stopping_patience_positive():
     assert cfg.patience > 0
 
 
-def test_loss_config_eff_scales_weight():
-    cfg = LossConfig(weight_mse_curve=2.0)
-    assert cfg.eff("weight_mse_curve") == pytest.approx(2.0 * cfg.norm.mse_curve)
-
-
-def test_loss_config_eff_unknown_norm_returns_alpha():
-    cfg = LossConfig(weight_param_l1=3.0)
-    assert cfg.eff("weight_param_l1") == pytest.approx(3.0 * cfg.norm.param_l1)
+def test_loss_config_weight_used_directly():
+    cfg = LossConfig(weight_mse_curve=2.0, weight_param_l1=3.0)
+    assert cfg.weight_mse_curve == pytest.approx(2.0)
+    assert cfg.weight_param_l1  == pytest.approx(3.0)
 
 
 def test_loss_config_param_weights_tuple():
     cfg = LossConfig()
     assert isinstance(cfg.param_weights, tuple)
     assert len(cfg.param_weights) == 3
-    assert isinstance(cfg.norm, LossNormalizationConfig)
 
 
 def test_loss_curriculum_holds_two_loss_configs():
@@ -153,11 +146,6 @@ def test_loss_curriculum_holds_two_loss_configs():
     assert isinstance(cfg.warmup, LossConfig)
     assert isinstance(cfg.complete, LossConfig)
     assert cfg.warmup is not cfg.complete
-
-
-def test_loss_normalization_round_trips():
-    cfg = LossNormalizationConfig()
-    assert LossNormalizationConfig(**dataclasses.asdict(cfg)) == cfg
 
 
 def test_train_entry_config_holds_all_modes():

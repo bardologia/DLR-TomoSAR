@@ -806,23 +806,13 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Effective term weight",
-                    "tex"   : r"\mathrm{eff}_j = \alpha_j \cdot \nu_j",
-                    "note"  : "Each enabled term carries a user weight times a fixed empirical normaliser from LossNormalizationConfig (mse 0.2565, l1 0.7994, huber 1.3050, charbonnier 0.7953, cosine 0.1229, coherence 0.1176, ssim 2.4106, param L1 1.0, param huber 5.3999, param mse 1.0, tv 1.5330).",
-                    "vars"  : [
-                        {"sym": r"\mathrm{eff}_j", "desc": "effective weight of term j"},
-                        {"sym": r"\alpha_j",       "desc": "user weight, the weight_* config value"},
-                        {"sym": r"\nu_j",          "desc": "fixed normalisation factor of term j"},
-                    ],
-                },
-                {
                     "title" : "Normalised weighted total loss",
-                    "tex"   : r"\mathcal{L}_{\mathrm{total}} = \frac{\sum_j \mathrm{eff}_j\,\ell_j}{\sum_j \mathrm{eff}_j}",
-                    "note"  : "Sum over enabled terms divided by the total effective weight; returned unnormalised when no term is enabled. A curriculum may swap the whole configuration at a fixed epoch.",
+                    "tex"   : r"\mathcal{L}_{\mathrm{total}} = \frac{\sum_j \alpha_j\,\ell_j}{\sum_j \alpha_j}",
+                    "note"  : "Sum over enabled terms divided by the total weight; returned unnormalised when no term is enabled. Each term's weight is its user-selected weight_* value directly — the user is responsible for scaling terms to comparable magnitude. A curriculum may swap the whole configuration at a fixed epoch.",
                     "vars"  : [
                         {"sym": r"\mathcal{L}_{\mathrm{total}}", "desc": "scalar training loss"},
                         {"sym": r"\ell_j",                       "desc": "raw value of enabled term j"},
-                        {"sym": r"\mathrm{eff}_j",               "desc": "effective weight of term j"},
+                        {"sym": r"\alpha_j",                     "desc": "user weight, the weight_* config value of term j"},
                         {"sym": r"j",                            "desc": "index over enabled terms (use_* = True)"},
                     ],
                 },
@@ -838,11 +828,11 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Loss scale probe — suggested normaliser",
+                    "title" : "Loss scale probe — suggested scale factor",
                     "tex"   : r"\nu_i = \frac{1}{\overline{\ell_i}} \qquad \text{or} \qquad \nu_i = \frac{\overline{\ell_{\mathrm{ref}}}}{\overline{\ell_i}}",
-                    "note"  : "Suggested LossNormalizationConfig values: each term scaled to unit magnitude, or to the magnitude of a chosen reference term.",
+                    "note"  : "Diagnostic only: a scale factor to fold into weight_i so terms reach a comparable magnitude — each term scaled to unit magnitude, or to the magnitude of a chosen reference term.",
                     "vars"  : [
-                        {"sym": r"\nu_i",                          "desc": "suggested normalisation factor of term i"},
+                        {"sym": r"\nu_i",                          "desc": "suggested scale factor to fold into weight_i"},
                         {"sym": r"\overline{\ell_i}",              "desc": "filtered mean raw value of term i"},
                         {"sym": r"\overline{\ell_{\mathrm{ref}}}", "desc": "filtered mean of the chosen reference term"},
                     ],

@@ -4,27 +4,6 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class LossNormalizationConfig:
-    mse_curve         : float = 0.256520
-    l1_curve          : float = 0.799401
-    huber_curve       : float = 1.304963
-    charbonnier_curve : float = 0.795284
-    cosine_curve      : float = 0.122937
-    spectral_coh      : float = 0.117614
-    ssim_curve        : float = 2.410647
-    param_l1          : float = 1.000000
-    param_huber       : float = 5.399934
-    param_mse         : float = 1.000000
-    smoothness_tv     : float = 1.532997
-    total_power       : float = 1.000000
-    moments           : float = 1.000000
-    coherence_resyn   : float = 1.000000
-    covariance_match  : float = 1.000000
-    capon_cycle       : float = 1.000000
-    presence_bce      : float = 1.000000
-
-
-@dataclass
 class LossConfig:
     use_mse_curve    : bool  = False
     weight_mse_curve : float = 1.0
@@ -105,13 +84,6 @@ class LossConfig:
     capon_loading      : float = 1e-2
 
     physics_floor            : float = 1e-3
-
-    norm : LossNormalizationConfig = field(default_factory=LossNormalizationConfig)
-
-    def eff(self, weight_key: str) -> float:
-        alpha       = getattr(self, weight_key)
-        norm_factor = getattr(self.norm, weight_key.removeprefix("weight_"), 1.0)
-        return alpha * norm_factor
 
 
 @dataclass

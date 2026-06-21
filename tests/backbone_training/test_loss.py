@@ -89,8 +89,7 @@ def test_weighted_components_scale_with_eff_weight():
 
     out  = loss(pred, gt)
 
-    eff      = cfg.eff("weight_param_l1")
-    expected = eff * out["components"]["param_l1"].item()
+    expected = cfg.weight_param_l1 * out["components"]["param_l1"].item()
 
     assert out["weighted"]["param_l1"].item() == pytest.approx(expected, rel=1e-5)
 
@@ -257,7 +256,7 @@ def test_total_loss_is_weighted_normalised_mean():
 
     out  = loss(pred, gt)
 
-    weight_sum   = cfg.eff("weight_param_l1") + cfg.eff("weight_mse_curve")
+    weight_sum   = cfg.weight_param_l1 + cfg.weight_mse_curve
     summed       = sum(v.item() for k, v in out["weighted"].items() if "/" not in k)
     expected     = summed / weight_sum
 

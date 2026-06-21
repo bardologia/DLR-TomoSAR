@@ -14,7 +14,6 @@ from configuration.training.general.runtime import (
     PermutationMetricsConfig,
 )
 from configuration.training.general.loss import (
-    LossNormalizationConfig,
     LossConfig,
     LossCurriculumConfig,
 )

@@ -118,7 +118,7 @@ class LossScaleProbe:
         skipped = [name for name, weight in suggested.items() if not math.isfinite(weight)]
 
         for name in sorted(skipped):
-            self.logger.warning(f"Probe term '{name}' has raw mean <= 0 (raw={means[name]:.6f}); no usable suggested weight — do not copy into LossNormalizationConfig.")
+            self.logger.warning(f"Probe term '{name}' has raw mean <= 0 (raw={means[name]:.6f}); no usable suggested weight.")
 
         rows = [
             {
@@ -133,7 +133,7 @@ class LossScaleProbe:
 
         formula = f"raw({ref}) / raw(i)" if ref_val is not None else "1 / raw(i)"
         self.logger.subsection(f"Formula : suggested_weight(i) = {formula}")
-        self.logger.subsection("Update LossNormalizationConfig with these values, then tune weight_* (alpha) freely.")
+        self.logger.subsection("Fold these scale factors into the relevant weight_* terms to bring them to a comparable magnitude.")
 
         if ref is not None and ref not in means:
             self.logger.warning(f"Reference term '{ref}' not found — each term normalised to 1.0 independently.")
