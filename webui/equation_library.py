@@ -772,6 +772,18 @@ class EquationLibrary:
                     ],
                 },
                 {
+                    "title" : "Weighted parameter MSE",
+                    "tex"   : r"\ell_{\mathrm{param\text{-}MSE}} = \operatorname{mean}_{b,k,p,h,w}\!\left(w_p\,m_{b,k,p,h,w}\,\left(\hat{\theta}_{b,k,p,h,w} - \theta_{b,k,p,h,w}\right)^2\right)",
+                    "note"  : "Quadratic counterpart of the parameter loss over the matched effective slots K = min(K_pred, K_GT); penalises large slot errors more strongly than the L1 and Huber variants.",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{param\text{-}MSE}}", "desc": "parameter MSE term value"},
+                        {"sym": r"\hat{\theta}, \theta",             "desc": "predicted and GT parameters (normalised space)"},
+                        {"sym": r"w_p",                              "desc": "per-parameter weight (a, mu, sigma)"},
+                        {"sym": r"m",                                "desc": "activity mask"},
+                        {"sym": r"b, k, p, h, w",                    "desc": "batch, slot, parameter, pixel indices"},
+                    ],
+                },
+                {
                     "title" : "Smoothness (total variation)",
                     "tex"   : r"\ell_{\mathrm{TV}} = \operatorname{mean}_{b,c,h,w}\left|\hat{\theta}_{b,c,h+1,w} - \hat{\theta}_{b,c,h,w}\right| + \operatorname{mean}_{b,c,h,w}\left|\hat{\theta}_{b,c,h,w+1} - \hat{\theta}_{b,c,h,w}\right|",
                     "note"  : "Anisotropic TV in normalised parameter space; the two directional means are computed over their own difference tensors and summed.",
@@ -796,7 +808,7 @@ class EquationLibrary:
                 {
                     "title" : "Effective term weight",
                     "tex"   : r"\mathrm{eff}_j = \alpha_j \cdot \nu_j",
-                    "note"  : "Each enabled term carries a user weight times a fixed empirical normaliser from LossNormalizationConfig (mse 0.2565, l1 0.7994, huber 1.3050, charbonnier 0.7953, cosine 0.1229, coherence 0.1176, ssim 2.4106, param L1 1.0, param huber 5.3999, tv 1.5330).",
+                    "note"  : "Each enabled term carries a user weight times a fixed empirical normaliser from LossNormalizationConfig (mse 0.2565, l1 0.7994, huber 1.3050, charbonnier 0.7953, cosine 0.1229, coherence 0.1176, ssim 2.4106, param L1 1.0, param huber 5.3999, param mse 1.0, tv 1.5330).",
                     "vars"  : [
                         {"sym": r"\mathrm{eff}_j", "desc": "effective weight of term j"},
                         {"sym": r"\alpha_j",       "desc": "user weight, the weight_* config value"},
