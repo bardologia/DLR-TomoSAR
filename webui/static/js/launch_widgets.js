@@ -315,7 +315,7 @@ class ExperimentBuilder {
 
   static MODES = [
     { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
-    { key: "warmup",     label: "warmup only", hint: "curriculum disabled, each warmup loss trains alone" },
+    { key: "warmup",     label: "warmup only", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
@@ -384,6 +384,11 @@ class ExperimentBuilder {
     this.secondaryRows  = [];
     this.patchEl        = null;
     this.patchSizesEl   = null;
+    this.warmupCatalogEl     = null;
+    this.warmupCatalogGridEl = null;
+    this.warmupCountEl       = null;
+    this.warmupCustomEl      = null;
+    this.warmupCustomHeadEl  = null;
     this.presenceEl     = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
@@ -420,6 +425,7 @@ class ExperimentBuilder {
     this.columnEls.complete = columns.appendChild(this._column("complete", "complete losses"));
     body.appendChild(columns);
 
+    if (this.modeLeaf) body.appendChild(this._warmupCatalogPanel());
     if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
     if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
@@ -451,6 +457,7 @@ class ExperimentBuilder {
     this._paintSecondary();
     this._paintPatch();
     this._paintPresence();
+    this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
   }
@@ -862,8 +869,9 @@ class ExperimentBuilder {
     if (this.modeEl) this.modeEl.classList.toggle("is-dirty", this.view.dirty[this.modeLeaf.path] !== undefined);
     if (this.hintEl) this.hintEl.textContent = ExperimentBuilder.MODES.find((entry) => entry.key === mode).hint;
 
-    if (this.columnsEl)          this.columnsEl.hidden          = mode === "secondary" || mode === "patch" || mode === "presence";
+    if (this.columnsEl)          this.columnsEl.hidden          = mode !== "curriculum";
     if (this.columnEls.complete) this.columnEls.complete.hidden = mode !== "curriculum";
+    if (this.warmupCatalogEl)    this.warmupCatalogEl.hidden    = mode !== "warmup";
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
@@ -1038,6 +1046,7 @@ class ExperimentBuilder {
       count.textContent = `${this.variants[which].length} variant${this.variants[which].length === 1 ? "" : "s"}`;
     });
 
+    this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
   }
@@ -1141,6 +1150,179 @@ class ExperimentBuilder {
     row.appendChild(weight);
     row.appendChild(remove);
     return row;
+  }
+
+  _warmupCatalogPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-warmup";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">warmup loss sweep</span><span class="exp-col__count exp-warmup__count"></span>`;
+    this.warmupCountEl = head.querySelector(".exp-warmup__count");
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Check a loss to train it alone as one trial. Expand a checked card to stack extra terms onto that trial.";
+
+    const grid     = document.createElement("div");
+    grid.className = "exp-warmup__grid";
+    this.warmupCatalogGridEl = grid;
+
+    const customHead       = document.createElement("div");
+    customHead.className    = "exp-presence__sub exp-warmup__customhead";
+    customHead.textContent  = "other variants";
+    this.warmupCustomHeadEl = customHead;
+
+    const custom     = document.createElement("div");
+    custom.className = "exp-warmup__custom";
+    this.warmupCustomEl = custom;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(grid);
+    panel.appendChild(customHead);
+    panel.appendChild(custom);
+    this.warmupCatalogEl = panel;
+    return panel;
+  }
+
+  _warmupBindings() {
+    const byTerm = new Map();
+    const custom = [];
+
+    this.variants.warmup.forEach((variant, index) => {
+      const base  = variant.terms[0];
+      const known = base && this.terms.some((term) => term.useKey === base.useKey);
+      if (known && !byTerm.has(base.useKey)) byTerm.set(base.useKey, index);
+      else custom.push(index);
+    });
+
+    return { byTerm, custom };
+  }
+
+  _paintWarmupCatalog() {
+    if (!this.warmupCatalogGridEl) return;
+
+    const { byTerm, custom } = this._warmupBindings();
+
+    this.warmupCatalogGridEl.innerHTML = "";
+    this.terms.forEach((term) => {
+      const index   = byTerm.has(term.useKey) ? byTerm.get(term.useKey) : -1;
+      const variant = index >= 0 ? this.variants.warmup[index] : null;
+      this.warmupCatalogGridEl.appendChild(this._warmupLossCard(term, variant, index));
+    });
+
+    this.warmupCustomEl.innerHTML = "";
+    custom.forEach((index) => this.warmupCustomEl.appendChild(this._card("warmup", this.variants.warmup[index], index)));
+    const hasCustom = custom.length > 0;
+    this.warmupCustomEl.hidden     = !hasCustom;
+    this.warmupCustomHeadEl.hidden = !hasCustom;
+
+    if (this.warmupCountEl) {
+      const n = this.variants.warmup.length;
+      this.warmupCountEl.textContent = `${n} selected = ${n} trial${n === 1 ? "" : "s"}`;
+    }
+  }
+
+  _warmupLossCard(term, variant, index) {
+    const on       = !!variant;
+    const card     = document.createElement("div");
+    card.className = "exp-loss-card" + (on ? " is-on" : "");
+
+    const head     = document.createElement("div");
+    head.className = "exp-loss-card__head";
+
+    const toggle     = document.createElement("button");
+    toggle.type      = "button";
+    toggle.className = "switch exp-loss-card__switch" + (on ? " is-on" : "");
+    toggle.setAttribute("role", "switch");
+    toggle.setAttribute("aria-checked", String(on));
+    toggle.title     = on ? "Drop this loss from the sweep" : "Add this loss as a trial";
+    toggle.innerHTML = `<span class="switch__knob"></span>`;
+    toggle.addEventListener("click", () => this._toggleWarmupLoss(term, index));
+
+    const name       = document.createElement("span");
+    name.className   = "exp-loss-card__name";
+    name.textContent = term.key;
+
+    head.appendChild(toggle);
+    head.appendChild(name);
+    card.appendChild(head);
+
+    if (!on) return card;
+
+    const body     = document.createElement("div");
+    body.className = "exp-loss-card__body";
+
+    const labelRow     = document.createElement("label");
+    labelRow.className = "exp-loss-card__labelrow";
+    labelRow.innerHTML = `<span>label</span>`;
+    const label        = document.createElement("input");
+    label.className    = "cfg-edit__input";
+    label.value        = variant.label;
+    label.spellcheck   = false;
+    label.title        = "variant label, used in the run name";
+    label.addEventListener("change", () => {
+      variant.label = label.value.trim() || variant.label;
+      this._emit("warmup");
+    });
+    labelRow.appendChild(label);
+    body.appendChild(labelRow);
+
+    const baseRow     = document.createElement("div");
+    baseRow.className = "exp-loss-card__base";
+    baseRow.innerHTML = `<span class="exp-loss-card__weightlabel">weight</span>`;
+    const baseWeight       = document.createElement("input");
+    baseWeight.className    = "cfg-edit__input";
+    baseWeight.type        = "number";
+    baseWeight.step        = "any";
+    baseWeight.value       = String(variant.terms[0].weight);
+    baseWeight.spellcheck  = false;
+    baseWeight.title       = "loss weight";
+    baseWeight.addEventListener("change", () => {
+      variant.terms[0].weight = Number(baseWeight.value) || 0;
+      this._emit("warmup");
+    });
+    baseRow.appendChild(baseWeight);
+    body.appendChild(baseRow);
+
+    if (variant.terms.length > 1) {
+      const extras     = document.createElement("div");
+      extras.className = "exp-card__terms";
+      variant.terms.forEach((extra, ti) => {
+        if (ti === 0) return;
+        extras.appendChild(this._termRow("warmup", variant, extra, ti));
+      });
+      body.appendChild(extras);
+    }
+
+    const extrasKeys = Object.keys(variant.extras);
+    if (extrasKeys.length) {
+      const kept       = document.createElement("div");
+      kept.className   = "exp-card__extras";
+      kept.textContent = `raw keys kept: ${extrasKeys.join(", ")}`;
+      body.appendChild(kept);
+    }
+
+    const addTerm = LaunchWidgetDom.mini("Add term", () => {
+      const unused = this.terms.find((candidate) => !variant.terms.some((vt) => vt.useKey === candidate.useKey));
+      const pick   = unused || this.terms[0];
+      variant.terms.push({ useKey: pick.useKey, weightKey: pick.weightKey, weight: pick.defaultWeight });
+      this._emit("warmup");
+    });
+    addTerm.classList.add("exp-card__add");
+    body.appendChild(addTerm);
+
+    card.appendChild(body);
+    return card;
+  }
+
+  _toggleWarmupLoss(term, index) {
+    if (index >= 0) this.variants.warmup.splice(index, 1);
+    else this.variants.warmup.push({ label: this._uniqueLabel("warmup", term.key), terms: [{ useKey: term.useKey, weightKey: term.weightKey, weight: term.defaultWeight }], extras: {} });
+
+    this._emit("warmup");
   }
 
   _paintSummary() {

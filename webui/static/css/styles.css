@@ -1359,6 +1359,24 @@ main { margin-left: var(--navw); }
 .exp-presence__cell { display: inline-flex; align-items: center; gap: 6px; }
 .exp-presence__remove { padding: 0 6px; line-height: 1.4; }
 
+.exp-warmup__count { white-space: nowrap; }
+.exp-warmup__grid { padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; align-items: start; }
+.exp-loss-card { border: 1px solid var(--line); border-radius: 2px; background: var(--surface); padding: 9px 10px; display: flex; flex-direction: column; gap: 8px; }
+.exp-loss-card.is-on { border-color: var(--accent); }
+.exp-loss-card__head { display: flex; align-items: center; gap: 10px; }
+.exp-loss-card__switch { flex: 0 0 auto; }
+.exp-loss-card__name { font-family: var(--mono); font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+.exp-loss-card:not(.is-on) .exp-loss-card__name { color: var(--ink-dim); }
+.exp-loss-card__body { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.exp-loss-card__labelrow { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.exp-loss-card__labelrow input { flex: 1; min-width: 0; }
+.exp-loss-card__base { display: flex; align-items: center; gap: 8px; }
+.exp-loss-card__weightlabel { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.exp-loss-card__base input { width: 96px; }
+.exp-warmup__customhead { padding-top: 4px; }
+.exp-warmup__custom { padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.exp-warmup__customhead[hidden], .exp-warmup__custom[hidden] { display: none; }
+
 .rail-override__change { overflow-wrap: anywhere; }
 .cfg-edit__row--dependent .cfg-edit__name { color: var(--ink-dim); }
 
