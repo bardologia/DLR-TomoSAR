@@ -25,6 +25,7 @@ class CollectingLogger:
         self.warnings    = []
         self.sections    = []
         self.subsections = []
+        self.kv_tables   = []
 
     def warning(self, msg):
         self.warnings.append(msg)
@@ -34,6 +35,9 @@ class CollectingLogger:
 
     def subsection(self, msg):
         self.subsections.append(msg)
+
+    def kv_table(self, data, *args, **kwargs):
+        self.kv_tables.append(dict(data))
 
 
 class RecordingTracker:
@@ -252,7 +256,7 @@ def test_start_logs_startup_info():
     m.stop()
 
     assert any("Resource Monitor" in s for s in logger.sections)
-    assert any("NVML available" in s for s in logger.subsections)
+    assert any("NVML available" in table for table in logger.kv_tables)
 
 
 def test_stop_logs_peak_metrics():
@@ -263,7 +267,7 @@ def test_stop_logs_peak_metrics():
     m.stop()
 
     assert any("Peaks" in s for s in logger.sections)
-    assert any("Total samples" in s for s in logger.subsections)
+    assert any("Total samples" in table for table in logger.kv_tables)
 
 
 def test_stop_without_start_is_safe():
