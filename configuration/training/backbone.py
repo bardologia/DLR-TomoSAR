@@ -15,8 +15,8 @@ from configuration.training.general.runtime     import IOConfig, MemoryConfig, O
 def _default_curriculum() -> LossCurriculumConfig:
     return LossCurriculumConfig(
         enabled  = False,
-        warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-        complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
+        warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True, param_match="hungarian_active"),
+        complete = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True, param_match="hungarian_active"),
     )
 
 
