@@ -161,6 +161,18 @@ class ParamLoss:
         return ParamLoss._reduce(weights * val, weights, active_norm)
 
     @staticmethod
+    def mse(
+        pred        : torch.Tensor,
+        gt          : torch.Tensor,
+        weights     : torch.Tensor,
+        active_norm : bool = False,
+    ) -> torch.Tensor:
+        diff = pred - gt
+        val  = diff * diff
+
+        return ParamLoss._reduce(weights * val, weights, active_norm)
+
+    @staticmethod
     def _reduce(weighted: torch.Tensor, weights: torch.Tensor, active_norm: bool) -> torch.Tensor:
         if active_norm:
             return weighted.sum() / weights.sum().clamp(min=ParamLoss.DENOM_FLOOR)

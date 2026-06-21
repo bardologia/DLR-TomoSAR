@@ -16,7 +16,7 @@ CHARB_E = 1e-3
 
 CURVE_ZERO_AT_IDENTITY = ["mse", "l1", "huber", "cosine", "spectral", "ssim"]
 CURVE_ALL              = CURVE_ZERO_AT_IDENTITY + ["charbonnier"]
-PARAM_ALL              = ["param_l1", "param_huber", "tv"]
+PARAM_ALL              = ["param_l1", "param_huber", "param_mse", "tv"]
 
 
 def _axis():
@@ -82,6 +82,8 @@ def _param(name, p, gt5, weights):
         return PL.l1(p, gt5, weights, ["amp", "mu", "sigma"])[0]
     if name == "param_huber":
         return PL.huber(p, gt5, weights, 0.5)
+    if name == "param_mse":
+        return PL.mse(p, gt5, weights)
     if name == "tv":
         return PL.tv(p)
 
@@ -200,7 +202,7 @@ def test_param_term_forward_finite_nonnegative(parameters, name):
 
 
 @pytest.mark.real_data
-@pytest.mark.parametrize("name", ["param_l1", "param_huber"])
+@pytest.mark.parametrize("name", ["param_l1", "param_huber", "param_mse"])
 def test_param_term_zero_when_prediction_equals_target(parameters, name):
     gt5 = _gt5(parameters)
     w   = _weights(gt5)

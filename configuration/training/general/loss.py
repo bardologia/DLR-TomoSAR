@@ -14,6 +14,7 @@ class LossNormalizationConfig:
     ssim_curve        : float = 2.410647
     param_l1          : float = 1.000000
     param_huber       : float = 5.399934
+    param_mse         : float = 1.000000
     smoothness_tv     : float = 1.532997
     total_power       : float = 1.000000
     moments           : float = 1.000000
@@ -61,6 +62,9 @@ class LossConfig:
     use_param_huber    : bool  = False
     weight_param_huber : float = 0.0
     param_huber_delta  : float = 0.5
+
+    use_param_mse    : bool  = False
+    weight_param_mse : float = 0.0
 
     param_weights : tuple = (1.0, 1.0, 1.0)
     param_match   : str   = "sort_gt_by_mu"

@@ -27,6 +27,7 @@ LOSS_TERMS = (
     LossTerm("covariance_match",   "use_covariance_match",   "weight_covariance_match",   "denorm"),
     LossTerm("capon_cycle",        "use_capon_cycle",        "weight_capon_cycle",        "denorm"),
     LossTerm("param_huber",        "use_param_huber",        "weight_param_huber",        "norm"),
+    LossTerm("param_mse",          "use_param_mse",          "weight_param_mse",          "norm"),
     LossTerm("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv",      "norm"),
     LossTerm("param_l1",           "use_param_l1",           "weight_param_l1",           "norm"),
 )
@@ -133,7 +134,10 @@ class Loss:
         if kind == "huber":
             return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}
 
-        raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1' or 'huber'.")
+        if kind == "mse":
+            return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}
+
+        raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1', 'huber', or 'mse'.")
 
     def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss):
         batch_size, num_channels, height, width = pred_gauss.shape
@@ -196,6 +200,7 @@ class Loss:
             "covariance_match":   lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor),
             "capon_cycle":        lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor),
             "param_huber":        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0],
+            "param_mse":          lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "mse")[0],
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
         }
 
