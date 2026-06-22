@@ -48,6 +48,14 @@ class ComparisonReport:
         ("relative_mse_reduction",       "vs Capon"),
     ]
 
+    COUNT_METRICS = [
+        ("count_exact_frac", "Exact"),
+        ("count_under_frac", "Under"),
+        ("count_over_frac",  "Over"),
+    ]
+
+    PRECISION_BUCKET_PATTERN = re.compile(r"^matched_precision_gt(\d+)$")
+
     def __init__(
         self,
         records        : list[TrialRecord],
@@ -92,9 +100,43 @@ class ComparisonReport:
         if not scored:
             return ["## Leaderboard\n", "_No inference metrics available._\n"]
 
+        headline_intro  = "Mean rank across the headline metrics (1 = best); missing metrics rank last."
+        precision_intro = (
+            "Mean rank of matched (permutation-invariant) precision, per GT scatterer count `k` — the share of "
+            "predicted scatterers that hit a true scatterer where the pixel truly holds `k` (1 = best; missing "
+            "buckets rank last). These are matching-strategy agnostic and so comparable across sort- and "
+            "Hungarian-matched trials. Precision rewards under-prediction, so read it alongside recall, not on its own."
+        )
+        count_intro = (
+            "Mean rank of count calibration (1 = best): `Exact` is the pixel share where the predicted active "
+            "scatterer count equals GT (higher better), `Under` / `Over` are the shares where the model predicts "
+            "too few / too many (lower better). Permutation-invariant; comparable across matching strategies."
+        )
+
+        lines  = self._rank_section("Leaderboard",            headline_intro,  self.HEADLINE_METRICS,            scored)
+        lines += self._rank_section("Per-Gaussian Precision",  precision_intro, self._precision_metrics(scored),  scored)
+        lines += self._rank_section("Count Calibration",       count_intro,     self.COUNT_METRICS,               scored)
+        return lines
+
+    def _precision_metrics(self, scored: list[TrialRecord]) -> list[tuple[str, str]]:
+        buckets: set[int] = set()
+        for r in scored:
+            for key in r.metrics:
+                match = self.PRECISION_BUCKET_PATTERN.match(key)
+                if match:
+                    buckets.add(int(match.group(1)))
+
+        metrics = [("matched_precision", "Overall")]
+        metrics += [(f"matched_precision_gt{k}", f"k={k}") for k in sorted(buckets)]
+        return metrics
+
+    def _rank_section(self, title: str, intro: str, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> list[str]:
+        if not metrics:
+            return [f"## {title}\n", "_No applicable metrics available._\n"]
+
         ranks: dict[str, dict[str, int]] = {r.name: {} for r in scored}
 
-        for key, _ in self.HEADLINE_METRICS:
+        for key, _ in metrics:
             valued  = [(r.name, value) for r in scored if (value := FiniteScalar.coerce(r.metrics.get(key))) is not None]
             reverse = MetricOrientation.direction(key) == "higher"
             ordered = sorted(valued, key=lambda item: item[1], reverse=reverse)
@@ -104,16 +146,16 @@ class ComparisonReport:
 
         worst      = len(scored) + 1
         mean_ranks = {
-            name: sum(ranks[name].get(key, worst) for key, _ in self.HEADLINE_METRICS) / len(self.HEADLINE_METRICS)
+            name: sum(ranks[name].get(key, worst) for key, _ in metrics) / len(metrics)
             for name in ranks
         }
 
-        lines = ["## Leaderboard\n", "Mean rank across the headline metrics (1 = best); missing metrics rank last.\n"]
+        lines = [f"## {title}\n", f"{intro}\n"]
 
-        table = MarkdownTable(["Rank", "Run", "Mean rank", *[label for _, label in self.HEADLINE_METRICS]])
+        table = MarkdownTable(["Rank", "Run", "Mean rank", *[label for _, label in metrics]])
 
         for position, name in enumerate(sorted(mean_ranks, key=mean_ranks.get), start=1):
-            cells = [str(ranks[name].get(key, "—")) for key, _ in self.HEADLINE_METRICS]
+            cells = [str(ranks[name].get(key, "—")) for key, _ in metrics]
             table.add_row(position, f"`{name}`", f"{mean_ranks[name]:.2f}", *cells)
 
         lines += table.render()
