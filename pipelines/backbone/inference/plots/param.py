@@ -14,57 +14,6 @@ from tools.metrics.gaussian_matching          import GaussianMatcher
 
 
 class ParamPlotter(PlotTools):
-    def plot_param_maps(
-        self,
-        params_pred : np.ndarray,
-        params_gt   : Optional[np.ndarray],
-        n_gaussians : int,
-        out_dir     : Path,
-        az_offset   : int,
-        rg_offset   : int,
-    ) -> List[Path]:
-
-        H, W   = params_pred.shape[-2:]
-        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
-        paths  = []
-
-        for k in range(n_gaussians):
-            for j, (fname, short) in enumerate(zip(("a", "mu", "sigma"), self.PARAM_SHORT)):
-                ch       = 3 * k + j
-                arr_pred = params_pred[ch]
-                vmin, vmax = self._shared_clim(arr_pred if params_gt is None else np.stack([arr_pred, params_gt[ch]]))
-
-                paths.append(self._imshow_panel(
-                    data       = arr_pred,
-                    title      = f"Pred {short} — g{k + 1}",
-                    x_label    = "range index",
-                    y_label    = "azimuth index",
-                    cbar_label = short,
-                    extent     = extent,
-                    cmap       = "jet",
-                    vmin       = vmin,
-                    vmax       = vmax,
-                    origin     = "upper",
-                    path       = out_dir / f"g{k + 1}_{fname}_pred.png",
-                ))
-
-                if params_gt is not None and ch < params_gt.shape[0]:
-                    paths.append(self._imshow_panel(
-                        data       = params_gt[ch],
-                        title      = f"GT {short} — g{k + 1}",
-                        x_label    = "range index",
-                        y_label    = "azimuth index",
-                        cbar_label = short,
-                        extent     = extent,
-                        cmap       = "jet",
-                        vmin       = vmin,
-                        vmax       = vmax,
-                        origin     = "upper",
-                        path       = out_dir / f"g{k + 1}_{fname}_gt.png",
-                    ))
-
-        return paths
-
     def plot_param_distributions(
         self,
         params_pred : np.ndarray,

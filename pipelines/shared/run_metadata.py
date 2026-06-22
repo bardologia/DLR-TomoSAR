@@ -75,7 +75,7 @@ class TrainingRunMetadata:
 
         return out_path
 
-    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int, param_match: str = "none", n_gaussians: int = 0, predict_presence: bool = False) -> Path:
+    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int, n_gaussians: int = 0, predict_presence: bool = False) -> Path:
         out_path = self.metadata_directory / "run_summary.json"
 
         payload  = {
@@ -86,7 +86,6 @@ class TrainingRunMetadata:
             "run_directory"    : str(self.run_directory),
             "framework"        : "pytorch",
             "n_devices"        : torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "param_match"      : param_match,
             "n_gaussians"      : n_gaussians,
             "predict_presence" : predict_presence,
         }

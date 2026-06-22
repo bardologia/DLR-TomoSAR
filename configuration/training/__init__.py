@@ -9,7 +9,6 @@ from configuration.training.general import (
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
-    PermutationMetricsConfig,
     LossConfig,
     LossCurriculumConfig,
     SharedSubConfigInheritance,

@@ -198,14 +198,14 @@ def test_grouper_no_empty_sections():
 
 def test_grouper_section_order_follows_definition():
     grouper = MetricSectionGrouper()
-    keys    = ["gauss_x", "n_pixels", "ssim_y"]
+    keys    = ["matched_mu_mae", "n_pixels", "ssim_y"]
     titles  = [t for t, _ in grouper.group(keys)]
 
     def idx(prefix):
         return next(i for i, t in enumerate(titles) if t.startswith(prefix))
 
     assert idx("Dataset Statistics") < idx("SSIM")
-    assert idx("SSIM") < idx("Gaussian Parameter Errors")
+    assert idx("SSIM") < idx("Matched Gaussian")
 
 
 @pytest.mark.real_data

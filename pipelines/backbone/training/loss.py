@@ -50,12 +50,9 @@ class Loss:
 
         cfg = self.loss_cfg
 
-        self.match_strategy = cfg.param_match
-
         self.logger.section("[Loss Function]")
         self.logger.kv_table({
             "Sample points":  x_axis.shape[0],
-            "Param matching": cfg.param_match,
             "Log all losses": self.log_all_losses,
         })
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
@@ -95,7 +92,6 @@ class Loss:
 
     def set_curriculum(self, complete_cfg) -> None:
         self.loss_cfg       = complete_cfg
-        self.match_strategy = complete_cfg.param_match
         self.loss_generation += 1
 
         self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
@@ -149,7 +145,7 @@ class Loss:
         gt      = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
         gt_phys = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
 
-        pred, pred_phys, gt, gt_phys = ParamMatcher.match(self.match_strategy, pred, pred_phys, gt, gt_phys)
+        pred, pred_phys, gt, gt_phys = ParamMatcher.match(pred, pred_phys, gt, gt_phys)
 
         effective_gaussians = min(num_gaussians, gt_gaussians)
 

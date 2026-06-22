@@ -59,20 +59,18 @@ class SlotPresenceTrialPlanner:
 
     ENTRY_KEYS = ("predict_presence",)
 
-    def __init__(self, model_name: str, presence_trials: dict, match_strategies: dict) -> None:
-        self.model_name       = model_name
-        self.presence_trials  = presence_trials
-        self.match_strategies = match_strategies
+    def __init__(self, model_name: str, presence_trials: dict) -> None:
+        self.model_name      = model_name
+        self.presence_trials = presence_trials
 
     def summary(self) -> dict:
         return {
-            "Presence trials"  : len(self.presence_trials),
-            "Match strategies" : list(self.match_strategies.values()),
-            "Total runs"       : len(self.presence_trials) * len(self.match_strategies),
+            "Presence trials" : len(self.presence_trials),
+            "Total runs"      : len(self.presence_trials),
         }
 
-    def _overrides(self, spec: dict, param_match: str) -> dict:
-        overrides = {"curriculum.enabled": False, "curriculum.warmup.param_match": param_match}
+    def _overrides(self, spec: dict) -> dict:
+        overrides = {"curriculum.enabled": False}
 
         for key, value in spec.items():
             if key in self.ENTRY_KEYS:
@@ -86,9 +84,8 @@ class SlotPresenceTrialPlanner:
         plans = []
 
         for trial_label, spec in self.presence_trials.items():
-            for match_label, param_match in self.match_strategies.items():
-                run_name = f"{self.model_name}_pr-{trial_label}-{match_label}"
-                plans.append((run_name, self._overrides(spec, param_match)))
+            run_name = f"{self.model_name}_pr-{trial_label}"
+            plans.append((run_name, self._overrides(spec)))
 
         return plans
 

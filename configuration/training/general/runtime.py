@@ -44,9 +44,3 @@ class ResourceConfig:
     warn_swap_pct      : float = 50.0
     warn_shm_pct       : float = 80.0
     warn_cooldown_sec  : float = 30.0
-
-
-@dataclass
-class PermutationMetricsConfig:
-    enabled       : bool  = True
-    amp_threshold : float = 1e-3

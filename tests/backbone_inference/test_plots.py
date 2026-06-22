@@ -82,17 +82,6 @@ def test_plottools_intensity_scale_normalize():
     assert tools_no._intensity_scale(ref) == 1.0
 
 
-def test_param_plotter_maps(tmp_path):
-    params = _params()
-    plotter = ParamPlotter()
-
-    paths = plotter.plot_param_maps(
-        params_pred=params, params_gt=params, n_gaussians=N_GAUSSIANS,
-        out_dir=tmp_path, az_offset=0, rg_offset=0,
-    )
-    _assert_files(paths)
-
-
 def test_param_plotter_distributions(tmp_path):
     params = _params()
     plotter = ParamPlotter()
@@ -128,44 +117,6 @@ def test_param_scatter_r2_value_exact():
     gt   = np.array([1.0, 2.0, 3.0, 4.0])
     pred = gt.copy()
     assert ParamPlotter._r2_value(gt, pred) == pytest.approx(1.0, abs=1e-9)
-
-
-def _slot_metrics():
-    gm = {}
-    for k in range(N_GAUSSIANS):
-        gm[f"slot_{k}_mu_pred_mean"]            = float(k * 10)
-        gm[f"slot_{k}_mu_pred_std"]             = 2.0
-        gm[f"slot_{k}_mu_gt_mean"]              = float(k * 10 + 1)
-        gm[f"slot_{k}_mu_gt_std"]               = 2.5
-        gm[f"slot_{k}_placeholder_precision"]   = 0.9
-        gm[f"slot_{k}_placeholder_recall"]      = 0.8
-        gm[f"slot_{k}_placeholder_f1"]          = 0.85
-        gm[f"slot_{k}_placeholder_gt_rate"]     = 0.3
-    gm["placeholder_precision"] = 0.88
-    gm["placeholder_recall"]    = 0.82
-    gm["placeholder_f1"]        = 0.85
-    gm["mu_ordering_rate"]      = 0.7
-    gm["permutation_consensus_dominant_frac"] = 0.6
-    gm["permutation_consensus_identity_frac"] = 0.5
-    return gm
-
-
-def test_slot_plotter_mu_distributions(tmp_path):
-    plotter = SlotPlotter()
-    paths   = plotter.plot_slot_mu_distributions(_slot_metrics(), N_GAUSSIANS, tmp_path)
-    _assert_files(paths)
-
-
-def test_slot_plotter_placeholder_detection(tmp_path):
-    plotter = SlotPlotter()
-    paths   = plotter.plot_placeholder_detection(_slot_metrics(), N_GAUSSIANS, tmp_path)
-    _assert_files(paths)
-
-
-def test_slot_plotter_ordering_summary(tmp_path):
-    plotter = SlotPlotter()
-    paths   = plotter.plot_slot_ordering_summary(_slot_metrics(), N_GAUSSIANS, tmp_path)
-    _assert_files(paths)
 
 
 def test_slot_plotter_active_count_map(tmp_path):

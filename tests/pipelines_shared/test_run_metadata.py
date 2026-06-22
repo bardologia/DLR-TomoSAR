@@ -63,14 +63,13 @@ def test_save_run_summary_payload(tmp_path):
     meta = TrainingRunMetadata(_trainer_config(), "swin", tmp_path, run_name="run_sum", logger=_logger(tmp_path))
 
     try:
-        out_path = meta.save_run_summary("swin", in_channels=9, out_channels=15, x_axis_length=150, param_match="size")
+        out_path = meta.save_run_summary("swin", in_channels=9, out_channels=15, x_axis_length=150)
         payload  = json.loads(out_path.read_text())
 
         assert payload["model_name"]    == "swin"
         assert payload["in_channels"]   == 9
         assert payload["out_channels"]  == 15
         assert payload["x_axis_length"] == 150
-        assert payload["param_match"]   == "size"
         assert payload["run_directory"] == str(meta.run_directory)
     finally:
         meta.close()

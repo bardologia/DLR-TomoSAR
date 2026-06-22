@@ -590,23 +590,16 @@ class Report:
 
         out.append("\n## 6. Gaussian parameter analysis\n")
         out.append(
-            "Caveat: figures 6.1 and 6.5–6.7 compare predicted slot k against GT slot k, so they assume the "
-            "canonical (μ-sorted) slot alignment and are only meaningful for sort-matched models — for a "
-            "Hungarian-matched run they show the slot relabelling, not the error. The parameter distributions "
-            "(6.2), parameter scatter (6.3), parameter error maps (6.4) and active-count map (6.8) are "
-            "permutation-invariant: the distributions, scatter and error maps Hungarian-match predicted Gaussians "
-            "to GT Gaussians per pixel before scoring, so they are valid for both matching strategies. For "
-            "aggregate ordering-independent accuracy see §2.5.\n"
+            "All parameter figures are permutation-invariant: the distributions (6.1), scatter (6.2) and "
+            "error maps (6.3) Hungarian-match predicted Gaussians to GT Gaussians per pixel before scoring, "
+            "and the active-count map (6.4) compares counts only. For aggregate ordering-independent accuracy "
+            "see §2.5.\n"
         )
         self._section(out, (
-            ("param_maps",             "6.1 Parameter spatial maps (pred vs GT)"),
-            ("param_distributions",    "6.2 Parameter distributions (GT vs Pred)"),
-            ("param_scatter",          "6.3 Parameter scatter plots (GT vs Pred, with R²)"),
-            ("param_error_maps",       "6.4 Parameter absolute-error maps |Pred − GT|"),
-            ("slot_mu_distributions",  "6.5 Slot μ distributions (GT vs Pred per slot)"),
-            ("placeholder_detection",  "6.6 Placeholder detection (precision / recall per slot)"),
-            ("slot_ordering_summary",  "6.7 Slot ordering summary"),
-            ("active_count_map",       "6.8 Active Gaussian count map"),
+            ("param_distributions",    "6.1 Parameter distributions (GT vs Pred)"),
+            ("param_scatter",          "6.2 Parameter scatter plots (GT vs Pred, with R²)"),
+            ("param_error_maps",       "6.3 Parameter absolute-error maps |Pred − GT|"),
+            ("active_count_map",       "6.4 Active Gaussian count map"),
         ))
 
         slice_groups = [(key, title) for key, title in (

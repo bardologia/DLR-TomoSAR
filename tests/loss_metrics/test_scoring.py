@@ -65,7 +65,7 @@ def test_orientation_lower_tokens():
 def test_orientation_higher_tokens():
     assert MetricOrientation.direction("r2_curve") == "higher"
     assert MetricOrientation.direction("ssim_elevation") == "higher"
-    assert MetricOrientation.higher_is_better("placeholder_f1") is True
+    assert MetricOrientation.higher_is_better("matched_f1") is True
     assert MetricOrientation.direction("count_acc_gt3")   == "higher"
     assert MetricOrientation.direction("count_acc_pred3") == "higher"
     assert MetricOrientation.direction("count_exact_frac") == "higher"
@@ -74,7 +74,7 @@ def test_orientation_higher_tokens():
 def test_orientation_neutral_returns_none():
     assert MetricOrientation.direction("n_pixels") is None
     assert MetricOrientation.direction("gt_amp") is None
-    assert MetricOrientation.direction("placeholder_gt_rate") is None
+    assert MetricOrientation.direction("matched_n_pairs") is None
     assert MetricOrientation.higher_is_better("n_pixels") is None
     assert MetricOrientation.direction("active_count_pred_mean")  is None
     assert MetricOrientation.direction("active_frac_pred")        is None

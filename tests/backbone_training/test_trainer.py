@@ -166,7 +166,7 @@ def test_curriculum_swap_replaces_loss_config(tmp_path):
 
     config.curriculum.enabled    = True
     config.curriculum.swap_epoch = 0
-    config.curriculum.complete   = LossConfig(use_mse_curve=True, weight_mse_curve=1.0, param_match="none")
+    config.curriculum.complete   = LossConfig(use_mse_curve=True, weight_mse_curve=1.0)
 
     logger     = Logger(log_dir=str(tmp_path / "logs"), name="curr", level="ERROR")
     norm_stats = identity_normalizer(6)
@@ -176,4 +176,3 @@ def test_curriculum_swap_replaces_loss_config(tmp_path):
 
     assert swapped is True
     assert trainer.criterion.loss_generation == 1
-    assert trainer.criterion.match_strategy  == "none"

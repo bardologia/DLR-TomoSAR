@@ -3,12 +3,10 @@ from __future__ import annotations
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses        import dataclass
-from itertools          import permutations
 from pathlib            import Path
 from typing             import Dict, Optional, Tuple
 
 import numpy         as np
-from scipy.optimize  import linear_sum_assignment
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
@@ -269,103 +267,6 @@ class Metrics:
             f"elev_ce_{suffix}"   : ce_gt,
         }
 
-    def _gaussian_param_metrics(self) -> Dict[str, float]:
-        out : Dict[str, float] = {}
-        pp  = self.result.params_pred
-        pg  = self.result.params_gt
-        n_K = self.n_gaussians
-
-        for k in range(n_K):
-            gt_amp = pg[3 * k]
-            valid  = (gt_amp >= 1e-3) & np.isfinite(pg[3 * k + 1])
-
-            mu_pred = np.where(valid, pp[3 * k + 1], np.nan)
-            mu_gt   = np.where(valid, pg[3 * k + 1], np.nan)
-            sg_pred = np.where(valid, pp[3 * k + 2], np.nan)
-            sg_gt   = np.where(valid, pg[3 * k + 2], np.nan)
-
-            mu_se  = (mu_pred - mu_gt)  ** 2
-            sig_se = (sg_pred - sg_gt)  ** 2
-
-            n_valid = int(np.sum(valid))
-
-            out[f"gauss_{k}_mu_mae"]   = float(np.nanmean(np.abs(mu_pred - mu_gt), dtype=np.float64)) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_mu_rmse"]  = float(np.sqrt(np.nanmean(mu_se,  dtype=np.float64)))         if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_mae"]  = float(np.nanmean(np.abs(sg_pred - sg_gt), dtype=np.float64)) if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_sig_rmse"] = float(np.sqrt(np.nanmean(sig_se, dtype=np.float64)))         if n_valid > 0 else float("nan")
-            out[f"gauss_{k}_n_valid"]  = n_valid
-
-        return out
-
-    def _slot_mu_stats(self) -> Dict[str, float]:
-        pp  = self.result.params_pred
-        pg  = self.result.params_gt
-        n_K = self.n_gaussians
-        out: Dict[str, float] = {}
-
-        for k in range(n_K):
-            gt_amp = pg[3 * k].reshape(-1)
-            active = (gt_amp >= 1e-3) & np.isfinite(gt_amp)
-
-            mu_pred = pp[3 * k + 1].reshape(-1)[active]
-            mu_gt   = pg[3 * k + 1].reshape(-1)[active]
-            mu_pred = mu_pred[np.isfinite(mu_pred)]
-            mu_gt   = mu_gt  [np.isfinite(mu_gt)]
-
-            out[f"slot_{k}_mu_pred_mean"] = float(np.mean(mu_pred)) if mu_pred.size > 0 else float("nan")
-            out[f"slot_{k}_mu_pred_std"]  = float(np.std( mu_pred)) if mu_pred.size > 0 else float("nan")
-            out[f"slot_{k}_mu_gt_mean"]   = float(np.mean(mu_gt))   if mu_gt.size   > 0 else float("nan")
-            out[f"slot_{k}_mu_gt_std"]    = float(np.std( mu_gt))   if mu_gt.size   > 0 else float("nan")
-
-        return out
-
-    def _placeholder_detection(self) -> Dict[str, float]:
-        pp  = self.result.params_pred
-        pg  = self.result.params_gt
-        n_K = self.n_gaussians
-        out: Dict[str, float] = {}
-
-        all_gt_ph   : list[np.ndarray] = []
-        all_pred_ph : list[np.ndarray] = []
-
-        for k in range(n_K):
-            gt_amp   = pg[3 * k].reshape(-1)
-            pred_amp = pp[3 * k].reshape(-1)
-            valid    = np.isfinite(gt_amp) & np.isfinite(pred_amp)
-
-            gt_ph   = (gt_amp  [valid] < 1e-3).astype(np.float32)
-            pred_ph = (pred_amp[valid] < 1e-3).astype(np.float32)
-
-            tp = (pred_ph * gt_ph).sum()
-            fp = (pred_ph * (1.0 - gt_ph)).sum()
-            fn = ((1.0 - pred_ph) * gt_ph).sum()
-
-            precision = float(tp / (tp + fp + 1e-8))
-            recall    = float(tp / (tp + fn + 1e-8))
-            f1        = 2.0 * precision * recall / (precision + recall + 1e-8)
-
-            out[f"slot_{k}_placeholder_precision"] = precision
-            out[f"slot_{k}_placeholder_recall"]    = recall
-            out[f"slot_{k}_placeholder_f1"]        = f1
-            out[f"slot_{k}_placeholder_gt_rate"]   = float(gt_ph.mean())   if gt_ph.size   > 0 else float("nan")
-            out[f"slot_{k}_placeholder_pred_rate"] = float(pred_ph.mean()) if pred_ph.size > 0 else float("nan")
-
-            all_gt_ph.append(gt_ph)
-            all_pred_ph.append(pred_ph)
-
-        gt_all   = np.concatenate(all_gt_ph)
-        pred_all = np.concatenate(all_pred_ph)
-        tp       = (pred_all * gt_all).sum()
-        fp       = (pred_all * (1.0 - gt_all)).sum()
-        fn       = ((1.0 - pred_all) * gt_all).sum()
-        p        = float(tp / (tp + fp + 1e-8))
-        r        = float(tp / (tp + fn + 1e-8))
-        out["placeholder_precision"] = p
-        out["placeholder_recall"]    = r
-        out["placeholder_f1"]        = 2.0 * p * r / (p + r + 1e-8)
-
-        return out
-
     def _active_count_stats(self) -> Dict[str, float]:
         pp  = self.result.params_pred
         pg  = self.result.params_gt
@@ -409,86 +310,6 @@ class Metrics:
                 out[f"count_acc_pred{k}"] = float((exact & pred_mask_k).sum() / pred_denom)
 
         return out
-
-    def _mu_ordering_rate(self) -> float:
-        pp  = self.result.params_pred
-        n_K = self.n_gaussians
-
-        if n_K < 2:
-            return float("nan")
-
-        mus    = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0)
-        amps   = np.stack([pp[3 * k]     for k in range(n_K)], axis=0)
-        active = amps >= 1e-3
-
-        ordered       = mus[:-1] < mus[1:]
-        both_active   = active[:-1] & active[1:]
-        has_violation = ((~ordered) & both_active).any(axis=0)
-
-        n_active     = active.sum(axis=0)
-        multi_active = n_active >= 2
-        denom        = int(multi_active.sum())
-
-        if denom == 0:
-            return float("nan")
-
-        return float((~has_violation & multi_active).sum() / denom)
-
-    def _permutation_consensus(self) -> Dict[str, float]:
-        pp  = self.result.params_pred
-        pg  = self.result.params_gt
-        n_K = self.n_gaussians
-
-        if n_K == 1:
-            return {"permutation_consensus_dominant_frac": 1.0,
-                    "permutation_consensus_identity_frac":  1.0}
-
-        pred_mu = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
-        gt_mu   = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
-
-        pred_mu = np.nan_to_num(pred_mu, nan=1e9)
-        gt_mu   = np.nan_to_num(gt_mu,   nan=1e9)
-
-        cost_mat = np.abs(pred_mu.T[:, :, None] - gt_mu.T[:, None, :])
-
-        all_perms    = list(permutations(range(n_K)))
-        identity_idx = all_perms.index(tuple(range(n_K)))
-
-        if n_K <= 4:
-            best_idx = self._best_perm_bruteforce(cost_mat, all_perms, n_K)
-        else:
-            best_idx = self._best_perm_assignment(cost_mat, all_perms)
-
-        counts = np.bincount(best_idx, minlength=len(all_perms)).astype(np.float64)
-        total  = counts.sum()
-
-        dominant_frac = float(counts.max()           / total)
-        identity_frac = float(counts[identity_idx]   / total)
-
-        return {
-            "permutation_consensus_dominant_frac": dominant_frac,
-            "permutation_consensus_identity_frac": identity_frac,
-        }
-
-    @staticmethod
-    def _best_perm_bruteforce(cost_mat: np.ndarray, all_perms: list, n_K: int) -> np.ndarray:
-        perm_costs = np.stack(
-            [cost_mat[:, np.arange(n_K), list(p)].sum(axis=1) for p in all_perms],
-            axis=1,
-        )
-
-        return perm_costs.argmin(axis=1)
-
-    @staticmethod
-    def _best_perm_assignment(cost_mat: np.ndarray, all_perms: list) -> np.ndarray:
-        perm_to_idx = {p: i for i, p in enumerate(all_perms)}
-        best_idx    = np.empty(cost_mat.shape[0], dtype=np.int64)
-
-        for hw in range(cost_mat.shape[0]):
-            _, col       = linear_sum_assignment(cost_mat[hw])
-            best_idx[hw] = perm_to_idx[tuple(col)]
-
-        return best_idx
 
     def _matched_gaussian_metrics(self, match_tol: float = 5.0) -> Dict[str, float]:
         pp  = self.result.params_pred
@@ -620,13 +441,7 @@ class Metrics:
         metrics.update(self._expand_elev(pred, gt, suffix="gt"))
 
         if param_space:
-            metrics.update(self._gaussian_param_metrics())
-            metrics.update(self._slot_mu_stats())
-            metrics.update(self._placeholder_detection())
             metrics.update(self._active_count_stats())
-
-            metrics["mu_ordering_rate"] = self._mu_ordering_rate()
-            metrics.update(self._permutation_consensus())
             metrics.update(self._matched_gaussian_metrics(match_tol=match_tol))
 
         return metrics

@@ -3,8 +3,6 @@ from __future__ import annotations
 import torch
 from torch.utils.data import DataLoader
 
-from tools                            import PermutationMetrics
-from tools.data.gaussians             import GaussianHead
 from tools.training                   import BaseTrainer, MetricAggregator
 from pipelines.backbone.training.loss import Loss
 from pipelines.backbone.training.docs import TrainingDocs
@@ -29,7 +27,6 @@ class CurriculumController:
         self.logger.section(f"[Curriculum Loss Swap @ epoch {epoch + 1}]")
         self.criterion.set_curriculum(lc.complete)
         self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
-        self.logger.subsection(f"Param match strategy updated to '{lc.complete.param_match}'.")
 
         if lc.reset_early_stopping:
             self.early_stopping.reset()
@@ -75,8 +72,7 @@ class Trainer(BaseTrainer):
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
-        self.docs                = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
-        self.permutation_metrics = PermutationMetrics(self.config.permutation_metrics, logger=self.logger)
+        self.docs = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
 
         self.curriculum_controller = CurriculumController(
             curriculum       = self.curriculum,
@@ -128,14 +124,6 @@ class Trainer(BaseTrainer):
 
         pred_output = self.model(images)
         loss_dict   = self.criterion(pred_output, gt_params)
-
-        if gt_params is not None:
-            pred_params, _ = GaussianHead.split(pred_output, self.gaussian_cfg.params_per_gaussian, self.gaussian_cfg.n_default_gaussians)
-            pred_phys      = self.norm_stats.denormalize_output(pred_params)
-            gt_phys        = self.norm_stats.denormalize_output(gt_params)
-
-            perm_m = self.permutation_metrics.compute(pred_phys.float(), gt_phys.float(), self.gaussian_cfg.params_per_gaussian)
-            aggregator.add_extra(perm_m)
 
         return loss_dict
 

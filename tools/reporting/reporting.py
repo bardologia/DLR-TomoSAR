@@ -60,10 +60,7 @@ class MetricSectionGrouper:
         ("Per-Pixel R² and Cosine",      re.compile(r"^pixel_(r2|cosine)_")),
         ("Peak Location Error",          re.compile(r"^pixel_peak_")),
         ("Per-Elevation-Bin Aggregates", re.compile(r"^elev_")),
-        ("Gaussian Parameter Errors (slot-aligned, sort-only)", re.compile(r"^gauss_")),
-        ("Slot Statistics (slot-aligned, sort-only)",           re.compile(r"^slot_")),
-        ("Placeholder Detection (slot-aligned, sort-only)",     re.compile(r"^placeholder_")),
-        ("Permutation and Ordering (swap-sensitive, deprecated)", re.compile(r"^(permutation_|mu_ordering)")),
+        ("Slot Occupancy",               re.compile(r"^slot_")),
         ("Matched Gaussian (Permutation-Invariant)", re.compile(r"^matched_")),
     ]
 

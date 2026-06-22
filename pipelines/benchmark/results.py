@@ -139,7 +139,7 @@ class ComparisonReport:
         ("Profile reconstructions",     re.compile(r"^profiles_")),
         ("Per-pixel metric maps",       re.compile(r"^(pixel_|metric_histograms)")),
         ("Gaussian parameter analysis", re.compile(r"^param_")),
-        ("Slot diagnostics",            re.compile(r"^(slot_|placeholder_|active_count)")),
+        ("Active Gaussian count",       re.compile(r"^active_count")),
         ("SSIM and elevation curves",   re.compile(r"^(ssim_|elev_metric)")),
         ("Azimuth slices",              re.compile(r"^slice_azimuth_")),
         ("Elevation slices",            re.compile(r"^slice_elev_")),

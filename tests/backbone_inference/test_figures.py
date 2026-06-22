@@ -150,11 +150,12 @@ def test_figure_composer_compose_creates_files(tmp_path):
         result=res, run=run, global_metrics=gm, x_axis_np=x_axis, indices=indices, param_space=True,
     )
 
-    assert "profiles_best" in figure_paths
-    assert "pixel_mse_map" in figure_paths
-    assert "param_maps"    in figure_paths
-    assert "slices_range"  in figure_paths
-    assert "ssim_range"    in figure_paths
+    assert "profiles_best"      in figure_paths
+    assert "pixel_mse_map"      in figure_paths
+    assert "param_distributions" in figure_paths
+    assert "active_count_map"   in figure_paths
+    assert "slices_range"       in figure_paths
+    assert "ssim_range"         in figure_paths
 
     flat = [p for paths in figure_paths.values() for p in paths]
     assert len(flat) > 0

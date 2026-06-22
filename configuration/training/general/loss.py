@@ -46,7 +46,6 @@ class LossConfig:
     weight_param_mse : float = 0.0
 
     param_weights : tuple = (1.0, 1.0, 1.0)
-    param_match   : str   = "sort_gt_by_mu"
 
     use_active_normalization : bool  = False
     presence_balance         : bool  = False

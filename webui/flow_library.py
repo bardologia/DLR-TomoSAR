@@ -654,7 +654,7 @@ class FlowLibrary:
             {"id": "znorm",  "tex": r"\hat{\mathbf{z}}",    "role": "intermediate", "kind": "tensor", "shape": "B x 3K x P x P", "desc": "raw normalised network output",          "sample": ["0.22", "-1.1", "0.7", "..."]},
             {"id": "th",     "tex": r"\hat{\theta}",        "role": "calculated",   "kind": "tensor", "shape": "B x 3K x P x P", "desc": "denormalised, hard-clamped params",      "sample": ["0.78", "12.1", "1.9", "..."]},
             {"id": "thgt",   "tex": r"\theta^{\mathrm{GT}}","role": "measured",     "kind": "tensor", "shape": "B x 3K x P x P", "desc": "ground-truth params, denormalised",      "sample": ["0.80", "12.0", "1.8", "..."]},
-            {"id": "thgts",  "tex": r"\theta^{\mathrm{GT}}_{\pi}", "role": "intermediate", "kind": "tensor", "shape": "B x 3K x P x P", "desc": "mu-sorted GT params (prediction unsorted)", "sample": ["0.80", "11.9", "1.8", "..."]},
+            {"id": "thgts",  "tex": r"\theta^{\mathrm{GT}}_{\pi}", "role": "intermediate", "kind": "tensor", "shape": "B x 3K x P x P", "desc": "mu-sorted GT params (canonical storage order)", "sample": ["0.80", "11.9", "1.8", "..."]},
             {"id": "p",      "tex": r"\mathbf{p}",          "role": "intermediate", "kind": "tensor", "shape": "N x P x P",    "desc": "reconstructed predicted patch spectrum",   "sample": [["0.05", "0.71"], ["0.33", "0.88"]]},
             {"id": "winv",   "tex": r"w_v",                 "role": "intermediate", "kind": "vector", "shape": "P",            "desc": "1D Hann taper, floored at 1e-3",           "sample": ["0.10", "0.45", "0.85", "1.00"]},
             {"id": "win",    "tex": r"w",                   "role": "intermediate", "kind": "matrix", "shape": "P x P",        "desc": "separable 2D overlap-add window",          "sample": [["0.10", "0.45"], ["0.45", "1.00"]]},
@@ -666,8 +666,8 @@ class FlowLibrary:
             {"id": "r2",     "tex": r"R^2",                 "role": "final",        "kind": "scalar", "shape": "1",            "desc": "overall reconstruction R-squared",         "sample": "0.94"},
             {"id": "psnr",   "tex": r"\mathrm{PSNR}",       "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "peak signal-to-noise ratio (dB)",          "sample": "28.4"},
             {"id": "elevr2", "tex": r"R^2_{\mathrm{elev}}", "role": "calculated",   "kind": "vector", "shape": "N",            "desc": "per-elevation-bin R-squared",              "sample": ["0.91", "0.93", "..."]},
-            {"id": "gmu",    "tex": r"\mathrm{MAE}_{\mu}",  "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "pooled per-Gaussian mu MAE (active pixels)", "sample": "0.42"},
-            {"id": "pcons",  "tex": r"f_{\mathrm{dom}}",    "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "permutation-consensus dominant fraction",  "sample": "0.81"},
+            {"id": "gmu",    "tex": r"\mathrm{MAE}_{\mu}",  "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "pooled matched Gaussian mu MAE (active pixels)", "sample": "0.42"},
+            {"id": "mf1",    "tex": r"F_1",                 "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "matched detection F1 within tolerance",    "sample": "0.86"},
             {"id": "redc",   "tex": r"\mathbf{r}",          "role": "measured",     "kind": "tensor", "shape": "N x Az x Rg",  "desc": "reduced-subset Capon tomogram (re-synthesised)", "sample": [["0.3", "0.8"], ["0.2", "0.6"]]},
             {"id": "dimp",   "tex": r"\Delta_{a,r}",        "role": "final",        "kind": "matrix", "shape": "Az x Rg",      "desc": "improvement map: reduced minus prediction MSE", "sample": [["0.01", "-0.00"], ["0.02", "0.01"]]},
         ]
@@ -699,7 +699,7 @@ class FlowLibrary:
             },
             {
                 "id": "align", "title": "GT slot mu-sort alignment", "phase": "Windowed predict",
-                "note": "Per pixel the GT slots are stably sorted by mean with inactive slots pushed to the end; the prediction keeps its raw slot order so the metrics measure the network's ordering.",
+                "note": "Per pixel the GT slots are stably sorted by mean with inactive slots pushed to the end, giving GT a canonical storage order; the parameter metrics later Hungarian-match predictions to these GT slots.",
                 "inputs": ["thgt"], "outputs": ["thgts"],
                 "lines": [
                     [{"id": "thgts", "tex": r"\theta^{\mathrm{GT}}_{\pi}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{take}\big("}, {"id": "thgt", "tex": r"\theta^{\mathrm{GT}}", "role": "measured"}, {"tex": r",\ \pi^{\star}\big),\quad \pi^{\star} = \operatorname{argsort}_k\,\kappa_k"}],
@@ -767,12 +767,12 @@ class FlowLibrary:
                 ],
             },
             {
-                "id": "paramslot", "title": "Parameter and slot metrics", "phase": "Param metrics",
-                "note": "On active pixels: per-Gaussian mu and sigma MAE/RMSE, placeholder detection F1, predicted mu-ordering rate, and a permutation consensus from per-pixel mu-distance assignment.",
-                "inputs": ["th", "thgts"], "outputs": ["gmu", "pcons"],
+                "id": "paramslot", "title": "Matched Gaussian metrics", "phase": "Param metrics",
+                "note": "On active pixels predictions are Hungarian-matched to GT Gaussians per pixel on mu distance: matched mu and sigma MAE/RMSE over matched pairs, plus detection recall, precision and F1 within tolerance.",
+                "inputs": ["th", "thgts"], "outputs": ["gmu", "mf1"],
                 "lines": [
-                    [{"id": "gmu", "tex": r"\mathrm{MAE}_{\mu,k}", "role": "calculated"}, {"tex": "="}, {"tex": r"\tfrac{1}{|\mathcal A_k|}\textstyle\sum_{\mathcal A_k}|\hat\mu_{k}-\mu^{\mathrm{GT}}_{k}|,\quad \mathcal A_k=\{a^{\mathrm{GT}}_k\ge10^{-3}\}"}],
-                    [{"id": "pcons", "tex": r"f_{\mathrm{dom}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\max_\pi \mathrm{count}(\pi)}{\sum_\pi \mathrm{count}(\pi)},\quad \pi^{\star} = \operatorname*{arg\,min}_{\pi}\textstyle\sum_k |\hat\mu_k - \mu^{\mathrm{GT}}_{\pi(k)}|"}],
+                    [{"id": "gmu", "tex": r"\mathrm{MAE}_{\mu}", "role": "calculated"}, {"tex": "="}, {"tex": r"\tfrac{1}{|\mathcal M|}\textstyle\sum_{(i,j)\in\mathcal M}|\hat\mu_{i}-\mu^{\mathrm{GT}}_{j}|,\quad \mathcal M = \text{matched active pairs}"}],
+                    [{"id": "mf1", "tex": r"F_1", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{2\,\mathrm{Prec}\,\mathrm{Rec}}{\mathrm{Prec}+\mathrm{Rec}},\quad \text{matched pairs with}\ |\Delta\mu|\le\tau"}],
                 ],
             },
             {

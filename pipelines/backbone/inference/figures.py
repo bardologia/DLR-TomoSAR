@@ -545,15 +545,6 @@ class FigureComposer:
         meta          = self.meta
         logger        = self.logger
 
-        figure_paths["param_maps"] = param_plotter.plot_param_maps(
-            params_pred = result.params_pred[: run.n_gaussians * 3],
-            params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
-            n_gaussians = run.n_gaussians,
-            out_dir     = meta.figures_dir / "param_maps",
-            az_offset   = result.azimuth_offset,
-            rg_offset   = result.range_offset,
-        )
-
         figure_paths["param_distributions"] = param_plotter.plot_param_distributions(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
@@ -577,24 +568,6 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
-        figure_paths["slot_mu_distributions"] = slot_plotter.plot_slot_mu_distributions(
-            global_metrics = global_metrics,
-            n_gaussians    = run.n_gaussians,
-            out_dir        = meta.figures_dir / "slots",
-        )
-
-        figure_paths["placeholder_detection"] = slot_plotter.plot_placeholder_detection(
-            global_metrics = global_metrics,
-            n_gaussians    = run.n_gaussians,
-            out_dir        = meta.figures_dir / "slots",
-        )
-
-        figure_paths["slot_ordering_summary"] = slot_plotter.plot_slot_ordering_summary(
-            global_metrics = global_metrics,
-            n_gaussians    = run.n_gaussians,
-            out_dir        = meta.figures_dir / "slots",
-        )
-
         figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
@@ -604,7 +577,7 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
-        logger.subsection(f"Param plots : maps, distributions, scatter, error maps, slots written to {meta.figures_dir}")
+        logger.subsection(f"Param plots : distributions, scatter, error maps, active-count map written to {meta.figures_dir}")
 
     def _compose_slices(self, result: Result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
         meta   = self.meta

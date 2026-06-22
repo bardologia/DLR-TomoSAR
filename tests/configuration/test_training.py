@@ -17,7 +17,6 @@ from configuration.training.general.runtime import (
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
-    PermutationMetricsConfig,
 )
 from configuration.training.general.loss import (
     LossConfig,
@@ -64,7 +63,6 @@ SIMPLE_DEFAULT_CONFIGS = [
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
-    PermutationMetricsConfig,
     LossConfig,
     LossCurriculumConfig,
     EmbeddingLossConfig,

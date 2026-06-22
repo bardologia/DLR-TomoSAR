@@ -9,14 +9,14 @@ from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, PermutationMetricsConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
 
 
 def _default_curriculum() -> LossCurriculumConfig:
     return LossCurriculumConfig(
         enabled  = False,
-        warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True, param_match="hungarian_active"),
-        complete = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True, param_match="hungarian_active"),
+        warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True),
+        complete = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True),
     )
 
 
@@ -91,13 +91,6 @@ def _default_presence_trials() -> dict:
     }
 
 
-def _default_presence_match_strategies() -> dict:
-    return {
-        "sort" : "sort_gt_by_mu",
-        "hung" : "hungarian_active",
-    }
-
-
 @dataclass
 class PatchTrialsConfig:
     sizes        : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
@@ -131,7 +124,6 @@ class BackboneTrainerConfig:
     resources           : ResourceConfig           = field(default_factory=ResourceConfig)
     memory              : MemoryConfig             = field(default_factory=MemoryConfig)
     gradient_clipper    : GradientClipperConfig    = field(default_factory=GradientClipperConfig)
-    permutation_metrics : PermutationMetricsConfig = field(default_factory=PermutationMetricsConfig)
 
 
 @dataclass
@@ -164,7 +156,6 @@ class BackboneEntryConfig:
     warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
     complete_losses  : dict                  = field(default_factory=_default_complete_losses)
     presence_trials  : dict                  = field(default_factory=_default_presence_trials)
-    presence_match_strategies : dict         = field(default_factory=_default_presence_match_strategies)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])

@@ -62,7 +62,7 @@ def test_gradient_flows_to_predictions():
 
 
 def test_identical_valid_params_give_zero_param_loss():
-    cfg    = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_match="none")
+    cfg    = LossConfig(use_param_l1=True, weight_param_l1=1.0)
     loss   = build_loss(n_gaussians=2, loss_cfg=cfg)
     params = valid_param_tensor(2, 2, 6, 6, seed=6)
 
@@ -72,7 +72,7 @@ def test_identical_valid_params_give_zero_param_loss():
 
 
 def test_prepare_clamps_prediction_so_invalid_identical_params_are_nonzero():
-    cfg    = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_match="none")
+    cfg    = LossConfig(use_param_l1=True, weight_param_l1=1.0)
     loss   = build_loss(n_gaussians=2, loss_cfg=cfg)
     params = param_tensor(2, 2, 6, 6, seed=30)
 
@@ -207,11 +207,10 @@ def test_curriculum_swap_changes_active_terms():
     before = loss(param_tensor(2, 2, 5, 5, seed=13), param_tensor(2, 2, 5, 5, seed=14))
     assert "param_l1" in before["components"]
 
-    swap = LossConfig(use_mse_curve=True, weight_mse_curve=1.0, param_match="none")
+    swap = LossConfig(use_mse_curve=True, weight_mse_curve=1.0)
     loss.set_curriculum(swap)
 
     assert loss.loss_generation == 1
-    assert loss.match_strategy  == "none"
 
     after = loss(param_tensor(2, 2, 5, 5, seed=15), param_tensor(2, 2, 5, 5, seed=16))
 
@@ -288,7 +287,7 @@ def test_loss_on_real_tomogram_param_target(parameters):
         logger       = tools.NullLogger(),
         tracker      = tools.NullTracker(),
         gaussian_cfg = gaussian_config(n_gaussians),
-        loss_cfg     = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_match="none"),
+        loss_cfg     = LossConfig(use_param_l1=True, weight_param_l1=1.0),
         norm_stats   = identity_normalizer(n_channels),
         geometry_cfg = geometry_config(),
     )

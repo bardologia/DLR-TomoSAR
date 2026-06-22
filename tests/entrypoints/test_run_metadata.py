@@ -87,7 +87,6 @@ def test_save_run_summary_payload(metadata):
         in_channels   = 9,
         out_channels  = 15,
         x_axis_length = 256,
-        param_match   = "size",
     )
 
     payload = json.loads(out_path.read_text())
@@ -95,7 +94,6 @@ def test_save_run_summary_payload(metadata):
     assert payload["in_channels"]   == 9
     assert payload["out_channels"]  == 15
     assert payload["x_axis_length"] == 256
-    assert payload["param_match"]   == "size"
     assert payload["framework"]     == "pytorch"
     assert payload["run_directory"] == str(metadata.run_directory)
 

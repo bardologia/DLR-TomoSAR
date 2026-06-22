@@ -11,7 +11,6 @@ from configuration.training.general.runtime import (
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
-    PermutationMetricsConfig,
 )
 from configuration.training.general.loss import (
     LossConfig,

@@ -18,7 +18,6 @@ class ComparisonReport:
         ("profiles",            "Profile reconstructions"),
         ("pixel_maps",          "Per-pixel metric maps"),
         ("histograms",          "Metric distributions"),
-        ("param_maps",          "Gaussian parameter maps"),
         ("param_distributions", "Parameter distributions"),
         ("param_scatter",       "Parameter scatter plots"),
         ("param_error_maps",    "Parameter error maps"),
@@ -30,10 +29,6 @@ class ComparisonReport:
         ("slices_norm",         "Tomogram slices (unit-area)"),
         ("reduced",             "Classical baseline"),
     ]
-
-    SLOT_ALIGNED_SUBDIRS = frozenset({
-        "param_maps", "slots",
-    })
 
     HEADLINE_METRICS = [
         ("curve_rmse_gt",                "RMSE"),
@@ -104,13 +99,12 @@ class ComparisonReport:
         precision_intro = (
             "Mean rank of matched (permutation-invariant) precision, per GT scatterer count `k` — the share of "
             "predicted scatterers that hit a true scatterer where the pixel truly holds `k` (1 = best; missing "
-            "buckets rank last). These are matching-strategy agnostic and so comparable across sort- and "
-            "Hungarian-matched trials. Precision rewards under-prediction, so read it alongside recall, not on its own."
+            "buckets rank last). Precision rewards under-prediction, so read it alongside recall, not on its own."
         )
         count_intro = (
             "Mean rank of count calibration (1 = best): `Exact` is the pixel share where the predicted active "
             "scatterer count equals GT (higher better), `Under` / `Over` are the shares where the model predicts "
-            "too few / too many (lower better). Permutation-invariant; comparable across matching strategies."
+            "too few / too many (lower better). Permutation-invariant."
         )
 
         lines  = self._rank_section("Leaderboard",            headline_intro,  self.HEADLINE_METRICS,            scored)
@@ -168,14 +162,11 @@ class ComparisonReport:
         lines  = self.assets.header("Metrics Comparison")
         lines += ["> Best value per metric in **bold** (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
         lines += [
-            "> **Reading guide.** Sections marked *slot-aligned, sort-only* (Gaussian Parameter Errors, "
-            "Slot Statistics, Placeholder Detection) pair predicted slot k with GT slot k, so they are only "
-            "valid for sort-matched models and are not comparable across matching strategies — for Hungarian "
-            "runs they report the slot relabelling, not the error. Use the *Matched Gaussian "
-            "(Permutation-Invariant)* section for ordering-independent Gaussian accuracy. `count_acc_gt{k}` is "
-            "exact-count agreement (calibration), not scatterer recovery — use `matched_recall_gt{k}`. "
-            "Precision and F1 reward under-prediction (a model that collapses slots to placeholder has few "
-            "false positives), so do not rank trials on them; read them alongside recall.\n"
+            "> **Reading guide.** Gaussian accuracy is reported by the *Matched Gaussian "
+            "(Permutation-Invariant)* section, which Hungarian-matches predicted Gaussians to GT before "
+            "scoring. `count_acc_gt{k}` is exact-count agreement (calibration), not scatterer recovery — use "
+            "`matched_recall_gt{k}`. Precision and F1 reward under-prediction (a model that collapses slots has "
+            "few false positives), so do not rank trials on them; read them alongside recall.\n"
         ]
 
         if not scored:
@@ -234,13 +225,6 @@ class ComparisonReport:
 
         lines  = self.assets.header(f"Figure Comparison – {title}")
         lines += [f"> Figures from the `{subdir}/` directory. Only trials with a completed inference run are shown.\n"]
-        if subdir in self.SLOT_ALIGNED_SUBDIRS:
-            lines += [
-                "> **Slot-aligned (sort-only).** These figures pair predicted slot k with GT slot k, so they are "
-                "only meaningful for sort-matched trials; for Hungarian-matched trials they show the slot "
-                "relabelling, not the error. Compare matching strategies via the permutation-invariant matched "
-                "metrics, not these panels.\n"
-            ]
 
         for name in sorted_names:
             lines.append(f"## `{name}`\n")

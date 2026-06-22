@@ -102,14 +102,7 @@ def test_tv_gradient_flow():
     assert torch.isfinite(p.grad).all()
 
 
-def test_match_passthrough_other_strategy():
-    pred, pp, gt, gp = (_params(i) for i in (16, 17, 18, 19))
-    out = ParamMatcher.match("none", pred, pp, gt, gp)
-    assert out[0] is pred
-    assert torch.equal(out[2], gt)
-
-
-def test_match_sort_gt_by_mu_is_permutation_invariant():
+def test_match_sorts_gt_by_mu():
     b, g, h, w = 1, 3, 1, 1
     gt = torch.zeros(b, g, 3, h, w, dtype=torch.float64)
     gt[0, :, 0, 0, 0] = torch.tensor([1.0, 1.0, 1.0])
@@ -118,12 +111,12 @@ def test_match_sort_gt_by_mu_is_permutation_invariant():
 
     pred = torch.zeros_like(gt)
 
-    _, _, sorted_gt, _ = ParamMatcher.match("sort_gt_by_mu", pred, pred.clone(), gt, gt_phys)
+    _, _, sorted_gt, _ = ParamMatcher.match(pred, pred.clone(), gt, gt_phys)
     mus = sorted_gt[0, :, 1, 0, 0]
     assert torch.all(mus[:-1] <= mus[1:])
 
 
-def test_match_sort_gt_by_mu_pushes_inactive_last():
+def test_match_pushes_inactive_gt_last():
     b, g, h, w = 1, 3, 1, 1
     gt = torch.zeros(b, g, 3, h, w, dtype=torch.float64)
     gt[0, :, 0, 0, 0] = torch.tensor([1.0, 0.0, 1.0])
@@ -131,12 +124,12 @@ def test_match_sort_gt_by_mu_pushes_inactive_last():
     gt_phys = gt.clone()
     pred    = torch.zeros_like(gt)
 
-    _, _, sorted_gt, sorted_phys = ParamMatcher.match("sort_gt_by_mu", pred, pred.clone(), gt, gt_phys)
+    _, _, sorted_gt, sorted_phys = ParamMatcher.match(pred, pred.clone(), gt, gt_phys)
     last_amp = sorted_phys[0, -1, 0, 0, 0]
     assert last_amp.item() == 0.0
 
 
-def test_match_hungarian_active_realigns_pred():
+def test_match_realigns_pred():
     b, g, h, w = 2, 3, 4, 4
     gt      = _params(20, b, g, h, w)
     gt_phys = gt.clone()
@@ -146,11 +139,11 @@ def test_match_hungarian_active_realigns_pred():
     pred      = gt[:, perm].clone()
     pred_phys = gt_phys[:, perm].clone()
 
-    matched, _, sorted_gt, _ = ParamMatcher.match("hungarian_active", pred, pred_phys, gt, gt_phys)
+    matched, _, sorted_gt, _ = ParamMatcher.match(pred, pred_phys, gt, gt_phys)
     assert (matched - sorted_gt).abs().max().item() < 1e-9
 
 
-def test_match_hungarian_active_ignores_inactive_gt():
+def test_match_ignores_inactive_gt():
     b, g, h, w = 2, 3, 4, 4
     gt      = _params(21, b, g, h, w)
     gt_phys = gt.clone()
@@ -158,17 +151,17 @@ def test_match_hungarian_active_ignores_inactive_gt():
     gt_phys[:, 2, :] = 0.0
 
     perm    = [2, 0, 1]
-    matched, _, sorted_gt, sorted_phys = ParamMatcher.match("hungarian_active", gt[:, perm].clone(), gt_phys[:, perm].clone(), gt, gt_phys)
+    matched, _, sorted_gt, sorted_phys = ParamMatcher.match(gt[:, perm].clone(), gt_phys[:, perm].clone(), gt, gt_phys)
     active  = sorted_phys[:, :, 0] > 1e-3
     err     = ((matched - sorted_gt).abs().sum(2) * active)[active.bool()]
     assert err.max().item() < 1e-9
 
 
-def test_match_hungarian_active_rejects_large_g():
+def test_match_rejects_large_g():
     b, g, h, w = 1, ParamMatcher.MAX_GAUSSIANS + 1, 1, 1
     t = _params(22, b, g, h, w)
     with pytest.raises(ValueError):
-        ParamMatcher.match("hungarian_active", t, t.clone(), t, t.clone())
+        ParamMatcher.match(t, t.clone(), t, t.clone())
 
 
 def test_presence_scale_inverse_frequency_upweights_rare_active():

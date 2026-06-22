@@ -11,29 +11,6 @@ class ParamMatcher:
     ACTIVE_AMP_THR = 1e-3
 
     @staticmethod
-    def sort_gt_by_mu(
-        pred      : torch.Tensor,
-        pred_phys : torch.Tensor,
-        gt        : torch.Tensor,
-        gt_phys   : torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        gt, gt_phys = ParamMatcher._sort_gt(gt, gt_phys)
-
-        return pred, pred_phys, gt, gt_phys
-
-    @staticmethod
-    def hungarian_active(
-        pred      : torch.Tensor,
-        pred_phys : torch.Tensor,
-        gt        : torch.Tensor,
-        gt_phys   : torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        gt, gt_phys     = ParamMatcher._sort_gt(gt, gt_phys)
-        pred, pred_phys = ParamMatcher._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
-
-        return pred, pred_phys, gt, gt_phys
-
-    @staticmethod
     def _sort_gt(gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         gt_phys_amp = gt_phys[:, :, 0]
         gt_mu       = gt[:, :, 1]
@@ -49,10 +26,10 @@ class ParamMatcher:
         B, G, P, H, W = pred.shape
 
         if gt.shape[1] != G:
-            raise ValueError(f"hungarian_active requires equal pred/gt gaussian counts, got {G} and {gt.shape[1]}")
+            raise ValueError(f"ParamMatcher.match requires equal pred/gt gaussian counts, got {G} and {gt.shape[1]}")
 
         if G > ParamMatcher.MAX_GAUSSIANS:
-            raise ValueError(f"hungarian_active enumerates G! permutations; G={G} exceeds MAX_GAUSSIANS={ParamMatcher.MAX_GAUSSIANS}")
+            raise ValueError(f"ParamMatcher.match enumerates G! permutations; G={G} exceeds MAX_GAUSSIANS={ParamMatcher.MAX_GAUSSIANS}")
 
         active = (gt_phys[:, :, 0] > ParamMatcher.ACTIVE_AMP_THR).to(pred.dtype)
 
@@ -77,17 +54,13 @@ class ParamMatcher:
 
     @staticmethod
     def match(
-        strategy  : str,
         pred      : torch.Tensor,
         pred_phys : torch.Tensor,
         gt        : torch.Tensor,
         gt_phys   : torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        if strategy == "sort_gt_by_mu":
-            return ParamMatcher.sort_gt_by_mu(pred, pred_phys, gt, gt_phys)
-
-        if strategy == "hungarian_active":
-            return ParamMatcher.hungarian_active(pred, pred_phys, gt, gt_phys)
+        gt, gt_phys     = ParamMatcher._sort_gt(gt, gt_phys)
+        pred, pred_phys = ParamMatcher._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
 
         return pred, pred_phys, gt, gt_phys
 
