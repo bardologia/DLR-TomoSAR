@@ -152,16 +152,37 @@ class ParamPlotter(PlotTools):
 
         return paths
 
-    def _scatter_panel(self, ax, gt: np.ndarray, pred: np.ndarray, label: str) -> None:
-        r2 = self._r2_value(gt, pred)
+    @staticmethod
+    def _point_density(gt: np.ndarray, pred: np.ndarray) -> np.ndarray:
+        bins = int(np.clip(np.sqrt(gt.size / 2.0), 16, 128))
 
-        ax.scatter(gt, pred, s=2, alpha=0.25, color="C0", rasterized=True, label=f"{label}  R²={r2:.3f}")
+        counts, gt_edges, pred_edges = np.histogram2d(gt, pred, bins=bins)
+        gt_bin   = np.clip(np.digitize(gt,   gt_edges)   - 1, 0, bins - 1)
+        pred_bin = np.clip(np.digitize(pred, pred_edges) - 1, 0, bins - 1)
+
+        return counts[gt_bin, pred_bin]
+
+    def _scatter_panel(self, ax, gt: np.ndarray, pred: np.ndarray, label: str):
+        r2      = self._r2_value(gt, pred)
+        density = self._point_density(gt, pred)
+        order   = np.argsort(density)
+
+        return ax.scatter(
+            gt[order], pred[order], c=density[order], s=4, alpha=0.7,
+            cmap="viridis", edgecolors="none", rasterized=True, label=f"{label}  R²={r2:.3f}",
+        )
 
     @staticmethod
-    def _identity_line(ax, *arrays: np.ndarray) -> None:
-        lo = min(float(arr.min()) for arr in arrays)
-        hi = max(float(arr.max()) for arr in arrays)
+    def _robust_square_limits(*arrays: np.ndarray, q: float = 0.5) -> tuple:
+        flat = np.concatenate([arr for arr in arrays])
+        lo   = float(np.percentile(flat, q))
+        hi   = float(np.percentile(flat, 100.0 - q))
+        pad  = (hi - lo) * 0.04 if hi > lo else 1.0
 
+        return lo - pad, hi + pad
+
+    @staticmethod
+    def _identity_line(ax, lo: float, hi: float) -> None:
         ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.9, linestyle="--", label="identity")
 
     def plot_param_scatter(
@@ -196,9 +217,17 @@ class ParamPlotter(PlotTools):
                 if gt.size == 0:
                     continue
 
-                fig, ax = plt.subplots(figsize=(4.6, 4.2))
-                self._scatter_panel(ax, gt, pred, "matched")
-                self._identity_line(ax, gt, pred)
+                fig, ax = plt.subplots(figsize=(5.2, 4.4))
+                sc      = self._scatter_panel(ax, gt, pred, "matched")
+                lo, hi  = self._robust_square_limits(gt, pred)
+                self._identity_line(ax, lo, hi)
+
+                ax.set_xlim(lo, hi)
+                ax.set_ylim(lo, hi)
+                ax.set_aspect("equal", adjustable="box")
+
+                fig.colorbar(sc, ax=ax, fraction=0.045, pad=0.02).set_label("point density (count per 2-D bin)")
+
                 r2_str = self._r2_value(gt, pred)
                 ax.set_title(f"GT g{k + 1} — {lbl}  (matched, R²={r2_str:.3f})", fontsize=10)
                 ax.set_xlabel(f"GT {short}")
