@@ -141,3 +141,38 @@ def test_constant_input_finite(name):
 
     assert x_hat.shape == x.shape
     assert _finite(x_hat)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_layernorm_embedding_is_registered_module(name):
+    cfg          = _tiny_config(name)
+    cfg.embedding_norm = "layernorm"
+    model, _     = get_profile_autoencoder(name, cfg)
+
+    keys = model.state_dict().keys()
+    assert any("embedding_layernorm" in k for k in keys)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_collapsed_embedding_backward_finite(name):
+    cfg                = _tiny_config(name)
+    cfg.embedding_norm = "layernorm"
+    model, _           = get_profile_autoencoder(name, cfg)
+    model.train()
+
+    original_encode = model.encode
+
+    def collapsed_encode(curve):
+        z = original_encode(curve)
+        return torch.full_like(z, 0.5) + 1e-6 * z
+
+    model.encode = collapsed_encode
+
+    x       = torch.randn(2, PROFILE_LENGTH, 3, 3)
+    x_hat   = model.decode(model.encode(x))
+    loss    = torch.nn.functional.mse_loss(x_hat, x)
+    loss.backward()
+
+    grads = [p.grad for p in model.parameters() if p.grad is not None]
+    assert _finite(loss)
+    assert all(_finite(g) for g in grads)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from models.blocks import EmbeddingNorm, build_activation, initialize_weights
+from models.blocks import ChannelLayerNorm, EmbeddingNorm, build_activation, initialize_weights
 
 
 class ProfileAutoencoderBlocks:
@@ -50,10 +50,17 @@ class ProfileAutoencoderBase(EmbeddingNorm, nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
+        self.embedding_layernorm = ChannelLayerNorm(config.embedding_dim) if config.embedding_norm == "layernorm" else None
+
         initialize_weights(module=self, mode=config.init_mode)
 
     def encode(self, curve: torch.Tensor) -> torch.Tensor:
         return self.normalize_embedding(self.encoder(curve))
+
+    def normalize_embedding(self, z: torch.Tensor) -> torch.Tensor:
+        if self.config.embedding_norm == "layernorm":
+            return self.embedding_layernorm(z)
+        return super().normalize_embedding(z)
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         return self.decoder(z)
