@@ -187,7 +187,7 @@ class ProfileDatasetConfigIO:
 
         path = Path(meta_directory) / ProfileDatasetConfigIO.FILENAME
         if not path.is_file():
-            raise FileNotFoundError(f"No {ProfileDatasetConfigIO.FILENAME} under {meta_directory}; this profile-autoencoder run predates dataset-config persistence and is not self-describing. Retrain to regenerate it.")
+            raise FileNotFoundError(f"No {ProfileDatasetConfigIO.FILENAME} under {meta_directory}; this profile-autoencoder run predates dataset-config persistence and is not self-describing. Regenerate it with 'python scripts/backfill_profile_dataset_config.py <run_directory>' (or retrain).")
 
         payload = FileIO.load_json(path)
         splits  = payload["split_regions"]
