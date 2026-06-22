@@ -49,6 +49,12 @@ class ScriptCatalog:
             "purpose"   : "Run sliding-window prediction, stitch cubes, and generate reports for one or more trained runs.",
             "essentials": ["logs_dir", "run_filter", "gpu"],
         },
+        "infer_profile_autoencoder": {
+            "title"     : "Profile AE Inference",
+            "category"  : "Inference",
+            "purpose"   : "Reconstruct held-out profiles with a trained profile autoencoder and score reconstruction quality (no spatial cube). Select profile-autoencoder runs only.",
+            "essentials": ["logs_dir", "run_filter", "gpus", "paths.dataset_path", "paths.parameters_path"],
+        },
         "benchmark": {
             "title"     : "Benchmark",
             "category"  : "Experiments",
@@ -95,6 +101,7 @@ class ScriptCatalog:
         "train_image_autoencoder",
         "train_jepa",
         "infer",
+        "infer_profile_autoencoder",
         "benchmark",
         "cross_validate",
         "tune",
