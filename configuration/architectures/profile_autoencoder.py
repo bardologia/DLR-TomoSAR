@@ -10,7 +10,7 @@ class ProfileAutoencoderBaseConfig:
     profile_length : int   = 256
 
     embedding_dim  : int = 24
-    embedding_norm : str = "l2"
+    embedding_norm : str = "layernorm"
 
     activation : str = "gelu"
     init_mode  : str = "default"
