@@ -31,7 +31,7 @@ def _worker(run_dir: str, config_path: str, gpu_id: int) -> None:
     from tools.runtime.config_cli                               import ConfigCli
 
     config   = ConfigCli.load_resolved(ProfileAeInferenceEntryConfig(), Path(config_path))
-    pipeline = ProfileAeInferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None), entry_config=config)
+    pipeline = ProfileAeInferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None))
     pipeline.run()
 
 

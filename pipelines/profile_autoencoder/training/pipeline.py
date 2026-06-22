@@ -9,7 +9,7 @@ from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipelin
 from pipelines.shared.config_factory                import ConfigFactory
 from pipelines.shared.run_metadata                  import TrainingRunMetadata
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from tools.data.io                                  import ProfileAutoencoderConfigIO
+from tools.data.io                                  import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
 
@@ -63,9 +63,10 @@ class TrainingPipeline:
             augmentation                = self.entry.profile_augmentation,
         )
 
-    def _save_metadata(self, run_meta, x_len: int) -> None:
+    def _save_metadata(self, run_meta, profile_config: ProfileDatasetConfig, x_len: int) -> None:
         run_meta.save_trainer_config()
         ProfileAutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
+        ProfileDatasetConfigIO.save(profile_config, run_meta.metadata_directory)
         run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
 
     def _make_trainer(self, run_meta, logger, model, x_axis) -> Trainer:
@@ -90,7 +91,7 @@ class TrainingPipeline:
 
         model = self._build_model(x_len)
 
-        self._save_metadata(run_meta, x_len)
+        self._save_metadata(run_meta, profile_config, x_len)
 
         return self._train(run_meta, logger, model, x_axis, train_loader, val_loader)
 

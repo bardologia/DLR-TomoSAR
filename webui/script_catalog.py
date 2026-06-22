@@ -52,8 +52,8 @@ class ScriptCatalog:
         "infer_profile_autoencoder": {
             "title"     : "Profile AE Inference",
             "category"  : "Inference",
-            "purpose"   : "Reconstruct held-out profiles with a trained profile autoencoder and score reconstruction quality (no spatial cube). Select profile-autoencoder runs only.",
-            "essentials": ["logs_dir", "run_filter", "gpus", "paths.dataset_path", "paths.parameters_path"],
+            "purpose"   : "Reconstruct held-out profiles with a trained profile autoencoder and score reconstruction quality (no spatial cube). Dataset paths and splits are read from each run's metadata. Select profile-autoencoder runs only.",
+            "essentials": ["logs_dir", "run_filter", "gpus"],
         },
         "benchmark": {
             "title"     : "Benchmark",

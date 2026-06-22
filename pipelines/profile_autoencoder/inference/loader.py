@@ -7,17 +7,15 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.inference.profile_autoencoder        import ProfileAeInferenceConfig
-from configuration.sar.gaussian_config                  import GaussianConfig
-from models.profile_autoencoder                         import get_profile_autoencoder
-from pipelines.backbone.dataset.spatial                 import Layout
-from pipelines.profile_autoencoder.dataset.datasets     import ProfileDataset
+from configuration.inference.profile_autoencoder         import ProfileAeInferenceConfig
+from models.profile_autoencoder                          import get_profile_autoencoder
+from pipelines.backbone.dataset.spatial                  import Layout
+from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.profile_autoencoder.dataset.splitting    import ParameterCropper
-from pipelines.shared.config_factory                    import ConfigFactory
-from tools.data.io                                      import FileIO, ProfileAutoencoderConfigIO
-from tools.data.regions                                 import CropRegion
-from tools.monitoring.logger                            import Logger
+from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
+from tools.data.io                                       import FileIO, ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from tools.data.regions                                  import CropRegion
+from tools.monitoring.logger                             import Logger
 
 
 @dataclass
@@ -37,9 +35,8 @@ class ProfileAeRun:
 
 
 class ProfileAeRunLoader:
-    def __init__(self, run_directory: Path, entry_config, logger: Logger) -> None:
+    def __init__(self, run_directory: Path, logger: Logger) -> None:
         self.run_directory  = Path(run_directory)
-        self.entry_config   = entry_config
         self.logger         = logger
         self.meta_directory = self.run_directory / "meta"
 
@@ -51,26 +48,20 @@ class ProfileAeRunLoader:
 
         return summary
 
-    def _dataset_layout(self):
-        factory        = ConfigFactory(self.entry_config)
-        dataset_config = factory.training_dataset_config()
-        gaussian       = GaussianConfig.from_dataset(self.entry_config.paths.dataset_path, self.entry_config.n_gaussians)
-
-        return dataset_config, gaussian
-
-    def _build_dataset(self, config: ProfileAeInferenceConfig, dataset_config, gaussian, normalizer: ProfileNormalizer):
+    def _build_dataset(self, config: ProfileAeInferenceConfig, dataset_config, normalizer: ProfileNormalizer):
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
         cropper = ParameterCropper(layout, dataset_config.split_regions, logger=self.logger)
 
         param_arrays = cropper.load_split(config.split)
         x_len        = cropper.profile_length()
-        x_axis       = np.linspace(gaussian.x_min, gaussian.x_max, x_len, dtype=np.float32)
+        x_axis       = np.linspace(dataset_config.x_min, dataset_config.x_max, x_len, dtype=np.float32)
 
         dataset = ProfileDataset(
             param_arrays    = param_arrays,
             x_axis          = x_axis,
-            n_gaussians     = gaussian.n_default_gaussians,
+            n_gaussians     = dataset_config.n_gaussians,
             split_name      = config.split,
+            amp_zero_thr    = dataset_config.amp_zero_thr,
             pixel_subsample = config.pixel_subsample,
             keep_empty_frac = config.keep_empty_frac,
             seed            = config.seed,
@@ -87,7 +78,7 @@ class ProfileAeRunLoader:
 
         model, _ = get_profile_autoencoder(ae_name, ae_cfg)
 
-        return model.to(device), ae_name, ae_cfg
+        return model.to(device), ae_name
 
     def _load_checkpoint(self, ckpt_path: Path, device: str):
         if not ckpt_path.is_file():
@@ -109,19 +100,19 @@ class ProfileAeRunLoader:
         self.logger.section("[Profile AE Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
 
-        summary       = self._read_run_summary()
-        embedding_dim = int(summary["out_channels"])
+        summary        = self._read_run_summary()
+        embedding_dim  = int(summary["out_channels"])
+        dataset_config = ProfileDatasetConfigIO.load(self.meta_directory)
+        normalizer     = ProfileNormalizer(ProfileStats.load(self.meta_directory, self.logger))
 
-        dataset_config, gaussian = self._dataset_layout()
-        normalizer               = ProfileNormalizer(ProfileStats.load(self.meta_directory, self.logger))
-
-        dataset, x_axis, x_len = self._build_dataset(config, dataset_config, gaussian, normalizer)
+        dataset, x_axis, x_len = self._build_dataset(config, dataset_config, normalizer)
 
         if x_len != int(summary["x_axis_length"]):
-            raise ValueError(f"Profile length mismatch: dataset gives {x_len} bins but the run was trained on {summary['x_axis_length']}. The dataset path does not match the training dataset.")
+            raise ValueError(f"Profile length mismatch: dataset gives {x_len} bins but the run was trained on {summary['x_axis_length']}. The persisted dataset no longer matches the training dataset.")
 
-        model, ae_name, _    = self._build_model(x_len, device)
-        ckpt_path            = self.run_directory / config.checkpoint_name
+        model, ae_name = self._build_model(x_len, device)
+        ckpt_path      = self.run_directory / config.checkpoint_name
+
         ckpt, ckpt_x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
 
         model.load_state_dict(ckpt["params"])

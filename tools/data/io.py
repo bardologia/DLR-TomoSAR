@@ -154,3 +154,65 @@ class ImageAutoencoderConfigIO(ConfigIO):
     @classmethod
     def _serialize(cls, config) -> dict:
         return asdict(config)
+
+
+class ProfileDatasetConfigIO:
+    FILENAME = "profile_dataset_config.json"
+
+    @staticmethod
+    def exists(meta_directory: Path) -> bool:
+        return (Path(meta_directory) / ProfileDatasetConfigIO.FILENAME).is_file()
+
+    @staticmethod
+    def save(config, meta_directory: Path) -> Path:
+        payload = asdict(config)
+
+        payload["preprocessing_run_directory"] = str(config.preprocessing_run_directory)
+        payload["parameters_path"]             = str(config.parameters_path) if config.parameters_path is not None else None
+
+        return FileIO.save_json(payload, Path(meta_directory) / ProfileDatasetConfigIO.FILENAME)
+
+    @staticmethod
+    def _parse_split(value):
+        from tools.data.regions import CropRegion
+
+        if isinstance(value, list):
+            return [CropRegion(**region) for region in value]
+        return CropRegion(**value)
+
+    @staticmethod
+    def load(meta_directory: Path):
+        from configuration.dataset.profile_autoencoder import ProfileAugmentationConfig, ProfileDatasetConfig
+        from tools.data.regions                        import SplitRegions
+
+        path = Path(meta_directory) / ProfileDatasetConfigIO.FILENAME
+        if not path.is_file():
+            raise FileNotFoundError(f"No {ProfileDatasetConfigIO.FILENAME} under {meta_directory}; this profile-autoencoder run predates dataset-config persistence and is not self-describing. Retrain to regenerate it.")
+
+        payload = FileIO.load_json(path)
+        splits  = payload["split_regions"]
+
+        split_regions = SplitRegions(
+            train = ProfileDatasetConfigIO._parse_split(splits["train"]),
+            val   = ProfileDatasetConfigIO._parse_split(splits["val"]),
+            test  = ProfileDatasetConfigIO._parse_split(splits["test"]),
+        )
+
+        return ProfileDatasetConfig(
+            preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
+            split_regions               = split_regions,
+            parameters_path             = Path(payload["parameters_path"]) if payload["parameters_path"] is not None else None,
+            n_gaussians                 = int(payload["n_gaussians"]),
+            x_min                       = float(payload["x_min"]),
+            x_max                       = float(payload["x_max"]),
+            pixel_subsample             = float(payload["pixel_subsample"]),
+            keep_empty_frac             = float(payload["keep_empty_frac"]),
+            amp_zero_thr                = float(payload["amp_zero_thr"]),
+            batch_size                  = int(payload["batch_size"]),
+            num_workers                 = int(payload["num_workers"]),
+            prefetch_factor             = int(payload["prefetch_factor"]),
+            pin_memory                  = bool(payload["pin_memory"]),
+            shuffle_train               = bool(payload["shuffle_train"]),
+            stats_max_samples           = int(payload["stats_max_samples"]),
+            augmentation                = ProfileAugmentationConfig(**payload["augmentation"]),
+        )

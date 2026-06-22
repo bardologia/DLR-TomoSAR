@@ -31,9 +31,8 @@ class ProfileAeInferenceMetadata:
 
 
 class ProfileAeInferencePipeline:
-    def __init__(self, config: ProfileAeInferenceConfig, entry_config) -> None:
-        self.config       = config
-        self.entry_config = entry_config
+    def __init__(self, config: ProfileAeInferenceConfig) -> None:
+        self.config = config
 
     def _setup(self) -> tuple[ProfileAeInferenceMetadata, Logger]:
         meta = ProfileAeInferenceMetadata(self.config)
@@ -51,7 +50,7 @@ class ProfileAeInferencePipeline:
         return meta, logger
 
     def _load_run(self, logger: Logger):
-        loader = ProfileAeRunLoader(self.config.run_directory, self.entry_config, logger=logger)
+        loader = ProfileAeRunLoader(self.config.run_directory, logger=logger)
         return loader.load(config=self.config, device=self.config.device)
 
     def _predict(self, run, logger: Logger):
