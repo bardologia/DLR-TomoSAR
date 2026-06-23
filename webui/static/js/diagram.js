@@ -84,8 +84,10 @@ class ModelDiagram {
   static _node(x, y, w, h, label, sub, variant, t, pick, subId, subT, flow) {
     const C = this.C;
     const isLat  = variant === "latent";
-    const stroke = variant === "io" ? C.ioStroke : isLat ? C.accent : C.boxStroke;
-    const fill   = variant === "io" ? C.ioFill   : isLat ? C.accent : C.boxFill;
+    const isLoss = variant === "loss";
+    const isProc = variant === "proc";
+    const stroke = variant === "io" ? C.ioStroke : isLat ? C.accent : isLoss ? C.accent2 : isProc ? "#9aa196" : C.boxStroke;
+    const fill   = variant === "io" ? C.ioFill   : isLat ? C.accent : isLoss ? "rgba(15,118,110,0.10)" : isProc ? "rgba(125,133,139,0.07)" : C.boxFill;
     const sw     = isLat ? 1.7 : 1.4;
     const cx = x + w / 2;
     const delay = t.toFixed(2);
@@ -1336,6 +1338,167 @@ class ModelDiagram {
     const enc = { id: "enc", title: "Encoder", caption: "patch-embed into tokens, add convolutional positional encoding, transformer blocks, then a 1x1 to the embedding", ops: [inIo, o.txt("PatchEmbed", "conv s8 -> tokens"), o.txt("LayerNorm"), o.txt("Pos encode", "DWConv 3x3"), { label: "Transformer block", sub: "x4", block: "vtb" }, o.txt("LayerNorm"), o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
     const dec = { id: "dec", title: "Decoder", caption: "project to tokens, positional encoding, transformer blocks, then un-patch back to the stack", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> D"), o.txt("Pos encode", "DWConv 3x3"), { label: "Transformer block", sub: "x4", block: "vtb" }, o.txt("LayerNorm"), o.txt("Unpatch", "ConvT s8"), outIo] };
     return { ...base, zSub, encSub: "Patch + Tx x4", decSub: "Tx x4 + unpatch", blocks: [enc, dec, vtb, latent(base.zLabel, zSub)] };
+  }
+
+  /* ---------- JEPA composites ---------- */
+
+  static buildJepa(model) {
+    const bp = model.key === "jepa_image"   ? this._jepaImage()
+             : model.key === "jepa_profile" ? this._jepaProfile()
+             :                                this._jepaFull();
+    const blocks = {};
+    bp.blocks.forEach((b) => { blocks[b.id] = b; });
+    const network =
+      `<figure class="dgm-net"><div class="dgm-frame dgm-frame--net">${bp.network}</div>` +
+      `<figcaption class="dgm-hint">Click any subsystem to expand its full architecture</figcaption></figure>`;
+    return { network, blocks };
+  }
+
+  static _prefix(blocks, p) {
+    const idmap = {};
+    blocks.forEach((b) => { idmap[b.id] = p + b.id; });
+    return blocks.map((b) => {
+      const nb = Object.assign({}, b, { id: p + b.id });
+      if (b.ops) nb.ops = b.ops.map((op) => (op.block && idmap[op.block]) ? Object.assign({}, op, { block: idmap[op.block] }) : op);
+      return nb;
+    });
+  }
+
+  static _jepaBackboneBlocks(inLabel, inSub, outLabel, outSub, headCaption) {
+    const o = this._o;
+    const s = this.spec({ key: "resunet", skip: "residual", head: "single", family: "resunet", activation: "relu", normalization: "batch" });
+    const raw = this._blocks(s).filter((b) => ["enc", "bridge", "dec"].includes(b.id));
+    const blocks = this._prefix(raw, "bb_");
+    blocks.push({ id: "bb_head", title: "Output head", caption: headCaption, ops: [o.txt("Conv 1x1", outSub), o.io(outLabel, outSub)] });
+    const wrapper = {
+      id: "backbone", title: "Backbone predictor — ResU-Net",
+      caption: "the supervised backbone (default ResU-Net; any backbone-zoo model can be swapped in) maps the input grid to a dense per-pixel output",
+      ops: [
+        o.io(inLabel, inSub),
+        { label: "Encoder stage", sub: "x4, residual + downsample", block: "bb_enc" },
+        { label: "Bridge", sub: "residual bottleneck", block: "bb_bridge" },
+        { label: "Decoder stage", sub: "x4, up-conv + skip concat", block: "bb_dec" },
+        { label: "Output head", sub: outSub, block: "bb_head" },
+        o.io(outLabel, outSub),
+      ],
+    };
+    return [wrapper, ...blocks];
+  }
+
+  static _jepaImageEncBlocks() {
+    const spec = this._aeSpec({ key: "conv2d_ae", skip: "2D conv encoder/decoder", head: "Conv to 2D embedding", activation: "gelu", normalization: "batch" }, "image_autoencoder");
+    const enc  = spec.blocks.find((b) => b.id === "enc");
+    const cb   = spec.blocks.find((b) => b.id === "cb");
+    const pref = this._prefix([enc, cb], "img_");
+    const encB = pref.find((b) => b.id === "img_enc");
+    encB.title   = "Image AE encoder (front-end)";
+    encB.caption = "the pretrained image-autoencoder encoder (default Conv2D; any image-AE-zoo model), frozen or fine-tuned; encode_features returns the encoded stack at the input resolution to feed the backbone";
+    return pref;
+  }
+
+  static _jepaProfileBlocks() {
+    const spec = this._aeSpec({ key: "mlp_ae", skip: "Symmetric MLP", head: "Dense to embedding", activation: "gelu", normalization: "none" }, "autoencoder");
+    const enc  = spec.blocks.find((b) => b.id === "enc");
+    const dec  = spec.blocks.find((b) => b.id === "dec");
+    const mlpd = spec.blocks.find((b) => b.id === "mlpd");
+    const pref = this._prefix([enc, dec, mlpd], "prof_");
+    const encB = pref.find((b) => b.id === "prof_enc");
+    encB.title   = "Profile AE encoder (target)";
+    encB.caption = "the pretrained profile-autoencoder encoder (default MLP; any profile-AE-zoo model) defines the target space; run under stop-grad (or as an EMA copy) on the reconstructed GT profile to produce z*";
+    const decB = pref.find((b) => b.id === "prof_dec");
+    decB.title   = "Profile AE decoder (curve recon)";
+    decB.caption = "the pretrained profile-autoencoder decoder maps the predicted embedding back to a profile for the reconstruction loss";
+    return pref;
+  }
+
+  static _jepaImage() {
+    const bb = this._jepaBackboneBlocks("encoded stack", "Dimg x P x P", "Gaussian params", "3K x P x P", "1x1 conv to the 3K Gaussian parameters");
+    const img = this._jepaImageEncBlocks();
+    const blocks = [...img, ...bb];
+    const nodes = [
+      { id: "in", type: "grid", cx: 95, cy: 150, label: "input stack", sub: "Cin x P x P" },
+      { id: "imgenc", cx: 312, cy: 150, w: 196, h: 66, label: "Image AE encoder", sub: "frozen front-end", block: "img_enc" },
+      { id: "feat", cx: 528, cy: 150, w: 156, h: 54, variant: "io", label: "encoded stack", sub: "Dimg x P x P" },
+      { id: "bb", cx: 736, cy: 150, w: 184, h: 66, label: "Backbone", sub: "ResU-Net predictor", block: "backbone" },
+      { id: "params", cx: 952, cy: 150, w: 156, h: 54, variant: "io", label: "Gaussian params", sub: "3K x P x P" },
+      { id: "ploss", cx: 1130, cy: 150, w: 152, h: 60, variant: "loss", label: "Parameter L1", sub: "vs GT params" },
+      { id: "gt", cx: 1130, cy: 312, w: 156, h: 54, variant: "io", label: "GT params", sub: "3K x P x P" },
+    ];
+    const edges = [
+      { from: "in", to: "imgenc", route: "H" }, { from: "imgenc", to: "feat", route: "H" }, { from: "feat", to: "bb", route: "H" },
+      { from: "bb", to: "params", route: "H" }, { from: "params", to: "ploss", route: "H" },
+      { from: "gt", to: "ploss", route: "V", label: "target" },
+    ];
+    return { network: this._netCustom({ nodes, edges, width: 1240, height: 392 }), blocks };
+  }
+
+  static _jepaProfile() {
+    const bb = this._jepaBackboneBlocks("input stack", "Cin x P x P", "z_hat", "D x P x P", "1x1 conv to the D-dim predicted embedding z_hat");
+    const prof = this._jepaProfileBlocks();
+    const blocks = [...bb, ...prof];
+    const nodes = [
+      { id: "in", type: "grid", cx: 95, cy: 90, label: "input stack", sub: "Cin x P x P" },
+      { id: "bb", cx: 380, cy: 90, w: 204, h: 66, label: "Backbone", sub: "ResU-Net -> z_hat", block: "backbone" },
+      { id: "zhat", cx: 920, cy: 90, w: 162, h: 54, variant: "latent", label: "z_hat", sub: "predicted, D" },
+
+      { id: "profdec", cx: 920, cy: 232, w: 196, h: 64, label: "Profile AE decoder", sub: "curve recon", block: "prof_dec" },
+      { id: "curvehat", cx: 920, cy: 360, w: 160, h: 54, variant: "io", label: "recon profile", sub: "L x P x P" },
+
+      { id: "gt", cx: 95, cy: 490, w: 178, h: 54, variant: "io", label: "GT Gaussian params", sub: "3K x P x P" },
+      { id: "recon", cx: 305, cy: 490, w: 164, h: 60, variant: "proc", label: "Reconstruct curve", sub: "GaussianCurve" },
+      { id: "gtcurve", cx: 508, cy: 490, w: 156, h: 54, variant: "io", label: "GT profile", sub: "L x P x P" },
+      { id: "profenc", cx: 710, cy: 490, w: 192, h: 66, label: "Profile AE encoder", sub: "stop-grad / EMA", block: "prof_enc" },
+      { id: "zstar", cx: 920, cy: 490, w: 162, h: 54, variant: "latent", label: "z*", sub: "target, D" },
+
+      { id: "embloss", cx: 1190, cy: 90, w: 172, h: 62, variant: "loss", label: "Embedding MSE", sub: "z_hat vs z*" },
+      { id: "curveloss", cx: 1190, cy: 360, w: 172, h: 60, variant: "loss", label: "Curve recon", sub: "vs GT profile" },
+    ];
+    const edges = [
+      { from: "in", to: "bb", route: "H" }, { from: "bb", to: "zhat", route: "H" },
+      { from: "gt", to: "recon", route: "H" }, { from: "recon", to: "gtcurve", route: "H" }, { from: "gtcurve", to: "profenc", route: "H" }, { from: "profenc", to: "zstar", route: "H" },
+      { from: "zhat", to: "profdec", route: "V" }, { from: "profdec", to: "curvehat", route: "V" },
+      { from: "zhat", to: "embloss", route: "H" },
+      { from: "curvehat", to: "curveloss", route: "H" },
+      { from: "zstar", to: "embloss", route: "P", kind: "skip", fromSide: "right", via: [[1070, 490], [1070, 90]], toPt: [1104, 90] },
+      { from: "gtcurve", to: "curveloss", route: "P", kind: "skip", fromSide: "bottom", via: [[508, 565], [1140, 565]], toPt: [1140, 390] },
+    ];
+    return { network: this._netCustom({ nodes, edges, width: 1330, height: 600 }), blocks };
+  }
+
+  static _jepaFull() {
+    const bb = this._jepaBackboneBlocks("encoded stack", "Dimg x P x P", "z_hat", "D x P x P", "1x1 conv to the D-dim predicted embedding z_hat");
+    const img = this._jepaImageEncBlocks();
+    const prof = this._jepaProfileBlocks();
+    const blocks = [...img, ...bb, ...prof];
+    const nodes = [
+      { id: "in", type: "grid", cx: 90, cy: 90, label: "input stack", sub: "Cin x P x P" },
+      { id: "imgenc", cx: 285, cy: 90, w: 190, h: 64, label: "Image AE encoder", sub: "front-end", block: "img_enc" },
+      { id: "feat", cx: 478, cy: 90, w: 152, h: 52, variant: "io", label: "encoded stack", sub: "Dimg x P x P" },
+      { id: "bb", cx: 658, cy: 90, w: 178, h: 64, label: "Backbone", sub: "ResU-Net -> z_hat", block: "backbone" },
+      { id: "zhat", cx: 920, cy: 90, w: 158, h: 52, variant: "latent", label: "z_hat", sub: "predicted, D" },
+
+      { id: "profdec", cx: 920, cy: 232, w: 192, h: 62, label: "Profile AE decoder", sub: "curve recon", block: "prof_dec" },
+      { id: "curvehat", cx: 920, cy: 360, w: 156, h: 52, variant: "io", label: "recon profile", sub: "L x P x P" },
+
+      { id: "gt", cx: 90, cy: 490, w: 172, h: 54, variant: "io", label: "GT Gaussian params", sub: "3K x P x P" },
+      { id: "recon", cx: 290, cy: 490, w: 158, h: 58, variant: "proc", label: "Reconstruct curve", sub: "GaussianCurve" },
+      { id: "gtcurve", cx: 478, cy: 490, w: 150, h: 52, variant: "io", label: "GT profile", sub: "L x P x P" },
+      { id: "profenc", cx: 662, cy: 490, w: 190, h: 64, label: "Profile AE encoder", sub: "stop-grad / EMA", block: "prof_enc" },
+      { id: "zstar", cx: 920, cy: 490, w: 158, h: 52, variant: "latent", label: "z*", sub: "target, D" },
+
+      { id: "embloss", cx: 1190, cy: 90, w: 172, h: 62, variant: "loss", label: "Embedding MSE", sub: "z_hat vs z*" },
+      { id: "curveloss", cx: 1190, cy: 360, w: 172, h: 60, variant: "loss", label: "Curve recon", sub: "vs GT profile" },
+    ];
+    const edges = [
+      { from: "in", to: "imgenc", route: "H" }, { from: "imgenc", to: "feat", route: "H" }, { from: "feat", to: "bb", route: "H" }, { from: "bb", to: "zhat", route: "H" },
+      { from: "gt", to: "recon", route: "H" }, { from: "recon", to: "gtcurve", route: "H" }, { from: "gtcurve", to: "profenc", route: "H" }, { from: "profenc", to: "zstar", route: "H" },
+      { from: "zhat", to: "profdec", route: "V" }, { from: "profdec", to: "curvehat", route: "V" },
+      { from: "zhat", to: "embloss", route: "H" },
+      { from: "curvehat", to: "curveloss", route: "H" },
+      { from: "zstar", to: "embloss", route: "P", kind: "skip", fromSide: "right", via: [[1070, 490], [1070, 90]], toPt: [1104, 90] },
+      { from: "gtcurve", to: "curveloss", route: "P", kind: "skip", fromSide: "bottom", via: [[478, 565], [1140, 565]], toPt: [1140, 390] },
+    ];
+    return { network: this._netCustom({ nodes, edges, width: 1330, height: 600 }), blocks };
   }
 }
 

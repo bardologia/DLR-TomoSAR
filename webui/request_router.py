@@ -18,6 +18,7 @@ from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
+from jepa_model_library               import JepaModelLibrary
 from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
@@ -39,7 +40,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -50,6 +51,7 @@ class RequestRouter:
         self.models      = models
         self.profile_ae_models = profile_ae_models
         self.image_ae_models   = image_ae_models
+        self.jepa_models       = jepa_models
         self.pipelines   = pipelines
         self.processes   = processes
         self.nuke        = nuke
@@ -197,6 +199,17 @@ class RequestRouter:
         if path.startswith("/api/image-autoencoders/") and path.endswith("/note"):
             key  = path[len("/api/image-autoencoders/"):-len("/note")]
             note = self.image_ae_models.note(key)
+            if note is None:
+                self._send_json(handler, {"error": "not found"}, 404)
+            else:
+                self._send_json(handler, note)
+            return
+        if path == "/api/jepa-variants":
+            self._send_json(handler, {"families": self.jepa_models.collect()})
+            return
+        if path.startswith("/api/jepa-variants/") and path.endswith("/note"):
+            key  = path[len("/api/jepa-variants/"):-len("/note")]
+            note = self.jepa_models.note(key)
             if note is None:
                 self._send_json(handler, {"error": "not found"}, 404)
             else:

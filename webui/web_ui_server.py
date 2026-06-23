@@ -12,6 +12,7 @@ from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
+from jepa_model_library               import JepaModelLibrary
 from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from request_router         import RequestRouter
@@ -54,6 +55,7 @@ class WebUIServer:
         self.models           = BackboneModelLibrary()
         self.profile_ae_models = ProfileAutoencoderModelLibrary()
         self.image_ae_models   = ImageAutoencoderModelLibrary()
+        self.jepa_models       = JepaModelLibrary()
         self.pipelines   = PipelineLibrary()
         self.processes   = ProcessManager(self.paths, self.logger)
         self.nuke        = ProcessNuke(self.logger)
@@ -76,6 +78,7 @@ class WebUIServer:
             models      = self.models,
             profile_ae_models = self.profile_ae_models,
             image_ae_models   = self.image_ae_models,
+            jepa_models       = self.jepa_models,
             pipelines   = self.pipelines,
             processes   = self.processes,
             nuke        = self.nuke,

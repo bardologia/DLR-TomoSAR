@@ -58,19 +58,21 @@ class ModelGallery {
     this._pops = this._pops || [];
     this._closeFrom(0);
 
-    const isAe    = this.kind !== "backbone";
-    const built   = isAe ? window.ModelDiagram.buildAE(m, this.kind) : window.ModelDiagram.build(m);
+    const isBackbone = this.kind === "backbone";
+    const isJepa     = this.kind === "jepa";
+    const isAe       = !isBackbone && !isJepa;
+    const built   = isJepa ? window.ModelDiagram.buildJepa(m) : isAe ? window.ModelDiagram.buildAE(m, this.kind) : window.ModelDiagram.build(m);
     this.blockMap = built.blocks;
     const diagram = built.network;
-    const legend  = isAe ? this._aeLegend(m) : this._legend(m);
-    const keyLabel = isAe ? "model key" : "backbone key";
-    const specA    = isAe ? "encoder / decoder" : "skip mechanism";
-    const specB    = isAe ? "latent" : "output head";
+    const legend  = isBackbone ? this._legend(m) : isJepa ? this._jepaLegend(m) : this._aeLegend(m);
+    const keyLabel = isBackbone ? "backbone key" : isJepa ? "variant key" : "model key";
+    const specA    = isBackbone ? "skip mechanism" : isJepa ? "components" : "encoder / decoder";
+    const specB    = isBackbone ? "output head" : isJepa ? "objective" : "latent";
 
     this.detailEl.innerHTML =
       `<div class="mdetail__head">` +
       `<div><span class="mdetail__family">${m.family}</span>` +
-      `<h3 class="mdetail__name">${m.name}${m.recommended ? `<span class="mdetail__best">${isAe ? "default" : "best in benchmark"}</span>` : ""}</h3></div>` +
+      `<h3 class="mdetail__name">${m.name}${m.recommended ? `<span class="mdetail__best">${isBackbone ? "best in benchmark" : "default"}</span>` : ""}</h3></div>` +
       `<span class="mdetail__params">${m.params} params</span>` +
       `</div>` +
       `<div class="mdetail__diagram">${diagram}</div>` +
@@ -96,6 +98,15 @@ class ModelGallery {
       `<div class="mdetail__legend">` +
       `<span class="legend__dot"></span>The encoder compresses the ${what} into the embedding` +
       `<span class="legend__sep">/</span>the decoder reconstructs it, and the trained encoder seeds JEPA.` +
+      `</div>`
+    );
+  }
+
+  _jepaLegend(m) {
+    return (
+      `<div class="mdetail__legend">` +
+      `<span class="legend__dot"></span>Pretrained autoencoders are imported and frozen or fine-tuned` +
+      `<span class="legend__sep">/</span>the backbone is the trainable predictor. Click a subsystem to expand its full architecture.` +
       `</div>`
     );
   }
@@ -267,7 +278,14 @@ class ModelGallery {
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         const id = el.getAttribute("data-block");
-        const side = id === "enc" ? "left" : id === "dec" ? "right" : id === "bridge" || id === "latent" ? "bottom" : "right";
+        let side;
+        if (this.kind === "jepa") {
+          const dR = this.detailEl.querySelector(".mdetail__diagram").getBoundingClientRect();
+          const eR = el.getBoundingClientRect();
+          side = (eR.left + eR.width / 2) < (dR.left + dR.width / 2) ? "right" : "left";
+        } else {
+          side = id === "enc" ? "left" : id === "dec" ? "right" : "bottom";
+        }
         this._openBlock(id, el, 0, side, null);
       });
     });
