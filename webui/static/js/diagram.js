@@ -1194,27 +1194,26 @@ class ModelDiagram {
 
   static _aeNetwork(spec) {
     const image = spec.io === "image";
-    const cy = 125;
-    const xs = { in: 100, enc: 300, z: 500, dec: 700, out: 900 };
     const inNode = image
-      ? { id: "in", type: "grid", cx: xs.in, cy, label: "input", sub: spec.inSub }
-      : { id: "in", type: "profile", cx: xs.in, cy, label: spec.inLabel, sub: spec.inSub };
+      ? { id: "in", type: "grid", cx: 165, cy: 74, label: "input", sub: spec.inSub }
+      : { id: "in", type: "profile", cx: 165, cy: 74, label: spec.inLabel, sub: spec.inSub };
     const outNode = image
-      ? { id: "out", type: "grid", cx: xs.out, cy, out: true, label: "reconstruction", sub: spec.outSub }
-      : { id: "out", type: "profile", cx: xs.out, cy, out: true, label: spec.outLabel, sub: spec.outSub };
+      ? { id: "out", type: "grid", cx: 555, cy: 74, out: true, label: "reconstruction", sub: spec.outSub }
+      : { id: "out", type: "profile", cx: 555, cy: 74, out: true, label: spec.outLabel, sub: spec.outSub };
 
-    const enc = { id: "enc", cx: xs.enc, cy, w: 154, h: 64, label: "Encoder", sub: spec.encSub, block: "enc" };
-    const z   = { id: "latent", cx: xs.z, cy, w: 150, h: 56, variant: "latent", label: spec.zLabel, sub: spec.zSub, block: "latent" };
-    const dec = { id: "dec", cx: xs.dec, cy, w: 154, h: 64, label: "Decoder", sub: spec.decSub, block: "dec" };
+    const enc    = { id: "enc", cx: 165, cy: 212, w: 158, h: 66, label: "Encoder", sub: spec.encSub, block: "enc" };
+    const latent = { id: "latent", cx: 360, cy: 350, w: 152, h: 56, variant: "latent", label: spec.zLabel, sub: spec.zSub, block: "latent" };
+    const dec    = { id: "dec", cx: 555, cy: 212, w: 158, h: 66, label: "Decoder", sub: spec.decSub, block: "dec" };
 
-    const nodes = [inNode, enc, z, dec, outNode];
+    const nodes = [inNode, enc, latent, dec, outNode];
     const edges = [
-      { from: "in", to: "enc", route: "H" },
-      { from: "enc", to: "latent", route: "H" },
-      { from: "latent", to: "dec", route: "H" },
-      { from: "dec", to: "out", route: "H" },
+      { from: "in", to: "enc", route: "V" },
+      { from: "enc", to: "latent", route: "VH", label: "compress" },
+      { from: "latent", to: "dec", route: "HV", label: "reconstruct" },
+      { from: "dec", to: "out", route: "V" },
     ];
-    return this._netCustom({ nodes, edges, width: 1000, height: 250 });
+    this._applyOrientation({ nodes, edges }, spec.blocks);
+    return this._netCustom({ nodes, edges, width: 720, height: 432 });
   }
 
   static _aeSpec(model, kind) {

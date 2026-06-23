@@ -267,7 +267,7 @@ class ModelGallery {
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         const id = el.getAttribute("data-block");
-        const side = this.kind !== "backbone" ? "bottom" : id === "bridge" ? "bottom" : id === "enc" ? "left" : "right";
+        const side = id === "enc" ? "left" : id === "dec" ? "right" : id === "bridge" || id === "latent" ? "bottom" : "right";
         this._openBlock(id, el, 0, side, null);
       });
     });
