@@ -107,7 +107,6 @@ class SigmaAdamKernel:
 
 class PmapSigmaAdamKernel:
     def __init__(self, devices: list) -> None:
-        self._devices   = devices
         self._n_devices = len(devices)
         batched_vg      = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss), in_axes=(0, None, 0, 0, 0))
         self._run       = self._build(batched_vg, devices)

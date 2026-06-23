@@ -75,10 +75,6 @@ class CubeStitcher:
         self._accum[:, v0:v0 + ph, h0:h0 + pw] += (patch * w[None, :, :]).astype(self.dtype, copy=False)
         self._weight[v0:v0 + ph, h0:h0 + pw]   += w
 
-    def add_patch_batch(self, indices: np.ndarray, batch_patches: np.ndarray) -> None:
-        for b, idx in enumerate(indices):
-            self.add_patch(int(idx), batch_patches[b])
-
     def finalize_cube(self) -> np.ndarray:
         H, W         = self.grid.spatial_size
         pad_t, pad_l = self.grid.pad_top, self.grid.pad_left
