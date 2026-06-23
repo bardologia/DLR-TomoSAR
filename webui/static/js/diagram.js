@@ -1146,6 +1146,164 @@ class ModelDiagram {
     this._applyOrientation({ nodes, edges }, blocks);
     return { network: this._netCustom({ nodes, edges, width: W, height: 475 }), blocks };
   }
+
+  /* ---------- autoencoders ---------- */
+
+  static buildAE(model, kind) {
+    const spec = this._aeSpec(model, kind);
+    const blocks = {};
+    spec.blocks.forEach((b) => { blocks[b.id] = b; });
+    const network =
+      `<figure class="dgm-net"><div class="dgm-frame dgm-frame--net">${this._aeNetwork(spec)}</div>` +
+      `<figcaption class="dgm-hint">Click any block to zoom into its operations</figcaption></figure>`;
+    return { network, blocks };
+  }
+
+  static _aeNetwork(spec) {
+    const image = spec.io === "image";
+    const cy = 150;
+    const inNode = image
+      ? { id: "in", type: "grid", cx: 92, cy, label: "input", sub: spec.inSub }
+      : { id: "in", cx: 96, cy, w: 130, h: 52, variant: "io", label: spec.inLabel, sub: spec.inSub };
+    const outNode = image
+      ? { id: "out", type: "grid", cx: 768, cy, out: true, label: "reconstruction", sub: spec.outSub }
+      : { id: "out", cx: 764, cy, w: 130, h: 52, variant: "io", label: spec.outLabel, sub: spec.outSub };
+
+    const enc = { id: "enc", cx: 268, cy, w: 150, h: 66, label: "Encoder", sub: spec.encSub, block: "enc" };
+    const z   = { id: "latent", cx: 430, cy, w: 124, h: 38, label: spec.zLabel, sub: spec.zSub, block: "latent" };
+    const dec = { id: "dec", cx: 592, cy, w: 150, h: 66, label: "Decoder", sub: spec.decSub, block: "dec" };
+
+    const nodes = [inNode, enc, z, dec, outNode];
+    const edges = [
+      { from: "in", to: "enc", route: "H" },
+      { from: "enc", to: "latent", route: "H", label: "compress" },
+      { from: "latent", to: "dec", route: "H", label: "reconstruct" },
+      { from: "dec", to: "out", route: "H" },
+    ];
+    return this._netCustom({ nodes, edges, width: 850, height: 286 });
+  }
+
+  static _aeSpec(model, kind) {
+    const o = this._o;
+    const s = this.spec(model);
+    const na = this._na(s);
+    const norm = s.norm || "Norm";
+    const act = s.act;
+    const image = kind === "image_autoencoder";
+
+    const latent = (zLabel, zSub) => ({
+      id: "latent", title: "Embedding",
+      caption: image
+        ? "the compressed 2D code: the encoder output and decoder input; the trained encoder seeds the JEPA image front-end"
+        : "the compressed code: the encoder output and decoder input; the trained encoder defines the JEPA target space",
+      ops: image
+        ? [o.io("encoder features"), o.txt("Conv 1x1", "-> embedding"), o.io(zLabel, zSub)]
+        : [o.io("encoder output"), o.txt("LayerNorm", "normalize z"), o.io(zLabel, zSub)],
+    });
+
+    if (!image) {
+      const base = { io: "profile", inLabel: "Profile", inSub: "1 x 256", outLabel: "Reconstruction", outSub: "1 x 256", zLabel: "Embedding", zSub: "24-d" };
+      const zEnd = o.io("embedding z", "24-d");
+      const zStart = o.io("embedding z", "24-d");
+      const inIo = o.io("profile", "1 x 256");
+      const outIo = o.io("profile", "1 x 256");
+
+      if (model.key === "mlp_ae") {
+        const dl = { id: "mlpd", title: "Dense layer", caption: "linear projection, activation, dropout", ops: [o.txt("Linear", "-> 512"), o.act(act), o.txt("Dropout"), o.io("output")] };
+        const enc = { id: "enc", title: "Encoder", caption: "stacked dense layers compress the flat profile, then a linear projects to the embedding", ops: [inIo, { label: "Dense layer", sub: "x4", block: "mlpd" }, o.txt("Linear", "512 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "mirror of the encoder: expand from the embedding back to the profile", ops: [zStart, o.txt("Linear", "24 -> 512"), { label: "Dense layer", sub: "x4", block: "mlpd" }, o.txt("Linear", "512 -> 256"), outIo] };
+        return { ...base, encSub: "Linear x4, 512", decSub: "Linear x4, 512", blocks: [enc, dec, dl, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "conv1d_ae") {
+        const enc = { id: "enc", title: "Encoder", caption: "two 1D convolutions over the range axis, global pool, then project to the embedding", ops: [inIo, o.txt("Conv1d k5", "1 -> 192"), o.act(act), o.txt("Conv1d k5", "192 -> 192"), o.act(act), o.txt("Global avg-pool", "-> 1"), o.txt("Linear", "192 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "expand the embedding to a sequence, then two 1D convolutions back to the profile", ops: [zStart, o.txt("Linear", "24 -> 192 x 256"), o.txt("Reshape", "192 x 256"), o.txt("Conv1d k5", "192 -> 192"), o.act(act), o.txt("Conv1d k5", "192 -> 1"), outIo] };
+        return { ...base, encSub: "Conv k5 x2", decSub: "Conv k5 x2", blocks: [enc, dec, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "transformer1d_ae") {
+        const txl = { id: "txl", title: "Transformer layer", caption: "self-attention then feed-forward, each with a residual add and post-norm", ops: [o.txt("Multi-head attn", "4 heads"), o.sum(), o.txt("LayerNorm"), o.txt("FFN", "192 -> 384 -> 192, GELU"), o.sum(), o.txt("LayerNorm"), o.io("output")], shortcuts: [{ from: "top", to: 1, label: "res" }, { from: 2, to: 4, label: "res" }] };
+        const enc = { id: "enc", title: "Encoder", caption: "embed the profile, relate bins with self-attention, then project to the embedding", ops: [inIo, o.txt("Linear", "256 -> 192"), { label: "Transformer layer", sub: "x3", block: "txl" }, o.txt("Linear", "192 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "mirror of the encoder: embed, self-attention, then project to the profile", ops: [zStart, o.txt("Linear", "24 -> 192"), { label: "Transformer layer", sub: "x3", block: "txl" }, o.txt("Linear", "192 -> 256"), outIo] };
+        return { ...base, encSub: "Transformer x3", decSub: "Transformer x3", blocks: [enc, dec, txl, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "resmlp_ae") {
+        const rmb = { id: "rmb", title: "Residual MLP block", caption: "pre-norm two-layer MLP with a residual skip", ops: [o.txt("LayerNorm"), o.txt("Linear", "384 -> 384"), o.act(act), o.txt("Linear", "384 -> 384"), o.sum(), o.io("output")], shortcuts: [{ from: "top", to: 4, label: "residual" }] };
+        const enc = { id: "enc", title: "Encoder", caption: "embed the profile, refine through residual MLP blocks, project to the embedding", ops: [inIo, o.txt("Linear", "256 -> 384"), { label: "Residual MLP block", sub: "x3", block: "rmb" }, o.txt("Linear", "384 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "mirror of the encoder back to the profile", ops: [zStart, o.txt("Linear", "24 -> 384"), { label: "Residual MLP block", sub: "x3", block: "rmb" }, o.txt("Linear", "384 -> 256"), outIo] };
+        return { ...base, encSub: "ResMLP x3, 384", decSub: "ResMLP x3, 384", blocks: [enc, dec, rmb, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "tcn_ae") {
+        const drb = { id: "drb", title: "Dilated residual block", caption: "two dilated 3x3 convs with a residual add; dilation grows as 2^i", ops: [o.txt("Conv1d k3", "d=2^i"), o.act(act), o.txt("Dropout"), o.txt("Conv1d k3", "d=2^i"), o.sum(), o.act(act), o.io("output")], shortcuts: [{ from: "top", to: 4, label: "residual" }] };
+        const enc = { id: "enc", title: "Encoder", caption: "stem conv, dilated residual stack growing the receptive field, global pool, project", ops: [inIo, o.txt("Conv1d k3", "1 -> 128"), { label: "Dilated residual", sub: "x4, d=1,2,4,8", block: "drb" }, o.txt("Global avg-pool", "-> 1"), o.txt("Linear", "128 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "expand to a sequence, mirror dilated residual stack, conv back to the profile", ops: [zStart, o.txt("Linear", "24 -> 128 x 256"), o.txt("Reshape", "128 x 256"), { label: "Dilated residual", sub: "x4", block: "drb" }, o.txt("Conv1d k3", "128 -> 1"), outIo] };
+        return { ...base, encSub: "Dilated x4", decSub: "Dilated x4", blocks: [enc, dec, drb, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "gru_ae") {
+        const enc = { id: "enc", title: "Encoder", caption: "a bidirectional GRU sweeps the profile; the final hidden state is projected to the embedding", ops: [inIo, o.txt("Reshape", "256 x 1"), { label: "BiGRU", sub: "2 layers, h=224", block: "grub" }, o.txt("Last hidden", "2 x 224"), o.txt("Linear", "448 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "broadcast the embedding over the sequence and unroll a GRU back to the profile", ops: [zStart, o.txt("Linear", "24 -> 224"), o.txt("Expand", "256 x 224"), { label: "GRU", sub: "2 layers, h=224", block: "grud" }, o.txt("Linear", "224 -> 1"), outIo] };
+        const grub = { id: "grub", title: "Bidirectional GRU", caption: "two stacked bidirectional GRU layers read the sequence both ways", ops: [o.txt("GRU layer", "forward + backward"), o.txt("GRU layer", "forward + backward"), o.io("hidden states")] };
+        const grud = { id: "grud", title: "GRU decoder", caption: "two stacked unidirectional GRU layers unroll the embedding", ops: [o.txt("GRU layer"), o.txt("GRU layer"), o.io("output sequence", "256 x 224")] };
+        return { ...base, encSub: "BiGRU x2", decSub: "GRU x2", blocks: [enc, dec, grub, grud, latent(base.zLabel, base.zSub)] };
+      }
+
+      if (model.key === "cnn_attn_ae") {
+        const txb = { id: "txb", title: "Transformer block", caption: "pre-norm self-attention then feed-forward, each with a residual add", ops: [o.txt("LayerNorm"), o.txt("Multi-head attn", "4 heads"), o.sum(), o.txt("LayerNorm"), o.txt("FFN", "192 -> 768 -> 192, GELU"), o.sum(), o.io("output")], shortcuts: [{ from: "top", to: 2, label: "residual" }, { from: 2, to: 5, label: "residual" }] };
+        const enc = { id: "enc", title: "Encoder", caption: "conv stem, tokenize into patches, relate tokens with attention, pool and project", ops: [inIo, o.txt("Conv1d k5", "1 -> 32"), o.act(act), o.txt("Tokenize", "patch 8 -> 32 tokens"), o.txt("+ Pos embed"), { label: "Transformer block", sub: "x2", block: "txb" }, o.txt("Mean pool", "over tokens"), o.txt("Linear", "192 -> 24"), zEnd] };
+        const dec = { id: "dec", title: "Decoder", caption: "broadcast over tokens, attention, then map tokens back to the profile", ops: [zStart, o.txt("Linear", "24 -> 192"), o.txt("Expand", "32 tokens"), o.txt("+ Pos embed"), { label: "Transformer block", sub: "x2", block: "txb" }, o.txt("Linear", "-> patch 8"), o.txt("Reshape + Linear", "-> 256"), outIo] };
+        return { ...base, encSub: "Tokens + attn x2", decSub: "Attn x2", blocks: [enc, dec, txb, latent(base.zLabel, base.zSub)] };
+      }
+    }
+
+    const base = { io: "image", inSub: "Cin x H x W", outSub: "Cin x H x W", zLabel: "2D embedding" };
+    const inIo = o.io("image stack", "Cin x H x W");
+    const outIo = o.io("reconstruction", "Cin x H x W");
+
+    if (model.key === "conv2d_ae") {
+      const zSub = "24 x H x W";
+      const cb = { id: "cb", title: "Conv block", caption: "two 3x3 convolutions, each followed by normalization and activation", ops: [o.conv("Cin", "C"), ...na, o.conv("C", "C"), ...na, o.io("output")] };
+      const enc = { id: "enc", title: "Encoder", caption: "stacked double-conv blocks, then a 1x1 to the embedding; strided downsample stages are inserted when downsample_factor > 1", ops: [inIo, { label: "Conv block", sub: "x2", block: "cb" }, o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
+      const dec = { id: "dec", title: "Decoder", caption: "project from the embedding, refine with conv blocks, 1x1 back to the stack (upsample stages mirror any encoder downsampling)", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> C"), { label: "Conv block", sub: "refine", block: "cb" }, o.txt("Conv 1x1", "C -> Cin"), outIo] };
+      return { ...base, zSub, encSub: "Conv blocks x2", decSub: "Conv blocks", blocks: [enc, dec, cb, latent(base.zLabel, zSub)] };
+    }
+
+    if (model.key === "resnet2d_ae") {
+      const zSub = "24 x H/2 x W/2";
+      const rb = { id: "rb", title: "Residual block", caption: "pre-activation residual block with a 1x1 projection shortcut", ops: [...na, o.conv("Cin", "C"), ...na, o.conv("C", "C"), o.sum(), o.io("output")], shortcuts: [{ from: "top", to: na.length * 2 + 2, label: "Proj", op: "Conv 1x1" }] };
+      const rdown = { id: "rdown", title: "Downsample stage", caption: "a stride-2 residual block doubles channels and halves resolution", ops: [{ label: "Residual block s2", sub: "down, x2 ch" }, o.io("output", "2C x H/2")] };
+      const rup = { id: "rup", title: "Upsample stage", caption: "transposed conv doubles resolution and halves channels, then a residual block", ops: [o.txt("ConvT 2x2", "up, C/2"), { label: "Residual block", block: "rb" }, o.io("output")] };
+      const enc = { id: "enc", title: "Encoder", caption: "residual blocks, a stride-2 downsample stage, then a 1x1 to the embedding", ops: [inIo, { label: "Residual block", sub: "x2", block: "rb" }, { label: "Downsample", sub: "stride 2", block: "rdown" }, o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
+      const dec = { id: "dec", title: "Decoder", caption: "project, an upsample stage, refine residual blocks, 1x1 back to the stack", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> C"), { label: "Upsample", sub: "x1", block: "rup" }, { label: "Residual block", sub: "refine", block: "rb" }, o.txt("Conv 1x1", "C -> Cin"), outIo] };
+      return { ...base, zSub, encSub: "Residual, /2", decSub: "Residual, up", blocks: [enc, dec, rb, rdown, rup, latent(base.zLabel, zSub)] };
+    }
+
+    if (model.key === "convnext2d_ae") {
+      const zSub = "24 x H/2 x W/2";
+      const cnx = { id: "cnx", title: "ConvNeXt block", caption: "depthwise 7x7, layer norm, inverted-bottleneck MLP, layer scale, residual", ops: [o.txt("DWConv 7x7", "per-channel"), o.txt("LayerNorm"), o.txt("Linear", "C -> 4C"), o.act("GELU"), o.txt("Linear", "4C -> C"), o.txt("Layer Scale", "gamma"), o.sum(), o.io("output")], shortcuts: [{ from: "top", to: 6, label: "residual" }] };
+      const cndown = { id: "cndown", title: "Downsample stage", caption: "channel layer norm, strided 2x2 conv, then ConvNeXt blocks", ops: [o.txt("LayerNorm"), o.txt("Conv 2x2 s2", "down, x2 ch"), { label: "ConvNeXt block", sub: "x2", block: "cnx" }, o.io("output", "2C x H/2")] };
+      const cnup = { id: "cnup", title: "Upsample stage", caption: "transposed conv up, then ConvNeXt blocks", ops: [o.txt("ConvT 2x2", "up, C/2"), { label: "ConvNeXt block", block: "cnx" }, o.io("output")] };
+      const enc = { id: "enc", title: "Encoder", caption: "3x3 stem, ConvNeXt blocks, a stride-2 downsample stage, then a 1x1 to the embedding", ops: [inIo, o.txt("Conv 3x3", "stem -> C"), { label: "ConvNeXt block", sub: "x2", block: "cnx" }, { label: "Downsample", sub: "stride 2", block: "cndown" }, o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
+      const dec = { id: "dec", title: "Decoder", caption: "project, an upsample stage, refine ConvNeXt blocks, 1x1 back to the stack", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> C"), { label: "Upsample", sub: "x1", block: "cnup" }, { label: "ConvNeXt block", sub: "refine", block: "cnx" }, o.txt("Conv 1x1", "C -> Cin"), outIo] };
+      return { ...base, zSub, encSub: "ConvNeXt, /2", decSub: "ConvNeXt, up", blocks: [enc, dec, cnx, cndown, cnup, latent(base.zLabel, zSub)] };
+    }
+
+    if (model.key === "dilated2d_ae") {
+      const zSub = "24 x H x W";
+      const drb = { id: "drb", title: "Dilated residual block", caption: "two dilated 3x3 convs with a residual add; no downsampling, dilation grows as 2^i", ops: [o.txt("Conv 3x3", "d=2^i"), o.txt(norm), o.act(act), o.txt("Conv 3x3", "d=2^i"), o.txt(norm), o.sum(), o.act(act), o.io("output")], shortcuts: [{ from: "top", to: 5, label: "residual" }] };
+      const enc = { id: "enc", title: "Encoder", caption: "3x3 stem, dilated residual stack at full resolution, then a 1x1 to the embedding", ops: [inIo, o.txt("Conv 3x3", "stem -> C"), ...na, { label: "Dilated residual", sub: "x3, d=1,2,4", block: "drb" }, o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
+      const dec = { id: "dec", title: "Decoder", caption: "project, mirror the dilated residual stack, 1x1 back to the stack; resolution never changes", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> C"), { label: "Dilated residual", sub: "x3", block: "drb" }, o.txt("Conv 1x1", "C -> Cin"), outIo] };
+      return { ...base, zSub, encSub: "Dilated x3, full res", decSub: "Dilated x3", blocks: [enc, dec, drb, latent(base.zLabel, zSub)] };
+    }
+
+    const zSub = "24 x H/8 x W/8";
+    const vtb = { id: "vtb", title: "Transformer block", caption: "pre-norm self-attention then MLP, each with a residual add", ops: [o.txt("LayerNorm"), o.txt("Multi-head attn", "6 heads"), o.sum(), o.txt("LayerNorm"), o.txt("MLP", "D -> 4D -> D, GELU"), o.sum(), o.io("output")], shortcuts: [{ from: "top", to: 2, label: "residual" }, { from: 2, to: 5, label: "residual" }] };
+    const enc = { id: "enc", title: "Encoder", caption: "patch-embed into tokens, add convolutional positional encoding, transformer blocks, then a 1x1 to the embedding", ops: [inIo, o.txt("PatchEmbed", "conv s8 -> tokens"), o.txt("LayerNorm"), o.txt("Pos encode", "DWConv 3x3"), { label: "Transformer block", sub: "x4", block: "vtb" }, o.txt("LayerNorm"), o.txt("Conv 1x1", "-> 24 ch"), o.io("2D embedding", zSub)] };
+    const dec = { id: "dec", title: "Decoder", caption: "project to tokens, positional encoding, transformer blocks, then un-patch back to the stack", ops: [o.io("2D embedding", zSub), o.txt("Conv 1x1", "24 -> D"), o.txt("Pos encode", "DWConv 3x3"), { label: "Transformer block", sub: "x4", block: "vtb" }, o.txt("LayerNorm"), o.txt("Unpatch", "ConvT s8"), outIo] };
+    return { ...base, zSub, encSub: "Patch + Tx x4", decSub: "Tx x4 + unpatch", blocks: [enc, dec, vtb, latent(base.zLabel, zSub)] };
+  }
 }
 
 window.ModelDiagram = ModelDiagram;

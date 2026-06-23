@@ -59,10 +59,10 @@ class ModelGallery {
     this._closeFrom(0);
 
     const isAe    = this.kind !== "backbone";
-    const built   = isAe ? null : window.ModelDiagram.build(m);
-    this.blockMap = built ? built.blocks : null;
-    const diagram = isAe ? this._aeDiagram(m) : built.network;
-    const legend  = isAe ? "" : this._legend(m);
+    const built   = isAe ? window.ModelDiagram.buildAE(m, this.kind) : window.ModelDiagram.build(m);
+    this.blockMap = built.blocks;
+    const diagram = built.network;
+    const legend  = isAe ? this._aeLegend(m) : this._legend(m);
     const keyLabel = isAe ? "model key" : "backbone key";
     const specA    = isAe ? "encoder / decoder" : "skip mechanism";
     const specB    = isAe ? "latent" : "output head";
@@ -86,28 +86,18 @@ class ModelGallery {
     this.detailEl.classList.remove("is-swap");
     void this.detailEl.offsetWidth;
     this.detailEl.classList.add("is-swap");
-    if (!isAe) this._wireSchema();
+    this._wireSchema();
     this._loadNote(m);
   }
 
-  _aeDiagram(m) {
-    const isImage = this.kind === "image_autoencoder";
-    const inLabel  = isImage ? "Image stack" : "Profile";
-    const outLabel = isImage ? "Reconstructed stack" : "Reconstructed profile";
-    const latLabel = isImage ? "2D embedding" : "Embedding";
-    const stages = [
-      { t: inLabel,  s: "input",   kind: "io" },
-      { t: "Encoder", s: m.skip,   kind: "net" },
-      { t: latLabel,  s: "latent", kind: "latent" },
-      { t: "Decoder", s: "reconstruction", kind: "net" },
-      { t: outLabel,  s: "output", kind: "io" },
-    ];
-    const node = (st) =>
-      `<div class="ae-node ae-node--${st.kind}"><span class="ae-node__title">${st.t}</span></div>`;
-    const arrow = `<div class="ae-arrow" aria-hidden="true">&rarr;</div>`;
-    const flow = stages.map(node).join(arrow);
-    return `<figure class="dgm-net"><div class="dgm-frame dgm-frame--net"><div class="ae-flow">${flow}</div></div>` +
-      `<figcaption class="dgm-hint">Encoder maps the input to the latent; the decoder reconstructs it</figcaption></figure>`;
+  _aeLegend(m) {
+    const what = this.kind === "image_autoencoder" ? "image stack" : "elevation profile";
+    return (
+      `<div class="mdetail__legend">` +
+      `<span class="legend__dot"></span>The encoder compresses the ${what} into the embedding` +
+      `<span class="legend__sep">/</span>the decoder reconstructs it, and the trained encoder seeds JEPA.` +
+      `</div>`
+    );
   }
 
   async _loadNote(m) {
@@ -277,7 +267,7 @@ class ModelGallery {
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         const id = el.getAttribute("data-block");
-        const side = id === "bridge" ? "bottom" : id === "enc" ? "left" : "right";
+        const side = this.kind !== "backbone" ? "bottom" : id === "bridge" ? "bottom" : id === "enc" ? "left" : "right";
         this._openBlock(id, el, 0, side, null);
       });
     });
