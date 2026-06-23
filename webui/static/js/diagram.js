@@ -83,18 +83,24 @@ class ModelDiagram {
 
   static _node(x, y, w, h, label, sub, variant, t, pick, subId, subT, flow) {
     const C = this.C;
-    const stroke = variant === "io" ? C.ioStroke : C.boxStroke;
-    const fill = variant === "io" ? C.ioFill : C.boxFill;
+    const isLat  = variant === "latent";
+    const stroke = variant === "io" ? C.ioStroke : isLat ? C.accent : C.boxStroke;
+    const fill   = variant === "io" ? C.ioFill   : isLat ? C.accent : C.boxFill;
+    const sw     = isLat ? 1.7 : 1.4;
     const cx = x + w / 2;
     const delay = t.toFixed(2);
-    const subStyle = subT != null ? ` style="animation-delay:${subT.toFixed(2)}s"` : "";
+    const mainStyle = isLat ? ` style="fill:#ffffff"` : "";
+    const subParts = [];
+    if (subT != null) subParts.push(`animation-delay:${subT.toFixed(2)}s`);
+    if (isLat) subParts.push("fill:rgba(255,255,255,0.86)");
+    const subStyle = subParts.length ? ` style="${subParts.join(";")}"` : "";
     let text;
     if (sub) {
       text =
-        `<text x="${cx}" y="${y + h / 2 - 3}" class="dgm-t">${label}</text>` +
+        `<text x="${cx}" y="${y + h / 2 - 3}" class="dgm-t"${mainStyle}>${label}</text>` +
         `<text x="${cx}" y="${y + h / 2 + 11}" class="dgm-s"${subStyle}>${sub}</text>`;
     } else {
-      text = `<text x="${cx}" y="${y + h / 2 + 4}" class="dgm-t">${label}</text>`;
+      text = `<text x="${cx}" y="${y + h / 2 + 4}" class="dgm-t"${mainStyle}>${label}</text>`;
     }
     let cls = "dgm-block", data = "";
     if (pick) {
@@ -105,10 +111,35 @@ class ModelDiagram {
     else if (subId) { cls += " dgm-pick dgm-sub"; data = ` data-subblock="${subId}"`; }
     return (
       `<g class="${cls}"${data} style="animation-delay:${delay}s">` +
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>` +
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>` +
       text +
       `</g>`
     );
+  }
+
+  static _profileGlyph(cx, cy, opts, t) {
+    const C = opts.out ? this.C.accent2 : this.C.accent;
+    const W = 74, H = 48;
+    const x = cx - W / 2, y = cy - H / 2;
+    const delay = t.toFixed(2);
+    const pad = 9;
+    const x0 = x + pad, x1 = x + W - pad, baseY = y + H - 9, amp = H - 20;
+    const pts = [];
+    const N = 28;
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const v = Math.exp(-Math.pow((u - 0.40) / 0.15, 2)) + 0.55 * Math.exp(-Math.pow((u - 0.74) / 0.10, 2));
+      const px = x0 + (x1 - x0) * u;
+      const py = baseY - Math.min(v, 1.05) * amp;
+      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    const card = `<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="6" fill="${this.C.ioFill}" stroke="${C}" stroke-width="1.5"/>`;
+    const axis = `<line x1="${x0}" y1="${baseY}" x2="${x1}" y2="${baseY}" stroke="${C}" stroke-width="0.6" opacity="0.45"/>`;
+    const wave = `<polyline points="${pts.join(' ')}" fill="none" stroke="${C}" stroke-width="1.7"/>`;
+    const lab =
+      `<text x="${cx}" y="${y - 14}" class="dgm-t">${opts.label}</text>` +
+      `<text x="${cx}" y="${y - 3}" class="dgm-s">${opts.sub}</text>`;
+    return `<g class="dgm-block" style="animation-delay:${delay}s">${card}${axis}${wave}${lab}</g>`;
   }
 
   static _gridStack(cx, cy, opts, t) {
@@ -901,8 +932,9 @@ class ModelDiagram {
     const box = {};
     g.nodes.forEach((n) => {
       const grid = n.type === "grid";
-      const w = grid ? 50 : (n.w || 150);
-      const h = grid ? 50 : (n.h || 50);
+      const prof = n.type === "profile";
+      const w = grid ? 50 : prof ? 74 : (n.w || 150);
+      const h = grid ? 50 : prof ? 48 : (n.h || 50);
       box[n.id] = { x: n.cx - w / 2, y: n.cy - h / 2, w, h, cx: n.cx, cy: n.cy };
     });
 
@@ -968,6 +1000,7 @@ class ModelDiagram {
       const b = box[n.id];
       const t = i * step;
       if (n.type === "grid") nodes += this._gridStack(b.cx, b.cy, { label: n.label, sub: n.sub, out: n.out, pick: n.block }, t);
+      else if (n.type === "profile") nodes += this._profileGlyph(b.cx, b.cy, { label: n.label, sub: n.sub, out: n.out }, t);
       else nodes += this._node(b.x, b.y, b.w, b.h, n.label, n.sub, n.variant || "op", t, n.block, null, settle + i * 0.05, n._flin != null ? `${n._flin};${n._flout};${n._fup}` : null);
     });
 
@@ -1161,26 +1194,27 @@ class ModelDiagram {
 
   static _aeNetwork(spec) {
     const image = spec.io === "image";
-    const cy = 150;
+    const cy = 125;
+    const xs = { in: 100, enc: 300, z: 500, dec: 700, out: 900 };
     const inNode = image
-      ? { id: "in", type: "grid", cx: 92, cy, label: "input", sub: spec.inSub }
-      : { id: "in", cx: 96, cy, w: 130, h: 52, variant: "io", label: spec.inLabel, sub: spec.inSub };
+      ? { id: "in", type: "grid", cx: xs.in, cy, label: "input", sub: spec.inSub }
+      : { id: "in", type: "profile", cx: xs.in, cy, label: spec.inLabel, sub: spec.inSub };
     const outNode = image
-      ? { id: "out", type: "grid", cx: 768, cy, out: true, label: "reconstruction", sub: spec.outSub }
-      : { id: "out", cx: 764, cy, w: 130, h: 52, variant: "io", label: spec.outLabel, sub: spec.outSub };
+      ? { id: "out", type: "grid", cx: xs.out, cy, out: true, label: "reconstruction", sub: spec.outSub }
+      : { id: "out", type: "profile", cx: xs.out, cy, out: true, label: spec.outLabel, sub: spec.outSub };
 
-    const enc = { id: "enc", cx: 268, cy, w: 150, h: 66, label: "Encoder", sub: spec.encSub, block: "enc" };
-    const z   = { id: "latent", cx: 430, cy, w: 124, h: 38, label: spec.zLabel, sub: spec.zSub, block: "latent" };
-    const dec = { id: "dec", cx: 592, cy, w: 150, h: 66, label: "Decoder", sub: spec.decSub, block: "dec" };
+    const enc = { id: "enc", cx: xs.enc, cy, w: 154, h: 64, label: "Encoder", sub: spec.encSub, block: "enc" };
+    const z   = { id: "latent", cx: xs.z, cy, w: 150, h: 56, variant: "latent", label: spec.zLabel, sub: spec.zSub, block: "latent" };
+    const dec = { id: "dec", cx: xs.dec, cy, w: 154, h: 64, label: "Decoder", sub: spec.decSub, block: "dec" };
 
     const nodes = [inNode, enc, z, dec, outNode];
     const edges = [
       { from: "in", to: "enc", route: "H" },
-      { from: "enc", to: "latent", route: "H", label: "compress" },
-      { from: "latent", to: "dec", route: "H", label: "reconstruct" },
+      { from: "enc", to: "latent", route: "H" },
+      { from: "latent", to: "dec", route: "H" },
       { from: "dec", to: "out", route: "H" },
     ];
-    return this._netCustom({ nodes, edges, width: 850, height: 286 });
+    return this._netCustom({ nodes, edges, width: 1000, height: 250 });
   }
 
   static _aeSpec(model, kind) {
