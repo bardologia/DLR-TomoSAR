@@ -13,6 +13,7 @@ from tqdm            import tqdm
 from tools.data.io               import FileIO
 from tools.data.preprocessing    import ProfileNormalizer
 from tools.metrics.gaussian_matching import GaussianMatcher
+from tools.metrics.slot_organization import SlotOrganization
 from tools.metrics.scoring       import R2, RelativeImprovement
 
 
@@ -399,6 +400,24 @@ class Metrics:
 
         return out
 
+    def _slot_organization_stats(self) -> Dict[str, float]:
+        pp  = self.result.params_pred
+        pg  = self.result.params_gt
+        n_K = self.n_gaussians
+        out: Dict[str, float] = {}
+
+        usage = SlotOrganization.usage_fractions(pp, n_K)
+        out["slot_usage_entropy"] = SlotOrganization.usage_entropy(usage)
+
+        rank_counts = SlotOrganization.mu_rank_matrix(pp, n_K)
+        out["slot_mu_rank_diag"] = SlotOrganization.diagonality(rank_counts)
+
+        if pg is not None:
+            assign_counts = SlotOrganization.assignment_matrix(pp, pg, n_K)
+            out["slot_gt_alignment"] = SlotOrganization.diagonality(assign_counts)
+
+        return out
+
     def compute(self, *, elev_indices  : Optional[np.ndarray] = None, range_indices : Optional[np.ndarray] = None, az_indices : Optional[np.ndarray] = None, param_space : bool = True, match_tol : float = 5.0) -> Dict[str, float]:
         pred = self.result.pred_curves
         gt   = self.result.gt_curves
@@ -443,6 +462,7 @@ class Metrics:
         if param_space:
             metrics.update(self._active_count_stats())
             metrics.update(self._matched_gaussian_metrics(match_tol=match_tol))
+            metrics.update(self._slot_organization_stats())
 
         return metrics
 

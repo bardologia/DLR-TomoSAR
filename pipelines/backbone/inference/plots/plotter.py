@@ -5,6 +5,7 @@ from pipelines.backbone.inference.plots.slice import SlicePlotter
 from pipelines.backbone.inference.plots.param import ParamPlotter
 from pipelines.backbone.inference.plots.slot  import SlotPlotter
 from pipelines.backbone.inference.plots.track import TrackPlotter
+from pipelines.backbone.inference.plots.organization import SlotOrganizationPlotter
 
 
 class Ploter(PlotTools):
@@ -23,3 +24,4 @@ class Ploter(PlotTools):
         self.param = ParamPlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
         self.slot  = SlotPlotter( cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
         self.track = TrackPlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)
+        self.organization = SlotOrganizationPlotter(cmap=cmap, err_cmap=err_cmap, normalize=normalize, fig_dpi=fig_dpi, save_dpi=save_dpi)

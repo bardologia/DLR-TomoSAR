@@ -579,6 +579,25 @@ class FigureComposer:
 
         logger.subsection(f"Param plots : distributions, scatter, error maps, active-count map written to {meta.figures_dir}")
 
+    def _compose_slot_organization(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
+        org_plotter = self.plotter.organization
+        meta        = self.meta
+        logger      = self.logger
+        n_K         = run.n_gaussians
+        out_dir     = meta.figures_dir / "slot_organization"
+
+        params_pred = result.params_pred[: n_K * 3]
+        params_gt   = result.params_gt  [: n_K * 3] if result.params_gt is not None else None
+
+        figure_paths["slot_usage"]      = org_plotter.plot_slot_usage(params_pred, n_K, out_dir)
+        figure_paths["slot_param_dist"] = org_plotter.plot_slot_param_distributions(params_pred, n_K, out_dir)
+        figure_paths["slot_mu_rank"]    = org_plotter.plot_mu_rank_matrix(params_pred, n_K, out_dir)
+
+        if params_gt is not None:
+            figure_paths["slot_assignment"] = org_plotter.plot_assignment_matrix(params_pred, params_gt, n_K, out_dir)
+
+        logger.subsection(f"Slot organization : usage, per-slot distributions, μ-rank and GT-assignment matrices written to {out_dir}")
+
     def _compose_slices(self, result: Result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict, figure_paths: Dict[str, List[Path]]) -> None:
         meta   = self.meta
         logger = self.logger
@@ -792,6 +811,7 @@ class FigureComposer:
 
         if param_space:
             self._compose_param_plots(result, run, global_metrics, figure_paths)
+            self._compose_slot_organization(result, run, figure_paths)
 
         self._compose_slices(result, run, global_metrics, x_axis_np, indices, figure_paths)
         self._compose_ssim(result, global_metrics, x_axis_np, indices, figure_paths)

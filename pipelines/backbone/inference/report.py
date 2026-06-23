@@ -272,6 +272,7 @@ class Report:
 
         out += self._build_active_count_headline()
         out += self._build_matched_headline()
+        out += self._build_slot_organization_headline()
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
         out += self._build_reduced_headline()
@@ -355,6 +356,34 @@ class Report:
 
         return out
 
+    def _build_slot_organization_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "slot_mu_rank_diag" not in gm:
+            return []
+
+        n_K = self.run_summary["n_gaussians"]
+        out = ["\n### 2.6 Slot internal organization (emergent)\n"]
+        out.append(
+            "Training Hungarian-matches predicted slots to GT before scoring, so the loss is invariant to "
+            "predicted slot ordering: the model gets no gradient fixing a role to an output channel. These "
+            "metrics, computed on the raw unsorted predicted slots, measure whether a consistent organization "
+            "emerged anyway. μ-rank diagonality is the fraction of active predicted slots whose channel index "
+            "equals their μ-rank within the pixel; slot↔GT alignment is the same against the μ-sorted GT index. "
+            f"1.0 means the model spontaneously emits slots in height order; chance is about {1.0 / n_K:.3f}.\n"
+        )
+
+        rows = [
+            ("Usage entropy (norm.)", gm["slot_usage_entropy"], "Evenness of per-slot activation; 1 = all slots used equally, 0 = a single slot"),
+            ("μ-rank diagonality",    gm["slot_mu_rank_diag"],  "Fraction of active slots whose channel index equals their μ-rank"),
+        ]
+        if "slot_gt_alignment" in gm:
+            rows.append(("Slot↔GT alignment", gm["slot_gt_alignment"], "Fraction of matched slots whose channel index equals the matched μ-sorted GT index"))
+
+        out.append(self._three_col_table(rows, header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
+
     def _build_tracks_table(self) -> List[str]:
         tracks = self.global_metrics.get("tracks")
         if not isinstance(tracks, dict):
@@ -424,7 +453,7 @@ class Report:
         if "improvement_pixel_mse_mean" not in gm:
             return []
 
-        out = ["\n### 2.6 NN improvement over the classical baseline\n"]
+        out = ["\n### 2.7 NN improvement over the classical baseline\n"]
         out.append(
             "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
             "secondary subset this run was trained on, processed identically to the ground-truth full-stack "
@@ -601,6 +630,25 @@ class Report:
             ("param_error_maps",       "6.3 Parameter absolute-error maps |Pred − GT|"),
             ("active_count_map",       "6.4 Active Gaussian count map"),
         ))
+
+        org_groups = [(key, title) for key, title in (
+            ("slot_usage",      "Per-slot activation frequency"),
+            ("slot_param_dist", "Per-slot parameter distributions"),
+            ("slot_mu_rank",    "Slot-index vs μ-rank matrix"),
+            ("slot_assignment", "Slot-index vs matched GT-index matrix"),
+        ) if fp.get(key)]
+
+        if org_groups:
+            out.append("\n## 6b. Slot internal organization (emergent under Hungarian matching)\n")
+            out.append(
+                "Analyses of the raw, unsorted predicted slots. Because Hungarian matching makes the training "
+                "loss permutation-invariant over slot index, any structure here is self-organised, not imposed. "
+                "Usage shows per-slot activation; the per-slot distributions reveal whether each slot specialises "
+                "in a height (μ), width (σ) or amplitude band; the μ-rank and matched-GT matrices show whether "
+                "the channel index tracks height order (a diagonal means the model spontaneously emits slots "
+                "sorted by μ). See §2.6 for the scalar summaries.\n"
+            )
+            self._numbered_section(out, "6b.", org_groups)
 
         slice_groups = [(key, title) for key, title in (
             ("slices_range",        "Range cuts"),
