@@ -9,7 +9,7 @@ import torch
 from tools.benchmarking            import LoaderSpec, GpuFeedBenchmark, DataLoaderSweep, SweepReport
 from tools.monitoring.logger       import Logger
 from tools.runtime.reproducibility import Reproducibility
-from pipelines.benchmarking.adapters import build_feed_target
+from pipelines.dataloader_tuning.adapters import build_feed_target
 
 
 class DataLoaderTuningPipeline:

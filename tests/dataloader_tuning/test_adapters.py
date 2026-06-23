@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.benchmarking.adapters import (
+from pipelines.dataloader_tuning.adapters import (
     DEFAULT_MODEL,
     FEED_ADAPTERS,
     FEED_MODES,

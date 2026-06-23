@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from pipelines.benchmarking.pipeline import DataLoaderTuningPipeline
+from pipelines.dataloader_tuning.pipeline import DataLoaderTuningPipeline
 
 from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
 from tools.benchmarking import LoaderSpec
@@ -37,7 +37,7 @@ def test_worker_counts_drops_counts_above_cores(tmp_path, monkeypatch):
     config   = _config(tmp_path, worker_counts=[0, 2, 1000000])
     pipeline = DataLoaderTuningPipeline(config)
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.os.cpu_count", lambda: 4)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 4)
 
     assert pipeline._worker_counts() == [0, 2]
 
@@ -46,7 +46,7 @@ def test_worker_counts_falls_back_to_min_when_all_dropped(tmp_path, monkeypatch)
     config   = _config(tmp_path, worker_counts=[64, 128])
     pipeline = DataLoaderTuningPipeline(config)
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.os.cpu_count", lambda: 4)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 4)
 
     assert pipeline._worker_counts() == [64]
 
@@ -55,7 +55,7 @@ def test_main_specs_is_cartesian_product(tmp_path, monkeypatch):
     config   = _config(tmp_path, batch_sizes=[256, 512], worker_counts=[0, 2])
     pipeline = DataLoaderTuningPipeline(config)
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.os.cpu_count", lambda: 8)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 8)
 
     specs = pipeline._main_specs()
 
@@ -68,7 +68,7 @@ def test_main_specs_uses_reference_prefetch_and_pins(tmp_path, monkeypatch):
     config   = _config(tmp_path, batch_sizes=[256], worker_counts=[2], reference_prefetch=4)
     pipeline = DataLoaderTuningPipeline(config)
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.os.cpu_count", lambda: 8)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 8)
 
     spec = pipeline._main_specs()[0]
 
@@ -135,7 +135,7 @@ def test_run_selects_highest_throughput_config(tmp_path, monkeypatch):
     config   = _config(tmp_path, batch_sizes=[256, 512], worker_counts=[2], refine=False, save_figures=False)
     pipeline = DataLoaderTuningPipeline(config)
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.os.cpu_count", lambda: 8)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 8)
 
     class FakeTarget:
         dataset        = [torch.zeros(2)]
@@ -147,8 +147,8 @@ def test_run_selects_highest_throughput_config(tmp_path, monkeypatch):
         item_source    = "synthetic"
         config_hint    = "synthetic"
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.build_feed_target", lambda *a, **k: FakeTarget())
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.GpuFeedBenchmark", lambda **kwargs: object())
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.build_feed_target", lambda *a, **k: FakeTarget())
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.GpuFeedBenchmark", lambda **kwargs: object())
 
     main_records = [
         _ok_record(256, 2, 4, True, 1000.0),
@@ -163,7 +163,7 @@ def test_run_selects_highest_throughput_config(tmp_path, monkeypatch):
                 self.on_result(dict(record))
             return main_records
 
-    monkeypatch.setattr("pipelines.benchmarking.pipeline.DataLoaderSweep", FakeSweep)
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.DataLoaderSweep", FakeSweep)
 
     final = pipeline.run()
 
