@@ -153,7 +153,7 @@ class MetricsBarPlotter(PlotBase):
 
         pearson  = float(pearsonr(s, r)[0])  if s.size > 1 else float("nan")
         spearman = float(spearmanr(s, r)[0]) if s.size > 1 else float("nan")
-        ax.text(0.02, 0.98, f"Pearson $r$ = {pearson:.3f}\nSpearman $\\rho$ = {spearman:.3f}\n(on plotted, $-1$-floored $R^2$)", transform=ax.transAxes, fontsize=9, va="top", ha="left", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
+        ax.text(0.98, 0.12, f"Pearson $r$ = {pearson:.3f}\nSpearman $\\rho$ = {spearman:.3f}\n(on plotted, $-1$-floored $R^2$)", transform=ax.transAxes, fontsize=9, va="bottom", ha="right", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
         return self._save(fig, out_dir / "snr_vs_r2.png")
