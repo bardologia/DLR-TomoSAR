@@ -422,11 +422,11 @@ class FlowLibrary:
             },
             {
                 "id": "fitstats", "title": "Fit normalisation statistics", "phase": "Normalization",
-                "note": "Statistics are fitted on the train split only, per slot, in float64; the live mapping is z-score with an optional log1p compression applied before fitting, and the scale floored at 1e-8.",
+                "note": "Statistics are fitted on the train split only, per slot, in float64. Heavy-tailed channels (SLC/ifg magnitudes, output amplitude and sigma, DEM) use the median and IQR of their log1p values (robust-IQR-log1p); the rest (re/im, phase, output mu) use the mean and standard deviation (z-score). The scale is floored at 1e-8.",
                 "inputs": ["xgeo", "gkeys"], "outputs": ["stats"],
                 "lines": [
                     [{"tex": r"f(x_c) = \log\!\big(1 + \max(x_c,0)\big)\ \ \text{(log1p slots)},\ \ \text{else } x_c"}],
-                    [{"id": "stats", "tex": r"(\mu_c, s_c)", "role": "calculated"}, {"tex": "="}, {"tex": r"\Big(\operatorname{mean} f(x_c),\ \ \max\!\big(\operatorname{std} f(x_c),\ 10^{-8}\big)\Big)"}],
+                    [{"id": "stats", "tex": r"(\mu_c, s_c)", "role": "calculated"}, {"tex": "="}, {"tex": r"\big(P_{50}f(x_c),\ P_{75}f(x_c) - P_{25}f(x_c)\big)\ \ \text{(robust)},\ \ \big(\operatorname{mean} f,\ \operatorname{std} f\big)\ \ \text{(z-score)}"}],
                 ],
             },
             {
@@ -596,10 +596,10 @@ class FlowLibrary:
             },
             {
                 "id": "composite", "title": "Composite weighted loss", "phase": "Composite",
-                "note": "The total loss is the effective-weight-normalised sum over enabled terms; each effective weight is the user weight times a fixed empirical normaliser that brings heterogeneous terms to roughly unit magnitude.",
+                "note": "The total loss is the weight-normalised sum over enabled terms; each weight is the user-selected weight_* value directly (no automatic normaliser). The loss-scale probe can suggest factors to fold into those weights, but the user is responsible for bringing heterogeneous terms to comparable magnitude.",
                 "inputs": ["lj"], "outputs": ["loss"],
                 "lines": [
-                    [{"tex": r"\mathrm{eff}_j = \alpha_j\,\nu_j,\qquad"}, {"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum_j \mathrm{eff}_j\,"}, {"id": "lj", "tex": r"\ell_j", "role": "calculated"}, {"tex": r"}{\sum_j \mathrm{eff}_j}"}],
+                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum_j \alpha_j\,"}, {"id": "lj", "tex": r"\ell_j", "role": "calculated"}, {"tex": r"}{\sum_j \alpha_j},\qquad \alpha_j = \mathtt{weight\_}j"}],
                 ],
             },
             {
@@ -699,7 +699,7 @@ class FlowLibrary:
             },
             {
                 "id": "align", "title": "GT slot mu-sort alignment", "phase": "Windowed predict",
-                "note": "Per pixel the GT slots are stably sorted by mean with inactive slots pushed to the end, giving GT a canonical storage order; the parameter metrics later Hungarian-match predictions to these GT slots.",
+                "note": "Per pixel the GT slots are stably sorted by mean with inactive slots pushed to the end, giving GT a canonical storage order; the parameter metrics later match predictions to these GT slots by brute-force optimal assignment.",
                 "inputs": ["thgt"], "outputs": ["thgts"],
                 "lines": [
                     [{"id": "thgts", "tex": r"\theta^{\mathrm{GT}}_{\pi}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{take}\big("}, {"id": "thgt", "tex": r"\theta^{\mathrm{GT}}", "role": "measured"}, {"tex": r",\ \pi^{\star}\big),\quad \pi^{\star} = \operatorname{argsort}_k\,\kappa_k"}],
@@ -768,7 +768,7 @@ class FlowLibrary:
             },
             {
                 "id": "paramslot", "title": "Matched Gaussian metrics", "phase": "Param metrics",
-                "note": "On active pixels predictions are Hungarian-matched to GT Gaussians per pixel on mu distance: matched mu and sigma MAE/RMSE over matched pairs, plus detection recall, precision and F1 within tolerance.",
+                "note": "On active pixels predictions are matched to GT Gaussians per pixel on mu distance by brute-force optimal assignment (all K! permutations, no Hungarian fallback): matched mu and sigma MAE/RMSE over matched pairs, plus detection recall, precision and F1 within tolerance.",
                 "inputs": ["th", "thgts"], "outputs": ["gmu", "mf1"],
                 "lines": [
                     [{"id": "gmu", "tex": r"\mathrm{MAE}_{\mu}", "role": "calculated"}, {"tex": "="}, {"tex": r"\tfrac{1}{|\mathcal M|}\textstyle\sum_{(i,j)\in\mathcal M}|\hat\mu_{i}-\mu^{\mathrm{GT}}_{j}|,\quad \mathcal M = \text{matched active pairs}"}],

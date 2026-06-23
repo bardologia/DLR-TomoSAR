@@ -161,7 +161,7 @@ class EquationLibrary:
                 {
                     "title" : "Profile magnitude and relative threshold",
                     "tex"   : r"P_h = |T_h|, \qquad P_h \leftarrow P_h \cdot \mathbf{1}\!\left[\,P_h > t_f \cdot \max_h P_h\,\right]",
-                    "note"  : "Each elevation profile is the tomogram magnitude; samples below a per-pixel relative floor are zeroed before fitting (sigma_fitting.py _load_batch).",
+                    "note"  : "Each elevation profile is the tomogram magnitude; samples below a per-pixel relative floor are zeroed before fitting (ProfilePreprocessor, sigma.py _load_batch).",
                     "vars"  : [
                         {"sym": r"P_h",               "desc": "profile value at elevation bin h"},
                         {"sym": r"T_h",               "desc": "tomogram value at bin h (per pixel)"},
@@ -183,7 +183,7 @@ class EquationLibrary:
                 {
                     "title" : "Per-pixel normalisation",
                     "tex"   : r"s = \max_h P_h, \qquad \tilde{\gamma}_h = \frac{P_h}{s}",
-                    "note"  : "The profile is normalised by its own maximum so the loss surface is independent of absolute backscatter. Pixels whose maximum is below 1e-7 are skipped entirely (their scale is treated as 1).",
+                    "note"  : "The profile is normalised by its own maximum so the loss surface is independent of absolute backscatter. Pixels whose maximum is below the activity threshold (1e-3) are skipped entirely (their scale is treated as 1).",
                     "vars"  : [
                         {"sym": r"s",                "desc": "per-pixel scale, reapplied to amplitudes at the end"},
                         {"sym": r"P_h",              "desc": "conditioned profile at bin h"},
@@ -191,33 +191,25 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Profile smoothing",
-                    "tex"   : r"\tilde{P}_h = \frac{1}{5}\sum_{j=-2}^{2} P_{h+j}",
-                    "note"  : "A width-5 uniform filter (mode nearest) smooths the raw profile before peak detection (peak_init.py).",
-                    "vars"  : [
-                        {"sym": r"\tilde{P}_h", "desc": "smoothed profile at bin h"},
-                        {"sym": r"P_{h+j}",     "desc": "raw profile at offset j from bin h"},
-                        {"sym": r"j",           "desc": "window offset, −2 to 2"},
-                    ],
-                },
-                {
                     "title" : "Prominence gate and inter-peak distance",
-                    "tex"   : r"\mathrm{prom}(p) \geq p_{\mathrm{frac}} \cdot \max_h \tilde{P}_h, \qquad |p_i - p_j| \geq d_{\min}",
-                    "note"  : "scipy.signal.find_peaks keeps a peak only if its topographic prominence exceeds a fraction of the profile maximum and it is at least d_min samples from any other accepted peak.",
+                    "tex"   : r"\mathrm{prom}(p) \geq p_{\mathrm{frac}} \cdot \max_h P_h, \qquad |p_i - p_j| \geq d_{\min}",
+                    "note"  : "scipy.signal.find_peaks runs directly on the raw (un-smoothed) profile and keeps a peak only if its topographic prominence exceeds a fraction of the profile maximum and it is at least d_min samples from any other accepted peak; accepted peaks are then sorted by descending prominence (sigma.py PeakInitialiser).",
                     "vars"  : [
                         {"sym": r"\mathrm{prom}(p)",  "desc": "height of peak p above its lowest enclosing contour"},
                         {"sym": r"p_{\mathrm{frac}}", "desc": "prominence_frac = 0.05"},
-                        {"sym": r"\tilde{P}_h",       "desc": "smoothed profile"},
+                        {"sym": r"P_h",               "desc": "raw profile"},
                         {"sym": r"p_i, p_j",          "desc": "accepted peak positions (bins)"},
                         {"sym": r"d_{\min}",          "desc": "minimum inter-peak distance (samples)"},
                     ],
                 },
                 {
-                    "title" : "Sigma guess and minimum distance",
-                    "tex"   : r"\sigma_{\mathrm{guess}} = \max\!\left(2\,\Delta\xi,\ \frac{x_{\max}-x_{\min}}{8K}\right), \qquad d_{\min} = \left\lfloor \sigma_{\mathrm{guess}}/\Delta\xi \right\rfloor",
-                    "note"  : "Every slot starts from the same width guess; the same quantity sets the peak separation in samples (floored at 1).",
+                    "title" : "Width scale, initial guess, and minimum distance",
+                    "tex"   : r"\sigma_{\mathrm{base}} = \max\!\left(2\,\Delta\xi,\ \frac{x_{\max}-x_{\min}}{8K}\right), \qquad \sigma_{\mathrm{guess}} = \frac{\sigma_{\mathrm{base}}}{D_\sigma}, \qquad d_{\min} = \max\!\left(1,\ \left\lfloor \sigma_{\mathrm{base}}/\Delta\xi \right\rfloor\right)",
+                    "note"  : "A span-derived width scale sets the peak-separation distance; the shared initial width guess is that scale divided by sigma_init_divisor.",
                     "vars"  : [
+                        {"sym": r"\sigma_{\mathrm{base}}",  "desc": "span-derived width scale (m)"},
                         {"sym": r"\sigma_{\mathrm{guess}}", "desc": "initial spread assigned to every slot (m)"},
+                        {"sym": r"D_\sigma",                "desc": "sigma_init_divisor = 4.0"},
                         {"sym": r"\Delta\xi",               "desc": "elevation bin spacing (m)"},
                         {"sym": r"x_{\min}, x_{\max}",      "desc": "elevation axis bounds (m)"},
                         {"sym": r"K",                       "desc": "components being initialised"},
@@ -239,21 +231,21 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Flat-profile fallback",
-                    "tex"   : r"\mathrm{idxs} = \mathrm{linspace}(0,\, H{-}1,\, K), \qquad a_g = \tilde{P}_{i_g}",
-                    "note"  : "Profiles with no detectable signal (maximum below 1e-10) receive K equally spaced initialisations; amplitudes are floored at 1e-10 in code to keep gradients alive.",
+                    "tex"   : r"\mathrm{idxs} = \mathrm{linspace}(0,\, H{-}1,\, K), \qquad a_g = \max\!\left(P_{i_g},\ 10^{-10}\right)",
+                    "note"  : "Profiles with no detectable signal (raw maximum below 1e-10) receive K equally spaced initialisations; amplitudes are floored at 1e-10 to keep gradients alive.",
                     "vars"  : [
                         {"sym": r"\mathrm{idxs}", "desc": "K equally spaced bin indices"},
                         {"sym": r"H",             "desc": "number of elevation bins"},
                         {"sym": r"K",             "desc": "slots to fill"},
                         {"sym": r"a_g",           "desc": "initial amplitude of slot g"},
-                        {"sym": r"\tilde{P}",     "desc": "smoothed profile"},
+                        {"sym": r"P",             "desc": "raw profile"},
                         {"sym": r"i_g",           "desc": "selected peak index of slot g"},
                     ],
                 },
                 {
                     "title" : "Discrete mixture (shared forward model)",
                     "tex"   : r"\hat{\gamma}(x_h) = \sum_{k=1}^{K} a_k\,\exp\!\left(-\frac{(x_h-\mu_k)^2}{2\sigma_k^2}\right)",
-                    "note"  : "The single reconciled convention in tools/gaussian_mixture.py, used by the fitting kernel, best-K scoring, the R² map, and the plots. Implementation guards: sigma floored at 1e-6, exponent clipped to [−100, 0].",
+                    "note"  : "The single reconciled convention in tools/data/gaussians.py (GaussianMixture), used by the fitting kernel, best-K scoring, the R² map, and the plots. Implementation guards: sigma floored at 1e-6, exponent clipped to [−100, 0].",
                     "vars"  : [
                         {"sym": r"\hat{\gamma}(x_h)", "desc": "reconstructed mixture at sample x_h"},
                         {"sym": r"x_h",               "desc": "h-th elevation sample (m)"},
@@ -305,7 +297,7 @@ class EquationLibrary:
                 {
                     "title" : "Adam update (sigma fit)",
                     "tex"   : r"\hat{m}_t = \frac{m_t}{1-\beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1-\beta_2^t}, \qquad \sigma_t = \sigma_{t-1} - \eta\,\frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon}",
-                    "note"  : "Bias-corrected Adam step; after every update the sigmas are clamped to [Δξ, (x_max − x_min)/2], one elevation bin to half the elevation span (sigma_kernels.py).",
+                    "note"  : "Bias-corrected Adam step; after every update the sigmas are clamped to [Δξ, (x_max − x_min)/2], one elevation bin to half the elevation span (sigma.py SigmaScan).",
                     "vars"  : [
                         {"sym": r"\sigma_t",             "desc": "sigma vector after step t"},
                         {"sym": r"\hat{m}_t, \hat{v}_t", "desc": "bias-corrected first and second moments"},
@@ -317,14 +309,14 @@ class EquationLibrary:
                 {
                     "title" : "Phase 3 — penalised score per K",
                     "tex"   : r"\mathrm{MSE}_K = \frac{1}{H}\sum_{h}\left(\hat{\gamma}_K(x_h) - \tilde{\gamma}(x_h)\right)^2, \qquad \mathrm{pen}_K = \mathrm{MSE}_K + \lambda_K \cdot K \cdot \bar{a}_K, \qquad \bar{a}_K = \frac{1}{K}\sum_{k=1}^{K} a^{\mathrm{norm}}_k",
-                    "note"  : "The K·mean-amplitude penalty spends the full component budget only when the profile is genuinely multi-layered (best_k.py).",
+                    "note"  : "The K·mean-amplitude penalty spends the full component budget only when the profile is genuinely multi-layered (sigma.py BestKSelector).",
                     "vars"  : [
                         {"sym": r"\mathrm{MSE}_K",      "desc": "fit error of the K-component model"},
                         {"sym": r"\hat{\gamma}_K(x_h)", "desc": "K-component reconstruction at sample x_h"},
                         {"sym": r"\tilde{\gamma}(x_h)", "desc": "normalised measured profile"},
                         {"sym": r"H",                   "desc": "number of elevation samples"},
                         {"sym": r"\mathrm{pen}_K",      "desc": "penalised score of model order K"},
-                        {"sym": r"\lambda_K",           "desc": "complexity penalty, lambda_k = 3e-3"},
+                        {"sym": r"\lambda_K",           "desc": "complexity penalty, lambda_k = 1e-2"},
                         {"sym": r"\bar{a}_K",           "desc": "mean of the K normalised amplitudes"},
                     ],
                 },
@@ -343,7 +335,7 @@ class EquationLibrary:
                 {
                     "title" : "Component ordering by mean elevation",
                     "tex"   : r"\kappa_k = \begin{cases} \mu_k & a_k > 10^{-3} \\ +\infty & \text{otherwise} \end{cases}, \qquad \pi = \operatorname{argsort}_k\,\kappa_k",
-                    "note"  : "After fitting, active components are sorted by ascending mu and inactive slots pushed last (fitting.py _sort_gaussians), giving GT a canonical storage order; the loss is permutation-invariant, Hungarian-matching predictions to these GT slots.",
+                    "note"  : "After fitting, active components are sorted by ascending mu and inactive slots pushed last (pipeline.py ParameterExtractor._sort_gaussians), giving GT a canonical storage order; the loss is permutation-invariant, matching predictions to these GT slots by optimal assignment.",
                     "vars"  : [
                         {"sym": r"\kappa_k", "desc": "sort key of slot k"},
                         {"sym": r"\mu_k",    "desc": "mean elevation of slot k (m)"},
@@ -354,7 +346,7 @@ class EquationLibrary:
                 {
                     "title" : "Fit quality map",
                     "tex"   : r"R^2(a,r) = 1 - \frac{\sum_{h=1}^{H}\big(\hat{\gamma}(x_h) - \gamma(x_h)\big)^2}{\sum_{h=1}^{H}\big(\gamma(x_h) - \bar{\gamma}\big)^2}",
-                    "note"  : "Per-pixel coefficient of determination over the elevation axis on the raw amplitude scale, accumulated in one pass per height; a 1e-12 stabiliser guards the denominator (param_pipeline/metrics.py).",
+                    "note"  : "Per-pixel coefficient of determination over the elevation axis against the thresholded and truncated profile, accumulated in one pass per height; a 1e-12 stabiliser guards the denominator (param_extraction/metrics.py FittingMetricsCalculator).",
                     "vars"  : [
                         {"sym": r"R^2(a,r)",          "desc": "fit quality at azimuth a, range r"},
                         {"sym": r"\hat{\gamma}(x_h)", "desc": "reconstructed mixture at sample x_h"},
@@ -406,13 +398,13 @@ class EquationLibrary:
                 {
                     "title" : "Stacked complex input array",
                     "tex"   : r"\mathbf{X}[0] = \mathbf{s}_0, \qquad \mathbf{X}[1 : 1+N_s] = S, \qquad \mathbf{X}[1+N_s :] = I",
-                    "note"  : "Primary, secondaries, and interferograms are written straight into one pre-allocated complex buffer of shape (1 + 2N_s, Az, Rg).",
+                    "note"  : "Primary, selected secondaries, and selected interferograms are written straight into one pre-allocated complex buffer of shape (1 + N_s + N_i, Az, Rg); the secondary and interferogram counts are independent.",
                     "vars"  : [
                         {"sym": r"\mathbf{X}",   "desc": "stacked complex input array"},
                         {"sym": r"\mathbf{s}_0", "desc": "primary SLC pass"},
                         {"sym": r"S",            "desc": "secondary SLC passes, shape (N_s, Az, Rg)"},
-                        {"sym": r"I",            "desc": "interferogram passes, shape (N_s, Az, Rg)"},
-                        {"sym": r"N_s",          "desc": "number of secondary passes"},
+                        {"sym": r"I",            "desc": "interferogram passes, shape (N_i, Az, Rg)"},
+                        {"sym": r"N_s, N_i",     "desc": "number of secondary and interferogram passes"},
                     ],
                 },
                 {
@@ -476,7 +468,7 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Input tensor assembly",
-                    "tex"   : r"\mathbf{x} = \left[\,\mathrm{rep}(s_0)\ \middle|\ \mathrm{rep}(S_1),\dots,\mathrm{rep}(S_{N_s})\ \middle|\ \mathrm{rep}(I_1),\dots,\mathrm{rep}(I_{N_s})\ \middle|\ \mathbf{d}\,\right]",
+                    "tex"   : r"\mathbf{x} = \left[\,\mathrm{rep}(s_0)\ \middle|\ \mathrm{rep}(S_1),\dots,\mathrm{rep}(S_{N_s})\ \middle|\ \mathrm{rep}(I_1),\dots,\mathrm{rep}(I_{N_i})\ \middle|\ \mathbf{d}\,\right]",
                     "note"  : "Per patch, each enabled source is converted by its representation and concatenated along the channel axis, with the optional DEM channel last.",
                     "vars"  : [
                         {"sym": r"\mathbf{x}",          "desc": "assembled input tensor, shape (C_in, P_H, P_W)"},
@@ -489,15 +481,15 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Input channel count",
-                    "tex"   : r"C_{\mathrm{in}} = c_{\mathrm{prim}} + N_s\,(c_{\mathrm{sec}} + c_{\mathrm{ifg}}) + c_{\mathrm{dem}}",
-                    "note"  : "Total input width follows from which sources are enabled and the representation chosen for each.",
+                    "tex"   : r"C_{\mathrm{in}} = c_{\mathrm{prim}} + N_s\,c_{\mathrm{sec}} + N_i\,c_{\mathrm{ifg}} + c_{\mathrm{dem}}",
+                    "note"  : "Total input width follows from which sources are enabled and the representation chosen for each; secondaries and interferograms are counted independently.",
                     "vars"  : [
                         {"sym": r"C_{\mathrm{in}}",   "desc": "total input channel count"},
                         {"sym": r"c_{\mathrm{prim}}", "desc": "channels of the primary pass (0 if disabled)"},
                         {"sym": r"c_{\mathrm{sec}}",  "desc": "channels per secondary pass"},
                         {"sym": r"c_{\mathrm{ifg}}",  "desc": "channels per interferogram pass"},
                         {"sym": r"c_{\mathrm{dem}}",  "desc": "1 if use_dem else 0"},
-                        {"sym": r"N_s",               "desc": "number of secondary passes"},
+                        {"sym": r"N_s, N_i",          "desc": "number of secondary and interferogram passes"},
                     ],
                 },
                 {
@@ -538,7 +530,7 @@ class EquationLibrary:
                 {
                     "title" : "Additive Gaussian input noise",
                     "tex"   : r"\mathbf{x}' = \mathbf{x} + \varepsilon, \qquad \varepsilon \sim \mathcal{N}\!\left(0,\ \sigma_{\mathrm{noise}}^2\,\mathbf{I}\right) \ \ (p_N = 0.25)",
-                    "note"  : "Applied to the input only; perturbing the regression target would corrupt the supervision.",
+                    "note"  : "Applied to the already-normalised input on the train split only (so the std is in normalised units); the regression target is never perturbed.",
                     "vars"  : [
                         {"sym": r"\mathbf{x}, \mathbf{x}'",  "desc": "input patch before and after"},
                         {"sym": r"\varepsilon",              "desc": "noise tensor, same shape as the input"},
@@ -548,34 +540,24 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Stats fit — percentile min-max",
-                    "tex"   : r"\mu_c = P_{0.1}\big(f(x)\big), \qquad s_c = P_{99.9}\big(f(x)\big) - P_{0.1}\big(f(x)\big)",
-                    "note"  : "MIN_MAX_P999 strategy for SLC and interferogram magnitudes (with log1p), raw re/im components, and the output mu and amplitude pools; the scale is floored at 1e-8 (norm_config.py).",
+                    "title" : "Stats fit — robust IQR with log1p",
+                    "tex"   : r"f(x) = \log\!\big(1 + \max(x, 0)\big), \qquad \mu_c = P_{50}\big(f(x)\big), \qquad s_c = P_{75}\big(f(x)\big) - P_{25}\big(f(x)\big)",
+                    "note"  : "The ROBUST_IQR_LOG1P strategy: median and interquartile range of the log-compressed values. The live slot mapping assigns it to the heavy-tailed channels — SLC and interferogram magnitudes, the output amplitude and sigma pools, and the DEM elevation channel; the scale is floored at 1e-8 (configuration/normalization/general.py).",
                     "vars"  : [
                         {"sym": r"\mu_c", "desc": "fitted location of channel group c"},
                         {"sym": r"s_c",   "desc": "fitted scale of channel group c"},
                         {"sym": r"P_q",   "desc": "q-th percentile of the collected values"},
-                        {"sym": r"f",     "desc": "log1p transform when the slot strategy requests it"},
+                        {"sym": r"f",     "desc": "log1p compression applied before fitting"},
                         {"sym": r"x",     "desc": "collected sample values of the group"},
                     ],
                 },
                 {
-                    "title" : "Stats fit — robust IQR and z-score",
-                    "tex"   : r"\mu_c = P_{50}, \quad s_c = P_{75} - P_{25}, \qquad \mu_c = \mathrm{mean}(x), \quad s_c = \mathrm{std}(x)",
-                    "note"  : "ROBUST_IQR for magnitude-normalised re/im components; ZSCORE for the DEM elevation channel. Both scales are floored at 1e-8.",
+                    "title" : "Stats fit — z-score",
+                    "tex"   : r"\mu_c = \mathrm{mean}(x), \qquad s_c = \max\!\big(\mathrm{std}(x),\ 10^{-8}\big)",
+                    "note"  : "The ZSCORE strategy: mean and standard deviation with no compression. The live slot mapping assigns it to the well-behaved channels — raw and magnitude-normalised re/im components, phase channels, and the output mu pool. MIN_MAX_P999 and FIXED_DIV_PI strategies remain defined but are not referenced by the current slot mapping.",
                     "vars"  : [
                         {"sym": r"\mu_c, s_c", "desc": "fitted location and scale of the group"},
-                        {"sym": r"P_q",        "desc": "q-th percentile (median, quartiles)"},
                         {"sym": r"x",          "desc": "collected sample values of the group"},
-                    ],
-                },
-                {
-                    "title" : "Stats fit — fixed phase scaling",
-                    "tex"   : r"\mu_c = 0, \qquad s_c = \pi",
-                    "note"  : "FIXED_DIV_PI for phase channels bounded in (−π, π]; no data is collected or fitted for these slots.",
-                    "vars"  : [
-                        {"sym": r"\mu_c, s_c", "desc": "fixed location and scale of phase channels"},
-                        {"sym": r"\pi",        "desc": "phase bound (radians)"},
                     ],
                 },
                 {
@@ -592,7 +574,7 @@ class EquationLibrary:
                 {
                     "title" : "Inverse normalisation",
                     "tex"   : r"x_c = \exp\!\big(\hat{x}_c\,s_c + \mu_c\big) - 1\ \ \text{(log1p)}, \qquad x_c = \hat{x}_c\,s_c + \mu_c\ \ \text{(otherwise)}",
-                    "note"  : "Used to recover physical units during loss computation and inference; the exponent argument is clamped at 15 in code to prevent expm1 overflow (normalizer.py).",
+                    "note"  : "Used to recover physical units during loss computation and inference; the exponent argument is clamped to [0, 80] in code to prevent expm1 overflow (transforms.py Log1pTransform).",
                     "vars"  : [
                         {"sym": r"x_c",        "desc": "recovered physical-space value"},
                         {"sym": r"\hat{x}_c",  "desc": "normalised value of channel c"},
@@ -605,7 +587,7 @@ class EquationLibrary:
     def _training_loss(self) -> dict:
         return {
             "group" : "Training · Loss",
-            "blurb" : "The composable multi-term objective, term by term: ten switchable components over curve space and parameter space, plus clamping, matching, and weight calibration.",
+            "blurb" : "The composable multi-term objective, term by term: seventeen switchable components over curve, physics, and parameter space, plus clamping, optimal-assignment matching, slot-presence weighting, and weight calibration.",
             "items" : [
                 {
                     "title" : "Physical parameter bounds",
@@ -689,7 +671,7 @@ class EquationLibrary:
                 {
                     "title" : "Spectral coherence",
                     "tex"   : r"\ell_{\mathrm{coh}} = 1 - \operatorname{mean}_{b,h,w,t}\!\left(\frac{\left|\langle \hat{y}, y \rangle_t\right|}{\sqrt{\langle \hat{y}^2 \rangle_t\,\langle y^2 \rangle_t}}\right)",
-                    "note"  : "Windowed inner products are computed as length-w average pools scaled back to sums; the constant window scaling cancels in the ratio. The denominator is floored at 1e-16 and the coherence clipped to [0, 1] in code.",
+                    "note"  : "Windowed inner products are computed as length-w average pools scaled back to sums; the constant window scaling cancels in the ratio. Windows whose pred or GT energy falls below 1e-6 are masked out, the denominator is floored at 1e-6, and the coherence clipped to [0, 1] in code (curve_loss.py spectral_coherence).",
                     "vars"  : [
                         {"sym": r"\ell_{\mathrm{coh}}",    "desc": "spectral coherence term value"},
                         {"sym": r"\langle u, v \rangle_t", "desc": "windowed sum of u·v at position t, window = 7"},
@@ -725,9 +707,81 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "GT sort and Hungarian prediction matching",
+                    "title" : "Tomographic forward operator (physics terms)",
+                    "tex"   : r"k_z^{(i)} = \frac{4\pi\,b_i}{\lambda\,r_0}, \qquad A_{i,n} = \exp\!\left(j\,k_z^{(i)}\,\xi_n\right), \qquad O_{i,j,n} = A_{i,n}\,\overline{A_{j,n}}",
+                    "note"  : "The five physics terms share this Fourier forward model built from the configured geometry: the perpendicular baselines set the vertical wavenumbers (or explicit kz_values are used directly). They operate on the reconstructed curves and reduce only over pixels whose GT integrated power exceeds the physics floor (1e-3). All physics terms default off (tomo_geometry.py TomoGeometry).",
+                    "vars"  : [
+                        {"sym": r"k_z^{(i)}", "desc": "vertical wavenumber of track i (rad/m)"},
+                        {"sym": r"b_i",       "desc": "perpendicular baseline of track i (m)"},
+                        {"sym": r"\lambda, r_0", "desc": "wavelength and slant range (m)"},
+                        {"sym": r"A_{i,n}",   "desc": "steering matrix, track i at elevation bin n"},
+                        {"sym": r"O_{i,j,n}", "desc": "per-bin steering outer product"},
+                        {"sym": r"\xi_n",     "desc": "elevation axis sample (m)"},
+                    ],
+                },
+                {
+                    "title" : "Total-power relative error",
+                    "tex"   : r"p_0 = \sum_n \hat{y}_n\,\Delta\xi, \quad t_0 = \sum_n y_n\,\Delta\xi, \qquad \ell_{\mathrm{pow}} = \left\langle \frac{|p_0 - t_0|}{t_0} \right\rangle_{t_0 > \tau}",
+                    "note"  : "Relative integrated-power error of the predicted spectrum, averaged over GT-strong pixels. Kept as a loss option though radiometric power is biased by Capon (physical_loss.py total_power).",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{pow}}", "desc": "total-power relative-error term"},
+                        {"sym": r"p_0, t_0",            "desc": "integrated power of predicted and GT curves"},
+                        {"sym": r"\Delta\xi",           "desc": "elevation bin spacing (m)"},
+                        {"sym": r"\tau",                "desc": "physics_floor = 1e-3"},
+                    ],
+                },
+                {
+                    "title" : "Profile moments",
+                    "tex"   : r"\bar{z} = \frac{\sum_n P_n\,\xi_n}{\sum_n P_n}, \quad \sigma_z = \sqrt{\frac{\sum_n P_n\,\xi_n^2}{\sum_n P_n} - \bar{z}^2 + 10^{-8}}, \qquad \ell_{\mathrm{mom}} = \left\langle \frac{w_0\frac{|\Delta m_0|}{t_0} + w_1\frac{|\Delta\bar{z}|}{\Delta\xi_R} + w_2\frac{|\Delta\sigma_z|}{\Delta\xi_R}}{w_0+w_1+w_2} \right\rangle",
+                    "note"  : "Relative error of the first three profile moments — mass m0, centroid z̄, and spread σ_z — used as a validation-grade physics term; moment weights default (1, 1, 1) (physical_loss.py moments).",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{mom}}",  "desc": "moments term value"},
+                        {"sym": r"P_n",                  "desc": "curve value at elevation bin n (pred or GT)"},
+                        {"sym": r"\bar{z}, \sigma_z",    "desc": "profile centroid and spread (m)"},
+                        {"sym": r"\Delta m_0, \Delta\bar{z}, \Delta\sigma_z", "desc": "pred-minus-GT moment differences"},
+                        {"sym": r"\Delta\xi_R",          "desc": "elevation axis span x_max − x_min (m)"},
+                        {"sym": r"w_0, w_1, w_2",        "desc": "moments_weights, default (1, 1, 1)"},
+                    ],
+                },
+                {
+                    "title" : "Coherence re-synthesis",
+                    "tex"   : r"\gamma_P\!\left(k_z^{(i)}\right) = \frac{\sum_n P_n\,e^{j\,k_z^{(i)}\xi_n}\,\Delta\xi}{\sum_n P_n\,\Delta\xi}, \qquad \ell_{\mathrm{coh\text{-}r}} = \left\langle \frac{1}{N_s}\sum_i \left|\gamma_P^{(i)} - \gamma_T^{(i)}\right|^2 \right\rangle",
+                    "note"  : "Compares the mass-normalised characteristic functions (interferometric coherences) of the two profiles sampled at each track wavenumber; insensitive to absolute power, the top-ranked physics loss (physical_loss.py coherence_resynthesis).",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{coh\text{-}r}}",      "desc": "coherence re-synthesis term value"},
+                        {"sym": r"\gamma_P, \gamma_T",                "desc": "normalised coherences of predicted and GT profiles"},
+                        {"sym": r"k_z^{(i)}",                         "desc": "vertical wavenumber of track i"},
+                        {"sym": r"N_s",                               "desc": "number of tracks"},
+                    ],
+                },
+                {
+                    "title" : "Covariance matching",
+                    "tex"   : r"\mathbf{R}[P] = \mathbf{A}\,\mathrm{diag}(P)\,\mathbf{A}^{H}\,\Delta\xi, \qquad \ell_{\mathrm{cov}} = \left\langle \frac{\left\|\mathbf{R}[P] - \mathbf{R}[T]\right\|_F^2}{\left\|\mathbf{R}[T]\right\|_F^2} \right\rangle",
+                    "note"  : "Relative Frobenius error of the synthesised covariance; the linearity of R in P lets the implementation transform only the prediction-minus-GT difference. Insensitive to absolute scale (physical_loss.py covariance_matching).",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{cov}}", "desc": "covariance matching term value"},
+                        {"sym": r"\mathbf{R}[P], \mathbf{R}[T]", "desc": "covariances synthesised from predicted and GT profiles"},
+                        {"sym": r"\mathbf{A}",          "desc": "steering matrix exp(j kz ξ)"},
+                        {"sym": r"\|\cdot\|_F",         "desc": "Frobenius norm over the track-pair axes"},
+                    ],
+                },
+                {
+                    "title" : "Capon cycle-consistency",
+                    "tex"   : r"\hat{T}_P(\xi_n) = \frac{1}{\mathbf{a}^{H}(\xi_n)\big(\mathbf{R}[P] + \epsilon\,\bar{\sigma}\,\mathbf{I}\big)^{-1}\mathbf{a}(\xi_n)}, \quad \bar{\sigma} = \frac{\mathrm{tr}\,\mathbf{R}[P]}{N_s}, \qquad \ell_{\mathrm{cyc}} = \left\langle \frac{1}{N}\sum_n \left(\frac{\hat{T}_P(\xi_n)}{m_0^{\hat{T}}} - \frac{T(\xi_n)}{m_0^{T}}\right)^2 \right\rangle",
+                    "note"  : "The most expensive physics term: synthesise the covariance from the prediction, apply signal-adaptive diagonal loading, Hermitianise, form the Capon spectrum by one solve per pixel, and compare mass-normalised spectra (physical_loss.py capon_cycle).",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{cyc}}",  "desc": "Capon cycle-consistency term value"},
+                        {"sym": r"\hat{T}_P(\xi_n)",     "desc": "Capon spectrum re-synthesised from the prediction"},
+                        {"sym": r"\bar{\sigma}",         "desc": "mean diagonal power for adaptive loading"},
+                        {"sym": r"\epsilon",             "desc": "capon_loading = 1e-2"},
+                        {"sym": r"m_0^{\hat{T}}, m_0^{T}", "desc": "integrated power normalisers"},
+                        {"sym": r"N, N_s",               "desc": "elevation bins and number of tracks"},
+                    ],
+                },
+                {
+                    "title" : "GT sort and optimal prediction matching",
                     "tex"   : r"\pi^\star_{h,w} = \operatorname*{argmin}_{\pi \in S_K} \sum_k \mathbf{1}\!\left[a^{\mathrm{GT}}_k > 10^{-3}\right] \sum_p \left|\hat{\theta}_{\pi(k),p} - \theta^{\mathrm{GT}}_{k,p}\right|, \qquad \hat{\Theta} \leftarrow \hat{\Theta}_{\pi^\star}",
-                    "note"  : "Before parameter-space terms, GT components are sorted by physical mu with inactive slots last, then predictions are Hungarian-matched to the GT slots per pixel by the permutation minimising the active-weighted L1 cost (param_loss.py). The loss is therefore permutation-invariant in the predicted slot order.",
+                    "note"  : "Before parameter-space terms, GT components are sorted by physical mu with inactive slots last, then predictions are matched to the GT slots per pixel by the optimal assignment minimising the active-weighted L1 cost. The optimum is found by exhaustive enumeration of all K! permutations (param_loss.py ParamMatcher, K ≤ MAX_GAUSSIANS = 6), so the loss is permutation-invariant in the predicted slot order.",
                     "vars"  : [
                         {"sym": r"\pi^\star_{h,w}",     "desc": "optimal pred-to-GT slot permutation at pixel (h, w)"},
                         {"sym": r"S_K",                 "desc": "all K! slot permutations"},
@@ -737,15 +791,39 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Parameter activity mask and weights",
-                    "tex"   : r"m_{b,k,p} = \begin{cases} 1 & p = a \\ \mathbf{1}\!\left[a^{\mathrm{GT}}_{b,k} > \tau_a\right] & p \in \{\mu, \sigma\} \end{cases}, \qquad w = (w_a, w_\mu, w_\sigma)",
-                    "note"  : "The amplitude channel is always supervised; mu and sigma receive zero weight on inactive GT slots. The weight vector is padded with ones if shorter than params_per_gaussian.",
+                    "title" : "Parameter activity mask and element weights",
+                    "tex"   : r"m_{b,k,p} = \begin{cases} 1 & p = a \\ \mathbf{1}\!\left[a^{\mathrm{GT}}_{b,k} > \tau_a\right] & p \in \{\mu, \sigma\} \end{cases}, \qquad W_{b,k,p} = w_p\,m_{b,k,p}\,\rho_{b,k}\,(\phi_{b,k}\ \text{if } p=a)",
+                    "note"  : "The per-element weight multiplies the per-parameter weight by the activity mask, the slot-presence scale, and (for amplitude) the focal scale. The amplitude channel is always supervised; mu and sigma receive zero weight on inactive GT slots. The weight vector is padded with ones if shorter than params_per_gaussian (loss.py _param_term).",
                     "vars"  : [
                         {"sym": r"m_{b,k,p}",            "desc": "activity mask for sample b, slot k, parameter p"},
                         {"sym": r"p",                    "desc": "parameter role: a, mu, or sigma"},
                         {"sym": r"a^{\mathrm{GT}}_{b,k}","desc": "GT amplitude at physical scale"},
                         {"sym": r"\tau_a",               "desc": "amp_zero_thr = 1e-3"},
-                        {"sym": r"w",                    "desc": "param_weights, default (1, 1, 1)"},
+                        {"sym": r"w_p",                  "desc": "param_weights, default (1, 1, 1)"},
+                        {"sym": r"\rho_{b,k}",           "desc": "slot-presence scale (see below)"},
+                        {"sym": r"\phi_{b,k}",           "desc": "amplitude focal scale (see below)"},
+                    ],
+                },
+                {
+                    "title" : "Slot-presence scaling and focal amplitude weight",
+                    "tex"   : r"\rho_{b,k} = a^{\mathrm{act}}_{b,k}\,w_{\mathrm{act}} + (1-a^{\mathrm{act}}_{b,k})\,w_{\mathrm{inact}}, \qquad \phi_{b,k} = \left(\frac{|\hat a_{b,k} - a^{\mathrm{GT}}_{b,k}|}{|\hat a_{b,k} - a^{\mathrm{GT}}_{b,k}| + \delta_\phi}\right)^{\!\gamma}",
+                    "note"  : "Optional reweighting to counter slot collapse under imbalanced occupancy. With presence_balance the active/inactive weights become 0.5/frac and 0.5/(1−frac) from the batch active fraction. The focal weight (γ > 0) up-weights amplitude slots the model gets wrong; γ = 0 disables it (returns 1). All default off (param_loss.py presence_scale, focal_scale).",
+                    "vars"  : [
+                        {"sym": r"\rho_{b,k}",              "desc": "slot-presence weight of slot k"},
+                        {"sym": r"a^{\mathrm{act}}_{b,k}",  "desc": "1 if GT slot active (a > τ_a), else 0"},
+                        {"sym": r"w_{\mathrm{act}}, w_{\mathrm{inact}}", "desc": "active_weight, inactive_weight (default 1, 1)"},
+                        {"sym": r"\phi_{b,k}",              "desc": "amplitude focal scale"},
+                        {"sym": r"\gamma",                  "desc": "amp_focal_gamma (default 0, off)"},
+                        {"sym": r"\delta_\phi",             "desc": "amp_focal_delta = 0.5"},
+                    ],
+                },
+                {
+                    "title" : "Active-set reduction",
+                    "tex"   : r"\ell = \frac{\sum_{b,k,p,h,w} W \cdot \ell^{\mathrm{elem}}}{\sum_{b,k,p,h,w} W}\quad(\text{active norm}), \qquad \ell = \operatorname{mean}\!\left(W \cdot \ell^{\mathrm{elem}}\right)\quad(\text{default})",
+                    "note"  : "With use_active_normalization the weighted parameter terms divide by the summed weights (the effective active count) instead of the plain element mean, so empty slots do not dilute the per-slot error. Default off (param_loss.py _reduce).",
+                    "vars"  : [
+                        {"sym": r"W",                  "desc": "per-element weight (mask × param weight × presence × focal)"},
+                        {"sym": r"\ell^{\mathrm{elem}}", "desc": "per-element loss contribution (|·|, Huber, or squared)"},
                     ],
                 },
                 {
@@ -795,15 +873,15 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Heteroscedastic NLL (noise head)",
-                    "tex"   : r"\mathcal{L}_{\mathrm{NLL}} = \frac{1}{BNHW}\sum_{b,n,h,w}\left[\frac{(\hat{y} - y)^2}{2\sigma_{\mathrm{noise}}^2} + \log \sigma_{\mathrm{noise}}\right], \qquad \sigma_{\mathrm{noise}} = e^{\log \sigma_{\mathrm{noise}}}",
-                    "note"  : "When the model carries a noise head (channels exceed 3K), it also predicts a per-pixel uncertainty entering a Gaussian negative log-likelihood. The noise std is clamped to [1e-4, 10] and the denominator stabilised with 1e-8 in code.",
+                    "title" : "Slot-presence BCE (presence head)",
+                    "tex"   : r"\mathcal{L}_{\mathrm{pres}} = \frac{\sum_{b,k,h,w} w_{b,k}\,\mathrm{BCE}\!\left(z_{b,k},\, a^{\mathrm{act}}_{b,k}\right)}{\sum_{b,k,h,w} w_{b,k}}, \qquad w_{\mathrm{pos}} = \frac{0.5}{\mathrm{frac}}, \quad w_{\mathrm{neg}} = \frac{0.5}{1-\mathrm{frac}}",
+                    "note"  : "When the model carries a presence head (predict_presence adds one logit per slot), it predicts per-slot occupancy supervised by a binary cross-entropy against the mu-sorted GT activity. With presence_bce_balance the positive/negative classes are reweighted by the GT active fraction; otherwise it is a plain mean. Requires predict_presence=True or it raises (loss.py _presence_term).",
                     "vars"  : [
-                        {"sym": r"\mathcal{L}_{\mathrm{NLL}}",   "desc": "negative log-likelihood loss"},
-                        {"sym": r"\hat{y}, y",                   "desc": "reconstructed and experimental curves"},
-                        {"sym": r"\sigma_{\mathrm{noise}}",      "desc": "per-pixel noise standard deviation"},
-                        {"sym": r"\log \sigma_{\mathrm{noise}}", "desc": "extra predicted output channel"},
-                        {"sym": r"B, N, H, W",                   "desc": "batch, elevation bins, patch height, patch width"},
+                        {"sym": r"\mathcal{L}_{\mathrm{pres}}", "desc": "slot-presence BCE loss"},
+                        {"sym": r"z_{b,k}",                     "desc": "presence logit of slot k"},
+                        {"sym": r"a^{\mathrm{act}}_{b,k}",      "desc": "GT slot activity target (mu-sorted, a > τ_a)"},
+                        {"sym": r"w_{b,k}",                     "desc": "class-balance weight (1 if unbalanced)"},
+                        {"sym": r"\mathrm{frac}",               "desc": "batch GT active fraction"},
                     ],
                 },
                 {
@@ -820,7 +898,7 @@ class EquationLibrary:
                 {
                     "title" : "Loss scale probe — outlier filter",
                     "tex"   : r"\mathrm{keep}\ v \iff Q_1 - 3\,\mathrm{IQR} \leq v \leq Q_3 + 3\,\mathrm{IQR}, \qquad \mathrm{IQR} = Q_3 - Q_1",
-                    "note"  : "The probe runs every term with weight 1 over a few batches; per-term raw values pass an IQR filter before averaging (loss_scale_probe.py).",
+                    "note"  : "The probe runs every term with weight 1 over a few batches; per-term raw values pass an IQR filter before averaging (loss_probe.py).",
                     "vars"  : [
                         {"sym": r"v",            "desc": "raw per-batch value of one term"},
                         {"sym": r"Q_1, Q_3",     "desc": "first and third quartiles of the values"},
@@ -844,7 +922,7 @@ class EquationLibrary:
     def _training_optim(self) -> dict:
         return {
             "group" : "Training · Optim",
-            "blurb" : "Everything that moves the weights: parameter groups, AdamW, four warmup modes, nine schedulers, three clipping modes, stopping rules.",
+            "blurb" : "Everything that moves the weights: parameter groups, AdamW, four warmup modes, two schedulers (cosine annealing and constant), three clipping modes, stopping rules.",
             "items" : [
                 {
                     "title" : "Parameter group rates",
@@ -1251,13 +1329,34 @@ class EquationLibrary:
                 {
                     "title" : "Permutation cost and optimal assignment",
                     "tex"   : r"C_{ij} = \left|\hat{\mu}_i - \mu^{\mathrm{GT}}_j\right|, \qquad \pi^*_{a,r} = \operatorname*{arg\,min}_{\pi \in S_K} \sum_k C_{k,\pi(k)}",
-                    "note"  : "NaN entries become 1e9 before matching. Brute force enumerates all K! permutations for K ≤ 4; the Hungarian algorithm (O(K³)) takes over at K ≥ 5 and returns the same optimum.",
+                    "note"  : "Inactive pairs and NaN entries take a large cost (1e7) so only mutually-active slots match cheaply. The optimum is found by exhaustively enumerating all K! permutations for every K (no Hungarian fallback), in pixel chunks (gaussian_matching.py GaussianMatcher).",
                     "vars"  : [
                         {"sym": r"C_{ij}",              "desc": "cost of matching predicted slot i to GT slot j"},
                         {"sym": r"\hat{\mu}_i",         "desc": "predicted mean of slot i (raw slot order)"},
                         {"sym": r"\mu^{\mathrm{GT}}_j", "desc": "GT mean of slot j (mu-sorted)"},
                         {"sym": r"\pi^*_{a,r}",         "desc": "cost-minimising assignment at pixel (a, r)"},
                         {"sym": r"S_K",                 "desc": "all K! slot permutations"},
+                    ],
+                },
+                {
+                    "title" : "Matched Gaussian parameter metrics",
+                    "tex"   : r"\mathrm{MAE}_\mu = \frac{1}{|\mathcal{M}|}\sum_{(i,j)\in\mathcal{M}} \left|\hat{\mu}_i - \mu^{\mathrm{GT}}_j\right|, \qquad F_1 = \frac{2\,\mathrm{Prec}\cdot\mathrm{Rec}}{\mathrm{Prec}+\mathrm{Rec}}, \qquad \mathrm{TP} = \left\{(i,j)\in\mathcal{M} : |\Delta\mu| \le \tau\right\}",
+                    "note"  : "On active pixels the matched pairs from the optimal assignment give mu and sigma MAE/RMSE; detection precision, recall, and F1 count a true positive when the matched mean error is within the tolerance. Also bucketed by GT active count (metrics.py _matched_gaussian_metrics).",
+                    "vars"  : [
+                        {"sym": r"\mathcal{M}",   "desc": "set of matched mutually-active pred-GT pairs"},
+                        {"sym": r"\mathrm{MAE}_\mu", "desc": "mean absolute mean-elevation error over matched pairs (m)"},
+                        {"sym": r"\mathrm{Prec}, \mathrm{Rec}", "desc": "TP / pred-active and TP / GT-active"},
+                        {"sym": r"\tau",          "desc": "match tolerance, match_tol = 5.0 (elevation bins)"},
+                    ],
+                },
+                {
+                    "title" : "Reduced-baseline Capon improvement",
+                    "tex"   : r"\bar{y}_{n,a,r} = \frac{y_{n,a,r}}{\max\!\left(\sum_n y_{n,a,r},\,10^{-12}\right)}\ \ (y\in\{C,\hat{C},\mathbf{r}\}), \qquad \Delta_{a,r} = \mathrm{MSE}^{\mathrm{red}}_{a,r} - \mathrm{MSE}^{\mathrm{pred}}_{a,r}",
+                    "note"  : "When the run used a strict secondary subset, a reduced Capon tomogram is re-synthesised; GT, prediction, and reduced cubes are unit-area normalised, then the per-pixel MSE improvement of the network over the reduced baseline (positive where the network wins) is reported alongside its curve, SSIM and per-elevation metrics (metrics.py reduced_comparison).",
+                    "vars"  : [
+                        {"sym": r"\bar{y}",        "desc": "unit-area-normalised profile (GT, prediction, or reduced)"},
+                        {"sym": r"C, \hat{C}, \mathbf{r}", "desc": "GT, prediction, and reduced-Capon cubes"},
+                        {"sym": r"\Delta_{a,r}",   "desc": "reduced-minus-prediction per-pixel MSE improvement"},
                     ],
                 },
             ],
