@@ -44,7 +44,7 @@ class ProfileAePlots(PlotBase):
         fig, ax = plt.subplots(figsize=(6.2, 4.0))
 
         values = np.log10(np.maximum(mse, 1e-12))
-        ax.hist(values, bins=60, color="#34495e", edgecolor="white", linewidth=0.3)
+        ax.hist(values, bins=self._bins(values), color="#34495e", edgecolor="white", linewidth=0.3)
 
         ax.set_xlabel(r"$\log_{10}$ per-curve MSE")
         ax.set_ylabel("count")
@@ -81,13 +81,26 @@ class ProfileAePlots(PlotBase):
         norms = np.linalg.norm(embeddings, axis=1)
 
         fig, ax = plt.subplots(figsize=(6.2, 4.0))
-        ax.hist(norms, bins=60, color="#117a65", edgecolor="white", linewidth=0.3)
+        ax.hist(norms, bins=self._bins(norms), color="#117a65", edgecolor="white", linewidth=0.3)
 
         ax.set_xlabel("embedding L2 norm")
         ax.set_ylabel("count")
         ax.set_title("Latent embedding norm distribution")
 
         return self._save(fig, figures_dir / "embedding_norm.png")
+
+    def _bins(self, values: np.ndarray, target: int = 60) -> int:
+        finite = np.asarray(values)[np.isfinite(values)]
+        if finite.size < 2:
+            return 1
+
+        lo, hi  = float(finite.min()), float(finite.max())
+        spread  = hi - lo
+        floor   = np.spacing(max(abs(lo), abs(hi), 1.0)) * target
+        if spread <= floor:
+            return 1
+
+        return min(target, finite.size)
 
     def compose(self, result, x_axis: np.ndarray, mse: np.ndarray, cfg, figures_dir: Path) -> Dict[str, List[Path]]:
         gt   = result.gt
