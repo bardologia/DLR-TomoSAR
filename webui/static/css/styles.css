@@ -1501,34 +1501,6 @@ main { margin-left: var(--navw); }
 .master__detail.is-swap { animation: swapIn 0.4s var(--ease); }
 @keyframes swapIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* ---------- Architectures: dark theme ---------- */
-.page[data-page="architectures"] {
-  --bg:          #0c1015;
-  --bg-1:        #141a21;
-  --bg-2:        #1a212a;
-  --surface:     #121820;
-  --surface-2:   #1b222c;
-  --line:        #283039;
-  --line-strong: #3c4651;
-  --ink:         #e7edf1;
-  --ink-dim:     #aeb8bf;
-  --ink-faint:   #79838b;
-  --accent:      #6f9bff;
-  --accent-2:    #2dd4bf;
-  --accent-deep: #9bb8ff;
-  --focus:       rgba(111, 155, 255, 0.30);
-  color: var(--ink);
-}
-.page[data-page="architectures"].is-active::before {
-  content: ""; position: fixed; inset: 0; left: var(--navw);
-  background: radial-gradient(135% 90% at 82% -12%, #18202b 0%, #0b0e13 68%);
-  z-index: -1; pointer-events: none;
-}
-.page[data-page="architectures"] .master__detail { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
-.page[data-page="architectures"] .mlist__item.is-active { background: rgba(111, 155, 255, 0.12); }
-.page[data-page="architectures"] .mdetail__note-body code { background: rgba(111, 155, 255, 0.10); }
-.page[data-page="architectures"] .spec { background: rgba(111, 155, 255, 0.05); }
-
 /* ---------- Model list ---------- */
 .mlist__group { margin-bottom: 12px; }
 .mlist__label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); padding: 8px 12px 6px; }
@@ -1556,19 +1528,19 @@ main { margin-left: var(--navw); }
 .dgm-fig { margin: 0; display: flex; flex-direction: column; }
 .dgm-frame {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--glass-line); border-radius: var(--r-card);
+  border: 1px solid var(--line); border-radius: var(--r-card);
   padding: 16px 14px;
   position: relative; overflow: hidden;
-  background-color: #0c1015;
+  background-color: var(--surface);
   background-image:
-    radial-gradient(125% 90% at 50% -12%, rgba(111, 155, 255, 0.18), rgba(111, 155, 255, 0) 60%),
-    radial-gradient(95% 85% at 96% 112%, rgba(45, 212, 191, 0.14), rgba(45, 212, 191, 0) 56%),
-    linear-gradient(rgba(111, 155, 255, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(111, 155, 255, 0.11) 1px, transparent 1px),
-    linear-gradient(rgba(111, 155, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(111, 155, 255, 0.05) 1px, transparent 1px);
+    radial-gradient(125% 90% at 50% -12%, rgba(29, 79, 216, 0.05), rgba(29, 79, 216, 0) 60%),
+    radial-gradient(95% 85% at 96% 112%, rgba(15, 118, 110, 0.045), rgba(15, 118, 110, 0) 56%),
+    linear-gradient(rgba(29, 79, 216, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 79, 216, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(29, 79, 216, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 79, 216, 0.025) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 78px 78px, 78px 78px, 13px 13px, 13px 13px;
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 1px 2px rgba(20, 25, 30, 0.04);
 }
 .dgm-frame--net { padding: 18px; }
 .dgm-fig figcaption { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 9px; font-style: italic; line-height: 1.4; }
@@ -1673,12 +1645,12 @@ main { margin-left: var(--navw); }
 }
 
 /* ---------- Diagram SVG ---------- */
-.dgm-t { fill: #e7edf1; font-family: "JetBrains Mono", monospace; font-size: 12px; text-anchor: middle; }
-.dgm-s { fill: #98a2a9; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
-.dgm-sum { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; text-anchor: middle; }
-.dgm-deco { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 8px; text-anchor: middle; }
-.dgm-lbl { fill: #2dd4bf; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
-.dgm-lbl--flow { fill: #98a2a9; }
+.dgm-t { fill: #16191b; font-family: "JetBrains Mono", monospace; font-size: 12px; text-anchor: middle; }
+.dgm-s { fill: #7d858b; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
+.dgm-sum { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; text-anchor: middle; }
+.dgm-deco { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 8px; text-anchor: middle; }
+.dgm-lbl { fill: #0f766e; font-family: "JetBrains Mono", monospace; font-size: 9.5px; text-anchor: middle; }
+.dgm-lbl--flow { fill: #7d858b; }
 .dgm-flow { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 0.4 13; opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .dgm-block { opacity: 0; animation: dgmPop 0.4s var(--ease) forwards; }

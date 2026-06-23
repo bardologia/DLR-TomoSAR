@@ -2,14 +2,14 @@
 
 class ModelDiagram {
   static C = {
-    accent: "#6f9bff",
-    accent2: "#2dd4bf",
-    boxStroke: "#6f9bff",
-    boxFill: "rgba(111,155,255,0.12)",
-    ioStroke: "rgba(141,151,157,0.55)",
-    ioFill: "#161c23",
-    flow: "rgba(141,151,157,0.55)",
-    skip: "rgba(45,212,191,0.6)",
+    accent: "#1d4fd8",
+    accent2: "#0f766e",
+    boxStroke: "#1d4fd8",
+    boxFill: "rgba(29,79,216,0.06)",
+    ioStroke: "#9aa196",
+    ioFill: "#ffffff",
+    flow: "rgba(125,133,139,0.85)",
+    skip: "rgba(15,118,110,0.55)",
   };
 
   static render(model) {
