@@ -1546,6 +1546,7 @@ main { margin-left: var(--navw); }
 .dgm-fig figcaption { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 9px; font-style: italic; line-height: 1.4; }
 .dgm { width: 100%; height: auto; display: block; }
 .dgm--net { max-width: 1080px; margin: 0 auto; }
+.dgm-net--wide .dgm--net { max-width: 100%; }
 .mdetail__diagram { position: relative; }
 .dgm-hint { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 9px; font-style: italic; }
 .dgm-sub rect { stroke-dasharray: 5 3; }

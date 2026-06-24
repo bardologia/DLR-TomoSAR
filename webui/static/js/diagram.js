@@ -1349,7 +1349,7 @@ class ModelDiagram {
     const blocks = {};
     bp.blocks.forEach((b) => { blocks[b.id] = b; });
     const network =
-      `<figure class="dgm-net"><div class="dgm-frame dgm-frame--net">${bp.network}</div>` +
+      `<figure class="dgm-net dgm-net--wide"><div class="dgm-frame dgm-frame--net">${bp.network}</div>` +
       `<figcaption class="dgm-hint">Click any subsystem to expand its full architecture</figcaption></figure>`;
     return { network, blocks };
   }
