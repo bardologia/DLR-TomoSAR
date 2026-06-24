@@ -83,7 +83,7 @@ class ScriptCatalog:
             "title"     : "Tune",
             "category"  : "Experiments",
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
-            "essentials": ["run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run"],
+            "essentials": ["run_tag", "gpus", "training_type", "jepa.profile_autoencoder_run", "jepa.image_autoencoder_run"],
         },
         "tune_dataloader": {
             "title"     : "Feed Tuner",

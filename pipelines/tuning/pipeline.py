@@ -72,6 +72,18 @@ class TuningOrchestrator:
             training        = self.config.training,
         )
 
+    def _image_ae_entry_template(self):
+        from configuration.training import ImageAeEntryConfig
+
+        return ImageAeEntryConfig(
+            seed        = self.config.tuning.base_seed,
+            n_gaussians = self.config.n_gaussians,
+            ae_loss     = self.config.image_ae_loss,
+            overfit     = self.config.overfit,
+            paths       = self.config.paths,
+            training    = self.config.training,
+        )
+
     def _jepa_entry_template(self):
         from configuration.training import JepaEntryConfig
 
@@ -83,8 +95,12 @@ class TuningOrchestrator:
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
             profile_autoencoder_run    = jepa.profile_autoencoder_run,
             profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
+            image_autoencoder_logdir   = jepa.image_autoencoder_logdir,
+            image_autoencoder_run      = jepa.image_autoencoder_run,
+            image_autoencoder_mode     = jepa.image_autoencoder_mode,
             target_provider            = jepa.target_provider,
             embedding_loss             = jepa.embedding_loss,
+            param_loss                 = jepa.param_loss,
             overfit                    = self.config.overfit,
             paths                      = self.config.paths,
             training                   = self.config.training,
@@ -324,14 +340,31 @@ class TuningOrchestrator:
 
         if self.config.training_type == "profile_autoencoder":
             from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
+            from pipelines.tuning.trial      import TrialProfileAePipeline
 
             tuner = AeTuner(
-                model_name     = model_name,
-                config_cls     = PROFILE_AE_CONFIG_REGISTRY[model_name],
-                entry_template = self._ae_entry_template(),
-                tune_cfg       = tune_cfg,
-                log_dir        = str(self.run_dir / model_name),
-                logger         = logger,
+                model_name         = model_name,
+                config_cls         = PROFILE_AE_CONFIG_REGISTRY[model_name],
+                entry_template     = self._ae_entry_template(),
+                trial_pipeline_cls = TrialProfileAePipeline,
+                autoencoder_attr   = "autoencoder",
+                tune_cfg           = tune_cfg,
+                log_dir            = str(self.run_dir / model_name),
+                logger             = logger,
+            )
+        elif self.config.training_type == "image_autoencoder":
+            from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
+            from pipelines.tuning.trial    import TrialImageAePipeline
+
+            tuner = AeTuner(
+                model_name         = model_name,
+                config_cls         = IMAGE_AE_CONFIG_REGISTRY[model_name],
+                entry_template     = self._image_ae_entry_template(),
+                trial_pipeline_cls = TrialImageAePipeline,
+                autoencoder_attr   = "image_autoencoder",
+                tune_cfg           = tune_cfg,
+                log_dir            = str(self.run_dir / model_name),
+                logger             = logger,
             )
         elif self.config.training_type == "jepa":
             tuner = JepaTuner(

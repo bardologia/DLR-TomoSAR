@@ -13,7 +13,7 @@ class LaunchView {
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
-    ["image autoencoder", /image_autoencoder|image_ae_finetune/],
+    ["image autoencoder", /image_autoencoder|image_ae_finetune|image_ae_loss/],
     ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
     ["embedding", /embedding/],
     ["probe", /^probe_/],
@@ -39,6 +39,13 @@ class LaunchView {
   static TRAINING_TYPES = [
     ["backbone", "Backbone"],
     ["profile_autoencoder", "Profile AE"],
+    ["jepa", "JEPA"],
+  ];
+
+  static TRAINING_TYPES_TUNE = [
+    ["backbone", "Backbone"],
+    ["profile_autoencoder", "Profile AE"],
+    ["image_autoencoder", "Image AE"],
     ["jepa", "JEPA"],
   ];
 
@@ -166,7 +173,7 @@ class LaunchView {
   static TYPE_TABS = {
     benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
     cross_validate: { field: "training_type", options: LaunchView.TRAINING_TYPES },
-    tune:           { field: "training_type", options: LaunchView.TRAINING_TYPES },
+    tune:           { field: "training_type", options: LaunchView.TRAINING_TYPES_TUNE },
   };
 
   static OPTION_GATES = {
@@ -182,14 +189,20 @@ class LaunchView {
       inference:   ["backbone", "jepa"],
     } },
     tune: { field: "training_type", sections: {
-      jepa:    ["jepa"],
-      ae_loss: ["profile_autoencoder"],
+      jepa:          ["jepa"],
+      ae_loss:       ["profile_autoencoder"],
+      image_ae_loss: ["image_autoencoder"],
     } },
   };
 
   static EXPERIMENT_JEPA_CHOICES = {
     "jepa.profile_autoencoder_mode": ["frozen", "finetune"],
     "jepa.target_provider":          ["stopgrad", "ema", "live"],
+  };
+
+  static TUNE_CHOICES = {
+    ...LaunchView.EXPERIMENT_JEPA_CHOICES,
+    "jepa.image_autoencoder_mode": ["frozen", "finetune"],
   };
 
   static CHOICES = {
@@ -200,7 +213,7 @@ class LaunchView {
     },
     benchmark:      LaunchView.EXPERIMENT_JEPA_CHOICES,
     cross_validate: LaunchView.EXPERIMENT_JEPA_CHOICES,
-    tune:           LaunchView.EXPERIMENT_JEPA_CHOICES,
+    tune:           LaunchView.TUNE_CHOICES,
   };
 
   static DATASET_PICKERS = {
@@ -211,6 +224,11 @@ class LaunchView {
   static EXPERIMENT_PICKERS = {
     ...LaunchView.DATASET_PICKERS,
     "jepa.profile_autoencoder_run": { mode: "runs", baseFrom: "jepa.profile_autoencoder_logdir", checkpointOnly: true },
+  };
+
+  static TUNE_PICKERS = {
+    ...LaunchView.EXPERIMENT_PICKERS,
+    "jepa.image_autoencoder_run": { mode: "runs", baseFrom: "jepa.image_autoencoder_logdir", checkpointOnly: true },
   };
 
   static PICKERS = {
@@ -227,7 +245,7 @@ class LaunchView {
     },
     benchmark:         LaunchView.EXPERIMENT_PICKERS,
     cross_validate:    LaunchView.EXPERIMENT_PICKERS,
-    tune:              LaunchView.EXPERIMENT_PICKERS,
+    tune:              LaunchView.TUNE_PICKERS,
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },

@@ -14,6 +14,12 @@ def _default_ae_loss():
     return ProfileAeLossConfig()
 
 
+def _default_image_ae_loss():
+    from configuration.training.image_autoencoder import ImageAeLossConfig
+
+    return ImageAeLossConfig()
+
+
 @dataclass
 class TuningConfig:
     n_trials : int = 100
@@ -49,6 +55,7 @@ class TuningEntryConfig:
     training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
     overfit         : OverfitConfig       = field(default_factory=OverfitConfig)
     ae_loss         : object              = field(default_factory=_default_ae_loss)
+    image_ae_loss   : object              = field(default_factory=_default_image_ae_loss)
     jepa            : JepaTuneConfig       = field(default_factory=JepaTuneConfig)
     pixel_subsample : float               = 1.0
     keep_empty_frac : float               = 0.05

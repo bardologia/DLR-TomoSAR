@@ -5,7 +5,7 @@ from pathlib import Path
 import optuna
 import pytest
 
-from pipelines.tuning.trial  import TrialTrainer, TrialProfileAeTrainer, TrialJepaTrainer
+from pipelines.tuning.trial  import TrialTrainer, TrialProfileAeTrainer, TrialImageAeTrainer, TrialJepaTrainer
 from pipelines.tuning.tuners import AeTuner, JepaTuner
 
 
@@ -92,6 +92,20 @@ def test_jepa_trainer_after_eval_reports_and_prunes():
         trainer._after_eval(8.0, 0)
 
 
+def test_image_ae_trainer_after_eval_reports_and_prunes():
+    pruner = optuna.pruners.ThresholdPruner(upper=1.0)
+    study  = optuna.create_study(direction="minimize", pruner=pruner)
+    trial  = study.ask()
+
+    trainer = TrialImageAeTrainer.__new__(TrialImageAeTrainer)
+    trainer._trial = trial
+
+    with pytest.raises(optuna.exceptions.TrialPruned):
+        trainer._after_eval(7.0, 0)
+
+    assert trial.storage.get_trial(trial._trial_id).intermediate_values[0] == 7.0
+
+
 class FakeEntryTraining:
     def __init__(self):
         self.epochs              = 0
@@ -127,9 +141,7 @@ class FakeAeConfig:
         return {"depth": {"type": "categorical", "choices": [3, 4, 6]}}
 
 
-def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path, monkeypatch):
-    import pipelines.tuning.trial as trial_mod
-
+def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path):
     captured = {}
 
     class CaptureAePipeline:
@@ -140,15 +152,14 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path, 
         def run(self):
             return (None, None, 0.5), None
 
-    monkeypatch.setattr(trial_mod, "TrialProfileAePipeline", CaptureAePipeline)
-
     tuner = AeTuner(
-        model_name     = "mlp_ae",
-        config_cls     = FakeAeConfig,
-        entry_template = FakeAeEntry(),
-        tune_cfg       = tune_cfg,
-        log_dir        = str(tmp_path),
-        logger         = fake_logger,
+        model_name         = "mlp_ae",
+        config_cls         = FakeAeConfig,
+        entry_template     = FakeAeEntry(),
+        trial_pipeline_cls = CaptureAePipeline,
+        tune_cfg           = tune_cfg,
+        log_dir            = str(tmp_path),
+        logger             = fake_logger,
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
@@ -168,9 +179,7 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path, 
     assert entry.autoencoder.depth         in [3, 4, 6]
 
 
-def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_path, monkeypatch):
-    import pipelines.tuning.trial as trial_mod
-
+def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_path):
     class FakeAePipeline:
         def __init__(self, entry, trial):
             self.entry = entry
@@ -178,21 +187,50 @@ def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_pat
         def run(self):
             return (None, None, 0.7), None
 
-    monkeypatch.setattr(trial_mod, "TrialProfileAePipeline", FakeAePipeline)
-
     tuner = AeTuner(
-        model_name     = "mlp_ae",
-        config_cls     = FakeAeConfig,
-        entry_template = FakeAeEntry(),
-        tune_cfg       = tune_cfg,
-        log_dir        = str(tmp_path),
-        logger         = fake_logger,
+        model_name         = "mlp_ae",
+        config_cls         = FakeAeConfig,
+        entry_template     = FakeAeEntry(),
+        trial_pipeline_cls = FakeAePipeline,
+        tune_cfg           = tune_cfg,
+        log_dir            = str(tmp_path),
+        logger             = fake_logger,
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
     study.optimize(tuner._objective, n_trials=1)
 
     assert study.best_value == 0.7
+
+
+def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tmp_path):
+    captured = {}
+
+    class CaptureImageAePipeline:
+        def __init__(self, entry, trial):
+            captured["entry"] = entry
+
+        def run(self):
+            return (None, None, 0.3), None
+
+    tuner = AeTuner(
+        model_name         = "conv2d_ae",
+        config_cls         = FakeAeConfig,
+        entry_template     = FakeAeEntry(),
+        trial_pipeline_cls = CaptureImageAePipeline,
+        autoencoder_attr   = "image_autoencoder",
+        tune_cfg           = tune_cfg,
+        log_dir            = str(tmp_path),
+        logger             = fake_logger,
+    )
+
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
+    study.optimize(tuner._objective, n_trials=1)
+
+    entry = captured["entry"]
+    assert entry.ae_model_name              == "conv2d_ae"
+    assert entry.image_autoencoder.embedding_dim in [16, 24, 32]
+    assert not hasattr(entry, "autoencoder")
 
 
 class FakeJepaConfig:

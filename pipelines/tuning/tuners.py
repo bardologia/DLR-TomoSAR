@@ -146,19 +146,23 @@ class Tuner:
 class AeTuner:
     def __init__(
         self,
-        model_name     : str,
+        model_name        : str,
         config_cls,
         entry_template,
+        trial_pipeline_cls,
         tune_cfg,
-        log_dir        : str,
+        log_dir           : str,
         logger,
+        autoencoder_attr  : str = "autoencoder",
     ) -> None:
-        self.model_name     = model_name
-        self.config_cls     = config_cls
-        self.entry_template = entry_template
-        self.tune_cfg       = tune_cfg
-        self.log_dir        = log_dir
-        self.logger         = logger
+        self.model_name         = model_name
+        self.config_cls         = config_cls
+        self.entry_template     = entry_template
+        self.trial_pipeline_cls = trial_pipeline_cls
+        self.autoencoder_attr   = autoencoder_attr
+        self.tune_cfg           = tune_cfg
+        self.log_dir            = log_dir
+        self.logger             = logger
 
         self.sampler     = ParamSampler()
         self.space       = {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
@@ -170,13 +174,11 @@ class AeTuner:
             setattr(ae_config, k, v)
 
     def _objective(self, trial: optuna.Trial) -> float:
-        from pipelines.tuning.trial import TrialProfileAePipeline
-
         ae_config = self.config_cls()
         self._apply_params(trial, ae_config)
 
         entry = copy.deepcopy(self.entry_template)
-        entry.autoencoder   = ae_config
+        setattr(entry, self.autoencoder_attr, ae_config)
         entry.ae_model_name = self.model_name
         entry.run_name      = f"trial_{trial.number:04d}"
         entry.seed          = self.tune_cfg.base_seed + trial.number
@@ -186,8 +188,8 @@ class AeTuner:
         entry.training.scheduler_epochs    = self.tune_cfg.n_epochs
         entry.training.early_stop_patience = self.tune_cfg.early_stop_patience
 
-        pipeline                       = TrialProfileAePipeline(entry, trial=trial)
-        (_, _, best_val_loss), _       = pipeline.run()
+        pipeline                 = self.trial_pipeline_cls(entry, trial=trial)
+        (_, _, best_val_loss), _ = pipeline.run()
 
         return best_val_loss
 
