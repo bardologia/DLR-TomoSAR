@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_presence_trials
+from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
 from pipelines.backbone.training.experiments import (
     CurriculumTrialPlanner,
+    InputTrialPlanner,
     PatchSizeTrialPlanner,
     SecondaryTrialPlanner,
     SlotPresenceTrialPlanner,
@@ -162,6 +163,57 @@ def test_secondary_rejects_too_many_secondaries():
 
     with pytest.raises(ValueError):
         SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+
+
+def test_input_planner_default_variant_drops_interferograms():
+    planner = InputTrialPlanner("resunet", _default_input_trials(), CANDIDATES)
+
+    plans = planner.plan()
+
+    assert len(plans) == 1
+
+    name, overrides = plans[0]
+    assert name == "resunet_in-amp-allsec-noifg"
+    assert overrides["input.use_primary"]        is True
+    assert overrides["input.use_secondaries"]    is True
+    assert overrides["input.use_interferograms"] is False
+    assert overrides["paths.secondary_labels"]   == tuple(CANDIDATES)
+
+
+def test_input_planner_uses_all_tracks_per_variant():
+    trials  = {"a": {"use_interferograms": False}, "b": {"use_dem": True}}
+    planner = InputTrialPlanner("unet", trials, CANDIDATES)
+
+    plans = dict(planner.plan())
+
+    assert set(plans) == {"unet_in-a", "unet_in-b"}
+    assert all(overrides["paths.secondary_labels"] == tuple(CANDIDATES) for overrides in plans.values())
+    assert planner.summary() == {"Input variants": 2, "Tracks": f"all ({len(CANDIDATES)} secondaries)"}
+
+
+def test_input_planner_rejects_unknown_keys():
+    with pytest.raises(ValueError):
+        InputTrialPlanner("resunet", {"bad": {"use_phase": True}}, CANDIDATES)
+
+
+def test_input_planner_rejects_empty_trials():
+    with pytest.raises(ValueError):
+        InputTrialPlanner("resunet", {}, CANDIDATES)
+
+
+@pytest.mark.real_data
+def test_input_from_dataset_uses_full_stack(test_data_dir):
+    from configuration.sar.geometry_config import GeometryConfig
+
+    planner = InputTrialPlanner.from_dataset("resunet", _default_input_trials(), GeometryConfig(), test_data_dir)
+
+    plans = planner.plan()
+
+    assert len(plans) == 1
+    name, overrides = plans[0]
+    assert name == "resunet_in-amp-allsec-noifg"
+    assert overrides["input.use_interferograms"] is False
+    assert len(overrides["paths.secondary_labels"]) == len(planner.candidates) >= 1
 
 
 @pytest.mark.real_data

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
+from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, PatchConfig, SplitRegions
 from configuration.inference import InferenceConfig
 from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
@@ -29,11 +29,7 @@ class ConfigFactory:
         return CropRegion(*layout["global_crop"])
 
     def benchmark_input_config(self) -> InputConfig:
-        return InputConfig(
-            use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
-            use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
-            use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
-        )
+        return InputConfig.full_stack()
 
     def training_dataset_config(self) -> DatasetConfig:
         crop     = self.global_crop()

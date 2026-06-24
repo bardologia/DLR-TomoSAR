@@ -90,6 +90,56 @@ class SlotPresenceTrialPlanner:
         return plans
 
 
+class InputTrialPlanner:
+
+    INPUT_KEYS = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")
+
+    def __init__(self, model_name: str, input_trials: dict, candidates: list[str]) -> None:
+        self.model_name   = model_name
+        self.input_trials = input_trials
+        self.candidates   = list(candidates)
+
+        self._validate()
+
+    @classmethod
+    def from_dataset(cls, model_name: str, input_trials: dict, geometry, dataset_path: str | Path) -> "InputTrialPlanner":
+        path = geometry.baselines_file(dataset_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Input trials need the baselines table to enumerate all tracks, but {path} does not exist")
+
+        table = TrackBaselines.load(path)
+        return cls(model_name, input_trials, list(table.labels[1:]))
+
+    def _validate(self) -> None:
+        if not self.input_trials:
+            raise ValueError("input_trials must list at least one input variant")
+
+        for label, spec in self.input_trials.items():
+            unknown = [key for key in spec if key not in self.INPUT_KEYS]
+            if unknown:
+                raise ValueError(f"Input trial '{label}' has unknown keys {unknown}; allowed keys are {self.INPUT_KEYS}")
+
+    def summary(self) -> dict:
+        return {
+            "Input variants" : len(self.input_trials),
+            "Tracks"         : f"all ({len(self.candidates)} secondaries)",
+        }
+
+    def _overrides(self, spec: dict) -> dict:
+        overrides = {f"input.{key}": value for key, value in spec.items()}
+        overrides["paths.secondary_labels"] = tuple(self.candidates)
+        return overrides
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for label, spec in self.input_trials.items():
+            run_name = f"{self.model_name}_in-{label}"
+            plans.append((run_name, self._overrides(spec)))
+
+        return plans
+
+
 class PatchSizeTrialPlanner:
     def __init__(self, model_name: str, trials) -> None:
         self.model_name = model_name

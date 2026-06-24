@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.benchmark.general            import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.dataset                       import InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
@@ -91,6 +92,12 @@ def _default_presence_trials() -> dict:
     }
 
 
+def _default_input_trials() -> dict:
+    return {
+        "amp-allsec-noifg" : {"use_primary": True, "use_secondaries": True, "use_interferograms": False},
+    }
+
+
 @dataclass
 class PatchTrialsConfig:
     sizes        : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
@@ -142,6 +149,7 @@ class BackboneEntryConfig:
     curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)
     overfit    : OverfitConfig        = field(default_factory=OverfitConfig)
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
+    input      : InputConfig          = field(default_factory=InputConfig.full_stack)
 
     probe_enabled    : bool = False
     probe_n_batches  : int  = 1000
@@ -158,5 +166,6 @@ class BackboneEntryConfig:
     presence_trials  : dict                  = field(default_factory=_default_presence_trials)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
+    input_trials     : dict                  = field(default_factory=_default_input_trials)
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
     poll_interval_s  : float                 = 5.0

@@ -24,6 +24,14 @@ class InputConfig:
 
     use_dem                       : bool           = False
 
+    @classmethod
+    def full_stack(cls) -> "InputConfig":
+        return cls(
+            use_primary        = True,  primary_representation        = Representation.MAG_ONLY,
+            use_secondaries    = True,  secondaries_representation    = Representation.MAG_ONLY,
+            use_interferograms = True,  interferograms_representation = Representation.ANGLE_ONLY,
+        )
+
     @property
     def primary_channels_per_pass(self) -> int:
         return self.primary_representation.channels_per_pass if self.use_primary else 0
