@@ -80,7 +80,7 @@ class WeightXrayConfig:
 
 @dataclass
 class WeightXrayEntryConfig:
-    runs_dir : Path = Path("runs")
+    runs_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
 
     checkpoint_filename : str = "best_model.pt"
     output_subdir       : str = "weight_xray"
