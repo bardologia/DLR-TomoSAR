@@ -320,6 +320,7 @@ class ExperimentBuilder {
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one training run per input variant" },
+    { key: "ablation",   label: "ablation study", hint: "cumulative ablation: the full model degrades one chosen feature at a time, in order, down to the baseline; one run per step" },
   ];
 
   static PRESENCE_MATCHES = [
@@ -358,6 +359,10 @@ class ExperimentBuilder {
 
     this.inputTrialsLeaf = byPath.get("input_trials");
 
+    this.ablationFeaturesLeaf = byPath.get("ablation_features");
+    this.ablationCatalogLeaf  = byPath.get("ablation_catalog");
+    this.ablationFullLeaf     = byPath.get("ablation_include_full");
+
     this.secondary = new Map();
     this.patch     = new Map();
     byPath.forEach((leaf) => {
@@ -372,6 +377,9 @@ class ExperimentBuilder {
     if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
     if (this.inputTrialsLeaf)    this.claimed.push(this.inputTrialsLeaf.path);
+    if (this.ablationFeaturesLeaf) this.claimed.push(this.ablationFeaturesLeaf.path);
+    if (this.ablationCatalogLeaf)  this.claimed.push(this.ablationCatalogLeaf.path);
+    if (this.ablationFullLeaf)     this.claimed.push(this.ablationFullLeaf.path);
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -396,6 +404,10 @@ class ExperimentBuilder {
     this.presenceEl     = null;
     this.inputEl        = null;
     this.inputCellsEl   = null;
+    this.ablationEl     = null;
+    this.ablationMenuEl = null;
+    this.ablationListEl = null;
+    this.ablationFullEl = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -436,6 +448,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
+    if (this.modeLeaf && this.ablationFeaturesLeaf) body.appendChild(this._ablationPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -465,6 +478,7 @@ class ExperimentBuilder {
     this._paintPatch();
     this._paintPresence();
     this._paintInput();
+    this._paintAblation();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -980,6 +994,279 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _ablationCatalog() {
+    if (!this.ablationCatalogLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.ablationCatalogLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _ablationFeatures() {
+    if (!this.ablationFeaturesLeaf) return [];
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.ablationFeaturesLeaf));
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _ablationFull() {
+    if (!this.ablationFullLeaf) return true;
+    return this.view._effective(this.ablationFullLeaf) === "True";
+  }
+
+  _ablationSpecText(feature) {
+    const degrade = feature && feature.degrade ? feature.degrade : {};
+    const parts   = Object.entries(degrade).map(([path, value]) => `${path.split(".").pop()}=${PythonLiteral.render(value)}`);
+    return parts.length ? parts.join(", ") : "no change";
+  }
+
+  _ablationPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence exp-ablation";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">ablation order</span>`;
+
+    const full = LaunchWidgetDom.mini("full-model run", () => this._toggleAblationFull());
+    full.classList.add("exp-ablation__full");
+    this.ablationFullEl = full;
+    head.appendChild(full);
+
+    const reset = LaunchWidgetDom.mini("reset features", () => this._resetAblation());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Run 0 is the full model with every selected feature enabled; each later run degrades one more feature in the order below, ending at the baseline with all of them off. Pick from the catalog, drag with the arrows to reorder, or add a custom feature by config path.";
+
+    const menuHead      = document.createElement("div");
+    menuHead.className   = "exp-presence__sub";
+    menuHead.textContent = "feature catalog";
+
+    const menu       = document.createElement("div");
+    menu.className   = "exp-builder__names exp-ablation__menu";
+    this.ablationMenuEl = menu;
+
+    const listHead      = document.createElement("div");
+    listHead.className   = "exp-presence__sub";
+    listHead.textContent = "degradation order (full to baseline)";
+
+    const list       = document.createElement("div");
+    list.className   = "exp-ablation__list";
+    this.ablationListEl = list;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(menuHead);
+    panel.appendChild(menu);
+    panel.appendChild(listHead);
+    panel.appendChild(list);
+    panel.appendChild(this._ablationCustomForm());
+    this.ablationEl = panel;
+
+    if (this.ablationFeaturesLeaf) this.view.controls[this.ablationFeaturesLeaf.path] = { leaf: this.ablationFeaturesLeaf, reset: () => this._repaintAblation() };
+    if (this.ablationFullLeaf)     this.view.controls[this.ablationFullLeaf.path]     = { leaf: this.ablationFullLeaf,     reset: () => this._repaintAblation() };
+
+    this._paintAblation();
+    return panel;
+  }
+
+  _ablationCustomForm() {
+    const form     = document.createElement("div");
+    form.className = "exp-ablation__custom";
+
+    const label = document.createElement("input");
+    label.type        = "text";
+    label.placeholder = "label";
+    label.className   = "exp-ablation__field exp-ablation__field--label";
+
+    const path = document.createElement("input");
+    path.type        = "text";
+    path.placeholder = "config.path";
+    path.className   = "exp-ablation__field exp-ablation__field--path";
+
+    const value = document.createElement("input");
+    value.type        = "text";
+    value.placeholder = "degraded value";
+    value.className   = "exp-ablation__field exp-ablation__field--value";
+
+    const add = LaunchWidgetDom.mini("add custom", () => {
+      if (this._addCustomAblationFeature(label.value, path.value, value.value)) {
+        label.value = "";
+        path.value  = "";
+        value.value = "";
+      }
+    });
+
+    form.appendChild(label);
+    form.appendChild(path);
+    form.appendChild(value);
+    form.appendChild(add);
+    return form;
+  }
+
+  _paintAblation() {
+    this._paintAblationMenu();
+    this._paintAblationList();
+    if (this.ablationFullEl) this.ablationFullEl.classList.toggle("is-on", this._ablationFull());
+  }
+
+  _paintAblationMenu() {
+    if (!this.ablationMenuEl) return;
+    this.ablationMenuEl.innerHTML = "";
+
+    const chosen  = new Set(this._ablationFeatures().map((feature) => feature.label));
+    const catalog = this._ablationCatalog();
+
+    Object.keys(catalog).forEach((key) => {
+      const chip       = document.createElement("button");
+      chip.type        = "button";
+      chip.className   = "exp-name exp-ablation__option";
+      chip.textContent = key;
+      chip.title       = this._ablationSpecText(catalog[key]);
+      chip.disabled    = chosen.has(key);
+      chip.classList.toggle("is-on", chosen.has(key));
+      chip.addEventListener("click", () => this._addAblationFeature(key));
+      this.ablationMenuEl.appendChild(chip);
+    });
+  }
+
+  _paintAblationList() {
+    if (!this.ablationListEl) return;
+    this.ablationListEl.innerHTML = "";
+
+    const features = this._ablationFeatures();
+
+    features.forEach((feature, index) => this.ablationListEl.appendChild(this._ablationRow(feature, index, features.length)));
+
+    if (!features.length) {
+      const empty       = document.createElement("p");
+      empty.className   = "exp-ablation__empty";
+      empty.textContent = "no features selected; pick from the catalog above";
+      this.ablationListEl.appendChild(empty);
+    }
+  }
+
+  _ablationRow(feature, index, total) {
+    const row     = document.createElement("div");
+    row.className = "exp-ablation__row";
+
+    const isBaseline = index === total - 1;
+    const stepLabel  = document.createElement("span");
+    stepLabel.className   = "exp-ablation__step";
+    stepLabel.textContent = isBaseline ? `${index + 1} base` : `${index + 1}`;
+    row.appendChild(stepLabel);
+
+    const name       = document.createElement("span");
+    name.className   = "exp-ablation__label";
+    name.textContent = feature.label;
+    name.title       = this._ablationSpecText(feature);
+    row.appendChild(name);
+
+    const up = LaunchWidgetDom.mini("↑", () => this._moveAblationFeature(index, -1));
+    up.classList.add("exp-ablation__move");
+    up.disabled = index === 0;
+    row.appendChild(up);
+
+    const down = LaunchWidgetDom.mini("↓", () => this._moveAblationFeature(index, 1));
+    down.classList.add("exp-ablation__move");
+    down.disabled = index === total - 1;
+    row.appendChild(down);
+
+    const remove = LaunchWidgetDom.mini("×", () => this._removeAblationFeature(index));
+    remove.classList.add("exp-presence__remove");
+    remove.title = "Remove feature";
+    row.appendChild(remove);
+    return row;
+  }
+
+  _coerceLiteral(text) {
+    const trimmed = String(text).trim();
+    if (trimmed.toLowerCase() === "true")  return true;
+    if (trimmed.toLowerCase() === "false") return false;
+    if (trimmed !== "" && !isNaN(Number(trimmed))) return Number(trimmed);
+    return trimmed;
+  }
+
+  _addAblationFeature(key) {
+    const catalog = this._ablationCatalog();
+    const feature = catalog[key];
+    if (!feature) return;
+
+    const features = this._ablationFeatures();
+    if (features.some((entry) => entry.label === key)) return;
+
+    features.push(feature);
+    this._setAblationFeatures(features);
+  }
+
+  _addCustomAblationFeature(label, path, value) {
+    const cleanLabel = String(label).trim();
+    const cleanPath  = String(path).trim();
+    if (!cleanLabel || !cleanPath) {
+      window.toast("custom feature needs a label and a config path", "error");
+      return false;
+    }
+
+    const features = this._ablationFeatures();
+    if (features.some((entry) => entry.label === cleanLabel)) {
+      window.toast(`feature '${cleanLabel}' is already in the order`, "error");
+      return false;
+    }
+
+    features.push({ label: cleanLabel, group: "custom", enable: {}, degrade: { [cleanPath]: this._coerceLiteral(value) } });
+    this._setAblationFeatures(features);
+    return true;
+  }
+
+  _moveAblationFeature(index, delta) {
+    const features = this._ablationFeatures();
+    const target   = index + delta;
+    if (target < 0 || target >= features.length) return;
+
+    const moved = features.splice(index, 1)[0];
+    features.splice(target, 0, moved);
+    this._setAblationFeatures(features);
+  }
+
+  _removeAblationFeature(index) {
+    const features = this._ablationFeatures();
+    features.splice(index, 1);
+    this._setAblationFeatures(features);
+  }
+
+  _toggleAblationFull() {
+    if (!this.ablationFullLeaf) return;
+    const next = this._ablationFull() ? "False" : "True";
+    this.view._setValue(this.ablationFullLeaf, next);
+    this._repaintAblation();
+  }
+
+  _setAblationFeatures(features) {
+    if (!this.ablationFeaturesLeaf) return;
+    this.view._setValue(this.ablationFeaturesLeaf, PythonLiteral.render(features));
+    this._repaintAblation();
+  }
+
+  _resetAblation() {
+    if (this.ablationFeaturesLeaf) this.view._setValue(this.ablationFeaturesLeaf, this.ablationFeaturesLeaf.value);
+    if (this.ablationFullLeaf)     this.view._setValue(this.ablationFullLeaf, this.ablationFullLeaf.value);
+    this._repaintAblation();
+  }
+
+  _repaintAblation() {
+    this._paintAblation();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -994,6 +1281,7 @@ class ExperimentBuilder {
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
+    if (this.ablationEl)         this.ablationEl.hidden         = mode !== "ablation";
   }
 
   _paintSecondary() {
@@ -1492,6 +1780,13 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "ablation") {
+      const n    = this._ablationFeatures().length;
+      const runs = n + (this._ablationFull() ? 1 : 0);
+      this.summaryEl.textContent = `${n} feature${n === 1 ? "" : "s"} = ${runs} run${runs === 1 ? "" : "s"} (full to baseline)${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
   }
 
@@ -1522,6 +1817,15 @@ class ExperimentBuilder {
       });
     } else if (mode === "input") {
       this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
+    } else if (mode === "ablation") {
+      const features = this._ablationFeatures();
+      const total    = features.length;
+      if (this._ablationFull()) names.push(`${model}_abl-0-full`);
+      features.forEach((feature, index) => {
+        const step = index + 1;
+        if (step === total) names.push(`${model}_abl-${step}-baseline`);
+        else names.push(`${model}_abl-${step}-no_${feature.label}`);
+      });
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

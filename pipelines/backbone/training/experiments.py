@@ -90,6 +90,63 @@ class SlotPresenceTrialPlanner:
         return plans
 
 
+class AblationTrialPlanner:
+
+    def __init__(self, model_name: str, features: list, include_full: bool) -> None:
+        self.model_name   = model_name
+        self.features     = list(features)
+        self.include_full = include_full
+
+        self._validate()
+
+    def _validate(self) -> None:
+        if not self.features:
+            raise ValueError("ablation_features must list at least one feature to ablate")
+
+        for index, feature in enumerate(self.features):
+            if "label" not in feature or "degrade" not in feature:
+                raise ValueError(f"Ablation feature #{index} must define 'label' and 'degrade', got {feature}")
+
+    def summary(self) -> dict:
+        return {
+            "Ablation features" : len(self.features),
+            "Order"             : " -> ".join(feature["label"] for feature in self.features),
+            "Total runs"        : len(self.features) + (1 if self.include_full else 0),
+        }
+
+    def _enabled_overrides(self) -> dict:
+        merged = {}
+        for feature in self.features:
+            merged.update(feature.get("enable", {}))
+        return merged
+
+    def _degraded_prefix(self, count: int) -> dict:
+        merged = {}
+        for feature in self.features[:count]:
+            merged.update(feature["degrade"])
+        return merged
+
+    def _run_name(self, step: int) -> str:
+        if step == 0:
+            return f"{self.model_name}_abl-0-full"
+        if step == len(self.features):
+            return f"{self.model_name}_abl-{step}-baseline"
+        return f"{self.model_name}_abl-{step}-no_{self.features[step - 1]['label']}"
+
+    def plan(self) -> list[tuple[str, dict]]:
+        enabled = self._enabled_overrides()
+        plans   = []
+
+        if self.include_full:
+            plans.append((self._run_name(0), dict(enabled)))
+
+        for step in range(1, len(self.features) + 1):
+            overrides = {**enabled, **self._degraded_prefix(step)}
+            plans.append((self._run_name(step), overrides))
+
+        return plans
+
+
 class InputTrialPlanner:
 
     INPUT_KEYS = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")

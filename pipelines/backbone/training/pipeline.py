@@ -16,7 +16,7 @@ from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from tools.orchestration                     import ExperimentStage, GpuJob
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
-from pipelines.backbone.training.experiments import CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
+from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.run_metadata           import TrainingRunMetadata
 from tools.runtime.config_cli                import ConfigCli
@@ -310,7 +310,7 @@ class SingleTrainRunner:
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "input_trials", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "input_trials", "ablation_features", "ablation_catalog", "ablation_include_full", "gpus", "poll_interval_s")
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path, stage: str) -> None:
         self.config       = config
@@ -339,8 +339,10 @@ class TrainScheduler:
             return PatchSizeTrialPlanner(self.config.backbone_name, self.config.patch_trials)
         if mode == "input":
             return InputTrialPlanner.from_dataset(self.config.backbone_name, self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
+        if mode == "ablation":
+            return AblationTrialPlanner(self.config.backbone_name, self.config.ablation_features, self.config.ablation_include_full)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'secondary', 'patch' or 'input'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'secondary', 'patch', 'input' or 'ablation'")
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
         argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name})

@@ -8,6 +8,7 @@ from configuration.dataset                       import InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
+from configuration.training.general.ablation    import AblationCatalog
 from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
@@ -170,5 +171,10 @@ class BackboneEntryConfig:
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     input_trials     : dict                  = field(default_factory=_default_input_trials)
+
+    ablation_features     : list = field(default_factory=AblationCatalog.default_features)
+    ablation_catalog      : dict = field(default_factory=AblationCatalog.as_dict)
+    ablation_include_full : bool = True
+
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
     poll_interval_s  : float                 = 5.0

@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
+from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
+    AblationTrialPlanner,
     CurriculumTrialPlanner,
     InputTrialPlanner,
     PatchSizeTrialPlanner,
@@ -199,6 +201,87 @@ def test_input_planner_rejects_unknown_keys():
 def test_input_planner_rejects_empty_trials():
     with pytest.raises(ValueError):
         InputTrialPlanner("resunet", {}, CANDIDATES)
+
+
+ABL_FEATURES = [
+    {"label": "presence", "enable": {"predict_presence": True, "curriculum.warmup.use_presence_bce": True}, "degrade": {"predict_presence": False, "curriculum.warmup.use_presence_bce": False}},
+    {"label": "focal",    "enable": {"curriculum.warmup.amp_focal_gamma": 2.0},                                "degrade": {"curriculum.warmup.amp_focal_gamma": 0.0}},
+    {"label": "balance",  "enable": {"curriculum.warmup.presence_balance": True},                            "degrade": {"curriculum.warmup.presence_balance": False}},
+]
+
+
+def test_ablation_planner_cumulative_full_to_baseline():
+    planner = AblationTrialPlanner("resunet", ABL_FEATURES, include_full=True)
+
+    plans = planner.plan()
+    names = [name for name, _ in plans]
+
+    assert names == [
+        "resunet_abl-0-full",
+        "resunet_abl-1-no_presence",
+        "resunet_abl-2-no_focal",
+        "resunet_abl-3-baseline",
+    ]
+    assert planner.summary()["Total runs"] == 4
+
+    full = dict(plans)["resunet_abl-0-full"]
+    assert full["predict_presence"]                       is True
+    assert full["curriculum.warmup.amp_focal_gamma"]      == 2.0
+    assert full["curriculum.warmup.presence_balance"]     is True
+
+    step1 = dict(plans)["resunet_abl-1-no_presence"]
+    assert step1["predict_presence"]                      is False
+    assert step1["curriculum.warmup.use_presence_bce"]    is False
+    assert step1["curriculum.warmup.amp_focal_gamma"]     == 2.0
+    assert step1["curriculum.warmup.presence_balance"]    is True
+
+    baseline = dict(plans)["resunet_abl-3-baseline"]
+    assert baseline["predict_presence"]                   is False
+    assert baseline["curriculum.warmup.amp_focal_gamma"]  == 0.0
+    assert baseline["curriculum.warmup.presence_balance"] is False
+
+
+def test_ablation_planner_without_full_run():
+    planner = AblationTrialPlanner("unet", ABL_FEATURES, include_full=False)
+
+    plans = planner.plan()
+
+    assert [name for name, _ in plans] == [
+        "unet_abl-1-no_presence",
+        "unet_abl-2-no_focal",
+        "unet_abl-3-baseline",
+    ]
+    assert planner.summary()["Total runs"] == 3
+
+
+def test_ablation_planner_rejects_empty_features():
+    with pytest.raises(ValueError):
+        AblationTrialPlanner("resunet", [], include_full=True)
+
+
+def test_ablation_planner_rejects_feature_without_degrade():
+    with pytest.raises(ValueError):
+        AblationTrialPlanner("resunet", [{"label": "x"}], include_full=True)
+
+
+def test_ablation_catalog_default_features_are_slot_fixes():
+    features = AblationCatalog.default_features()
+    labels   = [feature["label"] for feature in features]
+
+    assert labels == ["predict_presence", "focal", "active_norm", "presence_balance"]
+    for feature in features:
+        assert set(feature) >= {"label", "enable", "degrade"}
+
+
+def test_ablation_catalog_as_dict_covers_loss_terms():
+    catalog = AblationCatalog.as_dict()
+
+    assert "curve_loss_mse_to_l1" in catalog
+    assert "spectral_coherence"   in catalog
+
+    swap = catalog["curve_loss_mse_to_l1"]
+    assert swap["enable"]["curriculum.warmup.use_mse_curve"]  is True
+    assert swap["degrade"]["curriculum.warmup.use_l1_curve"]  is True
 
 
 @pytest.mark.real_data
