@@ -1,28 +1,28 @@
 "use strict";
 
-class AblationView {
+class AblationView extends ConfigForm {
   constructor(runConsole, project) {
+    super();
     this.runConsole = runConsole;
     this.project    = project || {};
     this.host       = document.getElementById("ablation-root");
     this.key        = "train_backbone";
 
-    this.detail   = null;
-    this.config   = null;
-    this.byPath   = new Map();
-    this.dirty    = {};
-    this.controls = {};
-    this.builder  = null;
-    this.detach   = true;
+    this.detail = null;
+    this.config = null;
+    this.byPath = new Map();
+    this.builder = null;
+    this.detach  = true;
 
     this.loaded  = false;
     this.loading = false;
 
-    this.interpEl  = null;
-    this.detachEl  = null;
-    this.countEl   = null;
-    this.launchBtn = null;
-    this.cmdEl     = null;
+    this.configHost = null;
+    this.interpEl   = null;
+    this.detachEl   = null;
+    this.topCountEl = null;
+    this.launchBtn  = null;
+    this.cmdEl      = null;
   }
 
   async enter() {
@@ -55,15 +55,45 @@ class AblationView {
       return;
     }
 
+    const models = await window.apiGet("/api/backbones");
+    this.modelFamilies = (models && models.families) || [];
+
     this.loaded = true;
     this._render();
-    this._arm();
-    this._refresh();
   }
 
   _render() {
     this.host.innerHTML = "";
 
+    this.dirty         = {};
+    this.controls      = {};
+    this.states        = [];
+    this.panels        = new Map();
+    this.bands         = [];
+    this.gates         = [];
+    this.gatedSections = new Set();
+    this.classColors   = new Map();
+    this.query         = "";
+    this.showAll       = false;
+
+    this.host.appendChild(this._buildBar());
+
+    const configHost     = document.createElement("div");
+    configHost.className  = "ablation__config";
+    this.configHost      = configHost;
+    this.host.appendChild(configHost);
+
+    const cmd     = document.createElement("pre");
+    cmd.className = "ablation__cmd";
+    this.cmdEl    = cmd;
+    this.host.appendChild(cmd);
+
+    this._arm();
+    this._renderConfig();
+    this._refresh();
+  }
+
+  _buildBar() {
     const bar     = document.createElement("div");
     bar.className = "ablation__bar";
 
@@ -83,6 +113,7 @@ class AblationView {
       this.detach = !this.detach;
       detach.textContent = this.detach ? "detached" : "attached";
       detach.classList.toggle("is-on", this.detach);
+      this._refresh();
     });
     detach.classList.toggle("is-on", this.detach);
     this.detachEl = detach;
@@ -90,7 +121,7 @@ class AblationView {
 
     const count     = document.createElement("span");
     count.className = "ablation__count";
-    this.countEl    = count;
+    this.topCountEl = count;
     bar.appendChild(count);
 
     const launch     = document.createElement("button");
@@ -100,15 +131,7 @@ class AblationView {
     this.launchBtn = launch;
     bar.appendChild(launch);
 
-    this.host.appendChild(bar);
-
-    this.builder = new window.AblationBuilder(this, this.byPath);
-    this.host.appendChild(this.builder.build());
-
-    const cmd     = document.createElement("pre");
-    cmd.className = "ablation__cmd";
-    this.cmdEl    = cmd;
-    this.host.appendChild(cmd);
+    return bar;
   }
 
   _arm() {
@@ -118,46 +141,72 @@ class AblationView {
     if (trials) this._setValue(trials, "True");
   }
 
-  _effective(leaf) {
-    return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
-  }
+  _renderConfig() {
+    const host   = this.configHost;
+    host.innerHTML = "";
+    const cfg    = this.config;
+    const byPath = this.byPath;
 
-  _setValue(leaf, value) {
-    const changed = value !== leaf.value && value !== "";
-    if (changed) this.dirty[leaf.path] = value;
-    else delete this.dirty[leaf.path];
-    this._refresh();
-  }
+    this.overrideSections = this._detectOverrideSections(cfg.leaves);
 
-  _commandText() {
-    let text = this.detail.command || "python main/train.py";
-    Object.entries(this.dirty).forEach(([path, value]) => {
-      const raw      = String(value);
-      const shown    = raw.length > 80 ? `${raw.slice(0, 77)}…` : raw;
-      const rendered = /\s/.test(shown) ? `'${shown}'` : shown;
-      text += ` \\\n  --${path} ${rendered}`;
-    });
-    return text;
+    host.appendChild(this._buildToolbar(cfg));
+
+    const modelNameLeaf = byPath.get("backbone_name");
+    const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
+
+    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === modelNameLeaf.path));
+    const claimed = new Set(pinned.map((leaf) => leaf.path));
+    if (cardPanel) claimed.add(modelNameLeaf.path);
+
+    this.builder = new window.AblationBuilder(this, byPath);
+    this.builder.claimed.forEach((path) => claimed.add(path));
+
+    if (byPath.get("trials_enabled") && byPath.get("warmup_losses") && byPath.get("complete_losses")) {
+      const fanout = new window.ExperimentBuilder(this, byPath);
+      fanout.claimed.forEach((path) => claimed.add(path));
+    }
+
+    if (pinned.length) host.appendChild(this._buildPins(pinned));
+    if (cardPanel) host.appendChild(cardPanel.build());
+    host.appendChild(this.builder.build());
+
+    this._renderBands(host, claimed);
   }
 
   _active() {
     const trials = this.byPath.get("trials_enabled");
     const mode   = this.byPath.get("trials_mode");
-    return trials && mode && this._effective(trials) === "True" && this._effective(mode) === "ablation";
+    return Boolean(trials && mode && this._effective(trials) === "True" && this._effective(mode) === "ablation");
   }
 
   _refresh() {
-    if (this.builder) this.builder.refreshFromView();
+    const active = this._active();
+    const n      = Object.keys(this.dirty).length;
+    const label  = n ? `${n} override${n === 1 ? "" : "s"}` : "all defaults";
 
-    const n = Object.keys(this.dirty).length;
-    if (this.countEl) this.countEl.textContent = n ? `${n} override${n === 1 ? "" : "s"}` : "all defaults";
-    if (this.cmdEl) this.cmdEl.textContent = this._commandText();
+    if (this.topCountEl) this.topCountEl.textContent = label;
+    if (this.countEl)    this.countEl.textContent    = label;
+    if (this.cmdEl)      this.cmdEl.textContent       = this._commandText();
 
     if (this.launchBtn) {
-      const active = this._active();
       this.launchBtn.disabled    = !active;
       this.launchBtn.textContent = active ? "Launch ablation study" : "Enable the ablation switch to launch";
     }
+
+    if (this.builder) this.builder.refreshFromView();
+    this._refreshBadges();
+    this._refreshGates();
+  }
+
+  _commandText() {
+    let text = (this.detail && this.detail.command) || "python main/train.py";
+    Object.entries(this.dirty).forEach(([path, value]) => {
+      const raw      = String(value);
+      const rendered = /^[\w@%+=:,./-]+$/.test(raw) ? raw : `'${raw.replace(/'/g, `'\\''`)}'`;
+      text += ` \\\n  --${path} ${rendered}`;
+    });
+    if (this.detach) text += ` \\\n  --detach`;
+    return text;
   }
 
   _launch() {
