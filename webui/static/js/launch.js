@@ -275,6 +275,7 @@ class LaunchView {
     this.showAll = false;
     this.overrideSections = { suppressed: new Set(), labels: new Map() };
     this.modelFamilies = null;
+    this.modelEndpoint = null;
     this.pinsEl = null;
     this.builder = null;
     this.detach = true;
@@ -309,6 +310,7 @@ class LaunchView {
     this.showAll = false;
     this.overrideSections = { suppressed: new Set(), labels: new Map() };
     this.modelFamilies = null;
+    this.modelEndpoint = null;
     this.pinsEl = null;
     this.builder = null;
     this.detach = true;
@@ -337,8 +339,10 @@ class LaunchView {
     this.config = cfg;
 
     if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "backbone_name" || leaf.path === "ae_model_name")) {
-      const models = await window.apiGet(this._modelFamiliesEndpoint());
+      const endpoint = this._modelFamiliesEndpoint();
+      const models   = await window.apiGet(endpoint);
       if (seq !== this.loadSeq) return;
+      this.modelEndpoint = endpoint;
       this.modelFamilies = (models && models.families) || [];
     }
 
@@ -346,10 +350,41 @@ class LaunchView {
     this._refresh();
   }
 
+  _activeTrainingType() {
+    if (LaunchView.MODEL_KEY_TYPE[this.key]) return LaunchView.MODEL_KEY_TYPE[this.key];
+
+    const typeTab = LaunchView.TYPE_TABS[this.key];
+    if (typeTab && this.config) {
+      const leaf = this.config.leaves.find((l) => l.path === typeTab.field);
+      if (leaf) return this._effective(leaf);
+    }
+
+    return "backbone";
+  }
+
   _modelFamiliesEndpoint() {
-    if (this.key === "train_image_autoencoder")   return "/api/image-autoencoders";
-    if (this.key === "train_profile_autoencoder") return "/api/profile-autoencoders";
+    const type = this._activeTrainingType();
+    if (type === "image_autoencoder")   return "/api/image-autoencoders";
+    if (type === "profile_autoencoder") return "/api/profile-autoencoders";
     return "/api/backbones";
+  }
+
+  async _reloadModelsForType() {
+    if (!this.config) return;
+    if (!this.config.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "backbone_name" || leaf.path === "ae_model_name")) return;
+
+    const endpoint = this._modelFamiliesEndpoint();
+    if (endpoint === this.modelEndpoint) return;
+
+    const seq    = this.loadSeq;
+    const models = await window.apiGet(endpoint);
+    if (seq !== this.loadSeq) return;
+
+    this.modelEndpoint = endpoint;
+    this.modelFamilies = (models && models.families) || [];
+
+    this._renderConfig(this.config);
+    this._refresh();
   }
 
   leave() {
@@ -428,6 +463,7 @@ class LaunchView {
         this._setValue(leaf, value);
         paint();
         this._paintTypeCard(value);
+        this._reloadModelsForType();
       });
       host.appendChild(tab);
     });
