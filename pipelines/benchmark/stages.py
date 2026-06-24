@@ -8,15 +8,27 @@ from pathlib     import Path
 from configuration.benchmark import BenchmarkConfig
 from pipelines.benchmark.results                import ComparisonReport, TrialCollector
 from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
+from pipelines.shared.seed_sweep                import SeedSet
 from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.data.io                              import FileIO
 from tools.monitoring.logger                    import Logger
 
 
-class OverfitStage(ExperimentStage):
+class SeedExpandedStage:
+    def _expand(self, config: BenchmarkConfig, models: list[str]) -> list[str]:
+        units      = SeedSet.units(models, config.seeds)
+        self._unit = {name: (base, seed) for base, seed, name in units}
+        return [name for _, _, name in units]
+
+    def _seed_command(self, action: str, name: str) -> list[str]:
+        base, seed = self._unit[name]
+        return [sys.executable, str(self.entry_script), "--worker", action, "--model", base, *SeedSet.cli_args(seed), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)]
+
+
+class OverfitStage(SeedExpandedStage, ExperimentStage):
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
-        self.models       = models
+        self.names        = self._expand(config, models)
         self.stage_dir    = self.run_dir / "overfit"
         self.results_path = self.run_dir / "pipeline" / "overfit_results.json"
         self.report_path  = self.run_dir / "pipeline" / "overfit_report.md"
@@ -24,25 +36,25 @@ class OverfitStage(ExperimentStage):
     def passed(self, results: list[dict]) -> bool:
         return bool(results) and all(r["status"] == "PASS" for r in results)
 
-    def _result_path(self, model_name: str) -> Path:
-        return self.stage_dir / model_name / "overfit_result.json"
+    def _result_path(self, name: str) -> Path:
+        return self.stage_dir / name / "overfit_result.json"
 
-    def _has_result(self, model_name: str) -> bool:
-        return self.config.resume and self._result_path(model_name).exists()
+    def _has_result(self, name: str) -> bool:
+        return self.config.resume and self._result_path(name).exists()
 
-    def _job(self, model_name: str) -> GpuJob:
+    def _job(self, name: str) -> GpuJob:
         return GpuJob(
-            name     = model_name,
-            command  = [sys.executable, str(self.entry_script), "--worker", "overfit", "--model", model_name, "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.stage_dir / model_name / "worker.log",
+            name     = name,
+            command  = self._seed_command("overfit", name),
+            log_path = self.stage_dir / name / "worker.log",
         )
 
-    def _load_result(self, model_name: str) -> dict:
-        path = self._result_path(model_name)
+    def _load_result(self, name: str) -> dict:
+        path = self._result_path(name)
 
         if not path.exists():
             return {
-                "model"      : model_name,
+                "model"      : name,
                 "status"     : "FAIL",
                 "final_loss" : None,
                 "converged"  : None,
@@ -68,7 +80,7 @@ class OverfitStage(ExperimentStage):
             f"| Batch size | {self.config.overfit.batch_size} |",
             f"| Crop | {self.config.overfit.azimuth_lines} × {self.config.overfit.range_lines} (azimuth start {self.config.overfit.azimuth_start}) |",
             f"| Require convergence | {self.config.overfit.require_convergence} |",
-            f"| Seed | {self.config.overfit.seed} |",
+            f"| Seed | {self.config.seeds or self.config.overfit.seed} |",
             "",
             "## Results\n",
             "| Model | Status | Final loss | Converged | Error |",
@@ -103,7 +115,8 @@ class OverfitStage(ExperimentStage):
     def run(self) -> list[dict]:
         self.logger.section("Overfit gate")
         self.logger.kv_table({
-            "Models"              : len(self.models),
+            "Runs"                : len(self.names),
+            "Seeds"               : self.config.seeds or "—",
             "Max steps"           : self.config.overfit.max_steps,
             "Stop threshold"      : self.config.overfit.stop_threshold,
             "Batch size"          : self.config.overfit.batch_size,
@@ -111,16 +124,16 @@ class OverfitStage(ExperimentStage):
             "GPUs"                : self.config.gpus,
         }, title="Configuration")
 
-        cached  = [m for m in self.models if self._has_result(m)]
-        pending = [m for m in self.models if m not in cached]
+        cached  = [name for name in self.names if self._has_result(name)]
+        pending = [name for name in self.names if name not in cached]
 
-        for model_name in cached:
-            self.logger.info(f"{model_name}: cached result reused")
+        for name in cached:
+            self.logger.info(f"{name}: cached result reused")
 
         if pending:
-            self._run_queue([self._job(m) for m in pending])
+            self._run_queue([self._job(name) for name in pending])
 
-        results = [self._load_result(m) for m in self.models]
+        results = [self._load_result(name) for name in self.names]
 
         self._write_results(results, self.results_path)
         self._write_report(results)
@@ -331,14 +344,30 @@ class SizeMatchStage(ExperimentStage):
         return records
 
 
-class TrainingStage(QueuedTrainingStage):
+class TrainingStage(SeedExpandedStage, QueuedTrainingStage):
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
-        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=models, logger=logger)
+        items = self._expand(config, models)
+        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=items, logger=logger)
+
+    def _job(self, item: str) -> GpuJob:
+        return GpuJob(
+            name     = item,
+            command  = self._seed_command(self.worker_action, item),
+            log_path = self.stage_dir / item / self.cached_logname,
+        )
 
 
-class InferenceStage(QueuedInferenceStage):
+class InferenceStage(SeedExpandedStage, QueuedInferenceStage):
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
-        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=models, logger=logger)
+        items = self._expand(config, models)
+        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=items, logger=logger)
+
+    def _job(self, item: str) -> GpuJob:
+        return GpuJob(
+            name     = item,
+            command  = self._seed_command(self.worker_action, item),
+            log_path = self.stage_dir / item / self.worker_logname,
+        )
 
 
 class ComparisonStage(ExperimentStage):

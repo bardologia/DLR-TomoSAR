@@ -20,7 +20,7 @@ def _scheduler() -> None:
     pipeline.run()
 
 
-def _worker(stage: str, model_name: str, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
+def _worker(stage: str, model_name: str, seed: int | None, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
     EnvironmentPinner.gpu(gpu_id)
 
     from configuration.benchmark import BenchmarkConfig
@@ -37,13 +37,18 @@ def _worker(stage: str, model_name: str, gpu_id: int, run_tag: str, run_dir: str
     }
 
     worker = workers[stage](config=config, run_tag=run_tag)
-    worker.run(model_name=model_name)
+
+    if stage == "maxbatch":
+        worker.run(model_name=model_name)
+    else:
+        worker.run(model_name=model_name, seed=seed)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--worker",  type=str, default=None, choices=["overfit", "maxbatch", "train", "infer"])
     parser.add_argument("--model",   type=str, default=None)
+    parser.add_argument("--seed",    type=int, default=None)
     parser.add_argument("--gpu",     type=int, default=0)
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--run-dir", type=str, default=None)
@@ -52,7 +57,7 @@ def main() -> None:
     if args.worker:
         if args.model is None or args.run_tag is None:
             sys.exit("ERROR: --worker requires --model and --run-tag")
-        _worker(stage=args.worker, model_name=args.model, gpu_id=args.gpu, run_tag=args.run_tag, run_dir=args.run_dir)
+        _worker(stage=args.worker, model_name=args.model, seed=args.seed, gpu_id=args.gpu, run_tag=args.run_tag, run_dir=args.run_dir)
     else:
         _scheduler()
 

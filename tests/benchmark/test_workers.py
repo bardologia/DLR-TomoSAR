@@ -42,6 +42,13 @@ def test_overfit_preparer_boosts_learning_rates_tenfold():
     assert prepared.encoder_lr == pytest.approx(base_lr * 10.0)
 
 
+def test_run_name_suffixes_only_when_seed_given(config):
+    worker = BenchmarkWorker(config, "tag")
+
+    assert worker._run_name("unet", None) == "unet"
+    assert worker._run_name("unet", 5)    == "unet_seed5"
+
+
 def test_size_overrides_empty_without_file(config):
     worker = BenchmarkWorker(config, "tag")
 

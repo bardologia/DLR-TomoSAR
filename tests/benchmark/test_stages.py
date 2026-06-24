@@ -240,3 +240,49 @@ def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, 
     assert collected["run_dir"] == stage.run_dir
     assert collected["kwargs"]["reference_model"] == config.size_match.reference_model
     assert "comparison" in str(out_dir)
+
+
+def test_overfit_no_seeds_keeps_plain_model_names(config, logger_stub):
+    stage = OverfitStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet", "vit"], logger=logger_stub)
+
+    assert stage.names == ["unet", "vit"]
+    assert "--seed" not in stage._job("unet").command
+
+
+def test_overfit_seed_sweep_expands_runs_per_model_and_seed(config, logger_stub):
+    config.seeds = [1, 2]
+    stage = OverfitStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet", "vit"], logger=logger_stub)
+
+    assert stage.names == ["unet_seed1", "unet_seed2", "vit_seed1", "vit_seed2"]
+
+    job = stage._job("unet_seed2")
+    assert job.command[job.command.index("--model") + 1] == "unet"
+    assert job.command[job.command.index("--seed")  + 1] == "2"
+    assert job.command[job.command.index("--worker") + 1] == "overfit"
+    assert job.log_path == stage.stage_dir / "unet_seed2" / "worker.log"
+    assert stage._result_path("unet_seed2") == stage.stage_dir / "unet_seed2" / "overfit_result.json"
+
+
+def test_training_seed_sweep_job_uses_base_model_and_seed(config, logger_stub):
+    config.seeds = [7]
+    stage = TrainingStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+
+    assert stage.items == ["unet_seed7"]
+
+    job = stage._job("unet_seed7")
+    assert job.command[job.command.index("--model") + 1] == "unet"
+    assert job.command[job.command.index("--seed")  + 1] == "7"
+    assert job.command[job.command.index("--worker") + 1] == "train"
+    assert job.log_path == stage.stage_dir / "unet_seed7" / "worker.log"
+
+
+def test_inference_seed_sweep_matches_training_run_names(config, logger_stub):
+    config.seeds = [3, 4]
+    stage = InferenceStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+
+    assert stage.items == ["unet_seed3", "unet_seed4"]
+
+    job = stage._job("unet_seed4")
+    assert job.command[job.command.index("--model") + 1] == "unet"
+    assert job.command[job.command.index("--seed")  + 1] == "4"
+    assert job.command[job.command.index("--worker") + 1] == "infer"

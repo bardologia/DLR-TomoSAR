@@ -5,6 +5,7 @@ from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config_factory            import ConfigFactory
+from pipelines.shared.seed_sweep                import SeedSet
 from tools.data.io                              import FileIO
 from tools.training.pretraining.overfit_gate    import OverfitGate
 from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
@@ -16,6 +17,9 @@ class BenchmarkWorker:
         self.run_tag = run_tag
         self.run_dir = Path(config.paths.log_base_dir) / run_tag
         self.factory = ConfigFactory(config)
+
+    def _run_name(self, model_name: str, seed: int | None) -> str:
+        return model_name if seed is None else SeedSet.run_name(model_name, seed)
 
     def _size_overrides(self, model_name: str) -> dict:
         size_match_path = self.run_dir / "pipeline" / "size_match.json"
@@ -52,13 +56,13 @@ class BenchmarkWorker:
             enabled_losses = {},
         )
 
-    def _ae_entry_config(self, model_name: str, logdir: Path, overfit):
+    def _ae_entry_config(self, model_name: str, logdir: Path, overfit, run_name: str | None = None, seed: int | None = None):
         from configuration.training import ProfileAeEntryConfig
         from models.profile_autoencoder                        import PROFILE_AE_CONFIG_REGISTRY
 
         return ProfileAeEntryConfig(
-            run_name        = model_name,
-            seed            = self.config.seed,
+            run_name        = run_name or model_name,
+            seed            = self.config.seed if seed is None else seed,
             n_gaussians     = self.config.n_gaussians,
             logdir          = logdir,
             pixel_subsample = self.config.pixel_subsample,
@@ -71,15 +75,15 @@ class BenchmarkWorker:
             training        = self.config.training,
         )
 
-    def _jepa_entry_config(self, model_name: str, logdir: Path, overfit):
+    def _jepa_entry_config(self, model_name: str, logdir: Path, overfit, run_name: str | None = None, seed: int | None = None):
         from configuration.training import JepaEntryConfig
 
         jepa = self.config.jepa
 
         return JepaEntryConfig(
-            run_name                   = model_name,
+            run_name                   = run_name or model_name,
             backbone_name              = model_name,
-            seed                       = self.config.seed,
+            seed                       = self.config.seed if seed is None else seed,
             n_gaussians                = self.config.n_gaussians,
             logdir                     = logdir,
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
@@ -159,19 +163,21 @@ class OverfitWorker(BenchmarkWorker):
 
         self._finalize_overfit(result, result_path)
 
-    def run(self, model_name: str) -> None:
+    def run(self, model_name: str, seed: int | None = None) -> None:
+        run_name = self._run_name(model_name, seed)
+
         if self.config.training_type == "profile_autoencoder":
-            self._run_ae(model_name)
+            self._run_ae(model_name, run_name, seed)
             return
         if self.config.training_type == "jepa":
-            self._run_jepa(model_name)
+            self._run_jepa(model_name, run_name, seed)
             return
 
         from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "overfit"
-        result_path  = stage_dir / model_name / "overfit_result.json"
+        result_path  = stage_dir / run_name / "overfit_result.json"
         model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
 
         for attribute, value in self._size_overrides(model_name).items():
@@ -185,13 +191,13 @@ class OverfitWorker(BenchmarkWorker):
                 dataset_config = self.factory.overfit_dataset_config(),
                 backbone_name  = model_name,
                 model_config   = model_config,
-                seed           = self.config.overfit.seed,
-                run_name       = model_name,
+                seed           = self.config.overfit.seed if seed is None else seed,
+                run_name       = run_name,
             )
 
             return self._final_loss(pipeline.run(probe_config=self._probe_config()))
 
-        self._execute_overfit(model_name, self.config.overfit.stop_threshold, result_path, run_body)
+        self._execute_overfit(run_name, self.config.overfit.stop_threshold, result_path, run_body)
 
     def _overfit_config(self):
         from configuration.training import OverfitConfig
@@ -204,39 +210,39 @@ class OverfitWorker(BenchmarkWorker):
             batch_size     = gate.batch_size,
         )
 
-    def _run_ae(self, model_name: str) -> None:
+    def _run_ae(self, model_name: str, run_name: str, seed: int | None) -> None:
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
-        result_path = stage_dir / model_name / "overfit_result.json"
+        result_path = stage_dir / run_name / "overfit_result.json"
 
         overfit = self._overfit_config()
 
         def run_body():
-            entry                   = self._ae_entry_config(model_name, stage_dir, overfit)
+            entry                   = self._ae_entry_config(model_name, stage_dir, overfit, run_name=run_name, seed=seed)
             (train_losses, _, _), _ = TrainingPipeline(entry).run()
 
             return float(train_losses[-1]) if train_losses else None
 
-        self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
+        self._execute_overfit(run_name, gate.stop_threshold, result_path, run_body)
 
-    def _run_jepa(self, model_name: str) -> None:
+    def _run_jepa(self, model_name: str, run_name: str, seed: int | None) -> None:
         from pipelines.jepa.training.pipeline import TrainingPipeline
 
         gate        = self.config.overfit
         stage_dir   = self.run_dir / "overfit"
-        result_path = stage_dir / model_name / "overfit_result.json"
+        result_path = stage_dir / run_name / "overfit_result.json"
 
         overfit = self._overfit_config()
 
         def run_body():
-            entry                   = self._jepa_entry_config(model_name, stage_dir, overfit)
+            entry                   = self._jepa_entry_config(model_name, stage_dir, overfit, run_name=run_name, seed=seed)
             (train_losses, _, _), _ = TrainingPipeline(entry).run()
 
             return float(train_losses[-1]) if train_losses else None
 
-        self._execute_overfit(model_name, gate.stop_threshold, result_path, run_body)
+        self._execute_overfit(run_name, gate.stop_threshold, result_path, run_body)
 
 
 class MaxBatchWorker(BenchmarkWorker):
@@ -256,12 +262,14 @@ class MaxBatchWorker(BenchmarkWorker):
 
 
 class TrainingWorker(BenchmarkWorker):
-    def run(self, model_name: str) -> None:
+    def run(self, model_name: str, seed: int | None = None) -> None:
+        run_name = self._run_name(model_name, seed)
+
         if self.config.training_type == "profile_autoencoder":
             from configuration.training import OverfitConfig
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-            entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
+            entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False), run_name=run_name, seed=seed)
             TrainingPipeline(entry).run()
             return
 
@@ -269,7 +277,7 @@ class TrainingWorker(BenchmarkWorker):
             from configuration.training import OverfitConfig
             from pipelines.jepa.training.pipeline      import TrainingPipeline
 
-            entry = self._jepa_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False))
+            entry = self._jepa_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False), run_name=run_name, seed=seed)
             TrainingPipeline(entry).run()
             return
 
@@ -291,18 +299,18 @@ class TrainingWorker(BenchmarkWorker):
             dataset_config = self.factory.training_dataset_config(),
             backbone_name  = model_name,
             model_config   = model_config,
-            seed           = self.config.seed,
-            run_name       = model_name,
+            seed           = self.config.seed if seed is None else seed,
+            run_name       = run_name,
         )
 
         pipeline.run(probe_config=self._probe_config())
 
 
 class InferenceWorker(BenchmarkWorker):
-    def run(self, model_name: str) -> None:
+    def run(self, model_name: str, seed: int | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
 
-        run_directory = self.run_dir / "training" / model_name
+        run_directory = self.run_dir / "training" / self._run_name(model_name, seed)
 
         pipeline = InferencePipeline(self.factory.inference_config(run_directory))
         pipeline.run()
