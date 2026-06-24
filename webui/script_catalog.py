@@ -22,7 +22,7 @@ class ScriptCatalog:
         "train_backbone": {
             "title"     : "Train Backbone",
             "category"  : "Training",
-            "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, or secondary-track selections.",
+            "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, secondary-track selections, or input-channel ablations.",
             "essentials": ["run_name", "backbone_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "train_profile_autoencoder": {

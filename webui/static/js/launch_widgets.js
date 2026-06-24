@@ -319,6 +319,7 @@ class ExperimentBuilder {
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
+    { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one training run per input variant" },
   ];
 
   static PRESENCE_MATCHES = [
@@ -355,6 +356,8 @@ class ExperimentBuilder {
     this.presenceTrialsLeaf = byPath.get("presence_trials");
     this.presenceMatchLeaf  = byPath.get("presence_match_strategies");
 
+    this.inputTrialsLeaf = byPath.get("input_trials");
+
     this.secondary = new Map();
     this.patch     = new Map();
     byPath.forEach((leaf) => {
@@ -368,6 +371,7 @@ class ExperimentBuilder {
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
+    if (this.inputTrialsLeaf)    this.claimed.push(this.inputTrialsLeaf.path);
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -390,6 +394,8 @@ class ExperimentBuilder {
     this.warmupCustomEl      = null;
     this.warmupCustomHeadEl  = null;
     this.presenceEl     = null;
+    this.inputEl        = null;
+    this.inputCellsEl   = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -429,6 +435,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
     if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
+    if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -457,6 +464,7 @@ class ExperimentBuilder {
     this._paintSecondary();
     this._paintPatch();
     this._paintPresence();
+    this._paintInput();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -862,6 +870,116 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _inputTrials() {
+    if (!this.inputTrialsLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.inputTrialsLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _inputCells() {
+    return Object.keys(this._inputTrials());
+  }
+
+  _inputSpecText(spec) {
+    const on    = (key) => spec && Object.prototype.hasOwnProperty.call(spec, key) ? Boolean(spec[key]) : null;
+    const amps  = [];
+    if (on("use_primary")     !== false) amps.push("primary");
+    if (on("use_secondaries") !== false) amps.push("secondaries");
+
+    const parts = [];
+    parts.push(amps.length ? `${amps.join("+")} amp` : "no amplitude");
+    parts.push(on("use_interferograms") === false ? "no ifg" : "ifg");
+    if (on("use_dem") === true) parts.push("dem");
+    return parts.join(", ");
+  }
+
+  _inputPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">input-channel ablation</span>`;
+    const reset    = LaunchWidgetDom.mini("reset variants", () => this._resetInput());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Every variant trains on all tracks; each toggles which input channels feed the model. Drop variants to trim the fan-out. Adding variants and channel representations live in code (_default_input_trials); use reset variants to restore the default.";
+
+    const cellHead       = document.createElement("div");
+    cellHead.className    = "exp-presence__sub";
+    cellHead.textContent  = "input variants";
+
+    const cells         = document.createElement("div");
+    cells.className     = "exp-builder__names exp-presence__cells";
+    this.inputCellsEl   = cells;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(cellHead);
+    panel.appendChild(cells);
+    this.inputEl = panel;
+
+    if (this.inputTrialsLeaf) this.view.controls[this.inputTrialsLeaf.path] = { leaf: this.inputTrialsLeaf, reset: () => this._repaintInput() };
+
+    this._paintInput();
+    return panel;
+  }
+
+  _paintInput() {
+    if (!this.inputCellsEl) return;
+    this.inputCellsEl.innerHTML = "";
+    const trials = this._inputTrials();
+    Object.keys(trials).forEach((cell) => this.inputCellsEl.appendChild(this._inputCellChip(cell, trials[cell])));
+  }
+
+  _inputCellChip(cell, spec) {
+    const chip     = document.createElement("span");
+    chip.className = "exp-name exp-presence__cell";
+    chip.title     = this._inputSpecText(spec);
+
+    const label       = document.createElement("span");
+    label.textContent = `${cell} · ${this._inputSpecText(spec)}`;
+    chip.appendChild(label);
+
+    const remove = LaunchWidgetDom.mini("×", () => this._removeInputCell(cell));
+    remove.classList.add("exp-presence__remove");
+    remove.title = "Remove variant";
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _removeInputCell(cell) {
+    if (!this.inputTrialsLeaf) return;
+    let raw;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(this.inputTrialsLeaf));
+    } catch (e) {
+      return;
+    }
+    if (!raw || typeof raw !== "object" || Object.keys(raw).length <= 1) return;
+    delete raw[cell];
+    this.view._setValue(this.inputTrialsLeaf, PythonLiteral.render(raw));
+    this._repaintInput();
+  }
+
+  _resetInput() {
+    if (this.inputTrialsLeaf) this.view._setValue(this.inputTrialsLeaf, this.inputTrialsLeaf.value);
+    this._repaintInput();
+  }
+
+  _repaintInput() {
+    this._paintInput();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -875,6 +993,7 @@ class ExperimentBuilder {
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
+    if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
   }
 
   _paintSecondary() {
@@ -1367,6 +1486,12 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "input") {
+      const n = this._inputCells().length;
+      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}, all tracks${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
   }
 
@@ -1395,6 +1520,8 @@ class ExperimentBuilder {
       this._presenceCells().forEach((cell) => {
         this._presenceStrategies().forEach((strategy) => names.push(`${model}_pr-${cell}-${strategy}`));
       });
+    } else if (mode === "input") {
+      this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

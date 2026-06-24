@@ -19,6 +19,7 @@ class LaunchView {
     ["probe", /^probe_/],
     ["outputs", /^save_(cubes|plots|animations)$/],
     ["identifiers", /identifier|output_tag$|^dataset_type$/],
+    ["image stack", /^use_(primary|secondaries|interferograms|dem)$/],
     ["data", /batch|worker|patch|stride|azimuth|dataset|^use_amp$|accumulation/],
     ["model", /model|gauss/],
     ["source", /fusar|track_selection|polarisation|^base_directory$/],
