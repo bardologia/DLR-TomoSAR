@@ -27,32 +27,33 @@ class PhysicsLossLibrary:
     def _operator(self) -> dict:
         return {
             "title"  : "The shared forward operator",
-            "blurb"  : "The vertical wavenumber of each pass, the steering matrix sampled on the elevation grid, and the per-bin outer product the covariance terms reuse. Built once per run by TomoGeometry from the resolved geometry; the same matrices feed all five terms.",
+            "blurb"  : "The vertical wavenumber of each pass, the steering response sampled on the elevation grid, and the steering outer product the covariance terms reuse. By default the wavenumber is per-pixel: the geometry field (previous section) gives every pass its own kz at every azimuth and range, and the steering is assembled per pixel from that kz map. When the geometry is constant across the scene this reduces to a single TomoGeometry matrix set built once per run. Either way the same operator feeds all five terms.",
             "items"  : [
                 {
                     "title" : "Vertical wavenumber",
-                    "tex"   : r"k_z^{(i)} = \frac{4\pi\,b_i}{\lambda\,r_0}",
-                    "note"  : "Each pass sees elevation through a phase ramp whose rate is set by its perpendicular baseline. The wider the baseline spread, the finer the elevation resolution the stack can resolve.",
+                    "tex"   : r"k_z^{(i)} = \frac{4\pi\,b^{\perp}_i}{\lambda\,r\,\sin\theta}",
+                    "note"  : "Each pass sees elevation through a phase ramp whose rate is set by its perpendicular baseline. The wider the baseline spread, the finer the elevation resolution the stack can resolve. This is the per-pixel height convention; the slant convention drops the sin theta. kz is recomputed for every azimuth and range pixel, and the reference pass has kz = 0.",
                     "vars"  : [
-                        {"sym": r"k_z^{(i)}",     "desc": "vertical wavenumber of pass i (rad/m)"},
-                        {"sym": r"b_i",           "desc": "perpendicular baseline of pass i (m)"},
-                        {"sym": r"\lambda, r_0",  "desc": "radar wavelength and slant range (m)"},
+                        {"sym": r"k_z^{(i)}",     "desc": "vertical wavenumber of pass i, per azimuth and range (rad/m)"},
+                        {"sym": r"b^{\perp}_i",   "desc": "perpendicular baseline of pass i (m)"},
+                        {"sym": r"\lambda",       "desc": "radar wavelength (m)"},
+                        {"sym": r"r, \theta",     "desc": "per-range slant range (m) and look angle"},
                     ],
                 },
                 {
-                    "title" : "Steering matrix",
-                    "tex"   : r"A_{i,n} = \exp\!\left(j\,k_z^{(i)}\,\xi_n\right)",
-                    "note"  : "The complex response of pass i to unit reflectivity at elevation bin n. Mapping a profile through A re-synthesises the multibaseline signal a real acquisition would have measured.",
+                    "title" : "Steering response",
+                    "tex"   : r"A^{(p)}_{i,n} = \exp\!\left(j\,k_{z,p}^{(i)}\,\xi_n\right)",
+                    "note"  : "The complex response of pass i to unit reflectivity at elevation bin n, for pixel p. Mapping a profile through it re-synthesises the multibaseline signal a real acquisition would have measured. In the per-pixel path the response is rebuilt from each pixel's own kz; in the constant-geometry path it is one steering matrix shared by every pixel.",
                     "vars"  : [
-                        {"sym": r"A_{i,n}", "desc": "steering matrix, pass i at elevation bin n"},
-                        {"sym": r"\xi_n",   "desc": "elevation grid sample (m)"},
-                        {"sym": r"j",       "desc": "imaginary unit"},
+                        {"sym": r"A^{(p)}_{i,n}", "desc": "steering response, pass i at elevation bin n, pixel p"},
+                        {"sym": r"k_{z,p}^{(i)}", "desc": "per-pixel vertical wavenumber from the kz map"},
+                        {"sym": r"\xi_n",         "desc": "elevation grid sample (m)"},
                     ],
                 },
                 {
                     "title" : "Steering outer product",
                     "tex"   : r"O_{i,j,n} = A_{i,n}\,\overline{A_{j,n}}",
-                    "note"  : "Precomputed per elevation bin so the covariance and Capon-cycle terms synthesise a covariance matrix with a single contraction against the profile, instead of rebuilding the steering products at every step.",
+                    "note"  : "How the covariance and Capon-cycle terms synthesise a covariance matrix with a single contraction against the profile. With constant geometry it is precomputed once per elevation bin; with per-pixel geometry the covariance is synthesised per pixel from that pixel's kz, so this outer product is the shared-geometry optimisation of the same operation.",
                     "vars"  : [
                         {"sym": r"O_{i,j,n}",         "desc": "outer product of the steering columns at bin n"},
                         {"sym": r"\overline{A_{j,n}}", "desc": "complex conjugate of the steering entry"},
