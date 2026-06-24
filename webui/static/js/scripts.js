@@ -34,9 +34,26 @@ class ScriptPanel {
     });
   }
 
+  _ablationCard() {
+    const card     = document.createElement("a");
+    card.className = "script-card script-card--ablation reveal";
+    card.href      = "#/ablation";
+    card.innerHTML =
+      `<span class="script-card__glow"></span>` +
+      `<div class="script-card__top"><span class="script-card__cat">Training</span>` +
+      `<span class="script-card__file">main/train.py</span></div>` +
+      `<h3 class="script-card__title">Ablation study</h3>` +
+      `<p class="script-card__purpose">Cumulative ablation of the backbone: train the full model and degrade one selected feature at a time, in order, down to the baseline.</p>` +
+      `<div class="script-card__foot"><span>feature regression</span>` +
+      `<span class="arrow">configure &rarr;</span></div>`;
+    return card;
+  }
+
   _renderGrid() {
     this.gridEl.innerHTML = "";
     const items = this.scripts.filter((s) => this.filter === "All" || s.category === this.filter);
+
+    if (this.filter === "All" || this.filter === "Training") this.gridEl.appendChild(this._ablationCard());
 
     const seenGroups = new Set();
     let i = 0;

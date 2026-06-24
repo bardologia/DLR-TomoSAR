@@ -1350,6 +1350,8 @@ main { margin-left: var(--navw); }
 .exp-presence__cell { display: inline-flex; align-items: center; gap: 6px; }
 .exp-presence__remove { padding: 0 6px; line-height: 1.4; }
 
+.script-card--ablation .script-card__cat { color: var(--accent); border-color: var(--accent); }
+
 .ablation__note { font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); padding: 24px 0; }
 .ablation__note--error { color: var(--accent); }
 .ablation__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
