@@ -46,10 +46,6 @@ class TuningEntryConfig:
     gpus         : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])
     skip_models  : list[str]  = field(default_factory=list)
     run_tag      : str | None = None
-    batch_size   : int        = 256
-    num_workers  : int        = 4
-    warmup_steps : int        = 200
-    eta_min      : float      = 1e-6
 
     n_gaussians     : int                 = 5
     training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)

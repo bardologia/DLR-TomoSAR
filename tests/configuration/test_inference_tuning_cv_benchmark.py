@@ -98,7 +98,7 @@ def test_tuning_entry_config_subconfigs():
     assert isinstance(cfg.jepa, JepaTuneConfig)
     assert isinstance(cfg.paths, BenchmarkPathsConfig)
     assert isinstance(cfg.gpus, list)
-    assert cfg.batch_size > 0
+    assert cfg.training.batch_size > 0
 
 
 def test_tuning_entry_ae_loss_default_factory():

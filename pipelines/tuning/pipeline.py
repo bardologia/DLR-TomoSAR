@@ -6,12 +6,9 @@ from pathlib import Path
 import optuna
 from optuna.trial import TrialState
 
-from configuration.dataset import DatasetConfig, PatchConfig, SplitRegions
-from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, TrainingLoopConfig, BackboneTrainerConfig
 from configuration.tuning import TuningConfig
-from configuration.sar.gaussian_config          import GaussianConfig
-from configuration.sar.geometry_config          import GeometryConfig
 from models                                     import config_registry, BACKBONE_CONFIG_REGISTRY
+from pipelines.shared.config_factory            import ConfigFactory
 from tools                                      import FileIO
 from tools                                      import GpuJob
 from tools                                      import GpuQueue
@@ -22,7 +19,6 @@ from pipelines.tuning.tuners                    import JepaTuner
 from pipelines.tuning.tuners                    import Tuner
 from tools.runtime.config_cli                   import ConfigCli
 from tools.monitoring.logger                    import Logger
-from tools.data.regions                         import CropRegion
 
 
 class TuningOrchestrator:
@@ -106,61 +102,11 @@ class TuningOrchestrator:
             training                   = self.config.training,
         )
 
-    def _load_layout(self, dataset_path: Path) -> dict:
-        return FileIO.load_json(dataset_path / "data" / "dataset.json")
-
-    def _split_regions(self, global_crop: CropRegion) -> SplitRegions:
-        canonical = self.config.training
-
-        return SplitRegions(
-            train = CropRegion(canonical.train_azimuth[0], canonical.train_azimuth[1], global_crop.range_start, global_crop.range_end),
-            val   = CropRegion(canonical.val_azimuth[0],   canonical.val_azimuth[1],   global_crop.range_start, global_crop.range_end),
-            test  = CropRegion(canonical.test_azimuth[0],  canonical.test_azimuth[1],  global_crop.range_start, global_crop.range_end),
-        )
-
-    def _dataset_config(self, dataset_path: Path, split_regions: SplitRegions, secondary_labels) -> DatasetConfig:
-        return DatasetConfig(
-            preprocessing_run_directory = dataset_path,
-            parameters_path             = self.config.paths.parameters_path,
-            split_regions               = split_regions,
-            secondary_labels            = secondary_labels,
-            patch                       = PatchConfig(size=(64, 64), stride=32, use_reflective_padding=True),
-            batch_size                  = self.config.batch_size,
-            num_workers                 = self.config.num_workers,
-            shuffle_train               = True,
-            pin_memory                  = True,
-        )
-
-    def _trainer_config(self, dataset_path: Path, secondary_labels) -> BackboneTrainerConfig:
-        return BackboneTrainerConfig(
-            gaussian         = GaussianConfig.from_dataset(dataset_path, n_gaussians=5),
-            geometry         = GeometryConfig().resolved(dataset_path, secondary_labels=secondary_labels),
-            early_stopping   = EarlyStoppingConfig(patience=8, restore_best=True),
-            warmup           = WarmupConfig(warmup_steps=self.config.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
-            scheduler        = SchedulerConfig(type="cosine_annealing", epochs=60, eta_min=self.config.eta_min),
-            optimizer        = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8),
-            gradient_clipper = GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
-            io               = IOConfig(logdir=str(self.config.paths.log_base_dir)),
-            training         = TrainingLoopConfig(epochs=60, validation_frequency=1, gradient_accumulation_steps=1),
-
-            curriculum = LossCurriculumConfig(
-                enabled  = False,
-                warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_weights=(1.0, 1.0, 1.0)),
-                complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-            ),
-        )
-
     def _build_base_configs(self):
-        dataset_path = Path(self.config.paths.dataset_path)
+        factory = ConfigFactory(self.config)
 
-        layout      = self._load_layout(dataset_path)
-        global_crop = CropRegion(*layout["global_crop"])
-
-        secondary_labels = tuple(self.config.paths.secondary_labels) if self.config.paths.secondary_labels else None
-
-        split_regions  = self._split_regions(global_crop)
-        dataset_config = self._dataset_config(dataset_path, split_regions, secondary_labels)
-        trainer_config = self._trainer_config(dataset_path, secondary_labels)
+        trainer_config = factory.training_trainer_config(logdir=Path(self.config.paths.log_base_dir))
+        dataset_config = factory.training_dataset_config()
 
         return trainer_config, dataset_config
 
