@@ -140,6 +140,112 @@ class SingleTrainRunner:
         self.config  = config
         self.factory = ConfigFactory(config)
 
+    def _pretrain_preflight(self) -> None:
+        from pipelines.shared.pretrain_preflight import PretrainPreflight
+
+        PretrainPreflight(
+            pretrain_config = self.config.pretrain,
+            training_config = self.config.training,
+            build_context   = self._build_pretrain_context,
+            logdir          = Path(self.config.logdir),
+            label           = self.config.backbone_name,
+        ).run()
+
+    def _build_pretrain_context(self, logger, device):
+        from models                     import BACKBONE_CONFIG_REGISTRY, get_backbone
+        from tools.training.pretraining  import PretrainContext, TrainStepMemoryProbe, TrainerFeed
+
+        work_dir = Path(self.config.logdir) / "pretrain" / "context"
+
+        trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
+        trainer_config.curriculum = self.config.curriculum
+        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+
+        dataset_config              = self.factory.training_dataset_config()
+        dataset_config.input_config = self.config.input
+
+        gaussian_cfg               = trainer_config.gaussian
+        dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
+
+        dataset_pipeline      = DatasetPipeline(config=dataset_config, training_run_directory=work_dir, logger=logger, seed=self.config.seed)
+        profile_length        = dataset_pipeline.layout.profile_length
+        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
+
+        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
+        dataset                                            = datasets["train"]
+
+        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
+        for attribute, value in self.config.model_overrides.items():
+            setattr(model_config, attribute, value)
+
+        in_channels  = dataset.input_channels
+        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians, gaussian_cfg.predict_presence)
+
+        overrides = {"in_channels": in_channels, "out_channels": out_channels}
+        if self.config.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
+            overrides["image_size"] = dataset_config.patch.size[0]
+
+        model, model_cfg = get_backbone(self.config.backbone_name, config=model_config, **overrides)
+
+        trainer = Trainer(model=model, model_cfg=model_cfg, x_axis=dataset_config.x_axis, config=trainer_config, run_dir=work_dir, logger=logger, norm_stats=dataset.normalizer, emit_docs=False)
+        trainer.criterion.set_curriculum(trainer_config.curriculum.complete)
+        trainer.model.train()
+
+        feed = TrainerFeed(trainer)
+
+        return PretrainContext(
+            dataset        = dataset,
+            model          = model,
+            to_model_input = feed.to_model_input,
+            forward_loss   = feed.forward_loss,
+            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
+            run_overfit    = self._overfit_loss,
+            device         = device,
+            use_amp        = trainer.use_amp,
+            context_gb     = 0.0,
+            on_oom         = lambda: self._release(trainer),
+        )
+
+    def _release(self, trainer) -> None:
+        trainer.optimizer.zero_grad(set_to_none=True)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    def _overfit_loss(self):
+        from configuration.training      import OverfitConfig
+        from models                      import BACKBONE_CONFIG_REGISTRY
+        from pipelines.benchmark.workers import OverfitModelPreparer
+
+        pretrain = self.config.pretrain
+        work_dir = Path(self.config.logdir) / "pretrain" / "overfit"
+
+        trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
+        trainer_config.curriculum = self.config.curriculum
+        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        trainer_config.overfit    = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
+
+        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
+        for attribute, value in self.config.model_overrides.items():
+            setattr(model_config, attribute, value)
+        model_config = OverfitModelPreparer(model_config).prepare()
+
+        dataset_config              = self.factory.training_dataset_config()
+        dataset_config.input_config = self.config.input
+
+        pipeline = TrainingPipeline(
+            trainer_config = trainer_config,
+            dataset_config = dataset_config,
+            backbone_name  = self.config.backbone_name,
+            model_config   = model_config,
+            seed           = pretrain.seed,
+            run_name       = f"{self.config.backbone_name}_pretrain_overfit",
+        )
+
+        outputs      = pipeline.run(probe_config=self._probe_config())
+        train_losses = outputs[0] if isinstance(outputs, (tuple, list)) and outputs else None
+
+        return float(train_losses[-1]) if train_losses else None
+
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(
             enabled        = self.config.probe_enabled,
@@ -160,6 +266,8 @@ class SingleTrainRunner:
 
     def run(self):
         from models import BACKBONE_CONFIG_REGISTRY
+
+        self._pretrain_preflight()
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
