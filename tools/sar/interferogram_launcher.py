@@ -27,6 +27,7 @@ class InterferogramLauncher:
         interferograms_path : Path,
         baselines_path      : Path,
         profiles_path       : Path,
+        parameters_path     : Path,
         result_path         : Path,
     ) -> dict:
         return {
@@ -44,6 +45,7 @@ class InterferogramLauncher:
             "interferograms_path" : str(interferograms_path),
             "baselines_path"      : str(baselines_path),
             "profiles_path"       : str(profiles_path),
+            "parameters_path"     : str(parameters_path),
             "result_path"         : str(result_path),
         }
 

@@ -16,14 +16,16 @@ from tools.monitoring.logger         import Logger
 from tools.data.regions              import CropRegion
 from pipelines.shared.spec_generator import GeneratorBase
 from tools.baselines                 import BaselineExtractor, TrackBaselines, TrackProfiles
+from tools.sar                       import TrackParameterCollector, TrackParameters
 
 
 class InterferogramProcessor:
     def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
-        self.config          = config
-        self.logger          = logger
-        self.track_baselines = None
-        self.track_profiles  = None
+        self.config           = config
+        self.logger           = logger
+        self.track_baselines  = None
+        self.track_profiles   = None
+        self.track_parameters = None
 
         self.logger.section("[InterferogramProcessor Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
@@ -53,7 +55,10 @@ class InterferogramProcessor:
         for slave_index, slave in enumerate(tomography_object.slaves, start=1):
             self.logger.subsection(f"  - [{slave_index}] {slave}")
 
-        self.track_baselines, self.track_profiles = self._extract_baselines([tomography_object.master, *tomography_object.slaves], crop_tuple)
+        pass_directories = [tomography_object.master, *tomography_object.slaves]
+
+        self.track_baselines, self.track_profiles = self._extract_baselines(pass_directories, crop_tuple)
+        self.track_parameters                     = self._extract_parameters(pass_directories)
 
         primary, secondaries, interferograms = self._compute_interferograms(tomography_object)
         self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
@@ -66,6 +71,12 @@ class InterferogramProcessor:
 
         self.logger.kv_table(table.describe(), title="Track Baselines")
         return table, profiles
+
+    def _extract_parameters(self, pass_directories: list) -> TrackParameters:
+        parameters = TrackParameterCollector.from_pass_directories([str(p) for p in pass_directories]).collect()
+
+        self.logger.kv_table(parameters.describe(), title="Track Parameters")
+        return parameters
 
     def _compute_interferograms(self, tomography_object) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         import pyrat as pyrat_module
@@ -211,6 +222,11 @@ class InterferogramGenerator(GeneratorBase):
             profiles_path = Path(self.spec["profiles_path"])
             FileIO.ensure_dir(profiles_path.parent)
             processor.track_profiles.save(profiles_path)
+
+        if processor.track_parameters is not None:
+            parameters_path = Path(self.spec["parameters_path"])
+            FileIO.ensure_dir(parameters_path.parent)
+            processor.track_parameters.save(parameters_path)
 
         result = {
             "primary_shape"        : list(primary_shape),

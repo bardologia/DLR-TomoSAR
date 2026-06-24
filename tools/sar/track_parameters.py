@@ -1,0 +1,177 @@
+from __future__ import annotations
+
+import json
+import math
+import xml.etree.ElementTree as ElementTree
+from dataclasses import dataclass, field
+from pathlib     import Path
+from typing      import ClassVar
+
+from tools.baselines.reading import PassProductResolver
+
+
+class StepParameterFile:
+    INTEGER_TYPES = ("long", "int", "byte", "uint", "ulong", "short")
+    FLOAT_TYPES   = ("double", "float")
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+
+    def _object_node(self, root: ElementTree.Element) -> ElementTree.Element:
+        node = root.find("object")
+
+        if node is None:
+            raise ValueError(f"{self.path} has no <object> parameter block under <idl2xml>")
+
+        return node
+
+    def _parameter(self, parameter_el: ElementTree.Element) -> tuple:
+        name      = parameter_el.get("name")
+        datatype  = parameter_el.find("datatype")
+        value_el  = parameter_el.find("value")
+        base_type = (datatype.text or "").strip().lower() if datatype is not None else "string"
+
+        return name, self._value(value_el, base_type)
+
+    def _value(self, value_el: ElementTree.Element, base_type: str):
+        nested_objects    = value_el.findall("object")
+        nested_parameters = value_el.findall("parameter")
+
+        if nested_objects:
+            return self._group(nested_objects[0])
+
+        if nested_parameters:
+            group = self._group(value_el)
+            return group["ptr"] if list(group) == ["ptr"] else group
+
+        return self._coerce_text(value_el.text or "", base_type)
+
+    def _group(self, object_el: ElementTree.Element) -> dict:
+        return {name: value for name, value in (self._parameter(p) for p in object_el.findall("parameter"))}
+
+    def _coerce_text(self, text: str, base_type: str):
+        stripped = text.strip()
+
+        if stripped.startswith("[") and stripped.endswith("]"):
+            tokens = [token for token in stripped[1:-1].split(",") if token.strip() != ""]
+            return [self._coerce_scalar(token, base_type) for token in tokens]
+
+        return self._coerce_scalar(stripped, base_type)
+
+    def _coerce_scalar(self, token: str, base_type: str):
+        token = token.strip()
+
+        if base_type in self.INTEGER_TYPES:
+            return int(token)
+
+        if base_type in self.FLOAT_TYPES:
+            return float(token)
+
+        return token
+
+    def parse(self) -> dict:
+        root        = ElementTree.parse(self.path).getroot()
+        object_node = self._object_node(root)
+
+        return {name: value for name, value in (self._parameter(p) for p in object_node.findall("parameter"))}
+
+
+class StepParameterResolver(PassProductResolver):
+    PRODUCT_SUBDIR   = Path("GTC") / "GTC-RDP"
+    PRODUCT_PATTERNS = ("pp_*.xml",)
+
+
+@dataclass
+class TrackParameters:
+    labels      : list
+    parameters  : list
+    track_files : list = field(default_factory=list)
+
+    FILENAME : ClassVar[str] = "track_parameters.json"
+
+    @property
+    def reference(self) -> str:
+        return self.labels[0]
+
+    @property
+    def n_tracks(self) -> int:
+        return len(self.labels)
+
+    def derived(self) -> list:
+        return [self._track_geometry(params) for params in self.parameters]
+
+    def _track_geometry(self, params: dict) -> dict:
+        slant_range = params["r"]
+        height      = params["h0"] - params["terrain"]
+        near        = float(slant_range[0])
+        far         = float(slant_range[-1])
+
+        return {
+            "look_side"            : "right" if params["antdir"] > 0 else "left",
+            "depression_angle_deg" : math.degrees(params["da"]),
+            "wavelength_m"         : params["lambda"],
+            "sensor_altitude_m"    : params["h0"],
+            "terrain_height_m"     : params["terrain"],
+            "slant_range_near_m"   : near,
+            "slant_range_far_m"    : far,
+            "slant_range_ref_m"    : params["rref"],
+            "look_angle_near_deg"  : math.degrees(math.acos(min(1.0, height / near))),
+            "look_angle_far_deg"   : math.degrees(math.acos(min(1.0, height / far))),
+        }
+
+    def describe(self) -> dict:
+        geometry = self.derived()
+
+        return {
+            "Tracks"             : self.n_tracks,
+            "Reference"          : self.reference,
+            "Look side"          : geometry[0]["look_side"],
+            "Wavelength [m]"     : f"{geometry[0]['wavelength_m']:.4f}",
+            "Depression [deg]"   : ", ".join(f"{g['depression_angle_deg']:.2f}" for g in geometry),
+            "Slant range ref [m]": ", ".join(f"{g['slant_range_ref_m']:.1f}" for g in geometry),
+            "Look angle [deg]"   : ", ".join(f"{g['look_angle_near_deg']:.1f}-{g['look_angle_far_deg']:.1f}" for g in geometry),
+        }
+
+    def to_payload(self) -> dict:
+        return {
+            "labels"      : list(self.labels),
+            "reference"   : self.reference,
+            "parameters"  : list(self.parameters),
+            "derived"     : self.derived(),
+            "track_files" : [str(f) for f in self.track_files],
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict) -> "TrackParameters":
+        return cls(
+            labels      = list(payload["labels"]),
+            parameters  = list(payload["parameters"]),
+            track_files = list(payload["track_files"]),
+        )
+
+    def save(self, path: str | Path) -> Path:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_payload(), indent=4), encoding="utf-8")
+
+        return path
+
+    @classmethod
+    def load(cls, path: str | Path) -> "TrackParameters":
+        return cls.from_payload(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+class TrackParameterCollector:
+    def __init__(self, track_paths: dict) -> None:
+        self.track_paths = {label: Path(path) for label, path in track_paths.items()}
+
+    @classmethod
+    def from_pass_directories(cls, pass_directories: list) -> "TrackParameterCollector":
+        return cls(StepParameterResolver().resolve_passes([str(directory) for directory in pass_directories]))
+
+    def collect(self) -> TrackParameters:
+        labels     = list(self.track_paths.keys())
+        files      = [self.track_paths[label] for label in labels]
+        parameters = [StepParameterFile(path).parse() for path in files]
+
+        return TrackParameters(labels=labels, parameters=parameters, track_files=[str(f) for f in files])

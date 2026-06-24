@@ -28,9 +28,9 @@ class TrackReader:
         return rrat
 
 
-class TrackFileResolver:
-    TRACK_SUBDIR      = Path("INF") / "INF-TRACK"
-    TRACK_PATTERNS    = ("track_sar_resa_*.rat", "track_*.rat")
+class PassProductResolver:
+    PRODUCT_SUBDIR    = Path(".")
+    PRODUCT_PATTERNS  = ()
     TRACK_DIR_PATTERN = re.compile(r"[Tt]\d+\w*")
 
     def label(self, pass_directory: str | Path) -> str:
@@ -43,14 +43,14 @@ class TrackFileResolver:
         return path.parent if self.TRACK_DIR_PATTERN.fullmatch(path.name) else path
 
     def resolve(self, pass_directory: str | Path) -> Path:
-        directory = Path(pass_directory) / self.TRACK_SUBDIR
+        directory = Path(pass_directory) / self.PRODUCT_SUBDIR
 
-        for pattern in self.TRACK_PATTERNS:
+        for pattern in self.PRODUCT_PATTERNS:
             candidates = sorted(directory.glob(pattern))
             if candidates:
                 return candidates[0]
 
-        raise FileNotFoundError(f"No track file matching {self.TRACK_PATTERNS} under {directory}")
+        raise FileNotFoundError(f"No file matching {self.PRODUCT_PATTERNS} under {directory}")
 
     def resolve_passes(self, pass_directories: list) -> dict:
         mapping = {}
@@ -61,3 +61,8 @@ class TrackFileResolver:
             mapping[label] = path
 
         return mapping
+
+
+class TrackFileResolver(PassProductResolver):
+    PRODUCT_SUBDIR   = Path("INF") / "INF-TRACK"
+    PRODUCT_PATTERNS = ("track_sar_resa_*.rat", "track_*.rat")

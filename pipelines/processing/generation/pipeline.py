@@ -9,7 +9,7 @@ from pipelines.processing.generation.artifacts import ArtifactRegistry, Metadata
 from pipelines.processing.generation.plots     import StackPlotter
 from tools                                     import FileIO, ProcessPoolRunner
 from tools.monitoring.logger                   import Logger
-from tools.sar                                 import InterferogramLauncher, TomogramLauncher
+from tools.sar                                 import InterferogramLauncher, TomogramLauncher, TrackParameters
 from tools.baselines                           import TrackBaselines
 
 
@@ -54,6 +54,7 @@ class ProcessingPipeline:
         interferograms_path = self.artifact_registry.artifact_path("interferograms")
         profiles_path       = self.artifact_registry.artifact_path("track_profiles")
         baselines_path      = self.config.paths.metadata_directory / TrackBaselines.FILENAME
+        parameters_path     = self.config.paths.metadata_directory / TrackParameters.FILENAME
         result_path         = self.config.paths.metadata_directory / "interferogram_result.json"
 
         self.logger.subsection(f"[Active] Building interferometric stack in env '{self.config.tomogram_env_name}'")
@@ -64,6 +65,7 @@ class ProcessingPipeline:
             interferograms_path = interferograms_path,
             baselines_path      = baselines_path,
             profiles_path       = profiles_path,
+            parameters_path     = parameters_path,
             result_path         = result_path,
         )
         spec_path = self.config.paths.metadata_directory / "interferogram_spec.json"

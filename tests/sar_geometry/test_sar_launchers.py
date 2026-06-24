@@ -53,6 +53,7 @@ def test_interferogram_build_spec_all_paths_present():
         interferograms_path = Path("/i.npy"),
         baselines_path      = Path("/bl.json"),
         profiles_path       = Path("/pr.npz"),
+        parameters_path     = Path("/pp.json"),
         result_path         = Path("/r.json"),
     )
 
@@ -61,6 +62,7 @@ def test_interferogram_build_spec_all_paths_present():
     assert spec["interferograms_path"] == "/i.npy"
     assert spec["baselines_path"] == "/bl.json"
     assert spec["profiles_path"] == "/pr.npz"
+    assert spec["parameters_path"] == "/pp.json"
     assert spec["result_path"] == "/r.json"
 
 
@@ -72,6 +74,7 @@ def test_interferogram_build_spec_includes_pyrat_threads():
         interferograms_path = Path("/i"),
         baselines_path      = Path("/bl"),
         profiles_path       = Path("/pr"),
+        parameters_path     = Path("/pp"),
         result_path         = Path("/r"),
     )
 
@@ -89,6 +92,7 @@ def test_interferogram_build_spec_is_json_serialisable():
         interferograms_path = Path("/i"),
         baselines_path      = Path("/bl"),
         profiles_path       = Path("/pr"),
+        parameters_path     = Path("/pp"),
         result_path         = Path("/r"),
     )
 
