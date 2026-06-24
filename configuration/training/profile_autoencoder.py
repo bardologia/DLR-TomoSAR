@@ -43,7 +43,7 @@ class ProfileAeEntryConfig:
     run_name    : str | None = None
     gpu         : int        = 0
     seed        : int        = 0
-    n_seeds     : int        = 1
+    seeds       : list[int]  = field(default_factory=list)
     n_gaussians : int        = 5
     logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
 

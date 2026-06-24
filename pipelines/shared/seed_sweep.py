@@ -11,8 +11,8 @@ class SeedSweepRunner:
         self.runner_factory = runner_factory
 
     def _seeds(self) -> list[int]:
-        count = max(1, int(getattr(self.config, "n_seeds", 1)))
-        return [self.config.seed + offset for offset in range(count)]
+        seeds = list(getattr(self.config, "seeds", None) or [])
+        return seeds or [self.config.seed]
 
     def _base_run_name(self) -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -26,7 +26,8 @@ class SeedSweepRunner:
         seeds = self._seeds()
 
         if len(seeds) == 1:
-            return self.runner_factory(self.config).run()
+            config = replace(self.config, seed=seeds[0])
+            return self.runner_factory(config).run()
 
         base    = self._base_run_name()
         results = {seed: self._run_seed(base, seed) for seed in seeds}
