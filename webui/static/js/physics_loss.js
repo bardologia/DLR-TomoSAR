@@ -24,6 +24,7 @@ class PhysicsLossView {
     this.root.innerHTML = "";
     this.root.appendChild(this._buildHead());
     this.root.appendChild(this._buildOperator());
+    this.root.appendChild(this._buildDataset());
     this.root.appendChild(this._buildTermsSection());
     this.root.appendChild(this._buildComparison());
     this.root.appendChild(this._buildConfig());
@@ -105,6 +106,156 @@ class PhysicsLossView {
       grid.appendChild(card);
     });
     section.appendChild(grid);
+
+    return section;
+  }
+
+  _buildDataset() {
+    const ds      = this.data.dataset || {};
+    const section = document.createElement("section");
+    section.className = "phys-block";
+    section.appendChild(this._sectionHead("From the dataset", ds.title, ds.blurb));
+
+    const srcLabel       = document.createElement("h4");
+    srcLabel.className   = "phys-sub";
+    srcLabel.textContent = "Artifacts read";
+    section.appendChild(srcLabel);
+
+    const srcGrid     = document.createElement("div");
+    srcGrid.className = "phys-src-grid";
+    (ds.sources || []).forEach((src) => {
+      const card     = document.createElement("div");
+      card.className = "phys-src reveal";
+
+      const file       = document.createElement("code");
+      file.className   = "phys-src__file";
+      file.textContent = src.file;
+
+      const container       = document.createElement("span");
+      container.className   = "phys-src__container";
+      container.textContent = src.container;
+
+      const role       = document.createElement("p");
+      role.className   = "phys-src__role";
+      role.textContent = src.role;
+
+      const head     = document.createElement("div");
+      head.className = "phys-src__head";
+      head.appendChild(file);
+      head.appendChild(container);
+
+      card.appendChild(head);
+      card.appendChild(role);
+
+      const list     = document.createElement("dl");
+      list.className = "phys-src__fields";
+      (src.fields || []).forEach((f) => {
+        const row     = document.createElement("div");
+        row.className = "phys-src__field";
+
+        const name       = document.createElement("dt");
+        name.className   = "phys-src__name";
+        name.textContent = f.name;
+
+        const shape       = document.createElement("span");
+        shape.className   = "phys-src__shape";
+        shape.textContent = f.shape;
+
+        const desc       = document.createElement("dd");
+        desc.className   = "phys-src__desc";
+        desc.textContent = f.desc;
+
+        name.appendChild(shape);
+        row.appendChild(name);
+        row.appendChild(desc);
+        list.appendChild(row);
+      });
+      card.appendChild(list);
+      srcGrid.appendChild(card);
+    });
+    section.appendChild(srcGrid);
+
+    const pipeLabel       = document.createElement("h4");
+    pipeLabel.className   = "phys-sub";
+    pipeLabel.textContent = "Construction chain";
+    section.appendChild(pipeLabel);
+
+    const pipe     = document.createElement("ol");
+    pipe.className = "phys-pipe";
+    (ds.pipeline || []).forEach((stp) => {
+      const item     = document.createElement("li");
+      item.className = "phys-step reveal";
+
+      const no       = document.createElement("span");
+      no.className   = "phys-step__no";
+      no.textContent = stp.step;
+
+      const body     = document.createElement("div");
+      body.className = "phys-step__body";
+
+      const title       = document.createElement("h5");
+      title.className   = "phys-step__title";
+      title.textContent = stp.title;
+      body.appendChild(title);
+
+      if (stp.tex) {
+        const tex     = document.createElement("div");
+        tex.className = "phys-step__tex";
+        this._typeset(tex, stp.tex, true);
+        body.appendChild(tex);
+      }
+
+      const detail       = document.createElement("p");
+      detail.className   = "phys-step__detail";
+      detail.textContent = stp.detail;
+      body.appendChild(detail);
+
+      const out       = document.createElement("code");
+      out.className   = "phys-step__out";
+      out.textContent = stp.output;
+      body.appendChild(out);
+
+      item.appendChild(no);
+      item.appendChild(body);
+      pipe.appendChild(item);
+    });
+    section.appendChild(pipe);
+
+    const example = ds.example || {};
+    if ((example.rows || []).length) {
+      const exWrap     = document.createElement("div");
+      exWrap.className = "phys-example reveal";
+
+      const exHead       = document.createElement("div");
+      exHead.className   = "phys-example__head";
+      const exTitle       = document.createElement("span");
+      exTitle.className   = "phys-example__title";
+      exTitle.textContent = example.title;
+      const exBlurb       = document.createElement("p");
+      exBlurb.className   = "phys-example__blurb";
+      exBlurb.textContent = example.blurb;
+      exHead.appendChild(exTitle);
+      exHead.appendChild(exBlurb);
+      exWrap.appendChild(exHead);
+
+      const grid     = document.createElement("dl");
+      grid.className = "phys-example__grid";
+      example.rows.forEach((r) => {
+        const row     = document.createElement("div");
+        row.className = "phys-example__row";
+        const k       = document.createElement("dt");
+        k.className   = "phys-example__k";
+        k.textContent = r.k;
+        const v       = document.createElement("dd");
+        v.className   = "phys-example__v";
+        v.textContent = r.v;
+        row.appendChild(k);
+        row.appendChild(v);
+        grid.appendChild(row);
+      });
+      exWrap.appendChild(grid);
+      section.appendChild(exWrap);
+    }
 
     return section;
   }

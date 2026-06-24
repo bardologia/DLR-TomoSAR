@@ -175,6 +175,136 @@ class PhysicsLossLibrary:
             },
         ]
 
+    def _dataset(self) -> dict:
+        return {
+            "title"   : "What track data is used, and how the geometry is built",
+            "blurb"   : "The forward operator above is not hand-set: its wavelength, slant range, look angle, per-pass baselines, and elevation grid are all extracted from the preprocessed dataset. This is the full schema of which dataset artifacts are read, what fields each one contributes, and the exact construction chain that turns them into the per-pixel vertical wavenumber and the elevation axis the loss steers with.",
+            "sources" : [
+                {
+                    "file"      : "meta/track_parameters.json",
+                    "container" : "TrackParameters",
+                    "role"      : "Per-pass acquisition parameters, parsed from each track's INF/INF-RDP pp_*.xml (STEP processor) for the dataset polarisation. The reference track is labels[0]. Source of wavelength, slant-range vector, and the sensor/terrain heights behind the look angle.",
+                    "fields"    : [
+                        {"name": "lambda",            "shape": "scalar",        "desc": "radar wavelength (m); sets the 4 pi / lambda kz scale"},
+                        {"name": "r",                 "shape": "[n_range_full]", "desc": "slant-range vector, one entry per range sample (m)"},
+                        {"name": "h0",                "shape": "scalar",        "desc": "sensor altitude above the datum (m)"},
+                        {"name": "terrain",           "shape": "scalar",        "desc": "reference terrain height (m); h0 - terrain is the height above ground"},
+                        {"name": "antdir / da / rref","shape": "scalar",        "desc": "look side, depression angle, reference range (reported, diagnostic)"},
+                    ],
+                },
+                {
+                    "file"      : "data/track_profiles.npz",
+                    "container" : "TrackProfiles",
+                    "role"      : "Per-azimuth track positions for every pass over the full crop, in the resa frame. The horizontal and vertical profiles, referenced to the primary, become the per-azimuth baselines. azimuth_start keeps the profiles aligned to absolute SLC samples.",
+                    "fields"    : [
+                        {"name": "labels",            "shape": "[n_tracks]",        "desc": "ordered pass labels; must equal the parameter labels"},
+                        {"name": "horizontal",        "shape": "[n_tracks, n_az]",  "desc": "horizontal track position per azimuth (m)"},
+                        {"name": "vertical",          "shape": "[n_tracks, n_az]",  "desc": "vertical track position per azimuth (m)"},
+                        {"name": "horizontal_std / vertical_std", "shape": "[n_tracks]", "desc": "windowed dispersion of each profile (validation)"},
+                        {"name": "azimuth_start",     "shape": "scalar",            "desc": "absolute azimuth sample of profile column 0"},
+                    ],
+                },
+                {
+                    "file"      : "data/tomogram_full.npy",
+                    "container" : "ndarray (complex64)",
+                    "role"      : "The PyRAT Capon tomogram, axis order (elevation, azimuth, range). It is the ground-truth profile the loss target is fitted to, and its elevation dimension fixes the number of x-axis bins, so the steering grid and the GT curves share one axis.",
+                    "fields"    : [
+                        {"name": "shape[0]",          "shape": "n_elevation",       "desc": "elevation bins -> profile_length / x_axis length"},
+                        {"name": "shape[1:]",         "shape": "[n_az, n_range]",   "desc": "azimuth x range extent of the crop"},
+                    ],
+                },
+                {
+                    "file"      : "meta/config_state.json",
+                    "container" : "ProcessingConfig snapshot",
+                    "role"      : "Frozen record of the preprocessing run. Supplies the elevation extent (the PyRAT beamforming range) and the global crop that bounds the range and azimuth windows.",
+                    "fields"    : [
+                        {"name": "tomogram_config.height_range", "shape": "[2]", "desc": "elevation axis [z_min, z_max] in metres (here -20, 80)"},
+                        {"name": "crop",                         "shape": "[4]", "desc": "azimuth_start/end, range_start/end that slice r and the profiles"},
+                        {"name": "tomogram_config.polarisation", "shape": "str", "desc": "polarisation selecting the pp_*.xml and SLC products"},
+                    ],
+                },
+                {
+                    "file"      : "meta/baselines.json + data/dataset.json",
+                    "container" : "TrackBaselines / dataset manifest",
+                    "role"      : "Windowed-mean baselines (and their stds) used for validation and the global-geometry fallback path, plus the dataset manifest holding the global crop, the ordered pass labels, and the artifact map. interferograms.npy (primary * conj of each DEM-deramped secondary) is the measured multibaseline signal that feeds the model input stack.",
+                    "fields"    : [
+                        {"name": "labels / reference",    "shape": "[n_tracks]", "desc": "pass order and the primary; reference is always index 0"},
+                        {"name": "horizontal / vertical", "shape": "[n_tracks]", "desc": "windowed-mean baseline components (m), reference-subtracted"},
+                        {"name": "global_crop / pass_labels", "shape": "manifest", "desc": "crop bounds and ordered passes echoed into the geometry build"},
+                    ],
+                },
+            ],
+            "pipeline" : [
+                {
+                    "step"   : "01",
+                    "title"  : "Align passes",
+                    "tex"    : "",
+                    "detail" : "GeometryFieldBuilder checks that the track_profiles labels equal the track_parameters labels and fails loudly otherwise. The primary (index 0) is the interferometric reference; all baselines and phases are relative to it.",
+                    "output" : "ordered track labels, reference = labels[0]",
+                },
+                {
+                    "step"   : "02",
+                    "title"  : "Range geometry from the reference track",
+                    "tex"    : r"r_n = r^{\mathrm{ref}}[n_0{:}n_1], \qquad \theta_n = \arccos\!\frac{h_0 - h_t}{r_n}",
+                    "detail" : "The reference track's slant-range vector is sliced to the crop range window, and the look angle per range bin comes from the sensor height above terrain over the slant range. Look angle grows from near to far range across the swath.",
+                    "output" : "slant_range[n_range], look_angle[n_range]",
+                },
+                {
+                    "step"   : "03",
+                    "title"  : "Per-azimuth baselines",
+                    "tex"    : r"b^{h}_{i,a} = H_{i,a} - H_{0,a}, \qquad b^{v}_{i,a} = V_{i,a} - V_{0,a}",
+                    "detail" : "Horizontal and vertical track positions from track_profiles are sliced to the crop azimuth window and referenced to the primary, so the reference baseline is exactly zero and every other pass is an offset from it.",
+                    "output" : "baseline_h[n_tracks, n_az], baseline_v[n_tracks, n_az]",
+                },
+                {
+                    "step"   : "04",
+                    "title"  : "Perpendicular baseline",
+                    "tex"    : r"b^{\perp}_{i,a,n} = b^{h}_{i,a}\cos\theta_n + b^{v}_{i,a}\sin\theta_n",
+                    "detail" : "The horizontal and vertical offsets are projected onto the direction perpendicular to the line of sight using the per-range look angle. Only this perpendicular component carries elevation sensitivity.",
+                    "output" : "b_perp[n_tracks, n_az, n_range]",
+                },
+                {
+                    "step"   : "05",
+                    "title"  : "Per-pixel vertical wavenumber",
+                    "tex"    : r"k_z = \frac{4\pi\,b^{\perp}}{\lambda\,r_n\,\sin\theta_n}\;\;(\text{height}) \qquad k_z = \frac{4\pi\,b^{\perp}}{\lambda\,r_n}\;\;(\text{slant})",
+                    "detail" : "GeometryField.kz(convention) builds a wavenumber for every (pass, azimuth, range). The default height convention divides by sin theta to index a vertical axis; the slant convention indexes the line-of-sight-normal elevation. They differ only by 1/sin theta and give the same interferometric phase. The reference pass has kz = 0.",
+                    "output" : "kz[n_tracks, n_az, n_range]",
+                },
+                {
+                    "step"   : "06",
+                    "title"  : "Elevation axis",
+                    "tex"    : r"\xi = \mathrm{linspace}(z_{\min},\,z_{\max},\,N_\xi), \qquad N_\xi = \text{tomogram elevation bins}",
+                    "detail" : "The axis span is the height_range recorded by the preprocessing run; the sample count is read directly from the tomogram's elevation dimension. Because both come from the same dataset, x_axis and the ground-truth curves are sampled identically and the integration step dx is exact.",
+                    "output" : "x_axis[N_xi], dx",
+                },
+                {
+                    "step"   : "07",
+                    "title"  : "Slice into the loss",
+                    "tex"    : "",
+                    "detail" : "Per training region, GeometryField.slice crops the field to the patch and .kz(convention) yields the per-pixel kz_map. It is aligned bin-for-bin with the tomogram patch and fed to the steering operator, so each pixel is steered with its own geometry rather than a single scene-wide kz.",
+                    "output" : "kz_map[B, n_tracks, H, W]",
+                },
+            ],
+            "example"  : {
+                "title" : "Resolved on the FL01 reference stack",
+                "blurb" : "The values every step above produces on the transferred 17sartom-traun L-band stack, as verified against the dataset artifacts.",
+                "rows"  : [
+                    {"k": "Stack",                  "v": "17sartom-traun, L-band, hv"},
+                    {"k": "Tracks",                 "v": "29 (1 primary + 28 secondaries)"},
+                    {"k": "Reference pass",          "v": "FL01_PS02 (= pass_labels[0])"},
+                    {"k": "Wavelength",             "v": "0.2262 m (L-band)"},
+                    {"k": "Sensor altitude h0",      "v": "3719.2 m"},
+                    {"k": "Terrain",                "v": "683.9 m"},
+                    {"k": "Height above terrain",    "v": "3035.3 m"},
+                    {"k": "Slant range near to far", "v": "3598.9 to 3898.0 m"},
+                    {"k": "Look angle near to far",  "v": "32.50 to 38.86 deg"},
+                    {"k": "Crop",                   "v": "azimuth [1000, 2000), range [500, 1000)"},
+                    {"k": "Elevation axis",         "v": "[-20, 80] m, 150 bins, dx = 0.671 m"},
+                    {"k": "kz convention",          "v": "height (4 pi b_perp / lambda r sin theta)"},
+                ],
+            },
+        }
+
     def _comparison(self) -> dict:
         return {
             "title"   : "How the five terms compare",
@@ -230,6 +360,7 @@ class PhysicsLossLibrary:
         return {
             "intro"      : self._intro(),
             "operator"   : self._operator(),
+            "dataset"    : self._dataset(),
             "terms"      : self._terms(),
             "comparison" : self._comparison(),
             "config"     : self._config(),
