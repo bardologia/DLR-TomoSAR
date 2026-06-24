@@ -9,6 +9,7 @@ from configuration.architectures.profile_autoencoder import ProfileAutoencoderBa
 from configuration.sar.geometry_config               import GeometryConfig
 from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.pretraining      import PretrainConfig
 from configuration.training.general.trainer          import SharedSubConfigInheritance
 
 
@@ -58,3 +59,4 @@ class ProfileAeEntryConfig:
 
     paths    : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
     training : TrainingQueueConfig  = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))
+    pretrain : PretrainConfig       = field(default_factory=PretrainConfig)

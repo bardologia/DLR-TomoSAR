@@ -12,6 +12,7 @@ from configuration.training.general import (
     LossConfig,
     LossCurriculumConfig,
     SharedSubConfigInheritance,
+    PretrainConfig,
 )
 from configuration.training.backbone import (
     PatchTrialsConfig,

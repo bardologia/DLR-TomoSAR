@@ -11,6 +11,7 @@ from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.pretraining import PretrainConfig
 
 
 def _default_curriculum() -> LossCurriculumConfig:
@@ -146,6 +147,7 @@ class BackboneEntryConfig:
 
     paths      : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
     training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
+    pretrain   : PretrainConfig       = field(default_factory=PretrainConfig)
     curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)
     overfit    : OverfitConfig        = field(default_factory=OverfitConfig)
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
