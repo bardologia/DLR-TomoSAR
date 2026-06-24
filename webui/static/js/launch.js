@@ -427,7 +427,7 @@ class LaunchView {
       tab.addEventListener("click", () => {
         this._setValue(leaf, value);
         paint();
-        this._paintModelCard(LaunchView.MODEL_MEANINGS[value]);
+        this._paintTypeCard(value);
       });
       host.appendChild(tab);
     });
@@ -449,6 +449,19 @@ class LaunchView {
     card.className = "modelcard";
     card.id = "launch-model-card";
     this.modelCardEl = card;
+    this._paintJepaModesCard();
+    return card;
+  }
+
+  _paintTypeCard(value) {
+    if (value === "jepa") this._paintJepaModesCard();
+    else                  this._paintModelCard(LaunchView.MODEL_MEANINGS[value]);
+  }
+
+  _paintJepaModesCard() {
+    const card = this.modelCardEl;
+    if (!card) return;
+    card.hidden = false;
 
     const modes = [
       LaunchView.JEPA_MEANINGS.profile_only,
@@ -467,8 +480,6 @@ class LaunchView {
       `<div class="modelcard__head"><span class="modelcard__kicker">What JEPA can do</span>` +
       `<p class="modelcard__summary">JEPA trains in three modes, selected by which autoencoder runs you provide. All three possibilities are shown below.</p></div>` +
       `<div class="modelmodes">${rows}</div>`;
-
-    return card;
   }
 
   _paintModelCard(meaning) {
@@ -802,8 +813,8 @@ class LaunchView {
     const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
     const meaning   = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
 
-    if (this.key === "train_jepa") host.appendChild(this._buildJepaModesCard());
-    else if (meaning)              host.appendChild(this._buildModelCard(meaning));
+    if (modelType === "jepa") host.appendChild(this._buildJepaModesCard());
+    else if (meaning)         host.appendChild(this._buildModelCard(meaning));
 
     host.appendChild(this._buildToolbar(cfg));
 
