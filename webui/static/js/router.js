@@ -8,7 +8,7 @@ class Router {
       this.pages[p.dataset.page] = p;
     });
     this.links = [...document.querySelectorAll("[data-route]")];
-    this.navAlias = { launch: "scripts" };
+    this.navAlias = { launch: "scripts", ablation: "scripts" };
     this.current = null;
 
     window.addEventListener("hashchange", () => this._sync());
