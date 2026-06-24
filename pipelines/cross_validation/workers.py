@@ -6,12 +6,11 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.benchmark.results                       import TrialCollector, TrialRecord
+from pipelines.benchmark.results                       import SeedAggregation, TrialCollector, TrialRecord
 from pipelines.benchmark.workers                       import BenchmarkWorker
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
 from tools.data.io                                      import FileIO
 from tools.data.regions                                import SplitRegions
-from tools.metrics.scoring                             import FiniteScalar
 from tools.monitoring.logger                           import Logger
 
 
@@ -37,26 +36,6 @@ class FoldCollector(TrialCollector):
 
         return sorted(groups.items(), key=lambda item: FoldNaming.index(item[0]))
 
-    def _mean_std(self, values: list[float]) -> tuple[float, float | None]:
-        mean = float(np.mean(values))
-        std  = float(np.std(values, ddof=1)) if len(values) > 1 else None
-
-        return mean, std
-
-    def _aggregate(self, dicts: list[dict], keys: list[str]) -> tuple[dict, dict]:
-        means, stds = {}, {}
-
-        for key in keys:
-            values = [FiniteScalar.coerce(d.get(key)) for d in dicts]
-            values = [value for value in values if value is not None]
-
-            if not values:
-                continue
-
-            means[key], stds[key] = self._mean_std(values)
-
-        return means, stds
-
     def _split_view(self, record: TrialRecord, split: str) -> TrialRecord:
         inference_dir = record.run_dir / "inference" / split
 
@@ -80,13 +59,13 @@ class FoldCollector(TrialCollector):
         views = [self._split_view(run, split) for run in runs]
         keys  = sorted({key for view in views for key in view.metrics})
 
-        means, stds   = self._aggregate([view.metrics for view in views], keys)
+        means, stds   = SeedAggregation.aggregate([view.metrics for view in views], keys)
         representative = next((view for view in views if view.inference_dir is not None), views[0])
 
         return replace(representative, name=fold_name, metrics=means), stds
 
     def _fold_base_record(self, fold_name: str, runs: list[TrialRecord]) -> tuple[TrialRecord, float | None]:
-        checkpoint, checkpoint_std = self._aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
+        checkpoint, checkpoint_std = SeedAggregation.aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
 
         durations = [run.training_result.get("duration_s") for run in runs]
         durations = [value for value in durations if isinstance(value, (int, float))]

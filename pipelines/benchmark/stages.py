@@ -6,7 +6,7 @@ from datetime    import datetime
 from pathlib     import Path
 
 from configuration.benchmark import BenchmarkConfig
-from pipelines.benchmark.results                import ComparisonReport, TrialCollector
+from pipelines.benchmark.results                import BenchmarkSeedCollector, ComparisonReport
 from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
 from pipelines.shared.seed_sweep                import SeedSet
 from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
@@ -377,7 +377,7 @@ class ComparisonStage(ExperimentStage):
     def run(self) -> Path:
         self.logger.section("Comparison reports")
 
-        collector = TrialCollector(run_dir=self.run_dir, logger=self.logger)
+        collector = BenchmarkSeedCollector(run_dir=self.run_dir, logger=self.logger)
         records   = collector.collect()
 
         out_dir = self.run_dir / "comparison" / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -388,6 +388,7 @@ class ComparisonStage(ExperimentStage):
             reference_model = self.config.size_match.reference_model,
             embed_images    = self.config.comparison.embed_images,
             logger          = self.logger,
+            seed_dispersion = collector.seed_dispersion,
         )
 
         written = report.write_all()

@@ -15,6 +15,10 @@ class SeedSet:
         return f"{base}_seed{seed}"
 
     @staticmethod
+    def base(run_name: str) -> str:
+        return run_name.split("_seed")[0]
+
+    @staticmethod
     def cli_args(seed: int | None) -> list[str]:
         return ["--seed", str(seed)] if seed is not None else []
 

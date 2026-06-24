@@ -222,7 +222,8 @@ def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, 
 
     class FakeCollector:
         def __init__(self, run_dir, logger):
-            collected["run_dir"] = run_dir
+            collected["run_dir"]  = run_dir
+            self.seed_dispersion  = {"unet": {"n_seeds": 2}}
         def collect(self):
             return []
 
@@ -232,13 +233,14 @@ def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, 
         def write_all(self):
             return [Path("/tmp/x.md")]
 
-    monkeypatch.setattr("pipelines.benchmark.stages.TrialCollector", FakeCollector)
+    monkeypatch.setattr("pipelines.benchmark.stages.BenchmarkSeedCollector", FakeCollector)
     monkeypatch.setattr("pipelines.benchmark.stages.ComparisonReport", FakeReport)
 
     out_dir = stage.run()
 
     assert collected["run_dir"] == stage.run_dir
     assert collected["kwargs"]["reference_model"] == config.size_match.reference_model
+    assert collected["kwargs"]["seed_dispersion"] == {"unet": {"n_seeds": 2}}
     assert "comparison" in str(out_dir)
 
 

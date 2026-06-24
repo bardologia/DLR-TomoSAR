@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import gc
+import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib     import Path
 
+import numpy as np
+
+from pipelines.shared.seed_sweep import SeedSet
 from tools.data.io             import FileIO
 from tools.reporting.reporting import MetricSectionGrouper, ReportAssets
 from tools.metrics.scoring     import FiniteScalar, MetricOrientation
@@ -13,6 +17,30 @@ from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
 _CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
+
+
+class SeedAggregation:
+    @staticmethod
+    def mean_std(values: list[float]) -> tuple[float, float | None]:
+        mean = float(np.mean(values))
+        std  = float(np.std(values, ddof=1)) if len(values) > 1 else None
+
+        return mean, std
+
+    @staticmethod
+    def aggregate(dicts: list[dict], keys: list[str]) -> tuple[dict, dict]:
+        means, stds = {}, {}
+
+        for key in keys:
+            values = [FiniteScalar.coerce(d.get(key)) for d in dicts]
+            values = [value for value in values if value is not None]
+
+            if not values:
+                continue
+
+            means[key], stds[key] = SeedAggregation.mean_std(values)
+
+        return means, stds
 
 
 @dataclass
@@ -115,7 +143,7 @@ class TrialCollector:
         for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
             record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
 
-            record.size_match      = size_match[trial_dir.name] if trial_dir.name in size_match else {}
+            record.size_match      = size_match.get(SeedSet.base(trial_dir.name), {})
             record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
             record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
             record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
@@ -131,6 +159,70 @@ class TrialCollector:
             records.append(record)
 
         return records
+
+
+class BenchmarkSeedCollector(TrialCollector):
+    CHECKPOINT_KEYS = ("best_val_loss", "best_epoch", "n_train_epochs")
+
+    def __init__(self, run_dir: Path, logger: Logger) -> None:
+        super().__init__(run_dir=run_dir, logger=logger)
+        self.seed_dispersion = {}
+
+    def _group_by_model(self, records: list[TrialRecord]) -> list[tuple[str, list[TrialRecord]]]:
+        groups: dict[str, list[TrialRecord]] = {}
+
+        for record in records:
+            groups.setdefault(SeedSet.base(record.name), []).append(record)
+
+        return list(groups.items())
+
+    def _aggregate_group(self, model_name: str, runs: list[TrialRecord]) -> tuple[TrialRecord, dict]:
+        representative = next((run for run in runs if run.has_inference), runs[0])
+
+        metric_keys             = sorted({key for run in runs for key in run.metrics})
+        metric_means, metric_std = SeedAggregation.aggregate([run.metrics for run in runs], metric_keys)
+        ckpt_means, ckpt_std     = SeedAggregation.aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
+
+        overfit_losses = [run.overfit.get("final_loss") for run in runs]
+        overfit_losses = [value for value in overfit_losses if isinstance(value, (int, float))]
+        durations      = [run.training_result.get("duration_s") for run in runs]
+        durations      = [value for value in durations if isinstance(value, (int, float))]
+
+        record                 = replace(representative, name=model_name, metrics=metric_means)
+        record.checkpoint      = {**representative.checkpoint, **ckpt_means}
+        record.training_result = {
+            "status"     : "DONE" if all(run.training_result.get("status") == "DONE" for run in runs) else "PARTIAL",
+            "duration_s" : float(np.mean(durations)) if durations else None,
+        }
+        record.overfit = {
+            **representative.overfit,
+            "status"     : "PASS" if all(run.overfit.get("status") == "PASS" for run in runs) else "FAIL",
+            "final_loss" : float(np.mean(overfit_losses)) if overfit_losses else None,
+            "converged"  : all(run.overfit.get("converged") for run in runs) if all("converged" in run.overfit for run in runs) else None,
+        }
+
+        dispersion = {
+            "n_seeds"           : len(runs),
+            "best_val_loss_std" : ckpt_std.get("best_val_loss"),
+            "metrics"           : metric_std,
+        }
+
+        return record, dispersion
+
+    def collect(self) -> list[TrialRecord]:
+        self.seed_dispersion = {}
+        aggregated           = []
+
+        for model_name, runs in self._group_by_model(super().collect()):
+            if len(runs) == 1:
+                aggregated.append(runs[0])
+                continue
+
+            record, dispersion = self._aggregate_group(model_name, runs)
+            aggregated.append(record)
+            self.seed_dispersion[model_name] = dispersion
+
+        return aggregated
 
 
 class ComparisonReport:
@@ -157,15 +249,27 @@ class ComparisonReport:
         ("pixel_peak_err_units_mean_gt", "Peak err"),
     ]
 
-    def __init__(self, records: list[TrialRecord], out_dir: Path, reference_model: str, embed_images: bool, logger: Logger, rank_models: bool = True) -> None:
+    def __init__(self, records: list[TrialRecord], out_dir: Path, reference_model: str, embed_images: bool, logger: Logger, rank_models: bool = True, seed_dispersion: dict | None = None) -> None:
         self.records         = records
         self.out_dir         = out_dir
         self.reference_model = reference_model
         self.embed_images    = embed_images
         self.logger          = logger
         self.rank_models     = rank_models
+        self.seed_dispersion = seed_dispersion or {}
+        self.has_seed_sweep  = any(entry["n_seeds"] > 1 for entry in self.seed_dispersion.values())
         self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
         self.timestamp       = self.assets.timestamp
+
+    def _seed_annotated(self, cell: str, std: float | None) -> str:
+        if std is None or not math.isfinite(std):
+            return cell
+
+        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
+
+    def _metric_seed_std(self, name: str, key: str) -> float | None:
+        entry = self.seed_dispersion.get(name)
+        return entry["metrics"].get(key) if entry else None
 
     def _write_overview(self) -> Path:
         if self.rank_models:
@@ -230,11 +334,13 @@ class ComparisonReport:
             duration_s = r.training_result.get("duration_s")
             duration   = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
 
+            best_val_loss_std = self.seed_dispersion.get(r.name, {}).get("best_val_loss_std")
+
             table.add_row(
                 f"`{r.name}`",
                 r.training_result.get("status", "—"),
                 ScalarFormatter.format_scalar(r.checkpoint.get("best_epoch")),
-                ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")),
+                self._seed_annotated(ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")), best_val_loss_std),
                 ScalarFormatter.format_scalar(r.checkpoint.get("n_train_epochs")),
                 duration,
             )
@@ -292,6 +398,8 @@ class ComparisonReport:
         if self.rank_models:
             lines  = self.assets.header("Test Metrics Comparison")
             lines += ["> Best value per metric in **bold** (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
+            if self.has_seed_sweep:
+                lines += ["> Each model was trained under multiple seeds; cells show the seed mean ± seed standard deviation.\n"]
         else:
             lines  = self.assets.header("Per-Fold Test Metrics")
             lines += ["> Folds of one model across disjoint azimuth regions; no value is highlighted as best (↓ lower is better, ↑ higher is better). Per-bin array metrics are excluded.\n"]
@@ -322,11 +430,12 @@ class ComparisonReport:
                 best = max(numeric) if direction == "higher" else min(numeric)
 
             cells = []
-            for value in values:
+            for r, value in zip(scored, values):
                 cell   = ScalarFormatter.format_scalar(value)
                 finite = FiniteScalar.coerce(value)
                 if best is not None and finite is not None and finite == best:
                     cell = f"**{cell}**"
+                cell = self._seed_annotated(cell, self._metric_seed_std(r.name, key))
                 cells.append(cell)
 
             table.add_row(f"`{key}`{arrow}", *cells)
@@ -389,7 +498,7 @@ class ComparisonReport:
     def _write_summary_json(self) -> Path:
         payload = []
         for r in self.records:
-            payload.append({
+            entry = {
                 "name"            : r.name,
                 "run_dir"         : str(r.run_dir),
                 "parameters"      : r.parameters,
@@ -404,7 +513,12 @@ class ComparisonReport:
                 "figures"         : [path.name for path in r.figures],
                 "animations"      : [path.name for path in r.animations],
                 "report_path"     : str(r.report_path) if r.report_path else None,
-            })
+            }
+
+            if r.name in self.seed_dispersion:
+                entry["seed_dispersion"] = self.seed_dispersion[r.name]
+
+            payload.append(entry)
 
         out = self.out_dir / "comparison_summary.json"
         return FileIO.save_json(payload, out, indent=2)

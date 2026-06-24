@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from pipelines.benchmark.results import ComparisonReport, TrialCollector, TrialRecord
+from pipelines.benchmark.results import BenchmarkSeedCollector, ComparisonReport, TrialCollector, TrialRecord
 
 from tools.data.io import FileIO
 
@@ -124,6 +124,95 @@ def test_collector_attaches_inference_metrics_and_media(tmp_path, logger_stub):
     assert [p.name for p in record.figures]    == ["profiles_1.png"]
     assert [p.name for p in record.animations] == ["elev.gif"]
     assert record.report_path is not None
+
+
+def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
+    import numpy as np
+
+    pipe = tmp_path / "pipeline"
+    pipe.mkdir(parents=True)
+    _write_json(pipe / "size_match.json", {"unet": {"parameters": 100, "overrides": {}}})
+    _write_json(pipe / "overfit_results.json", [
+        {"model": "unet_seed1", "status": "PASS", "final_loss": 0.1, "converged": True},
+        {"model": "unet_seed2", "status": "PASS", "final_loss": 0.3, "converged": True},
+    ])
+    _write_json(pipe / "training_results.json", [
+        {"name": "unet_seed1", "status": "DONE", "duration_s": 10.0},
+        {"name": "unet_seed2", "status": "DONE", "duration_s": 20.0},
+    ])
+
+    for seed, rmse in ((1, 2.0), (2, 4.0)):
+        inference_dir = tmp_path / "training" / f"unet_seed{seed}" / "inference" / "run_a"
+        inference_dir.mkdir(parents=True)
+        _write_json(inference_dir / "metrics.json", {"curve_rmse_gt": rmse})
+
+    collector = BenchmarkSeedCollector(run_dir=tmp_path, logger=logger_stub)
+    records   = collector.collect()
+
+    assert [record.name for record in records] == ["unet"]
+
+    record = records[0]
+    assert record.metrics["curve_rmse_gt"]          == 3.0
+    assert record.parameters                        == 100
+    assert record.overfit["final_loss"]             == pytest.approx(0.2)
+    assert record.training_result["duration_s"]     == pytest.approx(15.0)
+
+    dispersion = collector.seed_dispersion["unet"]
+    assert dispersion["n_seeds"]                     == 2
+    assert dispersion["metrics"]["curve_rmse_gt"]    == pytest.approx(float(np.std([2.0, 4.0], ddof=1)))
+
+
+def test_seed_collector_single_run_is_identity(tmp_path, logger_stub):
+    pipe = tmp_path / "pipeline"
+    pipe.mkdir(parents=True)
+    _write_json(pipe / "size_match.json", {})
+    _write_json(pipe / "overfit_results.json", [])
+    _write_json(pipe / "training_results.json", [])
+    (tmp_path / "training" / "unet").mkdir(parents=True)
+
+    collector = BenchmarkSeedCollector(run_dir=tmp_path, logger=logger_stub)
+    records   = collector.collect()
+
+    assert [record.name for record in records] == ["unet"]
+    assert collector.seed_dispersion           == {}
+
+
+def test_metric_table_annotates_seed_dispersion(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = ComparisonReport(
+        records         = records,
+        out_dir         = tmp_path,
+        reference_model = "unet",
+        embed_images    = False,
+        logger          = logger_stub,
+        seed_dispersion = {"unet": {"n_seeds": 2, "best_val_loss_std": 0.01, "metrics": {"overall_r2_gt": 0.05}}},
+    )
+
+    assert report.has_seed_sweep is True
+
+    lines = "\n".join(report._metric_table(["overall_r2_gt"], records))
+
+    assert "± " in lines
+
+
+def test_summary_json_includes_seed_dispersion(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = ComparisonReport(
+        records         = records,
+        out_dir         = tmp_path / "out",
+        reference_model = "unet",
+        embed_images    = False,
+        logger          = logger_stub,
+        seed_dispersion = {"unet": {"n_seeds": 2, "best_val_loss_std": None, "metrics": {}}},
+    )
+
+    report.write_all()
+
+    payload = json.loads((report.out_dir / "comparison_summary.json").read_text())
+    by_name = {entry["name"]: entry for entry in payload}
+
+    assert by_name["unet"]["seed_dispersion"]["n_seeds"] == 2
+    assert "seed_dispersion" not in by_name["resunet"]
 
 
 def _records_with_metrics(out_dir):
