@@ -1550,7 +1550,8 @@ class ExperimentBuilder {
 
 class AblationBuilder {
   constructor(view, byPath) {
-    this.view = view;
+    this.view   = view;
+    this.byPath = byPath;
 
     this.trialsLeaf   = byPath.get("trials_enabled");
     this.modeLeaf     = byPath.get("trials_mode");
@@ -1573,6 +1574,7 @@ class AblationBuilder {
     this.menuEl       = null;
     this.listEl       = null;
     this.fullEl       = null;
+    this.datalistId   = "ablation-cfg-paths";
     this._paintSwitch = null;
   }
 
@@ -1615,6 +1617,7 @@ class AblationBuilder {
 
     this.root.appendChild(head);
     this.root.appendChild(body);
+    this.root.appendChild(this._pathDatalist());
 
     if (this.featuresLeaf) this.view.controls[this.featuresLeaf.path] = { leaf: this.featuresLeaf, reset: () => this._repaint() };
     if (this.fullLeaf)     this.view.controls[this.fullLeaf.path]     = { leaf: this.fullLeaf,     reset: () => this._repaint() };
@@ -1696,6 +1699,30 @@ class AblationBuilder {
     return parts.length ? parts.join(", ") : "no change";
   }
 
+  _featureKeys(feature) {
+    const keys = [];
+    const seen = new Set();
+    [feature.enable || {}, feature.degrade || {}].forEach((dict) => {
+      Object.keys(dict).forEach((path) => {
+        if (seen.has(path)) return;
+        seen.add(path);
+        keys.push(path);
+      });
+    });
+    return keys;
+  }
+
+  _pathDatalist() {
+    const list = document.createElement("datalist");
+    list.id    = this.datalistId;
+    [...this.byPath.keys()].forEach((path) => {
+      const opt   = document.createElement("option");
+      opt.value   = path;
+      list.appendChild(opt);
+    });
+    return list;
+  }
+
   _panel() {
     const panel     = document.createElement("div");
     panel.className = "exp-secondary exp-presence exp-ablation";
@@ -1715,7 +1742,7 @@ class AblationBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Run 0 is the full model with every selected feature enabled; each later run degrades one more feature in the order below, ending at the baseline with all of them off. Pick from the catalog, reorder with the arrows, or add a custom feature by config path.";
+    note.textContent = "Run 0 is the full model with every selected feature enabled (the before values); each later run degrades one more feature in the order below to its after value, ending at the baseline with all of them degraded. Edit the before and after of any config path, add or remove paths, or rename the feature. Pick from the catalog, or add a custom feature by config path.";
 
     const menuHead      = document.createElement("div");
     menuHead.className   = "exp-presence__sub";
@@ -1752,36 +1779,53 @@ class AblationBuilder {
     label.placeholder = "label";
     label.className   = "exp-ablation__field exp-ablation__field--label";
 
+    const group = document.createElement("input");
+    group.type        = "text";
+    group.placeholder = "group";
+    group.className   = "exp-ablation__field exp-ablation__field--group";
+
     const path = document.createElement("input");
     path.type        = "text";
     path.placeholder = "config.path";
     path.className   = "exp-ablation__field exp-ablation__field--path";
+    path.setAttribute("list", this.datalistId);
 
-    const value = document.createElement("input");
-    value.type        = "text";
-    value.placeholder = "degraded value";
-    value.className   = "exp-ablation__field exp-ablation__field--value";
+    const before = document.createElement("input");
+    before.type        = "text";
+    before.placeholder = "before";
+    before.className   = "exp-ablation__field exp-ablation__field--value";
 
-    const add = LaunchWidgetDom.mini("add custom", () => {
-      if (this._addCustom(label.value, path.value, value.value)) {
+    const after = document.createElement("input");
+    after.type        = "text";
+    after.placeholder = "after";
+    after.className   = "exp-ablation__field exp-ablation__field--value";
+
+    const add = LaunchWidgetDom.mini("add custom feature", () => {
+      if (this._addCustom(label.value, group.value, path.value, before.value, after.value)) {
         label.value = "";
+        group.value = "";
         path.value  = "";
-        value.value = "";
+        before.value = "";
+        after.value  = "";
       }
     });
 
     form.appendChild(label);
+    form.appendChild(group);
     form.appendChild(path);
-    form.appendChild(value);
+    form.appendChild(before);
+    form.appendChild(after);
     form.appendChild(add);
     return form;
   }
 
   _coerceLiteral(text) {
     const trimmed = String(text).trim();
+    if (trimmed === "") return "";
     if (trimmed.toLowerCase() === "true")  return true;
     if (trimmed.toLowerCase() === "false") return false;
-    if (trimmed !== "" && !isNaN(Number(trimmed))) return Number(trimmed);
+    if (trimmed.toLowerCase() === "none")  return null;
+    if (!isNaN(Number(trimmed))) return Number(trimmed);
     return trimmed;
   }
 
@@ -1796,8 +1840,9 @@ class AblationBuilder {
     this._setFeatures(features);
   }
 
-  _addCustom(label, path, value) {
+  _addCustom(label, group, path, before, after) {
     const cleanLabel = String(label).trim();
+    const cleanGroup = String(group).trim() || "custom";
     const cleanPath  = String(path).trim();
     if (!cleanLabel || !cleanPath) {
       window.toast("custom feature needs a label and a config path", "error");
@@ -1810,9 +1855,64 @@ class AblationBuilder {
       return false;
     }
 
-    features.push({ label: cleanLabel, group: "custom", enable: {}, degrade: { [cleanPath]: this._coerceLiteral(value) } });
+    const enable  = {};
+    const degrade = {};
+    if (String(before).trim() !== "") enable[cleanPath]  = this._coerceLiteral(before);
+    degrade[cleanPath] = this._coerceLiteral(after);
+
+    features.push({ label: cleanLabel, group: cleanGroup, enable, degrade });
     this._setFeatures(features);
     return true;
+  }
+
+  _renameFeature(index, label) {
+    const clean    = String(label).trim();
+    if (!clean) return;
+    const features = this._features();
+    if (!features[index]) return;
+    if (features.some((entry, i) => i !== index && entry.label === clean)) {
+      window.toast(`feature '${clean}' is already in the order`, "error");
+      this._repaint();
+      return;
+    }
+    features[index].label = clean;
+    this._setFeatures(features);
+  }
+
+  _setPathValue(index, side, path, value) {
+    const features = this._features();
+    const feature  = features[index];
+    if (!feature) return;
+    if (!feature[side]) feature[side] = {};
+    feature[side][path] = value;
+    this._setFeatures(features);
+  }
+
+  _addPath(index, path, before, after) {
+    const cleanPath = String(path).trim();
+    if (!cleanPath) {
+      window.toast("a config path is required", "error");
+      return false;
+    }
+
+    const features = this._features();
+    const feature  = features[index];
+    if (!feature) return false;
+    if (!feature.enable)  feature.enable  = {};
+    if (!feature.degrade) feature.degrade = {};
+    if (String(before).trim() !== "") feature.enable[cleanPath] = this._coerceLiteral(before);
+    feature.degrade[cleanPath] = this._coerceLiteral(after);
+    this._setFeatures(features);
+    return true;
+  }
+
+  _removePath(index, path) {
+    const features = this._features();
+    const feature  = features[index];
+    if (!feature) return;
+    if (feature.enable)  delete feature.enable[path];
+    if (feature.degrade) delete feature.degrade[path];
+    this._setFeatures(features);
   }
 
   _move(index, delta) {
@@ -1896,33 +1996,176 @@ class AblationBuilder {
     const row     = document.createElement("div");
     row.className = "exp-ablation__row";
 
-    const isBaseline = index === total - 1;
-    const stepLabel  = document.createElement("span");
-    stepLabel.className   = "exp-ablation__step";
-    stepLabel.textContent = isBaseline ? `${index + 1} base` : `${index + 1}`;
-    row.appendChild(stepLabel);
+    const head     = document.createElement("div");
+    head.className = "exp-ablation__rowhead";
 
-    const name       = document.createElement("span");
-    name.className   = "exp-ablation__label";
-    name.textContent = feature.label;
-    name.title       = this._specText(feature);
-    row.appendChild(name);
+    const isBaseline = index === total - 1;
+    const step       = document.createElement("span");
+    step.className   = "exp-ablation__step";
+    step.textContent = isBaseline ? `${index + 1} base` : `${index + 1}`;
+    head.appendChild(step);
+
+    const label       = document.createElement("input");
+    label.type        = "text";
+    label.className   = "exp-ablation__labelinput";
+    label.value       = feature.label || "";
+    label.spellcheck  = false;
+    label.title       = "feature label, used in the trial run name";
+    label.addEventListener("change", () => this._renameFeature(index, label.value));
+    head.appendChild(label);
+
+    const group       = document.createElement("span");
+    group.className   = "exp-ablation__group";
+    group.textContent = feature.group || "custom";
+    head.appendChild(group);
 
     const up = LaunchWidgetDom.mini("↑", () => this._move(index, -1));
     up.classList.add("exp-ablation__move");
     up.disabled = index === 0;
-    row.appendChild(up);
+    head.appendChild(up);
 
     const down = LaunchWidgetDom.mini("↓", () => this._move(index, 1));
     down.classList.add("exp-ablation__move");
     down.disabled = index === total - 1;
-    row.appendChild(down);
+    head.appendChild(down);
 
     const remove = LaunchWidgetDom.mini("×", () => this._remove(index));
     remove.classList.add("exp-presence__remove");
-    remove.title = "Remove feature";
-    row.appendChild(remove);
+    remove.title = "remove feature";
+    head.appendChild(remove);
+
+    row.appendChild(head);
+
+    const paths     = document.createElement("div");
+    paths.className = "exp-ablation__paths";
+
+    const keys = this._featureKeys(feature);
+    if (!keys.length) {
+      const none       = document.createElement("p");
+      none.className   = "exp-ablation__pathnote";
+      none.textContent = "no config paths yet — add one below";
+      paths.appendChild(none);
+    }
+    keys.forEach((path) => paths.appendChild(this._pathRow(feature, index, path)));
+    paths.appendChild(this._addPathForm(index));
+
+    row.appendChild(paths);
     return row;
+  }
+
+  _pathRow(feature, index, path) {
+    const item     = document.createElement("div");
+    item.className = "exp-ablation__path";
+
+    const name       = document.createElement("span");
+    name.className   = "exp-ablation__pathname";
+    name.textContent = path;
+    name.title       = path;
+    item.appendChild(name);
+
+    const beforeVal = feature.enable ? feature.enable[path] : undefined;
+    const before    = this._valueEditor(path, beforeVal, (v) => this._setPathValue(index, "enable", path, v));
+    before.classList.add("exp-ablation__val", "exp-ablation__val--before");
+    before.title = `before (full model) · --${path}`;
+    item.appendChild(before);
+
+    const arrow       = document.createElement("span");
+    arrow.className   = "exp-ablation__arrow";
+    arrow.textContent = "→";
+    item.appendChild(arrow);
+
+    const afterVal = feature.degrade ? feature.degrade[path] : undefined;
+    const after    = this._valueEditor(path, afterVal, (v) => this._setPathValue(index, "degrade", path, v));
+    after.classList.add("exp-ablation__val", "exp-ablation__val--after");
+    after.title = `after (degraded) · --${path}`;
+    item.appendChild(after);
+
+    const rm = LaunchWidgetDom.mini("×", () => this._removePath(index, path));
+    rm.classList.add("exp-ablation__pathremove");
+    rm.title = "remove this config path";
+    item.appendChild(rm);
+
+    return item;
+  }
+
+  _addPathForm(index) {
+    const form     = document.createElement("div");
+    form.className = "exp-ablation__addpath";
+
+    const path = document.createElement("input");
+    path.type        = "text";
+    path.placeholder = "config.path";
+    path.className   = "exp-ablation__field exp-ablation__field--path";
+    path.setAttribute("list", this.datalistId);
+
+    const before = document.createElement("input");
+    before.type        = "text";
+    before.placeholder = "before";
+    before.className   = "exp-ablation__field exp-ablation__field--value";
+
+    const after = document.createElement("input");
+    after.type        = "text";
+    after.placeholder = "after";
+    after.className   = "exp-ablation__field exp-ablation__field--value";
+
+    const add = LaunchWidgetDom.mini("add path", () => {
+      if (this._addPath(index, path.value, before.value, after.value)) {
+        path.value   = "";
+        before.value = "";
+        after.value  = "";
+      }
+    });
+    add.classList.add("exp-ablation__addbtn");
+
+    form.appendChild(path);
+    form.appendChild(before);
+    form.appendChild(after);
+    form.appendChild(add);
+    return form;
+  }
+
+  _valueEditor(path, value, onCommit) {
+    const leaf = this.byPath.get(path);
+    const type = leaf ? leaf.type : null;
+
+    if (type === "bool") {
+      const btn       = document.createElement("button");
+      btn.type        = "button";
+      btn.className   = "switch exp-ablation__switch";
+      btn.setAttribute("role", "switch");
+      btn.innerHTML   = `<span class="switch__knob"></span>`;
+      const paint = (state) => {
+        btn.classList.toggle("is-on", state);
+        btn.setAttribute("aria-checked", String(state));
+      };
+      paint(value === true);
+      btn.addEventListener("click", () => {
+        const next = !btn.classList.contains("is-on");
+        paint(next);
+        onCommit(next);
+      });
+      return btn;
+    }
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input exp-ablation__input";
+    input.spellcheck = false;
+
+    if (type === "int" || type === "float") {
+      input.type  = "number";
+      input.step  = type === "int" ? "1" : "any";
+      input.value = value === undefined || value === null ? "" : String(value);
+      input.addEventListener("change", () => {
+        const raw = input.value.trim();
+        onCommit(raw === "" ? null : Number(raw));
+      });
+    } else {
+      input.type        = "text";
+      input.value       = value === undefined || value === null ? "" : String(value);
+      input.placeholder = value === undefined ? "unset" : "";
+      input.addEventListener("change", () => onCommit(input.value));
+    }
+    return input;
   }
 
   _gpusSuffix() {
@@ -2380,6 +2623,997 @@ class GpuPicker {
 }
 
 
+
+class ConfigForm {
+  constructor() {
+    this.dirty            = {};
+    this.controls         = {};
+    this.dependents       = {};
+    this.states           = [];
+    this.panels           = new Map();
+    this.bands            = [];
+    this.gates            = [];
+    this.gatedSections    = new Set();
+    this.classColors      = new Map();
+    this.query            = "";
+    this.showAll          = false;
+    this.overrideSections = { suppressed: new Set(), labels: new Map(), identical: new Set(), sections: new Set(), differ: new Map() };
+    this.modelFamilies    = null;
+    this.pinsEl           = null;
+    this.nomatchEl        = null;
+    this.countEl          = null;
+    this.showAllBtn       = null;
+    this.totalFields      = 0;
+  }
+
+  static PALETTE = ["#1d4fd8", "#0f766e", "#b45309", "#7c3aed", "#be185d", "#0e7490", "#4d7c0f", "#b91c1c"];
+
+  static FIELD_TAXONOMY = [
+    ["curve space", /curve|spectral|ssim/],
+    ["param space", /^param/],
+    ["slot presence", /presence|focal|active_normalization|active_weight|inactive_weight/],
+    ["regularization", /smooth|_tv$/],
+    ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
+    ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
+    ["early stopping", /^early_stop/],
+    ["image autoencoder", /image_autoencoder|image_ae_finetune|image_ae_loss/],
+    ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],
+    ["embedding", /embedding/],
+    ["probe", /^probe_/],
+    ["outputs", /^save_(cubes|plots|animations)$/],
+    ["identifiers", /identifier|output_tag$|^dataset_type$/],
+    ["image stack", /^use_(primary|secondaries|interferograms|dem)$/],
+    ["data", /batch|worker|patch|stride|azimuth|dataset|^use_amp$|accumulation/],
+    ["model", /model|gauss/],
+    ["source", /fusar|track_selection|polarisation|^base_directory$/],
+    ["run", /^run_|^gpu|^seeds?$|^device|^log|dir|path/],
+    ["reset", /^reset_/],
+    ["beamforming", /beamforming|^filter_|^height_range$|^win_list$/],
+    ["stitching", /stitch|cube/],
+    ["figures", /cmap|dpi|intensity/],
+  ];
+
+  static STACK_PAIRS = [
+    ["param space", "regularization"],
+    ["schedule", "early stopping"],
+    ["data", "run"],
+  ];
+
+  static OPTION_GATES = {
+    benchmark: { field: "training_type", sections: {
+      jepa:       ["jepa"],
+      ae_loss:    ["profile_autoencoder"],
+      size_match: ["backbone"],
+      inference:  ["backbone", "jepa"],
+    } },
+    cross_validate: { field: "training_type", sections: {
+      jepa:        ["jepa"],
+      autoencoder: ["profile_autoencoder"],
+      inference:   ["backbone", "jepa"],
+    } },
+    tune: { field: "training_type", sections: {
+      jepa:          ["jepa"],
+      ae_loss:       ["profile_autoencoder"],
+      image_ae_loss: ["image_autoencoder"],
+    } },
+  };
+
+  static EXPERIMENT_JEPA_CHOICES = {
+    "jepa.profile_autoencoder_mode": ["frozen", "finetune"],
+    "jepa.target_provider":          ["stopgrad", "ema", "live"],
+  };
+
+  static TUNE_CHOICES = {
+    ...ConfigForm.EXPERIMENT_JEPA_CHOICES,
+    "jepa.image_autoencoder_mode": ["frozen", "finetune"],
+  };
+
+  static CHOICES = {
+    train_jepa: {
+      profile_autoencoder_mode: ["frozen", "finetune"],
+      image_autoencoder_mode:   ["frozen", "finetune"],
+      target_provider:          ["stopgrad", "ema", "live"],
+    },
+    benchmark:      ConfigForm.EXPERIMENT_JEPA_CHOICES,
+    cross_validate: ConfigForm.EXPERIMENT_JEPA_CHOICES,
+    tune:           ConfigForm.TUNE_CHOICES,
+  };
+
+  static DATASET_PICKERS = {
+    "paths.dataset_path":    { mode: "datasets", multi: false, baseFromParent: true, validOnly: true },
+    "paths.parameters_path": { mode: "params", datasetFrom: "paths.dataset_path" },
+  };
+
+  static EXPERIMENT_PICKERS = {
+    ...ConfigForm.DATASET_PICKERS,
+    "jepa.profile_autoencoder_run": { mode: "runs", baseFrom: "jepa.profile_autoencoder_logdir", checkpointOnly: true },
+  };
+
+  static TUNE_PICKERS = {
+    ...ConfigForm.EXPERIMENT_PICKERS,
+    "jepa.image_autoencoder_run": { mode: "runs", baseFrom: "jepa.image_autoencoder_logdir", checkpointOnly: true },
+  };
+
+  static PICKERS = {
+    extract_params: {
+      dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
+    },
+    train_backbone:             ConfigForm.DATASET_PICKERS,
+    train_profile_autoencoder:  ConfigForm.DATASET_PICKERS,
+    train_image_autoencoder:    ConfigForm.DATASET_PICKERS,
+    train_jepa:              {
+      ...ConfigForm.DATASET_PICKERS,
+      profile_autoencoder_run: { mode: "runs", baseFrom: "profile_autoencoder_logdir", checkpointOnly: true },
+      image_autoencoder_run:   { mode: "runs", baseFrom: "image_autoencoder_logdir",   checkpointOnly: true },
+    },
+    benchmark:         ConfigForm.EXPERIMENT_PICKERS,
+    cross_validate:    ConfigForm.EXPERIMENT_PICKERS,
+    tune:              ConfigForm.TUNE_PICKERS,
+    infer: {
+      run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
+    },
+    xray_weights: {
+      run_filter: { mode: "runs", multi: true, baseFrom: "runs_dir", checkpointOnly: true },
+    },
+    compare_trials: {
+      run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
+    },
+  };
+
+  static GPU_FIELDS = ["gpu", "gpus", "gpu_device_ids"];
+
+  _buildToolbar(cfg) {
+    const bar = document.createElement("div");
+    bar.className = "cfg-toolbar";
+
+    const search = document.createElement("input");
+    search.className = "cfg-search";
+    search.type = "search";
+    search.placeholder = `Filter ${cfg.leaves.length} fields...`;
+    search.spellcheck = false;
+    search.addEventListener("input", () => {
+      this.query = search.value.trim().toLowerCase();
+      this._applyVisibility(true);
+    });
+
+    const count = document.createElement("span");
+    count.className = "cfg-toolbar__count";
+    this.countEl = count;
+
+    const showAll = document.createElement("button");
+    showAll.className = "btn btn--mini cfg-showall";
+    this.showAllBtn = showAll;
+    this.totalFields = cfg.leaves.length - this.overrideSections.identical.size;
+    showAll.addEventListener("click", () => {
+      this.showAll = !this.showAll;
+      this._refreshShowAll();
+      this._applyVisibility(true);
+    });
+
+    const reset = document.createElement("button");
+    reset.className = "btn btn--mini";
+    reset.textContent = "Reset all";
+    reset.addEventListener("click", () => this._resetAll());
+
+    bar.appendChild(search);
+    bar.appendChild(count);
+    bar.appendChild(showAll);
+    bar.appendChild(reset);
+    this._refreshShowAll();
+    return bar;
+  }
+
+  _refreshShowAll() {
+    if (!this.showAllBtn) return;
+    this.showAllBtn.classList.toggle("is-on", this.showAll);
+    this.showAllBtn.textContent = this.showAll ? "Essentials only" : `Show all ${this.totalFields} fields`;
+  }
+
+  _detectOverrideSections(leaves) {
+    const byPath   = new Map(leaves.map((l) => [l.path, l.value]));
+    const identical = new Set();
+    const sections  = new Set();
+    const differ    = new Map();
+
+    leaves.forEach((leaf) => {
+      if (!/\.warmup(\.|$)/.test(leaf.path)) return;
+      const counterpart = leaf.path.replace(/\.warmup(\.|$)/, ".complete$1");
+      if (!byPath.has(counterpart)) return;
+      sections.add(leaf.section);
+      if (byPath.get(counterpart) === leaf.value) identical.add(leaf.path);
+      else differ.set(leaf.section, (differ.get(leaf.section) || 0) + 1);
+    });
+
+    return { identical, sections, differ };
+  }
+
+  _shownCount(leaves) {
+    return leaves.filter((l) => !this.overrideSections.identical.has(l.path)).length;
+  }
+
+  _buildPins(pinned) {
+    const panel = document.createElement("section");
+    panel.className = "launch-pins";
+
+    const head = document.createElement("header");
+    head.className = "launch-pins__head";
+    head.innerHTML = `<h3 class="launch-pins__name">Run essentials</h3><span class="launch-pins__hint">check these before every launch</span>`;
+
+    const grid = document.createElement("div");
+    grid.className = "launch-pins__grid";
+    pinned.forEach((leaf) => grid.appendChild(this._buildRow(leaf, "", true)));
+
+    panel.appendChild(head);
+    panel.appendChild(grid);
+    this.pinsEl = panel;
+    return panel;
+  }
+
+  _renderBands(host, claimed) {
+    const grouped = new Map();
+    this.config.leaves.forEach((leaf) => {
+      if (claimed.has(leaf.path)) return;
+      if (!grouped.has(leaf.section)) grouped.set(leaf.section, []);
+      grouped.get(leaf.section).push(leaf);
+    });
+
+    const sections = [...grouped.keys()];
+    const nonRoot  = sections.filter((s) => s !== "");
+    const promote  = nonRoot.length > 1 && new Set(nonRoot.map((s) => s.split(".")[0])).size === 1;
+    const bandKey  = (s) => (s === "" ? "run" : s.split(".").slice(0, promote ? 2 : 1).join("."));
+
+    const bandMap = new Map();
+    sections.forEach((s) => {
+      const k = bandKey(s);
+      if (!bandMap.has(k)) bandMap.set(k, []);
+      bandMap.get(k).push(s);
+    });
+
+    const wall = document.createElement("div");
+    wall.className = "launch-bands";
+    bandMap.forEach((bandSections, key) => wall.appendChild(this._buildBand(key, bandSections, grouped)));
+    host.appendChild(wall);
+
+    this._wireSectionGates(grouped);
+
+    const empty = document.createElement("p");
+    empty.className = "cfg-note launch-nomatch";
+    empty.textContent = "No fields match this filter.";
+    empty.hidden = true;
+    this.nomatchEl = empty;
+    host.appendChild(empty);
+  }
+
+  _classColor(sectionClass) {
+    if (!this.classColors.has(sectionClass)) {
+      this.classColors.set(sectionClass, ConfigForm.PALETTE[this.classColors.size % ConfigForm.PALETTE.length]);
+    }
+    return this.classColors.get(sectionClass);
+  }
+
+  _buildBand(key, bandSections, grouped) {
+    const ordered = [...bandSections].sort((a, b) => a.split(".").length - b.split(".").length);
+    const nFields = bandSections.reduce((n, s) => n + this._shownCount(grouped.get(s)), 0);
+    const rootClass = grouped.get(ordered[0])[0].section_class;
+
+    const band = document.createElement("section");
+    band.className = "launch-band";
+    band.style.setProperty("--cc", this._classColor(rootClass));
+
+    const head = document.createElement("header");
+    head.className = "band-head";
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-expanded", "false");
+    head.innerHTML =
+      `<span class="band-head__chev">&rsaquo;</span>` +
+      `<span class="cc-dot" aria-hidden="true"></span>` +
+      `<h3 class="band-head__name">${key}</h3>` +
+      `<span class="edit-badge" hidden></span>` +
+      `<span class="band-head__class">${rootClass}</span>` +
+      `<span class="band-head__count">${nFields} fields</span>`;
+    head.addEventListener("click", () => this._toggleBand(band, head));
+    head.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      this._toggleBand(band, head);
+    });
+
+    const body = document.createElement("div");
+    body.className = "band-body";
+    band.appendChild(head);
+    band.appendChild(body);
+
+    const holders = new Map();
+    const bandChildren = document.createElement("div");
+    bandChildren.className = "band-children";
+
+    ordered.forEach((section) => {
+      const leaves = grouped.get(section);
+      const isBandRoot = section === "" || section === key;
+
+      if (isBandRoot) {
+        const grid = this._buildFieldsGrid(section, leaves, "band-fields");
+        body.appendChild(grid);
+        this.panels.set(section, { el: grid, badge: null });
+        holders.set(section, bandChildren);
+        return;
+      }
+
+      const parentPath = section.split(".").slice(0, -1).join(".");
+      const host = holders.get(parentPath) || bandChildren;
+      const sub = this._buildSubPanel(section, leaves);
+      host.appendChild(sub.el);
+      this.panels.set(section, { el: sub.el, badge: sub.badge });
+      holders.set(section, sub.children);
+    });
+
+    body.appendChild(bandChildren);
+    this.bands.push({ el: band, head, badge: head.querySelector(".edit-badge"), sections: bandSections });
+    return band;
+  }
+
+  _toggleBand(band, head) {
+    const open = band.classList.toggle("is-open");
+    head.setAttribute("aria-expanded", String(open));
+  }
+
+  _setBandOpen(band, head, open) {
+    band.classList.toggle("is-open", open);
+    head.setAttribute("aria-expanded", String(open));
+  }
+
+  _sectionEdited(section) {
+    return this.states.some(({ leaf }) => leaf.section === section && this.dirty[leaf.path] !== undefined);
+  }
+
+  _buildSubPanel(section, leaves) {
+    const isOverride = this.overrideSections.sections.has(section);
+    const name  = section.split(".").pop();
+    const label = isOverride ? `${name} overrides` : name;
+    const shown = this._shownCount(leaves);
+
+    const el = document.createElement("section");
+    el.className = "sub-panel";
+    if (isOverride) el.classList.add("sub-panel--override");
+    el.dataset.section = section;
+    el.title = isOverride ? `${section} — only the fields that differ from complete` : section;
+    el.style.setProperty("--cc", this._classColor(leaves[0].section_class));
+
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "sub-panel__head";
+    head.setAttribute("aria-expanded", "false");
+    head.innerHTML =
+      `<span class="sub-panel__chev">&rsaquo;</span>` +
+      `<span class="cc-dot" aria-hidden="true"></span>` +
+      `<h4 class="sub-panel__name">${label}</h4>` +
+      `<span class="edit-badge" hidden></span>` +
+      `<span class="sub-panel__class">${leaves[0].section_class}</span>` +
+      `<span class="sub-panel__count">${shown}${isOverride ? " differ" : " fields"}</span>`;
+    head.addEventListener("click", () => {
+      const open = el.classList.toggle("is-open");
+      head.setAttribute("aria-expanded", String(open));
+    });
+
+    const body = this._buildFieldsGrid(section, leaves, "sub-panel__body");
+
+    const children = document.createElement("div");
+    children.className = "band-children band-children--nested";
+
+    el.appendChild(head);
+    if (isOverride) {
+      const note = document.createElement("p");
+      note.className = "sub-panel__note";
+      note.textContent = "Inherits the complete stage; fields edited here override the complete values.";
+      el.appendChild(note);
+    }
+    el.appendChild(body);
+    el.appendChild(children);
+    return { el, badge: head.querySelector(".edit-badge"), children };
+  }
+
+  _buildFieldsGrid(section, leaves, className) {
+    const grid = document.createElement("div");
+    grid.className = className;
+    grid.dataset.section = section;
+
+    const blocks = new Map();
+    leaves.forEach((leaf) => {
+      if (!blocks.has(leaf.block)) blocks.set(leaf.block, []);
+      blocks.get(leaf.block).push(leaf);
+    });
+
+    const shortName = (leaf) => (section ? leaf.path.slice(section.length + 1) : leaf.path);
+    const isTermBlock = (blockLeaves) => {
+      const lead = blockLeaves[0];
+      const name = shortName(lead);
+      return lead.type === "bool" && lead.editable && name.startsWith("use_") && blockLeaves.some((l) => shortName(l).startsWith("weight_"));
+    };
+    const isGateBlock = (blockLeaves) => {
+      const lead = blockLeaves[0];
+      const name = shortName(lead);
+      return isTermBlock(blockLeaves) || (lead.type === "bool" && lead.editable && name !== "enabled" && name.endsWith("_enabled"));
+    };
+    const appendCell = (host, blockLeaves) => {
+      if (!isGateBlock(blockLeaves)) {
+        blockLeaves.forEach((leaf) => host.appendChild(this._buildRow(leaf, section)));
+        return;
+      }
+      const cell = document.createElement("div");
+      cell.className = "band-block";
+      this._buildBlock(blockLeaves, section, cell);
+      host.appendChild(cell);
+    };
+
+    const blockTitle = (blockLeaves) => {
+      const names = blockLeaves.map(shortName);
+      const lead = names[0];
+      if (isGateBlock(blockLeaves)) {
+        if (lead.endsWith("_enabled")) return lead.slice(0, -"_enabled".length);
+        if (lead.startsWith("use_")) return lead.slice(4);
+      }
+      if (names.length < 2) return null;
+
+      const tokenLists = names.map((n) => n.split("_"));
+
+      const prefix = [];
+      for (let i = 0; i < tokenLists[0].length; i++) {
+        const token = tokenLists[0][i];
+        if (tokenLists.every((tokens) => tokens[i] === token)) prefix.push(token);
+        else break;
+      }
+      if (prefix.join("_").length >= 3) return prefix.join("_");
+
+      const suffix = [];
+      for (let i = 1; i <= Math.min(...tokenLists.map((t) => t.length)); i++) {
+        const token = tokenLists[0][tokenLists[0].length - i];
+        if (tokenLists.every((tokens) => tokens[tokens.length - i] === token)) suffix.unshift(token);
+        else break;
+      }
+      if (suffix.join("_").length >= 3) return suffix.join("_");
+
+      const counts = new Map();
+      tokenLists.forEach((tokens) => new Set(tokens).forEach((token) => counts.set(token, (counts.get(token) || 0) + 1)));
+      const majority = [...counts.entries()].filter(([token, n]) => token.length >= 3 && n > names.length / 2).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+      if (majority.length) return majority[0][0];
+
+      return taxonomyTitle(names);
+    };
+
+    const taxonomyTitle = (names) => {
+      const order  = ConfigForm.FIELD_TAXONOMY.map(([title]) => title);
+      const counts = new Map();
+      names.forEach((name) => {
+        const rule = ConfigForm.FIELD_TAXONOMY.find(([, pattern]) => pattern.test(name));
+        if (rule) counts.set(rule[0], (counts.get(rule[0]) || 0) + 1);
+      });
+      if (!counts.size) return null;
+      return [...counts.entries()].sort((a, b) => b[1] - a[1] || order.indexOf(a[0]) - order.indexOf(b[0]))[0][0];
+    };
+
+    const makeGroupEl = (title) => {
+      const group = document.createElement("div");
+      group.className = "field-group";
+      if (title) {
+        const heading = document.createElement("div");
+        heading.className = "field-group__title";
+        heading.textContent = title;
+        group.appendChild(heading);
+      }
+      const inner = document.createElement("div");
+      inner.className = "field-group__grid";
+      group.appendChild(inner);
+      return { group, inner };
+    };
+
+    const makeGroup = (title, members) => {
+      if (!members.length) return null;
+      const { group, inner } = makeGroupEl(title);
+      members.forEach((blockLeaves) => appendCell(inner, blockLeaves));
+      return group;
+    };
+
+    const appendWithStack = (named) => {
+      const stackedBelow = new Set();
+      ConfigForm.STACK_PAIRS.forEach(([top, bottom]) => {
+        if (named.get(top) && named.get(bottom)) stackedBelow.add(bottom);
+      });
+
+      named.forEach((el, title) => {
+        if (el === null || stackedBelow.has(title)) return;
+
+        const pair = ConfigForm.STACK_PAIRS.find(([top, bottom]) => top === title && stackedBelow.has(bottom));
+        if (pair) {
+          const stack = document.createElement("div");
+          stack.className = "field-group-stack";
+          stack.appendChild(el);
+          stack.appendChild(named.get(pair[1]));
+          grid.appendChild(stack);
+          return;
+        }
+
+        grid.appendChild(el);
+      });
+    };
+
+    const termCount = [...blocks.values()].filter(isTermBlock).length;
+
+    const SLOT_PRESENCE = /presence|focal|active_normalization|active_weight|inactive_weight/;
+
+    if (termCount >= 2) {
+      const buckets = { curve: [], param: [], slot: [], reg: [], general: [] };
+      blocks.forEach((blockLeaves) => {
+        if (!isTermBlock(blockLeaves)) {
+          if (shortName(blockLeaves[0]).startsWith("param")) buckets.param.push(blockLeaves);
+          else if (SLOT_PRESENCE.test(shortName(blockLeaves[0]))) buckets.slot.push(blockLeaves);
+          else buckets.general.push(blockLeaves);
+          return;
+        }
+        const label = shortName(blockLeaves[0]).slice(4);
+        if (label.startsWith("param")) buckets.param.push(blockLeaves);
+        else if (/curve|spectral|ssim/.test(label)) buckets.curve.push(blockLeaves);
+        else if (SLOT_PRESENCE.test(label)) buckets.slot.push(blockLeaves);
+        else buckets.reg.push(blockLeaves);
+      });
+
+      grid.classList.add("is-grouped");
+      const named = new Map();
+      named.set("curve space", makeGroup("curve space", buckets.curve));
+      named.set("param space", makeGroup("param space", buckets.param));
+      named.set("slot presence", makeGroup("slot presence", buckets.slot));
+      named.set("regularization", makeGroup("regularization", buckets.reg));
+      named.set("general", makeGroup("general", buckets.general));
+      appendWithStack(named);
+      return grid;
+    }
+
+    if (blocks.size >= 3) {
+      grid.classList.add("is-grouped");
+      blocks.forEach((blockLeaves) => {
+        grid.appendChild(makeGroup(blockTitle(blockLeaves), [blockLeaves]));
+      });
+      return grid;
+    }
+
+    const plainBlocks = [];
+    const gateBlocks = [];
+    blocks.forEach((blockLeaves) => (isGateBlock(blockLeaves) ? gateBlocks : plainBlocks).push(blockLeaves));
+    const plainLeaves = plainBlocks.flat();
+
+    if (plainLeaves.length >= 7) {
+      const classified = new Map();
+      plainLeaves.forEach((leaf) => {
+        const rule = ConfigForm.FIELD_TAXONOMY.find(([, pattern]) => pattern.test(shortName(leaf)));
+        const title = rule ? rule[0] : "general";
+        if (!classified.has(title)) classified.set(title, []);
+        classified.get(title).push(leaf);
+      });
+
+      if (classified.size >= 2 || gateBlocks.length) {
+        grid.classList.add("is-grouped");
+        const named = new Map();
+        [...ConfigForm.FIELD_TAXONOMY.map(([title]) => title), "general"].forEach((title) => {
+          if (!classified.has(title)) return;
+          const { group, inner } = makeGroupEl(title);
+          classified.get(title).forEach((leaf) => inner.appendChild(this._buildRow(leaf, section)));
+          named.set(title, group);
+        });
+        appendWithStack(named);
+        gateBlocks.forEach((blockLeaves) => grid.appendChild(makeGroup(blockTitle(blockLeaves), [blockLeaves])));
+        return grid;
+      }
+    }
+
+    if (blocks.size >= 2) {
+      grid.classList.add("is-grouped");
+      blocks.forEach((blockLeaves) => {
+        grid.appendChild(makeGroup(blockTitle(blockLeaves), [blockLeaves]));
+      });
+      return grid;
+    }
+
+    blocks.forEach((blockLeaves) => appendCell(grid, blockLeaves));
+    return grid;
+  }
+
+  _buildBlock(blockLeaves, section, body) {
+    const shortName = (leaf) => (section ? leaf.path.slice(section.length + 1) : leaf.path);
+    const lead = blockLeaves[0];
+    const leadName = shortName(lead);
+    const hasWeight = blockLeaves.some((l) => shortName(l).startsWith("weight_"));
+    const isTermGate = lead.type === "bool" && lead.editable && leadName.startsWith("use_") && hasWeight;
+    const isBlockGate = lead.type === "bool" && lead.editable && leadName !== "enabled" && leadName.endsWith("_enabled");
+
+    if (!isTermGate && !isBlockGate) {
+      blockLeaves.forEach((leaf) => body.appendChild(this._buildRow(leaf, section)));
+      return;
+    }
+
+    const rest = blockLeaves.slice(1);
+    let weight = null;
+    if (isTermGate) {
+      const index = rest.findIndex((l) => shortName(l).startsWith("weight_") && (l.type === "float" || l.type === "int"));
+      if (index >= 0) weight = rest.splice(index, 1)[0];
+    }
+
+    const label = isTermGate ? leadName.slice(4) : leadName;
+    const row = this._buildGateRow(lead, weight, label);
+    body.appendChild(row);
+
+    const gatedRows = rest.map((leaf) => {
+      const dependent = body.appendChild(this._buildRow(leaf, section));
+      dependent.classList.add("cfg-edit__row--dependent");
+      return this.states[this.states.length - 1];
+    });
+
+    this.gates.push({ leaf: lead, states: gatedRows, sections: [], weightEl: row.querySelector(".term-weight") });
+  }
+
+  _buildGateRow(lead, weight, label) {
+    const row = document.createElement("div");
+    row.className = "cfg-edit__row";
+    row.title = weight ? `--${lead.path} · --${weight.path}` : `--${lead.path}`;
+
+    const name = document.createElement("div");
+    name.className = "cfg-edit__name";
+    name.textContent = label;
+    row.appendChild(name);
+
+    const cell = document.createElement("div");
+    cell.className = "term-control";
+
+    const toggle = this._switchControl(lead);
+    cell.appendChild(toggle.el);
+    this.controls[lead.path] = { leaf: lead, reset: toggle.reset };
+    this.states.push({ leaf: lead, row, section: lead.section });
+
+    if (weight) {
+      const wrap = document.createElement("div");
+      wrap.className = "term-weight";
+      const tag = document.createElement("span");
+      tag.className = "term-weight__tag";
+      tag.textContent = "weight";
+      const control = this._numberControl(weight);
+      control.input.title = `--${weight.path}`;
+      wrap.appendChild(tag);
+      wrap.appendChild(control.input);
+      cell.appendChild(wrap);
+      this.controls[weight.path] = { leaf: weight, reset: control.reset };
+      this.states.push({ leaf: weight, row, section: weight.section });
+    }
+
+    row.appendChild(cell);
+    return row;
+  }
+
+  _buildRow(leaf, section, pinned = false) {
+    const short = section ? leaf.path.slice(section.length + 1) : leaf.path;
+
+    const row = document.createElement("div");
+    row.className = "cfg-edit__row";
+    row.title = `--${leaf.path}`;
+
+    const label = document.createElement("div");
+    label.className = "cfg-edit__name";
+    label.textContent = short;
+    label.title = `${leaf.type} · --${leaf.path}`;
+    row.appendChild(label);
+
+    let control;
+    const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
+    const choices    = leaf.editable ? this._choicesFor(leaf) : null;
+    if (leaf.editable && this._isGpuField(leaf) && window.GpuPicker) {
+      control = new window.GpuPicker(this, leaf).build();
+      row.classList.add("cfg-edit__row--board");
+    } else if (pickerSpec && window.DatasetPicker) {
+      control = new window.DatasetPicker(this, leaf, pickerSpec).build();
+      row.classList.add(pickerSpec.multi ? "cfg-edit__row--board" : "cfg-edit__row--wide");
+    } else if (choices) {
+      control = this._choiceControl(leaf, choices);
+    } else if (!leaf.editable) {
+      control = this._textControl(leaf);
+      control.input.disabled = true;
+      control.input.classList.add("is-locked");
+      control.input.title = "not overridable from the command line";
+    } else if (leaf.type === "bool") {
+      control = this._switchControl(leaf);
+    } else if (leaf.type === "int" || leaf.type === "float") {
+      control = new window.NumberField(this, leaf, short).build();
+      row.classList.add("cfg-edit__row--num");
+    } else {
+      control = this._textControl(leaf);
+    }
+
+    row.appendChild(control.el);
+    this.controls[leaf.path] = { leaf, reset: control.reset };
+    this.states.push({ leaf, row, section: leaf.section, pinned });
+    return row;
+  }
+
+  _wireSectionGates(grouped) {
+    grouped.forEach((leaves, section) => {
+      const lead = leaves[0];
+      const leadName = section ? lead.path.slice(section.length + 1) : lead.path;
+      if (leadName !== "enabled" || lead.type !== "bool" || !lead.editable) return;
+
+      const states = this.states.filter((s) => s.leaf.section === section && s.leaf !== lead);
+      const sections = [...this.panels.keys()].filter((name) => name.startsWith(`${section}.complete`));
+
+      if (states.length || sections.length) {
+        this.gates.push({ leaf: lead, states, sections, weightEl: null });
+      }
+    });
+  }
+
+  _effective(leaf) {
+    return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
+  }
+
+  _leafByPath(path) {
+    return this.config ? this.config.leaves.find((leaf) => leaf.path === path) : null;
+  }
+
+  _optionGate() {
+    return ConfigForm.OPTION_GATES[this.key] || null;
+  }
+
+  _optionValue(gate) {
+    const leaf = this._leafByPath(gate.field);
+    return leaf ? this._effective(leaf) : null;
+  }
+
+  _sectionOptionGated(section, gate, value) {
+    const allowed = gate.sections[section.split(".")[0]];
+    return Boolean(allowed) && !allowed.includes(value);
+  }
+
+  _pickerSpec(leaf) {
+    const specs = ConfigForm.PICKERS[this.key];
+    return specs ? specs[leaf.path] : null;
+  }
+
+  _isGpuField(leaf) {
+    if (leaf.type !== "list" && leaf.type !== "int") return false;
+    return ConfigForm.GPU_FIELDS.includes(leaf.path.split(".").pop());
+  }
+
+  _choicesFor(leaf) {
+    const map = ConfigForm.CHOICES[this.key];
+    return map ? map[leaf.path] || null : null;
+  }
+
+  _choiceControl(leaf, choices) {
+    const select = document.createElement("select");
+    select.className = "cfg-edit__input picker__select";
+
+    const current = String(leaf.value);
+    const options = choices.includes(current) ? choices : [current, ...choices];
+    options.forEach((value) => {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = value;
+      select.appendChild(opt);
+    });
+    select.value = current;
+
+    select.addEventListener("change", () => {
+      select.classList.toggle("is-dirty", select.value !== leaf.value);
+      this._setValue(leaf, select.value);
+      this._fireDependents(leaf.path, select.value);
+    });
+
+    const reset = () => {
+      select.value = leaf.value;
+      select.classList.remove("is-dirty");
+    };
+    return { el: select, input: select, reset };
+  }
+
+  _onDependency(path, fn) {
+    (this.dependents[path] = this.dependents[path] || []).push(fn);
+  }
+
+  _fireDependents(path, value) {
+    (this.dependents[path] || []).forEach((fn) => fn(value));
+  }
+
+  _setValue(leaf, value) {
+    const changed = value !== leaf.value && value !== "";
+    if (changed) this.dirty[leaf.path] = value;
+    else delete this.dirty[leaf.path];
+    this._refresh();
+  }
+
+  _textControl(leaf) {
+    const input = document.createElement("input");
+    input.className = "cfg-edit__input";
+    input.value = leaf.value;
+    input.spellcheck = false;
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value);
+      this._setValue(leaf, input.value);
+      this._fireDependents(leaf.path, input.value);
+    });
+    const reset = () => {
+      input.value = leaf.value;
+      input.classList.remove("is-dirty");
+    };
+    return { el: input, input, reset };
+  }
+
+  _numberControl(leaf) {
+    const input = document.createElement("input");
+    input.className = "cfg-edit__input";
+    input.type = "number";
+    input.step = leaf.type === "int" ? "1" : "any";
+    input.value = leaf.value;
+    input.spellcheck = false;
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
+      this._setValue(leaf, input.value);
+    });
+    const reset = () => {
+      input.value = leaf.value;
+      input.classList.remove("is-dirty");
+    };
+    return { el: input, input, reset };
+  }
+
+  _switchControl(leaf) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "switch";
+    toggle.setAttribute("role", "switch");
+    toggle.innerHTML = `<span class="switch__knob"></span>`;
+
+    const paint = () => {
+      const on = this._effective(leaf) === "True";
+      toggle.classList.toggle("is-on", on);
+      toggle.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
+      toggle.setAttribute("aria-checked", String(on));
+    };
+    toggle.addEventListener("click", () => {
+      const next = this._effective(leaf) === "True" ? "False" : "True";
+      this._setValue(leaf, next);
+      paint();
+    });
+    paint();
+
+    const reset = () => paint();
+    return { el: toggle, input: toggle, reset };
+  }
+
+  _resetField(path) {
+    const control = this.controls[path];
+    delete this.dirty[path];
+    if (control) control.reset();
+    this._refresh();
+  }
+
+  _resetAll() {
+    this.dirty = {};
+    Object.values(this.controls).forEach((c) => c.reset());
+    this._refresh();
+  }
+
+  _refreshGates() {
+    this.gatedSections = new Set();
+    this.states.forEach(({ row }) => {
+      delete row.dataset.gated;
+    });
+
+    this.gates.forEach((gate) => {
+      const open = this._effective(gate.leaf) === "True";
+      if (gate.weightEl) gate.weightEl.hidden = !open;
+      if (!open) {
+        gate.states.forEach(({ row }) => (row.dataset.gated = "1"));
+        gate.sections.forEach((section) => this.gatedSections.add(section));
+      }
+    });
+
+    const optionGate = this._optionGate();
+    if (optionGate) {
+      const value = this._optionValue(optionGate);
+      this.states.forEach(({ leaf, row }) => {
+        if (this._sectionOptionGated(leaf.section, optionGate, value)) row.dataset.gated = "1";
+      });
+      [...this.panels.keys()].forEach((section) => {
+        if (this._sectionOptionGated(section, optionGate, value)) this.gatedSections.add(section);
+      });
+    }
+
+    this._applyVisibility();
+  }
+
+  _applyVisibility(sync = false) {
+    const rowVisible = new Map();
+    this.states.forEach(({ leaf, row, pinned }) => {
+      const matches    = !this.query || leaf.path.toLowerCase().includes(this.query);
+      const dirty      = this.dirty[leaf.path] !== undefined;
+      const identical  = this.overrideSections.identical.has(leaf.path);
+      const inOverride = this.overrideSections.sections.has(leaf.section);
+
+      let disclosed;
+      if (this.query)            disclosed = matches;
+      else if (dirty || pinned)  disclosed = true;
+      else if (inOverride)       disclosed = true;
+      else if (identical)        disclosed = false;
+      else                       disclosed = this.showAll;
+
+      if (matches && disclosed && row.dataset.gated !== "1") rowVisible.set(row, true);
+      else if (!rowVisible.has(row)) rowVisible.set(row, false);
+    });
+    rowVisible.forEach((visible, row) => (row.hidden = !visible));
+
+    const sectionHasRows = new Map();
+    this.states.forEach(({ leaf, row, pinned }) => {
+      if (pinned) return;
+      const prior = sectionHasRows.get(leaf.section) || false;
+      sectionHasRows.set(leaf.section, prior || rowVisible.get(row));
+    });
+
+    const orderedSections = [...this.panels.keys()].sort((a, b) => b.split(".").length - a.split(".").length);
+    const sectionVisible = new Map();
+    orderedSections.forEach((section) => {
+      const childVisible = orderedSections.some((other) => other !== section && other.startsWith(section ? `${section}.` : ".") && sectionVisible.get(other));
+      const isOverride = this.overrideSections.sections.has(section);
+      const visible = !this.gatedSections.has(section) && ((sectionHasRows.get(section) || false) || childVisible || isOverride);
+      sectionVisible.set(section, visible);
+      const el = this.panels.get(section).el;
+      el.hidden = !visible;
+      if (el.classList.contains("sub-panel")) {
+        const subWant = visible && (Boolean(this.query) || this.showAll || this._sectionEdited(section) || childVisible);
+        const subHead = el.querySelector(".sub-panel__head");
+        if (sync) { el.classList.toggle("is-open", subWant); if (subHead) subHead.setAttribute("aria-expanded", String(subWant)); }
+        else if (subWant) { el.classList.add("is-open"); if (subHead) subHead.setAttribute("aria-expanded", "true"); }
+      }
+    });
+
+    let anyVisible = false;
+    this.bands.forEach((band) => {
+      const visible = band.sections.some((section) => sectionVisible.get(section));
+      band.el.hidden = !visible;
+      anyVisible = anyVisible || visible;
+
+      const edited   = band.sections.some((section) => this._sectionEdited(section));
+      const wantOpen = visible && (Boolean(this.query) || this.showAll || edited);
+      if (sync) this._setBandOpen(band.el, band.head, wantOpen);
+      else if (wantOpen && !band.el.classList.contains("is-open")) this._setBandOpen(band.el, band.head, true);
+    });
+
+    if (this.pinsEl) {
+      const rows = [...this.pinsEl.querySelectorAll(".cfg-edit__row")];
+      this.pinsEl.hidden = rows.length > 0 && rows.every((row) => row.hidden);
+      anyVisible = anyVisible || !this.pinsEl.hidden;
+    }
+
+    const none = this.nomatchEl;
+    if (none) none.hidden = anyVisible;
+  }
+
+  _refreshBadges() {
+    const counts = new Map();
+    this.states.forEach(({ leaf, pinned }) => {
+      if (pinned) return;
+      if (this.dirty[leaf.path] !== undefined) counts.set(leaf.section, (counts.get(leaf.section) || 0) + 1);
+    });
+
+    this.panels.forEach(({ badge }, section) => {
+      if (!badge) return;
+      const n = counts.get(section) || 0;
+      badge.hidden = n === 0;
+      badge.textContent = n ? `${n} edited` : "";
+    });
+
+    this.bands.forEach((band) => {
+      const n = band.sections.reduce((sum, section) => sum + (counts.get(section) || 0), 0);
+      band.badge.hidden = n === 0;
+      band.badge.textContent = n ? `${n} edited` : "";
+    });
+  }
+}
+
 window.PythonLiteral     = PythonLiteral;
 window.GpuCardSelect     = GpuCardSelect;
 window.GpuPicker         = GpuPicker;
@@ -2389,3 +3623,4 @@ window.ModelTogglePanel  = ModelTogglePanel;
 window.ModelCardPanel    = ModelCardPanel;
 window.ExperimentBuilder = ExperimentBuilder;
 window.AblationBuilder   = AblationBuilder;
+window.ConfigForm        = ConfigForm;
