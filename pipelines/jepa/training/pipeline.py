@@ -12,6 +12,7 @@ from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalize
 from pipelines.shared.config_factory                     import ConfigFactory
 from pipelines.shared.run_metadata                       import TrainingRunMetadata
 from pipelines.shared.dataset_prep                        import BackboneDatasetPreparation
+from pipelines.shared.training_runner                    import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                       import Reproducibility
@@ -190,26 +191,14 @@ class TrainingPipeline:
         return self._train(run_meta, logger, model, backbone_cfg, x_axis, datasets, loaders, profile_normalizer)
 
 
-class SingleTrainRunner:
-    def __init__(self, config) -> None:
-        self.config = config
+class SingleTrainRunner(EntryConfigTrainRunner):
+    pipeline_class = TrainingPipeline
 
-    def _pretrain_preflight(self) -> None:
-        from pipelines.shared.pretrain_preflight import PretrainPreflight
+    @property
+    def label(self) -> str:
+        return self.config.backbone_name
 
-        PretrainPreflight(
-            pretrain_config = self.config.pretrain,
-            training_config = self.config.training,
-            build_context   = self._build_pretrain_context,
-            logdir          = Path(self.config.logdir),
-            label           = self.config.backbone_name,
-        ).run()
-
-    def _build_pretrain_context(self, logger, device):
-        from pipelines.shared.dataset_prep import BackboneDatasetPreparation
-        from pipelines.shared.run_metadata import TrainingRunMetadata
-        from tools.training.pretraining    import PretrainContext, TrainStepMemoryProbe, TrainerFeed
-
+    def _build_pretrain_trainer(self, logger):
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
         pipeline = TrainingPipeline(self.config)
         run_meta = TrainingRunMetadata(pipeline.trainer_config, pipeline.backbone_name, work_dir, "pretrain_context")
@@ -221,45 +210,12 @@ class SingleTrainRunner:
         profile_normalizer  = pipeline._profile_normalizer(run_meta, logger)
 
         trainer = pipeline._make_trainer(model, backbone_cfg, x_axis, work_dir, logger, norm_stats, profile_normalizer)
-        trainer.model.train()
 
-        dataset = datasets["train"]
-        feed    = TrainerFeed(trainer)
+        return trainer, datasets["train"], model
 
-        return PretrainContext(
-            dataset        = dataset,
-            model          = model,
-            to_model_input = feed.to_model_input,
-            forward_loss   = feed.forward_loss,
-            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
-            run_overfit    = self._overfit_loss,
-            device         = device,
-            use_amp        = trainer.use_amp,
-            context_gb     = 0.0,
-            on_oom         = lambda: self._release(trainer),
-        )
-
-    def _release(self, trainer) -> None:
-        import torch
-
-        trainer.optimizer.zero_grad(set_to_none=True)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-    def _overfit_loss(self):
-        import copy
-        from configuration.training import OverfitConfig
-
-        pretrain          = self.config.pretrain
-        entry             = copy.deepcopy(self.config)
-        entry.overfit     = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
-        entry.run_name    = f"{self.config.backbone_name}_pretrain_overfit"
-        entry.logdir      = Path(self.config.logdir) / "pretrain" / "overfit"
+    def _overfit_entry(self, entry):
         entry.infer_after = False
-
-        (train_losses, _val_losses, _test_losses), _run_dir = TrainingPipeline(entry).run()
-
-        return float(train_losses[-1]) if train_losses else None
+        return entry
 
     def run(self):
         self._pretrain_preflight()
@@ -271,3 +227,5 @@ class SingleTrainRunner:
 
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
             InferencePipeline(inference_config).run()
+
+        return results

@@ -8,6 +8,7 @@ from models.profile_autoencoder                             import get_profile_a
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
 from pipelines.shared.config_factory                import ConfigFactory
 from pipelines.shared.run_metadata                  import TrainingRunMetadata
+from pipelines.shared.training_runner               import EntryConfigTrainRunner
 from pipelines.profile_autoencoder.training.trainer import Trainer
 from tools.data.io                                  import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
@@ -96,26 +97,14 @@ class TrainingPipeline:
         return self._train(run_meta, logger, model, x_axis, train_loader, val_loader)
 
 
-class SingleTrainRunner:
-    def __init__(self, config) -> None:
-        self.config = config
+class SingleTrainRunner(EntryConfigTrainRunner):
+    pipeline_class = TrainingPipeline
 
-    def _pretrain_preflight(self) -> None:
-        from pipelines.shared.pretrain_preflight import PretrainPreflight
+    @property
+    def label(self) -> str:
+        return self.config.ae_model_name
 
-        PretrainPreflight(
-            pretrain_config = self.config.pretrain,
-            training_config = self.config.training,
-            build_context   = self._build_pretrain_context,
-            logdir          = Path(self.config.logdir),
-            label           = self.config.ae_model_name,
-        ).run()
-
-    def _build_pretrain_context(self, logger, device):
-        from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
-        from pipelines.profile_autoencoder.training.trainer import Trainer
-        from tools.training.pretraining                     import PretrainContext, TrainStepMemoryProbe, TrainerFeed
-
+    def _build_pretrain_trainer(self, logger):
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
         pipeline = TrainingPipeline(self.config)
 
@@ -123,49 +112,8 @@ class SingleTrainRunner:
         dataset_pipeline = ProfileDatasetPipeline(profile_config, work_dir, logger=logger, seed=self.config.seed)
 
         (_loaders, datasets, x_axis, x_len, _normalizer) = dataset_pipeline.run()
-        dataset                                          = datasets["train"]
 
         model   = pipeline._build_model(x_len)
         trainer = Trainer(model, pipeline.autoencoder_cfg, x_axis, pipeline.trainer_config, work_dir, logger)
-        trainer.model.train()
 
-        feed = TrainerFeed(trainer)
-
-        return PretrainContext(
-            dataset        = dataset,
-            model          = model,
-            to_model_input = feed.to_model_input,
-            forward_loss   = feed.forward_loss,
-            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
-            run_overfit    = self._overfit_loss,
-            device         = device,
-            use_amp        = trainer.use_amp,
-            context_gb     = 0.0,
-            on_oom         = lambda: self._release(trainer),
-        )
-
-    def _release(self, trainer) -> None:
-        import torch
-
-        trainer.optimizer.zero_grad(set_to_none=True)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-    def _overfit_loss(self):
-        import copy
-        from configuration.training import OverfitConfig
-
-        pretrain       = self.config.pretrain
-        entry          = copy.deepcopy(self.config)
-        entry.overfit  = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
-        entry.run_name = f"{self.config.ae_model_name}_pretrain_overfit"
-        entry.logdir   = Path(self.config.logdir) / "pretrain" / "overfit"
-
-        (train_losses, _val_losses, _test_losses), _run_dir = TrainingPipeline(entry).run()
-
-        return float(train_losses[-1]) if train_losses else None
-
-    def run(self):
-        self._pretrain_preflight()
-
-        return TrainingPipeline(self.config).run()
+        return trainer, datasets["train"], model

@@ -19,6 +19,7 @@ from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.run_metadata           import TrainingRunMetadata
+from pipelines.shared.training_runner        import SingleTrainRunner as BaseSingleTrainRunner
 from tools.runtime.config_cli                import ConfigCli
 from tools.monitoring.logger                 import Logger
 from tools.runtime.reproducibility           import Reproducibility
@@ -143,27 +144,19 @@ class TrainingPipeline:
         return results
 
 
-class SingleTrainRunner:
+class SingleTrainRunner(BaseSingleTrainRunner):
     def __init__(self, config) -> None:
         from pipelines.shared.config_factory import ConfigFactory
 
-        self.config  = config
+        super().__init__(config)
         self.factory = ConfigFactory(config)
 
-    def _pretrain_preflight(self) -> None:
-        from pipelines.shared.pretrain_preflight import PretrainPreflight
+    @property
+    def label(self) -> str:
+        return self.config.backbone_name
 
-        PretrainPreflight(
-            pretrain_config = self.config.pretrain,
-            training_config = self.config.training,
-            build_context   = self._build_pretrain_context,
-            logdir          = Path(self.config.logdir),
-            label           = self.config.backbone_name,
-        ).run()
-
-    def _build_pretrain_context(self, logger, device):
-        from models                     import BACKBONE_CONFIG_REGISTRY, get_backbone
-        from tools.training.pretraining  import PretrainContext, TrainStepMemoryProbe, TrainerFeed
+    def _build_pretrain_trainer(self, logger):
+        from models import BACKBONE_CONFIG_REGISTRY, get_backbone
 
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
 
@@ -199,27 +192,8 @@ class SingleTrainRunner:
 
         trainer = Trainer(model=model, model_cfg=model_cfg, x_axis=dataset_config.x_axis, config=trainer_config, run_dir=work_dir, logger=logger, norm_stats=dataset.normalizer, emit_docs=False)
         trainer.criterion.set_curriculum(trainer_config.curriculum.complete)
-        trainer.model.train()
 
-        feed = TrainerFeed(trainer)
-
-        return PretrainContext(
-            dataset        = dataset,
-            model          = model,
-            to_model_input = feed.to_model_input,
-            forward_loss   = feed.forward_loss,
-            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
-            run_overfit    = self._overfit_loss,
-            device         = device,
-            use_amp        = trainer.use_amp,
-            context_gb     = 0.0,
-            on_oom         = lambda: self._release(trainer),
-        )
-
-    def _release(self, trainer) -> None:
-        trainer.optimizer.zero_grad(set_to_none=True)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        return trainer, dataset, model
 
     def _overfit_loss(self):
         from configuration.training      import OverfitConfig
