@@ -182,7 +182,7 @@ class DatasetConfig:
     split_regions               : SplitRegions
     parameters_path  : Optional[Path]            = None
     secondary_labels : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
-    patch            : PatchConfig        = field(default_factory=PatchConfig)
+    patch            : PatchConfig               = field(default_factory=PatchConfig)
     input_config     : InputConfig               = field(default_factory=InputConfig)
     output_config    : OutputConfig              = field(default_factory=OutputConfig)
     augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)
