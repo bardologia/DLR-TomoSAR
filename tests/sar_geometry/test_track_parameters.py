@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from tools.sar.track_parameters import (
@@ -70,9 +68,8 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 """
 
 
-def _write_sample(directory, pols=("hh",), primary=True) -> None:
-    subdir  = Path("GTC") / "GTC-RDP" if primary else Path("INF") / "INF-RDP"
-    product = directory / subdir
+def _write_sample(directory, pols=("hh",)) -> None:
+    product = directory / "INF" / "INF-RDP"
     product.mkdir(parents=True)
 
     for pol in pols:
@@ -93,49 +90,33 @@ def test_parser_coerces_scalars_arrays_and_nested(tmp_path):
     assert params["dims_info"]["side_looking"] == "right"
 
 
-def test_resolver_finds_primary_under_gtc_rdp(tmp_path):
-    _write_sample(tmp_path / "PS02" / "T01L", primary=True)
+def test_resolver_finds_pp_under_inf_rdp(tmp_path):
+    _write_sample(tmp_path / "PS02" / "T01L")
 
-    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hh", is_primary=True)
-
-    assert resolved.parent.parts[-2:] == ("GTC", "GTC-RDP")
-    assert resolved.name              == "pp_17sartom0102_Lhh_t01L.xml"
-
-
-def test_resolver_finds_secondary_under_inf_rdp(tmp_path):
-    _write_sample(tmp_path / "PS04" / "T01L", primary=False)
-
-    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS04" / "T01L", "hh", is_primary=False)
+    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hh")
 
     assert resolved.parent.parts[-2:] == ("INF", "INF-RDP")
     assert resolved.name              == "pp_17sartom0102_Lhh_t01L.xml"
 
 
-def test_resolver_does_not_cross_roles(tmp_path):
-    _write_sample(tmp_path / "PS02" / "T01L", primary=True)
-
-    with pytest.raises(FileNotFoundError):
-        StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hh", is_primary=False)
-
-
 def test_resolver_selects_requested_polarisation(tmp_path):
-    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "hv", "vv"), primary=True)
+    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "hv", "vv"))
 
-    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv", is_primary=True)
+    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv")
 
     assert resolved.name == "pp_17sartom0102_Lhv_t01L.xml"
 
 
 def test_resolver_raises_when_polarisation_absent(tmp_path):
-    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "vv"), primary=True)
+    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "vv"))
 
     with pytest.raises(FileNotFoundError):
-        StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv", is_primary=True)
+        StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv")
 
 
 def test_collector_builds_parameters_over_passes(tmp_path):
-    _write_sample(tmp_path / "FL01" / "PS02" / "T01L", pols=("hh", "hv"), primary=True)
-    _write_sample(tmp_path / "FL01" / "PS04" / "T01L", pols=("hh", "hv"), primary=False)
+    for pass_name in ("PS02", "PS04"):
+        _write_sample(tmp_path / "FL01" / pass_name / "T01L", pols=("hh", "hv"))
 
     directories = [tmp_path / "FL01" / "PS02" / "T01L", tmp_path / "FL01" / "PS04" / "T01L"]
     parameters  = TrackParameterCollector.from_pass_directories(directories, "hv").collect()
@@ -143,8 +124,7 @@ def test_collector_builds_parameters_over_passes(tmp_path):
     assert parameters.labels      == ["FL01_PS02", "FL01_PS04"]
     assert parameters.reference   == "FL01_PS02"
     assert parameters.n_tracks    == 2
-    assert parameters.track_files[0].endswith("GTC/GTC-RDP/pp_17sartom0102_Lhv_t01L.xml")
-    assert parameters.track_files[1].endswith("INF/INF-RDP/pp_17sartom0102_Lhv_t01L.xml")
+    assert all(path.endswith("INF/INF-RDP/pp_17sartom0102_Lhv_t01L.xml") for path in parameters.track_files)
 
 
 def test_derived_geometry_matches_acquisition(tmp_path):

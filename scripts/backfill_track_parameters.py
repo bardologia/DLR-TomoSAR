@@ -65,8 +65,8 @@ class TrackParameterBackfiller:
         resolver    = StepParameterResolver()
         track_paths = {}
 
-        for index, (label, track_file) in enumerate(zip(baselines.labels, baselines.track_files)):
-            track_paths[label] = resolver.resolve_for_polarisation(self._pass_directory(track_file), polarisation, is_primary=(index == 0))
+        for label, track_file in zip(baselines.labels, baselines.track_files):
+            track_paths[label] = resolver.resolve_for_polarisation(self._pass_directory(track_file), polarisation)
 
         return track_paths
 

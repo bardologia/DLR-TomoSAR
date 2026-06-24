@@ -78,8 +78,7 @@ class StepParameterFile:
 
 
 class StepParameterResolver(PassProductResolver):
-    PRIMARY_SUBDIR       = Path("GTC") / "GTC-RDP"
-    SECONDARY_SUBDIR     = Path("INF") / "INF-RDP"
+    PRODUCT_SUBDIR       = Path("INF") / "INF-RDP"
     PRODUCT_PATTERN      = "pp_*.xml"
     POLARISATION_PATTERN = re.compile(r"_[A-Za-z]*?([hvHV]{2})_[Tt][0-9A-Za-z]+$")
 
@@ -91,12 +90,8 @@ class StepParameterResolver(PassProductResolver):
 
         return match.group(1).lower()
 
-    def _product_directory(self, pass_directory: str | Path, is_primary: bool) -> Path:
-        subdir = self.PRIMARY_SUBDIR if is_primary else self.SECONDARY_SUBDIR
-        return Path(pass_directory) / subdir
-
-    def resolve_for_polarisation(self, pass_directory: str | Path, polarisation: str, is_primary: bool) -> Path:
-        directory  = self._product_directory(pass_directory, is_primary)
+    def resolve_for_polarisation(self, pass_directory: str | Path, polarisation: str) -> Path:
+        directory  = Path(pass_directory) / self.PRODUCT_SUBDIR
         wanted     = polarisation.lower()
         candidates = sorted(directory.glob(self.PRODUCT_PATTERN))
         matches    = [candidate for candidate in candidates if self._polarisation_of(candidate) == wanted]
@@ -198,7 +193,7 @@ class TrackParameterCollector:
     @classmethod
     def from_pass_directories(cls, pass_directories: list, polarisation: str) -> "TrackParameterCollector":
         resolver    = StepParameterResolver()
-        track_paths = {resolver.label(str(directory)): resolver.resolve_for_polarisation(directory, polarisation, is_primary=(index == 0)) for index, directory in enumerate(pass_directories)}
+        track_paths = {resolver.label(str(directory)): resolver.resolve_for_polarisation(directory, polarisation) for directory in pass_directories}
 
         return cls(track_paths)
 
