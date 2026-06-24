@@ -249,6 +249,9 @@ class LaunchView {
     infer: {
       run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
     },
+    xray_weights: {
+      run_filter: { mode: "runs", multi: true, baseFrom: "runs_dir", checkpointOnly: true },
+    },
     compare_trials: {
       run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
     },

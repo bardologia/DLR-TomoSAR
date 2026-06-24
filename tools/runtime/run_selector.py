@@ -59,7 +59,35 @@ class RunSelector:
         ordered = sorted(dict.fromkeys(indices))
         return [run_dirs[index - 1] for index in ordered]
 
+    def _lookup(self, run_dirs: list[Path], names: list[str]) -> list[Path]:
+        by_key = {}
+        for run_dir in run_dirs:
+            by_key[run_dir.name] = run_dir
+            by_key[str(run_dir.relative_to(self.runs_dir))] = run_dir
+
+        selection = []
+        for name in names:
+            run_dir = by_key.get(name)
+            if run_dir is None:
+                raise FileNotFoundError(f"No run '{name}' with '{self.checkpoint_filename}' under {self.runs_dir}")
+            selection.append(run_dir)
+
+        ordered = list(dict.fromkeys(selection))
+        self.logger.ok(f"Selected {len(ordered)} run(s): {', '.join(run_dir.name for run_dir in ordered)}")
+        return ordered
+
     def select(self) -> list[Path]:
         run_dirs = self._discover()
         self._present(run_dirs)
         return self._prompt(run_dirs)
+
+    def filter(self, names: list[str]) -> list[Path]:
+        run_dirs = self._discover()
+        self._present(run_dirs)
+        return self._lookup(run_dirs, names)
+
+    def all(self) -> list[Path]:
+        run_dirs = self._discover()
+        self._present(run_dirs)
+        self.logger.ok(f"Selected all {len(run_dirs)} run(s)")
+        return run_dirs

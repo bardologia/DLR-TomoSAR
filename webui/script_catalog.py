@@ -76,8 +76,8 @@ class ScriptCatalog:
         "xray_weights": {
             "title"     : "X-Ray Weights",
             "category"  : "Analysis",
-            "purpose"   : "Diagnose any model checkpoint: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics.",
-            "essentials": ["checkpoint_path", "output_dir", "checkpoint_filename", "make_plots", "dead_abs_threshold", "rank_ratio_warn"],
+            "purpose"   : "Scan a runs directory, select one or more checkpoints, and diagnose each: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics inside each run directory.",
+            "essentials": ["runs_dir", "run_filter", "checkpoint_filename", "make_plots", "dead_abs_threshold", "rank_ratio_warn"],
         },
         "tune": {
             "title"     : "Tune",

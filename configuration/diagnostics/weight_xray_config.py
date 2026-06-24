@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib     import Path
-from typing      import Optional
+from typing      import List, Optional
 
 
 @dataclass
@@ -80,7 +80,8 @@ class WeightXrayConfig:
 
 @dataclass
 class WeightXrayEntryConfig:
-    runs_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
 
     checkpoint_filename : str = "best_model.pt"
     output_subdir       : str = "weight_xray"
