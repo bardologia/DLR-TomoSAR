@@ -80,10 +80,10 @@ class WeightXrayConfig:
 
 @dataclass
 class WeightXrayEntryConfig:
-    checkpoint_path : Path = Path("logs")
-    output_dir      : Path = Path("results/weight_xray")
+    runs_dir : Path = Path("runs")
 
     checkpoint_filename : str = "best_model.pt"
+    output_subdir       : str = "weight_xray"
 
     make_plots   : bool = True
     embed_images : bool = False
@@ -100,7 +100,7 @@ class WeightXrayEntryConfig:
     duplicate_max_units  : int = 512
     max_layer_histograms : int = 24
 
-    def to_config(self) -> WeightXrayConfig:
+    def to_config(self, run_dir: Path) -> WeightXrayConfig:
         thresholds = WeightXrayThresholds(
             dead_abs_threshold      = self.dead_abs_threshold,
             dead_fraction_warn      = self.dead_fraction_warn,
@@ -112,8 +112,8 @@ class WeightXrayEntryConfig:
         )
 
         return WeightXrayConfig(
-            checkpoint_path     = self.checkpoint_path,
-            output_dir          = self.output_dir,
+            checkpoint_path     = run_dir,
+            output_dir          = Path(run_dir) / self.output_subdir,
             checkpoint_filename = self.checkpoint_filename,
             thresholds          = thresholds,
             svd_max_dim          = self.svd_max_dim,

@@ -7,7 +7,8 @@ from typing      import Optional
 import numpy as np
 import torch
 
-from configuration.diagnostics.weight_xray_config import WeightXrayConfig, WeightXrayThresholds
+from configuration.diagnostics.weight_xray_config import WeightXrayConfig, WeightXrayEntryConfig, WeightXrayThresholds
+from tools.runtime.run_selector                    import RunSelector
 
 
 SEVERITY_RANK = {"ok": 0, "info": 1, "warning": 2, "critical": 3}
@@ -454,3 +455,23 @@ class WeightXray:
         outputs    = self._report(reports, summary, plot_paths)
 
         return {"summary": summary, "outputs": outputs}
+
+
+class WeightXrayBatch:
+    def __init__(self, entry_config: WeightXrayEntryConfig, logger) -> None:
+        self.entry_config = entry_config
+        self.logger       = logger
+
+    def _select_runs(self) -> list[Path]:
+        return RunSelector(self.entry_config.runs_dir, self.entry_config.checkpoint_filename, self.logger).select()
+
+    def _xray_run(self, run_dir: Path) -> dict:
+        config = self.entry_config.to_config(run_dir)
+        result = WeightXray(config, self.logger).run()
+
+        self.logger.ok(f"{run_dir.name}: {result['summary']['verdict']} -> {config.report_directory}")
+        return result
+
+    def run(self) -> list[dict]:
+        run_dirs = self._select_runs()
+        return [self._xray_run(run_dir) for run_dir in run_dirs]
