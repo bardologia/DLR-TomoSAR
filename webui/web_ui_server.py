@@ -10,6 +10,7 @@ from flow_library           import FlowLibrary
 from gpu_watchdog            import GpuWatchdog
 from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
+from physics_loss_library   import PhysicsLossLibrary
 from pipeline_library       import PipelineLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from jepa_model_library               import JepaModelLibrary
@@ -51,6 +52,7 @@ class WebUIServer:
         self.catalog     = ScriptCatalog(self.paths, self.resolver)
         self.configs     = ConfigRegistry(self.paths)
         self.equations   = EquationLibrary()
+        self.physics_loss = PhysicsLossLibrary()
         self.flows       = FlowLibrary()
         self.models           = BackboneModelLibrary()
         self.profile_ae_models = ProfileAutoencoderModelLibrary()
@@ -74,6 +76,7 @@ class WebUIServer:
             resolver    = self.resolver,
             configs     = self.configs,
             equations   = self.equations,
+            physics_loss = self.physics_loss,
             flows       = self.flows,
             models      = self.models,
             profile_ae_models = self.profile_ae_models,

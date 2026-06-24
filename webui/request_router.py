@@ -19,6 +19,7 @@ from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from pipeline_library       import PipelineLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from jepa_model_library               import JepaModelLibrary
+from physics_loss_library   import PhysicsLossLibrary
 from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
@@ -40,13 +41,14 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
         self.resolver    = resolver
         self.configs     = configs
         self.equations   = equations
+        self.physics_loss = physics_loss
         self.flows       = flows
         self.models      = models
         self.profile_ae_models = profile_ae_models
@@ -167,6 +169,9 @@ class RequestRouter:
             return
         if path == "/api/equations":
             self._send_json(handler, {"groups": self.equations.collect()})
+            return
+        if path == "/api/physics-loss":
+            self._send_json(handler, self.physics_loss.collect())
             return
         if path == "/api/flows":
             self._send_json(handler, {"flows": self.flows.collect()})

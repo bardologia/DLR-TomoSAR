@@ -134,6 +134,8 @@ class App {
     this.flowView = new window.FlowView(document.getElementById("flowx"));
     this._initModelMode();
 
+    this.physicsLossView = new window.PhysicsLossView(document.getElementById("phys"));
+
     this.pipelineFlow = new window.PipelineFlow(document.getElementById("flow"));
     this.pipelineFlow.load();
 
@@ -249,6 +251,7 @@ class App {
     } else {
       this.launchView.leave();
     }
+    if (route === "physics") this.physicsLossView.load();
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
     if (route === "results") this.resultsView.enter();
