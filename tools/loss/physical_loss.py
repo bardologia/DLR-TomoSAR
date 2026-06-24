@@ -116,3 +116,115 @@ class PhysicalLoss:
         val = ((spec_n - targ_n) ** 2).mean(dim=1)
 
         return PhysicalLoss.masked_mean(val, mask)
+
+    @staticmethod
+    def _track_steering(kz_track: torch.Tensor, x_axis: torch.Tensor) -> torch.Tensor:
+        phase = kz_track.unsqueeze(1) * x_axis.reshape(1, -1, 1, 1)
+
+        return torch.polar(torch.ones_like(phase), phase)
+
+    @staticmethod
+    def _synthesise_track(curves: torch.Tensor, kz_track: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
+        steering = PhysicalLoss._track_steering(kz_track, x_axis)
+
+        return (steering * curves.to(steering.dtype)).sum(dim=1) * dx
+
+    @staticmethod
+    def coherence_resynthesis_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+        n_tracks = kz_map.shape[1]
+
+        p0   = pred.sum(dim=1) * dx
+        t0   = target.sum(dim=1) * dx
+        mask = (t0 > floor).to(pred.dtype)
+
+        p0c = p0.clamp(min=floor)
+        t0c = t0.clamp(min=floor)
+
+        val = torch.zeros_like(p0)
+
+        for track in range(n_tracks):
+            gp = PhysicalLoss._synthesise_track(pred,   kz_map[:, track], x_axis, dx) / p0c
+            gt = PhysicalLoss._synthesise_track(target, kz_map[:, track], x_axis, dx) / t0c
+
+            val = val + (gp - gt).abs() ** 2
+
+        return PhysicalLoss.masked_mean(val / n_tracks, mask)
+
+    @staticmethod
+    def _synthesise_pair(curves: torch.Tensor, kz_difference: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
+        phase    = kz_difference.unsqueeze(1) * x_axis.reshape(1, -1, 1, 1)
+        rotation = torch.polar(torch.ones_like(phase), phase)
+
+        return (rotation * curves.to(rotation.dtype)).sum(dim=1) * dx
+
+    @staticmethod
+    def covariance_matching_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+        n_tracks = kz_map.shape[1]
+
+        t0   = target.sum(dim=1) * dx
+        mask = (t0 > floor).to(pred.dtype)
+
+        diff = (pred - target)
+
+        num = torch.zeros_like(t0)
+        den = torch.zeros_like(t0)
+
+        for i in range(n_tracks):
+            for j in range(n_tracks):
+                kz_difference = kz_map[:, i] - kz_map[:, j]
+
+                delta = PhysicalLoss._synthesise_pair(diff,   kz_difference, x_axis, dx)
+                ref   = PhysicalLoss._synthesise_pair(target, kz_difference, x_axis, dx)
+
+                num = num + delta.abs() ** 2
+                den = den + ref.abs() ** 2
+
+        return PhysicalLoss.masked_mean(num / den.clamp(min=1e-12), mask)
+
+    @staticmethod
+    def _synthesise_covariance(curves: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
+        B, n_tracks, H, W = kz_map.shape
+
+        cov = torch.zeros((B, H, W, n_tracks, n_tracks), dtype=torch.complex64, device=kz_map.device)
+
+        for i in range(n_tracks):
+            for j in range(i, n_tracks):
+                entry = PhysicalLoss._synthesise_pair(curves, kz_map[:, i] - kz_map[:, j], x_axis, dx).to(torch.complex64)
+
+                cov[..., i, j] = entry
+                if j != i:
+                    cov[..., j, i] = entry.conj()
+
+        return cov
+
+    @staticmethod
+    def capon_cycle_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, loading: float, floor: float) -> torch.Tensor:
+        B, n_tracks, H, W = kz_map.shape
+
+        t0   = target.sum(dim=1) * dx
+        mask = (t0 > floor).to(pred.dtype)
+
+        cov   = PhysicalLoss._synthesise_covariance(pred, kz_map, x_axis, dx)
+        trace = torch.diagonal(cov, dim1=-2, dim2=-1).sum(dim=-1).real / n_tracks
+        eye   = torch.eye(n_tracks, dtype=cov.dtype, device=cov.device)
+        cov   = cov + (loading * trace.clamp(min=floor)).unsqueeze(-1).unsqueeze(-1) * eye
+
+        cov = 0.5 * (cov + cov.conj().transpose(-2, -1))
+
+        spec = torch.empty((B, x_axis.shape[0], H, W), dtype=pred.dtype, device=pred.device)
+
+        for k in range(x_axis.shape[0]):
+            phase  = kz_map * x_axis[k]
+            steer  = torch.polar(torch.ones_like(phase), phase).to(torch.complex64).permute(0, 2, 3, 1).unsqueeze(-1)
+            solved = torch.linalg.solve(cov, steer)
+            denom  = (steer.conj() * solved).sum(dim=-2).squeeze(-1).real
+
+            spec[:, k] = 1.0 / denom.clamp(min=1e-12)
+
+        p0     = spec.sum(dim=1) * dx
+        spec_n = spec / p0.clamp(min=floor).unsqueeze(1)
+        targ_n = target / t0.clamp(min=floor).unsqueeze(1)
+
+        val = ((spec_n - targ_n) ** 2).mean(dim=1)
+
+        return PhysicalLoss.masked_mean(val, mask)
