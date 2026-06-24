@@ -140,6 +140,7 @@ class BackboneEntryConfig:
     backbone_name   : str        = "resunet"
     gpu             : int        = 0
     seed             : int        = 0
+    n_seeds          : int        = 1
     n_gaussians      : int        = 5
     predict_presence : bool       = False
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")

@@ -4,7 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from tools.runtime.config_cli import ConfigCli
+from pipelines.shared.seed_sweep import SeedSweepRunner
+from tools.runtime.config_cli    import ConfigCli
 
 
 class TrainingLauncher:
@@ -31,7 +32,7 @@ class TrainingLauncher:
         config = cli.apply(argv)
 
         if trial.trial or not config.trials_enabled:
-            SingleTrainRunner(config).run()
+            SeedSweepRunner(config, SingleTrainRunner).run()
             return
 
         TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script, stage="backbone").run()
@@ -40,19 +41,19 @@ class TrainingLauncher:
         from pipelines.jepa.training.pipeline import SingleTrainRunner
 
         config = ConfigCli(config, description="JEPA predictor training").apply(argv)
-        SingleTrainRunner(config).run()
+        SeedSweepRunner(config, SingleTrainRunner).run()
 
     def _profile_autoencoder(self, config, argv: list[str]) -> None:
         from pipelines.profile_autoencoder.training.pipeline import SingleTrainRunner
 
         config = ConfigCli(config, description="Profile autoencoder training").apply(argv)
-        SingleTrainRunner(config).run()
+        SeedSweepRunner(config, SingleTrainRunner).run()
 
     def _image_autoencoder(self, config, argv: list[str]) -> None:
         from pipelines.image_autoencoder.training.pipeline import SingleTrainRunner
 
         config = ConfigCli(config, description="Image autoencoder training").apply(argv)
-        SingleTrainRunner(config).run()
+        SeedSweepRunner(config, SingleTrainRunner).run()
 
     def run(self) -> None:
         from configuration.training import TrainEntryConfig

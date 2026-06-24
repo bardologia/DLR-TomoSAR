@@ -23,7 +23,7 @@ class LaunchView {
     ["data", /batch|worker|patch|stride|azimuth|dataset|^use_amp$|accumulation/],
     ["model", /model|gauss/],
     ["source", /fusar|track_selection|polarisation|^base_directory$/],
-    ["run", /^run_|^gpu|^seed$|^device|^log|dir|path/],
+    ["run", /^run_|^gpu|^seed$|^n_seeds$|^device|^log|dir|path/],
     ["reset", /^reset_/],
     ["beamforming", /beamforming|^filter_|^height_range$|^win_list$/],
     ["stitching", /stitch|cube/],
