@@ -97,7 +97,7 @@ em { font-style: italic; color: var(--accent); }
 .nav__brand { display: flex; align-items: center; gap: 11px; }
 
 .nav__logo {
-  height: 26px;
+  height: 44px;
   width: auto;
   display: block;
 }
