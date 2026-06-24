@@ -58,7 +58,7 @@ class InterferogramProcessor:
         pass_directories = [tomography_object.master, *tomography_object.slaves]
 
         self.track_baselines, self.track_profiles = self._extract_baselines(pass_directories, crop_tuple)
-        self.track_parameters                     = self._extract_parameters(pass_directories)
+        self.track_parameters                     = self._extract_parameters(pass_directories, tomogram_config.polarisation)
 
         primary, secondaries, interferograms = self._compute_interferograms(tomography_object)
         self.logger.subsection(f"FSAR stack built — primary: {primary.shape}, secondaries: {secondaries.shape}, interferograms: {interferograms.shape}")
@@ -72,8 +72,8 @@ class InterferogramProcessor:
         self.logger.kv_table(table.describe(), title="Track Baselines")
         return table, profiles
 
-    def _extract_parameters(self, pass_directories: list) -> TrackParameters:
-        parameters = TrackParameterCollector.from_pass_directories([str(p) for p in pass_directories]).collect()
+    def _extract_parameters(self, pass_directories: list, polarisation: str) -> TrackParameters:
+        parameters = TrackParameterCollector.from_pass_directories([str(p) for p in pass_directories], polarisation).collect()
 
         self.logger.kv_table(parameters.describe(), title="Track Parameters")
         return parameters

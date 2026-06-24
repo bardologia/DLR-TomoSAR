@@ -68,10 +68,12 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 """
 
 
-def _write_sample(directory) -> None:
+def _write_sample(directory, pols=("hh",)) -> None:
     product = directory / "GTC" / "GTC-RDP"
     product.mkdir(parents=True)
-    (product / "pp_17sartom0102_Lhh_t01L.xml").write_text(SAMPLE_XML, encoding="utf-8")
+
+    for pol in pols:
+        (product / f"pp_17sartom0102_L{pol}_t01L.xml").write_text(SAMPLE_XML, encoding="utf-8")
 
 
 def test_parser_coerces_scalars_arrays_and_nested(tmp_path):
@@ -91,28 +93,37 @@ def test_parser_coerces_scalars_arrays_and_nested(tmp_path):
 def test_resolver_finds_pp_under_gtc_rdp(tmp_path):
     _write_sample(tmp_path / "PS02" / "T01L")
 
-    resolved = StepParameterResolver().resolve(tmp_path / "PS02" / "T01L")
+    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hh")
 
     assert resolved.name == "pp_17sartom0102_Lhh_t01L.xml"
 
 
-def test_resolver_raises_when_missing(tmp_path):
-    (tmp_path / "PS02" / "T01L" / "GTC" / "GTC-RDP").mkdir(parents=True)
+def test_resolver_selects_requested_polarisation(tmp_path):
+    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "hv", "vv"))
+
+    resolved = StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv")
+
+    assert resolved.name == "pp_17sartom0102_Lhv_t01L.xml"
+
+
+def test_resolver_raises_when_polarisation_absent(tmp_path):
+    _write_sample(tmp_path / "PS02" / "T01L", pols=("hh", "vv"))
 
     with pytest.raises(FileNotFoundError):
-        StepParameterResolver().resolve(tmp_path / "PS02" / "T01L")
+        StepParameterResolver().resolve_for_polarisation(tmp_path / "PS02" / "T01L", "hv")
 
 
 def test_collector_builds_parameters_over_passes(tmp_path):
     for pass_name in ("PS02", "PS04"):
-        _write_sample(tmp_path / "FL01" / pass_name / "T01L")
+        _write_sample(tmp_path / "FL01" / pass_name / "T01L", pols=("hh", "hv"))
 
     directories = [tmp_path / "FL01" / "PS02" / "T01L", tmp_path / "FL01" / "PS04" / "T01L"]
-    parameters  = TrackParameterCollector.from_pass_directories(directories).collect()
+    parameters  = TrackParameterCollector.from_pass_directories(directories, "hv").collect()
 
-    assert parameters.labels    == ["FL01_PS02", "FL01_PS04"]
-    assert parameters.reference == "FL01_PS02"
-    assert parameters.n_tracks  == 2
+    assert parameters.labels      == ["FL01_PS02", "FL01_PS04"]
+    assert parameters.reference   == "FL01_PS02"
+    assert parameters.n_tracks    == 2
+    assert all(path.endswith("_Lhv_t01L.xml") for path in parameters.track_files)
 
 
 def test_derived_geometry_matches_acquisition(tmp_path):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
 from pathlib     import Path
@@ -77,8 +78,32 @@ class StepParameterFile:
 
 
 class StepParameterResolver(PassProductResolver):
-    PRODUCT_SUBDIR   = Path("GTC") / "GTC-RDP"
-    PRODUCT_PATTERNS = ("pp_*.xml",)
+    PRODUCT_SUBDIR       = Path("GTC") / "GTC-RDP"
+    PRODUCT_PATTERNS     = ("pp_*.xml",)
+    POLARISATION_PATTERN = re.compile(r"_[A-Za-z]*?([hvHV]{2})_[Tt][0-9A-Za-z]+$")
+
+    def _polarisation_of(self, parameter_file: Path) -> str:
+        match = self.POLARISATION_PATTERN.search(parameter_file.stem)
+
+        if match is None:
+            raise ValueError(f"Cannot read polarisation from parameter file name '{parameter_file.name}'")
+
+        return match.group(1).lower()
+
+    def resolve_for_polarisation(self, pass_directory: str | Path, polarisation: str) -> Path:
+        directory  = Path(pass_directory) / self.PRODUCT_SUBDIR
+        wanted     = polarisation.lower()
+        candidates = sorted(directory.glob(self.PRODUCT_PATTERNS[0]))
+        matches    = [candidate for candidate in candidates if self._polarisation_of(candidate) == wanted]
+
+        if not matches:
+            available = ", ".join(self._polarisation_of(candidate) for candidate in candidates) or "none"
+            raise FileNotFoundError(f"No pp_*.xml for polarisation '{wanted}' under {directory} (available: {available})")
+
+        if len(matches) > 1:
+            raise ValueError(f"Multiple parameter files for polarisation '{wanted}' under {directory}: {[m.name for m in matches]}")
+
+        return matches[0]
 
 
 @dataclass
@@ -166,8 +191,11 @@ class TrackParameterCollector:
         self.track_paths = {label: Path(path) for label, path in track_paths.items()}
 
     @classmethod
-    def from_pass_directories(cls, pass_directories: list) -> "TrackParameterCollector":
-        return cls(StepParameterResolver().resolve_passes([str(directory) for directory in pass_directories]))
+    def from_pass_directories(cls, pass_directories: list, polarisation: str) -> "TrackParameterCollector":
+        resolver    = StepParameterResolver()
+        track_paths = {resolver.label(str(directory)): resolver.resolve_for_polarisation(directory, polarisation) for directory in pass_directories}
+
+        return cls(track_paths)
 
     def collect(self) -> TrackParameters:
         labels     = list(self.track_paths.keys())

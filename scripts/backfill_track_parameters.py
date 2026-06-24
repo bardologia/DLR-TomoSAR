@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -34,6 +35,19 @@ class TrackParameterBackfiller:
 
         return baselines
 
+    def _load_polarisation(self) -> str:
+        path = self.meta_directory / "config_state.json"
+
+        if not path.is_file():
+            raise FileNotFoundError(f"No config_state.json under {self.meta_directory}; cannot recover the dataset polarisation.")
+
+        polarisation = json.loads(path.read_text(encoding="utf-8")).get("tomogram_config", {}).get("polarisation")
+
+        if not polarisation:
+            raise ValueError(f"{path} has no tomogram_config.polarisation; cannot select the matching pp_*.xml.")
+
+        return str(polarisation)
+
     def _remap_path(self, path: str) -> str:
         if self.remap is None:
             return path
@@ -47,12 +61,12 @@ class TrackParameterBackfiller:
     def _pass_directory(self, track_file: str) -> Path:
         return Path(self._remap_path(track_file)).parents[self.TRACK_DEPTH]
 
-    def _resolve_parameter_files(self, baselines: TrackBaselines) -> dict:
+    def _resolve_parameter_files(self, baselines: TrackBaselines, polarisation: str) -> dict:
         resolver    = StepParameterResolver()
         track_paths = {}
 
         for label, track_file in zip(baselines.labels, baselines.track_files):
-            track_paths[label] = resolver.resolve(self._pass_directory(track_file))
+            track_paths[label] = resolver.resolve_for_polarisation(self._pass_directory(track_file), polarisation)
 
         return track_paths
 
@@ -66,10 +80,12 @@ class TrackParameterBackfiller:
             print(f"skip     {out_path} already present (use --overwrite to regenerate).")
             return True
 
-        baselines   = self._load_baselines()
-        track_paths = self._resolve_parameter_files(baselines)
-        parameters  = self._collect(track_paths)
+        baselines    = self._load_baselines()
+        polarisation = self._load_polarisation()
+        track_paths  = self._resolve_parameter_files(baselines, polarisation)
+        parameters   = self._collect(track_paths)
 
+        print(f"  {'Polarisation':20s}: {polarisation}")
         for line, value in parameters.describe().items():
             print(f"  {line:20s}: {value}")
 
