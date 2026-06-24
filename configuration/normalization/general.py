@@ -131,11 +131,35 @@ class NormalizationConfig:
     input_strategy  : str = "per_slot"
     output_strategy : str = "per_slot"
 
+    pass_mag   : str = "default"
+    pass_phase : str = "default"
+    ifg_mag    : str = "default"
+    ifg_phase  : str = "default"
+    out_amp    : str = "default"
+    out_mu     : str = "default"
+    out_sigma  : str = "default"
+    dem        : str = "default"
+
     clamp_output : bool  = True
     clamp_floor  : float = 0.0
     clamp_ceil   : float = 80.0
 
+    SLOT_FIELDS = {
+        "pass/mag"      : "pass_mag",
+        "pass/phase"    : "pass_phase",
+        "ifg/mag"       : "ifg_mag",
+        "ifg/phase"     : "ifg_phase",
+        "out/amp"       : "out_amp",
+        "out/mu"        : "out_mu",
+        "out/sigma"     : "out_sigma",
+        "dem/elevation" : "dem",
+    }
+
     def strategy(self, which: str, slot_key: str) -> ChannelStrategy:
+        field_name = self.SLOT_FIELDS.get(slot_key)
+        if field_name is not None and getattr(self, field_name) != "default":
+            return Presets.by_name(getattr(self, field_name))
+
         name = self.input_strategy if which == "input" else self.output_strategy
         if name == "per_slot":
             return ChannelStrategy.from_slot(slot_key)

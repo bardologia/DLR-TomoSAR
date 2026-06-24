@@ -101,6 +101,14 @@ def test_normalization_config_named_preset_overrides_every_slot():
     assert cfg.strategy("output", "out/amp").norm_method  is NormMethod.ZSCORE
 
 
+def test_normalization_config_per_channel_override_wins_over_global():
+    cfg = NormalizationConfig(output_strategy="per_slot", out_amp="zscore")
+
+    assert cfg.strategy("output", "out/amp").norm_method   is NormMethod.ZSCORE
+    assert cfg.strategy("output", "out/sigma") == _SLOT_STRATEGIES["out/sigma"]
+    assert cfg.strategy("input", "pass/mag")   == _SLOT_STRATEGIES["pass/mag"]
+
+
 def test_normalization_clamp_round_trips_through_dict():
     cfg   = NormalizationConfig(clamp_output=False, clamp_floor=0.0, clamp_ceil=50.0)
     clamp = cfg.clamp()

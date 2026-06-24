@@ -264,13 +264,36 @@ def test_ablation_planner_rejects_feature_without_degrade():
         AblationTrialPlanner("resunet", [{"label": "x"}], include_full=True)
 
 
-def test_ablation_catalog_default_features_are_slot_fixes():
+def test_ablation_catalog_default_is_the_standard_set():
     features = AblationCatalog.default_features()
     labels   = [feature["label"] for feature in features]
 
-    assert labels == ["predict_presence", "focal", "active_norm", "presence_balance"]
+    assert labels == [
+        "out_amp", "out_mu", "out_sigma", "pass_mag", "ifg_phase",
+        "output_clamp", "augmentation", "curriculum", "warmup_loss",
+        "physics_loss", "class_imbalance",
+    ]
     for feature in features:
         assert set(feature) >= {"label", "enable", "degrade"}
+
+
+def test_ablation_catalog_standard_categories_present():
+    catalog = AblationCatalog.as_dict()
+
+    assert catalog["out_amp"]["degrade"]["normalization.out_amp"]     == "zscore"
+    assert catalog["augmentation"]["degrade"]["augmentation.p_noise"] == 0.0
+
+    physics = catalog["physics_loss"]
+    assert physics["enable"]["curriculum.warmup.use_total_power"]  is True
+    assert physics["degrade"]["curriculum.warmup.use_moments"]     is False
+
+    imbalance = catalog["class_imbalance"]
+    assert imbalance["enable"]["curriculum.warmup.presence_balance"]  is True
+    assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
+
+    warmup = catalog["warmup_loss"]
+    assert warmup["enable"]["curriculum.warmup.use_mse_curve"]   is True
+    assert warmup["degrade"]["curriculum.warmup.use_mse_curve"]  is False
 
 
 def test_ablation_catalog_as_dict_covers_loss_terms():

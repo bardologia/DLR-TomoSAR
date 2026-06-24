@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.benchmark.general            import BenchmarkPathsConfig, TrainingQueueConfig
-from configuration.dataset                       import InputConfig
+from configuration.dataset                       import AugmentationConfig, InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
@@ -156,6 +156,7 @@ class BackboneEntryConfig:
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
     input      : InputConfig          = field(default_factory=InputConfig.full_stack)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
 
     probe_enabled    : bool = False
     probe_n_batches  : int  = 1000

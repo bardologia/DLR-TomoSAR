@@ -62,6 +62,7 @@ class ConfigFactory:
             input_config    = self.benchmark_input_config(),
             output_config   = self._output_config(),
             normalization   = self._normalization(),
+            augmentation    = getattr(self.config, "augmentation", AugmentationConfig()),
             batch_size      = training.batch_size,
             num_workers     = training.num_workers,
             prefetch_factor = training.prefetch_factor,
