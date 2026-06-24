@@ -16,6 +16,7 @@ class GeometryConfig:
     baselines_source   : str   = "auto"
     baseline_component : str   = "perpendicular"
     baselines_origin   : str   = "config"
+    height_axis_convention : str = "height"
 
     def baselines_file(self, dataset_dir: str | Path) -> Path:
         return Path(dataset_dir) / "meta" / TrackBaselines.FILENAME
