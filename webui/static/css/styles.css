@@ -1350,6 +1350,9 @@ main { margin-left: var(--navw); }
 .exp-presence__cell { display: inline-flex; align-items: center; gap: 6px; }
 .exp-presence__remove { padding: 0 6px; line-height: 1.4; }
 
+.exp-ablation-card .special-head__name::before { content: "// "; color: var(--ink-dim); }
+.exp-ablation-card.is-trials { border-color: var(--accent); }
+
 .exp-ablation__full { margin-left: auto; border-style: dashed; color: var(--ink-dim); }
 .exp-ablation__full.is-on { border-style: solid; color: var(--accent); border-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 .exp-ablation__menu { padding: 6px 12px 10px; }
