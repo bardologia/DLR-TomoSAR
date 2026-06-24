@@ -146,7 +146,7 @@ def _parse_remap(value: str | None) -> tuple | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="TEMPORARY: backfill meta/track_parameters.json for datasets generated before the track-parameter component existed, by re-reading the F-SAR GTC/GTC-RDP/pp_*.xml of each track recovered from meta/baselines.json.")
+    parser = argparse.ArgumentParser(description="TEMPORARY: backfill meta/track_parameters.json for datasets generated before the track-parameter component existed, by re-reading the F-SAR INF/INF-RDP/pp_*.xml of each track recovered from meta/baselines.json.")
     parser.add_argument("paths", type=str, nargs="+", help="Dataset run directories, or a parent directory to scan recursively for meta/baselines.json.")
     parser.add_argument("--remap",     type=str, default=None, help="Translate the stored server prefix to where the data actually lives, as OLD=NEW (e.g. /ste/rnd=/home/bard/ste).")
     parser.add_argument("--overwrite", action="store_true", help="Regenerate track_parameters.json even if it already exists.")

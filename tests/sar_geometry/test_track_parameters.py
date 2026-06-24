@@ -152,3 +152,21 @@ def test_payload_roundtrip_preserves_parameters(tmp_path):
     assert restored.labels                       == parameters.labels
     assert restored.parameters[0]["r"]           == [3300.0, 4000.0, 6000.0]
     assert restored.parameters[0]["dims_info"]   == {"side_looking": "right"}
+
+
+def test_payload_deduplicates_shared_fields():
+    primary   = {"da": 0.61, "r": [1.0, 2.0, 3.0], "h0": 3719.1, "ident": "A"}
+    secondary = {"da": 0.61, "r": [1.0, 2.0, 3.0], "h0": 3719.0, "ident": "B"}
+
+    parameters = TrackParameters(labels=["FL01_PS02", "FL01_PS04"], parameters=[primary, secondary])
+    payload    = parameters.to_payload()
+
+    assert payload["shared"]                 == {"da": 0.61, "r": [1.0, 2.0, 3.0]}
+    assert payload["per_track"]["FL01_PS02"] == {"h0": 3719.1, "ident": "A"}
+    assert payload["per_track"]["FL01_PS04"] == {"h0": 3719.0, "ident": "B"}
+    assert "r" not in payload["per_track"]["FL01_PS02"]
+
+    restored = TrackParameters.from_payload(payload)
+
+    assert restored.parameters[0] == primary
+    assert restored.parameters[1] == secondary

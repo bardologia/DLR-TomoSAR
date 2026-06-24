@@ -157,20 +157,41 @@ class TrackParameters:
             "Look angle [deg]"   : ", ".join(f"{g['look_angle_near_deg']:.1f}-{g['look_angle_far_deg']:.1f}" for g in geometry),
         }
 
+    def _partition(self) -> tuple:
+        shared       = {}
+        varying_keys = []
+
+        for key in self.parameters[0]:
+            values = [params[key] for params in self.parameters]
+
+            if all(value == values[0] for value in values):
+                shared[key] = values[0]
+            else:
+                varying_keys.append(key)
+
+        per_track = {label: {key: params[key] for key in varying_keys} for label, params in zip(self.labels, self.parameters)}
+
+        return shared, per_track
+
     def to_payload(self) -> dict:
+        shared, per_track = self._partition()
+
         return {
             "labels"      : list(self.labels),
             "reference"   : self.reference,
-            "parameters"  : list(self.parameters),
-            "derived"     : self.derived(),
+            "shared"      : shared,
+            "per_track"   : per_track,
             "track_files" : [str(f) for f in self.track_files],
         }
 
     @classmethod
     def from_payload(cls, payload: dict) -> "TrackParameters":
+        shared     = payload["shared"]
+        parameters = [{**shared, **payload["per_track"][label]} for label in payload["labels"]]
+
         return cls(
             labels      = list(payload["labels"]),
-            parameters  = list(payload["parameters"]),
+            parameters  = parameters,
             track_files = list(payload["track_files"]),
         )
 
