@@ -1350,6 +1350,14 @@ main { margin-left: var(--navw); }
 .exp-presence__cell { display: inline-flex; align-items: center; gap: 6px; }
 .exp-presence__remove { padding: 0 6px; line-height: 1.4; }
 
+.ablation__note { font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); padding: 24px 0; }
+.ablation__note--error { color: var(--accent); }
+.ablation__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.ablation__interp { font-family: var(--mono); font-size: 12px; min-width: 220px; }
+.ablation__count { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); }
+.ablation__launch { margin-left: auto; }
+.ablation__cmd { margin-top: 16px; padding: 12px 14px; background: var(--bg-1); border: 1px solid var(--line); border-radius: 2px; font-family: var(--mono); font-size: 11.5px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .exp-ablation-card .special-head__name::before { content: "// "; color: var(--ink-dim); }
 .exp-ablation-card.is-trials { border-color: var(--accent); }
 

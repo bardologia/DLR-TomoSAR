@@ -29,6 +29,7 @@
     <a href="#/architectures" data-route="architectures">Architectures</a>
     <a href="#/physics" data-route="physics">Physics Loss</a>
     <a href="#/scripts" data-route="scripts">Scripts</a>
+    <a href="#/ablation" data-route="ablation">Ablation</a>
     <a href="#/configuration" data-route="configuration">Configuration</a>
     <a href="#/console" data-route="console">Console</a>
     <a href="#/results" data-route="results">Results</a>
@@ -130,6 +131,19 @@
     </div>
     <div class="filter-row" id="script-filters"></div>
     <div class="script-grid" id="script-grid"></div>
+  </section>
+
+  <!-- ABLATION -->
+  <section class="page page--pad" data-page="ablation">
+    <div class="page__head">
+      <h2 class="page__title">Ablation study</h2>
+      <p class="page__lead">
+        Configure a full ablation of the backbone model: pick the features to ablate and
+        their order, then launch a cumulative loop that trains the full model and degrades
+        one feature at a time down to the baseline.
+      </p>
+    </div>
+    <div id="ablation-root"></div>
   </section>
 
   <!-- LAUNCH -->
@@ -575,14 +589,15 @@
 <script src="/static/js/models.js?v=20260616a"></script>
 <script src="/static/js/configs.js?v=20260606r"></script>
 <script src="/static/js/scripts.js?v=20260606r"></script>
-<script src="/static/js/launch_widgets.js?v=20260620b"></script>
+<script src="/static/js/launch_widgets.js?v=20260624d"></script>
 <script src="/static/js/launch_pickers.js?v=20260609p"></script>
-<script src="/static/js/launch.js?v=20260624c"></script>
+<script src="/static/js/launch.js?v=20260624d"></script>
+<script src="/static/js/ablation.js?v=20260624d"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260624a"></script>
+<script src="/static/js/app.js?v=20260624d"></script>
 </body>
 </html>

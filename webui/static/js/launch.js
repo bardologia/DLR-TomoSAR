@@ -281,7 +281,6 @@ class LaunchView {
     this.modelEndpoint = null;
     this.pinsEl = null;
     this.builder = null;
-    this.ablationBuilder = null;
     this.detach = true;
     this.cmdEl = null;
     this.manifestEl = null;
@@ -317,7 +316,6 @@ class LaunchView {
     this.modelEndpoint = null;
     this.pinsEl = null;
     this.builder = null;
-    this.ablationBuilder = null;
     this.detach = true;
 
     this._renderSkeleton();
@@ -881,18 +879,13 @@ class LaunchView {
       }
     }
 
-    if (byPath.get("trials_enabled") && byPath.get("ablation_features")) {
-      const candidate = new window.AblationBuilder(this, byPath);
-      if (candidate.available) {
-        this.ablationBuilder = candidate;
-        candidate.claimed.forEach((path) => claimed.add(path));
-      }
-    }
+    ["ablation_features", "ablation_catalog", "ablation_include_full"].forEach((path) => {
+      if (byPath.get(path)) claimed.add(path);
+    });
 
     if (pinned.length) host.appendChild(this._buildPins(pinned));
     if (cardPanel) host.appendChild(cardPanel.build());
     if (this.builder) host.appendChild(this.builder.build());
-    if (this.ablationBuilder) host.appendChild(this.ablationBuilder.build());
     if (modelPanel) host.appendChild(modelPanel.build());
 
     const grouped = new Map();
@@ -1751,7 +1744,6 @@ class LaunchView {
 
     if (this.manifestEl) this._renderManifest();
     if (this.builder) this.builder.refreshFromView();
-    if (this.ablationBuilder) this.ablationBuilder.refreshFromView();
     this._refreshBadges();
     this._refreshGates();
   }

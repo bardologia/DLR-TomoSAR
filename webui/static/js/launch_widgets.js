@@ -1033,12 +1033,6 @@ class ExperimentBuilder {
     return terms;
   }
 
-  _ownsMode() {
-    if (!this.modeLeaf) return true;
-    const value = this.view._effective(this.modeLeaf);
-    return ExperimentBuilder.MODES.some((mode) => mode.key === value);
-  }
-
   _trialsSwitch() {
     const leaf     = this.trialsLeaf;
     const toggle   = document.createElement("button");
@@ -1049,21 +1043,16 @@ class ExperimentBuilder {
     toggle.innerHTML = `<span class="switch__knob"></span>`;
 
     const paint = () => {
-      const on = this.view._effective(leaf) === "True" && this._ownsMode();
+      const on = this.view._effective(leaf) === "True";
       toggle.classList.toggle("is-on", on);
-      toggle.classList.toggle("is-dirty", this.view.dirty[leaf.path] !== undefined && this._ownsMode());
+      toggle.classList.toggle("is-dirty", this.view.dirty[leaf.path] !== undefined);
       toggle.setAttribute("aria-checked", String(on));
       this.root.classList.toggle("is-trials", on);
     };
 
     toggle.addEventListener("click", () => {
-      const active = this.view._effective(leaf) === "True" && this._ownsMode();
-      if (active) {
-        this.view._setValue(leaf, "False");
-      } else {
-        if (this.modeLeaf && !this._ownsMode()) this.view._setValue(this.modeLeaf, "curriculum");
-        this.view._setValue(leaf, "True");
-      }
+      const next = this.view._effective(leaf) === "True" ? "False" : "True";
+      this.view._setValue(leaf, next);
       paint();
     });
 

@@ -125,6 +125,8 @@ class App {
 
     this.launchView = new window.LaunchView(this.runConsole, this.project || {});
 
+    this.ablationView = new window.AblationView(this.runConsole, this.project || {});
+
     this.equationView = new window.EquationView(
       document.getElementById("eq-tabs"),
       document.getElementById("eq-grid")
@@ -251,6 +253,7 @@ class App {
     } else {
       this.launchView.leave();
     }
+    if (route === "ablation") this.ablationView.enter();
     if (route === "physics") this.physicsLossView.load();
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
