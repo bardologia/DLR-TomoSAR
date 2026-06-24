@@ -47,7 +47,7 @@ class ScriptCatalog:
             "title"     : "Inference",
             "category"  : "Inference",
             "purpose"   : "Run sliding-window prediction, stitch cubes, and generate reports for one or more trained runs.",
-            "essentials": ["logs_dir", "run_filter", "gpu"],
+            "essentials": ["logs_dir", "run_filter", "gpus"],
         },
         "infer_profile_autoencoder": {
             "title"     : "Profile AE Inference",
@@ -72,12 +72,6 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
             "essentials": ["runs_dir", "run_tags"],
-        },
-        "physics_check": {
-            "title"     : "Physics Check",
-            "category"  : "Analysis",
-            "purpose"   : "Compare physical quantities between Gaussian fits and the Capon tomogram to establish physics loss floors.",
-            "essentials": ["dataset_path", "device"],
         },
         "tune": {
             "title"     : "Tune",
@@ -107,7 +101,6 @@ class ScriptCatalog:
         "tune",
         "tune_dataloader",
         "compare_trials",
-        "physics_check",
     ]
 
     GROUPS = {
