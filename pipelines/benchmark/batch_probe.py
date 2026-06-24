@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 from configuration.benchmark            import BenchmarkConfig
 from models                             import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
@@ -16,6 +15,7 @@ from pipelines.shared.config_factory     import ConfigFactory
 from tools.data.gaussians                import GaussianHead
 from tools.monitoring.logger             import Logger
 from tools.runtime.reproducibility       import Reproducibility
+from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMemoryProbe
 
 
 class MaxBatchProbe:
@@ -94,42 +94,14 @@ class MaxBatchProbe:
         return trainer
 
     def _candidates(self) -> list[int]:
-        sizes = []
-        size  = 1
-
-        while size <= self.ceiling:
-            sizes.append(size)
-            size *= 2
-
-        return sizes
+        return BatchSizeFinder.candidates(self.ceiling)
 
     def _trial(self, trainer, dataset, batch_size: int) -> float:
+        return TrainStepMemoryProbe(trainer, dataset, self.measure_steps, self.device, self.context_gb)(batch_size)
+
+    def _release(self, trainer) -> None:
+        trainer.optimizer.zero_grad(set_to_none=True)
         torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats(self.device)
-
-        loader   = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=True, num_workers=0)
-        iterator = iter(loader)
-
-        for _ in range(self.measure_steps):
-            try:
-                batch = next(iterator)
-            except StopIteration:
-                iterator = iter(loader)
-                batch    = next(iterator)
-
-            trainer.optimizer.zero_grad(set_to_none=True)
-
-            with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=trainer.use_amp):
-                loss = trainer._compute_loss(batch)["total_loss"]
-
-            loss.backward()
-            trainer.optimizer.step()
-
-        peak_reserved = torch.cuda.max_memory_reserved(self.device)
-
-        del loss, batch, iterator, loader
-
-        return self.context_gb + peak_reserved / (1024.0 ** 3)
 
     def run(self) -> dict:
         result = {
@@ -154,33 +126,18 @@ class MaxBatchProbe:
             model, model_cfg = self._build_model(dataset_config, dataset, gaussian_cfg)
             trainer          = self._build_trainer(trainer_config, dataset_config, model, model_cfg, dataset)
 
-            best = None
+            finder = BatchSizeFinder(
+                trial_step = lambda batch_size: self._trial(trainer, dataset, batch_size),
+                budget_gb  = self.budget_gb,
+                ceiling    = self.ceiling,
+                device     = self.device,
+                logger     = self.logger,
+                model_name = self.model_name,
+                context_gb = self.context_gb,
+                on_oom     = lambda: self._release(trainer),
+            )
 
-            for batch_size in self._candidates():
-                try:
-                    peak_gb = self._trial(trainer, dataset, batch_size)
-                except torch.cuda.OutOfMemoryError:
-                    trainer.optimizer.zero_grad(set_to_none=True)
-                    torch.cuda.empty_cache()
-                    result["trials"].append({"batch_size": batch_size, "peak_gb": None, "status": "OOM"})
-                    self.logger.subsection(f"batch {batch_size:>5} -> OOM")
-                    break
-
-                fits = peak_gb <= self.budget_gb
-                result["trials"].append({"batch_size": batch_size, "peak_gb": peak_gb, "status": "FIT" if fits else "OVER"})
-                self.logger.subsection(f"batch {batch_size:>5} -> {peak_gb:.2f} GB {'FIT' if fits else 'OVER'}")
-
-                if not fits:
-                    break
-
-                best = (batch_size, peak_gb)
-
-            if best is None:
-                result["status"] = "FAIL"
-                result["error"]  = f"batch size 1 exceeds the {self.budget_gb:g} GB budget"
-            else:
-                result["batch_size"], result["peak_gb"] = best
-                result["status"]                        = "PASS"
+            result.update(finder.run())
 
             del trainer, model
             gc.collect()

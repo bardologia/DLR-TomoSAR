@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from pipelines.benchmark.batch_probe import MaxBatchProbe
+from tools.training.pretraining.batch_finder import TrainStepMemoryProbe
 
 from configuration.benchmark import BenchmarkConfig
 
@@ -32,7 +33,7 @@ def test_candidates_stop_below_non_power_of_two_ceiling():
 
 
 def test_trial_uses_real_trainer_loss_not_surrogate():
-    source = inspect.getsource(MaxBatchProbe._trial)
+    source = inspect.getsource(TrainStepMemoryProbe.__call__)
 
     assert "_compute_loss" in source
     assert "total_loss" in source
@@ -41,7 +42,7 @@ def test_trial_uses_real_trainer_loss_not_surrogate():
 
 
 def test_trial_measures_peak_reserved_memory():
-    source = inspect.getsource(MaxBatchProbe._trial)
+    source = inspect.getsource(TrainStepMemoryProbe.__call__)
 
     assert "reset_peak_memory_stats" in source
     assert "max_memory_reserved" in source

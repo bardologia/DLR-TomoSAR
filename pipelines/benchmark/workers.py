@@ -6,6 +6,7 @@ from pathlib import Path
 from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config_factory            import ConfigFactory
 from tools.data.io                              import FileIO
+from tools.training.pretraining.overfit_gate    import OverfitGate
 from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
 
 
@@ -92,18 +93,7 @@ class BenchmarkWorker:
         )
 
     def _finalize_overfit(self, result: dict, result_path: Path) -> None:
-        threshold = result["threshold"]
-
-        if result["final_loss"] is not None:
-            result["converged"] = bool(result["final_loss"] <= threshold)
-
-        if result["status"] == "PASS" and result["final_loss"] is None:
-            result["status"] = "FAIL"
-            result["error"]  = result["error"] or "overfit gate produced no final loss to evaluate"
-
-        if result["status"] == "PASS" and self.config.overfit.require_convergence and result["converged"] is not True:
-            result["status"] = "FAIL"
-            result["error"]  = f"final loss {result['final_loss']:.3e} above stop threshold {threshold:.0e}"
+        OverfitGate.evaluate(result, self.config.overfit.require_convergence)
 
         FileIO.save_json(result, result_path, indent=2)
 
