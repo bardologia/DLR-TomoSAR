@@ -25,6 +25,7 @@ class CrossValidationReport:
         model_name       : str,
         embed_images     : bool,
         logger           : Logger,
+        seed_dispersion  : dict | None = None,
     ) -> None:
         self.base_records     = base_records
         self.records_by_split = records_by_split
@@ -33,8 +34,26 @@ class CrossValidationReport:
         self.model_name       = model_name
         self.embed_images     = embed_images
         self.logger           = logger
+        self.seed_dispersion  = seed_dispersion or {}
+        self.has_seed_sweep   = any(entry["n_seeds"] > 1 for entry in self.seed_dispersion.values())
         self.grouper          = MetricSectionGrouper()
         self.timestamp        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def _seed_std(self, fold_name: str, split: str | None, key: str) -> float | None:
+        entry = self.seed_dispersion.get(fold_name)
+        if entry is None:
+            return None
+
+        if split is None:
+            return entry["best_val_loss_std"] if key == "best_val_loss" else None
+
+        return entry["splits"].get(split, {}).get(key)
+
+    def _seed_annotated(self, cell: str, std: float | None) -> str:
+        if std is None or not math.isfinite(std):
+            return cell
+
+        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
 
     def _require_all_folds(self) -> None:
         n_total = self.planner.n_folds
@@ -71,7 +90,7 @@ class CrossValidationReport:
             return None
         return std
 
-    def _aggregate_table(self, keys: list[str], records: list[TrialRecord]) -> list[str]:
+    def _aggregate_table(self, keys: list[str], records: list[TrialRecord], split: str | None = None) -> list[str]:
         n_total     = len(records)
         fold_labels = [f"`{record.name}`" for record in records]
         table       = MarkdownTable(["Metric", "Mean", "Std", "N (folds used)", *fold_labels])
@@ -87,7 +106,7 @@ class CrossValidationReport:
             mean_cell  = ScalarFormatter.format_scalar(mean)
             std_cell   = self._format_std(std, len(numeric))
             count_cell = f"{len(numeric)}/{n_total}"
-            fold_cells = [ScalarFormatter.format_scalar(value) for value in values]
+            fold_cells = [self._seed_annotated(ScalarFormatter.format_scalar(value), self._seed_std(record.name, split, key)) for record, value in zip(records, values)]
 
             table.add_row(f"`{key}`", mean_cell, std_cell, count_cell, *fold_cells)
 
@@ -99,6 +118,9 @@ class CrossValidationReport:
             f"\n_Generated {self.timestamp}_\n",
             f"Model `{self.model_name}`, {self.planner.n_folds} folds. All aggregates are reported as mean and sample standard deviation across folds.\n",
         ]
+
+        if self.has_seed_sweep:
+            lines += ["Each fold was trained under multiple seeds. Per-fold cells show the seed mean ± within-fold seed standard deviation; the Mean and Std columns aggregate the per-fold seed means across folds.\n"]
 
         lines += ["## Fold Plan\n"]
 
@@ -121,7 +143,7 @@ class CrossValidationReport:
             lines += [f"## Split `{split}` — Metric Aggregates\n"]
 
             for title, keys in self.grouper.group(MetricSectionGrouper.scalar_keys(records)):
-                lines += [f"### {title}\n", *self._aggregate_table(keys, records)]
+                lines += [f"### {title}\n", *self._aggregate_table(keys, records, split)]
 
         out = self.out_dir / "cv_aggregate_report.md"
         out.write_text("\n".join(lines), encoding="utf-8")
@@ -148,7 +170,7 @@ class CrossValidationReport:
             duration_s = record.training_result.get("duration_s")
             duration   = f"{duration_s / 60:.1f} min" if duration_s is not None else "—"
             epoch_cell = ScalarFormatter.format_scalar(record.checkpoint.get("best_epoch"))
-            loss_cell  = ScalarFormatter.format_scalar(record.checkpoint.get("best_val_loss"))
+            loss_cell  = self._seed_annotated(ScalarFormatter.format_scalar(record.checkpoint.get("best_val_loss")), self._seed_std(record.name, None, "best_val_loss"))
             run_cell   = ScalarFormatter.format_scalar(record.checkpoint.get("n_train_epochs"))
 
             table.add_row(f"`{record.name}`", epoch_cell, loss_cell, run_cell, duration)
@@ -202,12 +224,21 @@ class CrossValidationReport:
                     "per_fold" : {record.name: record.metrics.get(key) for record in scored},
                 }
 
+                if self.has_seed_sweep:
+                    split_payload[key]["per_fold_seed_std"] = {record.name: self._seed_std(record.name, split, key) for record in scored}
+
             payload["splits"][split] = split_payload
 
         best_losses = [value for value in (FiniteScalar.coerce(record.checkpoint.get("best_val_loss")) for record in self.base_records) if value is not None]
         if best_losses:
             mean, std = self._mean_std(best_losses)
             payload["best_val_loss"] = {"mean": mean, "std": self._json_std(std, len(best_losses)), "n_used": len(best_losses), "n_total": n_total}
+
+            if self.has_seed_sweep:
+                payload["best_val_loss"]["per_fold_seed_std"] = {record.name: self._seed_std(record.name, None, "best_val_loss") for record in self.base_records}
+
+        if self.has_seed_sweep:
+            payload["seeds_per_fold"] = {fold: entry["n_seeds"] for fold, entry in self.seed_dispersion.items()}
 
         out = self.out_dir / "cv_summary.json"
         return FileIO.save_json(payload, out, indent=2)

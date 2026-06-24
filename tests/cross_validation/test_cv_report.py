@@ -226,6 +226,55 @@ def test_aggregate_table_skips_non_numeric_metrics(tmp_path):
     assert "`label_str`"     not in body
 
 
+def _seed_dispersion(best_val_loss_std: float, metric_std: float) -> dict:
+    return {
+        FoldNaming.name(index): {
+            "n_seeds"           : 2,
+            "best_val_loss_std" : best_val_loss_std,
+            "splits"            : {"test": {"curve_rmse_gt": metric_std}},
+        }
+        for index in range(N_FOLDS)
+    }
+
+
+def test_seed_dispersion_annotates_markdown_and_json(tmp_path):
+    metrics = split_metrics()
+    report  = CrossValidationReport(
+        base_records     = make_records(metrics),
+        records_by_split = {"test": make_records(metrics)},
+        planner          = make_planner(),
+        out_dir          = tmp_path / "reports",
+        model_name       = "resunet",
+        embed_images     = False,
+        logger           = make_logger(tmp_path),
+        seed_dispersion  = _seed_dispersion(best_val_loss_std=0.05, metric_std=0.5),
+    )
+
+    assert report.has_seed_sweep is True
+
+    report.write_all()
+
+    text = (report.out_dir / "cv_aggregate_report.md").read_text()
+    assert "± " in text
+    assert "within-fold seed standard deviation" in text
+
+    payload = json.loads((report.out_dir / "cv_summary.json").read_text())
+    assert payload["seeds_per_fold"][FoldNaming.name(0)] == 2
+    assert payload["splits"]["test"]["curve_rmse_gt"]["per_fold_seed_std"][FoldNaming.name(0)] == pytest.approx(0.5)
+    assert payload["best_val_loss"]["per_fold_seed_std"][FoldNaming.name(0)] == pytest.approx(0.05)
+
+
+def test_no_seed_dispersion_keeps_summary_unchanged(tmp_path):
+    report = make_report(tmp_path)
+    report.write_all()
+
+    payload = json.loads((report.out_dir / "cv_summary.json").read_text())
+
+    assert report.has_seed_sweep is False
+    assert "seeds_per_fold" not in payload
+    assert "per_fold_seed_std" not in payload["splits"]["test"]["curve_rmse_gt"]
+
+
 def test_partial_fold_metrics_counted_in_n_used(tmp_path):
     metrics = split_metrics()
     metrics[3]["curve_rmse_gt"] = float("nan")

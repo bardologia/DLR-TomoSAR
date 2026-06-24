@@ -46,6 +46,7 @@ class CrossValidationConfig:
     run_tag         : str | None = None
     resume          : bool       = True
     seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=list)
     n_gaussians     : int        = 5
     poll_interval_s : float      = 5.0
 

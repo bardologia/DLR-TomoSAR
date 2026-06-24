@@ -101,6 +101,31 @@ def test_collector_split_view_empty_when_metrics_absent(tmp_path):
     assert records[1].figures       == []
 
 
+def test_collector_aggregates_seeds_per_fold(tmp_path):
+    import numpy as np
+
+    names     = ["fold_0_seed1", "fold_0_seed2", "fold_1_seed1", "fold_1_seed2"]
+    inference = {
+        "fold_0_seed1": {"test": {"curve_rmse_gt": 2.0}},
+        "fold_0_seed2": {"test": {"curve_rmse_gt": 4.0}},
+        "fold_1_seed1": {"test": {"curve_rmse_gt": 1.0}},
+        "fold_1_seed2": {"test": {"curve_rmse_gt": 3.0}},
+    }
+
+    run_dir   = build_run_dir(tmp_path, names, inference)
+    collector = FoldCollector(run_dir=run_dir, splits=["test"], logger=make_logger(tmp_path))
+
+    base, by_split = collector.collect_by_split()
+
+    assert [record.name for record in base]            == ["fold_0", "fold_1"]
+    assert by_split["test"][0].metrics["curve_rmse_gt"] == 3.0
+    assert by_split["test"][1].metrics["curve_rmse_gt"] == 2.0
+
+    dispersion = collector.seed_dispersion
+    assert dispersion["fold_0"]["n_seeds"] == 2
+    assert dispersion["fold_0"]["splits"]["test"]["curve_rmse_gt"] == pytest.approx(float(np.std([2.0, 4.0], ddof=1)))
+
+
 def test_collector_multiple_splits_independent(tmp_path):
     run_dir = build_run_dir(
         tmp_path,
@@ -129,8 +154,9 @@ def test_training_worker_dispatches_to_backbone(test_data_dir, monkeypatch):
 
     captured = {}
 
-    def fake_backbone(self, fold_index, split_regions):
+    def fake_backbone(self, fold_index, seed, split_regions):
         captured["fold"]    = fold_index
+        captured["seed"]    = seed
         captured["regions"] = split_regions
 
     monkeypatch.setattr(FoldTrainingWorker, "_run_backbone", fake_backbone, raising=True)
@@ -138,6 +164,7 @@ def test_training_worker_dispatches_to_backbone(test_data_dir, monkeypatch):
     worker.run(2)
 
     assert captured["fold"] == 2
+    assert captured["seed"] is None
     assert isinstance(captured["regions"], SplitRegions)
 
 
@@ -146,7 +173,7 @@ def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch
     worker = FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt")
 
     captured = {}
-    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone", lambda self, i, sr: captured.update(sr=sr), raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone", lambda self, i, seed, sr: captured.update(sr=sr), raising=True)
 
     worker.run(2)
 
@@ -159,9 +186,9 @@ def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch
 def test_training_worker_dispatch_routes_by_type(test_data_dir, monkeypatch):
     seen = {}
 
-    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone",            lambda self, i, sr: seen.update(kind="backbone"), raising=True)
-    monkeypatch.setattr(FoldTrainingWorker, "_run_jepa",               lambda self, i, sr: seen.update(kind="jepa"),     raising=True)
-    monkeypatch.setattr(FoldTrainingWorker, "_run_profile_autoencoder", lambda self, i, sr: seen.update(kind="ae"),       raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_backbone",            lambda self, i, seed, sr: seen.update(kind="backbone"), raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_jepa",               lambda self, i, seed, sr: seen.update(kind="jepa"),     raising=True)
+    monkeypatch.setattr(FoldTrainingWorker, "_run_profile_autoencoder", lambda self, i, seed, sr: seen.update(kind="ae"),       raising=True)
 
     FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt").run(0)
     assert seen["kind"] == "backbone"

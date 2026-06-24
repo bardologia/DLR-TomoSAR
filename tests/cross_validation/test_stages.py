@@ -52,11 +52,27 @@ def test_training_stage_builds_one_item_per_fold(tmp_path):
     assert stage.items == [f"fold_{i}" for i in range(5)]
 
 
-def test_training_stage_worker_flag_and_value(tmp_path):
+def test_training_stage_job_carries_fold_index(tmp_path):
     stage = FoldTrainingStage(config=stage_config(tmp_path), entry_script=Path("e.py"), run_tag="rt", logger=make_logger(tmp_path))
 
-    assert stage._worker_flag()           == "--fold"
-    assert stage._worker_value("fold_3")  == "3"
+    job = stage._job("fold_3")
+
+    assert job.command[job.command.index("--worker") + 1] == "train"
+    assert job.command[job.command.index("--fold")  + 1] == "3"
+    assert "--seed" not in job.command
+
+
+def test_training_stage_seed_sweep_expands_fold_by_seed(tmp_path):
+    config       = stage_config(tmp_path)
+    config.seeds = [1, 2]
+    stage        = FoldTrainingStage(config=config, entry_script=Path("e.py"), run_tag="rt", logger=make_logger(tmp_path))
+
+    assert stage.items == [f"fold_{i}_seed{s}" for i in range(5) for s in (1, 2)]
+
+    job = stage._job("fold_3_seed2")
+    assert job.command[job.command.index("--fold") + 1] == "3"
+    assert job.command[job.command.index("--seed") + 1] == "2"
+    assert job.log_path == stage.stage_dir / "fold_3_seed2" / stage.cached_logname
 
 
 def test_training_stage_subdir_and_results_path(tmp_path):
@@ -172,17 +188,19 @@ def test_report_stage_invokes_collector_and_report(tmp_path, monkeypatch):
 
     class FakeCollector:
         def __init__(self, run_dir, splits, logger):
-            seen["splits"] = splits
+            seen["splits"]       = splits
+            self.seed_dispersion = {}
 
         def collect_by_split(self):
             return ["base"], {"test": ["rec"]}
 
     class FakeReport:
-        def __init__(self, base_records, records_by_split, planner, out_dir, model_name, embed_images, logger):
+        def __init__(self, base_records, records_by_split, planner, out_dir, model_name, embed_images, logger, seed_dispersion=None):
             seen["base_records"]     = base_records
             seen["records_by_split"] = records_by_split
             seen["model_name"]       = model_name
             seen["out_dir"]          = out_dir
+            seen["seed_dispersion"]  = seed_dispersion
 
         def write_all(self):
             seen["wrote"] = True
@@ -212,13 +230,14 @@ def test_report_stage_model_name_for_profile_autoencoder(tmp_path, monkeypatch):
 
     class FakeCollector:
         def __init__(self, run_dir, splits, logger):
-            seen["splits"] = splits
+            seen["splits"]       = splits
+            self.seed_dispersion = {}
 
         def collect_by_split(self):
             return [], {}
 
     class FakeReport:
-        def __init__(self, base_records, records_by_split, planner, out_dir, model_name, embed_images, logger):
+        def __init__(self, base_records, records_by_split, planner, out_dir, model_name, embed_images, logger, seed_dispersion=None):
             seen["model_name"] = model_name
 
         def write_all(self):

@@ -6,6 +6,7 @@ from pathlib     import Path
 from configuration.cross_validation import CrossValidationConfig
 from configuration.inference import InferenceConfig
 from pipelines.shared.config_factory                   import ConfigFactory
+from pipelines.shared.seed_sweep                       import SeedSet
 from tools.data.regions                                import CropRegion, SplitRegions
 
 
@@ -98,8 +99,22 @@ class FoldNaming:
         return f"fold_{index}"
 
     @staticmethod
+    def run_name(index: int, seed: int | None) -> str:
+        base = FoldNaming.name(index)
+        return base if seed is None else SeedSet.run_name(base, seed)
+
+    @staticmethod
+    def base(name: str) -> str:
+        return name.split("_seed")[0]
+
+    @staticmethod
     def index(name: str) -> int:
-        return int(name.split("_")[-1])
+        return int(FoldNaming.base(name).split("_")[-1])
+
+    @staticmethod
+    def seed(name: str) -> int | None:
+        parts = name.split("_seed")
+        return int(parts[1]) if len(parts) == 2 else None
 
 
 class FoldConfigFactory(ConfigFactory):
