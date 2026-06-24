@@ -67,6 +67,23 @@ class AblationCatalog:
         ]
 
     @classmethod
+    def _normalization_features(cls) -> list[dict]:
+        return [
+            {
+                "label"   : "normalization",
+                "group"   : "normalization",
+                "enable"  : {"normalization.input_strategy": "per_slot", "normalization.output_strategy": "per_slot"},
+                "degrade" : {"normalization.input_strategy": "zscore",   "normalization.output_strategy": "zscore"},
+            },
+            {
+                "label"   : "output_clamp",
+                "group"   : "normalization",
+                "enable"  : {"normalization.clamp_output": True},
+                "degrade" : {"normalization.clamp_output": False},
+            },
+        ]
+
+    @classmethod
     def _loss_toggle(cls, label: str, use_key: str, weight_key: str, weight: float) -> dict:
         prefix = cls.WARMUP_PREFIX
 
@@ -80,7 +97,7 @@ class AblationCatalog:
     @classmethod
     def features(cls) -> list[dict]:
         loss_terms = [cls._loss_toggle(label, use_key, weight_key, weight) for label, use_key, weight_key, weight in cls.LOSS_TERMS]
-        return cls._slot_features() + cls._structural_features() + loss_terms
+        return cls._slot_features() + cls._structural_features() + cls._normalization_features() + loss_terms
 
     @classmethod
     def as_dict(cls) -> dict:

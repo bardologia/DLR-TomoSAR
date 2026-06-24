@@ -284,6 +284,19 @@ def test_ablation_catalog_as_dict_covers_loss_terms():
     assert swap["degrade"]["curriculum.warmup.use_l1_curve"]  is True
 
 
+def test_ablation_catalog_covers_normalization_and_clamp():
+    catalog = AblationCatalog.as_dict()
+
+    norm = catalog["normalization"]
+    assert norm["enable"]["normalization.input_strategy"]   == "per_slot"
+    assert norm["degrade"]["normalization.input_strategy"]  == "zscore"
+    assert norm["degrade"]["normalization.output_strategy"] == "zscore"
+
+    clamp = catalog["output_clamp"]
+    assert clamp["enable"]["normalization.clamp_output"]  is True
+    assert clamp["degrade"]["normalization.clamp_output"] is False
+
+
 @pytest.mark.real_data
 def test_input_from_dataset_uses_full_stack(test_data_dir):
     from configuration.sar.geometry_config import GeometryConfig

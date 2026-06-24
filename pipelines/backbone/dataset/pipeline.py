@@ -193,6 +193,7 @@ class DatasetPipeline:
             n_secondaries    = train_ds.n_secondaries,
             n_interferograms = train_ds.n_interferograms,
             n_gaussians      = self.config.n_gaussians,
+            normalization    = self.config.normalization,
             num_workers      = self.config.num_workers,
             max_samples      = 4000,
         )

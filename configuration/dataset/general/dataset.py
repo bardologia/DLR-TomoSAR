@@ -6,7 +6,7 @@ from typing      import Literal, Optional, Sequence, Tuple
 
 import numpy as np
 
-from configuration.normalization.general import ChannelStrategy
+from configuration.normalization.general import ChannelStrategy, NormalizationConfig
 from tools.data.representation      import Representation
 from tools.data.regions             import SplitRegions
 
@@ -193,6 +193,7 @@ class DatasetConfig:
     patch            : PatchConfig               = field(default_factory=PatchConfig)
     input_config     : InputConfig               = field(default_factory=InputConfig)
     output_config    : OutputConfig              = field(default_factory=OutputConfig)
+    normalization    : NormalizationConfig       = field(default_factory=NormalizationConfig)
     augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)
 
     batch_size      : int                  = 8

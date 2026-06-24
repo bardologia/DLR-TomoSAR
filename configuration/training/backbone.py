@@ -8,6 +8,7 @@ from configuration.dataset                       import InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
+from configuration.normalization.general        import NormalizationConfig
 from configuration.training.general.ablation    import AblationCatalog
 from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
@@ -154,6 +155,7 @@ class BackboneEntryConfig:
     overfit    : OverfitConfig        = field(default_factory=OverfitConfig)
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
     input      : InputConfig          = field(default_factory=InputConfig.full_stack)
+    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
 
     probe_enabled    : bool = False
     probe_n_batches  : int  = 1000

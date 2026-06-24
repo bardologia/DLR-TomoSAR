@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, PatchConfig, SplitRegions
+from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.normalization import NormalizationConfig, Presets
 from configuration.inference import InferenceConfig
 from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
@@ -31,6 +32,17 @@ class ConfigFactory:
     def benchmark_input_config(self) -> InputConfig:
         return InputConfig.full_stack()
 
+    def _normalization(self) -> NormalizationConfig:
+        return getattr(self.config, "normalization", NormalizationConfig())
+
+    def _output_config(self) -> OutputConfig:
+        norm = self._normalization()
+        if norm.output_strategy == "per_slot":
+            return OutputConfig()
+
+        strategy = Presets.by_name(norm.output_strategy)
+        return OutputConfig(output_strategies={"out/amp": strategy, "out/mu": strategy, "out/sigma": strategy})
+
     def training_dataset_config(self) -> DatasetConfig:
         crop     = self.global_crop()
         training = self.config.training
@@ -48,6 +60,8 @@ class ConfigFactory:
             secondary_labels            = self._secondary_labels(),
             patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
             input_config    = self.benchmark_input_config(),
+            output_config   = self._output_config(),
+            normalization   = self._normalization(),
             batch_size      = training.batch_size,
             num_workers     = training.num_workers,
             prefetch_factor = training.prefetch_factor,
@@ -74,7 +88,9 @@ class ConfigFactory:
                 test  = overfit_crop,
             ),
 
-            input_config = self.benchmark_input_config(),
+            input_config  = self.benchmark_input_config(),
+            output_config = self._output_config(),
+            normalization = self._normalization(),
 
             augmentation = AugmentationConfig(
                 p_flip_h    = 0.0,

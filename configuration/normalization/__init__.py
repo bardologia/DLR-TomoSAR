@@ -3,4 +3,6 @@ from configuration.normalization.general import (
     ChannelStrategy,
     Presets,
     ChannelStats,
+    OutputClampConfig,
+    NormalizationConfig,
 )

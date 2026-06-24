@@ -15,8 +15,10 @@ class Log1pTransform:
         return np.log1p(np.maximum(x, 0.0))
 
     @staticmethod
-    def decompress(x, ceil: float = CEIL):
+    def decompress(x, floor: float = 0.0, ceil: float = CEIL, enabled: bool = True):
         if isinstance(x, torch.Tensor):
-            return torch.expm1(torch.clamp(x, min=0.0, max=ceil))
+            bounded = torch.clamp(x, min=floor, max=ceil) if enabled else x
+            return torch.expm1(bounded)
 
-        return np.expm1(np.clip(x, 0.0, ceil))
+        bounded = np.clip(x, floor, ceil) if enabled else x
+        return np.expm1(bounded)

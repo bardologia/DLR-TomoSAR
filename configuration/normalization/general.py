@@ -70,6 +70,28 @@ class Presets:
     ZSCORE           = ChannelStrategy(NormMethod.ZSCORE,       apply_log1p=False)
     ZSCORE_LOG1P     = ChannelStrategy(NormMethod.ZSCORE,       apply_log1p=True)
 
+    @classmethod
+    def names(cls) -> list[str]:
+        return ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"]
+
+    @classmethod
+    def by_name(cls, name: str) -> ChannelStrategy:
+        table = {
+            "min_max"          : cls.MIN_MAX,
+            "min_max_log1p"    : cls.MIN_MAX_LOG1P,
+            "robust_iqr"       : cls.ROBUST_IQR,
+            "robust_iqr_log1p" : cls.ROBUST_IQR_LOG1P,
+            "fixed_div_pi"     : cls.FIXED_DIV_PI,
+            "zscore"           : cls.ZSCORE,
+            "zscore_log1p"     : cls.ZSCORE_LOG1P,
+        }
+
+        key = name.strip().lower()
+        if key not in table:
+            raise ValueError(f"Unknown normalization preset '{name}'; valid presets are {cls.names()} or 'per_slot'")
+
+        return table[key]
+
 
 _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
     "pass/mag"        : Presets.ROBUST_IQR_LOG1P,
@@ -88,6 +110,39 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
 
     "dem/elevation"   : Presets.ROBUST_IQR_LOG1P,
 }
+
+
+@dataclass
+class OutputClampConfig:
+    enabled : bool  = True
+    floor   : float = 0.0
+    ceil    : float = 80.0
+
+    def as_dict(self) -> dict:
+        return {"enabled": self.enabled, "floor": self.floor, "ceil": self.ceil}
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "OutputClampConfig":
+        return cls(enabled=bool(payload["enabled"]), floor=float(payload["floor"]), ceil=float(payload["ceil"]))
+
+
+@dataclass
+class NormalizationConfig:
+    input_strategy  : str = "per_slot"
+    output_strategy : str = "per_slot"
+
+    clamp_output : bool  = True
+    clamp_floor  : float = 0.0
+    clamp_ceil   : float = 80.0
+
+    def strategy(self, which: str, slot_key: str) -> ChannelStrategy:
+        name = self.input_strategy if which == "input" else self.output_strategy
+        if name == "per_slot":
+            return ChannelStrategy.from_slot(slot_key)
+        return Presets.by_name(name)
+
+    def clamp(self) -> OutputClampConfig:
+        return OutputClampConfig(enabled=self.clamp_output, floor=self.clamp_floor, ceil=self.clamp_ceil)
 
 
 @dataclass

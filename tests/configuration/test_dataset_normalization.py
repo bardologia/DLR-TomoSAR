@@ -18,6 +18,8 @@ from configuration.normalization import (
     ChannelStrategy,
     Presets,
     ChannelStats,
+    NormalizationConfig,
+    OutputClampConfig,
 )
 from configuration.normalization.general import _SLOT_STRATEGIES
 
@@ -75,6 +77,40 @@ def test_output_config_round_trips_through_dict():
 def test_output_config_strategy_for_known_key():
     cfg = OutputConfig()
     assert isinstance(cfg.strategy_for("out/amp"), ChannelStrategy)
+
+
+def test_presets_by_name_resolves_and_rejects():
+    assert Presets.by_name("zscore").norm_method            is NormMethod.ZSCORE
+    assert Presets.by_name("robust_iqr_log1p").apply_log1p  is True
+
+    with pytest.raises(ValueError):
+        Presets.by_name("not_a_preset")
+
+
+def test_normalization_config_per_slot_matches_slot_defaults():
+    cfg = NormalizationConfig()
+    assert cfg.input_strategy  == "per_slot"
+    assert cfg.output_strategy == "per_slot"
+    assert cfg.strategy("input", "pass/mag")  == _SLOT_STRATEGIES["pass/mag"]
+    assert cfg.strategy("output", "out/amp")  == _SLOT_STRATEGIES["out/amp"]
+
+
+def test_normalization_config_named_preset_overrides_every_slot():
+    cfg = NormalizationConfig(input_strategy="zscore", output_strategy="zscore")
+    assert cfg.strategy("input", "pass/mag").norm_method  is NormMethod.ZSCORE
+    assert cfg.strategy("output", "out/amp").norm_method  is NormMethod.ZSCORE
+
+
+def test_normalization_clamp_round_trips_through_dict():
+    cfg   = NormalizationConfig(clamp_output=False, clamp_floor=0.0, clamp_ceil=50.0)
+    clamp = cfg.clamp()
+
+    assert isinstance(clamp, OutputClampConfig)
+    assert clamp.enabled is False
+    assert clamp.ceil    == 50.0
+
+    rebuilt = OutputClampConfig.from_dict(clamp.as_dict())
+    assert rebuilt == clamp
 
 
 def test_patch_config_defaults():

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib     import Path
 from typing      import Optional, Union
 
@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from configuration.dataset import InputConfig, OutputConfig
-from configuration.normalization import ChannelStats, ChannelStrategy, NormMethod
+from configuration.normalization import ChannelStats, ChannelStrategy, NormalizationConfig, NormMethod, OutputClampConfig
 from tools.data.io                     import FileIO
 from tools.data.sampling               import Sampler
 from tools.data.transforms             import Log1pTransform
@@ -24,6 +24,7 @@ Array = Union[np.ndarray, torch.Tensor]
 class Stats:
     input_stats  : Optional[ChannelStats] = None
     output_stats : Optional[ChannelStats] = None
+    clamp        : OutputClampConfig      = field(default_factory=OutputClampConfig)
 
     def save(self, directory: Path) -> Path:
         directory = Path(directory)
@@ -32,6 +33,7 @@ class Stats:
         payload = {
             "input_stats"  : self.input_stats.as_dict()  if self.input_stats  else None,
             "output_stats" : self.output_stats.as_dict() if self.output_stats else None,
+            "clamp"        : self.clamp.as_dict(),
         }
 
         return FileIO.save_json(payload, out_path, indent=4)
@@ -46,15 +48,17 @@ class Stats:
 
         input_stats  = ChannelStats.from_dict(payload["input_stats"])
         output_stats = ChannelStats.from_dict(payload["output_stats"])
+        clamp        = OutputClampConfig.from_dict(payload["clamp"])
 
         logger.section("[Normalization stats loaded]")
         logger.kv_table({
             "Stats path":      path,
             "Input channels":  input_stats.n_channels,
             "Output channels": output_stats.n_channels,
+            "Output clamp":    f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
         })
 
-        return cls(input_stats = input_stats, output_stats = output_stats)
+        return cls(input_stats = input_stats, output_stats = output_stats, clamp = clamp)
 
     @classmethod
     def merge(cls, input_only: "Stats", output_only: "Stats") -> "Stats":
@@ -101,6 +105,7 @@ class StatsComputer:
     def _collect(
         subset,
         group_keys         : list[str],
+        strategies         : dict[str, ChannelStrategy],
         num_workers        : int,
         batch_size         : int,
         max_vals_per_group : int = 1_000_000,
@@ -108,7 +113,7 @@ class StatsComputer:
 
         unique_groups  = list(dict.fromkeys(group_keys))
         group_channels = {g: [i for i, k in enumerate(group_keys) if k == g] for g in unique_groups}
-        needs_data     = {g for g in unique_groups if ChannelStrategy.from_slot(g).norm_method is not NormMethod.FIXED_DIV_PI}
+        needs_data     = {g for g in unique_groups if strategies[g].norm_method is not NormMethod.FIXED_DIV_PI}
 
         collected: dict[str, list[np.ndarray]] = {g: [] for g in needs_data}
         if not collected:
@@ -145,9 +150,9 @@ class StatsComputer:
         return {g: np.concatenate(v) for g, v in collected.items() if v}
 
     @staticmethod
-    def _fit_input(logger : Logger, group_keys : list[str], collected : dict[str, np.ndarray]) -> ChannelStats:
+    def _fit_input(logger : Logger, group_keys : list[str], strategies : dict[str, ChannelStrategy], collected : dict[str, np.ndarray]) -> ChannelStats:
         unique_groups    = list(dict.fromkeys(group_keys))
-        group_strategies = {g: ChannelStrategy.from_slot(g) for g in unique_groups}
+        group_strategies = strategies
 
         group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected.get(g, np.array([]))) for g in unique_groups}
 
@@ -184,10 +189,13 @@ class StatsComputer:
         input_config     : InputConfig,
         n_secondaries    : int,
         n_interferograms : int,
+        normalization    : NormalizationConfig = None,
         max_samples      : int = 0,
         num_workers      : int = 4,
         batch_size       : int = 512,
     ) -> Stats:
+
+        normalization = normalization if normalization is not None else NormalizationConfig()
 
         logger.section("[Input Normalization Statistics]")
         subset, n_use, n_total = StatsComputer._get_subset(dataset, max_samples)
@@ -196,7 +204,7 @@ class StatsComputer:
         in_channels = int(in_first.shape[0])
 
         logger.kv_table({
-            "Strategy":       "auto-selected per slot-kind (grouped across passes/ifgs)",
+            "Strategy":       f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)",
             "Samples":        f"{n_use:,} / {n_total:,}",
             "Input channels": in_channels,
         })
@@ -204,12 +212,15 @@ class StatsComputer:
         group_keys = StatsComputer._input_to_group(input_config, n_secondaries, n_interferograms)
         assert len(group_keys) == in_channels, (f"Group key count ({len(group_keys)}) != tensor channels ({in_channels})")
 
+        strategies = {g: normalization.strategy("input", g) for g in dict.fromkeys(group_keys)}
+
         logger.section("[Input grouping by slot-kind]")
         StatsComputer._log_grouping(logger, "Input", group_keys)
 
         collected = StatsComputer._collect(
             subset      = subset,
             group_keys  = group_keys,
+            strategies  = strategies,
             num_workers = num_workers,
             batch_size  = batch_size,
         )
@@ -217,6 +228,7 @@ class StatsComputer:
         input_stats = StatsComputer._fit_input(
             logger     = logger,
             group_keys = group_keys,
+            strategies = strategies,
             collected  = collected,
         )
 
@@ -348,12 +360,14 @@ class StatsComputer:
         n_secondaries    : int,
         n_interferograms : int,
         n_gaussians      : int,
+        normalization    : NormalizationConfig = None,
         max_samples      : int = 0,
         num_workers      : int = 4,
         batch_size       : int = 512,
     ) -> Stats:
 
-        detached = StatsComputer._detach_augmenters(dataset)
+        normalization = normalization if normalization is not None else NormalizationConfig()
+        detached      = StatsComputer._detach_augmenters(dataset)
 
         try:
             input_only = StatsComputer.compute_input_stats(
@@ -362,6 +376,7 @@ class StatsComputer:
                 input_config     = input_config,
                 n_secondaries    = n_secondaries,
                 n_interferograms = n_interferograms,
+                normalization    = normalization,
                 num_workers      = num_workers,
                 max_samples      = max_samples,
                 batch_size       = batch_size,
@@ -376,7 +391,9 @@ class StatsComputer:
             logger        = logger,
         )
 
-        return Stats.merge(input_only, output_only)
+        merged       = Stats.merge(input_only, output_only)
+        merged.clamp = normalization.clamp()
+        return merged
 
 
 class Normalizer:
@@ -411,6 +428,7 @@ class Normalizer:
     def _apply_normalization(self, tensor: Array, stats: ChannelStats, inverse: bool) -> Array:
         is_torch = isinstance(tensor, torch.Tensor)
         vectors  = self._channel_vectors(stats)
+        clamp    = self.stats.clamp
 
         shape    = (1, -1, 1, 1) if tensor.ndim == 4 else (-1, 1, 1)
 
@@ -426,7 +444,7 @@ class Normalizer:
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
-                out = torch.where(log1p, Log1pTransform.decompress(x), x)
+                out = torch.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
 
             return out
 
@@ -440,7 +458,7 @@ class Normalizer:
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
-            out = np.where(log1p, Log1pTransform.decompress(x), x)
+            out = np.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
