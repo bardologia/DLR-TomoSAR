@@ -106,6 +106,7 @@ class Trainer(BaseTrainer):
     def _compute_loss(self, batch) -> dict:
         images    = batch[0].to(self.device)
         gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
+        kz_map    = batch[2].to(self.device) if len(batch) > 2 and batch[2] is not None else None
 
         if self.tracker.debug:
             self._warn_nonfinite(images, "input images")
@@ -116,14 +117,15 @@ class Trainer(BaseTrainer):
         if self.tracker.debug:
             self._warn_nonfinite(pred_params, "model predictions")
 
-        return self.criterion(pred_params, gt_params)
+        return self.criterion(pred_params, gt_params, kz_map)
 
     def _eval_step(self, batch, aggregator: MetricAggregator) -> dict:
         images    = batch[0].to(self.device)
         gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
+        kz_map    = batch[2].to(self.device) if len(batch) > 2 and batch[2] is not None else None
 
         pred_output = self.model(images)
-        loss_dict   = self.criterion(pred_output, gt_params)
+        loss_dict   = self.criterion(pred_output, gt_params, kz_map)
 
         return loss_dict
 

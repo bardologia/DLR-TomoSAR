@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib     import Path
 from typing      import Optional, Tuple
 
+import numpy as np
 from torch.utils.data import DataLoader
 
 from configuration.dataset import DatasetConfig
@@ -15,6 +16,7 @@ from pipelines.backbone.dataset.normalization import Normalizer, StatsComputer
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
 from tools.data.io                            import FileIO
 from tools.monitoring.logger                  import Logger
+from tools.sar                                import GeometryField
 
 
 class MetadataWriter:
@@ -69,10 +71,11 @@ class MetadataWriter:
 
 
 class DatasetPipeline:
-    def __init__(self, config : DatasetConfig, training_run_directory : Path, logger : Logger | None = None, seed : int = 0) -> None:
+    def __init__(self, config : DatasetConfig, training_run_directory : Path, logger : Logger | None = None, seed : int = 0, height_axis_convention : str = "height", build_geometry_field : bool = False) -> None:
         self.config                 = config
         self.training_run_directory = Path(training_run_directory)
         self.seed                   = int(seed)
+        self.height_axis_convention = height_axis_convention
 
         log_dir = self.training_run_directory / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -82,6 +85,7 @@ class DatasetPipeline:
         self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
         self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed)
+        self.geometry_field  = self._load_geometry_field() if build_geometry_field else None
 
         ic = config.input_config
         oc = config.output_config
@@ -105,6 +109,29 @@ class DatasetPipeline:
     @property
     def profile_length(self) -> int:
         return self.layout.profile_length
+
+    def _load_geometry_field(self) -> GeometryField:
+        path = Path(self.config.preprocessing_run_directory) / "meta" / GeometryField.FILENAME
+
+        if not path.is_file():
+            raise FileNotFoundError(f"A per-pixel physics-geometry loss term is active but {path} is missing; run scripts/backfill_geometry_field.py for this dataset first.")
+
+        field = GeometryField.load(path).subset(self.config.secondary_labels)
+
+        self.logger.section("[Per-Pixel Geometry Field Loaded]")
+        self.logger.kv_table(field.describe(), title="Geometry Field")
+        self.logger.subsection(f"Height-axis convention : {self.height_axis_convention}")
+
+        return field
+
+    def _region_kz_field(self, region: CropRegion) -> Optional[np.ndarray]:
+        if self.geometry_field is None:
+            return None
+
+        azimuth_slice, range_slice = region.local_slices(self.layout.global_crop)
+        region_field               = self.geometry_field.slice(azimuth_slice, range_slice)
+
+        return region_field.kz(self.height_axis_convention).astype(np.float32)
 
     def _build_dataset(self, split_name : str, normalizer : Optional[Normalizer] = None):
         regions  = self.config.split_regions.regions(split_name)
@@ -136,6 +163,7 @@ class DatasetPipeline:
                 n_gaussians      = self.config.n_gaussians,
                 augmenter        = self.augmenter,
                 dem              = arrays.get("dem") if self.config.input_config.use_dem else None,
+                kz_field         = self._region_kz_field(region),
             )
 
             parts.append(part)

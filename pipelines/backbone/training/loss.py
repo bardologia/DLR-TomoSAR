@@ -176,9 +176,18 @@ class Loss:
 
         return pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves
 
-    def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys) -> dict:
+    def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map) -> dict:
         lc = CurveLoss
         pc = PhysicalLoss
+
+        if kz_map is not None:
+            coherence_resyn  = lambda: pc.coherence_resynthesis_pp(pred_curves, exp_curves, kz_map, self.x_axis, self.dx, cfg.physics_floor)
+            covariance_match = lambda: pc.covariance_matching_pp(pred_curves, exp_curves, kz_map, self.x_axis, self.dx, cfg.physics_floor)
+            capon_cycle      = lambda: pc.capon_cycle_pp(pred_curves, exp_curves, kz_map, self.x_axis, self.dx, cfg.capon_loading, cfg.physics_floor)
+        else:
+            coherence_resyn  = lambda: pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor)
+            covariance_match = lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor)
+            capon_cycle      = lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor)
 
         return {
             "mse_curve":          lambda: lc.mse_diff(diff),
@@ -190,9 +199,9 @@ class Loss:
             "ssim_curve":         lambda: lc.ssim(pred_curves, exp_curves, cfg.ssim_window_size, cfg.ssim_sigma, cfg.ssim_data_range, cfg.ssim_k1, cfg.ssim_k2, cfg.ssim_axis),
             "total_power_relerr": lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor),
             "moments":            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights),
-            "coherence_resyn":    lambda: pc.coherence_resynthesis(pred_curves, exp_curves, self.geometry.steering, self.dx, cfg.physics_floor),
-            "covariance_match":   lambda: pc.covariance_matching(pred_curves, exp_curves, self.geometry.outer, self.dx, cfg.physics_floor),
-            "capon_cycle":        lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor),
+            "coherence_resyn":    coherence_resyn,
+            "covariance_match":   covariance_match,
+            "capon_cycle":        capon_cycle,
             "param_huber":        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0],
             "param_mse":          lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "mse")[0],
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
@@ -264,17 +273,20 @@ class Loss:
 
         return out
 
-    def __call__(self, pred_output, gt_params):
+    def __call__(self, pred_output, gt_params, kz_map=None):
         cfg = self.loss_cfg
 
         pred_params, presence_logits = GaussianHead.split(pred_output, self.gaussian_cfg.params_per_gaussian, self.gaussian_cfg.n_default_gaussians)
 
         pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_params, gt_params)
 
+        if kz_map is not None:
+            kz_map = kz_map.to(device=pred_curves.device, dtype=pred_curves.dtype)
+
         needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
         diff       = (pred_curves - exp_curves) if needs_diff else None
 
-        computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys)
+        computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map)
 
         components : dict = {}
         weighted   : dict = {}

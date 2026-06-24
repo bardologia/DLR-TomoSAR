@@ -88,6 +88,33 @@ def test_training_pipeline_end_to_end_produces_checkpoint(test_data_dir, params_
 
 @pytest.mark.real_data
 @pytest.mark.slow
+def test_training_pipeline_runs_per_pixel_physics_geometry(test_data_dir, params_dir, tmp_path):
+    dataset_config = _dataset_config(test_data_dir, params_dir)
+    trainer_config = _trainer_config(test_data_dir, tmp_path)
+
+    trainer_config.curriculum.warmup.use_covariance_match    = True
+    trainer_config.curriculum.warmup.weight_covariance_match = 1.0
+    trainer_config.geometry.height_axis_convention           = "height"
+
+    pipeline = TrainingPipeline(
+        trainer_config = trainer_config,
+        dataset_config = dataset_config,
+        backbone_name  = "resunet",
+        model_config   = None,
+        seed           = 0,
+        run_name       = "pipeline_physics",
+    )
+
+    train_losses, val_losses, best_val = pipeline.run(probe_config=None)
+
+    assert pipeline.dataset_pipeline.geometry_field is not None
+    assert pipeline.dataset_pipeline.geometry_field.n_tracks == 3
+    assert (pipeline.run_metadata.run_directory / "best_model.pt").exists()
+    assert len(train_losses) == 1
+
+
+@pytest.mark.real_data
+@pytest.mark.slow
 def test_training_pipeline_saves_configs(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
     trainer_config = _trainer_config(test_data_dir, tmp_path)

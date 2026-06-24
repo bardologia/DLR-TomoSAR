@@ -23,29 +23,29 @@ class SpatialAugmenter:
             title="Augmentation Config",
         )
 
-    def _flip_horizontal(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _flip_horizontal(self, tensors: list) -> list:
         if self._rng.random() >= self.config.p_flip_h:
-            return input_tensor, gt_params
+            return tensors
 
         sl = (Ellipsis, slice(None), slice(None, None, -1))
 
-        return input_tensor[sl], gt_params[sl]
+        return [tensor[sl] for tensor in tensors]
 
-    def _flip_vertical(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _flip_vertical(self, tensors: list) -> list:
         if self._rng.random() >= self.config.p_flip_v:
-            return input_tensor, gt_params
+            return tensors
 
         sl = (Ellipsis, slice(None, None, -1), slice(None))
 
-        return input_tensor[sl], gt_params[sl]
+        return [tensor[sl] for tensor in tensors]
 
-    def _rotate90(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _rotate90(self, tensors: list) -> list:
         if self.config.p_rot90 <= 0.0 or self._rng.random() >= self.config.p_rot90:
-            return input_tensor, gt_params
+            return tensors
 
         k = int(self._rng.integers(1, 4))
 
-        return np.rot90(input_tensor, k=k, axes=(-2, -1)), np.rot90(gt_params, k=k, axes=(-2, -1))
+        return [np.rot90(tensor, k=k, axes=(-2, -1)) for tensor in tensors]
 
     def add_noise(self, normalized_input: np.ndarray) -> np.ndarray:
         if self._rng.random() >= self.config.p_noise:
@@ -59,12 +59,18 @@ class SpatialAugmenter:
         self.seed = int(seed)
         self._rng = np.random.default_rng(self.seed)
 
-    def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        input_tensor, gt_params = self._flip_horizontal(input_tensor, gt_params)
-        input_tensor, gt_params = self._flip_vertical(input_tensor,   gt_params)
-        input_tensor, gt_params = self._rotate90(input_tensor,        gt_params)
+    def __call__(self, input_tensor: np.ndarray, gt_params: np.ndarray, geometry: np.ndarray | None = None):
+        tensors = [input_tensor, gt_params] if geometry is None else [input_tensor, gt_params, geometry]
 
-        input_tensor = np.ascontiguousarray(input_tensor)
-        gt_params    = np.ascontiguousarray(gt_params)
+        tensors = self._flip_horizontal(tensors)
+        tensors = self._flip_vertical(tensors)
 
-        return input_tensor, gt_params
+        if geometry is None:
+            tensors = self._rotate90(tensors)
+
+        tensors = [np.ascontiguousarray(tensor) for tensor in tensors]
+
+        if geometry is None:
+            return tensors[0], tensors[1]
+
+        return tensors[0], tensors[1], tensors[2]

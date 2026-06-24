@@ -24,6 +24,14 @@ from tools.monitoring.logger                 import Logger
 from tools.runtime.reproducibility           import Reproducibility
 
 
+def physics_geometry_active(trainer_config) -> bool:
+    curriculum = trainer_config.curriculum
+    loss_cfgs  = [curriculum.warmup] + ([curriculum.complete] if curriculum.enabled else [])
+    flags      = ("use_coherence_resyn", "use_covariance_match", "use_capon_cycle")
+
+    return any(getattr(cfg, flag, False) for cfg in loss_cfgs for flag in flags)
+
+
 class TrainingPipeline:
     def __init__(
         self,
@@ -59,6 +67,8 @@ class TrainingPipeline:
             training_run_directory = self.run_metadata.run_directory,
             logger                 = self.logger,
             seed                   = self.seed,
+            height_axis_convention = trainer_config.geometry.height_axis_convention,
+            build_geometry_field   = physics_geometry_active(trainer_config),
         )
 
     def _build_model(self, in_channels: int, out_channels: int):
@@ -167,7 +177,7 @@ class SingleTrainRunner:
         gaussian_cfg               = trainer_config.gaussian
         dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
 
-        dataset_pipeline      = DatasetPipeline(config=dataset_config, training_run_directory=work_dir, logger=logger, seed=self.config.seed)
+        dataset_pipeline      = DatasetPipeline(config=dataset_config, training_run_directory=work_dir, logger=logger, seed=self.config.seed, height_axis_convention=trainer_config.geometry.height_axis_convention, build_geometry_field=physics_geometry_active(trainer_config))
         profile_length        = dataset_pipeline.layout.profile_length
         dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
 

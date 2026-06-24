@@ -68,6 +68,24 @@ def test_patchdataset_no_nan_in_any_sample(interferograms, parameters):
 
 
 @pytest.mark.real_data
+def test_patchdataset_attaches_aligned_kz_field(interferograms, parameters):
+    ds, patcher = _backbone_dataset(interferograms, parameters, split_name="val")
+
+    n_tracks    = 5
+    kz          = np.random.default_rng(0).standard_normal((n_tracks, 24, 24)).astype(np.float32)
+    ds.kz_field = kz
+
+    sample = ds[0]
+
+    assert len(sample) == 3
+
+    x, y, kz_patch = sample
+
+    assert kz_patch.shape == (n_tracks, 8, 8)
+    np.testing.assert_array_equal(kz_patch, patcher.extract(kz, 0))
+
+
+@pytest.mark.real_data
 def test_patchdataset_angle_channels_in_pi_range(interferograms, parameters):
     ds, _ = _backbone_dataset(interferograms, parameters)
 
