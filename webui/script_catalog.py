@@ -73,6 +73,12 @@ class ScriptCatalog:
             "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
             "essentials": ["runs_dir", "run_tags"],
         },
+        "xray_weights": {
+            "title"     : "X-Ray Weights",
+            "category"  : "Analysis",
+            "purpose"   : "Diagnose any model checkpoint: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics.",
+            "essentials": ["checkpoint_path", "output_dir", "checkpoint_filename", "make_plots", "dead_abs_threshold", "rank_ratio_warn"],
+        },
         "tune": {
             "title"     : "Tune",
             "category"  : "Experiments",
@@ -101,6 +107,7 @@ class ScriptCatalog:
         "tune",
         "tune_dataloader",
         "compare_trials",
+        "xray_weights",
     ]
 
     GROUPS = {

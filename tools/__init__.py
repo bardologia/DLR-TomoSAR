@@ -2,6 +2,7 @@ from .monitoring    import Logger, NullLogger, NullTracker, ResourceMonitor, Tra
 from .reporting     import MarkdownDoc, MarkdownTable, MetricSectionGrouper, PlotBase, ReportAssets
 from .metrics       import FiniteScalar, MetricOrientation, R2, RelativeImprovement
 from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, BackboneModelConfigIO, ProfileNormalizer, ProfilePreprocessor, SplitRegions
+from .diagnostics   import IssueDetector, LayerReport, StateDictResolver, WeightAnalyzer, WeightXray, XraySummarizer
 from .training      import BaseTrainer, Checkpoint, EarlyStopping, GradientClipper, MetricAggregator, OverfitManager, Scheduler, Warmup
 from .orchestration import ExperimentStage, GpuJob, GpuJobResult, GpuQueue, ProcessPoolRunner, QueuedInferenceStage, QueuedTrainingStage
 from .runtime       import CondaEnv, CondaJobDispatcher, Reproducibility, WorkerInitializer
@@ -24,6 +25,12 @@ __all__ = [
     "SplitRegions",
     "FileIO",
     "BackboneModelConfigIO",
+    "IssueDetector",
+    "LayerReport",
+    "StateDictResolver",
+    "WeightAnalyzer",
+    "WeightXray",
+    "XraySummarizer",
     "ExperimentStage",
     "GpuJob",
     "GpuJobResult",
