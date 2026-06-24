@@ -16,7 +16,7 @@ const grid = (cells, build) => {
 window.FLOW_SKETCHES = {
 
   slc_load: {
-    tip: "The master loads as an RGI-SLC range-Doppler image while each secondary arrives as an INF-SLC already co-registered and carrying its own DEM-predicted phase.",
+    tip: "Master is an RGI-SLC; each secondary is a co-registered INF-SLC carrying its DEM-predicted phase.",
     build(svg) { svg.innerHTML = `
       <rect x="34" y="36" width="50" height="80" rx="3" class="skl-pop f-meas"/>
       <text x="59" y="128" text-anchor="middle" style="fill:#6ea8ff;font-size:8px">master</text>
@@ -29,7 +29,7 @@ window.FLOW_SKETCHES = {
   },
 
   baselines: {
-    tip: "Horizontal and vertical track positions are averaged over the azimuth window and re-expressed relative to track 0, aborting if any per-track position std exceeds 5 metres.",
+    tip: "Track positions are averaged over azimuth and referenced to track 0; aborts if any std exceeds 5 m.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="40" y1="116" x2="206" y2="116"/>
       <line class="skl-axis" x1="40" y1="116" x2="40" y2="28"/>
@@ -45,7 +45,7 @@ window.FLOW_SKETCHES = {
   },
 
   deramp: {
-    tip: "Multiplying each secondary by exp(j phi_DEM) cancels the DEM-predicted terrain ramp under the later conjugation, leaving only sub-resolution elevation structure.",
+    tip: "Multiplying by exp(j phi_DEM) cancels the terrain ramp, leaving only sub-resolution structure.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="120" x2="214" y2="120"/>
       <line class="skl-dash c-faint" x1="28" y1="112" x2="150" y2="46"/>
@@ -57,7 +57,7 @@ window.FLOW_SKETCHES = {
   },
 
   crossprod: {
-    tip: "Conjugating the deramped secondary against the master subtracts its phase, and because conjugation flips the DEM sign the term phi_DEM is effectively removed from arg(c_i).",
+    tip: "Conjugating the secondary against the master subtracts its phase and removes phi_DEM from arg(c_i).",
     build(svg) { svg.innerHTML = `
       <circle cx="120" cy="78" r="44" class="skl-axis" style="fill:none;opacity:.5"/>
       <line class="skl-axis" x1="68" y1="78" x2="172" y2="78"/>
@@ -74,7 +74,7 @@ window.FLOW_SKETCHES = {
   },
 
   phasor: {
-    tip: "Dividing by |c_i| floored at 1e-30 collapses every cross-product onto the unit circle, equalising inter-pass amplitude while null pixels go to zero instead of NaN.",
+    tip: "Dividing by |c_i| (floor 1e-30) maps each cross-product onto the unit circle; nulls go to zero, not NaN.",
     build(svg) { svg.innerHTML = `
       <circle cx="120" cy="76" r="46" class="skl-axis" style="fill:none;opacity:.55"/>
       <line class="skl-axis" x1="66" y1="76" x2="174" y2="76"/>
@@ -88,7 +88,7 @@ window.FLOW_SKETCHES = {
   },
 
   clip: {
-    tip: "The secondary amplitude is capped at c_max = 1.25 so a single bright corner reflector or artefact cannot dominate the per-pass weight.",
+    tip: "Amplitude is capped at c_max = 1.25 so one bright reflector cannot dominate the per-pass weight.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="214" y2="118"/>
       <line class="sk-live skl-pop" x1="30" y1="56" x2="214" y2="56" style="stroke:#c4a3ff;stroke-width:1.4;stroke-dasharray:4 4;opacity:1"/>
@@ -103,7 +103,7 @@ window.FLOW_SKETCHES = {
   },
 
   interf: {
-    tip: "The clipped amplitude A_i is re-attached as the modulus of the unit phasor, producing an interferogram whose argument is the residual elevation phase and whose magnitude is a bounded SNR proxy.",
+    tip: "Clipped A_i re-attaches as the phasor modulus: phase is residual elevation, magnitude a bounded SNR proxy.",
     build(svg) { svg.innerHTML = `
       <circle cx="120" cy="76" r="40" class="skl-axis" style="fill:none;opacity:.5"/>
       <line class="skl-axis" x1="72" y1="76" x2="168" y2="76"/>
@@ -118,7 +118,7 @@ window.FLOW_SKETCHES = {
   },
 
   subdivide: {
-    tip: "A crop above W_max = 1000 lines is split into M non-overlapping azimuth subsections processed by a worker plan resolved from the core budget B = floor(C f_effort).",
+    tip: "Crops above W_max = 1000 lines split into M azimuth subsections, run by a worker plan from B = floor(C f_effort).",
     build(svg) { svg.innerHTML = `
       <rect x="40" y="30" width="38" height="104" rx="2" class="skl-pop f-meas" style="opacity:.8"/>
       <text x="108" y="80" text-anchor="middle" style="fill:#7e8aa0;font-size:12px">&#8594;</text>
@@ -134,7 +134,7 @@ window.FLOW_SKETCHES = {
   },
 
   covariance: {
-    tip: "A 20x10 px Boxcar window averages the interferometric stack into the per-pixel sample covariance R-hat that the Capon estimator later inverts; its diagonal holds per-pass power.",
+    tip: "A 20x10 boxcar averages the stack into the sample covariance R-hat; its diagonal holds per-pass power.",
     build(svg) {
       const m = grid(4, (r, c) => {
         const x = 92 + c * 26, y = 34 + r * 26;
@@ -152,7 +152,7 @@ window.FLOW_SKETCHES = {
   },
 
   capon: {
-    tip: "Over a uniform elevation grid spanning [x_min, x_max] the minimum-variance estimator evaluates 1/(a^H R^-1 a), peaking sharply at the true scatterer height.",
+    tip: "Over the elevation grid the minimum-variance estimator 1/(a^H R^-1 a) peaks at the true scatterer height.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="36" y1="120" x2="212" y2="120"/>
       <path class="skl-draw c-cal" d="M36 116 L74 113 L104 108 L124 56 L144 108 L176 114 L212 117" style="fill:none"/>
@@ -162,7 +162,7 @@ window.FLOW_SKETCHES = {
   },
 
   concat: {
-    tip: "Each worker's HDF5 subsection is reassembled along azimuth, stacking the DEM on axis 0 and the tomogram on axis 1 into the full-stack outputs.",
+    tip: "Worker subsections reassemble along azimuth: DEM on axis 0, tomogram on axis 1.",
     build(svg) { svg.innerHTML = `
       <rect x="44" y="34" width="58" height="20" rx="2" class="skl-pop f-cal"/>
       <rect x="44" y="58" width="58" height="20" rx="2" class="skl-pop f-cal"/>
@@ -175,7 +175,7 @@ window.FLOW_SKETCHES = {
   },
 
   threshold: {
-    tip: "Magnitude samples below the relative floor t_f times the profile peak are zeroed and everything past index H_tr is dropped before the loss or R-squared see the profile.",
+    tip: "Samples below t_f x peak are zeroed and bins past H_tr dropped before the loss sees the profile.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="120" x2="214" y2="120"/>
       <line class="skl-dash c-mid" x1="24" y1="96" x2="180" y2="96"/>
@@ -188,7 +188,7 @@ window.FLOW_SKETCHES = {
   },
 
   activity: {
-    tip: "A pixel is fitted only when its profile maximum clears the activity threshold tau_a of 1e-3; otherwise it is skipped with parameters left at zero and scale fixed to one.",
+    tip: "A pixel is fitted only if its peak clears tau_a = 1e-3; otherwise skipped with zero parameters.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="118" x2="214" y2="118"/>
       <line class="skl-dash c-mid" x1="24" y1="58" x2="214" y2="58"/>
@@ -202,7 +202,7 @@ window.FLOW_SKETCHES = {
   },
 
   pnorm: {
-    tip: "Dividing every bin by the per-pixel maximum lifts the tallest peak to exactly one, so the MSE and complexity penalty are comparable across pixels of any backscatter level.",
+    tip: "Dividing by the per-pixel max sets the tallest peak to one, making the loss comparable across pixels.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="120" x2="214" y2="120"/>
       <line class="skl-axis" x1="24" y1="22" x2="24" y2="120"/>
@@ -214,7 +214,7 @@ window.FLOW_SKETCHES = {
   },
 
   peakfind: {
-    tip: "find_peaks scans the raw profile with no smoothing, keeping a maximum only when its topographic prominence reaches p_frac of the peak and it sits at least d_min bins from any rival.",
+    tip: "find_peaks keeps a maximum only if its prominence reaches p_frac of the peak and it sits d_min bins from rivals.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="120" x2="214" y2="120"/>
       <path class="skl-draw c-meas" d="M24 118 L44 96 L60 40 L78 102 L96 110 L114 70 L132 104 L150 112 L168 58 L190 104 L214 116" style="fill:none"/>
@@ -225,7 +225,7 @@ window.FLOW_SKETCHES = {
   },
 
   geometry: {
-    tip: "The span-derived sigma_base seeds the initial width sigma_base over D_sigma, while Adam is later clamped between one elevation bin and half the elevation span.",
+    tip: "sigma0 = sigma_base / D_sigma seeds the width; Adam later clamps it between one bin and half the span.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="40" y1="120" x2="40" y2="24"/>
       <line class="skl-dash c-cal" x1="34" y1="40" x2="200" y2="40"/>
@@ -239,7 +239,7 @@ window.FLOW_SKETCHES = {
   },
 
   residfill: {
-    tip: "When fewer than K peaks are found, a window of half-width d_min is zeroed around each detected peak and the empty slots are filled by repeated argmax of that masked residual.",
+    tip: "If fewer than K peaks are found, each is masked over half-width d_min and the rest filled by repeated argmax.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="118" x2="214" y2="118"/>
       <rect x="32" y="22" width="32" height="96" class="skl-pop f-faint" style="opacity:.4"/>
@@ -253,7 +253,7 @@ window.FLOW_SKETCHES = {
   },
 
   seed: {
-    tip: "Amplitude and mean are read straight off the raw-profile peaks and frozen through Phase 2, collapsing the fit to a well-conditioned one-dimensional width search per component.",
+    tip: "Amplitude and mean are read off the peaks and frozen, reducing the fit to a 1-D width search per component.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="118" x2="214" y2="118"/>
       <path class="skl-draw c-meas" d="M24 116 L52 100 L78 44 L104 102 L130 110 L158 60 L190 104 L214 112" style="fill:none;opacity:.45"/>
@@ -268,7 +268,7 @@ window.FLOW_SKETCHES = {
   },
 
   objective: {
-    tip: "With amplitudes and means frozen, the loss is the mean-squared gap between the K-Gaussian sum and the normalised profile, with each sigma floored at 1e-6 before squaring.",
+    tip: "With a and mu frozen, the loss is the MSE between the K-Gaussian sum and the profile; sigma floored at 1e-6.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="116" x2="214" y2="116"/>
       <path class="skl-draw c-mid" d="M24 114 q40 -74 80 0 q40 -54 86 0 L214 114" style="fill:none"/>
@@ -280,7 +280,7 @@ window.FLOW_SKETCHES = {
   },
 
   adam: {
-    tip: "Bias-corrected Adam runs as a single lax.scan of T = 3000 steps compiled into one XLA program, with the widths clamped to the sigma_lo and sigma_hi band on every step.",
+    tip: "Adam runs as one lax.scan of T = 3000 steps, clamping each width to [sigma_lo, sigma_hi].",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="120" x2="214" y2="120"/>
       <line class="skl-axis" x1="28" y1="22" x2="28" y2="120"/>
@@ -292,7 +292,7 @@ window.FLOW_SKETCHES = {
   },
 
   scoreK: {
-    tip: "Each order K is scored as its normalised MSE plus the penalty lambda_K times K times the mean amplitude, so a slot is paid for only when a real peak fills it.",
+    tip: "Each order K scores as MSE + lambda_K x K x mean amplitude, so a slot is paid for only when filled.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="32" y1="118" x2="214" y2="118"/>
       <rect x="44" y="58" width="20" height="60" class="skl-pop f-mid"/>
@@ -309,7 +309,7 @@ window.FLOW_SKETCHES = {
   },
 
   selectK: {
-    tip: "The penalised score is minimised over model order with ties broken toward the smaller K, so a tie between two and three components resolves in favour of the simpler fit.",
+    tip: "The penalised score is minimised over K, ties broken toward the smaller K.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="32" y1="116" x2="214" y2="116"/>
       <rect x="44" y="48" width="22" height="68" class="skl-pop f-mid"/>
@@ -322,7 +322,7 @@ window.FLOW_SKETCHES = {
   },
 
   rescale: {
-    tip: "The winner's amplitudes are multiplied back by the per-pixel scale s to return to raw backscatter units, while its means and widths are written through unchanged.",
+    tip: "The winner's amplitudes scale back by s to raw units; means and widths pass through unchanged.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="24" y1="118" x2="214" y2="118"/>
       <line class="skl-dash c-faint" x1="24" y1="56" x2="214" y2="56"/>
@@ -334,7 +334,7 @@ window.FLOW_SKETCHES = {
   },
 
   assemble: {
-    tip: "Active components are sorted by ascending mean elevation, inactive slots keyed to infinity drop to the end, and the result is written into the interleaved 3K target with zeros beyond K*.",
+    tip: "Active components sort by ascending mean, inactive slots drop to the end, into the interleaved 3K target.",
     build(svg) { svg.innerHTML = `
       <rect x="40" y="40" width="26" height="20" class="skl-pop f-cal"/>
       <rect x="40" y="66" width="26" height="20" class="skl-pop f-cal"/>
@@ -350,7 +350,7 @@ window.FLOW_SKETCHES = {
   },
 
   quality: {
-    tip: "The per-pixel R-squared compares the reconstructed mixture against the thresholded profile with a 1e-12 stabiliser on the total sum of squares, then paints a fit-quality map.",
+    tip: "Per-pixel R-squared compares the reconstruction to the profile (1e-12 stabiliser), painting a fit-quality map.",
     build(svg) {
       const cells = [[0.95,"f-cal"],[0.9,"f-cal"],[0.6,"f-mid"],[0.7,"f-mid"],[0.92,"f-cal"],[0.88,"f-cal"],[0.85,"f-cal"],[0.4,"f-faint"],[0.9,"f-cal"]];
       let m = "";
@@ -366,7 +366,7 @@ window.FLOW_SKETCHES = {
   },
 
   diagnostics: {
-    tip: "Post-hoc only, the relative margin between the runner-up score and L_K* flags ambiguous pixels, and the peak-to-floor contrast uses the lowest-quartile bins as its noise floor.",
+    tip: "Post-hoc: the runner-up margin over L_K* flags ambiguous pixels; contrast uses the lowest-quartile bins as floor.",
     build(svg) { svg.innerHTML = `
       <text x="34" y="30" style="fill:#c4a3ff;font-size:8px">m_rel</text>
       <rect x="34" y="36" width="92" height="12" rx="2" class="skl-pop f-faint" style="opacity:.3"/>
@@ -381,7 +381,7 @@ window.FLOW_SKETCHES = {
   },
 
   splitgeom: {
-    tip: "The azimuth range splits 70/15/15 into contiguous train, validation and test bands that share the full range extent with no overlap.",
+    tip: "Azimuth splits 70/15/15 into contiguous, non-overlapping train, val and test bands.",
     build(svg) { svg.innerHTML = `
       <rect x="40" y="22" width="160" height="74" class="skl-pop f-mid" style="opacity:.85"/>
       <rect x="40" y="96" width="160" height="16" class="skl-pop f-cal" style="opacity:.85"/>
@@ -393,7 +393,7 @@ window.FLOW_SKETCHES = {
   },
 
   localslice: {
-    tip: "Subtracting the global-crop origin az0 converts each band's absolute azimuth bounds into zero-based slices into the memory-mapped arrays.",
+    tip: "Subtracting the crop origin az0 turns absolute azimuth bounds into zero-based slices.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="50" x2="214" y2="50"/>
       <text x="30" y="40" style="fill:#7e8aa0;font-size:7px">absolute</text>
@@ -407,7 +407,7 @@ window.FLOW_SKETCHES = {
   },
 
   secselect: {
-    tip: "Flight-qualified labels in L_req map to positional indices, e.g. {3,5,7,25}, gathered identically from both the secondary SLCs and the interferograms.",
+    tip: "Qualified labels in L_req map to positional indices, gathered alike from the secondaries and interferograms.",
     build(svg) {
       let row = "";
       for (let i = 0; i < 7; i++) { const sel = (i === 3 || i === 5 || i === 6); row += `<rect class="skl-pop ${sel ? "f-cal" : "f-faint"}" x="${28 + i * 24}" y="32" width="20" height="20" style="opacity:${sel ? 1 : 0.5}"/>`; if (sel) row += `<rect class="sk-live" x="${28 + i * 24}" y="32" width="20" height="20" style="fill:none;stroke:#4fd6c4;stroke-width:2.5"/>`; }
@@ -422,7 +422,7 @@ window.FLOW_SKETCHES = {
   },
 
   stack: {
-    tip: "Primary lands at slot 0, the Ns secondaries fill X[1:1+Ns], and the Ni interferograms fill X[1+Ns:], all written by pass-index into one pre-allocated complex buffer.",
+    tip: "Primary at slot 0, Ns secondaries in X[1:1+Ns], Ni interferograms after, into one complex buffer.",
     build(svg) { svg.innerHTML = `
       <rect x="38" y="30" width="44" height="18" class="skl-pop f-meas"/>
       <text x="60" y="43" text-anchor="middle" style="fill:#0b1014;font-size:8px">s0</text>
@@ -437,7 +437,7 @@ window.FLOW_SKETCHES = {
   },
 
   patchgrid: {
-    tip: "A strided P-by-P window tiles the region; ceil((Az-P)/s)+1 rows by ceil((Rg-P)/s)+1 columns guarantees the last patch still covers the far border.",
+    tip: "A strided PxP window tiles the region; the row/col counts let the last patch cover the far border.",
     build(svg) {
       let g = "";
       for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) g += `<rect x="${40 + c * 41}" y="${30 + r * 32}" width="40" height="30" class="skl-pop f-mid" style="opacity:.16;stroke:#f5b971;stroke-width:.8"/>`;
@@ -447,7 +447,7 @@ window.FLOW_SKETCHES = {
   },
 
   padgeom: {
-    tip: "The azimuth deficit pv splits as floor(pv/2) on top and pv-floor(pv/2) on the bottom, so an odd deficit puts the extra pixel at the bottom edge.",
+    tip: "The azimuth deficit pv splits floor(pv/2) on top, the rest below; odd deficits go to the bottom.",
     build(svg) { svg.innerHTML = `
       <rect x="78" y="44" width="84" height="62" class="skl-pop f-mid" style="opacity:.8"/>
       <text x="120" y="80" text-anchor="middle" style="fill:#0b1014;font-size:8px">region</text>
@@ -459,7 +459,7 @@ window.FLOW_SKETCHES = {
   },
 
   extract: {
-    tip: "The clipped read window is deep-copied so it never aliases the mmap, then reflect-padded in one pass by the same routine that serves the stack, the parameters and the DEM.",
+    tip: "The read window is deep-copied (never aliases the mmap), then reflect-padded by the shared routine.",
     build(svg) { svg.innerHTML = `
       <rect x="28" y="32" width="74" height="74" class="skl-draw c-faint" style="fill:none"/>
       <rect x="58" y="62" width="44" height="44" class="skl-pop f-meas" style="opacity:.75"/>
@@ -471,7 +471,7 @@ window.FLOW_SKETCHES = {
   },
 
   represent: {
-    tip: "By default an SLC pass keeps its magnitude |p| and an interferogram keeps its phase angle, while magnitude-normalised channels divide by m = max(|p|, 1) to guard zero magnitude.",
+    tip: "An SLC pass keeps |p|, an interferogram keeps its phase; normalised channels divide by m = max(|p|, 1).",
     build(svg) { svg.innerHTML = `
       <circle cx="64" cy="70" r="32" class="skl-axis" style="fill:none;opacity:.5"/>
       <line class="skl-axis" x1="26" y1="70" x2="102" y2="70"/>
@@ -489,7 +489,7 @@ window.FLOW_SKETCHES = {
   },
 
   assemble_in: {
-    tip: "Each source's real channels are concatenated along the channel axis in fixed order: primary, then secondaries, then interferograms, with the optional DEM channel last.",
+    tip: "Real channels concatenate in fixed order: primary, secondaries, interferograms, optional DEM last.",
     build(svg) { svg.innerHTML = `
       <rect x="28" y="44" width="22" height="40" class="skl-pop f-meas"/>
       <rect x="54" y="44" width="22" height="40" class="skl-pop f-mid"/>
@@ -503,7 +503,7 @@ window.FLOW_SKETCHES = {
   },
 
   target: {
-    tip: "Channels 3g+r are gathered from the interleaved (a, mu, sigma) ground-truth layout; enabling all three roles keeps every one of the n_g*3 parameter channels.",
+    tip: "Channels are gathered from the interleaved (a, mu, sigma) GT; all three roles keep every n_g*3 channel.",
     build(svg) {
       const cls = ["f-meas", "f-mid", "f-cal"], roles = ["a", "mu", "s"];
       let row = "", out = "";
@@ -514,7 +514,7 @@ window.FLOW_SKETCHES = {
   },
 
   augment_geo: {
-    tip: "On the train split only, the sampled flip-or-rot90 transform is applied identically to input x and target y, so a horizontal flip mirrors both and keeps every pixel aligned.",
+    tip: "On train only, the sampled flip/rot90 is applied alike to x and y, keeping every pixel aligned.",
     build(svg) { svg.innerHTML = `
       <rect x="42" y="36" width="52" height="52" class="skl-draw c-meas" style="fill:none"/>
       <polygon points="50,80 50,44 74,44" style="fill:#6ea8ff;opacity:.7"/>
@@ -527,7 +527,7 @@ window.FLOW_SKETCHES = {
   },
 
   slotkeys: {
-    tip: "The same strided layout that built the tensor labels each channel by family/slot, so pass/mag, ifg/phase and dem/elev each pick up their own normalisation strategy.",
+    tip: "The strided layout labels each channel by family/slot, so pass/mag, ifg/phase and dem/elev get their own norm.",
     build(svg) {
       const L = [["pass/mag", "f-meas", "#6ea8ff"], ["pass/mag", "f-meas", "#6ea8ff"], ["ifg/phase", "f-mid", "#f5b971"], ["ifg/phase", "f-mid", "#f5b971"], ["dem/elev", "f-faint", "#7e8aa0"]];
       let s = "";
@@ -538,7 +538,7 @@ window.FLOW_SKETCHES = {
   },
 
   fitstats: {
-    tip: "Fitted on the train split only in float64, each slot's z-score uses mean and std of f(x), with an optional log1p compression applied before fitting and the scale floored at 1e-8.",
+    tip: "On train only (float64), each slot's mu and std fit from f(x); optional log1p first, scale floored at 1e-8.",
     build(svg) {
       const hs = [14, 26, 40, 52, 46, 32, 20, 10];
       let b = "";
@@ -549,7 +549,7 @@ window.FLOW_SKETCHES = {
   },
 
   normalise: {
-    tip: "Subtracting mu_c and dividing by s_c shifts each slot's distribution to zero mean and unit scale, applied identically to every split to feed the network dimensionless tensors.",
+    tip: "Subtracting mu_c and dividing by s_c gives each slot zero mean and unit scale across every split.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="104" x2="214" y2="104"/>
       <line class="skl-dash c-faint" x1="120" y1="34" x2="120" y2="110"/>
@@ -561,7 +561,7 @@ window.FLOW_SKETCHES = {
   },
 
   noise: {
-    tip: "On the train split only and with probability p_N, Gaussian noise of std 0.01 is added to the already-normalised input, jittering x-hat while the target stays untouched.",
+    tip: "On train only, with probability p_N, std-0.01 Gaussian noise jitters x-hat; the target stays untouched.",
     build(svg) { svg.innerHTML = `
       <path class="skl-draw c-faint" d="M30 80 Q70 42 110 80 T190 80" style="fill:none;opacity:.5"/>
       <path class="skl-draw c-fin" d="M30 82 Q50 60 70 64 Q90 36 110 78 Q130 92 150 70 Q170 50 190 76" style="fill:none"/>
@@ -570,7 +570,7 @@ window.FLOW_SKETCHES = {
   },
 
   denorm: {
-    tip: "The inverse multiplies by s_c and adds mu_c, and for log1p slots takes expm1 of the result with the exponent argument clamped at 80 to prevent float32 overflow.",
+    tip: "The inverse scales by s_c, adds mu_c, and for log1p slots takes expm1 with the exponent capped at 80.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="104" x2="214" y2="104"/>
       <line class="skl-dash c-mid" x1="30" y1="48" x2="214" y2="48"/>
@@ -581,7 +581,7 @@ window.FLOW_SKETCHES = {
   },
 
   forward: {
-    tip: "One autocast forward pass turns the normalised input patch into 3K interleaved Gaussian channels of amplitude, mean and sigma per pixel.",
+    tip: "One autocast forward pass maps the input patch to 3K interleaved (a, mu, sigma) channels per pixel.",
     build(svg) { svg.innerHTML = `
       <rect x="24" y="56" width="20" height="40" rx="2" class="skl-pop f-meas"/>
       <path class="skl-draw c-faint" d="M56 48 L100 64 L100 96 L56 112 Z" style="fill:none"/>
@@ -595,7 +595,7 @@ window.FLOW_SKETCHES = {
   },
 
   tdenorm: {
-    tip: "expm1 inverts the log1p amplitude and sigma channels, with the exponent argument clamped at 80 so an early blow-up cannot become a NaN.",
+    tip: "expm1 inverts the log1p amplitude and sigma channels, exponent capped at 80 to avoid NaNs.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="214" y2="118"/>
       <line class="skl-axis" x1="30" y1="22" x2="30" y2="118"/>
@@ -606,7 +606,7 @@ window.FLOW_SKETCHES = {
   },
 
   clamp: {
-    tip: "Out-of-bounds amplitude and sigma are clipped to grid limits but keep a 0.01 leaky straight-through slope so the heads still pass a small gradient.",
+    tip: "Out-of-bounds amplitude and sigma clip to grid limits but keep a 0.01 leaky slope so gradients still flow.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="214" y2="118"/>
       <line class="skl-dash c-faint" x1="62" y1="20" x2="62" y2="120"/>
@@ -619,7 +619,7 @@ window.FLOW_SKETCHES = {
   },
 
   renorm: {
-    tip: "log1p minus the offset over the scale maps the clamped physical predictions back into the same normalised units as the labels.",
+    tip: "(log1p - offset) / scale maps the clamped physical predictions back into label-normalised units.",
     build(svg) { svg.innerHTML = `
       <rect x="26" y="50" width="44" height="50" rx="3" class="skl-pop f-cal"/>
       <text x="48" y="79" text-anchor="middle" style="fill:#0b1014;font-size:9px">12.4</text>
@@ -633,7 +633,7 @@ window.FLOW_SKETCHES = {
   },
 
   reconstruct: {
-    tip: "Predicted and GT parameters each sum K Gaussian bumps on the elevation axis into a curve; the GT curve is built once under no_grad.",
+    tip: "Predicted and GT parameters each sum K Gaussians into an elevation curve; the GT curve is built once under no_grad.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="118" x2="216" y2="118"/>
       <path class="skl-draw c-faint" d="M40 118 Q70 70 100 118" style="fill:none;opacity:.4"/>
@@ -645,7 +645,7 @@ window.FLOW_SKETCHES = {
   },
 
   residual: {
-    tip: "The single elementwise difference y-hat minus y becomes the residual bars shared by the MSE, L1, Huber and Charbonnier terms.",
+    tip: "The elementwise y-hat - y is the residual shared by the MSE, L1, Huber and Charbonnier terms.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="80" x2="216" y2="80"/>
       <path class="skl-draw c-cal" d="M30 70 Q60 30 90 56 Q120 18 150 50 Q180 44 214 70" style="fill:none"/>
@@ -657,7 +657,7 @@ window.FLOW_SKETCHES = {
   },
 
   curvepoint: {
-    tip: "Four pointwise reductions of the shared residual: MSE squares it, L1 takes magnitude, Huber bends at delta and Charbonnier smooths the L1 with epsilon.",
+    tip: "Four pointwise residual reductions: MSE squares, L1 magnitude, Huber bends at delta, Charbonnier smooths with epsilon.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="120" y1="118" x2="120" y2="22"/>
       <line class="skl-axis" x1="28" y1="100" x2="214" y2="100"/>
@@ -670,7 +670,7 @@ window.FLOW_SKETCHES = {
   },
 
   curveshape: {
-    tip: "Three shape terms ignore magnitude: cosine angle over valid pixels, windowed spectral coherence, and per-slice SSIM on jointly normalised images.",
+    tip: "Three magnitude-free shape terms: cosine angle, windowed spectral coherence, and per-slice SSIM.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="62" y1="116" x2="62" y2="32"/>
       <line class="skl-axis" x1="40" y1="96" x2="86" y2="96"/>
@@ -686,7 +686,7 @@ window.FLOW_SKETCHES = {
   },
 
   physgeom: {
-    tip: "The vertical wavenumber kz scales the master-relative perpendicular baseline by the monostatic 4-pi-over-lambda-r0 factor to build the steering phasors.",
+    tip: "kz scales the perpendicular baseline by the monostatic 4pi/(lambda r0) factor to build the steering phasors.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="40" y1="120" x2="40" y2="28"/>
       <line class="skl-axis" x1="40" y1="120" x2="120" y2="120"/>
@@ -703,7 +703,7 @@ window.FLOW_SKETCHES = {
   },
 
   physmoments: {
-    tip: "Ratio terms compare relative integrated power plus the mass, centroid and spread moments, reduced only over GT-strong pixels.",
+    tip: "Ratio terms compare integrated power and the mass, centroid and spread moments over GT-strong pixels.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="216" y2="118"/>
       <path class="skl-draw c-cal" d="M40 118 Q90 40 124 70 Q150 92 200 118" style="fill:rgba(79,214,196,0.12)"/>
@@ -716,7 +716,7 @@ window.FLOW_SKETCHES = {
   },
 
   physcov: {
-    tip: "Coherence compares the two normalised characteristic functions while covariance matching transforms only the profile difference R[P-T] thanks to R's linearity.",
+    tip: "Coherence compares the normalised characteristic functions; covariance matching transforms only R[P-T].",
     build(svg) {
       const m = grid(3, (r, c) => { const x = 132 + c * 26, y = 36 + r * 26; const cl = r === c ? "sk-live skl-pop f-mid" : "skl-pop f-faint"; const op = r === c ? 1 : 0.3; return `<rect class="${cl}" x="${x}" y="${y}" width="22" height="22" rx="2" style="opacity:${op}"/>`; });
       svg.innerHTML = `
@@ -731,7 +731,7 @@ window.FLOW_SKETCHES = {
   },
 
   physcapon: {
-    tip: "Capon synthesises R[P], adds signal-adaptive diagonal loading, then solves once per pixel to form the spectrum compared mass-normalised.",
+    tip: "Capon synthesises R[P], adds adaptive diagonal loading, then solves once per pixel for a mass-normalised spectrum.",
     build(svg) { svg.innerHTML = `
       <rect x="36" y="40" width="48" height="48" rx="2" class="skl-pop f-mid" style="opacity:.5"/>
       <line class="skl-draw c-fin" x1="36" y1="40" x2="84" y2="88" style="stroke-width:3"/>
@@ -743,7 +743,7 @@ window.FLOW_SKETCHES = {
   },
 
   paramterms: {
-    tip: "GT components are mu-sorted and empty slots mask mu and sigma to zero weight, so Param-L1/Huber act in normalised space while TV penalises spatial irregularity.",
+    tip: "GT sorts by mu, empty slots mask to zero weight; Param-L1/Huber act in normalised space, TV penalises roughness.",
     build(svg) { svg.innerHTML = `
       <rect x="34" y="42" width="22" height="20" rx="2" class="skl-pop f-cal"/>
       <rect x="34" y="66" width="22" height="20" rx="2" class="skl-pop f-cal"/>
@@ -757,7 +757,7 @@ window.FLOW_SKETCHES = {
   },
 
   composite: {
-    tip: "Each term's effective weight is the user weight times a fixed empirical normaliser; the weighted terms sum and divide by total weight into one loss.",
+    tip: "Each term's weight is the user weight times a fixed normaliser; the weighted terms sum over total weight into one loss.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="140" y2="118"/>
       <rect x="36" y="92" width="14" height="26" class="skl-pop f-cal"/>
@@ -773,7 +773,7 @@ window.FLOW_SKETCHES = {
   },
 
   gradclip: {
-    tip: "When the global gradient norm exceeds the threshold tau, every gradient is rescaled by tau over the norm so the clipped vector lands exactly on the limit.",
+    tip: "If the gradient norm exceeds tau, all gradients scale by tau/norm, landing exactly on the limit.",
     build(svg) { svg.innerHTML = `
       <circle cx="76" cy="80" r="44" class="skl-dash c-faint" style="fill:none;opacity:.5"/>
       <text x="40" y="36" style="fill:#7e8aa0;font-size:7px">tau</text>
@@ -786,7 +786,7 @@ window.FLOW_SKETCHES = {
   },
 
   adamw: {
-    tip: "Bias-corrected adaptive moments with decoupled weight decay step the weights down a loss surface, driving the training loss lower each epoch.",
+    tip: "Adaptive moments with decoupled weight decay step the weights downhill, lowering the loss each epoch.",
     build(svg) { svg.innerHTML = `
       <path class="skl-draw c-faint" d="M30 36 Q120 156 210 36" style="fill:none;opacity:.5"/>
       <circle cx="42" cy="60" r="2.5" class="skl-pop f-mid" style="opacity:.4"/>
@@ -797,7 +797,7 @@ window.FLOW_SKETCHES = {
   },
 
   schedule: {
-    tip: "The effective LR is the base rate times a per-epoch cosine decay times a linear per-step warmup, with the loss curriculum swapping objectives at the swap epoch.",
+    tip: "Effective LR = base x cosine decay x linear warmup; the curriculum swaps objectives at the swap epoch.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="118" x2="216" y2="118"/>
       <line class="skl-axis" x1="28" y1="22" x2="28" y2="118"/>
@@ -809,7 +809,7 @@ window.FLOW_SKETCHES = {
   },
 
   checkpoint: {
-    tip: "Validation runs every few epochs; a strict improvement checkpoints the best epoch and early stopping reverts to it after patience evaluations without a new minimum.",
+    tip: "Validation checkpoints the best epoch; early stopping reverts to it after patience evals without a new minimum.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="28" y1="118" x2="216" y2="118"/>
       <path class="skl-draw c-cal" d="M30 50 L62 72 L94 60 L120 90 L150 78 L180 96 L210 88" style="fill:none"/>
@@ -819,7 +819,7 @@ window.FLOW_SKETCHES = {
   },
 
   load: {
-    tip: "The architecture is rebuilt verbatim from the saved config before the best-epoch theta-star tensor is loaded with no EMA, refusing any input that is not one contiguous region.",
+    tip: "The architecture is rebuilt from the saved config, then theta* loads (no EMA); input must be one contiguous region.",
     build(svg) { svg.innerHTML = `
       <rect x="38" y="40" width="64" height="70" rx="4" class="skl-draw c-faint" style="fill:#1b242f"/>
       <rect x="48" y="52" width="44" height="6" rx="2" class="skl-pop f-meas"/>
@@ -834,7 +834,7 @@ window.FLOW_SKETCHES = {
   },
 
   predict: {
-    tip: "For every patch on the sliding-window grid the frozen model emits the raw normalised z-hat in deterministic raster order, so the cube ends with no holes.",
+    tip: "The frozen model emits raw normalised z-hat for every sliding-window patch in raster order, leaving no holes.",
     build(svg) {
       let g = "";
       for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) g += `<rect x="${44 + c * 34}" y="${40 + r * 28}" width="30" height="24" rx="2" style="fill:#1b242f;stroke:#303d4c"/>`;
@@ -844,7 +844,7 @@ window.FLOW_SKETCHES = {
   },
 
   idenorm: {
-    tip: "Predictions are denormalised then hard-clamped (no leaky slope) with a flat saturating transfer curve, pinning amplitude into [0, a_max].",
+    tip: "Predictions are denormalised then hard-clamped (no leaky slope), pinning amplitude into [0, a_max].",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="40" y1="110" x2="210" y2="110"/>
       <line class="skl-axis" x1="40" y1="110" x2="40" y2="28"/>
@@ -856,7 +856,7 @@ window.FLOW_SKETCHES = {
   },
 
   align: {
-    tip: "GT slots are stably sorted by mu with inactive slots pushed to the end, while the prediction keeps its raw order so the metric scores the network's own arrangement.",
+    tip: "GT slots sort by mu (inactive last); the prediction keeps its raw order, so the metric scores its own arrangement.",
     build(svg) { svg.innerHTML = `
       <text x="60" y="34" text-anchor="middle" style="fill:#6ea8ff;font-size:8px">GT</text>
       <text x="180" y="34" text-anchor="middle" style="fill:#f5b971;font-size:8px">mu-sorted</text>
@@ -876,7 +876,7 @@ window.FLOW_SKETCHES = {
   },
 
   recon: {
-    tip: "Each patch's clamped Gaussians are evaluated on the elevation axis with amplitudes rectified at zero and a 2-sigma-squared-plus-1e-8 kernel denominator, summing into one spectrum.",
+    tip: "Each patch's clamped Gaussians sum on the elevation axis, amplitudes rectified at zero, denominator 2 sigma^2 + 1e-8.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="34" y1="116" x2="214" y2="116"/>
       <path class="skl-draw c-faint" d="M34 116 C70 116 78 64 96 64 C114 64 122 116 158 116" style="fill:none;opacity:.4"/>
@@ -886,7 +886,7 @@ window.FLOW_SKETCHES = {
   },
 
   window: {
-    tip: "A separable Hann taper has each 1D axis factor floored at 1e-3 before the outer product, so every covered position carries a strictly positive overlap-add weight.",
+    tip: "A separable Hann taper (each axis floored at 1e-3) gives every covered position a positive overlap-add weight.",
     build(svg) {
       let cells = "";
       for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) { const d = Math.hypot(r - 2, c - 2) / 2.83; const op = (0.95 - d * 0.85).toFixed(2); cells += `<rect x="${150 + c * 12}" y="${40 + r * 12}" width="11" height="11" style="fill:#f5b971;opacity:${op}"/>`; }
@@ -900,7 +900,7 @@ window.FLOW_SKETCHES = {
   },
 
   ola: {
-    tip: "Each windowed patch is scattered additively into the value accumulator A at its grid origin while the bare window is added to the parallel weight buffer W.",
+    tip: "Each windowed patch adds into accumulator A at its origin; the bare window adds into the weight buffer W.",
     build(svg) { svg.innerHTML = `
       <rect x="46" y="44" width="64" height="64" class="skl-axis" style="fill:#15302d"/>
       <text x="78" y="36" text-anchor="middle" style="fill:#4fd6c4;font-size:8px">A += p w</text>
@@ -914,7 +914,7 @@ window.FLOW_SKETCHES = {
   },
 
   finalise: {
-    tip: "The value accumulator is divided elementwise by max(W,1) so uncovered positions divide by one and read zero, then the grid padding is trimmed to the scene extent.",
+    tip: "A is divided by max(W,1) so uncovered positions read zero, then padding is trimmed to the scene extent.",
     build(svg) { svg.innerHTML = `
       <rect x="38" y="52" width="44" height="44" class="skl-pop f-cal" style="opacity:.7"/>
       <text x="60" y="78" text-anchor="middle" style="fill:#0b1014;font-size:11px">A</text>
@@ -928,7 +928,7 @@ window.FLOW_SKETCHES = {
   },
 
   pixelmaps: {
-    tip: "Five per-pixel maps reduce over the N elevation bins at each azimuth-range cell: MSE, MAE, R-squared, cosine similarity, and peak-bin index error.",
+    tip: "Five per-pixel maps reduce over the elevation bins: MSE, MAE, R-squared, cosine similarity, and peak-bin error.",
     build(svg) {
       const vals = [0.9, 0.7, 0.95, 0.6, 0.8, 0.4, 0.85, 0.5, 0.92, 0.65, 0.75, 0.55];
       let cells = "";
@@ -944,7 +944,7 @@ window.FLOW_SKETCHES = {
   },
 
   globalcurve: {
-    tip: "Cube-wide scalars at physical scale: MSE, RMSE, an overall R-squared, and a PSNR whose peak signal is the GT-only dynamic range C_max minus C_min.",
+    tip: "Cube-wide scalars at physical scale: MSE, RMSE, R-squared, and a PSNR over the GT range C_max - C_min.",
     build(svg) { svg.innerHTML = `
       <rect x="40" y="40" width="160" height="70" rx="5" class="skl-axis" style="fill:#1b242f"/>
       <text x="58" y="64" style="fill:#9fb0c0;font-size:11px">R2</text>
@@ -956,7 +956,7 @@ window.FLOW_SKETCHES = {
   },
 
   elevssim: {
-    tip: "Per elevation bin the MAE, RMSE, R-squared and a cross-entropy between column-normalised distributions are accumulated, alongside a mean SSIM over the elevation slices.",
+    tip: "Per elevation bin: MAE, RMSE, R-squared and a column-normalised cross-entropy, plus mean SSIM over the slices.",
     build(svg) {
       const h = [20, 34, 46, 40, 28, 18];
       let b = "";
@@ -967,7 +967,7 @@ window.FLOW_SKETCHES = {
   },
 
   paramslot: {
-    tip: "On active pixels the per-Gaussian mu and sigma MAE/RMSE, placeholder F1 and mu-ordering rate are pooled, with a permutation consensus voted from per-pixel mu-distance assignment.",
+    tip: "On active pixels, per-Gaussian mu/sigma errors and ordering rate pool, with a permutation consensus from mu-distance.",
     build(svg) { svg.innerHTML = `
       <circle cx="60" cy="58" r="9" class="skl-dash c-meas" style="fill:none"/>
       <circle cx="60" cy="58" r="4" class="skl-pop f-cal"/>
@@ -982,7 +982,7 @@ window.FLOW_SKETCHES = {
   },
 
   reduced: {
-    tip: "For a strict secondary subset a reduced Capon tomogram is re-synthesised, then GT, prediction and reduced cubes are unit-area normalised and the network's per-pixel MSE gain is mapped.",
+    tip: "A reduced Capon tomogram is re-synthesised; GT, prediction and reduced cubes are area-normalised and the MSE gain mapped.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="40" y1="100" x2="150" y2="100"/>
       <path class="skl-draw c-meas" d="M40 100 C66 100 72 48 95 48 C118 48 124 100 150 100" style="fill:none"/>
@@ -997,7 +997,7 @@ window.FLOW_SKETCHES = {
   },
 
   spacelr: {
-    tip: "Encoder, bottleneck, decoder and head learning rates are each drawn from log-uniform on the decade span 1e-5 to 1e-2, with dropout drawn linearly across 0 to 0.5.",
+    tip: "Encoder, bottleneck, decoder and head LRs draw log-uniform over 1e-5 to 1e-2; dropout draws linearly over 0 to 0.5.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="210" y2="118"/>
       <text x="30" y="132" style="fill:#7e8aa0;font-size:7px">1e-5</text>
@@ -1013,7 +1013,7 @@ window.FLOW_SKETCHES = {
   },
 
   spacearch: {
-    tip: "Five categorical knobs are sampled, with the features list stored as index k in {0,1,2,3} and decoded through the lookup table back to a channel list like [64,128,256,512].",
+    tip: "Five categorical knobs are sampled; the features index k decodes through a lookup to a list like [64,128,256,512].",
     build(svg) { svg.innerHTML = `
       <rect x="28" y="26" width="26" height="16" rx="3" class="skl-pop f-faint"/>
       <rect x="58" y="26" width="26" height="16" rx="3" class="skl-pop f-faint"/>
@@ -1030,7 +1030,7 @@ window.FLOW_SKETCHES = {
   },
 
   merge: {
-    tip: "The 9-dim learning block and the 5-dim architecture block are stacked into one 14-dimensional joint space that multivariate TPE samples jointly.",
+    tip: "The 9-dim learning and 5-dim architecture blocks stack into one 14-D space that multivariate TPE samples jointly.",
     build(svg) { svg.innerHTML = `
       <rect x="34" y="42" width="46" height="66" rx="4" class="skl-pop f-mid" style="opacity:.85"/>
       <text x="57" y="34" text-anchor="middle" style="fill:#f5b971;font-size:8px">lr (9)</text>
@@ -1044,7 +1044,7 @@ window.FLOW_SKETCHES = {
   },
 
   tpesplit: {
-    tip: "Trials are split at the gamma quantile of their loss into a good set below and a bad set above, each fitted with its own KDE: l(theta) and g(theta).",
+    tip: "Trials split at the gamma quantile of loss into good and bad sets, each fit with its own KDE l(theta) and g(theta).",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="210" y2="118"/>
       <line class="skl-dash c-faint" x1="120" y1="26" x2="120" y2="122"/>
@@ -1057,7 +1057,7 @@ window.FLOW_SKETCHES = {
   },
 
   tpeacq: {
-    tip: "TPE proposes the theta maximising the density ratio l(theta) over g(theta), at the argmax marker, except during the first n0 = 8 startup trials which sample uniformly.",
+    tip: "TPE proposes the theta maximising l(theta)/g(theta), except the first n0 = 8 trials which sample uniformly.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="118" x2="210" y2="118"/>
       <path class="skl-draw c-cal" d="M34 110 C70 110 86 48 108 48 C120 48 124 110 130 110" style="fill:none;opacity:.5"/>
@@ -1070,7 +1070,7 @@ window.FLOW_SKETCHES = {
   },
 
   liar: {
-    tip: "Each pending trial across the parallel GPU workers is temporarily handed the worst completed objective max f as a phantom value so the workers do not all crowd the same point.",
+    tip: "Each pending trial gets the worst objective max f as a phantom value, so parallel workers avoid the same point.",
     build(svg) { svg.innerHTML = `
       <rect x="96" y="14" width="48" height="18" rx="4" class="skl-pop f-faint"/>
       <text x="120" y="27" text-anchor="middle" style="fill:#cfd8e8;font-size:7px">study</text>
@@ -1088,7 +1088,7 @@ window.FLOW_SKETCHES = {
   },
 
   trialsetup: {
-    tip: "The base config is deep-copied per trial and overridden with E = 30 epochs, patience = 8, and seed = 42 + trial.number before any training begins.",
+    tip: "The base config is deep-copied per trial, overridden with E = 30, patience = 8, seed = 42 + trial.number.",
     build(svg) { svg.innerHTML = `
       <rect x="30" y="50" width="56" height="50" rx="5" class="skl-pop f-faint"/>
       <text x="58" y="116" text-anchor="middle" style="fill:#7e8aa0;font-size:7px">base cfg</text>
@@ -1102,7 +1102,7 @@ window.FLOW_SKETCHES = {
   },
 
   trial: {
-    tip: "A trial trains a full model on the fixed canonical split for up to 30 epochs and returns f(theta), the minimum validation loss reached along that curve.",
+    tip: "A trial trains on the fixed split up to 30 epochs and returns f(theta), the minimum validation loss.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="120" x2="210" y2="120"/>
       <line class="skl-axis" x1="30" y1="24" x2="30" y2="120"/>
@@ -1114,7 +1114,7 @@ window.FLOW_SKETCHES = {
   },
 
   prune: {
-    tip: "At step t a trial whose validation loss rises above the running median m is pruned, but only once n_done and t both clear the 8-step warmup gate.",
+    tip: "A trial whose val loss rises above the running median m is pruned, once t clears the 8-step warmup.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="120" x2="210" y2="120"/>
       <line class="skl-dash c-mid" x1="30" y1="72" x2="210" y2="72"/>
@@ -1128,7 +1128,7 @@ window.FLOW_SKETCHES = {
   },
 
   best: {
-    tip: "The study dispatches only the remaining trials in GPU chunks, and after each completion rewrites theta-star as the argmin of f, decoding the features index back to its channel list.",
+    tip: "Remaining trials run in GPU chunks; after each, theta* is rewritten as argmin f, decoding the features index to channels.",
     build(svg) { svg.innerHTML = `
       <rect x="28" y="26" width="14" height="18" rx="2" class="skl-pop f-faint"/>
       <rect x="46" y="26" width="14" height="18" rx="2" class="skl-pop f-faint"/>
