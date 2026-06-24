@@ -351,8 +351,7 @@
       <aside class="ft__deck" id="ft-deck">
         <h3 class="ft-deck__title">Target</h3>
         <div class="ft-modes" id="ft-modes" role="tablist" aria-label="Tuning mode">
-          <button class="ft-mode is-active" data-mode="synthetic" role="tab">Synthetic</button>
-          <button class="ft-mode" data-mode="profile_autoencoder" role="tab">Profile AE</button>
+          <button class="ft-mode is-active" data-mode="profile_autoencoder" role="tab">Profile AE</button>
           <button class="ft-mode" data-mode="image_autoencoder" role="tab">Image AE</button>
           <button class="ft-mode" data-mode="backbone" role="tab">Backbone</button>
         </div>
@@ -372,15 +371,9 @@
           </div>
         </div>
 
-        <div class="ft-grid2">
-          <div class="ft-field">
-            <span class="ft-field__label">GPU</span>
-            <div class="ft-gpu-board" id="ft-gpu" aria-label="GPU device"></div>
-          </div>
-          <label class="ft-field">
-            <span class="ft-field__label">Model</span>
-            <input class="ft-input" id="ft-model" type="text" spellcheck="false" placeholder="default" />
-          </label>
+        <div class="ft-field">
+          <span class="ft-field__label">GPU</span>
+          <div class="ft-gpu-board" id="ft-gpu" aria-label="GPU device"></div>
         </div>
 
         <h3 class="ft-deck__title">Sweep grid</h3>
@@ -421,7 +414,7 @@
           </button>
           <button class="ft-stop" id="ft-stop" hidden>Stop</button>
         </div>
-        <p class="ft-deck__hint" id="ft-hint">Synthetic mode needs no dataset &mdash; it runs anywhere with a GPU.</p>
+        <p class="ft-deck__hint" id="ft-hint">Pick a dataset and parameters detected on this machine, then run the sweep.</p>
       </aside>
 
       <div class="ft__stage">
@@ -583,7 +576,7 @@
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
 <script src="/static/js/tensorboard.js?v=20260608r"></script>
-<script src="/static/js/feed_tuner.js?v=20260620b"></script>
+<script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260616b"></script>
 </body>
 </html>

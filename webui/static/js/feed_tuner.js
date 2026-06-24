@@ -1,7 +1,6 @@
 "use strict";
 
 const FT_DEFAULTS = {
-  synthetic:           { batch: "512,1024,2048,4096", workers: "0,2,4,6,8", prefetch: "2,4,8,16", timed: 60, warmup: 8, paths: false },
   profile_autoencoder: { batch: "256,512,1024,2048,4096", workers: "0,2,4,6,8", prefetch: "2,4,8,16", timed: 80, warmup: 8, paths: true },
   image_autoencoder:   { batch: "4,8,16,32,64", workers: "0,4,8,12,16", prefetch: "2,4,8", timed: 40, warmup: 5, paths: true },
   backbone:            { batch: "4,8,16,32,64", workers: "0,4,8,12,16", prefetch: "2,4,8", timed: 40, warmup: 5, paths: true },
@@ -284,7 +283,6 @@ class FeedTuner {
       paramsCustom: document.getElementById("ft-params-custom"),
       paramsNote: document.getElementById("ft-params-note"),
       gpu: document.getElementById("ft-gpu"),
-      model: document.getElementById("ft-model"),
       batch: document.getElementById("ft-batch"),
       workers: document.getElementById("ft-workers"),
       prefetch: document.getElementById("ft-prefetch"),
@@ -315,7 +313,7 @@ class FeedTuner {
       wait: new FtGauge(document.getElementById("ft-dial-wait"), (v) => (v <= 5 ? "#0f766e" : v <= 40 ? "#b45309" : "#b91c1c")),
     };
 
-    this.mode = "synthetic";
+    this.mode = "profile_autoencoder";
     this.modes.forEach((btn) => btn.addEventListener("click", () => this._selectMode(btn.dataset.mode)));
     this.runBtn.addEventListener("click", () => this._run());
     this.stopBtn.addEventListener("click", () => this._stop());
@@ -326,7 +324,7 @@ class FeedTuner {
     this.inputs.paramsCustom.addEventListener("input", () => { this.paramsPath = this.inputs.paramsCustom.value.trim(); });
     window.addEventListener("resize", () => this._draw());
 
-    this._applyDefaults("synthetic");
+    this._applyDefaults("profile_autoencoder");
   }
 
   async _loadGpus() {
@@ -356,9 +354,7 @@ class FeedTuner {
     this.inputs.timed.value = preset.timed;
     this.inputs.warmup.value = preset.warmup;
     this.paths.hidden = !preset.paths;
-    this.hint.textContent = preset.paths
-      ? "Pick a dataset and parameters detected on this machine, then run the sweep."
-      : "Synthetic mode needs no dataset — it runs anywhere with a GPU.";
+    this.hint.textContent = "Pick a dataset and parameters detected on this machine, then run the sweep.";
   }
 
   _config() {
@@ -465,7 +461,6 @@ class FeedTuner {
       warmup_batches: String(this.inputs.warmup.value || "8"),
       use_amp: this.inputs.amp.checked ? "true" : "false",
     };
-    if (this.inputs.model.value.trim()) overrides.model_name = this.inputs.model.value.trim();
     if (FT_DEFAULTS[this.mode].paths) {
       if (this.datasetPath) overrides["paths.dataset_path"] = this.datasetPath;
       if (this.paramsPath) overrides["paths.parameters_path"] = this.paramsPath;
