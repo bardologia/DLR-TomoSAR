@@ -1,4 +1,5 @@
 from configuration.architectures import ProfileAutoencoderBaseConfig, Conv1dAutoencoderConfig, MlpAutoencoderConfig, Transformer1dAutoencoderConfig, ResMlpAutoencoderConfig, TcnAutoencoderConfig, GruAutoencoderConfig, CnnAttnAutoencoderConfig
+from ..registry     import RegistryFactory
 from .base          import ProfileAutoencoderBase, ProfileAutoencoderBlocks
 from .mlp           import MlpAutoencoder
 from .conv1d        import Conv1dAutoencoder
@@ -30,17 +31,7 @@ PROFILE_AE_CONFIG_REGISTRY: dict[str, type] = {
 }
 
 
-def get_profile_autoencoder(name: str, config=None, **overrides):
-    key = name.lower().replace("-", "_").replace(" ", "_")
-    if key not in PROFILE_AE_MODEL_REGISTRY:
-        raise ValueError(f"Unknown autoencoder '{name}'. Available: {list(PROFILE_AE_MODEL_REGISTRY.keys())}")
-    if config is None:
-        config = PROFILE_AE_CONFIG_REGISTRY[key](**overrides)
-    elif overrides:
-        for k, v in overrides.items():
-            if hasattr(config, k):
-                setattr(config, k, v)
-    return PROFILE_AE_MODEL_REGISTRY[key](config), config
+get_profile_autoencoder = RegistryFactory(PROFILE_AE_MODEL_REGISTRY, PROFILE_AE_CONFIG_REGISTRY, "autoencoder").build
 
 
 __all__ = [

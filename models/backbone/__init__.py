@@ -1,5 +1,6 @@
 from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, MultiResUNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSkipConfig
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
+from ..registry     import RegistryFactory
 from .unet          import UNet, UNetMultiHead, UNetPerGaussian
 from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
 from .attention_unet import AttentionUNet
@@ -69,17 +70,7 @@ BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
 BACKBONE_IMAGE_SIZE_MODELS: frozenset[str] = frozenset({"swin_unet", "transunet", "unetr"})
 
 
-def get_backbone(name: str, config=None, **overrides):
-    key = name.lower().replace("-", "_").replace(" ", "_")
-    if key not in BACKBONE_MODEL_REGISTRY:
-        raise ValueError(f"Unknown backbone '{name}'. Available: {list(BACKBONE_MODEL_REGISTRY.keys())}")
-    if config is None:
-        config = BACKBONE_CONFIG_REGISTRY[key](**overrides)
-    elif overrides:
-        for k, v in overrides.items():
-            if hasattr(config, k):
-                setattr(config, k, v)
-    return BACKBONE_MODEL_REGISTRY[key](config), config
+get_backbone = RegistryFactory(BACKBONE_MODEL_REGISTRY, BACKBONE_CONFIG_REGISTRY, "backbone").build
 
 
 __all__ = [
