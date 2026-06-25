@@ -7,9 +7,9 @@ import time
 from collections import deque
 from datetime    import datetime
 
-from project_paths  import ProjectPaths
-from system_monitor import SystemMonitor
-from web_logger     import WebLogger
+from webui.project_paths  import ProjectPaths
+from webui.system_monitor import SystemMonitor
+from webui.web_logger     import WebLogger
 
 
 class GpuWatchdog:

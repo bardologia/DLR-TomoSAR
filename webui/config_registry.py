@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from project_paths import ProjectPaths
+from webui.project_paths import ProjectPaths
 
 
 class ConfigRegistry:

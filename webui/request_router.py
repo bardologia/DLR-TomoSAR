@@ -8,27 +8,27 @@ import threading
 from pathlib      import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from config_registry        import ConfigRegistry
-from cube_explorer          import CubeExplorer
-from dataset_browser        import DatasetBrowser
-from equation_library       import EquationLibrary
-from flow_library           import FlowLibrary
-from gpu_watchdog            import GpuWatchdog
-from backbone_model_library          import BackboneModelLibrary
-from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
-from pipeline_library       import PipelineLibrary
-from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
-from jepa_model_library               import JepaModelLibrary
-from physics_loss_library   import PhysicsLossLibrary
-from process_manager        import ProcessManager, ProcessNuke
-from project_paths          import ProjectPaths
-from resource_watchdog      import ResourceWatchdog
-from results_browser        import ResultsBrowser
-from script_catalog         import ScriptCatalog
-from script_config_resolver import ScriptConfigResolver
-from system_monitor         import SystemMonitor
-from tensorboard_manager    import TensorboardManager
-from web_logger             import WebLogger
+from webui.config_registry        import ConfigRegistry
+from webui.cube_explorer          import CubeExplorer
+from webui.dataset_browser        import DatasetBrowser
+from webui.equation_library       import EquationLibrary
+from webui.flow_library           import FlowLibrary
+from webui.gpu_watchdog            import GpuWatchdog
+from webui.backbone_model_library          import BackboneModelLibrary
+from webui.image_autoencoder_model_library  import ImageAutoencoderModelLibrary
+from webui.pipeline_library       import PipelineLibrary
+from webui.profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
+from webui.jepa_model_library               import JepaModelLibrary
+from webui.physics_loss_library   import PhysicsLossLibrary
+from webui.process_manager        import ProcessManager, ProcessNuke
+from webui.project_paths          import ProjectPaths
+from webui.resource_watchdog      import ResourceWatchdog
+from webui.results_browser        import ResultsBrowser
+from webui.script_catalog         import ScriptCatalog
+from webui.script_config_resolver import ScriptConfigResolver
+from webui.system_monitor         import SystemMonitor
+from webui.tensorboard_manager    import TensorboardManager
+from webui.web_logger             import WebLogger
 
 
 class RequestRouter:

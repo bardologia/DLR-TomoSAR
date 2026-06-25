@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from web_logger import WebLogger
+from webui.web_logger import WebLogger
 
 
 class DatasetBrowser:

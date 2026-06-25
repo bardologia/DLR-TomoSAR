@@ -2,6 +2,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$HERE/.." && pwd)"
 
 PORT="${1:-8765}"
 
@@ -16,4 +17,5 @@ for candidate in \
 done
 
 echo "Starting DLR-TomoSAR control console with: $PY"
-exec "$PY" "$HERE/serve.py" --port "$PORT"
+cd "$REPO_ROOT"
+exec "$PY" -m webui.serve --port "$PORT"

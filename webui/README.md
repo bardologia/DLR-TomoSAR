@@ -11,6 +11,12 @@ webui/run.sh            # starts on http://127.0.0.1:8765
 webui/run.sh 9000       # custom port
 ```
 
+From the repository root the server can also be launched directly as a package module:
+
+```bash
+python -m webui.serve --port 8765
+```
+
 `run.sh` auto-selects the `Dune` conda interpreter (the env that carries the project
 dependencies) and falls back to `conda:base` then system `python3`.
 

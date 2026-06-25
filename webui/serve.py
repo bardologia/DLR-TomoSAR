@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from web_ui_server import WebUIServer
+from webui.web_ui_server import WebUIServer
 
 
 class ServeEntry:

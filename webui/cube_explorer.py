@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from project_paths import ProjectPaths
-from web_logger    import WebLogger
+from webui.project_paths import ProjectPaths
+from webui.web_logger    import WebLogger
 
 
 class CubeExplorer:

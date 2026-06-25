@@ -13,8 +13,8 @@ import uuid
 from collections import deque
 from datetime    import datetime
 
-from project_paths import ProjectPaths
-from web_logger    import WebLogger
+from webui.project_paths import ProjectPaths
+from webui.web_logger    import WebLogger
 
 
 class JobStream:

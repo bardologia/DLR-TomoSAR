@@ -4,7 +4,7 @@ import json
 from pathlib      import Path
 from urllib.parse import quote
 
-from web_logger import WebLogger
+from webui.web_logger import WebLogger
 
 
 class ResultsBrowser:

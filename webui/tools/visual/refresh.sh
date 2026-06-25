@@ -11,9 +11,9 @@ PORT="${PORT:-8765}"
 OUT="${OUT:-/tmp/tomosar-ui}"
 LOG="/tmp/tomosar-webui-${PORT}.log"
 
-pkill -f "serve.py --port $PORT" 2>/dev/null || true
+pkill -f "webui.serve --port $PORT" 2>/dev/null || true
 for _ in $(seq 1 20); do
-  pgrep -f "serve.py --port $PORT" >/dev/null || break
+  pgrep -f "webui.serve --port $PORT" >/dev/null || break
   sleep 0.1
 done
 

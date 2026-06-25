@@ -6,8 +6,8 @@ import time
 from collections import deque
 from datetime    import datetime
 
-from process_manager import ProcessManager
-from web_logger      import WebLogger
+from webui.process_manager import ProcessManager
+from webui.web_logger      import WebLogger
 
 
 class ResourceWatchdog:

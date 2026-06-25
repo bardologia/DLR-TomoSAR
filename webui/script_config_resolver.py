@@ -5,7 +5,7 @@ import json
 import subprocess
 import threading
 
-from project_paths import ProjectPaths
+from webui.project_paths import ProjectPaths
 
 
 class ScriptConfigResolver:

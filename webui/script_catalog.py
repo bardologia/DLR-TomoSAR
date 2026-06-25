@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from project_paths          import ProjectPaths
-from script_config_resolver import ScriptConfigResolver
+from webui.project_paths          import ProjectPaths
+from webui.script_config_resolver import ScriptConfigResolver
 
 
 class ScriptCatalog:
