@@ -14,7 +14,13 @@ import _bootstrap
 from _bootstrap import EnvironmentPinner
 
 
-THREAD_KEYS = ("MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS", "OMP_NUM_THREADS")
+THREAD_KEYS = (
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+)
 
 
 @pytest.fixture
@@ -24,12 +30,8 @@ def clean_env(monkeypatch):
     return monkeypatch
 
 
-def test_thread_limits_mapping_values():
-    assert EnvironmentPinner.THREAD_LIMITS == {
-        "MKL_NUM_THREADS"     : "4",
-        "NUMEXPR_NUM_THREADS" : "4",
-        "OMP_NUM_THREADS"     : "4",
-    }
+def test_thread_vars_cover_all_blas_backends():
+    assert EnvironmentPinner.THREAD_VARS == THREAD_KEYS
 
 
 def test_threads_sets_documented_env_vars(clean_env):
@@ -37,9 +39,17 @@ def test_threads_sets_documented_env_vars(clean_env):
 
     EnvironmentPinner.threads()
 
-    assert os.environ["MKL_NUM_THREADS"]     == "4"
-    assert os.environ["NUMEXPR_NUM_THREADS"] == "4"
-    assert os.environ["OMP_NUM_THREADS"]     == "4"
+    for key in THREAD_KEYS:
+        assert os.environ[key] == "4"
+
+
+def test_threads_accepts_custom_count(clean_env):
+    import os
+
+    EnvironmentPinner.threads(1)
+
+    for key in THREAD_KEYS:
+        assert os.environ[key] == "1"
 
 
 def test_gpu_sets_cuda_visible_devices(clean_env):
@@ -73,24 +83,6 @@ def test_gpu_without_expandable_segments_leaves_alloc_conf_unset(clean_env):
     EnvironmentPinner.gpu(gpu_id=1, expandable_segments=False)
 
     assert "PYTORCH_CUDA_ALLOC_CONF" not in os.environ
-
-
-def test_gpu_none_reads_cli_default(clean_env, monkeypatch):
-    import os
-
-    monkeypatch.setattr(sys, "argv", ["prog"])
-    EnvironmentPinner.gpu(gpu_id=None)
-
-    assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
-
-
-def test_gpu_none_reads_cli_argument(clean_env, monkeypatch):
-    import os
-
-    monkeypatch.setattr(sys, "argv", ["prog", "--gpu", "2"])
-    EnvironmentPinner.gpu(gpu_id=None)
-
-    assert os.environ["CUDA_VISIBLE_DEVICES"] == "2"
 
 
 def test_gpus_joins_ids(clean_env):

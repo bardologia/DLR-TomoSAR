@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 import warnings
@@ -14,16 +13,18 @@ if str(_REPO_ROOT) not in sys.path:
 
 
 class EnvironmentPinner:
-    THREAD_LIMITS = {
-        "MKL_NUM_THREADS"     : "4",
-        "NUMEXPR_NUM_THREADS" : "4",
-        "OMP_NUM_THREADS"     : "4",
-    }
+    THREAD_VARS = (
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+    )
 
     @classmethod
-    def threads(cls) -> None:
-        for key, value in cls.THREAD_LIMITS.items():
-            os.environ[key] = value
+    def threads(cls, count: int = 4) -> None:
+        for key in cls.THREAD_VARS:
+            os.environ[key] = str(count)
 
     @classmethod
     def gpus(cls, gpu_ids: list) -> None:
@@ -35,13 +36,7 @@ class EnvironmentPinner:
         cls.threads()
 
     @classmethod
-    def gpu(cls, gpu_id: int | None = None, expandable_segments: bool = False) -> None:
-        if gpu_id is None:
-            parser = argparse.ArgumentParser(add_help=False)
-            parser.add_argument("--gpu", type=int, default=0)
-            args, _ = parser.parse_known_args()
-            gpu_id  = args.gpu
-
+    def gpu(cls, gpu_id: int, expandable_segments: bool = False) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
         cls.threads()
 
