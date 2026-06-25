@@ -8,7 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from tools.baselines       import TrackBaselines, TrackProfiles
+from tools.baselines       import TrackProfiles
 from tools.data.regions    import CropRegion
 from tools.sar             import GeometryField, GeometryFieldBuilder, TrackParameters
 
