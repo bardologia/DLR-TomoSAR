@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelines.training_launcher import TrainingLauncher
+from pipelines.shared.training_launcher import TrainingLauncher
 
 
 ENTRY = Path("/entry/train.py")

@@ -13,7 +13,7 @@ def main() -> None:
 
     EnvironmentPinner.gpu(args.gpu, expandable_segments=True)
 
-    from pipelines.training_launcher import TrainingLauncher
+    from pipelines.shared.training_launcher import TrainingLauncher
     TrainingLauncher(entry_script=Path(__file__).resolve()).run()
 
 if __name__ == "__main__":
