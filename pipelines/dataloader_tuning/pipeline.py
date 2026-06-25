@@ -8,6 +8,7 @@ import torch
 
 from tools.benchmarking            import LoaderSpec, GpuFeedBenchmark, DataLoaderSweep, SweepReport
 from tools.monitoring.logger       import Logger
+from tools.runtime.event_stream    import JsonEventStream
 from tools.runtime.reproducibility import Reproducibility
 from pipelines.dataloader_tuning.adapters import build_feed_target
 
@@ -21,11 +22,9 @@ class DataLoaderTuningPipeline:
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.logger = Logger(log_dir=str(self.output_dir / "logs"), name="dataloader_tuning", level="INFO")
+        self.events = JsonEventStream("@TUNE")
 
         Reproducibility.seed_everything(config.seed)
-
-    def _emit(self, kind: str, payload: dict) -> None:
-        print(f"@TUNE {kind} {json.dumps(payload)}", flush=True)
 
     def _build_target(self):
         self.logger.section("[DataLoader Tuning]")
@@ -77,7 +76,7 @@ class DataLoaderTuningPipeline:
     def _run_sweep(self, benchmark, specs, phase: str) -> list[dict]:
         def _on_result(record):
             record["phase"] = phase
-            self._emit("result", record)
+            self.events.emit("result", record)
             if record.get("status") == "ok":
                 self.logger.subsection(
                     f"bs={record['batch_size']:>5} workers={record['num_workers']} "
@@ -148,7 +147,7 @@ class DataLoaderTuningPipeline:
 
         parameter_count = sum(parameter.numel() for parameter in target.model.parameters())
 
-        self._emit("meta", {
+        self.events.emit("meta", {
             "mode"        : self.config.mode,
             "device"      : str(device),
             "model_name"  : target.model_name,
@@ -173,14 +172,14 @@ class DataLoaderTuningPipeline:
 
         final = self._final_config(recommendation, refine_report)
 
-        self._emit("recommendation", {"recommendation": recommendation, "final": final})
+        self.events.emit("recommendation", {"recommendation": recommendation, "final": final})
 
         results_path = self._write(target, device, main_results, refine_results, recommendation, final)
 
         self.logger.section("[Recommended configuration]")
         self.logger.kv_table({**final, "results": str(results_path)})
 
-        self._emit("done", {"results_path": str(results_path), "figure_dir": str(self.figure_dir)})
+        self.events.emit("done", {"results_path": str(results_path), "figure_dir": str(self.figure_dir)})
         self.logger.close()
 
         return final
