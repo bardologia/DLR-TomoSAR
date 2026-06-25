@@ -270,6 +270,8 @@ class Report:
         ]))
         out.append("")
 
+        self._subsection_index = 3
+
         out += self._build_active_count_headline()
         out += self._build_matched_headline()
         out += self._build_slot_organization_headline()
@@ -279,13 +281,17 @@ class Report:
 
         return out
 
+    def _next_subsection(self) -> str:
+        self._subsection_index += 1
+        return f"2.{self._subsection_index}"
+
     def _build_matched_headline(self) -> List[str]:
         gm = self.global_metrics
         if "matched_mu_mae" not in gm:
             return []
 
         n_K = self.run_summary["n_gaussians"]
-        out = ["\n### 2.5 Permutation-invariant matched Gaussian errors\n"]
+        out = [f"\n### {self._next_subsection()} Permutation-invariant matched Gaussian errors\n"]
         out.append(
             "Each pixel's predicted Gaussians are Hungarian-matched to its GT Gaussians on |Δμ| before "
             "scoring, so the errors are independent of slot ordering. A match counts as a detection hit when "
@@ -324,7 +330,7 @@ class Report:
             return []
 
         n_K = self.run_summary["n_gaussians"]
-        out = ["\n### 2.4 Slot occupancy (GT vs Pred)\n"]
+        out = [f"\n### {self._next_subsection()} Slot occupancy (GT vs Pred)\n"]
         out.append(
             "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude ≥ 1e-3), "
             "ground truth versus prediction, over the full stitched test cube.\n"
@@ -362,7 +368,7 @@ class Report:
             return []
 
         n_K = self.run_summary["n_gaussians"]
-        out = ["\n### 2.6 Slot internal organization (emergent)\n"]
+        out = [f"\n### {self._next_subsection()} Slot internal organization (emergent)\n"]
         out.append(
             "Training Hungarian-matches predicted slots to GT before scoring, so the loss is invariant to "
             "predicted slot ordering: the model gets no gradient fixing a role to an output channel. These "
@@ -389,7 +395,7 @@ class Report:
         if not isinstance(tracks, dict):
             return []
 
-        out = ["\n### 2.4 Tracks used in this run\n"]
+        out = [f"\n### {self._next_subsection()} Tracks used in this run\n"]
         out.append(
             f"Baselines relative to the reference pass `{tracks['reference']}` over azimuth window "
             f"{tracks['azimuth_window']}; absolute values are the resa-frame windowed means.\n"
@@ -420,7 +426,7 @@ class Report:
         if not isinstance(positions, dict):
             return []
 
-        out = ["\n### 2.5 Track positions and temporal deviation\n"]
+        out = [f"\n### {self._next_subsection()} Track positions and temporal deviation\n"]
         out.append(
             f"Absolute mean positions in the resa track frame over {positions['n_samples']} azimuth samples "
             f"starting at index {positions['azimuth_start']}. Spans are peak-to-peak excursions per component; "
@@ -453,7 +459,7 @@ class Report:
         if "improvement_pixel_mse_mean" not in gm:
             return []
 
-        out = ["\n### 2.7 NN improvement over the classical baseline\n"]
+        out = [f"\n### {self._next_subsection()} NN improvement over the classical baseline\n"]
         out.append(
             "The reduced tomogram is a classical Capon reconstruction from the primary plus the exact "
             "secondary subset this run was trained on, processed identically to the ground-truth full-stack "
