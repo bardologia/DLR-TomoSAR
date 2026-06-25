@@ -2,20 +2,20 @@ from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig,
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .unet          import UNet, UNetMultiHead, UNetPerGaussian
 from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
-from .AttentionUNet import AttentionUNet
-from .UNetPlusPlus  import UNetPlusPlus
-from .LinkNet       import LinkNet
-from .SwinUNet      import SwinUNet
-from .TransUNet     import TransUNet
-from .UNETR         import UNETR
-from .DeepLabV3Plus import DeepLabV3Plus
-from .SegFormerLite import SegFormerLite
-from .ConvNeXtUNet  import ConvNeXtUNet
-from .DenseUNet     import DenseUNet
-from .HRNetLite     import HRNetLite
-from .MultiResUNet  import MultiResUNet
-from .FPNNet        import FPNNet
-from .U2NetLite     import U2NetLite
+from .attention_unet import AttentionUNet
+from .unet_plus_plus  import UNetPlusPlus
+from .link_net        import LinkNet
+from .swin_unet       import SwinUNet
+from .trans_unet      import TransUNet
+from .unetr           import UNETR
+from .deeplab_v3_plus import DeepLabV3Plus
+from .segformer_lite  import SegFormerLite
+from .convnext_unet   import ConvNeXtUNet
+from .dense_unet      import DenseUNet
+from .hrnet_lite      import HRNetLite
+from .multires_unet   import MultiResUNet
+from .fpn_net         import FPNNet
+from .u2net_lite      import U2NetLite
 
 BACKBONE_MODEL_REGISTRY: dict[str, type] = {
     "unet"                : UNet,
