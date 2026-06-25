@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pipelines.shared.autoencoder_trainer      import AutoencoderTrainer
+from pipelines.autoencoder_common.trainer      import AutoencoderTrainer
 from pipelines.image_autoencoder.training.loss import Loss
 
 
