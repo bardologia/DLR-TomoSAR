@@ -8,7 +8,8 @@ from configuration.sar.gaussian_config         import GaussianConfig
 from configuration.sar.geometry_config         import GeometryConfig
 from configuration.training.backbone           import BackboneTrainerConfig
 from configuration.training.general.loss       import LossConfig
-from pipelines.backbone.dataset.normalization  import Normalizer, Stats
+from pipelines.backbone.dataset.normalizer     import Normalizer
+from pipelines.backbone.dataset.stats           import Stats
 from pipelines.backbone.training.loss          import Loss
 from models                                    import get_backbone
 

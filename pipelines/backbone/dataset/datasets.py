@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 from configuration.dataset import InputConfig, OutputConfig
 from pipelines.backbone.dataset.augmentation  import SpatialAugmenter
-from pipelines.backbone.dataset.normalization import Normalizer
+from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.spatial       import Patcher
 
 

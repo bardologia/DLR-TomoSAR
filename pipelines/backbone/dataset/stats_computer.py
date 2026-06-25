@@ -1,71 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib     import Path
-from typing      import Optional, Union
+from typing import Optional
 
 import numpy as np
-import torch
 from torch.utils.data import DataLoader, Subset
 
 from configuration.dataset import InputConfig, OutputConfig
-from configuration.normalization import ChannelStats, ChannelStrategy, NormalizationConfig, NormMethod, OutputClampConfig
-from tools.data.io                     import FileIO
+from configuration.normalization import ChannelStats, ChannelStrategy, NormalizationConfig, NormMethod
 from tools.data.sampling               import Sampler
-from tools.data.transforms             import Log1pTransform
 from tools.monitoring.logger           import Logger
 from tools.reporting.ranges            import RangeFormatter
 
-
-Array = Union[np.ndarray, torch.Tensor]
-
-
-@dataclass
-class Stats:
-    input_stats  : Optional[ChannelStats] = None
-    output_stats : Optional[ChannelStats] = None
-    clamp        : OutputClampConfig      = field(default_factory=OutputClampConfig)
-
-    def save(self, directory: Path) -> Path:
-        directory = Path(directory)
-        out_path  = directory / "normalization_stats.json"
-
-        payload = {
-            "input_stats"  : self.input_stats.as_dict()  if self.input_stats  else None,
-            "output_stats" : self.output_stats.as_dict() if self.output_stats else None,
-            "clamp"        : self.clamp.as_dict(),
-        }
-
-        return FileIO.save_json(payload, out_path, indent=4)
-
-    @classmethod
-    def load(cls, directory: Path, logger: Logger) -> "Stats":
-        path = Path(directory) / "normalization_stats.json"
-        if not path.exists():
-            raise FileNotFoundError(f"Normalization stats not found at '{path}'.")
-
-        payload = FileIO.load_json(path)
-
-        input_stats  = ChannelStats.from_dict(payload["input_stats"])
-        output_stats = ChannelStats.from_dict(payload["output_stats"])
-        clamp        = OutputClampConfig.from_dict(payload["clamp"])
-
-        logger.section("[Normalization stats loaded]")
-        logger.kv_table({
-            "Stats path":      path,
-            "Input channels":  input_stats.n_channels,
-            "Output channels": output_stats.n_channels,
-            "Output clamp":    f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
-        })
-
-        return cls(input_stats = input_stats, output_stats = output_stats, clamp = clamp)
-
-    @classmethod
-    def merge(cls, input_only: "Stats", output_only: "Stats") -> "Stats":
-        return cls(
-            input_stats  = input_only.input_stats,
-            output_stats = output_only.output_stats,
-        )
+from pipelines.backbone.dataset.stats import Stats
 
 
 class StatsComputer:
@@ -394,89 +340,3 @@ class StatsComputer:
         merged       = Stats.merge(input_only, output_only)
         merged.clamp = normalization.clamp()
         return merged
-
-
-class Normalizer:
-    def __init__(self, stats: Stats) -> None:
-        self.stats = stats
-
-        self._vectors: dict[int, dict] = {}
-
-    def _channel_vectors(self, stats: ChannelStats) -> dict:
-        key = id(stats)
-        if key in self._vectors:
-            return self._vectors[key]
-
-        if stats.strategies is None:
-            raise ValueError("ChannelStats is missing per-channel strategies; cannot build normalization vectors.")
-
-        loc       = np.asarray(stats.loc,   dtype=np.float32)
-        scale     = np.asarray(stats.scale, dtype=np.float32)
-        log1p     = np.asarray([strat.apply_log1p for strat in stats.strategies], dtype=bool)
-        inv_scale = (1.0 / scale).astype(np.float32)
-
-        vectors = {
-            "loc"       : loc,
-            "scale"     : scale,
-            "inv_scale" : inv_scale,
-            "log1p"     : log1p,
-        }
-        self._vectors[key] = vectors
-
-        return vectors
-
-    def _apply_normalization(self, tensor: Array, stats: ChannelStats, inverse: bool) -> Array:
-        is_torch = isinstance(tensor, torch.Tensor)
-        vectors  = self._channel_vectors(stats)
-        clamp    = self.stats.clamp
-
-        shape    = (1, -1, 1, 1) if tensor.ndim == 4 else (-1, 1, 1)
-
-        if is_torch:
-            device    = tensor.device
-            loc       = torch.as_tensor(vectors["loc"],       device=device).reshape(shape)
-            scale     = torch.as_tensor(vectors["scale"],     device=device).reshape(shape)
-            inv_scale = torch.as_tensor(vectors["inv_scale"], device=device).reshape(shape)
-            log1p     = torch.as_tensor(vectors["log1p"],     device=device).reshape(shape)
-
-            if not inverse:
-                x   = torch.where(log1p, Log1pTransform.compress(tensor), tensor)
-                out = (x - loc) * inv_scale
-            else:
-                x   = tensor * scale + loc
-                out = torch.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
-
-            return out
-
-        loc       = vectors["loc"].reshape(shape)
-        scale     = vectors["scale"].reshape(shape)
-        inv_scale = vectors["inv_scale"].reshape(shape)
-        log1p     = vectors["log1p"].reshape(shape)
-
-        if not inverse:
-            x   = np.where(log1p, Log1pTransform.compress(tensor), tensor)
-            out = (x - loc) * inv_scale
-        else:
-            x   = tensor * scale + loc
-            out = np.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
-
-        return np.ascontiguousarray(out, dtype=np.float32)
-
-    @staticmethod
-    def _require(stats: Optional[ChannelStats], role: str) -> ChannelStats:
-        if stats is None:
-            raise ValueError(f"Normalizer has no {role} stats; cannot (de)normalize {role}.")
-
-        return stats
-
-    def normalize_input(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=False)
-
-    def normalize_output(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=False)
-
-    def denormalize_input(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=True)
-
-    def denormalize_output(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=True)

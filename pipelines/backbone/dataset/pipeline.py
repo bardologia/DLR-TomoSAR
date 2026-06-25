@@ -12,7 +12,8 @@ from tools.data.regions                       import CropRegion
 from pipelines.backbone.dataset.augmentation  import SpatialAugmenter
 from pipelines.backbone.dataset.datasets      import MultiRegionDataset, PatchDataset
 from pipelines.shared.loaders                 import Loader
-from pipelines.backbone.dataset.normalization import Normalizer, StatsComputer
+from pipelines.backbone.dataset.normalizer    import Normalizer
+from pipelines.backbone.dataset.stats_computer import StatsComputer
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
 from tools.data.io                            import FileIO
 from tools.monitoring.logger                  import Logger

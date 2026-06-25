@@ -15,7 +15,8 @@ from tools.data.regions                       import CropRegion
 from configuration.sar.gaussian_config        import GaussianConfig
 from models                                   import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.datasets      import PatchDataset
-from pipelines.backbone.dataset.normalization import Normalizer, Stats
+from pipelines.backbone.dataset.normalizer    import Normalizer
+from pipelines.backbone.dataset.stats         import Stats
 from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
 from tools.data.io                            import FileIO, BackboneModelConfigIO
 from tools.data.gaussians                     import GaussianClamp, GaussianHead

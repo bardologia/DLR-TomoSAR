@@ -5,7 +5,8 @@ import pytest
 import torch
 
 from configuration.normalization.general     import ChannelStats, ChannelStrategy, NormMethod
-from pipelines.backbone.dataset.normalization import Normalizer, Stats
+from pipelines.backbone.dataset.normalizer    import Normalizer
+from pipelines.backbone.dataset.stats         import Stats
 
 
 def _zscore_stats() -> Stats:
@@ -89,7 +90,7 @@ def test_missing_output_stats_raises():
 def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, parameters):
     from configuration.dataset                      import InputConfig, OutputConfig, Representation
     from pipelines.backbone.dataset.datasets        import PatchDataset
-    from pipelines.backbone.dataset.normalization   import StatsComputer
+    from pipelines.backbone.dataset.stats_computer  import StatsComputer
     from pipelines.backbone.dataset.spatial         import Patcher
     from tools.monitoring.logger                    import Logger
 

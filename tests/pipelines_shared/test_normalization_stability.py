@@ -5,7 +5,8 @@ import pytest
 import torch
 
 from configuration.normalization.general    import ChannelStats, ChannelStrategy, NormMethod
-from pipelines.backbone.dataset.normalization import Normalizer, Stats
+from pipelines.backbone.dataset.normalizer    import Normalizer
+from pipelines.backbone.dataset.stats         import Stats
 
 ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma", "dem/elevation"]
 ZSCORE_SLOTS       = ["out/mu", "pass/phase", "ifg/phase", "pass/raw_re_im", "ifg/raw_re_im"]
