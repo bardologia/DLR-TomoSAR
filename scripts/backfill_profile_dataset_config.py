@@ -8,7 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from configuration.benchmark.general            import TrainingQueueConfig
+from configuration.training.general.run         import TrainingQueueConfig
 from configuration.dataset.profile_autoencoder  import ProfileAugmentationConfig, ProfileDatasetConfig
 from pipelines.shared.config_persistence        import ProfileDatasetConfigIO
 from tools.data.regions                         import CropRegion, SplitRegions

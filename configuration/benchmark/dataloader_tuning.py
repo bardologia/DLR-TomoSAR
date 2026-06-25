@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.benchmark.general import BenchmarkPathsConfig
+from configuration.training.general.run import RunPathsConfig
 
 
 @dataclass
@@ -35,5 +35,5 @@ class DataLoaderTuningEntryConfig:
     synthetic_samples : int = 200_000
     synthetic_length  : int = 96
 
-    paths      : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
+    paths      : RunPathsConfig = field(default_factory=RunPathsConfig)
     output_dir : Path                 = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/dataloader_tuning")

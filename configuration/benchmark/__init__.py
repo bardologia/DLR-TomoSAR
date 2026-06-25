@@ -1,9 +1,7 @@
 from configuration.benchmark.general import (
-    BenchmarkPathsConfig,
     OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
-    TrainingQueueConfig,
     InferenceQueueConfig,
     ComparisonReportConfig,
     BenchmarkConfig,

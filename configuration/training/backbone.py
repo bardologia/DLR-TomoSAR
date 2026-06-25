@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.benchmark.general            import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
 from configuration.dataset                       import AugmentationConfig, InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
@@ -148,7 +148,7 @@ class BackboneEntryConfig:
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
-    paths      : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
+    paths      : RunPathsConfig       = field(default_factory=RunPathsConfig)
     training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
     pretrain   : PretrainConfig       = field(default_factory=PretrainConfig)
     curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)

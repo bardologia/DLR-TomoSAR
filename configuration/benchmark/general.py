@@ -1,17 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib     import Path
 
-from configuration.benchmark.jepa import JepaBenchConfig
-
-
-@dataclass
-class BenchmarkPathsConfig:
-    dataset_path     : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")
-    parameters_path  : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10/params/params_Ng3_sigonly_k5/parameters_Ng3_sigonly_k5.npy")
-    log_base_dir     : Path  = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/benchmark_extended")
-    secondary_labels : tuple = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
+from configuration.benchmark.jepa       import JepaBenchConfig
+from configuration.training.general.run import RunPathsConfig, TrainingQueueConfig
 
 
 @dataclass
@@ -44,31 +36,6 @@ class SizeMatchConfig:
     scale_high      : float       = 8.0
     in_channels     : int         = 9
     locked_params   : tuple[str, ...] = ("embedding_dim", "embedding_dims")
-
-
-@dataclass
-class TrainingQueueConfig:
-    epochs               : int             = 100
-    scheduler_epochs     : int | None      = 100
-    validation_frequency : int             = 1
-    batch_size           : int             = 256
-    num_workers          : int             = 4
-    prefetch_factor      : int             = 2
-    warmup_steps         : int             = 200
-    eta_min              : float           = 1e-6
-    early_stop_patience  : int             = 30
-    patch_size           : tuple[int, int] = (64, 64)
-    patch_stride         : int             = 32
-    train_azimuth        : tuple[int, int] = (1000, 13000)
-    val_azimuth          : tuple[int, int] = (13000, 14500)
-    test_azimuth         : tuple[int, int] = (14500, 16000)
-    log_all_losses       : bool            = False
-
-    use_amp                     : bool = False
-    gradient_accumulation_steps : int  = 1
-
-    scale_lr_with_batch     : bool = True
-    lr_reference_batch_size : int  = 256
 
 
 @dataclass
@@ -112,7 +79,7 @@ def _default_ae_loss():
 class BenchmarkConfig:
     training_type : str = "backbone"
 
-    paths      : BenchmarkPathsConfig   = field(default_factory=BenchmarkPathsConfig)
+    paths      : RunPathsConfig         = field(default_factory=RunPathsConfig)
     overfit    : OverfitGateConfig      = field(default_factory=OverfitGateConfig)
     max_batch  : MaxBatchConfig         = field(default_factory=MaxBatchConfig)
     size_match : SizeMatchConfig        = field(default_factory=SizeMatchConfig)

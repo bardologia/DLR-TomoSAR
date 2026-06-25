@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.benchmark.general import (
-    BenchmarkPathsConfig,
     ComparisonReportConfig,
     InferenceQueueConfig,
-    TrainingQueueConfig,
 )
 from configuration.cross_validation.jepa                import JepaCvConfig
 from configuration.cross_validation.profile_autoencoder import AeCvConfig
 from configuration.sar.geometry_config                  import GeometryConfig
+from configuration.training.general.run                 import RunPathsConfig, TrainingQueueConfig
 from configuration.training.general.runtime             import OverfitConfig
 
 
@@ -29,7 +28,7 @@ class CrossValidationConfig:
     backbone_name   : str  = "resunet"
     model_overrides : dict = field(default_factory=dict)
 
-    paths      : BenchmarkPathsConfig   = field(default_factory=lambda: BenchmarkPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/cross_validation")))
+    paths      : RunPathsConfig         = field(default_factory=lambda: RunPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/cross_validation")))
     folds      : FoldConfig             = field(default_factory=FoldConfig)
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)

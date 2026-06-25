@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.benchmark.general                  import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.training.general.run               import RunPathsConfig, TrainingQueueConfig
 from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.architectures.image_autoencoder    import ImageAutoencoderBaseConfig
 from configuration.inference.general                  import InferenceConfig
@@ -106,9 +106,9 @@ class JepaEntryConfig:
     overfit        : OverfitConfig       = field(default_factory=OverfitConfig)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
-    paths    : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
-    training : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
-    pretrain : PretrainConfig       = field(default_factory=PretrainConfig)
+    paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    training : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
+    pretrain : PretrainConfig      = field(default_factory=PretrainConfig)
 
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=JepaDefaults.inference)

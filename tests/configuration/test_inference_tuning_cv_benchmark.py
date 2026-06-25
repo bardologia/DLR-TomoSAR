@@ -16,17 +16,16 @@ from configuration.cross_validation.jepa                 import JepaCvConfig
 from configuration.cross_validation.profile_autoencoder  import AeCvConfig
 
 from configuration.benchmark.general          import (
-    BenchmarkPathsConfig,
     OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
-    TrainingQueueConfig,
     InferenceQueueConfig,
     ComparisonReportConfig,
     BenchmarkConfig,
 )
 from configuration.benchmark.jepa             import JepaBenchConfig
 from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
+from configuration.training.general.run        import RunPathsConfig, TrainingQueueConfig
 
 
 DEFAULT_CONFIGS = [
@@ -39,7 +38,7 @@ DEFAULT_CONFIGS = [
     CrossValidationConfig,
     JepaCvConfig,
     AeCvConfig,
-    BenchmarkPathsConfig,
+    RunPathsConfig,
     OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
@@ -96,7 +95,7 @@ def test_tuning_entry_config_subconfigs():
     cfg = TuningEntryConfig()
     assert isinstance(cfg.tuning, TuningConfig)
     assert isinstance(cfg.jepa, JepaTuneConfig)
-    assert isinstance(cfg.paths, BenchmarkPathsConfig)
+    assert isinstance(cfg.paths, RunPathsConfig)
     assert isinstance(cfg.gpus, list)
     assert cfg.training.batch_size > 0
 
@@ -128,7 +127,7 @@ def test_cross_validation_runs_inference_logic():
 
 
 def test_benchmark_paths_defaults_are_paths():
-    cfg = BenchmarkPathsConfig()
+    cfg = RunPathsConfig()
     assert isinstance(cfg.dataset_path, Path)
     assert isinstance(cfg.parameters_path, Path)
     assert isinstance(cfg.secondary_labels, tuple)

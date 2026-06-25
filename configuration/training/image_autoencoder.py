@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.benchmark.general                import BenchmarkPathsConfig, TrainingQueueConfig
+from configuration.training.general.run             import RunPathsConfig, TrainingQueueConfig
 from configuration.architectures.image_autoencoder  import Conv2dImageAutoencoderConfig, ImageAutoencoderBaseConfig
 from configuration.sar.geometry_config              import GeometryConfig
 from configuration.training.general.optimization    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
@@ -52,6 +52,6 @@ class ImageAeEntryConfig:
     overfit           : OverfitConfig              = field(default_factory=OverfitConfig)
     geometry          : GeometryConfig             = field(default_factory=GeometryConfig)
 
-    paths    : BenchmarkPathsConfig = field(default_factory=BenchmarkPathsConfig)
-    training : TrainingQueueConfig  = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
-    pretrain : PretrainConfig       = field(default_factory=PretrainConfig)
+    paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    training : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
+    pretrain : PretrainConfig      = field(default_factory=PretrainConfig)
