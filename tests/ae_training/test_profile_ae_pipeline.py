@@ -9,10 +9,12 @@ import torch
 from torch.utils.data import DataLoader
 
 from configuration.architectures.profile_autoencoder import MlpAutoencoderConfig
+from configuration.dataset import ProfileDatasetConfig, SplitRegions
 from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig, ProfileAeTrainerConfig
 from pipelines.profile_autoencoder.training import pipeline as profile_pipeline
 from pipelines.shared.run_metadata import TrainingRunMetadata
+from tools.data.regions import CropRegion
 
 
 pytestmark = pytest.mark.slow
@@ -58,6 +60,11 @@ def _loader(n=8, batch_size=4, seed=0):
     return DataLoader(x, batch_size=batch_size)
 
 
+def _profile_config(tmp_path):
+    region = CropRegion(0, 8, 0, 8)
+    return ProfileDatasetConfig(preprocessing_run_directory=tmp_path, split_regions=SplitRegions(train=region, val=region, test=region))
+
+
 def test_build_model_sets_profile_length():
     cfg  = _build_cfg()
     pipe = _pipeline(cfg)
@@ -76,7 +83,7 @@ def test_orchestration_produces_checkpoint_and_metadata(tmp_path):
     model    = pipe._build_model(PROFILE_LENGTH)
     x_axis   = np.linspace(0.0, 1.0, PROFILE_LENGTH, dtype=np.float32)
 
-    pipe._save_metadata(run_meta, PROFILE_LENGTH)
+    pipe._save_metadata(run_meta, _profile_config(tmp_path), PROFILE_LENGTH)
 
     loader            = _loader()
     results, run_dir  = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader)
