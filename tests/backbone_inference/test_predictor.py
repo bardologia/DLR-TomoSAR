@@ -8,7 +8,8 @@ import torch
 
 from models.backbone import get_backbone
 from pipelines.backbone.dataset.spatial import Patcher
-from pipelines.backbone.inference.loader     import InferenceMetadata, ModelWrapper
+from pipelines.backbone.inference.model_wrapper import ModelWrapper
+from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics    import Result
 from pipelines.backbone.inference.predictor  import CubeStitcher, Predictor
 from tools.data.regions import CropRegion

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime    import datetime
 from pathlib     import Path
 from typing      import Optional, Tuple
 
@@ -10,103 +9,17 @@ import torch
 from torch.utils.data import DataLoader
 
 from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.inference import InferenceConfig
-from tools.data.regions                       import CropRegion
-from configuration.sar.gaussian_config        import GaussianConfig
-from models                                   import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from pipelines.backbone.dataset.datasets      import PatchDataset
-from pipelines.backbone.dataset.normalizer    import Normalizer
-from pipelines.backbone.dataset.stats         import Stats
-from pipelines.backbone.dataset.spatial       import Cropper, GridInfo, Layout, Patcher
-from tools.data.io                            import FileIO, BackboneModelConfigIO
-from tools.data.gaussians                     import GaussianClamp, GaussianHead
-from tools.monitoring.logger                  import Logger
-from tools.baselines                          import TrackBaselines, TrackProfiles
-
-
-
-
-class InferenceMetadata:
-    def __init__(self, config: InferenceConfig) -> None:
-        self.config = config
-        paths       = config.paths
-
-        base = config.run_directory / "inference"
-        self.output_dir     = base / config.output_subdir if config.output_subdir else base / datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.figures_dir    = self.output_dir / paths.figures_subdir
-        self.animations_dir = self.output_dir / paths.animations_subdir
-        self.logs_dir       = self.output_dir / paths.logs_subdir
-        self.cube_dir       = self.output_dir / paths.cubes_subdir
-        self.metrics_path   = self.output_dir / paths.metrics_filename
-        self.report_path    = self.output_dir / paths.report_filename
-
-    def figure_path(self, name: str, ext: str = "png") -> Path:
-        return self.figures_dir / f"{name}.{ext}"
-
-    def create_dirs(self) -> None:
-        FileIO.ensure_dirs(
-            self.output_dir,
-            self.figures_dir,
-            self.animations_dir,
-            self.logs_dir,
-            self.cube_dir,
-        )
-
-
-class ModelWrapper:
-    def __init__(
-        self,
-        model,
-        device,
-        *,
-        params_per_gaussian: int = 3,
-        normalizer=None,
-        x_axis: torch.Tensor | None = None,
-        amp_max: float | None = None,
-        n_gaussians: int = 0,
-        predict_presence: bool = False,
-        presence_gate_thr: float = 0.5,
-    ) -> None:
-
-        self._model               = model
-        self._device              = device
-        self._params_per_gaussian = params_per_gaussian
-        self._normalizer          = normalizer
-        self._x_axis              = x_axis
-        self._amp_max             = amp_max
-        self._n_gaussians         = n_gaussians
-        self._predict_presence    = predict_presence
-        self._presence_gate_thr   = presence_gate_thr
-
-    def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
-        if self._normalizer is not None:
-            out = self._normalizer.denormalize_output(out)
-
-        if self._x_axis is not None and self._amp_max is not None:
-            out = GaussianClamp.apply(
-                out,
-                x_axis      = self._x_axis.to(out.device),
-                amp_max     = self._amp_max,
-                ppg         = self._params_per_gaussian,
-                leaky_slope = 0.0,
-            )
-
-        return out
-
-    def __call__(self, x: np.ndarray) -> np.ndarray:
-        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self._device)
-
-        with torch.no_grad():
-            out = self._model(x_t)
-
-        if self._predict_presence:
-            params, presence_logits = GaussianHead.split(out, self._params_per_gaussian, self._n_gaussians)
-            params_phys             = self.denormalize_output(params)
-            out                     = GaussianHead.gate(params_phys, presence_logits, self._params_per_gaussian, self._n_gaussians, self._presence_gate_thr)
-        else:
-            out = self.denormalize_output(out)
-
-        return out.cpu().numpy()
+from tools.data.regions                         import CropRegion
+from configuration.sar.gaussian_config          import GaussianConfig
+from models                                     import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from pipelines.backbone.dataset.datasets        import PatchDataset
+from pipelines.backbone.dataset.normalizer      import Normalizer
+from pipelines.backbone.dataset.stats           import Stats
+from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Layout, Patcher
+from pipelines.backbone.inference.model_wrapper import ModelWrapper
+from tools.data.io                              import FileIO, BackboneModelConfigIO
+from tools.monitoring.logger                    import Logger
+from tools.baselines                            import TrackBaselines, TrackProfiles
 
 
 @dataclass

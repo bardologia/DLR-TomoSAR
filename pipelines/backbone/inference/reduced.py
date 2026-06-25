@@ -6,7 +6,8 @@ from typing  import List, Optional
 import numpy as np
 
 from configuration.inference import InferenceConfig
-from pipelines.backbone.inference.loader      import InferenceMetadata, Run
+from pipelines.backbone.inference.loader             import Run
+from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from tools                                    import FileIO
 from tools.monitoring.logger                  import Logger
 from tools.data.regions                       import CropRegion

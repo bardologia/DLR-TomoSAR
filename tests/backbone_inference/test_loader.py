@@ -7,7 +7,9 @@ import pytest
 import torch
 
 from configuration.inference import InferenceConfig
-from pipelines.backbone.inference.loader import InferenceMetadata, ModelWrapper, RunLoader
+from pipelines.backbone.inference.loader import RunLoader
+from pipelines.backbone.inference.model_wrapper import ModelWrapper
+from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 
 
 def _write_fake_checkpoint(path: Path, x_axis: np.ndarray) -> dict:

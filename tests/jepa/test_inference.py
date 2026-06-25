@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 
 from pipelines.backbone.dataset.spatial    import GridInfo
-from pipelines.backbone.inference.loader    import ModelWrapper, RunLoader
+from pipelines.backbone.inference.loader    import RunLoader
+from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from pipelines.jepa.inference.loader         import JepaInferenceModel, JepaRunLoader
 from pipelines.jepa.inference.pipeline       import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
 from pipelines.jepa.inference.predictor      import JepaCurvePredictor

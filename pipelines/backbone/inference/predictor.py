@@ -8,7 +8,8 @@ import numpy as np
 import torch
 
 from pipelines.backbone.dataset.spatial   import GridInfo
-from pipelines.backbone.inference.loader  import InferenceMetadata, Run
+from pipelines.backbone.inference.loader  import Run
+from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics import Metrics, Result
 from tools.data.gaussians                 import GaussianReconstructor
 from tools.monitoring.logger              import Logger

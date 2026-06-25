@@ -7,7 +7,8 @@ from models                                              import BACKBONE_IMAGE_S
 from models.profile_autoencoder                                  import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.backbone.inference.loader                 import ModelWrapper, RunLoader
+from pipelines.backbone.inference.loader                 import RunLoader
+from pipelines.backbone.inference.model_wrapper          import ModelWrapper
 from pipelines.jepa.training.trainer                     import JepaModule
 from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 

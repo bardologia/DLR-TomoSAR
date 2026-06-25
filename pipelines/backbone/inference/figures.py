@@ -7,7 +7,7 @@ import numpy as np
 
 from configuration.inference import InferenceConfig
 from pipelines.backbone.inference.animation import Animator
-from pipelines.backbone.inference.loader     import InferenceMetadata
+from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics    import Metrics, Result
 from pipelines.backbone.inference.plots      import Ploter
 from tools                                   import ProfileNormalizer
