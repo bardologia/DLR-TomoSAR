@@ -35,17 +35,37 @@ class ExperimentStage:
             self.logger.error(f"FAILED  {result[name_key]}{log_hint}")
 
 
-class QueuedTrainingStage(ExperimentStage):
-    stage_subdir   : str = "training"
-    worker_action  : str = "train"
-    summary_title  : str = "Training summary"
-    cached_logname : str = "worker.log"
+class QueuedStage(ExperimentStage):
+    stage_subdir     : str = "training"
+    worker_action    : str = ""
+    worker_logname   : str = "worker.log"
+    results_filename : str = ""
 
     def __init__(self, config, entry_script: Path, run_tag: str, items: list[str], logger: Logger) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
         self.items        = items
         self.stage_dir    = self.run_dir / self.stage_subdir
-        self.results_path = self.run_dir / "pipeline" / "training_results.json"
+        self.results_path = self.run_dir / "pipeline" / self.results_filename
+
+    def _job(self, item: str) -> GpuJob:
+        return GpuJob(
+            name     = item,
+            command  = [sys.executable, str(self.entry_script), "--worker", self.worker_action, self._worker_flag(), self._worker_value(item), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
+            log_path = self.stage_dir / item / self.worker_logname,
+        )
+
+    def _worker_flag(self) -> str:
+        return "--model"
+
+    def _worker_value(self, item: str) -> str:
+        return item
+
+
+class QueuedTrainingStage(QueuedStage):
+    worker_action    : str = "train"
+    summary_title    : str = "Training summary"
+    worker_logname   : str = "worker.log"
+    results_filename : str = "training_results.json"
 
     def _config_kv(self) -> dict:
         return {
@@ -66,19 +86,6 @@ class QueuedTrainingStage(ExperimentStage):
 
         return next(item_dir.rglob(self.config.inference.checkpoint_name), None) is not None
 
-    def _job(self, item: str) -> GpuJob:
-        return GpuJob(
-            name     = item,
-            command  = [sys.executable, str(self.entry_script), "--worker", self.worker_action, self._worker_flag(), self._worker_value(item), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.stage_dir / item / self.cached_logname,
-        )
-
-    def _worker_flag(self) -> str:
-        return "--model"
-
-    def _worker_value(self, item: str) -> str:
-        return item
-
     def _cached_result(self, item: str) -> dict:
         return {
             "name"       : item,
@@ -86,7 +93,7 @@ class QueuedTrainingStage(ExperimentStage):
             "status"     : "DONE",
             "returncode" : 0,
             "duration_s" : None,
-            "log_file"   : str(self.stage_dir / item / self.cached_logname),
+            "log_file"   : str(self.stage_dir / item / self.worker_logname),
         }
 
     def _log_summary(self, results: list[dict]) -> None:
@@ -124,17 +131,11 @@ class QueuedTrainingStage(ExperimentStage):
         return results
 
 
-class QueuedInferenceStage(ExperimentStage):
-    stage_subdir   : str = "training"
-    worker_action  : str = "infer"
-    summary_title  : str = "Inference summary"
-    worker_logname : str = "inference_worker.log"
-
-    def __init__(self, config, entry_script: Path, run_tag: str, items: list[str], logger: Logger) -> None:
-        super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
-        self.items        = items
-        self.stage_dir    = self.run_dir / self.stage_subdir
-        self.results_path = self.run_dir / "pipeline" / "inference_results.json"
+class QueuedInferenceStage(QueuedStage):
+    worker_action    : str = "infer"
+    summary_title    : str = "Inference summary"
+    worker_logname   : str = "inference_worker.log"
+    results_filename : str = "inference_results.json"
 
     def _config_kv(self) -> dict:
         return {
@@ -162,19 +163,6 @@ class QueuedInferenceStage(ExperimentStage):
             return False
 
         return next(inference_dir.glob("*/metrics.json"), None) is not None
-
-    def _job(self, item: str) -> GpuJob:
-        return GpuJob(
-            name     = item,
-            command  = [sys.executable, str(self.entry_script), "--worker", self.worker_action, self._worker_flag(), self._worker_value(item), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.stage_dir / item / self.worker_logname,
-        )
-
-    def _worker_flag(self) -> str:
-        return "--model"
-
-    def _worker_value(self, item: str) -> str:
-        return item
 
     def _static_result(self, item: str, status: str) -> dict:
         return {

@@ -353,7 +353,7 @@ class TrainingStage(SeedExpandedStage, QueuedTrainingStage):
         return GpuJob(
             name     = item,
             command  = self._seed_command(self.worker_action, item),
-            log_path = self.stage_dir / item / self.cached_logname,
+            log_path = self.stage_dir / item / self.worker_logname,
         )
 
 

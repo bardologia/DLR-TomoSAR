@@ -72,7 +72,7 @@ def test_training_stage_seed_sweep_expands_fold_by_seed(tmp_path):
     job = stage._job("fold_3_seed2")
     assert job.command[job.command.index("--fold") + 1] == "3"
     assert job.command[job.command.index("--seed") + 1] == "2"
-    assert job.log_path == stage.stage_dir / "fold_3_seed2" / stage.cached_logname
+    assert job.log_path == stage.stage_dir / "fold_3_seed2" / stage.worker_logname
 
 
 def test_training_stage_subdir_and_results_path(tmp_path):

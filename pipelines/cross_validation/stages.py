@@ -40,7 +40,7 @@ class FoldTrainingStage(QueuedTrainingStage):
         return GpuJob(
             name     = item,
             command  = [sys.executable, str(self.entry_script), "--worker", self.worker_action, "--fold", str(fold_index), *SeedSet.cli_args(seed), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
-            log_path = self.stage_dir / item / self.cached_logname,
+            log_path = self.stage_dir / item / self.worker_logname,
         )
 
 
