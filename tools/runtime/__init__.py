@@ -1,7 +1,7 @@
 import importlib
 
 _EXPORTS = {
-    "Detacher": "config_cli",
+    "Detacher": "detacher",
     "ConfigCli": "config_cli",
     "CondaEnv": "conda_env",
     "CondaJobDispatcher": "conda_env",
