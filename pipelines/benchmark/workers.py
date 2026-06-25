@@ -309,8 +309,10 @@ class TrainingWorker(BenchmarkWorker):
 class InferenceWorker(BenchmarkWorker):
     def run(self, model_name: str, seed: int | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
+        from pipelines.shared.inference_components import InferenceComponentsResolver
 
         run_directory = self.run_dir / "training" / self._run_name(model_name, seed)
 
-        pipeline = InferencePipeline(self.factory.inference_config(run_directory))
+        components = InferenceComponentsResolver.for_run(run_directory)
+        pipeline   = InferencePipeline(self.factory.inference_config(run_directory), components=components)
         pipeline.run()

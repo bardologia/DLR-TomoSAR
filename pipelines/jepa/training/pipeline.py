@@ -224,8 +224,10 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         if self.config.infer_after:
             from dataclasses                           import replace
             from pipelines.backbone.inference.pipeline import InferencePipeline
+            from pipelines.shared.inference_components import InferenceComponentsResolver
 
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
-            InferencePipeline(inference_config).run()
+            components       = InferenceComponentsResolver.for_run(Path(run_directory))
+            InferencePipeline(inference_config, components=components).run()
 
         return results

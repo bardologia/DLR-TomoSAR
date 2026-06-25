@@ -218,8 +218,9 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
     captured = {}
 
     class FakePipeline:
-        def __init__(self, inference_config):
-            captured["config"] = inference_config
+        def __init__(self, inference_config, components=None):
+            captured["config"]     = inference_config
+            captured["components"] = components
 
         def run(self):
             captured["ran"] = True

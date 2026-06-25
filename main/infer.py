@@ -28,10 +28,12 @@ def _worker(run_dir: str, config_path: str, gpu_id: int) -> None:
 
     from configuration.inference               import InferenceEntryConfig
     from pipelines.backbone.inference.pipeline  import InferencePipeline
+    from pipelines.shared.inference_components  import InferenceComponentsResolver
     from tools.runtime.config_cli               import ConfigCli
 
-    config   = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
-    pipeline = InferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None))
+    config     = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
+    components = InferenceComponentsResolver.for_run(Path(run_dir))
+    pipeline   = InferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None), components=components)
     pipeline.run()
 
 

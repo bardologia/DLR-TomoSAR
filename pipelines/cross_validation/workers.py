@@ -210,8 +210,10 @@ class FoldTrainingWorker(CrossValidationWorker):
 class FoldInferenceWorker(CrossValidationWorker):
     def run(self, fold_index: int, split: str, seed: int | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
+        from pipelines.shared.inference_components import InferenceComponentsResolver
 
         run_directory = self.run_dir / "folds" / FoldNaming.run_name(fold_index, seed)
 
-        pipeline = InferencePipeline(self.factory.fold_inference_config(run_directory, split))
+        components = InferenceComponentsResolver.for_run(run_directory)
+        pipeline   = InferencePipeline(self.factory.fold_inference_config(run_directory, split), components=components)
         pipeline.run()
