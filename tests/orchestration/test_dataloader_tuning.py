@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from tools.benchmarking.dataloader_tuning import DataLoaderSweep, LoaderSpec, SweepReport
+from tools.benchmarking.dataloader_tuning import DataLoaderSweep, LoaderSpec
+from tools.benchmarking.sweep_report     import SweepReport
 
 
 def _ok_record(spec: LoaderSpec, throughput: float, wait: float = 0.0, feed: float = 2.0, util: float = 90.0) -> dict:
