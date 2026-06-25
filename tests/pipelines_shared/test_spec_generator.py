@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from configuration.sar.processing_config import PathConfig, TomogramConfig
-from pipelines.shared.spec_generator     import GeneratorBase
-from tools.monitoring.logger             import Logger
+from configuration.sar.processing_config  import PathConfig, TomogramConfig
+from pipelines.processing.generation.base import GeneratorBase
+from tools.monitoring.logger              import Logger
 
 
 def _logger(tmp_path) -> Logger:

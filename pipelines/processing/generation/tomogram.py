@@ -15,12 +15,12 @@ from configuration.sar.processing_config              import (
     ProcessingConfig,
     TomogramConfig,
 )
-from tools.sar.pyrat_env             import PyRatEnvironment
-from tools.sar.tomogram_worker       import PyRatJob, run_pyrat_job
-from tools                           import FileIO, ProcessPoolRunner
-from tools.monitoring.logger         import Logger
-from tools.data.regions              import CropRegion
-from pipelines.shared.spec_generator import GeneratorBase
+from tools.sar.pyrat_env                  import PyRatEnvironment
+from tools.sar.tomogram_worker            import PyRatJob, run_pyrat_job
+from tools                                import FileIO, ProcessPoolRunner
+from tools.monitoring.logger              import Logger
+from tools.data.regions                   import CropRegion
+from pipelines.processing.generation.base import GeneratorBase
 
 
 class TomogramProcessor:
