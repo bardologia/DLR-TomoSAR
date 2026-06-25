@@ -11,7 +11,7 @@ from tools.reporting.reporting             import MetricSectionGrouper, ReportAs
 from tools.monitoring.logger               import Logger
 
 
-class ComparisonReport(ComparisonReportBase):
+class TrialComparisonReport(ComparisonReportBase):
 
     FIGURE_SUBDIRS = [
         ("tracks",              "Passes and interferograms"),

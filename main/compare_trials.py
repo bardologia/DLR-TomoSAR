@@ -11,7 +11,7 @@ def main() -> None:
 
     from configuration.comparison            import TrialComparisonConfig
     from pipelines.comparison.trial_collector        import TrialCollector
-    from pipelines.comparison.comparison_report      import ComparisonReport
+    from pipelines.comparison.comparison_report      import TrialComparisonReport
     from tools.runtime.config_cli                    import ConfigCli
     from tools.monitoring.logger                     import Logger
 
@@ -34,7 +34,7 @@ def main() -> None:
         collector = TrialCollector(runs_dir=runs_dir, run_tags=config.run_tags, logger=logger)
         records   = collector.collect()
 
-        report = ComparisonReport(
+        report = TrialComparisonReport(
             records        = records,
             out_dir        = out_dir,
             compare_images = config.compare_images,
