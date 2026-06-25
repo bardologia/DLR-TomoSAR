@@ -115,12 +115,16 @@ class TrialCollector:
 
         record.inference_dir = inference_dir
         record.metrics       = FileIO.load_json(inference_dir / "metrics.json")
-        record.figures       = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
         record.animations    = sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else []
+
+        self._attach_figures(record, inference_dir)
 
         report_path = inference_dir / "report.md"
         if report_path.exists():
             record.report_path = report_path
+
+    def _attach_figures(self, record: TrialRecord, inference_dir: Path) -> None:
+        record.figures = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
 
     def _aggregate_sources(self) -> tuple[dict, dict, dict]:
         size_match       = self._optional_json(self.pipeline_dir / "size_match.json")
