@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.param.param_extraction_config import (
+from configuration.param_extraction import (
     FitMode,
     FitConfig,
     FitSettings,

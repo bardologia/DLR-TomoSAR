@@ -7,7 +7,7 @@ from pathlib     import Path
 from tools.reporting.markdown import MarkdownDoc, MarkdownTable
 from tools.reporting.reporting import ReportAssets
 
-from configuration.diagnostics.weight_xray_config import WeightXrayConfig
+from configuration.diagnostics import WeightXrayConfig
 
 
 SEVERITY_STYLE = {"critical": "err", "warning": "warn", "info": "muted", "ok": "ok"}

@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import numpy as np
 import pytest
 
-from configuration.param.param_extraction_config import FitSettings, FitMode
+from configuration.param_extraction import FitSettings, FitMode
 from pipelines.processing.param_extraction.metrics import (
     FittingMetricsCalculator,
     KSelectionDiagnostics,

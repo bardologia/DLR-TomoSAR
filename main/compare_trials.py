@@ -9,7 +9,7 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.comparison.general            import TrialComparisonConfig
+    from configuration.comparison            import TrialComparisonConfig
     from pipelines.comparison.trial_collector        import TrialCollector
     from pipelines.comparison.comparison_report      import ComparisonReport
     from tools.runtime.config_cli                    import ConfigCli

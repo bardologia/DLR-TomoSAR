@@ -9,7 +9,7 @@ import torch
 
 from tools.reporting.plotting import PlotBase
 
-from configuration.diagnostics.weight_xray_config import WeightXrayConfig
+from configuration.diagnostics import WeightXrayConfig
 
 
 class WeightXrayPlots(PlotBase):

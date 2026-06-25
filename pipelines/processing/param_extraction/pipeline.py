@@ -8,7 +8,7 @@ from typing   import Tuple
 
 import numpy as np
 
-from configuration.param.param_extraction_config   import ExtractionConfig, FitSettings
+from configuration.param_extraction   import ExtractionConfig, FitSettings
 from pipelines.processing.param_extraction.metrics import FittingMetricsCalculator
 from pipelines.processing.param_extraction.plots   import FittingResultPlotter
 from tools.data.io                                 import FileIO

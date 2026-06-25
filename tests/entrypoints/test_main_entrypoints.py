@@ -41,7 +41,7 @@ CLI_MODULES = (
 ENTRY_CONFIGS = {
     "infer"          : ("configuration.inference",                    "InferenceEntryConfig"),
     "pre_process"    : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
-    "extract_params" : ("configuration.param.param_extraction_config", "ExtractParamsEntryConfig"),
+    "extract_params" : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
     "tune"           : ("configuration.tuning",                       "TuningEntryConfig"),
     "tune_dataloader": ("configuration.benchmark.dataloader_tuning",  "DataLoaderTuningEntryConfig"),
     "benchmark"      : ("configuration.benchmark",                    "BenchmarkConfig"),

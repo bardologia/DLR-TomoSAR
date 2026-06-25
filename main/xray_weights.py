@@ -6,7 +6,7 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.diagnostics.weight_xray_config import WeightXrayEntryConfig
+    from configuration.diagnostics import WeightXrayEntryConfig
     from tools.diagnostics.weight_xray               import WeightXrayBatch
     from tools.runtime.config_cli                    import ConfigCli
     from tools.monitoring.logger                     import Logger

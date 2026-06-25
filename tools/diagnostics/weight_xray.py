@@ -8,7 +8,7 @@ from typing      import Optional
 import numpy as np
 import torch
 
-from configuration.diagnostics.weight_xray_config import WeightXrayConfig, WeightXrayEntryConfig, WeightXrayThresholds
+from configuration.diagnostics import WeightXrayConfig, WeightXrayEntryConfig, WeightXrayThresholds
 from tools.runtime.run_selector                    import RunSelector
 
 
