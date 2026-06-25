@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from tools.training                              import BaseTrainer
+from pipelines.shared.autoencoder_trainer        import AutoencoderTrainer
 from pipelines.profile_autoencoder.training.loss import Loss
 
 
-class Trainer(BaseTrainer):
+class Trainer(AutoencoderTrainer):
     stage_name    = "Profile Autoencoder"
     section_title = "[Profile Autoencoder Training]"
-
-    def __init__(self, model, model_cfg, x_axis, config, run_dir, logger):
-        self.model_cfg = model_cfg
-        super().__init__(model, config, run_dir, logger, x_axis)
-
-    def _build_param_groups(self):
-        return self.model_cfg.get_param_groups(self.model)
 
     def _build_criterion(self):
         return Loss(self.config.ae_loss)
