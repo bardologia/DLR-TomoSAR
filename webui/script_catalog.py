@@ -46,14 +46,8 @@ class ScriptCatalog:
         "infer": {
             "title"     : "Inference",
             "category"  : "Inference",
-            "purpose"   : "Run sliding-window prediction, stitch cubes, and generate reports for one or more trained runs.",
-            "essentials": ["logs_dir", "run_filter", "gpus"],
-        },
-        "infer_profile_autoencoder": {
-            "title"     : "Profile AE Inference",
-            "category"  : "Inference",
-            "purpose"   : "Reconstruct held-out profiles with a trained profile autoencoder and score reconstruction quality (no spatial cube). Dataset paths and splits are read from each run's metadata. Select profile-autoencoder runs only.",
-            "essentials": ["logs_dir", "run_filter", "gpus"],
+            "purpose"   : "Single entry point for all inference. Auto-detects each run's type from its persisted configs and dispatches the right pipeline: backbone and JEPA runs get sliding-window prediction, stitched cubes, and reports; standalone profile- and image-autoencoder runs get reconstruction scoring. Sweeps every run root.",
+            "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
         "benchmark": {
             "title"     : "Benchmark",
@@ -101,7 +95,6 @@ class ScriptCatalog:
         "train_image_autoencoder",
         "train_jepa",
         "infer",
-        "infer_profile_autoencoder",
         "benchmark",
         "cross_validate",
         "tune",

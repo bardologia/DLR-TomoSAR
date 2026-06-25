@@ -42,11 +42,6 @@ class ProjectPaths:
             "config_module" : "configuration.cross_validation.general",
             "config_class"  : "CrossValidationConfig",
         },
-        "infer_profile_autoencoder": {
-            "file"          : "infer_profile_autoencoder",
-            "config_module" : "configuration.inference.profile_autoencoder",
-            "config_class"  : "ProfileAeInferenceEntryConfig",
-        },
     }
 
     def __init__(self) -> None:

@@ -84,6 +84,18 @@ def test_inference_entry_config_holds_inference():
     assert isinstance(cfg.run_filter, list)
 
 
+def test_inference_entry_config_holds_every_family():
+    from configuration.inference.image_autoencoder   import ImageAeInferenceConfig
+    from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
+
+    cfg = InferenceEntryConfig()
+
+    assert isinstance(cfg.logs_dirs, list) and len(cfg.logs_dirs) == 4
+    assert all(isinstance(root, str) for root in cfg.logs_dirs)
+    assert isinstance(cfg.profile_inference, ProfileAeInferenceConfig)
+    assert isinstance(cfg.image_inference, ImageAeInferenceConfig)
+
+
 def test_tuning_config_positive_trials():
     cfg = TuningConfig()
     assert cfg.n_trials > 0

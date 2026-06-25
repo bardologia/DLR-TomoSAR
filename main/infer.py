@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from dataclasses import replace
-from pathlib     import Path
+from pathlib import Path
 
 from _bootstrap import EnvironmentPinner
 
@@ -11,11 +10,11 @@ from _bootstrap import EnvironmentPinner
 def _scheduler() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.inference                import InferenceEntryConfig
-    from pipelines.backbone.inference.scheduler import InferenceScheduler
-    from tools.runtime.config_cli               import ConfigCli
+    from configuration.inference              import InferenceEntryConfig
+    from pipelines.shared.inference_scheduler import InferenceScheduler
+    from tools.runtime.config_cli             import ConfigCli
 
-    config = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone vs JEPA runs are auto-detected, fanned out across the selected GPUs").apply()
+    config = ConfigCli(InferenceEntryConfig(), description="Inference over one or more run directories; backbone, the two autoencoders, and JEPA runs are auto-detected from their persisted configs and fanned out across the selected GPUs").apply()
 
     results = InferenceScheduler(config=config, entry_script=Path(__file__).resolve()).run()
 
@@ -26,15 +25,13 @@ def _scheduler() -> None:
 def _worker(run_dir: str, config_path: str, gpu_id: int) -> None:
     EnvironmentPinner.gpu(gpu_id)
 
-    from configuration.inference               import InferenceEntryConfig
-    from pipelines.backbone.inference.pipeline  import InferencePipeline
-    from pipelines.shared.inference_components  import InferenceComponentsResolver
-    from tools.runtime.config_cli               import ConfigCli
+    from configuration.inference             import InferenceEntryConfig
+    from pipelines.shared.inference_dispatch import InferenceDispatcher
+    from tools.runtime.config_cli            import ConfigCli
 
-    config     = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
-    components = InferenceComponentsResolver.for_run(Path(run_dir))
-    pipeline   = InferencePipeline(replace(config.inference, run_directory=Path(run_dir), output_subdir=None), components=components)
-    pipeline.run()
+    config = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
+
+    InferenceDispatcher(config).run(Path(run_dir))
 
 
 def main() -> None:
