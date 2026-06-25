@@ -15,7 +15,8 @@ from models                                     import BACKBONE_IMAGE_SIZE_MODEL
 from pipelines.backbone.dataset.datasets        import PatchDataset
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
-from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Layout, Patcher
+from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
+from pipelines.shared.dataset_spatial           import Layout
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from tools.data.io                              import FileIO, BackboneModelConfigIO
 from tools.monitoring.logger                    import Logger

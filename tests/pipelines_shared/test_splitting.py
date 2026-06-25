@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pipelines.backbone.dataset.spatial          import Layout
+from pipelines.shared.dataset_spatial            import Layout
 from pipelines.profile_autoencoder.dataset.splitting import ParameterCropper
 from tools.data.regions                          import CropRegion, SplitRegions
 from tools.monitoring.logger                     import Logger

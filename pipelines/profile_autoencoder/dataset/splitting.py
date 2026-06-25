@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from pipelines.backbone.dataset.spatial import Layout
-from tools.data.regions                 import SplitRegions
+from pipelines.shared.dataset_spatial import Layout
+from tools.data.regions               import SplitRegions
 from tools.monitoring.logger            import Logger
 
 

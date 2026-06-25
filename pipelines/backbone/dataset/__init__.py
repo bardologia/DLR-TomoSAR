@@ -6,7 +6,8 @@ from pipelines.backbone.dataset.stats         import Stats
 from pipelines.backbone.dataset.stats_computer import StatsComputer
 from pipelines.backbone.dataset.pipeline        import DatasetPipeline
 from pipelines.backbone.dataset.metadata_writer import MetadataWriter
-from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Layout, Patcher
+from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
+from pipelines.shared.dataset_spatial           import Layout
 
 __all__ = [
     "MultiRegionDataset",

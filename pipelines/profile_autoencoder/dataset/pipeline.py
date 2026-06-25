@@ -12,7 +12,7 @@ from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.shared.loaders                            import Loader
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStatsComputer
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
-from pipelines.backbone.dataset.spatial                  import Layout
+from pipelines.shared.dataset_spatial                    import Layout
 from tools.monitoring.logger                             import Logger
 
 

@@ -13,8 +13,9 @@ from pipelines.backbone.dataset.datasets        import MultiRegionDataset, Patch
 from pipelines.shared.loaders                   import Loader
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats_computer  import StatsComputer
-from pipelines.backbone.dataset.spatial         import Cropper, Layout, Patcher
+from pipelines.backbone.dataset.spatial         import Cropper, Patcher
 from pipelines.backbone.dataset.metadata_writer import MetadataWriter
+from pipelines.shared.dataset_spatial           import Layout
 from tools.monitoring.logger                    import Logger
 from tools.sar                                  import GeometryField
 

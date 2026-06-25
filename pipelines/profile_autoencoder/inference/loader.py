@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from configuration.inference.profile_autoencoder         import ProfileAeInferenceConfig
 from models.profile_autoencoder                          import get_profile_autoencoder
-from pipelines.backbone.dataset.spatial                  import Layout
+from pipelines.shared.dataset_spatial                    import Layout
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
