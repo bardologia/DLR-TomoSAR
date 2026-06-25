@@ -85,8 +85,7 @@ class ProfileAeRunLoader:
             raise FileNotFoundError(f"Checkpoint not found for inference: {ckpt_path}")
 
         ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
-        raw    = ckpt["x_axis"]
-        x_axis = raw.cpu().numpy().astype(np.float32) if hasattr(raw, "cpu") else np.asarray(raw, dtype=np.float32)
+        x_axis = np.asarray(ckpt["x_axis"], dtype=np.float32)
 
         meta = {
             "epoch"         : int(ckpt["epoch"]),
