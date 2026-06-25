@@ -4,13 +4,14 @@ import re
 from pathlib import Path
 
 from pipelines.comparison.trial_collector import TrialRecord
-from tools.metrics.scoring                import FiniteScalar, MetricOrientation
-from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
-from tools.reporting.reporting            import MetricSectionGrouper, ReportAssets
-from tools.monitoring.logger              import Logger
+from pipelines.shared.comparison_report    import ComparisonReportBase
+from tools.metrics.scoring                 import FiniteScalar, MetricOrientation
+from tools.reporting.markdown              import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting             import MetricSectionGrouper, ReportAssets
+from tools.monitoring.logger               import Logger
 
 
-class ComparisonReport:
+class ComparisonReport(ComparisonReportBase):
 
     FIGURE_SUBDIRS = [
         ("tracks",              "Passes and interferograms"),
@@ -128,21 +129,7 @@ class ComparisonReport:
         if not metrics:
             return [f"## {title}\n", "_No applicable metrics available._\n"]
 
-        ranks: dict[str, dict[str, int]] = {r.name: {} for r in scored}
-
-        for key, _ in metrics:
-            valued  = [(r.name, value) for r in scored if (value := FiniteScalar.coerce(r.metrics.get(key))) is not None]
-            reverse = MetricOrientation.direction(key) == "higher"
-            ordered = sorted(valued, key=lambda item: item[1], reverse=reverse)
-
-            for position, (name, _) in enumerate(ordered, start=1):
-                ranks[name][key] = position
-
-        worst      = len(scored) + 1
-        mean_ranks = {
-            name: sum(ranks[name].get(key, worst) for key, _ in metrics) / len(metrics)
-            for name in ranks
-        }
+        ranks, mean_ranks = self._rank_metrics(metrics, scored)
 
         lines = [f"## {title}\n", f"{intro}\n"]
 

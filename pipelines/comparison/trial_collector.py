@@ -1,30 +1,20 @@
 from __future__ import annotations
 
 import gc
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib     import Path
 
-from tools.data.io           import FileIO
-from tools.monitoring.logger import Logger
+from pipelines.shared.trial_collection import TrialRecord as BaseTrialRecord
+from tools.data.io                     import FileIO
+from tools.monitoring.logger           import Logger
 
 
 _CHECKPOINT_KEYS = ("best_val_loss", "best_epoch", "epoch", "global_step")
 
 
 @dataclass
-class TrialRecord:
-    name          : str
-    run_dir       : Path
-    checkpoint    : dict       = field(default_factory=dict)
-    inference_dir : Path | None = None
-    metrics       : dict       = field(default_factory=dict)
-    figures_dir   : Path | None = None
-    animations    : list[Path] = field(default_factory=list)
-    report_path   : Path | None = None
-
-    @property
-    def has_inference(self) -> bool:
-        return self.inference_dir is not None
+class TrialRecord(BaseTrialRecord):
+    figures_dir : Path | None = None
 
     def figure_subdir(self, name: str) -> Path | None:
         if self.figures_dir is None:

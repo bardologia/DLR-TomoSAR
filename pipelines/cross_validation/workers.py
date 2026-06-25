@@ -6,7 +6,7 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.benchmark.results                       import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
 from pipelines.benchmark.workers                       import BenchmarkWorker
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
 from tools.data.io                                      import FileIO

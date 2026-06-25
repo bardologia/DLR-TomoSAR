@@ -1,164 +1,20 @@
 from __future__ import annotations
 
-import gc
 import math
 import re
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from pathlib     import Path
 
 import numpy as np
 
-from pipelines.shared.seed_sweep import SeedSet
-from tools.data.io             import FileIO
-from tools.reporting.reporting import MetricSectionGrouper, ReportAssets
-from tools.metrics.scoring     import FiniteScalar, MetricOrientation
-from tools.monitoring.logger   import Logger
-from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
-
-_TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
-_CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
-
-
-class SeedAggregation:
-    @staticmethod
-    def mean_std(values: list[float]) -> tuple[float, float | None]:
-        mean = float(np.mean(values))
-        std  = float(np.std(values, ddof=1)) if len(values) > 1 else None
-
-        return mean, std
-
-    @staticmethod
-    def aggregate(dicts: list[dict], keys: list[str]) -> tuple[dict, dict]:
-        means, stds = {}, {}
-
-        for key in keys:
-            values = [FiniteScalar.coerce(d.get(key)) for d in dicts]
-            values = [value for value in values if value is not None]
-
-            if not values:
-                continue
-
-            means[key], stds[key] = SeedAggregation.mean_std(values)
-
-        return means, stds
-
-
-@dataclass
-class TrialRecord:
-    name            : str
-    run_dir         : Path
-    parameters      : int | None  = None
-    size_match      : dict        = field(default_factory=dict)
-    trainer_config  : dict        = field(default_factory=dict)
-    run_summary     : dict        = field(default_factory=dict)
-    checkpoint      : dict        = field(default_factory=dict)
-    overfit         : dict        = field(default_factory=dict)
-    training_result : dict        = field(default_factory=dict)
-    inference_dir   : Path | None = None
-    metrics         : dict        = field(default_factory=dict)
-    figures         : list[Path]  = field(default_factory=list)
-    animations      : list[Path]  = field(default_factory=list)
-    report_path     : Path | None = None
-
-    @property
-    def has_inference(self) -> bool:
-        return self.inference_dir is not None
-
-
-class TrialCollector:
-    def __init__(self, run_dir: Path, logger: Logger) -> None:
-        self.run_dir      = run_dir
-        self.training_dir = run_dir / "training"
-        self.pipeline_dir = run_dir / "pipeline"
-        self.logger       = logger
-
-    def _optional_json(self, path: Path) -> dict:
-        if not path.exists():
-            return {}
-        return FileIO.load_json(path)
-
-    def _parse_parameters(self, trial_dir: Path, size_match: dict) -> int | None:
-        summary_path = trial_dir / "docs" / "model_doc.md"
-
-        if summary_path.exists():
-            match = _TOTAL_PARAMS_PATTERN.search(summary_path.read_text(encoding="utf-8", errors="ignore"))
-            if match:
-                return int(match.group(1).replace(",", ""))
-
-        return size_match["parameters"] if "parameters" in size_match else None
-
-    def _read_checkpoint(self, trial_dir: Path) -> dict:
-        import torch
-
-        checkpoint_path = next(trial_dir.rglob("best_model.pt"), None)
-        if checkpoint_path is None:
-            return {}
-
-        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-
-        info = {key: checkpoint.get(key) for key in _CHECKPOINT_KEYS}
-        info["n_train_epochs"] = len(checkpoint.get("train_losses") or [])
-        info["n_val_epochs"]   = len(checkpoint.get("val_losses") or [])
-
-        del checkpoint
-        gc.collect()
-
-        return {key: value for key, value in info.items() if value is not None}
-
-    def _attach_inference(self, record: TrialRecord) -> None:
-        inference_root = record.run_dir / "inference"
-        if not inference_root.is_dir():
-            return
-
-        candidates = sorted(d for d in inference_root.iterdir() if d.is_dir() and (d / "metrics.json").exists())
-        if not candidates:
-            return
-
-        inference_dir = candidates[-1]
-
-        record.inference_dir = inference_dir
-        record.metrics       = FileIO.load_json(inference_dir / "metrics.json")
-        record.figures       = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
-        record.animations    = sorted((inference_dir / "animations").glob("*.gif")) if (inference_dir / "animations").is_dir() else []
-
-        report_path = inference_dir / "report.md"
-        if report_path.exists():
-            record.report_path = report_path
-
-    def _aggregate_sources(self) -> tuple[dict, dict, dict]:
-        size_match       = self._optional_json(self.pipeline_dir / "size_match.json")
-        overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
-        training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
-
-        return size_match, overfit_results, training_results
-
-    def collect(self) -> list[TrialRecord]:
-        size_match, overfit_results, training_results = self._aggregate_sources()
-
-        if not self.training_dir.is_dir():
-            self.logger.error(f"No training directory found at: {self.training_dir}")
-            return []
-
-        records = []
-        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
-            record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
-
-            record.size_match      = size_match.get(SeedSet.base(trial_dir.name), {})
-            record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
-            record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
-            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
-            record.parameters      = self._parse_parameters(trial_dir, record.size_match)
-            record.checkpoint      = self._read_checkpoint(trial_dir)
-
-            self._attach_inference(record)
-
-            status = f"inference {record.inference_dir.name}" if record.has_inference else "no inference"
-            self.logger.info(f"{record.name:<22} {status}")
-
-            records.append(record)
-
-        return records
+from pipelines.shared.comparison_report import ComparisonReportBase
+from pipelines.shared.seed_sweep        import SeedSet
+from pipelines.shared.trial_collection  import SeedAggregation, TrialCollector, TrialRecord
+from tools.data.io                      import FileIO
+from tools.reporting.reporting          import MetricSectionGrouper, ReportAssets
+from tools.metrics.scoring              import FiniteScalar, MetricOrientation
+from tools.monitoring.logger            import Logger
+from tools.reporting.markdown           import MarkdownTable, ScalarFormatter
 
 
 class BenchmarkSeedCollector(TrialCollector):
@@ -225,7 +81,7 @@ class BenchmarkSeedCollector(TrialCollector):
         return aggregated
 
 
-class ComparisonReport:
+class ComparisonReport(ComparisonReportBase):
 
     FIGURE_GROUPS = [
         ("Profile reconstructions",     re.compile(r"^profiles_")),
@@ -236,17 +92,6 @@ class ComparisonReport:
         ("Azimuth slices",              re.compile(r"^slice_azimuth_")),
         ("Elevation slices",            re.compile(r"^slice_elev_")),
         ("Range slices",                re.compile(r"^slice_range_")),
-    ]
-
-    HEADLINE_METRICS = [
-        ("curve_rmse_gt",                "RMSE"),
-        ("curve_mae_gt",                 "MAE"),
-        ("overall_r2_gt",                "R²"),
-        ("psnr_db_gt",                   "PSNR"),
-        ("pixel_r2_gt_mean",             "Pixel R²"),
-        ("pixel_cosine_gt_mean",         "Cosine"),
-        ("ssim_gt_elev_mean",            "SSIM elev"),
-        ("pixel_peak_err_units_mean_gt", "Peak err"),
     ]
 
     def __init__(self, records: list[TrialRecord], out_dir: Path, reference_model: str, embed_images: bool, logger: Logger, rank_models: bool = True, seed_dispersion: dict | None = None) -> None:
@@ -363,21 +208,7 @@ class ComparisonReport:
         if not scored:
             return ["## Leaderboard\n", "_No inference metrics available yet._\n"]
 
-        ranks : dict[str, dict[str, int]] = {r.name: {} for r in scored}
-
-        for key, _ in self.HEADLINE_METRICS:
-            valued  = [(r.name, value) for r in scored if (value := FiniteScalar.coerce(r.metrics.get(key))) is not None]
-            reverse = MetricOrientation.direction(key) == "higher"
-            ordered = sorted(valued, key=lambda item: item[1], reverse=reverse)
-
-            for position, (name, _) in enumerate(ordered, start=1):
-                ranks[name][key] = position
-
-        worst = len(scored) + 1
-        mean_ranks = {
-            name: sum(ranks[name].get(key, worst) for key, _ in self.HEADLINE_METRICS) / len(self.HEADLINE_METRICS)
-            for name in ranks
-        }
+        ranks, mean_ranks = self._rank_metrics(self.HEADLINE_METRICS, scored)
 
         lines = ["## Leaderboard\n", "Mean rank across the headline metrics (1 = best); missing metrics rank last.\n"]
 
