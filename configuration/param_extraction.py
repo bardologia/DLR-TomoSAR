@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib     import Path
 from typing      import Optional, Tuple
@@ -89,30 +88,6 @@ class ExtractionConfig:
     @property
     def diagnostics_npz_path(self) -> Path:
         return self.output_directory / "fit_diagnostics.npz"
-
-    def discover_tomogram_path(self) -> Path:
-        tomogram_path = self.data_directory / "tomogram_full.npy"
-
-        if not tomogram_path.is_file():
-            raise FileNotFoundError(f"No tomogram_full.npy in {self.data_directory}")
-
-        return tomogram_path
-
-    def discover_height_range(self) -> Tuple[float, float]:
-        if self.height_range is not None:
-            return tuple(self.height_range)
-
-        meta_dir   = self.metadata_directory
-        state_path = meta_dir / "config_state.json"
-        if state_path.is_file():
-            with open(state_path, "r", encoding="utf-8") as f:
-                state = json.load(f)
-
-            hr = state["tomogram_config"]["height_range"]
-            if isinstance(hr, (list, tuple)) and len(hr) == 2:
-                return (float(hr[0]), float(hr[1]))
-
-        raise FileNotFoundError(f"No height_range override given and no config_state.json with a tomogram height_range under {meta_dir}")
 
 
 @dataclass

@@ -4,8 +4,8 @@ import gc
 from dataclasses import dataclass, field
 
 from configuration.benchmark import BenchmarkConfig
-from configuration.sar.gaussian_config          import GaussianConfig
 from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from pipelines.shared.sar_config_resolvers      import GaussianConfigLoader
 from tools.data.gaussians                       import GaussianHead
 from tools.monitoring.logger                    import Logger
 
@@ -151,7 +151,7 @@ class SizeMatcher:
         self.image_size  = config.training.patch_size[0]
         self.in_channels = config.size_match.in_channels
 
-        gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
+        gaussian_cfg      = GaussianConfigLoader.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
         self.out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, config.n_gaussians, gaussian_cfg.predict_presence)
 
     def reference_count(self) -> int:

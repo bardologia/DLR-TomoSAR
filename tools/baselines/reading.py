@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing  import Callable
+from dataclasses import replace
+from pathlib     import Path
+from typing      import Callable
 
 import numpy as np
+
+from tools.baselines.containers import TrackBaselines
 
 
 class TrackReader:
@@ -66,3 +69,25 @@ class PassProductResolver:
 class TrackFileResolver(PassProductResolver):
     PRODUCT_SUBDIR   = Path("INF") / "INF-TRACK"
     PRODUCT_PATTERNS = ("track_sar_resa_*.rat", "track_*.rat")
+
+
+class BaselinesResolver:
+    @staticmethod
+    def baselines_file(dataset_dir: str | Path) -> Path:
+        return Path(dataset_dir) / "meta" / TrackBaselines.FILENAME
+
+    def resolved(self, geometry, dataset_dir: str | Path, secondary_labels=None):
+        if geometry.baselines_source not in ("auto", "dataset", "manual"):
+            raise ValueError(f"Unknown baselines_source '{geometry.baselines_source}', expected 'auto', 'dataset' or 'manual'")
+
+        if geometry.baselines_source == "manual" or len(geometry.kz_values) > 0:
+            return geometry
+
+        path = self.baselines_file(dataset_dir)
+        if not path.exists():
+            if geometry.baselines_source == "dataset":
+                raise FileNotFoundError(f"baselines_source='dataset' but {path} does not exist")
+            return geometry
+
+        table = TrackBaselines.load(path).subset(secondary_labels)
+        return replace(geometry, baselines=table.baselines(geometry.baseline_component, look_angle_deg=geometry.look_angle_deg), baselines_origin=str(path))

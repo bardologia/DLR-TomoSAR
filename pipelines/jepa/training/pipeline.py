@@ -15,6 +15,7 @@ from pipelines.shared.dataset_prep                        import BackboneDataset
 from pipelines.shared.training_runner                    import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.shared.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
+from tools.baselines                                     import BaselinesResolver
 from tools.runtime.reproducibility                       import Reproducibility
 
 
@@ -65,7 +66,7 @@ class TrainingPipeline:
             overfit                        = entry_config.overfit,
         )
         self.trainer_config.inherit_shared_from(base)
-        self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        self.trainer_config.geometry = BaselinesResolver().resolved(entry_config.geometry, entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         self.dataset_config = self.factory.training_dataset_config()
         if split_regions is not None:

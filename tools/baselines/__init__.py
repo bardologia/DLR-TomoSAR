@@ -1,11 +1,12 @@
 from .containers import SecondarySelection, TrackBaselines, TrackProfiles
-from .reading    import PassProductResolver, TrackFileResolver, TrackReader
+from .reading    import BaselinesResolver, PassProductResolver, TrackFileResolver, TrackReader
 from .extraction import BaselineExtractor
 
 __all__ = [
     "SecondarySelection",
     "TrackBaselines",
     "TrackProfiles",
+    "BaselinesResolver",
     "PassProductResolver",
     "TrackFileResolver",
     "TrackReader",

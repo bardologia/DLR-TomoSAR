@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-import os
 from dataclasses import dataclass, field
 from datetime    import datetime
 from pathlib     import Path
@@ -35,49 +33,6 @@ class ParallelConfig:
 
     EFFORT_FRACTIONS : ClassVar[Dict[str, float]] = {"low": 0.25, "medium": 0.5, "high": 0.8}
     THREAD_CAP       : ClassVar[int]              = 16
-
-    @staticmethod
-    def available_cores() -> int:
-        try:
-            return len(os.sched_getaffinity(0))
-        except AttributeError:
-            return os.cpu_count() or 1
-
-    def core_budget(self) -> int:
-        if self.effort not in self.EFFORT_FRACTIONS:
-            raise ValueError(f"Unknown effort '{self.effort}', expected one of {sorted(self.EFFORT_FRACTIONS)}")
-        return max(1, int(self.available_cores() * self.EFFORT_FRACTIONS[self.effort]))
-
-    def interferogram_threads(self) -> int:
-        if self.pyrat_threads is not None:
-            return max(1, self.pyrat_threads)
-        return self.core_budget()
-
-    def resolve_plan(self, subsection_count: int) -> Tuple[int, int]:
-        budget = self.core_budget()
-
-        if self.tomogram_workers is not None and self.pyrat_threads is not None:
-            return max(1, min(subsection_count, self.tomogram_workers)), max(1, self.pyrat_threads)
-
-        if self.tomogram_workers is not None:
-            workers = max(1, min(subsection_count, self.tomogram_workers))
-            return workers, max(1, min(self.THREAD_CAP, budget // workers))
-
-        if self.pyrat_threads is not None:
-            threads = max(1, self.pyrat_threads)
-            return max(1, min(subsection_count, budget // threads)), threads
-
-        best_plan  = None
-        best_waves = None
-
-        for workers in range(1, min(subsection_count, budget) + 1):
-            threads = max(1, min(self.THREAD_CAP, budget // workers))
-            waves   = math.ceil(subsection_count / workers)
-
-            if best_plan is None or waves < best_waves or (waves == best_waves and threads > best_plan[1]):
-                best_plan, best_waves = (workers, threads), waves
-
-        return best_plan
 
 
 @dataclass

@@ -13,6 +13,8 @@ from configuration.param_extraction import (
     ExtractParamsEntryConfig,
 )
 
+from pipelines.processing.param_extraction.pipeline import ExtractionPathResolver
+
 
 def test_fit_config_alias_points_to_sigma_only():
     assert FitConfig is FitMode.SigmaOnly
@@ -90,25 +92,25 @@ def test_extraction_discover_height_range_from_state(tmp_path):
     (meta / "config_state.json").write_text(json.dumps({"tomogram_config": {"height_range": [-20.0, 80.0]}}))
 
     cfg = ExtractionConfig(processed_data_path=tmp_path)
-    assert cfg.discover_height_range() == (-20.0, 80.0)
+    assert ExtractionPathResolver(cfg).discover_height_range() == (-20.0, 80.0)
 
 
 def test_extraction_discover_height_range_override():
     cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"), height_range=(0.0, 50.0))
-    assert cfg.discover_height_range() == (0.0, 50.0)
+    assert ExtractionPathResolver(cfg).discover_height_range() == (0.0, 50.0)
 
 
 def test_extraction_discover_height_range_missing_raises(tmp_path):
     cfg = ExtractionConfig(processed_data_path=tmp_path)
     with pytest.raises(FileNotFoundError):
-        cfg.discover_height_range()
+        ExtractionPathResolver(cfg).discover_height_range()
 
 
 def test_extraction_discover_tomogram_missing_raises(tmp_path):
     (tmp_path / "data").mkdir()
     cfg = ExtractionConfig(processed_data_path=tmp_path)
     with pytest.raises(FileNotFoundError):
-        cfg.discover_tomogram_path()
+        ExtractionPathResolver(cfg).discover_tomogram_path()
 
 
 def test_extract_params_entry_defaults():

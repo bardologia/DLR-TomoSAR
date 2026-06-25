@@ -15,6 +15,35 @@ from tools.data.io                                 import FileIO
 from tools.monitoring.logger                       import Logger
 
 
+class ExtractionPathResolver:
+    def __init__(self, config: ExtractionConfig) -> None:
+        self.config = config
+
+    def discover_tomogram_path(self) -> Path:
+        tomogram_path = self.config.data_directory / "tomogram_full.npy"
+
+        if not tomogram_path.is_file():
+            raise FileNotFoundError(f"No tomogram_full.npy in {self.config.data_directory}")
+
+        return tomogram_path
+
+    def discover_height_range(self) -> Tuple[float, float]:
+        if self.config.height_range is not None:
+            return tuple(self.config.height_range)
+
+        meta_dir   = self.config.metadata_directory
+        state_path = meta_dir / "config_state.json"
+        if state_path.is_file():
+            with open(state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            hr = state["tomogram_config"]["height_range"]
+            if isinstance(hr, (list, tuple)) and len(hr) == 2:
+                return (float(hr[0]), float(hr[1]))
+
+        raise FileNotFoundError(f"No height_range override given and no config_state.json with a tomogram height_range under {meta_dir}")
+
+
 class DatasetQueueResolver:
     def __init__(self, base_path: Path, dataset_filter: list) -> None:
         self.base_path      = base_path
@@ -186,8 +215,9 @@ class ParameterExtractor:
 class ParamExtractionPipeline:
     def __init__(self, config: ExtractionConfig, logger: Logger | None = None) -> None:
         self.config           = config
-        self.tomogram_path    = config.discover_tomogram_path()
-        self.height_range     = config.discover_height_range()
+        path_resolver         = ExtractionPathResolver(config)
+        self.tomogram_path    = path_resolver.discover_tomogram_path()
+        self.height_range     = path_resolver.discover_height_range()
         self.output_directory = config.output_directory
         self.output_directory.mkdir(parents=True, exist_ok=True)
 

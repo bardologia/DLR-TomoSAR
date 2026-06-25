@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.baselines import TrackBaselines
+from tools.baselines import BaselinesResolver, TrackBaselines
 
 
 class TrialPlanner:
@@ -160,7 +160,7 @@ class InputTrialPlanner:
 
     @classmethod
     def from_dataset(cls, model_name: str, input_trials: dict, geometry, dataset_path: str | Path) -> "InputTrialPlanner":
-        path = geometry.baselines_file(dataset_path)
+        path = BaselinesResolver.baselines_file(dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Input trials need the baselines table to enumerate all tracks, but {path} does not exist")
 
@@ -246,7 +246,7 @@ class SecondaryTrialPlanner:
 
     @classmethod
     def from_dataset(cls, model_name: str, trials, geometry, dataset_path: str | Path) -> "SecondaryTrialPlanner":
-        path = geometry.baselines_file(dataset_path)
+        path = BaselinesResolver.baselines_file(dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Secondary trials need the baselines table, but {path} does not exist")
 

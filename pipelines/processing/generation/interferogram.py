@@ -15,6 +15,7 @@ from tools                                import FileIO
 from tools.monitoring.logger              import Logger
 from tools.data.regions                   import CropRegion
 from pipelines.processing.generation.base import GeneratorBase
+from pipelines.processing.scheduling      import ParallelPlanner
 from tools.baselines                      import BaselineExtractor, TrackBaselines, TrackProfiles
 from tools.sar                            import TrackParameterCollector, TrackParameters
 
@@ -23,13 +24,14 @@ class InterferogramProcessor:
     def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
         self.config           = config
         self.logger           = logger
+        self.planner          = ParallelPlanner(config.parallel)
         self.track_baselines  = None
         self.track_profiles   = None
         self.track_parameters = None
 
         self.logger.section("[InterferogramProcessor Initialization]")
         self.logger.subsection(f"Dataset Type  : {self.config.dataset_type}")
-        self.logger.subsection(f"PyRat Threads : {self.config.parallel.interferogram_threads()}")
+        self.logger.subsection(f"PyRat Threads : {self.planner.interferogram_threads()}")
 
         PyRatEnvironment.ensure_root_on_sys_path(str(self.config.paths.pyrat_directory))
 
@@ -37,7 +39,7 @@ class InterferogramProcessor:
         from pyrat import pyrat_init, tomo
 
         self.logger.subsection("Initializing PyRat for FSAR...")
-        pyrat_init(debug=False, nthreads=self.config.parallel.interferogram_threads())
+        pyrat_init(debug=False, nthreads=self.planner.interferogram_threads())
         tomogram_config = self.config.tomogram_config
 
         tomography_object = tomo.FuSARtomo(

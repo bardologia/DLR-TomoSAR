@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from tools.data.regions                         import CropRegion
-from configuration.sar.gaussian_config          import GaussianConfig
+from pipelines.shared.sar_config_resolvers      import GaussianConfigLoader
 from models                                     import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.datasets        import PatchDataset
 from pipelines.backbone.dataset.normalizer      import Normalizer
@@ -223,7 +223,7 @@ class RunLoader:
 
         model.eval()
         norm_stats = Stats.load(self.run_directory / "meta", self.logger)
-        gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
+        gauss_cfg  = GaussianConfigLoader.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
         model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max, n_gaussians, predict_presence)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(

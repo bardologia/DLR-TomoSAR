@@ -14,6 +14,7 @@ from configuration.dataset import DatasetConfig
 from configuration.training import BackboneTrainerConfig
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
+from tools.baselines                         import BaselinesResolver
 from tools.orchestration                     import ExperimentStage, GpuJob
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
@@ -162,7 +163,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
         trainer_config.curriculum = self.config.curriculum
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        trainer_config.geometry   = BaselinesResolver().resolved(self.config.geometry, self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input
@@ -205,7 +206,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
         trainer_config.curriculum = self.config.curriculum
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        trainer_config.geometry   = BaselinesResolver().resolved(self.config.geometry, self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
         trainer_config.overfit    = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
 
         model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
@@ -256,7 +257,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.overfit    = self.config.overfit
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        trainer_config.geometry   = BaselinesResolver().resolved(self.config.geometry, self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
         for attribute, value in self.config.model_overrides.items():

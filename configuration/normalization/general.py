@@ -4,8 +4,6 @@ from dataclasses import dataclass, field
 from enum        import Enum
 from typing      import Optional
 
-import numpy as np
-
 
 class NormMethod(Enum):
     MIN_MAX_P999 = "min_max_p999"
@@ -18,33 +16,6 @@ class NormMethod(Enum):
 class ChannelStrategy:
     norm_method : NormMethod
     apply_log1p : bool = False
-
-    def fit(self, flat: np.ndarray) -> tuple[float, float]:
-        if self.norm_method is NormMethod.FIXED_DIV_PI:
-            return 0.0, float(np.pi)
-
-        data = (
-            np.log1p(np.maximum(flat.astype(np.float64), 0.0))
-            if self.apply_log1p
-            else flat.astype(np.float64)
-        )
-
-        if self.norm_method is NormMethod.MIN_MAX_P999:
-            lo = float(np.percentile(data, 0.1))
-            hi = float(np.percentile(data, 99.9))
-            return lo, max(hi - lo, 1e-8)
-
-        if self.norm_method is NormMethod.ROBUST_IQR:
-            med = float(np.percentile(data, 50))
-            iqr = float(np.percentile(data, 75)) - float(np.percentile(data, 25))
-            return med, max(iqr, 1e-8)
-
-        if self.norm_method is NormMethod.ZSCORE:
-            m = float(data.mean())
-            s = float(data.std())
-            return m, max(s, 1e-8)
-
-        raise ValueError(f"Unknown norm method: {self.norm_method}")
 
     def as_dict(self) -> dict:
         return {"norm_method": self.norm_method.value, "apply_log1p": self.apply_log1p}

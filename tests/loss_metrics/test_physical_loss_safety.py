@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from configuration.sar.geometry_config import GeometryConfig
+from tools.baselines                   import BaselinesResolver
 from tools.data.gaussians              import GaussianClamp, GaussianCurve
 from tools.loss.physical_loss          import PhysicalLoss as PL
 from tools.sar.tomo_geometry           import TomoGeometry
@@ -30,7 +31,7 @@ def _dx():
 
 
 def _geometry(test_data_dir):
-    return TomoGeometry(GeometryConfig().resolved(str(test_data_dir)), _axis())
+    return TomoGeometry(BaselinesResolver().resolved(GeometryConfig(), str(test_data_dir)), _axis())
 
 
 def _gt(parameters):

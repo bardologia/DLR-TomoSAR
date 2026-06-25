@@ -11,8 +11,10 @@ from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion
 
 
-from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.sar.geometry_config          import GeometryConfig
+
+from tools.baselines                            import BaselinesResolver
+from pipelines.shared.sar_config_resolvers      import GaussianConfigLoader
 
 
 class ConfigFactory:
@@ -104,8 +106,8 @@ class ConfigFactory:
 
     def _base_trainer_kwargs(self, logdir: Path) -> dict:
         return {
-            "gaussian"         : GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians, predict_presence=getattr(self.config, "predict_presence", False)),
-            "geometry"         : GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
+            "gaussian"         : GaussianConfigLoader.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians, predict_presence=getattr(self.config, "predict_presence", False)),
+            "geometry"         : BaselinesResolver().resolved(GeometryConfig(), self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
             "gradient_clipper" : GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
             "io"               : IOConfig(logdir=str(logdir)),
         }

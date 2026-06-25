@@ -11,6 +11,7 @@ from configuration.sar.processing_config import (
     ProcessingConfig,
 )
 from configuration.sar.gaussian_config import GaussianConfig
+from pipelines.shared.sar_config_resolvers import GaussianConfigLoader
 
 from tests.configuration._helpers import make_crop
 
@@ -111,7 +112,7 @@ def test_config_state_crop_round_trips_through_processing(config_state_json):
 
 @pytest.mark.real_data
 def test_gaussian_from_dataset_matches_state(meta_dir, config_state_json):
-    gaussian     = GaussianConfig.from_dataset(meta_dir.parent, n_gaussians=5)
+    gaussian     = GaussianConfigLoader.from_dataset(meta_dir.parent, n_gaussians=5)
     height_range = config_state_json["tomogram_config"]["height_range"]
 
     assert gaussian.x_min == float(height_range[0])

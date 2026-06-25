@@ -14,6 +14,9 @@ from configuration.sar.processing_config import (
     PreProcessEntryConfig,
 )
 
+from pipelines.processing.scheduling import ParallelPlanner
+from tools.baselines                 import BaselinesResolver
+
 from tests.configuration._helpers import make_crop
 
 
@@ -48,32 +51,32 @@ def test_geometry_config_asdict_round_trips():
 
 def test_geometry_resolved_manual_returns_self(tmp_path):
     cfg      = GeometryConfig(baselines_source="manual")
-    resolved = cfg.resolved(tmp_path)
+    resolved = BaselinesResolver().resolved(cfg, tmp_path)
     assert resolved is cfg
 
 
 def test_geometry_resolved_with_kz_returns_self(tmp_path):
     cfg      = GeometryConfig(kz_values=(0.1, 0.2))
-    resolved = cfg.resolved(tmp_path)
+    resolved = BaselinesResolver().resolved(cfg, tmp_path)
     assert resolved is cfg
 
 
 def test_geometry_resolved_auto_missing_file_returns_self(tmp_path):
     cfg      = GeometryConfig(baselines_source="auto")
-    resolved = cfg.resolved(tmp_path)
+    resolved = BaselinesResolver().resolved(cfg, tmp_path)
     assert resolved is cfg
 
 
 def test_geometry_resolved_dataset_missing_file_raises(tmp_path):
     cfg = GeometryConfig(baselines_source="dataset")
     with pytest.raises(FileNotFoundError):
-        cfg.resolved(tmp_path)
+        BaselinesResolver().resolved(cfg, tmp_path)
 
 
 def test_geometry_resolved_invalid_source_raises(tmp_path):
     cfg = GeometryConfig(baselines_source="bogus")
     with pytest.raises(ValueError):
-        cfg.resolved(tmp_path)
+        BaselinesResolver().resolved(cfg, tmp_path)
 
 
 def test_tomogram_config_defaults():
@@ -100,19 +103,19 @@ def test_tomogram_config_default_factories_are_independent():
 
 @pytest.mark.parametrize("effort", ["low", "medium", "high"])
 def test_parallel_config_core_budget_valid(effort):
-    cfg = ParallelConfig(effort=effort)
-    assert cfg.core_budget() >= 1
+    planner = ParallelPlanner(ParallelConfig(effort=effort))
+    assert planner.core_budget() >= 1
 
 
 def test_parallel_config_unknown_effort_raises():
-    cfg = ParallelConfig(effort="extreme")
+    planner = ParallelPlanner(ParallelConfig(effort="extreme"))
     with pytest.raises(ValueError):
-        cfg.core_budget()
+        planner.core_budget()
 
 
 def test_parallel_config_resolve_plan_returns_positive_pair():
-    cfg              = ParallelConfig(effort="high")
-    workers, threads = cfg.resolve_plan(8)
+    planner          = ParallelPlanner(ParallelConfig(effort="high"))
+    workers, threads = planner.resolve_plan(8)
     assert workers >= 1
     assert threads >= 1
 

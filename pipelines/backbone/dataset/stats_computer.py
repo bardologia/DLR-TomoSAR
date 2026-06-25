@@ -14,6 +14,36 @@ from tools.reporting.ranges            import RangeFormatter
 from pipelines.backbone.dataset.stats import Stats
 
 
+class StrategyFitter:
+    @staticmethod
+    def fit(strategy : ChannelStrategy, flat : np.ndarray) -> tuple[float, float]:
+        if strategy.norm_method is NormMethod.FIXED_DIV_PI:
+            return 0.0, float(np.pi)
+
+        data = (
+            np.log1p(np.maximum(flat.astype(np.float64), 0.0))
+            if strategy.apply_log1p
+            else flat.astype(np.float64)
+        )
+
+        if strategy.norm_method is NormMethod.MIN_MAX_P999:
+            lo = float(np.percentile(data, 0.1))
+            hi = float(np.percentile(data, 99.9))
+            return lo, max(hi - lo, 1e-8)
+
+        if strategy.norm_method is NormMethod.ROBUST_IQR:
+            med = float(np.percentile(data, 50))
+            iqr = float(np.percentile(data, 75)) - float(np.percentile(data, 25))
+            return med, max(iqr, 1e-8)
+
+        if strategy.norm_method is NormMethod.ZSCORE:
+            m = float(data.mean())
+            s = float(data.std())
+            return m, max(s, 1e-8)
+
+        raise ValueError(f"Unknown norm method: {strategy.norm_method}")
+
+
 class StatsComputer:
     @staticmethod
     def _input_to_group(input_config : InputConfig, n_secondaries : int, n_interferograms : int) -> list[str]:
@@ -100,7 +130,7 @@ class StatsComputer:
         unique_groups    = list(dict.fromkeys(group_keys))
         group_strategies = strategies
 
-        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected.get(g, np.array([]))) for g in unique_groups}
+        group_mean_std: dict[str, tuple[float, float]] = {g: StrategyFitter.fit(group_strategies[g], collected.get(g, np.array([]))) for g in unique_groups}
 
         n          = len(group_keys)
         locs       = [group_mean_std[group_keys[i]][0] for i in range(n)]
@@ -198,7 +228,7 @@ class StatsComputer:
         n_gaussians   : int,
     ) -> ChannelStats:
 
-        role_fit   : dict[str, tuple[float, float]] = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
+        role_fit   : dict[str, tuple[float, float]] = {key: StrategyFitter.fit(output_config.strategy_for(key), pool) for key, pool in role_pools.items()}
         role_strat : dict[str, ChannelStrategy]     = {key: output_config.strategy_for(key) for key in role_pools}
 
         selected       = output_config.selected_indices(n_gaussians)

@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from configuration.dataset                  import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
-from configuration.sar.gaussian_config      import GaussianConfig
+from pipelines.shared.sar_config_resolvers  import GaussianConfigLoader
 from configuration.training.backbone        import BackboneTrainerConfig
 from pipelines.backbone.training.pipeline   import TrainingPipeline
 from tools.data.regions                     import CropRegion
@@ -45,7 +45,7 @@ def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
 
 
 def _trainer_config(test_data_dir, tmp_path) -> BackboneTrainerConfig:
-    gaussian = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+    gaussian = GaussianConfigLoader.from_dataset(test_data_dir, n_gaussians=5)
     config   = BackboneTrainerConfig(gaussian=gaussian)
 
     config.io.logdir                  = str(tmp_path)

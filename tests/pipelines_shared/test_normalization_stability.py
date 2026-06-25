@@ -7,6 +7,7 @@ import torch
 from configuration.normalization.general    import ChannelStats, ChannelStrategy, NormMethod
 from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.stats         import Stats
+from pipelines.backbone.dataset.stats_computer import StrategyFitter
 
 ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma", "dem/elevation"]
 ZSCORE_SLOTS       = ["out/mu", "pass/phase", "ifg/phase", "pass/raw_re_im", "ifg/raw_re_im"]
@@ -27,8 +28,8 @@ def _active(parameters):
 
 def _random_split_agreement(strat, vals, seed):
     r       = np.random.default_rng(seed).random(vals.shape) < 0.5
-    l1, s1  = strat.fit(vals[r])
-    l2, s2  = strat.fit(vals[~r])
+    l1, s1  = StrategyFitter.fit(strat, vals[r])
+    l2, s2  = StrategyFitter.fit(strat, vals[~r])
     loc_rel   = abs(l1 - l2) / (abs(l1) + abs(l2) + 1e-9)
     scale_rel = abs(s1 - s2) / (s1 + s2 + 1e-9)
     return loc_rel, scale_rel
@@ -36,7 +37,7 @@ def _random_split_agreement(strat, vals, seed):
 
 def _channel_stats(slot_keys, pools):
     strategies = [ChannelStrategy.from_slot(k) for k in slot_keys]
-    fits       = [strat.fit(pool) for strat, pool in zip(strategies, pools)]
+    fits       = [StrategyFitter.fit(strat, pool) for strat, pool in zip(strategies, pools)]
     return ChannelStats(
         loc        = [f[0] for f in fits],
         scale      = [f[1] for f in fits],
@@ -64,8 +65,8 @@ def test_mu_and_signed_channels_stay_zscore():
 def test_mu_robust_iqr_is_degenerate_which_is_why_mu_stays_zscore(parameters):
     _, mu, _ = _active(parameters)
 
-    _, robust_scale = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(mu)
-    _, zscore_scale = ChannelStrategy.from_slot("out/mu").fit(mu)
+    _, robust_scale = StrategyFitter.fit(ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False), mu)
+    _, zscore_scale = StrategyFitter.fit(ChannelStrategy.from_slot("out/mu"), mu)
 
     assert robust_scale <= 1e-7
     assert zscore_scale > 1.0
@@ -107,7 +108,7 @@ def test_configured_robust_scales_are_nondegenerate_on_real_data(parameters, pri
     pools = {"out/amp": amp, "out/sigma": sig, "pass/mag": pass_mag, "ifg/mag": ifg_mag, "dem/elevation": dem}
 
     for slot, vals in pools.items():
-        _, scale = ChannelStrategy.from_slot(slot).fit(vals)
+        _, scale = StrategyFitter.fit(ChannelStrategy.from_slot(slot), vals)
         assert scale > 1e-3
         assert scale > SCALE_FLOOR * 100
 
@@ -153,10 +154,10 @@ def test_robust_iqr_scale_is_more_outlier_stable_than_zscore():
 
     outliers = np.concatenate([base, np.full(400, 500.0)])
 
-    z_clean  = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(base)[1]
-    z_out    = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(outliers)[1]
-    r_clean  = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(base)[1]
-    r_out    = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(outliers)[1]
+    z_clean  = StrategyFitter.fit(ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False), base)[1]
+    z_out    = StrategyFitter.fit(ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False), outliers)[1]
+    r_clean  = StrategyFitter.fit(ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False), base)[1]
+    r_out    = StrategyFitter.fit(ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False), outliers)[1]
 
     z_drift = abs(z_out - z_clean) / z_clean
     r_drift = abs(r_out - r_clean) / r_clean

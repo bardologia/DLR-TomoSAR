@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
+from tools.baselines                    import BaselinesResolver
 from tools.baselines.containers         import TrackBaselines, TrackProfiles
 from tools.sar.tomo_geometry            import TomoGeometry
 import torch
@@ -117,7 +118,7 @@ def test_real_kz_from_perpendicular_baselines_sign(baselines_json):
 def test_geometry_config_resolved_loads_real_baselines(baselines_json, meta_dir):
     cfg      = GeometryConfig(baselines_source="dataset", baseline_component="perpendicular", look_angle_deg=45.0)
     dataset  = meta_dir.parent
-    resolved = cfg.resolved(dataset)
+    resolved = BaselinesResolver().resolved(cfg, dataset)
 
     table = TrackBaselines.from_payload(baselines_json)
     perp  = table.baselines("perpendicular", look_angle_deg=45.0)

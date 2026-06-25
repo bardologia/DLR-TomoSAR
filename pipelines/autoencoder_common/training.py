@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pipelines.shared.config_factory import ConfigFactory
 from pipelines.shared.run_metadata   import TrainingRunMetadata
+from tools.baselines                 import BaselinesResolver
 from tools.runtime.reproducibility   import Reproducibility
 
 
@@ -22,7 +23,7 @@ class AutoencoderTrainingPipeline:
         self.ae_model_name   = entry_config.ae_model_name
 
         self.trainer_config          = self._build_trainer_config(base, entry_config)
-        self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        self.trainer_config.geometry = BaselinesResolver().resolved(entry_config.geometry, entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         self.dataset_config = self.factory.training_dataset_config()
         if split_regions is not None:

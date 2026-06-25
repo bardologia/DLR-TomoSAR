@@ -5,14 +5,14 @@ import math
 import numpy as np
 import pytest
 
-from configuration.sar.gaussian_config import GaussianConfig
+from pipelines.shared.sar_config_resolvers import GaussianConfigLoader
 from tools.sar.geometry_field           import GeometryField
 from tools.sar.track_parameters          import TrackParameters
 
 
 @pytest.mark.real_data
 def test_elevation_axis_spans_config_height_range_at_tomogram_resolution(test_data_dir, config_state_json, tomogram_full):
-    gaussian       = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+    gaussian       = GaussianConfigLoader.from_dataset(test_data_dir, n_gaussians=5)
     height_range   = config_state_json["tomogram_config"]["height_range"]
     profile_length = int(tomogram_full.shape[0])
 

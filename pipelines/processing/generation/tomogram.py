@@ -21,18 +21,20 @@ from tools                                import FileIO, ProcessPoolRunner
 from tools.monitoring.logger              import Logger
 from tools.data.regions                   import CropRegion
 from pipelines.processing.generation.base import GeneratorBase
+from pipelines.processing.scheduling      import ParallelPlanner
 
 
 class TomogramProcessor:
     def __init__(self, config: ProcessingConfig, logger: Logger) -> None:
-        self.config = config
-        self.logger = logger
+        self.config  = config
+        self.logger  = logger
+        self.planner = ParallelPlanner(config.parallel)
 
         self.logger.section("[TomogramProcessor Initialization]")
         self.logger.subsection(f"Max Azimuth Width : {self.config.tomogram_config.max_crop_azimuth_width}")
         self.logger.subsection(f"Parallel Effort   : {self.config.parallel.effort}")
-        self.logger.subsection(f"Core Budget       : {self.config.parallel.core_budget()}")
-        self.logger.subsection(f"Cores Available   : {self.config.parallel.available_cores()}")
+        self.logger.subsection(f"Core Budget       : {self.planner.core_budget()}")
+        self.logger.subsection(f"Cores Available   : {self.planner.available_cores()}")
 
     def _create_temp(self) -> Path:
         parent = self.config.paths.temporary_directory
@@ -67,10 +69,9 @@ class TomogramProcessor:
     ) -> None:
         PyRatEnvironment.ensure_conda_lib_on_ld_path()
 
-        parallel_config = self.config.parallel
-        tasks           = []
+        tasks = []
 
-        resolved_workers, worker_threads = parallel_config.resolve_plan(len(subsections))
+        resolved_workers, worker_threads = self.planner.resolve_plan(len(subsections))
 
         parent_sys_path = list(sys.path)
 
@@ -96,7 +97,7 @@ class TomogramProcessor:
                 parent_sys_path       = parent_sys_path,
             ))
 
-        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({worker_threads} threads each, budget {parallel_config.core_budget()} of {parallel_config.available_cores()} cores)")
+        self.logger.subsection(f"Dispatching {len(tasks)} PyRat jobs across {resolved_workers} workers ({worker_threads} threads each, budget {self.planner.core_budget()} of {self.planner.available_cores()} cores)")
 
         runner    = ProcessPoolRunner(logger=self.logger, max_workers=resolved_workers)
         completed = runner.run(tasks, run_pyrat_job)
