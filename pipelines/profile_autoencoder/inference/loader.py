@@ -13,7 +13,8 @@ from pipelines.shared.dataset_spatial                    import Layout
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
-from tools.data.io                                       import FileIO, ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from pipelines.shared.config_persistence                 import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from tools.data.io                                       import FileIO
 from tools.data.regions                                  import CropRegion
 from tools.monitoring.logger                             import Logger
 

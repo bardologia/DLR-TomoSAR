@@ -14,7 +14,7 @@ from pipelines.shared.run_metadata                       import TrainingRunMetad
 from pipelines.shared.dataset_prep                        import BackboneDatasetPreparation
 from pipelines.shared.training_runner                    import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
-from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
+from pipelines.shared.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                       import Reproducibility
 
 

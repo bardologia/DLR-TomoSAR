@@ -9,7 +9,7 @@ from pipelines.shared.dataset_prep                   import BackboneDatasetPrepa
 from pipelines.shared.run_metadata                   import TrainingRunMetadata
 from pipelines.shared.training_runner                import EntryConfigTrainRunner
 from pipelines.image_autoencoder.training.trainer    import Trainer
-from tools.data.io                                   import ImageAutoencoderConfigIO
+from pipelines.shared.config_persistence             import ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                   import Reproducibility
 
 

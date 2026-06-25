@@ -10,7 +10,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from configuration.benchmark.general            import TrainingQueueConfig
 from configuration.dataset.profile_autoencoder  import ProfileAugmentationConfig, ProfileDatasetConfig
-from tools.data.io                              import ProfileDatasetConfigIO
+from pipelines.shared.config_persistence        import ProfileDatasetConfigIO
 from tools.data.regions                         import CropRegion, SplitRegions
 
 

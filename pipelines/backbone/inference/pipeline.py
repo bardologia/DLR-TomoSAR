@@ -27,7 +27,7 @@ class InferenceComponents:
 class InferenceComponentsResolver:
     @staticmethod
     def for_run(run_directory: Path) -> InferenceComponents:
-        from tools.data.io import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
+        from pipelines.shared.config_persistence import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 
         meta         = Path(run_directory) / "meta"
         has_backbone = BackboneModelConfigIO.exists(meta)

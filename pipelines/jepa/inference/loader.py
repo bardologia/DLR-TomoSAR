@@ -10,7 +10,7 @@ from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalize
 from pipelines.backbone.inference.loader                 import RunLoader
 from pipelines.backbone.inference.model_wrapper          import ModelWrapper
 from pipelines.jepa.training.trainer                     import JepaModule
-from tools.data.io                                       import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
+from pipelines.shared.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 
 
 

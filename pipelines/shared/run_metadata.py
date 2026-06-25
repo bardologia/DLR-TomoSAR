@@ -10,7 +10,8 @@ from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  #
 from torch.utils.tensorboard                      import SummaryWriter
 
 from configuration.training import BackboneTrainerConfig
-from tools.data.io                          import FileIO, BackboneModelConfigIO
+from pipelines.shared.config_persistence    import BackboneModelConfigIO
+from tools.data.io                          import FileIO
 from tools.monitoring.logger                import Logger
 
 

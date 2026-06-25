@@ -1,7 +1,7 @@
 from .monitoring    import Logger, NullLogger, NullTracker, ResourceMonitor, Tracker
 from .reporting     import MarkdownDoc, MarkdownTable, MetricSectionGrouper, PlotBase, ReportAssets
 from .metrics       import FiniteScalar, MetricOrientation, R2, RelativeImprovement
-from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, BackboneModelConfigIO, ProfileNormalizer, ProfilePreprocessor, SplitRegions
+from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, ProfileNormalizer, ProfilePreprocessor, SplitRegions
 from .diagnostics   import IssueDetector, LayerReport, StateDictResolver, WeightAnalyzer, WeightXray, XraySummarizer
 from .training      import BaseTrainer, Checkpoint, EarlyStopping, GradientClipper, MetricAggregator, OverfitManager, Scheduler, Warmup
 from .orchestration import ExperimentStage, GpuJob, GpuJobResult, GpuQueue, ProcessPoolRunner, QueuedInferenceStage, QueuedTrainingStage
@@ -24,7 +24,6 @@ __all__ = [
     "WorkerInitializer",
     "SplitRegions",
     "FileIO",
-    "BackboneModelConfigIO",
     "IssueDetector",
     "LayerReport",
     "StateDictResolver",

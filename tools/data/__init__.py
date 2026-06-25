@@ -1,7 +1,7 @@
 from .preprocessing  import ProfileNormalizer, ProfilePreprocessor
 from .regions        import CropRegion, SplitRegions
 from .gaussians      import GaussianClamp, GaussianCurve, GaussianMixture, GaussianReconstructor
-from .io             import FileIO, BackboneModelConfigIO
+from .io             import FileIO
 from .representation import Representation
 
 __all__ = [
@@ -14,6 +14,5 @@ __all__ = [
     "GaussianMixture",
     "GaussianReconstructor",
     "FileIO",
-    "BackboneModelConfigIO",
     "Representation",
 ]

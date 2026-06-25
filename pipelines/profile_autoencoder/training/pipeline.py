@@ -10,7 +10,7 @@ from pipelines.shared.config_factory                import ConfigFactory
 from pipelines.shared.run_metadata                  import TrainingRunMetadata
 from pipelines.shared.training_runner               import EntryConfigTrainRunner
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from tools.data.io                                  import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from pipelines.shared.config_persistence            import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 from tools.runtime.reproducibility                  import Reproducibility
 
 
