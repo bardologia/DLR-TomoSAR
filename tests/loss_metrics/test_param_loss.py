@@ -164,6 +164,42 @@ def test_match_rejects_large_g():
         ParamMatcher.match(t, t.clone(), t, t.clone())
 
 
+def test_match_rejects_unknown_method():
+    b, g, h, w = 1, 3, 1, 1
+    t = _params(23, b, g, h, w)
+    with pytest.raises(ValueError):
+        ParamMatcher.match(t, t.clone(), t, t.clone(), method="bogus")
+
+
+def test_sorted_gt_sorts_gt_but_leaves_pred():
+    b, g, h, w = 2, 3, 4, 4
+    gt      = _params(24, b, g, h, w)
+    gt_phys = gt.clone()
+    gt_phys[:, :, 0] = 1.0
+
+    perm      = [2, 0, 1]
+    pred      = gt[:, perm].clone()
+    pred_phys = gt_phys[:, perm].clone()
+
+    matched, _, sorted_gt, _ = ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=ParamMatcher.SORTED_GT)
+
+    mus = sorted_gt[:, :, 1]
+    assert torch.all(mus[:, :-1] <= mus[:, 1:])
+    assert torch.equal(matched, pred)
+
+
+def test_sorted_gt_pushes_inactive_gt_last():
+    b, g, h, w = 1, 3, 1, 1
+    gt = torch.zeros(b, g, 3, h, w, dtype=torch.float64)
+    gt[0, :, 0, 0, 0] = torch.tensor([1.0, 0.0, 1.0])
+    gt[0, :, 1, 0, 0] = torch.tensor([5.0, -8.0, 1.0])
+    gt_phys = gt.clone()
+    pred    = torch.zeros_like(gt)
+
+    _, _, _, sorted_phys = ParamMatcher.match(pred, pred.clone(), gt, gt_phys, method=ParamMatcher.SORTED_GT)
+    assert sorted_phys[0, -1, 0, 0, 0].item() == 0.0
+
+
 def test_presence_scale_inverse_frequency_upweights_rare_active():
     b, g, h, w = 2, 3, 4, 4
     active = torch.zeros(b, g, 1, h, w, dtype=torch.float64)

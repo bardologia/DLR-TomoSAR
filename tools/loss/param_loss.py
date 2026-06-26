@@ -10,6 +10,9 @@ class ParamMatcher:
     MAX_GAUSSIANS  = 6
     ACTIVE_AMP_THR = 1e-3
 
+    HUNGARIAN = "hungarian"
+    SORTED_GT = "sorted_gt"
+
     @staticmethod
     def _sort_gt(gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         gt_phys_amp = gt_phys[:, :, 0]
@@ -53,16 +56,33 @@ class ParamMatcher:
         return torch.gather(pred, dim=1, index=idx_b), torch.gather(pred_phys, dim=1, index=idx_b)
 
     @staticmethod
+    def _match_hungarian(pred: torch.Tensor, pred_phys: torch.Tensor, gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        gt, gt_phys     = ParamMatcher._sort_gt(gt, gt_phys)
+        pred, pred_phys = ParamMatcher._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
+
+        return pred, pred_phys, gt, gt_phys
+
+    @staticmethod
+    def _match_sorted_gt(pred: torch.Tensor, pred_phys: torch.Tensor, gt: torch.Tensor, gt_phys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        gt, gt_phys = ParamMatcher._sort_gt(gt, gt_phys)
+
+        return pred, pred_phys, gt, gt_phys
+
+    @staticmethod
     def match(
         pred      : torch.Tensor,
         pred_phys : torch.Tensor,
         gt        : torch.Tensor,
         gt_phys   : torch.Tensor,
+        method    : str = "hungarian",
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        gt, gt_phys     = ParamMatcher._sort_gt(gt, gt_phys)
-        pred, pred_phys = ParamMatcher._assign_pred_to_gt(pred, pred_phys, gt, gt_phys)
+        if method == ParamMatcher.HUNGARIAN:
+            return ParamMatcher._match_hungarian(pred, pred_phys, gt, gt_phys)
 
-        return pred, pred_phys, gt, gt_phys
+        if method == ParamMatcher.SORTED_GT:
+            return ParamMatcher._match_sorted_gt(pred, pred_phys, gt, gt_phys)
+
+        raise ValueError(f"Unknown matching method: {method!r}. Expected {ParamMatcher.HUNGARIAN!r} or {ParamMatcher.SORTED_GT!r}.")
 
 
 class ParamLoss:

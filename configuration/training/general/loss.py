@@ -47,6 +47,8 @@ class LossConfig:
 
     param_weights : tuple = (1.0, 1.0, 1.0)
 
+    param_matching : str = "hungarian"
+
     use_active_normalization : bool  = False
     presence_balance         : bool  = False
     active_weight            : float = 1.0
