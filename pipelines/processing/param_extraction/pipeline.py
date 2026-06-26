@@ -64,6 +64,9 @@ class ExtractionMetadataManager:
             "lambda_k"            : ext.fit_config.lambda_k,
             "sigma_init_divisor"  : ext.fit_config.sigma_init_divisor,
             "activity_threshold"  : ext.fit_config.activity_threshold,
+            "fit_amplitude"       : ext.fit_config.fit_amplitude,
+            "fit_mean"            : ext.fit_config.fit_mean,
+            "fitting_method"      : ext.fitting_method,
         }
 
         FileIO.save_json(payload, meta_path)
@@ -156,7 +159,7 @@ class ParameterExtractor:
         )
 
         self.logger.section("[Parameter Extractor Initialized]")
-        self.logger.subsection("Backend : JAX GPU (Sigma Only)")
+        self.logger.subsection(f"Backend : JAX GPU (free: {'+'.join(self.parameter_extraction.free_parameters)})")
         self.logger.subsection(f"Method  : {self.parameter_extraction.fitting_method}")
 
     @staticmethod

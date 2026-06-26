@@ -39,6 +39,53 @@ def test_fit_settings_parameters_per_profile():
     assert cfg.max_fit_iterations > 0
 
 
+def test_sigma_only_free_flags_default_off():
+    cfg = FitMode.SigmaOnly()
+    assert cfg.fit_amplitude is False
+    assert cfg.fit_mean      is False
+
+
+def test_free_parameters_default_is_sigma_only():
+    cfg = FitSettings()
+    assert cfg.free_parameters == ("sigma",)
+    assert cfg.fitting_method  == "sigma_only_adam"
+
+
+def test_free_parameters_amplitude_and_mean():
+    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True, fit_mean=True))
+    assert cfg.free_parameters == ("amp", "mu", "sigma")
+    assert cfg.fitting_method  == "amp_mu_sigma_adam"
+
+
+def test_free_parameters_amplitude_only():
+    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True))
+    assert cfg.free_parameters == ("amp", "sigma")
+    assert cfg.fitting_method  == "amp_sigma_adam"
+
+
+def test_free_parameters_mean_only():
+    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_mean=True))
+    assert cfg.free_parameters == ("mu", "sigma")
+    assert cfg.fitting_method  == "mu_sigma_adam"
+
+
+def test_suffix_encodes_free_flags():
+    base = ExtractionConfig(processed_data_path=Path("/tmp/run"))
+    full = ExtractionConfig(
+        processed_data_path = Path("/tmp/run"),
+        fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True, fit_mean=True)),
+    )
+    assert "fitamp" not in base.output_suffix_value
+    assert "fitmu"  not in base.output_suffix_value
+    assert full.output_suffix_value.endswith("_fitamp_fitmu")
+
+
+def test_entry_config_free_flags_default_off():
+    cfg = ExtractParamsEntryConfig()
+    assert cfg.fit_amplitude is False
+    assert cfg.fit_mean      is False
+
+
 def test_fit_settings_default_factory_independent():
     a = FitSettings()
     b = FitSettings()

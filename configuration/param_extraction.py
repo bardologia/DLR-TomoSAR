@@ -16,6 +16,8 @@ class FitMode:
         prominence_frac    : float = 0.05
         sigma_init_divisor : float = 4.0
         activity_threshold : float = 1e-3
+        fit_amplitude      : bool  = False
+        fit_mean           : bool  = False
 
 
 FitConfig = FitMode.SigmaOnly
@@ -31,8 +33,26 @@ class FitSettings:
         return 3 * self.fit_config.k_max
 
     @property
+    def free_parameters(self) -> Tuple[str, ...]:
+        cfg   = self.fit_config
+        names = []
+
+        if cfg.fit_amplitude:
+            names.append("amp")
+        if cfg.fit_mean:
+            names.append("mu")
+        names.append("sigma")
+
+        return tuple(names)
+
+    @property
     def fitting_method(self) -> str:
-        return "sigma_only_adam"
+        free = self.free_parameters
+
+        if free == ("sigma",):
+            return "sigma_only_adam"
+
+        return "_".join(free) + "_adam"
 
 
 @dataclass
@@ -72,7 +92,14 @@ class ExtractionConfig:
         lambda_k = cfg.lambda_k
         div_tag = f"{divisor:g}".replace(".", "p")
         lam_tag = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
-        return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}"
+
+        free_tag = ""
+        if cfg.fit_amplitude:
+            free_tag += "_fitamp"
+        if cfg.fit_mean:
+            free_tag += "_fitmu"
+
+        return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}{free_tag}"
 
     @property
     def output_subdir_name(self) -> str:
@@ -128,6 +155,8 @@ class ExtractParamsEntryConfig:
     fit_k_max              : int   = 5
     fit_lambda_k           : float = 1e-2
     fit_sigma_init_divisor : float = 4.0
+    fit_amplitude          : bool  = False
+    fit_mean               : bool  = False
 
     gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
     range_batch_size  : int  = 3500

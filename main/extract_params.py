@@ -41,7 +41,7 @@ def main() -> None:
 
             height_range = config.height_range,
 
-            fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor)),
+            fit_settings = FitSettings(fit_config=FitMode.SigmaOnly(k_max=config.fit_k_max, lambda_k=config.fit_lambda_k, sigma_init_divisor=config.fit_sigma_init_divisor, fit_amplitude=config.fit_amplitude, fit_mean=config.fit_mean)),
 
             range_batch_size  = config.range_batch_size,
             parameter_workers = config.parameter_workers,
