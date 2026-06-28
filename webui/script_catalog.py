@@ -129,6 +129,16 @@ class ScriptCatalog:
                 ("train_jepa",                "JEPA"),
             ],
         },
+        "compare": {
+            "title"    : "Compare",
+            "category" : "Analysis",
+            "purpose"  : "Compare a family of trials side by side. Pick the stage to compare: preprocessing windows, Gaussian-fit parameter extraction, or inference results across training runs.",
+            "members"  : [
+                ("compare_preprocessing_trials",    "Preprocessing"),
+                ("compare_param_extraction_trials", "Param Extraction"),
+                ("compare_trials",                  "Inference Trials"),
+            ],
+        },
     }
 
     def __init__(self, paths: ProjectPaths, resolver: ScriptConfigResolver) -> None:
