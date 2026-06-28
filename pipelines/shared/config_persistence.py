@@ -9,6 +9,7 @@ from models.image_autoencoder                   import IMAGE_AE_CONFIG_REGISTRY
 from models.profile_autoencoder                 import PROFILE_AE_CONFIG_REGISTRY
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion, SplitRegions
+from pipelines.shared.run_classifier            import RunArtifacts
 
 
 class ConfigIO:
@@ -73,7 +74,7 @@ class ConfigIO:
 
 
 class BackboneModelConfigIO(ConfigIO):
-    FILENAME     = "model_config.json"
+    FILENAME     = RunArtifacts.BACKBONE_CONFIG
     MISSING_NOUN = "backbone"
     UNKNOWN_NOUN = "architecture"
     EXCLUDED     = {"shape_logger_types"}
@@ -88,7 +89,7 @@ class BackboneModelConfigIO(ConfigIO):
 
 
 class ProfileAutoencoderConfigIO(ConfigIO):
-    FILENAME     = "profile_autoencoder_config.json"
+    FILENAME     = RunArtifacts.PROFILE_AE_CONFIG
     MISSING_NOUN = "profile autoencoder"
     UNKNOWN_NOUN = "profile autoencoder"
 
@@ -102,7 +103,7 @@ class ProfileAutoencoderConfigIO(ConfigIO):
 
 
 class ImageAutoencoderConfigIO(ConfigIO):
-    FILENAME     = "image_autoencoder_config.json"
+    FILENAME     = RunArtifacts.IMAGE_AE_CONFIG
     MISSING_NOUN = "image autoencoder"
     UNKNOWN_NOUN = "image autoencoder"
 

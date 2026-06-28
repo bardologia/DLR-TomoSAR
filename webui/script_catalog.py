@@ -43,10 +43,22 @@ class ScriptCatalog:
             "purpose"   : "Train the JEPA predictor in latent space. Operates in three modes depending on which autoencoder runs are selected: backbone + profile autoencoder, image autoencoder + backbone, or image autoencoder + backbone + profile autoencoder. Each autoencoder is imported pretrained and either frozen or fine-tuned.",
             "essentials": ["run_name", "backbone_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "image_autoencoder_mode", "image_autoencoder_logdir", "image_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
-        "infer": {
-            "title"     : "Inference",
+        "infer_backbone": {
+            "title"     : "Infer Backbone",
             "category"  : "Inference",
-            "purpose"   : "Single entry point for all inference. Auto-detects each run's type from its persisted configs and dispatches the right pipeline: backbone and JEPA runs get sliding-window prediction, stitched cubes, and reports; standalone profile- and image-autoencoder runs get reconstruction scoring. Sweeps every run root.",
+            "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs.",
+            "essentials": ["logs_dirs", "run_filter", "gpus"],
+        },
+        "infer_profile_autoencoder": {
+            "title"     : "Infer Profile AE",
+            "category"  : "Inference",
+            "purpose"   : "Profile-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone profile-autoencoder runs.",
+            "essentials": ["logs_dirs", "run_filter", "gpus"],
+        },
+        "infer_image_autoencoder": {
+            "title"     : "Infer Image AE",
+            "category"  : "Inference",
+            "purpose"   : "Image-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone image-autoencoder runs.",
             "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
         "benchmark": {
@@ -106,7 +118,9 @@ class ScriptCatalog:
         "train_profile_autoencoder",
         "train_image_autoencoder",
         "train_jepa",
-        "infer",
+        "infer_backbone",
+        "infer_profile_autoencoder",
+        "infer_image_autoencoder",
         "benchmark",
         "cross_validate",
         "tune",
@@ -127,6 +141,16 @@ class ScriptCatalog:
                 ("train_profile_autoencoder", "Profile AE"),
                 ("train_image_autoencoder",   "Image AE"),
                 ("train_jepa",                "JEPA"),
+            ],
+        },
+        "infer": {
+            "title"    : "Infer",
+            "category" : "Inference",
+            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, or the image autoencoder.",
+            "members"  : [
+                ("infer_backbone",            "Backbone"),
+                ("infer_profile_autoencoder", "Profile AE"),
+                ("infer_image_autoencoder",   "Image AE"),
             ],
         },
         "compare": {

@@ -5,17 +5,19 @@ from datetime import datetime
 from pathlib  import Path
 
 from configuration.inference       import InferenceEntryConfig
+from pipelines.shared.run_classifier import RunClassifier
 from tools.orchestration.gpu_queue import GpuJob, GpuJobResult, GpuQueue
 from tools.runtime.config_cli      import ConfigCli
 from tools.monitoring.logger       import Logger
 
 
 class InferenceScheduler:
-    def __init__(self, config: InferenceEntryConfig, entry_script: Path) -> None:
+    def __init__(self, config: InferenceEntryConfig, entry_script: Path, run_type: str) -> None:
         self.config       = config
         self.entry_script = entry_script
+        self.run_type     = run_type
         self.logs_dirs    = [Path(d) for d in config.logs_dirs]
-        self.work_dir     = Path("logs") / "inference" / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.work_dir     = Path("logs") / "inference" / run_type / datetime.now().strftime("%Y%m%d_%H%M%S")
 
     def _roots(self, logger: Logger) -> list[Path]:
         present = [root for root in self.logs_dirs if root.is_dir()]
@@ -26,7 +28,7 @@ class InferenceScheduler:
 
         return present
 
-    def _run_dirs(self, logger: Logger) -> list[Path]:
+    def _candidate_dirs(self, logger: Logger) -> list[Path]:
         roots = self._roots(logger)
 
         if self.config.run_filter:
@@ -37,6 +39,16 @@ class InferenceScheduler:
             return sorted(selected)
 
         return sorted(directory for root in roots for directory in root.iterdir() if directory.is_dir())
+
+    def _run_dirs(self, logger: Logger) -> list[Path]:
+        candidates = self._candidate_dirs(logger)
+        matched    = [directory for directory in candidates if RunClassifier.is_type(directory, self.run_type)]
+
+        skipped = len(candidates) - len(matched)
+        if skipped:
+            logger.subsection(f"Skipping {skipped} run(s) not of type '{self.run_type}'")
+
+        return matched
 
     def _worker_config(self) -> Path:
         path = self.work_dir / "resolved_config.json"
@@ -66,6 +78,7 @@ class InferenceScheduler:
             jobs        = self._jobs(run_dirs, config_path)
 
             logger.kv_table({
+                "Run type"  : self.run_type,
                 "Runs"      : len(run_dirs),
                 "GPUs"      : self.config.gpus,
                 "Run roots" : [str(root) for root in self.logs_dirs],

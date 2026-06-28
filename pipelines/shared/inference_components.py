@@ -15,12 +15,12 @@ class InferenceComponentsResolver:
 
         if ProfileAutoencoderConfigIO.exists(meta):
             if not has_backbone:
-                raise ValueError(f"Run '{run_directory}' is a standalone profile-autoencoder run, not a JEPA run; this resolver only selects backbone/JEPA spatial components. The unified 'main/infer.py' detects and scores standalone autoencoder runs on its own.")
+                raise ValueError(f"Run '{run_directory}' is a standalone profile-autoencoder run, not a JEPA run; this resolver only selects backbone/JEPA spatial components. Score standalone profile-autoencoder runs with main/infer_profile_autoencoder.py.")
             return JEPA_INFERENCE_COMPONENTS
 
         if ImageAutoencoderConfigIO.exists(meta):
             if not has_backbone:
-                raise ValueError(f"Run '{run_directory}' is a standalone image-autoencoder run, not a JEPA run; this resolver only selects backbone/JEPA spatial components. The unified 'main/infer.py' detects and scores standalone autoencoder runs on its own.")
+                raise ValueError(f"Run '{run_directory}' is a standalone image-autoencoder run, not a JEPA run; this resolver only selects backbone/JEPA spatial components. Score standalone image-autoencoder runs with main/infer_image_autoencoder.py.")
             return JEPA_PARAM_INFERENCE_COMPONENTS
 
         return InferenceComponents()

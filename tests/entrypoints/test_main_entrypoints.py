@@ -19,7 +19,9 @@ DEFER_HEAVY_IMPORTS = (
     "train_jepa",
     "train_profile_autoencoder",
     "train_image_autoencoder",
-    "infer",
+    "infer_backbone",
+    "infer_profile_autoencoder",
+    "infer_image_autoencoder",
     "generate_interferograms",
     "generate_tomogram",
     "tune",
@@ -31,7 +33,9 @@ DEFER_HEAVY_IMPORTS = (
 )
 
 CLI_MODULES = (
-    "infer",
+    "infer_backbone",
+    "infer_profile_autoencoder",
+    "infer_image_autoencoder",
     "pre_process",
     "extract_params",
     "tune",
@@ -42,7 +46,9 @@ CLI_MODULES = (
 )
 
 ENTRY_CONFIGS = {
-    "infer"          : ("configuration.inference",                    "InferenceEntryConfig"),
+    "infer_backbone"            : ("configuration.inference",          "InferenceEntryConfig"),
+    "infer_profile_autoencoder" : ("configuration.inference",          "InferenceEntryConfig"),
+    "infer_image_autoencoder"   : ("configuration.inference",          "InferenceEntryConfig"),
     "pre_process"    : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
     "extract_params" : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
     "tune"           : ("configuration.tuning",                       "TuningEntryConfig"),
@@ -196,8 +202,8 @@ def test_config_cli_rejects_unknown_override():
 
 
 def test_infer_worker_requires_run_dir_and_config(main_on_path, frozen_env, monkeypatch):
-    module = _import_main("infer")
-    monkeypatch.setattr(sys, "argv", ["infer.py", "--worker", "--run-dir", "x"])
+    module = _import_main("infer_backbone")
+    monkeypatch.setattr(sys, "argv", ["infer_backbone.py", "--worker", "--run-dir", "x"])
 
     with pytest.raises(SystemExit):
         module.main()

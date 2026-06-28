@@ -36,7 +36,7 @@ class PipelineLibrary:
             {
                 "key"    : "inference",
                 "name"   : "Inference",
-                "script" : "infer",
+                "script" : "infer_backbone",
                 "blurb"  : "Sliding-window prediction, overlap-add stitching, metrics, and report generation.",
                 "stages" : ["Windowed predict", "Cube stitch", "Metrics", "Report and figures"],
             },

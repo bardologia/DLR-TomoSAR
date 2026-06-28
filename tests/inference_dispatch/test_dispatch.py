@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.inference            import InferenceEntryConfig
-from pipelines.shared.inference_dispatch import InferenceDispatcher, RunType
+from pipelines.shared.run_classifier import RunClassifier, RunType
 
 
 def _make_run(tmp_path, *filenames):
@@ -14,31 +13,47 @@ def _make_run(tmp_path, *filenames):
     return tmp_path
 
 
-def _dispatcher():
-    return InferenceDispatcher(InferenceEntryConfig())
-
-
 def test_classify_backbone(tmp_path):
     run = _make_run(tmp_path, "model_config.json")
-    assert _dispatcher().classify(run) == RunType.BACKBONE
+    assert RunClassifier.classify(run) == RunType.BACKBONE
 
 
 def test_classify_profile_autoencoder(tmp_path):
     run = _make_run(tmp_path, "profile_autoencoder_config.json")
-    assert _dispatcher().classify(run) == RunType.PROFILE_AE
+    assert RunClassifier.classify(run) == RunType.PROFILE_AE
 
 
 def test_classify_image_autoencoder(tmp_path):
     run = _make_run(tmp_path, "image_autoencoder_config.json")
-    assert _dispatcher().classify(run) == RunType.IMAGE_AE
+    assert RunClassifier.classify(run) == RunType.IMAGE_AE
 
 
 def test_classify_jepa_run_routes_to_backbone(tmp_path):
     run = _make_run(tmp_path, "model_config.json", "profile_autoencoder_config.json")
-    assert _dispatcher().classify(run) == RunType.BACKBONE
+    assert RunClassifier.classify(run) == RunType.BACKBONE
 
 
 def test_classify_unrecognized_run_raises(tmp_path):
     run = _make_run(tmp_path)
     with pytest.raises(ValueError):
-        _dispatcher().classify(run)
+        RunClassifier.classify(run)
+
+
+def test_is_type_matches_only_its_type(tmp_path):
+    run = _make_run(tmp_path, "profile_autoencoder_config.json")
+    assert RunClassifier.is_type(run, RunType.PROFILE_AE) is True
+    assert RunClassifier.is_type(run, RunType.BACKBONE)   is False
+
+
+def test_is_type_returns_false_for_unrecognized_run(tmp_path):
+    run = _make_run(tmp_path)
+    assert RunClassifier.is_type(run, RunType.BACKBONE) is False
+
+
+def test_run_classifier_artifacts_match_config_io_filenames():
+    from pipelines.shared.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
+    from pipelines.shared.run_classifier     import RunArtifacts
+
+    assert BackboneModelConfigIO.FILENAME       == RunArtifacts.BACKBONE_CONFIG
+    assert ProfileAutoencoderConfigIO.FILENAME  == RunArtifacts.PROFILE_AE_CONFIG
+    assert ImageAutoencoderConfigIO.FILENAME    == RunArtifacts.IMAGE_AE_CONFIG

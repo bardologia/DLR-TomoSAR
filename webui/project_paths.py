@@ -29,6 +29,18 @@ class ProjectPaths:
             "config_module" : "configuration.training.jepa",
             "config_class"  : "JepaEntryConfig",
         },
+        "infer_backbone": {
+            "config_module" : "configuration.inference",
+            "config_class"  : "InferenceEntryConfig",
+        },
+        "infer_profile_autoencoder": {
+            "config_module" : "configuration.inference",
+            "config_class"  : "InferenceEntryConfig",
+        },
+        "infer_image_autoencoder": {
+            "config_module" : "configuration.inference",
+            "config_class"  : "InferenceEntryConfig",
+        },
         "cross_validate": {
             "file"          : "cross_validate",
             "config_module" : "configuration.cross_validation.general",
