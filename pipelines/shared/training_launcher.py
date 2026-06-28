@@ -1,72 +1,16 @@
 from __future__ import annotations
 
-import argparse
-import sys
-from pathlib import Path
-
 from pipelines.shared.seed_sweep import SeedSweepRunner
 from tools.runtime.config_cli    import ConfigCli
 
 
-class TrainingLauncher:
+class SeedSweepLauncher:
 
-    MODES = ("backbone", "jepa", "profile_autoencoder", "image_autoencoder")
+    def __init__(self, entry_config, runner_class, description: str) -> None:
+        self.entry_config = entry_config
+        self.runner_class = runner_class
+        self.description  = description
 
-    def __init__(self, entry_script: Path) -> None:
-        self.entry_script = Path(entry_script)
-
-    def _resolve_mode(self, default: str, argv: list[str]) -> str:
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument("--mode", choices=self.MODES, default=None)
-        args, _ = parser.parse_known_args(argv)
-        return args.mode or default
-
-    def _backbone(self, config, argv: list[str]) -> None:
-        from pipelines.backbone.training.pipeline import SingleTrainRunner, TrainScheduler
-
-        trial_parser = argparse.ArgumentParser(add_help=False)
-        trial_parser.add_argument("--trial", action="store_true")
-        trial, _ = trial_parser.parse_known_args(argv)
-
-        cli    = ConfigCli(config, description="Train one model end to end, or fan out curriculum/warmup/secondary trials across GPUs")
-        config = cli.apply(argv)
-
-        if trial.trial or not config.trials_enabled:
-            SeedSweepRunner(config, SingleTrainRunner).run()
-            return
-
-        TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script, stage="backbone").run()
-
-    def _jepa(self, config, argv: list[str]) -> None:
-        from pipelines.jepa.training.pipeline import SingleTrainRunner
-
-        config = ConfigCli(config, description="JEPA predictor training").apply(argv)
-        SeedSweepRunner(config, SingleTrainRunner).run()
-
-    def _profile_autoencoder(self, config, argv: list[str]) -> None:
-        from pipelines.profile_autoencoder.training.pipeline import SingleTrainRunner
-
-        config = ConfigCli(config, description="Profile autoencoder training").apply(argv)
-        SeedSweepRunner(config, SingleTrainRunner).run()
-
-    def _image_autoencoder(self, config, argv: list[str]) -> None:
-        from pipelines.image_autoencoder.training.pipeline import SingleTrainRunner
-
-        config = ConfigCli(config, description="Image autoencoder training").apply(argv)
-        SeedSweepRunner(config, SingleTrainRunner).run()
-
-    def run(self) -> None:
-        from configuration.training import TrainEntryConfig
-
-        argv  = sys.argv[1:]
-        entry = TrainEntryConfig()
-        mode  = self._resolve_mode(entry.mode, argv)
-        sub   = getattr(entry, mode)
-
-        dispatch = {
-            "backbone"           : self._backbone,
-            "jepa"               : self._jepa,
-            "profile_autoencoder": self._profile_autoencoder,
-            "image_autoencoder"  : self._image_autoencoder,
-        }
-        dispatch[mode](sub, argv)
+    def run(self, argv: list[str] | None = None) -> None:
+        config = ConfigCli(self.entry_config, description=self.description).apply(argv)
+        SeedSweepRunner(config, self.runner_class).run()

@@ -36,4 +36,3 @@ from configuration.training.profile_autoencoder import (
     ProfileAeTrainerConfig,
     ProfileAeEntryConfig,
 )
-from configuration.training.general.entry import TrainEntryConfig

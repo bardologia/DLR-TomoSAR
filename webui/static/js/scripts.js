@@ -41,7 +41,7 @@ class ScriptPanel {
     card.innerHTML =
       `<span class="script-card__glow"></span>` +
       `<div class="script-card__top"><span class="script-card__cat">Training</span>` +
-      `<span class="script-card__file">main/train.py</span></div>` +
+      `<span class="script-card__file">main/train_backbone.py</span></div>` +
       `<h3 class="script-card__title">Ablation study</h3>` +
       `<p class="script-card__purpose">Cumulative ablation of the backbone: train the full model and degrade one selected feature at a time, in order, down to the baseline.</p>` +
       `<div class="script-card__foot"><span>feature regression</span>` +

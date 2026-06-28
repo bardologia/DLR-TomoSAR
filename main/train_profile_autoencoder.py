@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from _bootstrap import EnvironmentPinner
 
@@ -13,8 +12,12 @@ def main() -> None:
 
     EnvironmentPinner.gpu(args.gpu, expandable_segments=True)
 
-    from pipelines.shared.training_launcher import TrainingLauncher
-    TrainingLauncher(entry_script=Path(__file__).resolve()).run()
+    from configuration.training.profile_autoencoder import ProfileAeEntryConfig
+    from pipelines.profile_autoencoder.training.pipeline import SingleTrainRunner
+    from pipelines.shared.training_launcher              import SeedSweepLauncher
+
+    SeedSweepLauncher(ProfileAeEntryConfig(), SingleTrainRunner, "Profile autoencoder training").run()
+
 
 if __name__ == "__main__":
     main()

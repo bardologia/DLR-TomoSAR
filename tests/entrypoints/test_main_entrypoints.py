@@ -15,7 +15,10 @@ _MAIN_DIR = Path(__file__).resolve().parents[2] / "main"
 THREAD_KEYS = ("MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS", "OMP_NUM_THREADS")
 
 DEFER_HEAVY_IMPORTS = (
-    "train",
+    "train_backbone",
+    "train_jepa",
+    "train_profile_autoencoder",
+    "train_image_autoencoder",
     "infer",
     "generate_interferograms",
     "generate_tomogram",
@@ -102,10 +105,11 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
     assert "CUDA_VISIBLE_DEVICES" not in os.environ
 
 
-def test_train_main_defers_heavy_imports(main_on_path, frozen_env):
-    source = (_MAIN_DIR / "train.py").read_text()
+@pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder"))
+def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
+    source = (_MAIN_DIR / f"{name}.py").read_text()
 
-    assert "import TrainingLauncher" not in source.split("def main")[0]
+    assert "from pipelines" not in source.split("def main")[0]
     assert "from pipelines" in source.split("def main", 1)[1]
 
 

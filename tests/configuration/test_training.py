@@ -23,7 +23,6 @@ from configuration.training.general.loss import (
     LossCurriculumConfig,
 )
 from configuration.training.general.trainer import SharedSubConfigInheritance
-from configuration.training.general.entry   import TrainEntryConfig
 
 from configuration.training.backbone import (
     PatchTrialsConfig,
@@ -70,7 +69,6 @@ SIMPLE_DEFAULT_CONFIGS = [
     ProfileAeLossConfig,
     PatchTrialsConfig,
     SecondaryTrialsConfig,
-    TrainEntryConfig,
     BackboneEntryConfig,
     JepaEntryConfig,
     ImageAeEntryConfig,
@@ -144,14 +142,6 @@ def test_loss_curriculum_holds_two_loss_configs():
     assert isinstance(cfg.warmup, LossConfig)
     assert isinstance(cfg.complete, LossConfig)
     assert cfg.warmup is not cfg.complete
-
-
-def test_train_entry_config_holds_all_modes():
-    cfg = TrainEntryConfig()
-    assert isinstance(cfg.backbone, BackboneEntryConfig)
-    assert isinstance(cfg.jepa, JepaEntryConfig)
-    assert isinstance(cfg.profile_autoencoder, ProfileAeEntryConfig)
-    assert isinstance(cfg.image_autoencoder, ImageAeEntryConfig)
 
 
 def test_backbone_entry_default_subconfigs():

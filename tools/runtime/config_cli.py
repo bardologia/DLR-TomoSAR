@@ -18,7 +18,6 @@ class ConfigCli:
         "--help-config",
         "--detach", "--nohup",
         "--gpu",
-        "--mode",
         "--trial", "--worker", "--resume",
         "--model",
         "--n-trials", "--study-name", "--storage-url",

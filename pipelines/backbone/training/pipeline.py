@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import gc
 import sys
 from dataclasses import replace
@@ -11,7 +12,9 @@ import torch
 from models                                  import BACKBONE_IMAGE_SIZE_MODELS
 from tools.data.gaussians                    import GaussianHead
 from configuration.dataset import DatasetConfig
-from configuration.training import BackboneTrainerConfig
+from configuration.training import BackboneTrainerConfig, BackboneEntryConfig
+from pipelines.shared.seed_sweep             import SeedSweepRunner
+from tools.runtime.config_cli                import ConfigCli
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from tools.orchestration                     import ExperimentStage, GpuJob
@@ -286,10 +289,9 @@ class TrainScheduler:
 
     SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "input_trials", "ablation_features", "ablation_catalog", "ablation_include_full", "gpus", "poll_interval_s")
 
-    def __init__(self, config, cli_overrides: dict, entry_script: Path, stage: str) -> None:
+    def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
         self.config       = config
         self.entry_script = Path(entry_script)
-        self.stage_name   = stage
         self.log_dir      = Path(config.logdir) / "batch_train_logs"
         self.results_path = self.log_dir / "train_scheduler_results.json"
 
@@ -323,7 +325,7 @@ class TrainScheduler:
 
         return GpuJob(
             name     = run_name,
-            command  = [sys.executable, str(self.entry_script), "--mode", self.stage_name, "--trial"] + argv,
+            command  = [sys.executable, str(self.entry_script), "--trial"] + argv,
             log_path = self.log_dir / f"{run_name}.log",
         )
 
@@ -357,3 +359,25 @@ class TrainScheduler:
         self.stage._log_failures(failed)
 
         self.logger.close()
+
+
+class BackboneTrainingLauncher:
+
+    def __init__(self, entry_script: Path) -> None:
+        self.entry_script = Path(entry_script)
+
+    def run(self, argv: list[str] | None = None) -> None:
+        argv = list(sys.argv[1:] if argv is None else argv)
+
+        cli    = ConfigCli(BackboneEntryConfig(), description="Train one backbone end to end, or fan out curriculum/warmup/secondary trials across GPUs")
+        config = cli.apply(argv)
+
+        trial_parser = argparse.ArgumentParser(add_help=False)
+        trial_parser.add_argument("--trial", action="store_true")
+        trial, _ = trial_parser.parse_known_args(argv)
+
+        if trial.trial or not config.trials_enabled:
+            SeedSweepRunner(config, SingleTrainRunner).run()
+            return
+
+        TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script).run()

@@ -31,7 +31,7 @@ class TrainingPipeline:
         image_dir   = self._resolve_ae_run(entry_config.image_autoencoder_logdir,   entry_config.image_autoencoder_run,   "image")
 
         if profile_dir is None and image_dir is None:
-            raise ValueError("JEPA requires at least one of profile_autoencoder_run or image_autoencoder_run; with neither, train the plain backbone with '--mode backbone'.")
+            raise ValueError("JEPA requires at least one of profile_autoencoder_run or image_autoencoder_run; with neither, train the plain backbone via main/train_backbone.py.")
 
         self.profile_autoencoder_meta = None
         self.autoencoder_cfg          = None

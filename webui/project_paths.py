@@ -14,26 +14,18 @@ class ProjectPaths:
 
     ENTRY_OVERRIDES = {
         "train_backbone": {
-            "file"          : "train",
-            "args"          : ["--mode", "backbone"],
             "config_module" : "configuration.training.backbone",
             "config_class"  : "BackboneEntryConfig",
         },
         "train_profile_autoencoder": {
-            "file"          : "train",
-            "args"          : ["--mode", "profile_autoencoder"],
             "config_module" : "configuration.training.profile_autoencoder",
             "config_class"  : "ProfileAeEntryConfig",
         },
         "train_image_autoencoder": {
-            "file"          : "train",
-            "args"          : ["--mode", "image_autoencoder"],
             "config_module" : "configuration.training.image_autoencoder",
             "config_class"  : "ImageAeEntryConfig",
         },
         "train_jepa": {
-            "file"          : "train",
-            "args"          : ["--mode", "jepa"],
             "config_module" : "configuration.training.jepa",
             "config_class"  : "JepaEntryConfig",
         },
