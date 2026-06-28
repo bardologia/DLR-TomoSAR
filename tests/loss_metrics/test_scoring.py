@@ -85,6 +85,12 @@ def test_orientation_default_is_lower():
     assert MetricOrientation.direction("some_unknown_thing") == "lower"
 
 
+def test_orientation_reduction_overrides_mse_token():
+    assert MetricOrientation.direction("relative_mse_reduction")       == "higher"
+    assert MetricOrientation.higher_is_better("relative_mse_reduction") is True
+    assert MetricOrientation.direction("fraction_pred_beats_reduced")  == "higher"
+
+
 def test_relative_improvement_lower_is_better():
     frac = RelativeImprovement.fraction(2.0, 1.0, higher_is_better=False)
     assert math.isclose(frac, 0.5)
