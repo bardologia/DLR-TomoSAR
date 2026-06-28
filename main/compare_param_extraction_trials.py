@@ -30,9 +30,13 @@ def main() -> None:
             "Output dir"   : str(out_dir),
         }, title="Configuration")
 
-        report = ParamExtractionComparisonPipeline(config=config, out_dir=out_dir, logger=logger).run()
+        reports = ParamExtractionComparisonPipeline(config=config, out_dir=out_dir, logger=logger).run()
 
-        logger.info(f"\nComparison written to: {report.parent}")
+        logger.subsection("Reports written")
+        for report in reports:
+            logger.info(str(report))
+
+        logger.info(f"\nComparison written to: {out_dir}")
 
 
 if __name__ == "__main__":

@@ -5,10 +5,11 @@ from pathlib     import Path
 
 import numpy as np
 
+from pipelines.comparison.metric_table           import MetricTableRenderer
 from pipelines.comparison.spatial_stats          import SpatialDispersion
 from pipelines.processing.param_extraction.metrics import SnrEstimator
 from tools.data.io                               import FileIO
-from tools.reporting.markdown                    import MarkdownDoc, MarkdownTable, ScalarFormatter
+from tools.reporting.markdown                    import MarkdownDoc
 from tools.reporting.plotting                    import PlotBase
 from tools.monitoring.logger                     import Logger
 
@@ -176,8 +177,7 @@ class WindowComparisonPlots(PlotBase):
 
 class WindowComparisonReport:
 
-    COLUMNS = [
-        ("window_label",          "Window"),
+    METRIC_COLUMNS = [
         ("valid_fraction",        "Valid frac"),
         ("contrast_db_median",    "Contrast dB"),
         ("speckle_cv_median",     "Speckle CV"),
@@ -185,26 +185,33 @@ class WindowComparisonReport:
         ("autocorr_length_az",    "Corr len"),
     ]
 
+    ORIENTATION = {
+        "valid_fraction"        : "higher",
+        "contrast_db_median"    : "higher",
+        "speckle_cv_median"     : "lower",
+        "spurious_peaks_median" : "lower",
+        "autocorr_length_az"    : "lower",
+    }
+
     def __init__(self, out_dir: Path, logger: Logger) -> None:
         self.out_dir = out_dir
         self.logger  = logger
 
     def _table(self, doc: MarkdownDoc, trials: list[WindowTrial]) -> None:
-        table = MarkdownTable([label for _, label in self.COLUMNS])
-
-        for trial in trials:
-            cells = []
-            for key, _ in self.COLUMNS:
-                value = trial.window_label if key == "window_label" else trial.metrics[key]
-                cells.append(ScalarFormatter.format_scalar(value, precision=4))
-            table.add_row(*cells)
+        rows = MetricTableRenderer.render(
+            rows           = trials,
+            leading        = [("Window", lambda trial: trial.window_label)],
+            metric_columns = self.METRIC_COLUMNS,
+            orientation    = self.ORIENTATION,
+        )
 
         doc.heading("Per-window metrics", level=2)
-        doc.table(table)
+        doc.raw("\n".join(rows))
+        doc.blank()
 
     def _reading(self, doc: MarkdownDoc) -> None:
         doc.heading("Reading the bias-variance trade-off", level=2)
-        doc.paragraph("As the multilook window grows, estimation variance falls: peak-to-floor contrast rises, residual speckle (local CV) drops, and spurious competing peaks per profile decrease. The cost is spatial resolution: the azimuth correlation length grows as neighbouring scatterers are mixed. There is no single best window. Select the knee where variance has settled before the correlation length climbs, keep the two strongest candidates, and break the tie downstream on the end metric with a matched receptive field.")
+        doc.paragraph("Arrows mark each axis on its own (↑ better, ↓ better) and the bold value is the per-column extreme, not an overall winner. As the multilook window grows, estimation variance falls: peak-to-floor contrast rises, residual speckle (local CV) drops, and spurious competing peaks per profile decrease. The cost is spatial resolution: the azimuth correlation length grows as neighbouring scatterers are mixed, so the largest window bolds the variance axes while the smallest bolds the correlation length. There is no single best window. Select the knee where variance has settled before the correlation length climbs, keep the two strongest candidates, and break the tie downstream on the end metric with a matched receptive field.")
 
     def _plots(self, doc: MarkdownDoc, plots: list[Path]) -> None:
         doc.heading("Comparison plots", level=2)

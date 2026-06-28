@@ -5,12 +5,14 @@ from pathlib     import Path
 
 import numpy as np
 
-from pipelines.comparison.spatial_stats import SpatialDispersion
-from pipelines.shared.comparison_report import ComparisonReportBase
-from tools.data.io                      import FileIO
-from tools.reporting.markdown           import MarkdownDoc, MarkdownTable, ScalarFormatter
-from tools.reporting.plotting           import PlotBase
-from tools.monitoring.logger            import Logger
+from pipelines.comparison.metric_table   import MetricTableRenderer
+from pipelines.comparison.spatial_stats   import SpatialDispersion
+from pipelines.shared.comparison_report   import ComparisonReportBase
+from tools.data.io                        import FileIO
+from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting            import ReportAssets
+from tools.reporting.plotting             import PlotBase
+from tools.monitoring.logger              import Logger
 
 
 @dataclass
@@ -247,6 +249,17 @@ class ParamComparisonReport(ComparisonReportBase):
         ("k_ambiguous_fraction",        "Ambiguous"),
     ]
 
+    ORIENTATION = {
+        "r2_median"                   : "higher",
+        "bic_median"                  : "lower",
+        "fit_coverage"                : "higher",
+        "active_slot_mean"            : None,
+        "collapsed_slot_fraction"     : "lower",
+        "mu_separation_median"        : None,
+        "mu_dominant_stability_error" : "lower",
+        "k_ambiguous_fraction"        : "lower",
+    }
+
     RANK_METRICS = [
         ("bic_median",                  "BIC"),
         ("r2_median",                   "R²"),
@@ -255,31 +268,18 @@ class ParamComparisonReport(ComparisonReportBase):
     ]
 
     def __init__(self, out_dir: Path, logger: Logger) -> None:
-        self.out_dir = out_dir
+        self.out_dir = Path(out_dir)
         self.logger  = logger
+        self.assets  = ReportAssets(base=self.out_dir)
 
     def _config_table(self, trials: list[ParamTrial]) -> list[str]:
         table = MarkdownTable([label for _, label in self.CONFIG_COLUMNS])
 
         for trial in trials:
-            cells = []
-            for key, _ in self.CONFIG_COLUMNS:
-                value = getattr(trial, key)
-                cells.append(ScalarFormatter.format_scalar(value, precision=4))
+            cells = [ScalarFormatter.format_scalar(getattr(trial, key), precision=4) for key, _ in self.CONFIG_COLUMNS]
             table.add_row(*cells)
 
         return ["## Trial configurations\n"] + table.render() + [""]
-
-    def _metric_table(self, trials: list[ParamTrial]) -> list[str]:
-        table = MarkdownTable(["Trial", "K"] + [label for _, label in self.METRIC_COLUMNS])
-
-        for trial in trials:
-            cells = [f"`{trial.label}`", trial.k_max]
-            for key, _ in self.METRIC_COLUMNS:
-                cells.append(ScalarFormatter.format_scalar(trial.metrics[key], precision=4))
-            table.add_row(*cells)
-
-        return ["## Per-trial metrics\n", "_Trials are grouped by number of Gaussians K; the two K families are separate deliverables and are never ranked against each other._\n"] + table.render() + [""]
 
     def _within_k_sections(self, trials: list[ParamTrial]) -> list[str]:
         orders = sorted({trial.k_max for trial in trials})
@@ -301,30 +301,48 @@ class ParamComparisonReport(ComparisonReportBase):
             "BIC penalises the extra free parameters a larger K spends, so it is comparable within a fixed K family but is reported, not used, across K. Collapsed slot fraction and slot separation expose Gaussian-slot collapse: a high collapsed fraction with small separation means the extra slots are fitting noise rather than distinct scatterers. Spatial coherence (block standard deviation of the dominant scatterer height) is low when fitted parameters vary smoothly across neighbouring pixels and high when the fit is locking onto speckle.\n",
         ]
 
-    def _plots(self, plots: list[Path]) -> list[str]:
-        lines = ["## Comparison plots\n"]
-        for path in plots:
-            lines.append(f"![{path.stem}]({Path('images') / path.name})\n")
-        return lines
-
-    def write(self, trials: list[ParamTrial], plots: list[Path]) -> Path:
-        doc = MarkdownDoc("Parameter-extraction trial comparison")
-        doc.paragraph(f"Compared {len(trials)} Gaussian-fit trials across {len(set(t.k_max for t in trials))} K families.")
-
-        lines  = doc.lines
+    def _write_overview(self, trials: list[ParamTrial]) -> Path:
+        lines  = self.assets.header("Parameter-Extraction Comparison Overview")
+        lines += [f"Compared {len(trials)} Gaussian-fit trials across {len(set(t.k_max for t in trials))} K families.\n"]
         lines += self._config_table(trials)
-        lines += self._metric_table(trials)
         lines += self._within_k_sections(trials)
-        if plots:
-            lines += self._plots(plots)
         lines += self._notes()
 
-        path = self.out_dir / "report.md"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+        out = self.out_dir / "overview.md"
+        out.write_text("\n".join(lines), encoding="utf-8")
+        return out
 
-        self.logger.info(f"Report written to: {path}")
-        return path
+    def _write_metrics(self, trials: list[ParamTrial], plots: list[Path]) -> Path:
+        table = MetricTableRenderer.render(
+            rows           = trials,
+            leading        = [("Trial", lambda trial: f"`{trial.label}`"), ("K", lambda trial: str(trial.k_max))],
+            metric_columns = self.METRIC_COLUMNS,
+            orientation    = self.ORIENTATION,
+            group_of       = lambda trial: trial.k_max,
+        )
+
+        lines  = self.assets.header("Parameter-Extraction Metrics")
+        lines += ["> Best value per metric in **bold** within each K family (↑ higher is better, ↓ lower is better). The K families are separate deliverables and are never ranked against each other.\n"]
+        lines += ["## Per-trial metrics\n", *table, ""]
+
+        if plots:
+            lines += ["## Comparison plots\n"]
+            for path in plots:
+                lines += self.assets.image(path.stem, path)
+
+        out = self.out_dir / "metrics.md"
+        out.write_text("\n".join(lines), encoding="utf-8")
+        return out
+
+    def write_all(self, trials: list[ParamTrial], plots: list[Path]) -> list[Path]:
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.section("Writing comparison reports")
+
+        written = [self._write_overview(trials), self._write_metrics(trials, plots)]
+        for path in written:
+            self.logger.info(f"Report written to: {path}")
+
+        return written
 
 
 class ParamExtractionComparisonPipeline:
@@ -349,10 +367,10 @@ class ParamExtractionComparisonPipeline:
             return []
         return ParamComparisonPlots(self.out_dir).render(trials)
 
-    def _report(self, trials: list[ParamTrial], plots: list[Path]) -> Path:
-        return ParamComparisonReport(self.out_dir, self.logger).write(trials, plots)
+    def _report(self, trials: list[ParamTrial], plots: list[Path]) -> list[Path]:
+        return ParamComparisonReport(self.out_dir, self.logger).write_all(trials, plots)
 
-    def run(self) -> Path:
+    def run(self) -> list[Path]:
         trials = self._collect()
         if not trials:
             raise RuntimeError("No parameter-extraction trials to compare")
