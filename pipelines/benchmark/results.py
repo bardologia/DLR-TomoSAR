@@ -208,19 +208,19 @@ class ComparisonReport(ComparisonReportBase):
         if not scored:
             return ["## Leaderboard\n", "_No inference metrics available yet._\n"]
 
-        ranks, mean_ranks = self._rank_metrics(self.HEADLINE_METRICS, scored)
+        headline_intro = (
+            "`Score` is a magnitude-aware composite in [0, 1] (per metric, 1 = best and 0 = worst by min-max, then "
+            "averaged; missing metrics score 0). `Mean rank` is the tie-averaged ordinal rank (1 = best), `Wins` "
+            "counts metrics where the model is best, `Δ` is the score gap to the leader. Models are ordered by `Score`."
+        )
+        grouped_intro = (
+            "Correlated headline metrics are averaged within a group first, so the curve-error metrics do not outvote "
+            "the independent axes. `Grouped score` averages the group scores with equal weight; each cell is the group "
+            "score with its group rank in parentheses (best in **bold**)."
+        )
 
-        lines = ["## Leaderboard\n", "Mean rank across the headline metrics (1 = best); missing metrics rank last.\n"]
-
-        table = MarkdownTable(["Rank", "Model", "Mean rank", *[label for _, label in self.HEADLINE_METRICS]])
-
-        for position, name in enumerate(sorted(mean_ranks, key=mean_ranks.get), start=1):
-            cells = [str(ranks[name].get(key, "—")) for key, _ in self.HEADLINE_METRICS]
-            table.add_row(position, f"`{name}`", f"{mean_ranks[name]:.2f}", *cells)
-
-        lines += table.render()
-        lines.append("")
-
+        lines  = self._rank_section("Model",    "Leaderboard",         headline_intro, self.HEADLINE_METRICS, scored)
+        lines += self._grouped_section("Model", "Grouped Leaderboard", grouped_intro,  self.HEADLINE_GROUPS,  scored)
         return lines
 
     def _write_metrics(self) -> Path:

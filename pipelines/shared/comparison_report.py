@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pipelines.shared.trial_collection import TrialRecord
-from tools.metrics.scoring             import FiniteScalar, MetricOrientation
+from tools.metrics.ranking             import RankingComputer, RankingResult
+from tools.reporting.markdown          import MarkdownTable
 
 
 class ComparisonReportBase:
@@ -16,21 +17,83 @@ class ComparisonReportBase:
         ("pixel_peak_err_units_mean_gt", "Peak err"),
     ]
 
-    def _rank_metrics(self, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> tuple[dict, dict]:
-        ranks : dict[str, dict[str, int]] = {r.name: {} for r in scored}
+    HEADLINE_GROUPS = [
+        ("Curve error",           ["curve_rmse_gt", "curve_mae_gt", "psnr_db_gt"]),
+        ("Variance explained",    ["overall_r2_gt", "pixel_r2_gt_mean"]),
+        ("Structural similarity", ["ssim_gt_elev_mean"]),
+        ("Shape (cosine)",        ["pixel_cosine_gt_mean"]),
+        ("Peak location",         ["pixel_peak_err_units_mean_gt"]),
+    ]
 
-        for key, _ in metrics:
-            valued  = [(r.name, value) for r in scored if (value := FiniteScalar.coerce(r.metrics.get(key))) is not None]
-            reverse = MetricOrientation.direction(key) == "higher"
-            ordered = sorted(valued, key=lambda item: item[1], reverse=reverse)
+    def _ranking(self, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> RankingResult:
+        trials = [(r.name, r.metrics) for r in scored]
+        return RankingComputer(metrics, trials).compute()
 
-            for position, (name, _) in enumerate(ordered, start=1):
-                ranks[name][key] = position
+    def _rank_section(self, entity: str, title: str, intro: str, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> list[str]:
+        if not metrics:
+            return [f"## {title}\n", "_No applicable metrics available._\n"]
 
-        worst = len(scored) + 1
-        mean_ranks = {
-            name: sum(ranks[name].get(key, worst) for key, _ in metrics) / len(metrics)
-            for name in ranks
-        }
+        result = self._ranking(metrics, scored)
+        leader = result.leader_composite()
 
-        return ranks, mean_ranks
+        lines = [f"## {title}\n", f"{intro}\n"]
+
+        table = MarkdownTable(["#", entity, "Score", "Mean rank", "Wins", "Δ", *[label for _, label in metrics]])
+
+        for position, name in enumerate(result.order(), start=1):
+            cells = []
+            for key, _ in metrics:
+                cell = RankingResult.format_rank(result.metric_rank(name, key))
+                if name in result.metric_leaders(key):
+                    cell = f"**{cell}**"
+                cells.append(cell)
+
+            delta = result.composite[name] - leader
+
+            table.add_row(
+                position,
+                f"`{name}`",
+                f"{result.composite[name]:.3f}",
+                f"{result.mean_rank[name]:.2f}",
+                result.wins[name],
+                f"{delta:+.3f}",
+                *cells,
+            )
+
+        lines += table.render()
+        lines.append("")
+        return lines
+
+    def _grouped_section(self, entity: str, title: str, intro: str, groups: list[tuple[str, list[str]]], scored: list[TrialRecord]) -> list[str]:
+        metrics = [(key, key) for _, keys in groups for key in keys]
+        if not metrics:
+            return [f"## {title}\n", "_No applicable metrics available._\n"]
+
+        result    = self._ranking(metrics, scored)
+        breakdown = result.group_breakdown(groups)
+        if not breakdown.labels:
+            return [f"## {title}\n", "_No applicable metrics available._\n"]
+
+        leader = breakdown.leader_overall()
+
+        lines = [f"## {title}\n", f"{intro}\n"]
+
+        table = MarkdownTable(["#", entity, "Grouped score", "Δ", *breakdown.labels])
+
+        for position, name in enumerate(breakdown.order(), start=1):
+            cells = []
+            for label in breakdown.labels:
+                score = breakdown.group_score[name][label]
+                rank  = breakdown.group_rank[label][name]
+                cell  = f"{score:.3f} ({RankingResult.format_rank(rank)})"
+                if name in breakdown.group_leaders(label):
+                    cell = f"**{cell}**"
+                cells.append(cell)
+
+            delta = breakdown.overall[name] - leader
+
+            table.add_row(position, f"`{name}`", f"{breakdown.overall[name]:.3f}", f"{delta:+.3f}", *cells)
+
+        lines += table.render()
+        lines.append("")
+        return lines

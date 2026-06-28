@@ -50,7 +50,17 @@ class TrialComparisonReport(ComparisonReportBase):
         ("count_over_frac",  "Over"),
     ]
 
+    HEADLINE_GROUPS = [
+        ("Curve error",           ["curve_rmse_gt", "curve_mae_gt", "psnr_db_gt"]),
+        ("Variance explained",    ["overall_r2_gt", "pixel_r2_gt_mean"]),
+        ("Structural similarity", ["ssim_gt_elev_mean", "ssim_norm_elev_mean"]),
+        ("Shape (cosine)",        ["pixel_cosine_gt_mean"]),
+        ("Peak location",         ["pixel_peak_err_units_mean_gt"]),
+        ("Gain vs Capon",         ["relative_mse_reduction"]),
+    ]
+
     PRECISION_BUCKET_PATTERN = re.compile(r"^matched_precision_gt(\d+)$")
+    RECALL_BUCKET_PATTERN    = re.compile(r"^matched_recall_gt(\d+)$")
 
     def __init__(
         self,
@@ -96,52 +106,63 @@ class TrialComparisonReport(ComparisonReportBase):
         if not scored:
             return ["## Leaderboard\n", "_No inference metrics available._\n"]
 
-        headline_intro  = "Mean rank across the headline metrics (1 = best); missing metrics rank last."
+        headline_intro = (
+            "`Score` is a magnitude-aware composite in [0, 1] (per metric, 1 = best and 0 = worst by min-max, then "
+            "averaged; missing metrics score 0). `Mean rank` is the tie-averaged ordinal rank (1 = best; missing "
+            "metrics rank last), `Wins` counts metrics where the trial is best, `Δ` is the score gap to the leader. "
+            "Trials are ordered by `Score`. Per-metric cells show the rank; the best is in **bold**."
+        )
+        grouped_intro = (
+            "Correlated headline metrics are averaged within a group first, so the curve-error metrics (RMSE / MAE / "
+            "PSNR) do not outvote the independent axes. `Grouped score` averages the group scores with equal weight; "
+            "each cell is the group score with its group rank in parentheses (best in **bold**)."
+        )
         precision_intro = (
-            "Mean rank of matched (permutation-invariant) precision, per GT scatterer count `k` — the share of "
-            "predicted scatterers that hit a true scatterer where the pixel truly holds `k` (1 = best; missing "
-            "buckets rank last). Precision rewards under-prediction, so read it alongside recall, not on its own."
+            "Matched (permutation-invariant) precision per GT scatterer count `k` — the share of predicted scatterers "
+            "that hit a true scatterer where the pixel truly holds `k`. Precision rewards under-prediction, so read it "
+            "alongside the recall leaderboard, never on its own."
+        )
+        recall_intro = (
+            "Matched (permutation-invariant) recall per GT scatterer count `k` — the share of true scatterers in "
+            "`k`-scatterer pixels that the model recovers. This is the scatterer-recovery metric; rank trials on it "
+            "rather than on precision."
         )
         count_intro = (
-            "Mean rank of count calibration (1 = best): `Exact` is the pixel share where the predicted active "
-            "scatterer count equals GT (higher better), `Under` / `Over` are the shares where the model predicts "
-            "too few / too many (lower better). Permutation-invariant."
+            "Count calibration: `Exact` is the pixel share where the predicted active scatterer count equals GT "
+            "(higher better), `Under` / `Over` are the shares where the model predicts too few / too many (lower "
+            "better). Permutation-invariant."
         )
 
-        lines  = self._rank_section("Leaderboard",            headline_intro,  self.HEADLINE_METRICS,            scored)
-        lines += self._rank_section("Per-Gaussian Precision",  precision_intro, self._precision_metrics(scored),  scored)
-        lines += self._rank_section("Count Calibration",       count_intro,     self.COUNT_METRICS,               scored)
+        lines  = self._rank_section("Run",    "Leaderboard",            headline_intro,  self.HEADLINE_METRICS,           scored)
+        lines += self._grouped_section("Run", "Grouped Leaderboard",    grouped_intro,   self.HEADLINE_GROUPS,            scored)
+        lines += self._rank_section("Run",    "Per-Gaussian Precision", precision_intro, self._precision_metrics(scored), scored)
+        lines += self._rank_section("Run",    "Per-Gaussian Recall",    recall_intro,    self._recall_metrics(scored),    scored)
+        lines += self._rank_section("Run",    "Count Calibration",      count_intro,     self.COUNT_METRICS,              scored)
         return lines
 
     def _precision_metrics(self, scored: list[TrialRecord]) -> list[tuple[str, str]]:
+        buckets = self._bucket_indices(scored, self.PRECISION_BUCKET_PATTERN)
+
+        metrics = [("matched_precision", "Overall")]
+        metrics += [(f"matched_precision_gt{k}", f"k={k}") for k in buckets]
+        return metrics
+
+    def _recall_metrics(self, scored: list[TrialRecord]) -> list[tuple[str, str]]:
+        buckets = self._bucket_indices(scored, self.RECALL_BUCKET_PATTERN)
+
+        metrics = [("matched_recall", "Overall")]
+        metrics += [(f"matched_recall_gt{k}", f"k={k}") for k in buckets]
+        return metrics
+
+    def _bucket_indices(self, scored: list[TrialRecord], pattern: re.Pattern) -> list[int]:
         buckets: set[int] = set()
         for r in scored:
             for key in r.metrics:
-                match = self.PRECISION_BUCKET_PATTERN.match(key)
+                match = pattern.match(key)
                 if match:
                     buckets.add(int(match.group(1)))
 
-        metrics = [("matched_precision", "Overall")]
-        metrics += [(f"matched_precision_gt{k}", f"k={k}") for k in sorted(buckets)]
-        return metrics
-
-    def _rank_section(self, title: str, intro: str, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> list[str]:
-        if not metrics:
-            return [f"## {title}\n", "_No applicable metrics available._\n"]
-
-        ranks, mean_ranks = self._rank_metrics(metrics, scored)
-
-        lines = [f"## {title}\n", f"{intro}\n"]
-
-        table = MarkdownTable(["Rank", "Run", "Mean rank", *[label for _, label in metrics]])
-
-        for position, name in enumerate(sorted(mean_ranks, key=mean_ranks.get), start=1):
-            cells = [str(ranks[name].get(key, "—")) for key, _ in metrics]
-            table.add_row(position, f"`{name}`", f"{mean_ranks[name]:.2f}", *cells)
-
-        lines += table.render()
-        lines.append("")
-        return lines
+        return sorted(buckets)
 
     def _write_metrics(self) -> Path:
         scored = [r for r in self.records if r.metrics]

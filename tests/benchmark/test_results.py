@@ -257,8 +257,8 @@ def test_leaderboard_dominant_model_has_lower_mean_rank(tmp_path, logger_stub):
     lines = [line for line in report._leaderboard() if line.startswith("| ")]
     data  = [line for line in lines if "`unet`" in line or "`resunet`" in line]
 
-    unet_rank    = float([line for line in data if "`unet`" in line][0].split("|")[3])
-    resunet_rank = float([line for line in data if "`resunet`" in line][0].split("|")[3])
+    unet_rank    = float([line for line in data if "`unet`" in line][0].split("|")[4])
+    resunet_rank = float([line for line in data if "`resunet`" in line][0].split("|")[4])
 
     assert unet_rank < resunet_rank
 
