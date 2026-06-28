@@ -67,6 +67,18 @@ class ScriptCatalog:
             "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
             "essentials": ["runs_dir", "run_tags"],
         },
+        "compare_preprocessing_trials": {
+            "title"     : "Compare Preprocessing",
+            "category"  : "Analysis",
+            "purpose"   : "Compare preprocessing trials that differ by multilook window size. Surfaces the bias-variance trade-off per window (contrast, residual speckle, spurious peaks, azimuth correlation length) as descriptive tables and plots, without forcing a single winner.",
+            "essentials": ["runs_dir", "run_tags"],
+        },
+        "compare_param_extraction_trials": {
+            "title"     : "Compare Param Extraction",
+            "category"  : "Analysis",
+            "purpose"   : "Compare Gaussian-fit parameter-extraction trials grouped by number of Gaussians K. Ranks within each K family on complexity-penalised BIC, variance explained, spatial coherence, and selection decisiveness, and exposes slot-collapse diagnostics. The K families are treated as separate deliverables.",
+            "essentials": ["params_dir", "run_tags"],
+        },
         "xray_weights": {
             "title"     : "X-Ray Weights",
             "category"  : "Analysis",
@@ -100,6 +112,8 @@ class ScriptCatalog:
         "tune",
         "tune_dataloader",
         "compare_trials",
+        "compare_preprocessing_trials",
+        "compare_param_extraction_trials",
         "xray_weights",
     ]
 
