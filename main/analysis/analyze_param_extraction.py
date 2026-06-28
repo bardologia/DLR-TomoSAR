@@ -15,7 +15,7 @@ def main() -> None:
     from tools.monitoring.logger                                import Logger
 
     config = ConfigCli(ParamExtractionInferenceConfig(), description="Recompute Gaussian-fit metrics, summaries, and plots for one or more parameter-extraction trials").apply()
-    logger = Logger(log_dir="logs", name="infer_param_extraction")
+    logger = Logger(log_dir="logs", name="analyze_param_extraction")
 
     logger.section("Parameter-extraction inference queue")
     logger.kv_table({

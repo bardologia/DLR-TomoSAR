@@ -13,7 +13,7 @@ def main() -> None:
     from tools.monitoring.logger                        import Logger
 
     config = ConfigCli(PreprocessInferenceConfig(), description="Render stack-overview plots for one or more preprocessing trials").apply()
-    logger = Logger(log_dir="logs", name="infer_preprocess")
+    logger = Logger(log_dir="logs", name="analyze_preprocessing")
 
     logger.section("Preprocessing inference queue")
     logger.kv_table({
