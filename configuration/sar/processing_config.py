@@ -173,3 +173,11 @@ class PreProcessEntryConfig:
         source = Path(self.fusar_project_path).stem
 
         return f"{source}_{crop.as_labeled_string()}_w{win_string}_{self.polarisation}_{self.stack_identifier}_{run_identifier}"
+
+
+@dataclass
+class PreprocessInferenceConfig:
+    runs_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/preprocessing")
+    run_tags : list = field(default_factory=list)
+
+    max_sessions : int = 4

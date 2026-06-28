@@ -112,12 +112,13 @@ class MetadataManager:
         self.registry.ensure_directory_structure()
 
         layout = {
-            "global_crop"   : list(self.config.crop.as_tuple()),
-            "dataset_type"  : self.config.dataset_type,
-            "tomogram_tag"  : self.config.tomogram_tag,
-            "parameter_tag" : self.config.parameter_tag,
-            "pass_labels"   : list(pass_labels) if pass_labels is not None else None,
-            "artifacts"     : self.registry.artifact_filenames(),
+            "global_crop"        : list(self.config.crop.as_tuple()),
+            "dataset_type"       : self.config.dataset_type,
+            "tomogram_tag"       : self.config.tomogram_tag,
+            "parameter_tag"      : self.config.parameter_tag,
+            "max_amplitude_clip" : self.config.tomogram_config.max_amplitude_clip,
+            "pass_labels"        : list(pass_labels) if pass_labels is not None else None,
+            "artifacts"          : self.registry.artifact_filenames(),
         }
 
         out_path = self.config.paths.data_directory / "dataset.json"

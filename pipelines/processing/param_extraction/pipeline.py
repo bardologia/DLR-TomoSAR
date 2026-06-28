@@ -9,8 +9,6 @@ from typing   import Tuple
 import numpy as np
 
 from configuration.param_extraction   import ExtractionConfig, FitSettings
-from pipelines.processing.param_extraction.metrics import FittingMetricsCalculator
-from pipelines.processing.param_extraction.plots   import FittingResultPlotter
 from tools.data.io                                 import FileIO
 from tools.monitoring.logger                       import Logger
 
@@ -64,6 +62,8 @@ class ExtractionMetadataManager:
             "lambda_k"            : ext.fit_config.lambda_k,
             "sigma_init_divisor"  : ext.fit_config.sigma_init_divisor,
             "activity_threshold"  : ext.fit_config.activity_threshold,
+            "threshold_factor"    : ext.fit_config.threshold_factor,
+            "truncation_index"    : ext.fit_config.truncation_index,
             "fit_amplitude"       : ext.fit_config.fit_amplitude,
             "fit_mean"            : ext.fit_config.fit_mean,
             "fitting_method"      : ext.fitting_method,
@@ -213,27 +213,6 @@ class ParamExtractionPipeline:
         self.metadata_manager = ExtractionMetadataManager(config, logger=self.logger)
         self.parameter_io     = ParameterIO(logger=self.logger)
 
-        n_K                = config.fit_settings.fit_config.k_max
-        threshold_factor   = float(config.fit_settings.fit_config.threshold_factor)
-        truncation_index   = int(  config.fit_settings.fit_config.truncation_index)
-        activity_threshold = float(config.fit_settings.fit_config.activity_threshold)
-
-        self.metrics_calculator = FittingMetricsCalculator(
-            n_gaussians      = n_K,
-            logger           = self.logger,
-            threshold_factor = threshold_factor,
-            truncation_index = truncation_index,
-            amp_threshold    = activity_threshold,
-        )
-        self.result_plotter     = FittingResultPlotter(
-            output_directory = self.output_directory,
-            n_gaussians      = n_K,
-            logger           = self.logger,
-            threshold_factor = threshold_factor,
-            truncation_index = truncation_index,
-            amp_threshold    = activity_threshold,
-        )
-
         self.logger.section("[Param Extraction Pipeline Initialized]")
         self.logger.subsection(f"Source tomogram   : {self.tomogram_path}")
         self.logger.subsection(f"Height range      : {self.height_range}")
@@ -248,25 +227,6 @@ class ParamExtractionPipeline:
     def _stage_save(self, parameters_array: np.ndarray) -> Path:
         return self.parameter_io.save_params(parameters_array, self.config.parameters_npy_path)
 
-    def _stage_metrics(self, parameters_array: np.ndarray, metadata: dict, diagnostics: dict) -> dict:
-        return self.metrics_calculator.run(parameters_array, metadata, self.tomogram_path, diagnostics)
-
-    def _stage_summary(self, metrics_dict: dict) -> Path:
-        payload = {
-            "global_summary" : metrics_dict.get("global_summary", {}),
-            "per_k_summary"  : metrics_dict.get("per_k_summary",  {}),
-            "snr_summary"    : metrics_dict.get("snr_summary",    {}),
-        }
-
-        summary_path = self.output_directory / "fit_metrics_summary.json"
-        FileIO.save_json(payload, summary_path)
-
-        self.logger.subsection(f"-> Metrics summary written: {summary_path}")
-        return summary_path
-
-    def _stage_plots(self, parameters_array: np.ndarray, metadata: dict, metrics_dict: dict) -> dict[str, Path]:
-        return self.result_plotter.run(parameters_array, metrics_dict, metadata, self.tomogram_path)
-
     def run(self) -> dict[str, Path]:
         self.logger.section("[Param Extraction Pipeline Execution]")
 
@@ -278,24 +238,12 @@ class ParamExtractionPipeline:
 
         meta_path = self.metadata_manager.save_run_metadata(npy_path, diag_path, self.tomogram_path, self.height_range)
 
-        parameters_array = self.parameter_io.load_params(npy_path)
-        metadata         = self.parameter_io.load_metadata(meta_path)
-        diagnostics      = self.parameter_io.load_diagnostics(diag_path)
-
-        metrics_dict = self._stage_metrics(parameters_array, metadata, diagnostics)
-        summary_path = self._stage_summary(metrics_dict)
-        plot_paths   = self._stage_plots(parameters_array, metadata, metrics_dict)
-        del parameters_array, diagnostics
-        gc.collect()
-
         self.logger.section("[Param Extraction Completed]")
 
         return {
             "parameters_npy"   : npy_path,
             "diagnostics_npz"  : diag_path,
             "metadata"         : meta_path,
-            "metrics_summary"  : summary_path,
             "output_directory" : self.output_directory,
             "source_tomogram"  : self.tomogram_path,
-            "plots"            : plot_paths,
         }

@@ -61,6 +61,18 @@ class ScriptCatalog:
             "purpose"   : "Image-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone image-autoencoder runs.",
             "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
+        "infer_preprocess": {
+            "title"     : "Infer Preprocessing",
+            "category"  : "Inference",
+            "purpose"   : "Render the stack-overview plots (SLC amplitudes, flattened interferograms, DEM) for one or more preprocessing trials, decoupled from the tomogram/interferogram generation step.",
+            "essentials": ["runs_dir", "run_tags", "max_sessions"],
+        },
+        "infer_param_extraction": {
+            "title"     : "Infer Param Extraction",
+            "category"  : "Inference",
+            "purpose"   : "Recompute the Gaussian-fit metrics, summary, and diagnostic plots for one or more parameter-extraction trials, decoupled from the GPU fitting step.",
+            "essentials": ["params_dir", "run_tags", "make_plots", "max_sessions"],
+        },
         "benchmark": {
             "title"     : "Benchmark",
             "category"  : "Experiments",
@@ -121,6 +133,8 @@ class ScriptCatalog:
         "infer_backbone",
         "infer_profile_autoencoder",
         "infer_image_autoencoder",
+        "infer_preprocess",
+        "infer_param_extraction",
         "benchmark",
         "cross_validate",
         "tune",
@@ -151,6 +165,8 @@ class ScriptCatalog:
                 ("infer_backbone",            "Backbone"),
                 ("infer_profile_autoencoder", "Profile AE"),
                 ("infer_image_autoencoder",   "Image AE"),
+                ("infer_preprocess",          "Preprocessing"),
+                ("infer_param_extraction",    "Param Extraction"),
             ],
         },
         "compare": {

@@ -333,6 +333,48 @@ def test_fitting_result_plotter_smoke(tomogram_full, parameters, fit_diagnostics
     assert all(p.is_file() for p in saved.values())
 
 
+@pytest.mark.real_data
+def test_param_run_inference_pipeline_smoke(tomogram_full, parameters, fit_diagnostics, logger, tmp_path):
+    import json
+
+    from pipelines.processing.param_extraction.inference import ParamRunInferencePipeline
+
+    a0, a1, r0, r1 = 0, 48, 0, 48
+
+    run_dir = tmp_path / "params_run"
+    run_dir.mkdir(parents=True)
+
+    tomo_path = tmp_path / "tomo.npy"
+    np.save(tomo_path, np.array(tomogram_full[:, a0:a1, r0:r1]))
+
+    np.save(run_dir / "parameters.npy", np.ascontiguousarray(np.array(parameters[:, a0:a1, r0:r1])))
+    np.savez(
+        run_dir / "fit_diagnostics.npz",
+        mse_per_k       = fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1],
+        penalised_per_k = fit_diagnostics["penalised_per_k"][:, a0:a1, r0:r1],
+        best_k_map      = fit_diagnostics["best_k_map"][a0:a1, r0:r1],
+        lambda_k        = fit_diagnostics["lambda_k"],
+    )
+
+    meta = {
+        "parameters_npy"     : "parameters.npy",
+        "diagnostics_npz"    : "fit_diagnostics.npz",
+        "source_tomogram"    : str(tomo_path),
+        "height_range"       : list(HEIGHT_RANGE),
+        "k_max"              : K_MAX,
+        "activity_threshold" : ACTIVITY_THRESH,
+        "threshold_factor"   : THRESHOLD_FACTOR,
+        "truncation_index"   : TRUNCATION_INDEX,
+    }
+    (run_dir / "param_extraction_meta.json").write_text(json.dumps(meta))
+
+    outputs = ParamRunInferencePipeline(run_dir, logger, make_plots=True).run()
+
+    assert (run_dir / "fit_metrics_summary.json").is_file()
+    assert outputs["plots"]
+    assert all(p.is_file() for p in outputs["plots"].values())
+
+
 @pytest.mark.slow
 @pytest.mark.real_data
 @pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")

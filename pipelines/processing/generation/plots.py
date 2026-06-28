@@ -9,7 +9,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from configuration.sar.processing_config import ProcessingConfig
 from tools.data.io                       import FileIO
 from tools.reporting.plotting            import PlotBase
 from tools.monitoring.logger             import Logger
@@ -19,12 +18,12 @@ class StackPlotter(PlotBase):
     PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
     PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
 
-    def __init__(self, config: ProcessingConfig, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
-        self.config           = config
-        self.logger           = logger
-        self.fig_dpi          = fig_dpi
-        self.save_dpi         = save_dpi
-        self.images_directory = Path(config.paths.run_directory) / "images"
+    def __init__(self, run_directory: Path, max_amplitude_clip: float, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
+        self.max_amplitude_clip = max_amplitude_clip
+        self.logger             = logger
+        self.fig_dpi            = fig_dpi
+        self.save_dpi           = save_dpi
+        self.images_directory   = Path(run_directory) / "images"
 
     def _setup_output_dirs(self) -> Dict[str, Path]:
         dirs = {
@@ -85,7 +84,7 @@ class StackPlotter(PlotBase):
         return self._save(fig, out_path)
 
     def _plot_interferogram(self, interferogram: np.ndarray, title: str, out_dir: Path, stem: str) -> Dict[str, Path]:
-        clip      = float(self.config.tomogram_config.max_amplitude_clip)
+        clip      = float(self.max_amplitude_clip)
         amplitude = np.abs(interferogram).astype(np.float32)
         phase     = np.angle(interferogram).astype(np.float32)
 

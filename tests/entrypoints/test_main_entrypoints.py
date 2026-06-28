@@ -30,12 +30,16 @@ DEFER_HEAVY_IMPORTS = (
     "tune_dataloader",
     "pre_process",
     "extract_params",
+    "infer_preprocess",
+    "infer_param_extraction",
 )
 
 CLI_MODULES = (
     "infer_backbone",
     "infer_profile_autoencoder",
     "infer_image_autoencoder",
+    "infer_preprocess",
+    "infer_param_extraction",
     "pre_process",
     "extract_params",
     "tune",
@@ -51,6 +55,8 @@ ENTRY_CONFIGS = {
     "infer_image_autoencoder"   : ("configuration.inference",          "InferenceEntryConfig"),
     "pre_process"    : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
     "extract_params" : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
+    "infer_preprocess"       : ("configuration.sar.processing_config", "PreprocessInferenceConfig"),
+    "infer_param_extraction" : ("configuration.param_extraction",      "ParamExtractionInferenceConfig"),
     "tune"           : ("configuration.tuning",                       "TuningEntryConfig"),
     "tune_dataloader": ("configuration.benchmark.dataloader_tuning",  "DataLoaderTuningEntryConfig"),
     "benchmark"      : ("configuration.benchmark",                    "BenchmarkConfig"),

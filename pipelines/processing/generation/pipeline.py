@@ -6,7 +6,6 @@ from typing  import Tuple
 
 from configuration.sar.processing_config       import ProcessingConfig
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
-from pipelines.processing.generation.plots     import StackPlotter
 from tools                                     import FileIO, ProcessPoolRunner
 from tools.monitoring.logger                   import Logger
 from tools.sar                                 import InterferogramLauncher, TomogramLauncher, TrackParameters
@@ -22,7 +21,6 @@ class ProcessingPipeline:
         self.metadata_manager       = MetadataManager    (config, logger=self.logger)
         self.tomogram_launcher      = TomogramLauncher    (config.tomogram_env_name, logger=self.logger)
         self.interferogram_launcher = InterferogramLauncher(config.tomogram_env_name, logger=self.logger)
-        self.stack_plotter          = StackPlotter       (config, logger=self.logger)
 
         self._pass_labels : list | None = None
 
@@ -86,20 +84,6 @@ class ProcessingPipeline:
 
         return primary_path, secondaries_path, interferograms_path
 
-    def _stage_plots(self, primary_path: Path, secondaries_path: Path, interferograms_path: Path, dem_path: Path, pass_labels: list | None) -> Path:
-        self.logger.subsection("[Active] Rendering stack overview plots")
-        self.stack_plotter.run(
-            primary_path        = primary_path,
-            secondaries_path    = secondaries_path,
-            interferograms_path = interferograms_path,
-            dem_path            = dem_path,
-            pass_labels         = pass_labels,
-        )
-
-        gc.collect()
-
-        return self.stack_plotter.images_directory
-
     def run(self) -> dict[str, Path]:
         self.logger.section("[Pre-Processing Pipeline Execution]")
 
@@ -111,8 +95,6 @@ class ProcessingPipeline:
 
         self.metadata_manager.save_dataset_layout(pass_labels=self._pass_labels)
 
-        images_directory = self._stage_plots(primary_path, secondaries_path, interferograms_path, full_dem_path, self._pass_labels)
-
         self.logger.section("[Pre-Processing Execution Completed]")
 
         return {
@@ -121,7 +103,6 @@ class ProcessingPipeline:
             "primary"        : primary_path,
             "secondaries"    : secondaries_path,
             "interferograms" : interferograms_path,
-            "images"         : images_directory,
             "run_directory"  : self.config.paths.run_directory,
         }
 

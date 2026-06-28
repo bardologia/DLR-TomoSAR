@@ -165,12 +165,45 @@ def test_stackplotter_smoke(tmp_path, primary, secondaries, interferograms, dem_
     np.save(interferograms_path, np.array(interferograms[:3, az, rg]))
     np.save(dem_path,            np.array(dem_full[az, rg]))
 
-    paths   = PathConfig(main_directory=tmp_path, run_subdirectory="run")
-    config  = ProcessingConfig(crop=crop_from_state, paths=paths)
-    plotter = StackPlotter(config, logger, fig_dpi=40, save_dpi=40)
+    plotter = StackPlotter(tmp_path / "run", CLIP, logger, fig_dpi=40, save_dpi=40)
 
     saved = plotter.run(primary_path, secondaries_path, interferograms_path, dem_path, pass_labels=pass_labels[:4])
 
     assert "primary" in saved
     assert "dem_full" in saved
     assert all(p.is_file() for p in saved.values())
+
+
+@pytest.mark.real_data
+def test_stack_inference_pipeline_smoke(tmp_path, primary, secondaries, interferograms, dem_full, pass_labels, logger):
+    from pipelines.processing.generation.inference import StackInferencePipeline
+
+    az, rg = slice(0, 24), slice(0, 24)
+
+    run_dir  = tmp_path / "trial"
+    data_dir = run_dir / "data"
+    data_dir.mkdir(parents=True)
+
+    np.save(data_dir / "primary.npy",        np.array(primary[az, rg]))
+    np.save(data_dir / "secondaries.npy",    np.array(secondaries[:3, az, rg]))
+    np.save(data_dir / "interferograms.npy", np.array(interferograms[:3, az, rg]))
+    np.save(data_dir / "dem_full.npy",       np.array(dem_full[az, rg]))
+
+    layout = {
+        "max_amplitude_clip" : CLIP,
+        "pass_labels"        : pass_labels[:4],
+        "artifacts"          : {
+            "tomogram_full"  : "tomogram_full.npy",
+            "dem_full"       : "dem_full.npy",
+            "primary"        : "primary.npy",
+            "secondaries"    : "secondaries.npy",
+            "interferograms" : "interferograms.npy",
+            "track_profiles" : "track_profiles.npz",
+        },
+    }
+    (data_dir / "dataset.json").write_text(json.dumps(layout))
+
+    outputs = StackInferencePipeline(run_dir, logger).run()
+
+    assert (run_dir / "images").is_dir()
+    assert outputs["figures"] > 0

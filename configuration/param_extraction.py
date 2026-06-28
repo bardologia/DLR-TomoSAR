@@ -161,3 +161,12 @@ class ExtractParamsEntryConfig:
     gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
     range_batch_size  : int  = 3500
     parameter_workers : int  = 100
+
+
+@dataclass
+class ParamExtractionInferenceConfig:
+    params_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/preprocessing/params")
+    run_tags   : list = field(default_factory=list)
+
+    make_plots   : bool = True
+    max_sessions : int  = 4
