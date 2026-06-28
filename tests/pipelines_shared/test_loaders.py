@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch.utils.data import Dataset
 
-from pipelines.shared.loaders import Loader
+from pipelines.shared.dataset.loaders import Loader
 from tools.monitoring.logger  import Logger
 
 

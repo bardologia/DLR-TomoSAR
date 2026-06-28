@@ -9,10 +9,10 @@ from torch.utils.data import DataLoader
 from configuration.dataset import ProfileDatasetConfig
 from pipelines.profile_autoencoder.dataset.augmentation  import ProfileAugmenter
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
-from pipelines.shared.loaders                            import Loader
+from pipelines.shared.dataset.loaders                            import Loader
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStatsComputer
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
-from pipelines.shared.dataset_spatial                    import Layout
+from pipelines.shared.dataset.dataset_spatial                    import Layout
 from tools.monitoring.logger                             import Logger
 
 

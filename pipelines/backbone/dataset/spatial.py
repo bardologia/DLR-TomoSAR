@@ -9,7 +9,7 @@ import numpy as np
 from tools.data.regions      import CropRegion, SplitRegions
 from tools.monitoring.logger import Logger
 
-from pipelines.shared.dataset_spatial import Layout
+from pipelines.shared.dataset.dataset_spatial import Layout
 
 
 class Cropper:

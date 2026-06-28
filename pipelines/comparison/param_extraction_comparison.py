@@ -7,7 +7,7 @@ import numpy as np
 
 from pipelines.comparison.metric_table   import MetricTableRenderer
 from pipelines.comparison.spatial_stats   import SpatialDispersion
-from pipelines.shared.comparison_report   import ComparisonReportBase
+from pipelines.shared.comparison.comparison_report   import ComparisonReportBase
 from tools.data.io                        import FileIO
 from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
 from tools.reporting.reporting            import ReportAssets

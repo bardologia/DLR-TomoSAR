@@ -16,9 +16,9 @@ from pipelines.backbone.dataset.datasets        import PatchDataset
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
 from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
-from pipelines.shared.dataset_spatial           import Layout
+from pipelines.shared.dataset.dataset_spatial           import Layout
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
-from pipelines.shared.config_persistence        import BackboneModelConfigIO
+from pipelines.shared.config.config_persistence        import BackboneModelConfigIO
 from tools.data.io                              import FileIO
 from tools.monitoring.logger                    import Logger
 from tools.baselines                            import TrackBaselines, TrackProfiles

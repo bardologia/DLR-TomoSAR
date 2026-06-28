@@ -352,8 +352,8 @@ class PhysicsLossLibrary:
                 },
             ],
             "cli"     : [
-                "python main/train_backbone.py --curriculum.complete.use_coherence_resyn true --curriculum.complete.weight_coherence_resyn 1.0",
-                "python main/train_backbone.py --geometry.kz_values \"[0.0, 0.12, 0.25, 0.37, 0.49]\"",
+                "python main/training/train_backbone.py --curriculum.complete.use_coherence_resyn true --curriculum.complete.weight_coherence_resyn 1.0",
+                "python main/training/train_backbone.py --geometry.kz_values \"[0.0, 0.12, 0.25, 0.37, 0.49]\"",
             ],
         }
 

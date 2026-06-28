@@ -5,10 +5,10 @@ from pathlib import Path
 from configuration.training import ImageAeTrainerConfig
 from models.image_autoencoder                        import get_image_autoencoder
 from pipelines.autoencoder_common.training           import AutoencoderTrainingPipeline
-from pipelines.shared.dataset_prep                   import BackboneDatasetPreparation
-from pipelines.shared.training_runner                import EntryConfigTrainRunner
+from pipelines.shared.dataset.dataset_prep                   import BackboneDatasetPreparation
+from pipelines.shared.training.training_runner                import EntryConfigTrainRunner
 from pipelines.image_autoencoder.training.trainer    import Trainer
-from pipelines.shared.config_persistence             import ImageAutoencoderConfigIO
+from pipelines.shared.config.config_persistence             import ImageAutoencoderConfigIO
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):

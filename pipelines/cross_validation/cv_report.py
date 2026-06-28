@@ -7,7 +7,7 @@ from pathlib  import Path
 import numpy as np
 
 from pipelines.benchmark.results      import ComparisonReport
-from pipelines.shared.trial_collection import TrialRecord
+from pipelines.shared.comparison.trial_collection import TrialRecord
 from pipelines.cross_validation.folds import FoldPlanner
 from tools                            import FileIO, MetricSectionGrouper
 from tools.metrics.scoring            import FiniteScalar

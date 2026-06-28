@@ -6,7 +6,7 @@ import pytest
 
 from configuration.benchmark.general import BenchmarkConfig
 from configuration.dataset           import Representation
-from pipelines.shared.config_factory import ConfigFactory
+from pipelines.shared.config.config_factory import ConfigFactory
 from tools.data.regions              import CropRegion
 
 

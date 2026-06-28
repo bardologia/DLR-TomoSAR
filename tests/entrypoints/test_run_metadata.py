@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from configuration.benchmark import BenchmarkConfig
-from pipelines.shared.config_factory import ConfigFactory
-from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.shared.config.run_metadata import TrainingRunMetadata
 
 
 @pytest.fixture

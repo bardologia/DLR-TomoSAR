@@ -11,7 +11,7 @@ from configuration.benchmark            import BenchmarkConfig
 from models                             import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 from pipelines.backbone.training.trainer import Trainer
-from pipelines.shared.config_factory     import ConfigFactory
+from pipelines.shared.config.config_factory     import ConfigFactory
 from tools.data.gaussians                import GaussianHead
 from tools.monitoring.logger             import Logger
 from tools.runtime.reproducibility       import Reproducibility

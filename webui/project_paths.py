@@ -58,13 +58,40 @@ class ProjectPaths:
         self.logs_dir    = self.repo_root / "logs"
         self.gpu_guard_dir = self.logs_dir / "gpu_guard"
 
+    SCRIPT_DIRS = {
+        "pre_process"               : "processing",
+        "extract_params"            : "processing",
+        "generate_tomogram"         : "processing",
+        "generate_interferograms"   : "processing",
+        "train_backbone"            : "training",
+        "train_profile_autoencoder" : "training",
+        "train_image_autoencoder"   : "training",
+        "train_jepa"                : "training",
+        "infer_backbone"            : "inference",
+        "infer_profile_autoencoder" : "inference",
+        "infer_image_autoencoder"   : "inference",
+        "infer_preprocess"          : "inference",
+        "infer_param_extraction"    : "inference",
+        "benchmark"                 : "experiments",
+        "cross_validate"            : "experiments",
+        "tune"                      : "experiments",
+        "tune_dataloader"           : "experiments",
+        "compare_trials"            : "analysis",
+        "compare_preprocessing_trials"    : "analysis",
+        "compare_param_extraction_trials" : "analysis",
+        "compare_runs"              : "analysis",
+        "xray_weights"              : "analysis",
+    }
+
     def script_entry(self, key: str) -> dict:
         override  = self.ENTRY_OVERRIDES.get(key, {})
         file_stem = override.get("file", key)
+        subdir    = self.SCRIPT_DIRS[key]
+        rel       = f"main/{subdir}/{file_stem}.py"
 
         return {
-            "path"          : self.main_dir / f"{file_stem}.py",
-            "rel"           : f"main/{file_stem}.py",
+            "path"          : self.main_dir / subdir / f"{file_stem}.py",
+            "rel"           : rel,
             "args"          : list(override.get("args", [])),
             "config_module" : override.get("config_module"),
             "config_class"  : override.get("config_class"),

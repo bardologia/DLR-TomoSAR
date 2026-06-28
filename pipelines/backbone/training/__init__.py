@@ -6,7 +6,7 @@ def __getattr__(name):
         from pipelines.backbone.training.pipeline import TrainingPipeline
         return TrainingPipeline
     if name == "TrainingRunMetadata":
-        from pipelines.shared.run_metadata import TrainingRunMetadata
+        from pipelines.shared.config.run_metadata import TrainingRunMetadata
         return TrainingRunMetadata
     if name == "SingleTrainRunner":
         from pipelines.backbone.training.pipeline import SingleTrainRunner

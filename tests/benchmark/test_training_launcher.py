@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
-    from pipelines.shared import training_launcher as mod
+    from pipelines.shared.training import training_launcher as mod
 
     captured = {}
     resolved = object()

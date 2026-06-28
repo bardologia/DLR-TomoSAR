@@ -8,7 +8,7 @@ from configuration.cross_validation import CrossValidationConfig
 from pipelines.cross_validation.cv_report              import CrossValidationReport
 from pipelines.cross_validation.folds                  import FoldNaming, FoldPlanner
 from pipelines.cross_validation.workers                import FoldCollector
-from pipelines.shared.seed_sweep                       import SeedSet
+from pipelines.shared.training.seed_sweep                       import SeedSet
 from tools                                             import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.monitoring.logger                           import Logger
 

@@ -8,7 +8,7 @@ from optuna.trial import TrialState
 
 from configuration.tuning import TuningConfig
 from models                                     import config_registry, BACKBONE_CONFIG_REGISTRY
-from pipelines.shared.config_factory            import ConfigFactory
+from pipelines.shared.config.config_factory            import ConfigFactory
 from tools                                      import FileIO
 from tools                                      import GpuJob
 from tools                                      import GpuQueue

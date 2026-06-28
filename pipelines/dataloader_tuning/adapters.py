@@ -229,7 +229,7 @@ class BackboneFeedAdapter:
 
     def _config_factory(self):
         from configuration.training          import BackboneEntryConfig
-        from pipelines.shared.config_factory import ConfigFactory
+        from pipelines.shared.config.config_factory import ConfigFactory
 
         entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed, n_gaussians=self.config.n_gaussians)
         entry.paths = self.config.paths

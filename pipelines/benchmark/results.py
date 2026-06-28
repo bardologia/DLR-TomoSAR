@@ -7,9 +7,9 @@ from pathlib     import Path
 
 import numpy as np
 
-from pipelines.shared.comparison_report import ComparisonReportBase
-from pipelines.shared.seed_sweep        import SeedSet
-from pipelines.shared.trial_collection  import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.comparison.comparison_report import ComparisonReportBase
+from pipelines.shared.training.seed_sweep        import SeedSet
+from pipelines.shared.comparison.trial_collection  import SeedAggregation, TrialCollector, TrialRecord
 from tools.data.io                      import FileIO
 from tools.reporting.reporting          import MetricSectionGrouper, ReportAssets
 from tools.metrics.scoring              import FiniteScalar, MetricOrientation

@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from pipelines.shared.config_persistence import (
+from pipelines.shared.config.config_persistence import (
     BackboneModelConfigIO,
     ProfileAutoencoderConfigIO,
     ImageAutoencoderConfigIO,

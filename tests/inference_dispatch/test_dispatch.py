@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pipelines.shared.run_classifier import RunClassifier, RunType
+from pipelines.shared.inference.run_classifier import RunClassifier, RunType
 
 
 def _make_run(tmp_path, *filenames):
@@ -51,8 +51,8 @@ def test_is_type_returns_false_for_unrecognized_run(tmp_path):
 
 
 def test_run_classifier_artifacts_match_config_io_filenames():
-    from pipelines.shared.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
-    from pipelines.shared.run_classifier     import RunArtifacts
+    from pipelines.shared.config.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
+    from pipelines.shared.inference.run_classifier     import RunArtifacts
 
     assert BackboneModelConfigIO.FILENAME       == RunArtifacts.BACKBONE_CONFIG
     assert ProfileAutoencoderConfigIO.FILENAME  == RunArtifacts.PROFILE_AE_CONFIG

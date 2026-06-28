@@ -13,7 +13,7 @@ from models                                  import BACKBONE_IMAGE_SIZE_MODELS
 from tools.data.gaussians                    import GaussianHead
 from configuration.dataset import DatasetConfig
 from configuration.training import BackboneTrainerConfig, BackboneEntryConfig
-from pipelines.shared.seed_sweep             import SeedSweepRunner
+from pipelines.shared.training.seed_sweep             import SeedSweepRunner
 from tools.runtime.config_cli                import ConfigCli
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
@@ -21,8 +21,8 @@ from tools.orchestration                     import ExperimentStage, GpuJob
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.trainer     import Trainer
-from pipelines.shared.run_metadata           import TrainingRunMetadata
-from pipelines.shared.training_runner        import SingleTrainRunner as BaseSingleTrainRunner
+from pipelines.shared.config.run_metadata           import TrainingRunMetadata
+from pipelines.shared.training.training_runner        import SingleTrainRunner as BaseSingleTrainRunner
 from tools.runtime.config_cli                import ConfigCli
 from tools.monitoring.logger                 import Logger
 from tools.runtime.reproducibility           import Reproducibility
@@ -149,7 +149,7 @@ class TrainingPipeline:
 
 class SingleTrainRunner(BaseSingleTrainRunner):
     def __init__(self, config) -> None:
-        from pipelines.shared.config_factory import ConfigFactory
+        from pipelines.shared.config.config_factory import ConfigFactory
 
         super().__init__(config)
         self.factory = ConfigFactory(config)

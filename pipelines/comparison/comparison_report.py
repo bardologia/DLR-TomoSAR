@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from pipelines.comparison.trial_collector import TrialRecord
-from pipelines.shared.comparison_report    import ComparisonReportBase
+from pipelines.shared.comparison.comparison_report    import ComparisonReportBase
 from tools.metrics.scoring                 import FiniteScalar, MetricOrientation
 from tools.reporting.markdown              import MarkdownTable, ScalarFormatter
 from tools.reporting.reporting             import MetricSectionGrouper, ReportAssets

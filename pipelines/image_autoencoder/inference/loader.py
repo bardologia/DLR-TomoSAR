@@ -11,7 +11,7 @@ from models.image_autoencoder                  import get_image_autoencoder
 from pipelines.backbone.dataset.normalizer     import Normalizer
 from pipelines.backbone.dataset.stats          import Stats
 from pipelines.backbone.inference.loader       import RunLoader
-from pipelines.shared.config_persistence       import ImageAutoencoderConfigIO
+from pipelines.shared.config.config_persistence       import ImageAutoencoderConfigIO
 from tools.data.regions                        import CropRegion
 from tools.monitoring.logger                   import Logger
 

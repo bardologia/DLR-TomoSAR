@@ -7,7 +7,7 @@ import pytest
 
 from configuration.dataset             import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
 from configuration.sar.gaussian_config import GaussianConfig
-from pipelines.shared.dataset_prep     import BackboneDatasetPreparation
+from pipelines.shared.dataset.dataset_prep     import BackboneDatasetPreparation
 from tools.data.regions                import CropRegion
 from tools.monitoring.logger           import Logger
 

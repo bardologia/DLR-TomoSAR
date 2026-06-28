@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib     import Path
 
-from pipelines.shared.trial_collection import TrialCollector as BaseTrialCollector
-from pipelines.shared.trial_collection import TrialRecord    as BaseTrialRecord
+from pipelines.shared.comparison.trial_collection import TrialCollector as BaseTrialCollector
+from pipelines.shared.comparison.trial_collection import TrialRecord    as BaseTrialRecord
 from tools.monitoring.logger           import Logger
 
 

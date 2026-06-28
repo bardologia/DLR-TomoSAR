@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pipelines.shared.dataset_spatial import Layout
+from pipelines.shared.dataset.dataset_spatial import Layout
 from tools.data.regions               import SplitRegions
 from tools.monitoring.logger            import Logger
 

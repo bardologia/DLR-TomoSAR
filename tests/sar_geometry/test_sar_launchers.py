@@ -100,8 +100,8 @@ def test_interferogram_build_spec_is_json_serialisable():
 
 
 def test_launcher_entry_points():
-    assert TomogramLauncher.ENTRY == "main/generate_tomogram.py"
-    assert InterferogramLauncher.ENTRY == "main/generate_interferograms.py"
+    assert TomogramLauncher.ENTRY == "main/processing/generate_tomogram.py"
+    assert InterferogramLauncher.ENTRY == "main/processing/generate_interferograms.py"
 
 
 def test_pyrat_job_is_dataclass_with_expected_fields():

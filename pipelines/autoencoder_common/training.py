@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipelines.shared.config_factory import ConfigFactory
-from pipelines.shared.run_metadata   import TrainingRunMetadata
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.shared.config.run_metadata   import TrainingRunMetadata
 from tools.runtime.reproducibility   import Reproducibility
 
 

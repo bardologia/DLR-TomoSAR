@@ -7,9 +7,9 @@ from configuration.training import ProfileAeTrainerConfig
 from models.profile_autoencoder                             import get_profile_autoencoder
 from pipelines.autoencoder_common.training          import AutoencoderTrainingPipeline
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
-from pipelines.shared.training_runner               import EntryConfigTrainRunner
+from pipelines.shared.training.training_runner               import EntryConfigTrainRunner
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from pipelines.shared.config_persistence            import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from pipelines.shared.config.config_persistence            import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):

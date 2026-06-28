@@ -12,7 +12,7 @@ from configuration.architectures.image_autoencoder import Conv2dImageAutoencoder
 from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
 from configuration.training.image_autoencoder import ImageAeLossConfig, ImageAeTrainerConfig
 from pipelines.image_autoencoder.training import pipeline as image_pipeline
-from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.shared.config.run_metadata import TrainingRunMetadata
 
 
 pytestmark = pytest.mark.slow

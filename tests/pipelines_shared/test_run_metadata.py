@@ -6,7 +6,7 @@ import pytest
 
 from configuration.sar.gaussian_config import GaussianConfig
 from configuration.training            import BackboneTrainerConfig
-from pipelines.shared.run_metadata     import TrainingRunMetadata
+from pipelines.shared.config.run_metadata     import TrainingRunMetadata
 from tools.monitoring.logger           import Logger
 
 

@@ -9,12 +9,12 @@ from models                                              import BACKBONE_IMAGE_S
 from models.profile_autoencoder                                  import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.shared.config_factory                     import ConfigFactory
-from pipelines.shared.run_metadata                       import TrainingRunMetadata
-from pipelines.shared.dataset_prep                        import BackboneDatasetPreparation
-from pipelines.shared.training_runner                    import EntryConfigTrainRunner
+from pipelines.shared.config.config_factory                     import ConfigFactory
+from pipelines.shared.config.run_metadata                       import TrainingRunMetadata
+from pipelines.shared.dataset.dataset_prep                        import BackboneDatasetPreparation
+from pipelines.shared.training.training_runner                    import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
-from pipelines.shared.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
+from pipelines.shared.config.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                       import Reproducibility
 
 
@@ -31,7 +31,7 @@ class TrainingPipeline:
         image_dir   = self._resolve_ae_run(entry_config.image_autoencoder_logdir,   entry_config.image_autoencoder_run,   "image")
 
         if profile_dir is None and image_dir is None:
-            raise ValueError("JEPA requires at least one of profile_autoencoder_run or image_autoencoder_run; with neither, train the plain backbone via main/train_backbone.py.")
+            raise ValueError("JEPA requires at least one of profile_autoencoder_run or image_autoencoder_run; with neither, train the plain backbone via main/training/train_backbone.py.")
 
         self.profile_autoencoder_meta = None
         self.autoencoder_cfg          = None
@@ -224,7 +224,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         if self.config.infer_after:
             from dataclasses                           import replace
             from pipelines.backbone.inference.pipeline import InferencePipeline
-            from pipelines.shared.inference_components import InferenceComponentsResolver
+            from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
             components       = InferenceComponentsResolver.for_run(Path(run_directory))

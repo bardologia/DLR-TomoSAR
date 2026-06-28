@@ -4,8 +4,8 @@ import traceback
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from pipelines.shared.config_factory            import ConfigFactory
-from pipelines.shared.seed_sweep                import SeedSet
+from pipelines.shared.config.config_factory            import ConfigFactory
+from pipelines.shared.training.seed_sweep                import SeedSet
 from tools.data.io                              import FileIO
 from tools.training.pretraining.overfit_gate    import OverfitGate
 from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
@@ -309,7 +309,7 @@ class TrainingWorker(BenchmarkWorker):
 class InferenceWorker(BenchmarkWorker):
     def run(self, model_name: str, seed: int | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
-        from pipelines.shared.inference_components import InferenceComponentsResolver
+        from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
         run_directory = self.run_dir / "training" / self._run_name(model_name, seed)
 

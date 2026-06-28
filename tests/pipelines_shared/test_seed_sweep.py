@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from pipelines.shared.seed_sweep import SeedSweepRunner
+from pipelines.shared.training.seed_sweep import SeedSweepRunner
 
 
 @dataclass

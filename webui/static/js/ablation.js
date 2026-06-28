@@ -199,7 +199,7 @@ class AblationView extends ConfigForm {
   }
 
   _commandText() {
-    let text = (this.detail && this.detail.command) || "python main/train_backbone.py";
+    let text = (this.detail && this.detail.command) || "python main/training/train_backbone.py";
     Object.entries(this.dirty).forEach(([path, value]) => {
       const raw      = String(value);
       const rendered = /^[\w@%+=:,./-]+$/.test(raw) ? raw : `'${raw.replace(/'/g, `'\\''`)}'`;

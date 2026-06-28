@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+import copy
+from pathlib import Path
+
+import torch
+
+from configuration.training              import OverfitConfig
+from pipelines.shared.training.pretrain_preflight import PretrainPreflight
+from tools.training.pretraining          import PretrainContext, TrainStepMemoryProbe, TrainerFeed
+
+
+class SingleTrainRunner:
+    def __init__(self, config) -> None:
+        self.config = config
+
+    @property
+    def label(self) -> str:
+        raise NotImplementedError
+
+    def _pretrain_preflight(self) -> None:
+        PretrainPreflight(
+            pretrain_config = self.config.pretrain,
+            training_config = self.config.training,
+            build_context   = self._build_pretrain_context,
+            logdir          = Path(self.config.logdir),
+            label           = self.label,
+        ).run()
+
+    def _build_pretrain_context(self, logger, device) -> PretrainContext:
+        trainer, dataset, model = self._build_pretrain_trainer(logger)
+        trainer.model.train()
+
+        feed = TrainerFeed(trainer)
+
+        return PretrainContext(
+            dataset        = dataset,
+            model          = model,
+            to_model_input = feed.to_model_input,
+            forward_loss   = feed.forward_loss,
+            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
+            run_overfit    = self._overfit_loss,
+            device         = device,
+            use_amp        = trainer.use_amp,
+            context_gb     = 0.0,
+            on_oom         = lambda: self._release(trainer),
+        )
+
+    def _build_pretrain_trainer(self, logger):
+        raise NotImplementedError
+
+    def _release(self, trainer) -> None:
+        trainer.optimizer.zero_grad(set_to_none=True)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    def _overfit_loss(self):
+        raise NotImplementedError
+
+    def run(self):
+        raise NotImplementedError
+
+
+class EntryConfigTrainRunner(SingleTrainRunner):
+    pipeline_class = None
+
+    def _overfit_entry(self, entry):
+        return entry
+
+    def _overfit_loss(self):
+        pretrain       = self.config.pretrain
+        entry          = copy.deepcopy(self.config)
+        entry.overfit  = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
+        entry.run_name = f"{self.label}_pretrain_overfit"
+        entry.logdir   = Path(self.config.logdir) / "pretrain" / "overfit"
+        entry          = self._overfit_entry(entry)
+
+        (train_losses, _val_losses, _test_losses), _run_dir = self.pipeline_class(entry).run()
+
+        return float(train_losses[-1]) if train_losses else None
+
+    def run(self):
+        self._pretrain_preflight()
+
+        return self.pipeline_class(self.config).run()

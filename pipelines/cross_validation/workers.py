@@ -6,7 +6,7 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.shared.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.comparison.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
 from pipelines.benchmark.workers                       import BenchmarkWorker
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
 from tools.data.io                                      import FileIO
@@ -210,7 +210,7 @@ class FoldTrainingWorker(CrossValidationWorker):
 class FoldInferenceWorker(CrossValidationWorker):
     def run(self, fold_index: int, split: str, seed: int | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
-        from pipelines.shared.inference_components import InferenceComponentsResolver
+        from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
         run_directory = self.run_dir / "folds" / FoldNaming.run_name(fold_index, seed)
 

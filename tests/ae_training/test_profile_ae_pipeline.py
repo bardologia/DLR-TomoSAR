@@ -13,7 +13,7 @@ from configuration.dataset import ProfileDatasetConfig, SplitRegions
 from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig, ProfileAeTrainerConfig
 from pipelines.profile_autoencoder.training import pipeline as profile_pipeline
-from pipelines.shared.run_metadata import TrainingRunMetadata
+from pipelines.shared.config.run_metadata import TrainingRunMetadata
 from tools.data.regions import CropRegion
 
 

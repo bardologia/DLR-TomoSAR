@@ -11,8 +11,17 @@ from tools.runtime.config_cli import ConfigCli
 
 
 _MAIN_DIR = Path(__file__).resolve().parents[2] / "main"
+_SUBDIRS  = ("processing", "training", "inference", "experiments", "analysis")
 
 THREAD_KEYS = ("MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS", "OMP_NUM_THREADS")
+
+
+def _script_path(name):
+    for subdir in _SUBDIRS:
+        candidate = _MAIN_DIR / subdir / f"{name}.py"
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"No entry script named {name}.py under {_MAIN_DIR}")
 
 DEFER_HEAVY_IMPORTS = (
     "train_backbone",
@@ -67,8 +76,9 @@ ENTRY_CONFIGS = {
 
 @pytest.fixture
 def main_on_path(monkeypatch):
-    if str(_MAIN_DIR) not in sys.path:
-        monkeypatch.syspath_prepend(str(_MAIN_DIR))
+    for subdir in _SUBDIRS:
+        monkeypatch.syspath_prepend(str(_MAIN_DIR / subdir))
+    monkeypatch.syspath_prepend(str(_MAIN_DIR))
     return _MAIN_DIR
 
 
@@ -103,7 +113,7 @@ def test_module_exposes_main_callable(name, main_on_path, frozen_env):
 
 @pytest.mark.parametrize("name", DEFER_HEAVY_IMPORTS)
 def test_module_guards_execution_behind_name_main(name, main_on_path, frozen_env):
-    source = (_MAIN_DIR / f"{name}.py").read_text()
+    source = _script_path(name).read_text()
 
     assert 'if __name__ == "__main__":' in source
 
@@ -119,7 +129,7 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
 
 @pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder"))
 def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
-    source = (_MAIN_DIR / f"{name}.py").read_text()
+    source = _script_path(name).read_text()
 
     assert "from pipelines" not in source.split("def main")[0]
     assert "from pipelines" in source.split("def main", 1)[1]

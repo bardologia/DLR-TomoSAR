@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class InterferogramLauncher:
-    ENTRY = "main/generate_interferograms.py"
+    ENTRY = "main/processing/generate_interferograms.py"
 
     def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:
         self.logger     = logger

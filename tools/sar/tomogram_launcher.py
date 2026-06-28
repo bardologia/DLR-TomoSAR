@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class TomogramLauncher:
-    ENTRY = "main/generate_tomogram.py"
+    ENTRY = "main/processing/generate_tomogram.py"
 
     def __init__(self, env_name: str, logger: Logger, repo_root: Optional[Path] = None) -> None:
         self.logger     = logger
