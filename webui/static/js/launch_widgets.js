@@ -2709,6 +2709,10 @@ class ConfigForm {
   };
 
   static CHOICES = {
+    train_backbone: {
+      "curriculum.warmup.param_matching":   ["hungarian", "sorted_gt"],
+      "curriculum.complete.param_matching": ["hungarian", "sorted_gt"],
+    },
     train_jepa: {
       profile_autoencoder_mode: ["frozen", "finetune"],
       image_autoencoder_mode:   ["frozen", "finetune"],

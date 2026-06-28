@@ -23,7 +23,7 @@ class ScriptCatalog:
             "title"     : "Train Backbone",
             "category"  : "Training",
             "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, secondary-track selections, or input-channel ablations.",
-            "essentials": ["run_name", "backbone_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_name", "backbone_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path", "curriculum.warmup.param_matching", "curriculum.complete.param_matching"],
         },
         "train_profile_autoencoder": {
             "title"     : "Train Profile Autoencoder",
