@@ -77,7 +77,7 @@ class ScriptCatalog:
             "title"     : "Analyze Preprocessing",
             "category"  : "Analysis",
             "purpose"   : "Render the stack-overview plots (SLC amplitudes, flattened interferograms, DEM) for one or more preprocessing trials, decoupled from the tomogram/interferogram generation step.",
-            "essentials": ["runs_dir", "run_tags", "max_sessions"],
+            "essentials": ["runs_dir", "run_tags", "max_amplitude_clip", "max_sessions"],
         },
         "analyze_param_extraction": {
             "title"     : "Analyze Param Extraction",

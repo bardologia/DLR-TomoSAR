@@ -180,4 +180,5 @@ class PreprocessInferenceConfig:
     runs_dir : Path = Path("/ste/rnd/User/vice_vi/Dataset")
     run_tags : list = field(default_factory=list)
 
-    max_sessions : int = 4
+    max_amplitude_clip : float = 1.25
+    max_sessions       : int   = 4

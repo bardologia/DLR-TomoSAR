@@ -13,10 +13,11 @@ class StackInferencePipeline:
 
     LAYOUT_FILENAME = "dataset.json"
 
-    def __init__(self, run_dir: Path, logger: Logger) -> None:
-        self.run_dir  = Path(run_dir)
-        self.data_dir = self.run_dir / "data"
-        self.logger   = logger
+    def __init__(self, run_dir: Path, max_amplitude_clip: float, logger: Logger) -> None:
+        self.run_dir            = Path(run_dir)
+        self.data_dir           = self.run_dir / "data"
+        self.max_amplitude_clip = max_amplitude_clip
+        self.logger             = logger
 
         self.logger.section("[Pre-Processing Inference]")
         self.logger.subsection(f"Run directory : {self.run_dir}")
@@ -29,7 +30,7 @@ class StackInferencePipeline:
 
         plotter = StackPlotter(
             run_directory      = self.run_dir,
-            max_amplitude_clip = layout["max_amplitude_clip"],
+            max_amplitude_clip = self.max_amplitude_clip,
             logger             = self.logger,
         )
 
@@ -93,8 +94,9 @@ class StackInferenceTrialCollector:
 
 
 class StackInferenceSession:
-    def __init__(self, run_dir: Path) -> None:
-        self.run_dir = Path(run_dir)
+    def __init__(self, run_dir: Path, max_amplitude_clip: float) -> None:
+        self.run_dir            = Path(run_dir)
+        self.max_amplitude_clip = max_amplitude_clip
 
     def execute(self) -> dict[str, Path]:
         log_dir = self.run_dir / "logs"
@@ -102,7 +104,7 @@ class StackInferenceSession:
 
         logger = Logger(log_dir=str(log_dir), name="preprocessing_inference", level="INFO")
 
-        return StackInferencePipeline(self.run_dir, logger=logger).run()
+        return StackInferencePipeline(self.run_dir, self.max_amplitude_clip, logger=logger).run()
 
 
 def run_stack_inference_session(session: StackInferenceSession) -> dict[str, Path]:
@@ -116,7 +118,7 @@ class PreprocessingInferenceScheduler:
 
     def _sessions(self) -> list[StackInferenceSession]:
         run_dirs = StackInferenceTrialCollector(Path(self.config.runs_dir), list(self.config.run_tags), self.logger).collect()
-        return [StackInferenceSession(run_dir) for run_dir in run_dirs]
+        return [StackInferenceSession(run_dir, self.config.max_amplitude_clip) for run_dir in run_dirs]
 
     def run(self) -> dict[str, dict[str, Path]]:
         sessions = self._sessions()
