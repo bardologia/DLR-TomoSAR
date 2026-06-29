@@ -2708,10 +2708,26 @@ class ConfigForm {
     "jepa.image_autoencoder_mode": ["frozen", "finetune"],
   };
 
+  static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
+
+  static NORMALIZATION_CHOICES = {
+    "normalization.input_strategy":  ["per_slot", ...ConfigForm.NORM_PRESETS],
+    "normalization.output_strategy": ["per_slot", ...ConfigForm.NORM_PRESETS],
+    "normalization.pass_mag":        ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.pass_phase":      ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.ifg_mag":         ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.ifg_phase":       ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.out_amp":         ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.out_mu":          ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.out_sigma":       ["default",  ...ConfigForm.NORM_PRESETS],
+    "normalization.dem":             ["default",  ...ConfigForm.NORM_PRESETS],
+  };
+
   static CHOICES = {
     train_backbone: {
       "curriculum.warmup.param_matching":   ["hungarian", "sorted_gt"],
       "curriculum.complete.param_matching": ["hungarian", "sorted_gt"],
+      ...ConfigForm.NORMALIZATION_CHOICES,
     },
     train_jepa: {
       profile_autoencoder_mode: ["frozen", "finetune"],
