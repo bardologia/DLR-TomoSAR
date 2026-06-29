@@ -8,7 +8,7 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 30
 
-    PARAM_MATCH_BASELINE = "sort"
+    PARAM_MATCH_BASELINE = "sorted_gt"
     PARAM_MATCH_FULL     = "hungarian"
 
     FULL_ARCHITECTURE     = "unet_skip"
@@ -16,10 +16,9 @@ class AblationCatalog:
 
     CHANNEL_NORMS = (
         ("out_amp",   "out_amp",   "robust_iqr_log1p", "zscore"),
-        ("out_mu",    "out_mu",    "zscore",           "robust_iqr_log1p"),
         ("out_sigma", "out_sigma", "robust_iqr_log1p", "zscore"),
-        ("pass_mag",  "pass_mag",  "robust_iqr_log1p", "zscore"),
-        ("ifg_phase", "ifg_phase", "zscore",           "robust_iqr_log1p"),
+        ("pass_mag",  "pass_mag",  "robust_iqr_log1p", "zscore_log1p"),
+        ("ifg_phase", "ifg_phase", "zscore",           "fixed_div_pi"),
         ("ifg_mag",   "ifg_mag",   "robust_iqr_log1p", "zscore"),
         ("dem",       "dem",       "robust_iqr_log1p", "zscore"),
     )
@@ -33,11 +32,8 @@ class AblationCatalog:
     )
 
     PHYSICS_TERMS = (
-        ("total_power",      "use_total_power",      "weight_total_power",      0.05),
-        ("moments",          "use_moments",          "weight_moments",          0.05),
         ("coherence_resyn",  "use_coherence_resyn",  "weight_coherence_resyn",  0.05),
         ("covariance_match", "use_covariance_match", "weight_covariance_match", 0.05),
-        ("capon_cycle",      "use_capon_cycle",      "weight_capon_cycle",      0.05),
     )
 
     LOSS_TERMS = (
@@ -108,14 +104,12 @@ class AblationCatalog:
                     f"{warmup}use_param_l1"    : False,
                     f"{warmup}use_l1_curve"    : True,
                     f"{warmup}weight_l1_curve" : 1.0,
-                    f"{warmup}param_matching"  : cls.PARAM_MATCH_FULL,
                 },
                 "degrade" : {
                     f"{warmup}use_l1_curve"    : False,
                     f"{warmup}weight_l1_curve" : 0.0,
                     f"{warmup}use_param_l1"    : True,
                     f"{warmup}weight_param_l1" : 1.0,
-                    f"{warmup}param_matching"  : cls.PARAM_MATCH_BASELINE,
                 },
             },
             {
@@ -142,7 +136,7 @@ class AblationCatalog:
 
     @classmethod
     def _imbalance_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
+        prefix = cls.COMPLETE_PREFIX
 
         return [
             {
@@ -155,7 +149,7 @@ class AblationCatalog:
 
     @classmethod
     def _slot_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
+        prefix = cls.COMPLETE_PREFIX
 
         return [
             {
@@ -241,9 +235,9 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "capon_cycle", "covariance_match", "coherence_resyn", "moments", "total_power",
+        "covariance_match", "coherence_resyn",
         "curriculum", "warmup_loss", "augmentation", "output_clamp",
-        "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
+        "ifg_phase", "pass_mag", "out_sigma", "out_amp",
         "architecture",
     )
 

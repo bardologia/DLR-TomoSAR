@@ -17,10 +17,32 @@ from configuration.training.general.pretraining import PretrainConfig
 
 
 def _default_curriculum() -> LossCurriculumConfig:
+    warmup = LossConfig(
+        use_l1_curve    = True,
+        weight_l1_curve = 1.0,
+        param_matching  = AblationCatalog.PARAM_MATCH_BASELINE,
+    )
+
+    complete = LossConfig(
+        use_l1_curve             = True,
+        weight_l1_curve          = 1.0,
+        param_matching           = AblationCatalog.PARAM_MATCH_FULL,
+        use_active_normalization = True,
+        presence_balance         = True,
+        amp_focal_gamma          = 2.0,
+        use_presence_bce         = True,
+        weight_presence_bce      = 1.0,
+        use_coherence_resyn      = True,
+        weight_coherence_resyn   = 0.05,
+        use_covariance_match     = True,
+        weight_covariance_match  = 0.05,
+    )
+
     return LossCurriculumConfig(
-        enabled  = False,
-        warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True),
-        complete = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True, presence_balance=True),
+        enabled    = True,
+        swap_epoch = AblationCatalog.CURRICULUM_SWAP_EPOCH,
+        warmup     = warmup,
+        complete   = complete,
     )
 
 
@@ -144,7 +166,7 @@ class BackboneEntryConfig:
     seed             : int        = 0
     seeds            : list[int]  = field(default_factory=list)
     n_gaussians      : int        = 5
-    predict_presence : bool       = False
+    predict_presence : bool       = True
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
