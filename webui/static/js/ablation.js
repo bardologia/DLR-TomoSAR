@@ -109,15 +109,38 @@ class AblationView extends ConfigForm {
     this.interpEl = interp;
     bar.appendChild(interp);
 
-    const detach = window.LaunchWidgetDom.mini(this.detach ? "detached" : "attached", () => {
+    const detachWrap     = document.createElement("div");
+    detachWrap.className  = "rail-detach ablation__detach";
+
+    const detachToggle    = document.createElement("button");
+    detachToggle.type     = "button";
+    detachToggle.className = "switch";
+    detachToggle.setAttribute("role", "switch");
+    detachToggle.innerHTML = `<span class="switch__knob"></span>`;
+
+    const detachLabel     = document.createElement("span");
+    detachLabel.className  = "rail-detach__label";
+    detachLabel.textContent = "Detach from server";
+
+    const paintDetach = () => {
+      detachToggle.classList.toggle("is-on", this.detach);
+      detachToggle.setAttribute("aria-checked", String(this.detach));
+      detachToggle.title = this.detach
+        ? "The run survives a lost connection or a console restart. Output goes to logs/<script>_<stamp>.out in the repo."
+        : "Output streams to this console. The run dies if the console server goes down.";
+    };
+
+    detachToggle.addEventListener("click", () => {
       this.detach = !this.detach;
-      detach.textContent = this.detach ? "detached" : "attached";
-      detach.classList.toggle("is-on", this.detach);
+      paintDetach();
       this._refresh();
     });
-    detach.classList.toggle("is-on", this.detach);
-    this.detachEl = detach;
-    bar.appendChild(detach);
+
+    paintDetach();
+    this.detachEl = detachToggle;
+    detachWrap.appendChild(detachToggle);
+    detachWrap.appendChild(detachLabel);
+    bar.appendChild(detachWrap);
 
     const count     = document.createElement("span");
     count.className = "ablation__count";
