@@ -368,7 +368,7 @@ def test_param_run_inference_pipeline_smoke(tomogram_full, parameters, fit_diagn
     }
     (run_dir / "param_extraction_meta.json").write_text(json.dumps(meta))
 
-    outputs = ParamRunInferencePipeline(run_dir, logger, make_plots=True).run()
+    outputs = ParamRunInferencePipeline(run_dir, logger, THRESHOLD_FACTOR, TRUNCATION_INDEX, make_plots=True).run()
 
     assert (run_dir / "fit_metrics_summary.json").is_file()
     assert outputs["plots"]

@@ -83,7 +83,7 @@ class ScriptCatalog:
             "title"     : "Analyze Param Extraction",
             "category"  : "Analysis",
             "purpose"   : "Recompute the Gaussian-fit metrics, summary, and diagnostic plots for one or more parameter-extraction trials, decoupled from the GPU fitting step.",
-            "essentials": ["params_dir", "run_tags", "make_plots", "max_sessions"],
+            "essentials": ["params_dir", "run_tags", "threshold_factor", "truncation_index", "make_plots", "max_sessions"],
         },
         "compare_trials": {
             "title"     : "Compare Trials",
