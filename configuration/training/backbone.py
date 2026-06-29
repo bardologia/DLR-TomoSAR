@@ -18,9 +18,11 @@ from configuration.training.general.pretraining import PretrainConfig
 
 def _default_curriculum() -> LossCurriculumConfig:
     warmup = LossConfig(
-        use_l1_curve    = True,
-        weight_l1_curve = 1.0,
-        param_matching  = AblationCatalog.PARAM_MATCH_FULL,
+        use_l1_curve             = True,
+        weight_l1_curve          = 1.0,
+        param_matching           = AblationCatalog.PARAM_MATCH_FULL,
+        use_active_normalization = True,
+        presence_balance         = True,
     )
 
     complete = LossConfig(

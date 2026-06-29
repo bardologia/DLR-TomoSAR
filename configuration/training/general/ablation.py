@@ -8,7 +8,8 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 30
 
-    PARAM_MATCH_FULL = "hungarian"
+    PARAM_MATCH_BASELINE = "sorted_gt"
+    PARAM_MATCH_FULL     = "hungarian"
 
     FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
@@ -100,15 +101,21 @@ class AblationCatalog:
                 "label"   : "warmup_loss",
                 "group"   : "warmup",
                 "enable"  : {
-                    f"{warmup}use_param_l1"    : False,
-                    f"{warmup}use_l1_curve"    : True,
-                    f"{warmup}weight_l1_curve" : 1.0,
+                    f"{warmup}use_param_l1"             : False,
+                    f"{warmup}use_l1_curve"             : True,
+                    f"{warmup}weight_l1_curve"          : 1.0,
+                    f"{warmup}param_matching"           : cls.PARAM_MATCH_FULL,
+                    f"{warmup}use_active_normalization" : True,
+                    f"{warmup}presence_balance"         : True,
                 },
                 "degrade" : {
-                    f"{warmup}use_l1_curve"    : False,
-                    f"{warmup}weight_l1_curve" : 0.0,
-                    f"{warmup}use_param_l1"    : True,
-                    f"{warmup}weight_param_l1" : 1.0,
+                    f"{warmup}use_l1_curve"             : False,
+                    f"{warmup}weight_l1_curve"          : 0.0,
+                    f"{warmup}use_param_l1"             : True,
+                    f"{warmup}weight_param_l1"          : 1.0,
+                    f"{warmup}param_matching"           : cls.PARAM_MATCH_BASELINE,
+                    f"{warmup}use_active_normalization" : False,
+                    f"{warmup}presence_balance"         : False,
                 },
             },
             {
@@ -135,7 +142,7 @@ class AblationCatalog:
 
     @classmethod
     def _imbalance_features(cls) -> list[dict]:
-        prefix = cls.COMPLETE_PREFIX
+        prefix = cls.WARMUP_PREFIX
 
         return [
             {
@@ -148,7 +155,7 @@ class AblationCatalog:
 
     @classmethod
     def _slot_features(cls) -> list[dict]:
-        prefix = cls.COMPLETE_PREFIX
+        prefix = cls.WARMUP_PREFIX
 
         return [
             {

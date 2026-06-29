@@ -300,18 +300,23 @@ def test_ablation_catalog_standard_categories_present():
     assert coherence["degrade"]["curriculum.complete.weight_coherence_resyn"] == 0.0
 
     imbalance = catalog["class_imbalance"]
-    assert imbalance["enable"]["curriculum.complete.presence_balance"]          is True
-    assert imbalance["degrade"]["curriculum.complete.use_active_normalization"] is False
+    assert imbalance["enable"]["curriculum.warmup.presence_balance"]          is True
+    assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
 
     presence = catalog["predict_presence"]
-    assert presence["enable"]["predict_presence"]                       is True
-    assert presence["enable"]["curriculum.complete.use_presence_bce"]   is True
-    assert presence["degrade"]["curriculum.complete.use_presence_bce"]  is False
+    assert presence["enable"]["predict_presence"]                      is True
+    assert presence["enable"]["curriculum.warmup.use_presence_bce"]    is True
+    assert presence["degrade"]["curriculum.warmup.use_presence_bce"]   is False
 
     warmup = catalog["warmup_loss"]
-    assert warmup["enable"]["curriculum.warmup.use_l1_curve"]    is True
-    assert "curriculum.warmup.param_matching" not in warmup["enable"]
-    assert warmup["degrade"]["curriculum.warmup.use_param_l1"]   is True
+    assert warmup["enable"]["curriculum.warmup.use_l1_curve"]             is True
+    assert warmup["enable"]["curriculum.warmup.param_matching"]           == "hungarian"
+    assert warmup["enable"]["curriculum.warmup.use_active_normalization"] is True
+    assert warmup["enable"]["curriculum.warmup.presence_balance"]         is True
+    assert warmup["degrade"]["curriculum.warmup.use_param_l1"]            is True
+    assert warmup["degrade"]["curriculum.warmup.param_matching"]          == "sorted_gt"
+    assert warmup["degrade"]["curriculum.warmup.use_active_normalization"] is False
+    assert warmup["degrade"]["curriculum.warmup.presence_balance"]        is False
 
     curriculum = catalog["curriculum"]
     assert curriculum["enable"]["curriculum.complete.use_l1_curve"]   is True
