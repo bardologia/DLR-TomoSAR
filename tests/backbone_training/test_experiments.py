@@ -269,9 +269,9 @@ def test_ablation_catalog_default_is_the_standard_set():
     labels   = [feature["label"] for feature in features]
 
     assert labels == [
-        "out_amp", "out_mu", "out_sigma", "pass_mag", "ifg_phase",
-        "output_clamp", "augmentation", "curriculum", "warmup_loss",
-        "physics_loss", "class_imbalance",
+        "physics", "curriculum", "augmentation", "output_clamp",
+        "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
+        "architecture",
     ]
     for feature in features:
         assert set(feature) >= {"label", "enable", "degrade"}
@@ -283,17 +283,19 @@ def test_ablation_catalog_standard_categories_present():
     assert catalog["out_amp"]["degrade"]["normalization.out_amp"]     == "zscore"
     assert catalog["augmentation"]["degrade"]["augmentation.p_noise"] == 0.0
 
-    physics = catalog["physics_loss"]
-    assert physics["enable"]["curriculum.warmup.use_total_power"]  is True
-    assert physics["degrade"]["curriculum.warmup.use_moments"]     is False
+    physics = catalog["physics"]
+    assert physics["enable"]["curriculum.complete.use_total_power"]  is True
+    assert physics["degrade"]["curriculum.complete.use_moments"]     is False
 
     imbalance = catalog["class_imbalance"]
     assert imbalance["enable"]["curriculum.warmup.presence_balance"]  is True
     assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
 
-    warmup = catalog["warmup_loss"]
-    assert warmup["enable"]["curriculum.warmup.use_mse_curve"]   is True
-    assert warmup["degrade"]["curriculum.warmup.use_mse_curve"]  is False
+    curriculum = catalog["curriculum"]
+    assert curriculum["enable"]["curriculum.warmup.param_matching"]   == "sort"
+    assert curriculum["enable"]["curriculum.complete.param_matching"] == "hungarian"
+    assert curriculum["enable"]["curriculum.complete.use_l1_curve"]   is True
+    assert curriculum["degrade"]["curriculum.enabled"]               is False
 
 
 def test_ablation_catalog_as_dict_covers_loss_terms():

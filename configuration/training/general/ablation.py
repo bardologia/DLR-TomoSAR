@@ -8,20 +8,11 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 30
 
+    PARAM_MATCH_BASELINE = "sort"
+    PARAM_MATCH_FULL     = "hungarian"
+
     FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
-
-    COMPLETE_TERMS = (
-        ("use_mse_curve",          "weight_mse_curve",          1.0),
-        ("use_ssim_curve",         "weight_ssim_curve",         0.05),
-        ("use_spectral_coherence", "weight_spectral_coh",       0.05),
-        ("use_smoothness_tv",      "weight_smoothness_tv",      1e-4),
-        ("use_total_power",        "weight_total_power",        0.05),
-        ("use_moments",            "weight_moments",            0.05),
-        ("use_coherence_resyn",    "weight_coherence_resyn",    0.05),
-        ("use_covariance_match",   "weight_covariance_match",   0.05),
-        ("use_capon_cycle",        "weight_capon_cycle",        0.05),
-    )
 
     CHANNEL_NORMS = (
         ("out_amp",   "out_amp",   "robust_iqr_log1p", "zscore"),
@@ -42,9 +33,11 @@ class AblationCatalog:
     )
 
     PHYSICS_TERMS = (
-        ("use_total_power",     "weight_total_power",     0.05),
-        ("use_moments",         "weight_moments",         0.05),
-        ("use_coherence_resyn", "weight_coherence_resyn", 0.05),
+        ("use_total_power",      "weight_total_power",      0.05),
+        ("use_moments",          "weight_moments",          0.05),
+        ("use_coherence_resyn",  "weight_coherence_resyn",  0.05),
+        ("use_covariance_match", "weight_covariance_match", 0.05),
+        ("use_capon_cycle",      "weight_capon_cycle",      0.05),
     )
 
     LOSS_TERMS = (
@@ -108,13 +101,13 @@ class AblationCatalog:
             "curriculum.swap_epoch"       : cls.CURRICULUM_SWAP_EPOCH,
             f"{warmup}use_param_l1"       : True,
             f"{warmup}weight_param_l1"    : 1.0,
-            f"{complete}use_param_l1"     : True,
-            f"{complete}weight_param_l1"  : 1.0,
+            f"{warmup}use_l1_curve"       : False,
+            f"{warmup}param_matching"     : cls.PARAM_MATCH_BASELINE,
+            f"{complete}use_param_l1"     : False,
+            f"{complete}use_l1_curve"     : True,
+            f"{complete}weight_l1_curve"  : 1.0,
+            f"{complete}param_matching"   : cls.PARAM_MATCH_FULL,
         }
-
-        for use_key, weight_key, weight in cls.COMPLETE_TERMS:
-            enable[f"{complete}{use_key}"]    = True
-            enable[f"{complete}{weight_key}"] = weight
 
         return [
             {
@@ -127,7 +120,7 @@ class AblationCatalog:
 
     @classmethod
     def _physics_features(cls) -> list[dict]:
-        prefix  = cls.WARMUP_PREFIX
+        prefix  = cls.COMPLETE_PREFIX
         enable  = {}
         degrade = {}
 
@@ -137,7 +130,7 @@ class AblationCatalog:
             degrade[f"{prefix}{use_key}"]    = False
             degrade[f"{prefix}{weight_key}"] = 0.0
 
-        return [{"label": "physics_loss", "group": "physics", "enable": enable, "degrade": degrade}]
+        return [{"label": "physics", "group": "physics", "enable": enable, "degrade": degrade}]
 
     @classmethod
     def _imbalance_features(cls) -> list[dict]:
@@ -240,7 +233,7 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "curriculum", "augmentation", "output_clamp",
+        "physics", "curriculum", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
         "architecture",
     )
