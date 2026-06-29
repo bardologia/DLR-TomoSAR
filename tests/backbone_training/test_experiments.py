@@ -269,7 +269,8 @@ def test_ablation_catalog_default_is_the_standard_set():
     labels   = [feature["label"] for feature in features]
 
     assert labels == [
-        "physics", "curriculum", "augmentation", "output_clamp",
+        "capon_cycle", "covariance_match", "coherence_resyn", "moments", "total_power",
+        "curriculum", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
         "architecture",
     ]
@@ -283,9 +284,13 @@ def test_ablation_catalog_standard_categories_present():
     assert catalog["out_amp"]["degrade"]["normalization.out_amp"]     == "zscore"
     assert catalog["augmentation"]["degrade"]["augmentation.p_noise"] == 0.0
 
-    physics = catalog["physics"]
-    assert physics["enable"]["curriculum.complete.use_total_power"]  is True
-    assert physics["degrade"]["curriculum.complete.use_moments"]     is False
+    total_power = catalog["total_power"]
+    assert total_power["enable"]["curriculum.complete.use_total_power"]  is True
+    assert total_power["degrade"]["curriculum.complete.use_total_power"] is False
+
+    capon = catalog["capon_cycle"]
+    assert capon["enable"]["curriculum.complete.use_capon_cycle"]   is True
+    assert capon["degrade"]["curriculum.complete.weight_capon_cycle"] == 0.0
 
     imbalance = catalog["class_imbalance"]
     assert imbalance["enable"]["curriculum.warmup.presence_balance"]  is True

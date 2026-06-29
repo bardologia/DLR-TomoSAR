@@ -33,22 +33,17 @@ class AblationCatalog:
     )
 
     PHYSICS_TERMS = (
-        ("use_total_power",      "weight_total_power",      0.05),
-        ("use_moments",          "weight_moments",          0.05),
-        ("use_coherence_resyn",  "weight_coherence_resyn",  0.05),
-        ("use_covariance_match", "weight_covariance_match", 0.05),
-        ("use_capon_cycle",      "weight_capon_cycle",      0.05),
+        ("total_power",      "use_total_power",      "weight_total_power",      0.05),
+        ("moments",          "use_moments",          "weight_moments",          0.05),
+        ("coherence_resyn",  "use_coherence_resyn",  "weight_coherence_resyn",  0.05),
+        ("covariance_match", "use_covariance_match", "weight_covariance_match", 0.05),
+        ("capon_cycle",      "use_capon_cycle",      "weight_capon_cycle",      0.05),
     )
 
     LOSS_TERMS = (
-        ("spectral_coherence", "use_spectral_coherence", "weight_spectral_coh",    0.05),
-        ("ssim",               "use_ssim_curve",         "weight_ssim_curve",       0.05),
-        ("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv",    1e-4),
-        ("total_power",        "use_total_power",        "weight_total_power",      0.05),
-        ("moments",            "use_moments",            "weight_moments",          0.05),
-        ("coherence_resyn",    "use_coherence_resyn",    "weight_coherence_resyn",  0.05),
-        ("covariance_match",   "use_covariance_match",   "weight_covariance_match", 0.05),
-        ("capon_cycle",        "use_capon_cycle",        "weight_capon_cycle",      0.05),
+        ("spectral_coherence", "use_spectral_coherence", "weight_spectral_coh",  0.05),
+        ("ssim",               "use_ssim_curve",         "weight_ssim_curve",    0.05),
+        ("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv", 1e-4),
     )
 
     @classmethod
@@ -120,17 +115,17 @@ class AblationCatalog:
 
     @classmethod
     def _physics_features(cls) -> list[dict]:
-        prefix  = cls.COMPLETE_PREFIX
-        enable  = {}
-        degrade = {}
+        prefix = cls.COMPLETE_PREFIX
 
-        for use_key, weight_key, weight in cls.PHYSICS_TERMS:
-            enable[f"{prefix}{use_key}"]     = True
-            enable[f"{prefix}{weight_key}"]  = weight
-            degrade[f"{prefix}{use_key}"]    = False
-            degrade[f"{prefix}{weight_key}"] = 0.0
-
-        return [{"label": "physics", "group": "physics", "enable": enable, "degrade": degrade}]
+        return [
+            {
+                "label"   : label,
+                "group"   : "physics",
+                "enable"  : {f"{prefix}{use_key}": True,  f"{prefix}{weight_key}": weight},
+                "degrade" : {f"{prefix}{use_key}": False, f"{prefix}{weight_key}": 0.0},
+            }
+            for label, use_key, weight_key, weight in cls.PHYSICS_TERMS
+        ]
 
     @classmethod
     def _imbalance_features(cls) -> list[dict]:
@@ -233,7 +228,8 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "physics", "curriculum", "augmentation", "output_clamp",
+        "capon_cycle", "covariance_match", "coherence_resyn", "moments", "total_power",
+        "curriculum", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
         "architecture",
     )
