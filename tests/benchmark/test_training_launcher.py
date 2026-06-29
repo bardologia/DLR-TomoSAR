@@ -125,14 +125,19 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
     assert job.log_path        == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
 
 
-def test_non_ablation_scheduler_keeps_flat_runs_root(tmp_path):
+def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
     import pipelines.backbone.training.pipeline as backbone_pipeline
     from configuration.training import BackboneEntryConfig
 
-    config             = BackboneEntryConfig()
-    config.logdir      = tmp_path
-    config.trials_mode = "curriculum"
+    for mode in ("curriculum", "warmup", "presence", "secondary", "patch", "input", "ablation"):
+        config             = BackboneEntryConfig()
+        config.logdir      = tmp_path
+        config.trials_mode = mode
 
-    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+        scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
 
-    assert scheduler.runs_root == tmp_path
+        assert scheduler.runs_root == tmp_path / mode
+        assert scheduler.log_dir   == tmp_path / mode / "batch_train_logs"
+
+        job = scheduler._job("model_trial", {})
+        assert job.command[-2:] == ["--logdir", str(tmp_path / mode)]

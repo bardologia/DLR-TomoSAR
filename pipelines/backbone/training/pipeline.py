@@ -288,7 +288,15 @@ class TrainScheduler:
 
     SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "input_trials", "ablation_features", "ablation_catalog", "ablation_include_full", "gpus", "poll_interval_s")
 
-    MODE_SUBDIRS = {"ablation": "ablation"}
+    MODE_SUBDIRS = {
+        "curriculum" : "curriculum",
+        "warmup"     : "warmup",
+        "presence"   : "presence",
+        "secondary"  : "secondary",
+        "patch"      : "patch",
+        "input"      : "input",
+        "ablation"   : "ablation",
+    }
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
         self.config       = config
