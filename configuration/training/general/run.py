@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib     import Path
 
+from configuration.training.general.optimization import ClipMode, SchedulerType, WarmupMode
+
 
 @dataclass
 class RunPathsConfig:
@@ -35,3 +37,13 @@ class TrainingQueueConfig:
 
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256
+
+    scheduler_type    : SchedulerType = SchedulerType.COSINE_ANNEALING
+    warmup_mode       : WarmupMode    = WarmupMode.LINEAR
+    warmup_poly_power : float         = 2.0
+
+    clip_mode                : ClipMode = ClipMode.FIXED
+    max_grad_norm            : float    = 1.0
+    clip_adaptive_window     : int      = 200
+    clip_adaptive_percentile : float    = 95.0
+    clip_adaptive_mean_std_k : float    = 2.0

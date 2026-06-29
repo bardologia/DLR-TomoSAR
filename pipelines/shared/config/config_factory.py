@@ -103,10 +103,11 @@ class ConfigFactory:
         )
 
     def _base_trainer_kwargs(self, logdir: Path) -> dict:
+        training = self.config.training
         return {
             "gaussian"         : GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians, predict_presence=getattr(self.config, "predict_presence", False)),
             "geometry"         : GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
-            "gradient_clipper" : GradientClipperConfig(clip_mode="fixed", max_grad_norm=1.0),
+            "gradient_clipper" : GradientClipperConfig(clip_mode=training.clip_mode.value, max_grad_norm=training.max_grad_norm, adaptive_window=training.clip_adaptive_window, adaptive_percentile=training.clip_adaptive_percentile, adaptive_mean_std_k=training.clip_adaptive_mean_std_k),
             "io"               : IOConfig(logdir=str(logdir)),
         }
 
@@ -119,8 +120,8 @@ class ConfigFactory:
             **self._base_trainer_kwargs(logdir),
 
             early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, restore_best=True),
-            warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode="linear"),
-            scheduler      = SchedulerConfig(type="cosine_annealing", epochs=scheduler_epochs, eta_min=training.eta_min),
+            warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode=training.warmup_mode.value, warmup_poly_power=training.warmup_poly_power),
+            scheduler      = SchedulerConfig(type=training.scheduler_type.value, epochs=scheduler_epochs, eta_min=training.eta_min),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, lr_scale=lr_scale),
 
             training = TrainingLoopConfig(
@@ -148,7 +149,7 @@ class ConfigFactory:
 
             early_stopping = EarlyStoppingConfig(patience=9999, restore_best=False),
             warmup         = WarmupConfig(warmup_enabled=False),
-            scheduler      = SchedulerConfig(type="cosine_annealing", epochs=overfit.max_steps, eta_min=1e-6),
+            scheduler      = SchedulerConfig(type=self.config.training.scheduler_type.value, epochs=overfit.max_steps, eta_min=1e-6),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
 
             training = TrainingLoopConfig(

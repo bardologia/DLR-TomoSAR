@@ -1,6 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum        import Enum
+
+
+class SchedulerType(Enum):
+    COSINE_ANNEALING = "cosine_annealing"
+    CONSTANT         = "constant"
+
+
+class WarmupMode(Enum):
+    LINEAR      = "linear"
+    COSINE      = "cosine"
+    EXPONENTIAL = "exponential"
+    POLYNOMIAL  = "polynomial"
+
+
+class ClipMode(Enum):
+    DISABLED            = "disabled"
+    FIXED               = "fixed"
+    ADAPTIVE_PERCENTILE = "adaptive_percentile"
+    ADAPTIVE_MEAN_STD   = "adaptive_mean_std"
 
 
 @dataclass
