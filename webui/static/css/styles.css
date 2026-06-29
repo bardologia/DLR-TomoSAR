@@ -1184,7 +1184,7 @@ main { margin-left: var(--navw); }
 .cfg-edit__row[hidden] { display: none; }
 .cfg-edit__row--bool { grid-template-columns: 1fr auto; }
 .cfg-edit__row--bool .switch { justify-self: end; }
-.cfg-edit__row--gate { grid-template-columns: 160px minmax(0, 1fr); }
+.cfg-edit__row--gate { grid-template-columns: 146px minmax(0, 1fr); }
 .cfg-edit__row--gate .cfg-edit__name { white-space: nowrap; }
 .cfg-edit__row--choice { grid-template-columns: minmax(110px, max-content) minmax(96px, 1fr); }
 .cfg-edit__name { font-family: var(--mono); font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }

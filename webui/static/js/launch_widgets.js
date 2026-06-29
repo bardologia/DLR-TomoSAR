@@ -3260,14 +3260,26 @@ class ConfigForm {
     return grid;
   }
 
+  _rowHeight(row) {
+    if (row.classList.contains("cfg-edit__row--num"))   return 2.2;
+    if (row.classList.contains("cfg-edit__row--board")) return 3.0;
+    if (row.classList.contains("cfg-edit__row--wide"))  return 2.0;
+    return 1.0;
+  }
+
+  _groupHeight(el) {
+    let h = el.querySelectorAll(".field-group__title").length * 1.2 + 0.4;
+    el.querySelectorAll(".cfg-edit__row").forEach((row) => (h += this._rowHeight(row)));
+    return h;
+  }
+
   _packBandColumns(grid) {
     if (!grid.classList.contains("is-grouped")) return;
     const items = [...grid.children];
     if (items.length < 2) return;
 
     const ncols  = Math.min(3, items.length);
-    const weight = (el) => el.querySelectorAll(".cfg-edit__row, .band-block").length + el.querySelectorAll(".field-group__title").length * 0.6 + 0.4;
-    const total  = items.reduce((sum, el) => sum + weight(el), 0);
+    const total  = items.reduce((sum, el) => sum + this._groupHeight(el), 0);
     const target = total / ncols;
 
     const cols = Array.from({ length: ncols }, () => {
@@ -3279,7 +3291,7 @@ class ConfigForm {
     let ci = 0;
     items.forEach((el) => {
       cols[ci].el.appendChild(el);
-      cols[ci].h += weight(el);
+      cols[ci].h += this._groupHeight(el);
       if (ci < ncols - 1 && cols[ci].h >= target) ci++;
     });
 
