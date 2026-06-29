@@ -217,9 +217,9 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "out_amp", "out_mu", "out_sigma", "pass_mag", "ifg_phase",
-        "output_clamp", "augmentation", "curriculum", "warmup_loss",
-        "physics_loss", "class_imbalance", "architecture",
+        "physics_loss", "class_imbalance", "warmup_loss", "curriculum",
+        "augmentation", "output_clamp", "ifg_phase", "pass_mag",
+        "out_sigma", "out_mu", "out_amp", "architecture",
     )
 
     @classmethod
