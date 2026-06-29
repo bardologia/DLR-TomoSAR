@@ -177,7 +177,7 @@ class PreProcessEntryConfig:
 
 @dataclass
 class PreprocessInferenceConfig:
-    runs_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/preprocessing")
+    runs_dir : Path = Path("/ste/rnd/User/vice_vi/Dataset")
     run_tags : list = field(default_factory=list)
 
     max_sessions : int = 4
