@@ -8,8 +8,7 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 30
 
-    PARAM_MATCH_BASELINE = "sorted_gt"
-    PARAM_MATCH_FULL     = "hungarian"
+    PARAM_MATCH_FULL = "hungarian"
 
     FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
