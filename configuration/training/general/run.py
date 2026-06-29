@@ -25,11 +25,6 @@ class TrainingQueueConfig:
     warmup_steps         : int             = 200
     eta_min              : float           = 1e-6
     early_stop_patience  : int             = 30
-    patch_size           : tuple[int, int] = (64, 64)
-    patch_stride         : int             = 32
-    train_azimuth        : tuple[int, int] = (1000, 13000)
-    val_azimuth          : tuple[int, int] = (13000, 14500)
-    test_azimuth         : tuple[int, int] = (14500, 16000)
     log_all_losses       : bool            = False
 
     use_amp                     : bool = False
@@ -51,3 +46,9 @@ class TrainingQueueConfig:
     clip_adaptive_window     : int      = 200
     clip_adaptive_percentile : float    = 95.0
     clip_adaptive_mean_std_k : float    = 2.0
+
+    patch_size           : tuple[int, int] = (64, 64)
+    patch_stride         : int             = 32
+    train_azimuth        : tuple[int, int] = (1000, 13000)
+    val_azimuth          : tuple[int, int] = (13000, 14500)
+    test_azimuth         : tuple[int, int] = (14500, 16000)

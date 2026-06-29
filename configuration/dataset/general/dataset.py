@@ -178,8 +178,10 @@ class AugmentationConfig:
     p_flip_h        : float               = 0.5
     p_flip_v        : float               = 0.5
     p_rot90         : float               = 0.0
-    amp_scale_range : Tuple[float, float] = (0.8, 1.2)
+
     p_amp_scale     : float               = 0.5
+    amp_scale_range : Tuple[float, float] = (0.8, 1.2)
+
     noise_std       : float               = 0.01
     p_noise         : float               = 0.25
 

@@ -282,8 +282,7 @@ class ModelCardPanel {
 
     card.innerHTML =
       `<span class="model-pick__top"><span class="model-pick__name">${model.name}</span>${badge}<span class="model-pick__params">${model.params || ""}</span></span>` +
-      `<span class="model-pick__meta">${meta}</span>` +
-      `<span class="model-pick__when">${model.when || ""}</span>`;
+      `<span class="model-pick__meta">${meta}</span>`;
 
     card.addEventListener("click", () => this._select(model.key));
     this.cards.set(model.key, card);
@@ -2653,7 +2652,7 @@ class ConfigForm {
     ["param space", /^param/],
     ["slot presence", /presence|focal|active_normalization|active_weight|inactive_weight/],
     ["regularization", /smooth|_tv$/],
-    ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values/],
+    ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values|height_axis/],
     ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
     ["early stopping", /^early_stop/],
     ["image autoencoder", /image_autoencoder|image_ae_finetune|image_ae_loss/],
@@ -2709,6 +2708,17 @@ class ConfigForm {
   };
 
   static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
+
+  static NORMALIZATION_DEFAULTS = {
+    "normalization.pass_mag"   : "robust_iqr_log1p",
+    "normalization.pass_phase" : "zscore",
+    "normalization.ifg_mag"    : "robust_iqr_log1p",
+    "normalization.ifg_phase"  : "zscore",
+    "normalization.out_amp"    : "robust_iqr_log1p",
+    "normalization.out_mu"     : "zscore",
+    "normalization.out_sigma"  : "robust_iqr_log1p",
+    "normalization.dem"        : "robust_iqr_log1p",
+  };
 
   static NORMALIZATION_CHOICES = {
     "normalization.input_strategy":  ["per_slot", ...ConfigForm.NORM_PRESETS],
@@ -2966,6 +2976,7 @@ class ConfigForm {
 
       if (isBandRoot) {
         const grid = this._buildFieldsGrid(section, leaves, "band-fields");
+        this._packBandColumns(grid);
         body.appendChild(grid);
         this.panels.set(section, { el: grid, badge: null });
         holders.set(section, bandChildren);
@@ -3249,6 +3260,34 @@ class ConfigForm {
     return grid;
   }
 
+  _packBandColumns(grid) {
+    if (!grid.classList.contains("is-grouped")) return;
+    const items = [...grid.children];
+    if (items.length < 2) return;
+
+    const ncols  = Math.min(3, items.length);
+    const weight = (el) => el.querySelectorAll(".cfg-edit__row, .band-block").length + el.querySelectorAll(".field-group__title").length * 0.6 + 0.4;
+    const total  = items.reduce((sum, el) => sum + weight(el), 0);
+    const target = total / ncols;
+
+    const cols = Array.from({ length: ncols }, () => {
+      const col = document.createElement("div");
+      col.className = "field-col";
+      return { el: col, h: 0 };
+    });
+
+    let ci = 0;
+    items.forEach((el) => {
+      cols[ci].el.appendChild(el);
+      cols[ci].h += weight(el);
+      if (ci < ncols - 1 && cols[ci].h >= target) ci++;
+    });
+
+    grid.classList.remove("is-grouped");
+    grid.classList.add("is-packed");
+    cols.forEach((col) => grid.appendChild(col.el));
+  }
+
   _buildBlock(blockLeaves, section, body) {
     const shortName = (leaf) => (section ? leaf.path.slice(section.length + 1) : leaf.path);
     const lead = blockLeaves[0];
@@ -3424,10 +3463,11 @@ class ConfigForm {
 
     const current = String(leaf.value);
     const options = choices.includes(current) ? choices : [current, ...choices];
+    const resolved = ConfigForm.NORMALIZATION_DEFAULTS[leaf.path];
     options.forEach((value) => {
       const opt = document.createElement("option");
       opt.value = value;
-      opt.textContent = value;
+      opt.textContent = value === "default" && resolved ? `${resolved} · per-slot` : value;
       select.appendChild(opt);
     });
     select.value = current;
