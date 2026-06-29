@@ -20,12 +20,15 @@ def _warmup_config(enabled=True, steps=10, start_factor=0.1, mode="linear", poly
     )
 
 
-def _scheduler_config(stype="cosine_annealing", epochs=10, eta_min=0.0):
+def _scheduler_config(stype="cosine_annealing", epochs=10, eta_min=0.0, step_size=30, gamma=0.1, power=1.0):
     return SimpleNamespace(
         scheduler=SimpleNamespace(
-            type    = stype,
-            epochs  = epochs,
-            eta_min = eta_min,
+            type      = stype,
+            epochs    = epochs,
+            eta_min   = eta_min,
+            step_size = step_size,
+            gamma     = gamma,
+            power     = power,
         )
     )
 
@@ -141,6 +144,55 @@ def test_scheduler_constant_returns_base(logger, tracker):
     for epoch in (0, 3, 9):
         lrs = sched.step(epoch)
         assert lrs == [0.05, 0.1]
+
+
+def test_scheduler_linear_endpoints_and_midpoint(logger, tracker):
+    config = _scheduler_config("linear", epochs=10, eta_min=0.0)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+
+    assert sched.step(0)[0]  == pytest.approx(0.1)
+    assert sched.step(5)[0]  == pytest.approx(0.05)
+    assert sched.step(10)[0] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_scheduler_linear_respects_eta_min(logger, tracker):
+    config = _scheduler_config("linear", epochs=10, eta_min=0.01)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+    assert sched.step(10)[0] == pytest.approx(0.01)
+
+
+def test_scheduler_polynomial_factor(logger, tracker):
+    config = _scheduler_config("polynomial", epochs=10, eta_min=0.0, power=2.0)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+
+    assert sched.step(0)[0]  == pytest.approx(0.1)
+    assert sched.step(5)[0]  == pytest.approx(0.1 * (0.5 ** 2.0))
+    assert sched.step(10)[0] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_scheduler_exponential_endpoints(logger, tracker):
+    config = _scheduler_config("exponential", epochs=10, eta_min=0.001)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+
+    assert sched.step(0)[0]  == pytest.approx(0.1)
+    assert sched.step(5)[0]  == pytest.approx(0.1 * ((0.001 / 0.1) ** 0.5))
+    assert sched.step(10)[0] == pytest.approx(0.001)
+
+
+def test_scheduler_step_decay(logger, tracker):
+    config = _scheduler_config("step", epochs=100, eta_min=0.0, step_size=10, gamma=0.5)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+
+    assert sched.step(0)[0]  == pytest.approx(0.1)
+    assert sched.step(9)[0]  == pytest.approx(0.1)
+    assert sched.step(10)[0] == pytest.approx(0.05)
+    assert sched.step(20)[0] == pytest.approx(0.025)
+
+
+def test_scheduler_step_floors_at_eta_min(logger, tracker):
+    config = _scheduler_config("step", epochs=100, eta_min=0.05, step_size=10, gamma=0.5)
+    sched  = Scheduler([0.1], warmup=None, config=config, logger=logger, tracker=tracker)
+    assert sched.step(50)[0] == pytest.approx(0.05)
 
 
 def test_scheduler_unknown_type_raises(logger, tracker):

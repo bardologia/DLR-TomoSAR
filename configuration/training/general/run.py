@@ -38,9 +38,13 @@ class TrainingQueueConfig:
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256
 
-    scheduler_type    : SchedulerType = SchedulerType.COSINE_ANNEALING
-    warmup_mode       : WarmupMode    = WarmupMode.LINEAR
-    warmup_poly_power : float         = 2.0
+    scheduler_type      : SchedulerType = SchedulerType.COSINE_ANNEALING
+    scheduler_step_size : int           = 30
+    scheduler_gamma     : float         = 0.1
+    scheduler_power     : float         = 1.0
+
+    warmup_mode       : WarmupMode = WarmupMode.LINEAR
+    warmup_poly_power : float      = 2.0
 
     clip_mode                : ClipMode = ClipMode.FIXED
     max_grad_norm            : float    = 1.0

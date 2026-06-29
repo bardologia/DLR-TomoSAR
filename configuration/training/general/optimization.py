@@ -7,6 +7,10 @@ from enum        import Enum
 class SchedulerType(Enum):
     COSINE_ANNEALING = "cosine_annealing"
     CONSTANT         = "constant"
+    LINEAR           = "linear"
+    POLYNOMIAL       = "polynomial"
+    EXPONENTIAL      = "exponential"
+    STEP             = "step"
 
 
 class WarmupMode(Enum):
@@ -34,9 +38,12 @@ class OptimizerConfig:
 
 @dataclass
 class SchedulerConfig:
-    type    : str   = "cosine_annealing"
-    epochs  : int   = 100
-    eta_min : float = 1e-6
+    type      : str   = "cosine_annealing"
+    epochs    : int   = 100
+    eta_min   : float = 1e-6
+    step_size : int   = 30
+    gamma     : float = 0.1
+    power     : float = 1.0
 
 
 @dataclass

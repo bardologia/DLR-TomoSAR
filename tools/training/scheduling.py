@@ -108,13 +108,37 @@ class Scheduler:
     def _resolved_t_max(self) -> int:
         return self._t_max_override if self._t_max_override is not None else self.config.scheduler.epochs
 
+    def _eta_min_ratio(self) -> float:
+        return float(self.config.scheduler.eta_min) / max(self.base_lrs[0], 1e-12)
+
+    def _progress(self, epoch: int) -> float:
+        return min(1.0, epoch / max(1, self._resolved_t_max()))
+
     def _cosine_annealing(self, epoch: int) -> float:
-        T_max         = self._resolved_t_max()
-        eta_min       = float(self.config.scheduler.eta_min)
-        base_lr       = self.base_lrs[0]
-        eta_min_ratio = eta_min / max(base_lr, 1e-12)
-        progress      = min(1.0, epoch / max(1, T_max))
-        return eta_min_ratio + 0.5 * (1.0 - eta_min_ratio) * (1.0 + math.cos(math.pi * progress))
+        ratio    = self._eta_min_ratio()
+        progress = self._progress(epoch)
+        return ratio + 0.5 * (1.0 - ratio) * (1.0 + math.cos(math.pi * progress))
+
+    def _linear(self, epoch: int) -> float:
+        ratio    = self._eta_min_ratio()
+        progress = self._progress(epoch)
+        return 1.0 - (1.0 - ratio) * progress
+
+    def _polynomial(self, epoch: int) -> float:
+        ratio    = self._eta_min_ratio()
+        progress = self._progress(epoch)
+        return ratio + (1.0 - ratio) * (1.0 - progress) ** self.config.scheduler.power
+
+    def _exponential(self, epoch: int) -> float:
+        ratio    = max(self._eta_min_ratio(), 1e-8)
+        progress = self._progress(epoch)
+        return ratio ** progress
+
+    def _step(self, epoch: int) -> float:
+        ratio     = self._eta_min_ratio()
+        step_size = max(1, self.config.scheduler.step_size)
+        decayed   = self.config.scheduler.gamma ** (epoch // step_size)
+        return max(decayed, ratio)
 
     def _constant(self) -> float:
         return 1.0
@@ -125,6 +149,18 @@ class Scheduler:
 
         if self.scheduler_type == "constant":
             return self._constant()
+
+        if self.scheduler_type == "linear":
+            return self._linear(epoch)
+
+        if self.scheduler_type == "polynomial":
+            return self._polynomial(epoch)
+
+        if self.scheduler_type == "exponential":
+            return self._exponential(epoch)
+
+        if self.scheduler_type == "step":
+            return self._step(epoch)
 
         raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -152,9 +188,16 @@ class Scheduler:
             "Base LRs"       : self.base_lrs,
         }
 
-        if self.scheduler_type == "cosine_annealing":
+        if self.scheduler_type in ("cosine_annealing", "linear", "polynomial", "exponential"):
             info["T_max"]   = self._resolved_t_max()
             info["Eta Min"] = self.config.scheduler.eta_min
+
+        if self.scheduler_type == "polynomial":
+            info["Power"] = self.config.scheduler.power
+
+        if self.scheduler_type == "step":
+            info["Step Size"] = self.config.scheduler.step_size
+            info["Gamma"]     = self.config.scheduler.gamma
 
         info["Warmup Enabled"] = self.warmup.enabled if self.warmup else False
         self.logger.kv_table(info)
