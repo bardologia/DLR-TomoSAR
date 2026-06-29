@@ -29,9 +29,6 @@ def _default_curriculum() -> LossCurriculumConfig:
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
         presence_balance         = True,
-        amp_focal_gamma          = 2.0,
-        use_presence_bce         = True,
-        weight_presence_bce      = 1.0,
         use_coherence_resyn      = True,
         weight_coherence_resyn   = 0.05,
         use_covariance_match     = True,
@@ -166,7 +163,7 @@ class BackboneEntryConfig:
     seed             : int        = 0
     seeds            : list[int]  = field(default_factory=list)
     n_gaussians      : int        = 5
-    predict_presence : bool       = True
+    predict_presence : bool       = False
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
