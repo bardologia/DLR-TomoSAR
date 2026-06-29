@@ -5,6 +5,9 @@ class AblationCatalog:
 
     WARMUP_PREFIX = "curriculum.warmup."
 
+    FULL_ARCHITECTURE     = "resunet"
+    BASELINE_ARCHITECTURE = "unet"
+
     CHANNEL_NORMS = (
         ("out_amp",   "out_amp",   "robust_iqr_log1p", "zscore"),
         ("out_mu",    "out_mu",    "zscore",           "robust_iqr_log1p"),
@@ -171,6 +174,17 @@ class AblationCatalog:
         ]
 
     @classmethod
+    def _architecture_features(cls) -> list[dict]:
+        return [
+            {
+                "label"   : "architecture",
+                "group"   : "architecture",
+                "enable"  : {"backbone_name": cls.FULL_ARCHITECTURE},
+                "degrade" : {"backbone_name": cls.BASELINE_ARCHITECTURE},
+            },
+        ]
+
+    @classmethod
     def _loss_toggle(cls, label: str, use_key: str, weight_key: str, weight: float) -> dict:
         prefix = cls.WARMUP_PREFIX
 
@@ -194,6 +208,7 @@ class AblationCatalog:
             + cls._imbalance_features()
             + cls._slot_features()
             + cls._structural_features()
+            + cls._architecture_features()
             + loss_terms
         )
 
@@ -204,7 +219,7 @@ class AblationCatalog:
     DEFAULT_ORDER = (
         "out_amp", "out_mu", "out_sigma", "pass_mag", "ifg_phase",
         "output_clamp", "augmentation", "curriculum", "warmup_loss",
-        "physics_loss", "class_imbalance",
+        "physics_loss", "class_imbalance", "architecture",
     )
 
     @classmethod
