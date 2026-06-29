@@ -5,7 +5,7 @@ class AblationCatalog:
 
     WARMUP_PREFIX = "curriculum.warmup."
 
-    FULL_ARCHITECTURE     = "resunet"
+    FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
 
     CHANNEL_NORMS = (
