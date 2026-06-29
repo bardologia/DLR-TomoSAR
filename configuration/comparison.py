@@ -18,7 +18,7 @@ class TrialComparisonConfig:
 
 @dataclass
 class PreprocessingComparisonConfig:
-    runs_dir : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/preprocessing")
+    runs_dir : Path      = Path("/ste/rnd/User/vice_vi/Dataset")
     run_tags : List[str] = field(default_factory=list)
 
     pixel_sample : int = 200000
