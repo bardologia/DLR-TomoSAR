@@ -2762,6 +2762,12 @@ class ConfigForm {
     compare_trials: {
       run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
     },
+    compare_preprocessing_trials: {
+      run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
+    },
+    compare_param_extraction_trials: {
+      run_tags: { mode: "runs_compare", multi: true, baseFrom: "params_dir" },
+    },
   };
 
   static GPU_FIELDS = ["gpu", "gpus", "gpu_device_ids"];
