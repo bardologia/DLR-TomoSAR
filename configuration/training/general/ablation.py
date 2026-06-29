@@ -3,10 +3,25 @@ from __future__ import annotations
 
 class AblationCatalog:
 
-    WARMUP_PREFIX = "curriculum.warmup."
+    WARMUP_PREFIX   = "curriculum.warmup."
+    COMPLETE_PREFIX = "curriculum.complete."
+
+    CURRICULUM_SWAP_EPOCH = 30
 
     FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
+
+    COMPLETE_TERMS = (
+        ("use_mse_curve",          "weight_mse_curve",          1.0),
+        ("use_ssim_curve",         "weight_ssim_curve",         0.05),
+        ("use_spectral_coherence", "weight_spectral_coh",       0.05),
+        ("use_smoothness_tv",      "weight_smoothness_tv",      1e-4),
+        ("use_total_power",        "weight_total_power",        0.05),
+        ("use_moments",            "weight_moments",            0.05),
+        ("use_coherence_resyn",    "weight_coherence_resyn",    0.05),
+        ("use_covariance_match",   "weight_covariance_match",   0.05),
+        ("use_capon_cycle",        "weight_capon_cycle",        0.05),
+    )
 
     CHANNEL_NORMS = (
         ("out_amp",   "out_amp",   "robust_iqr_log1p", "zscore"),
@@ -85,20 +100,28 @@ class AblationCatalog:
 
     @classmethod
     def _schedule_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
+        warmup   = cls.WARMUP_PREFIX
+        complete = cls.COMPLETE_PREFIX
+
+        enable = {
+            "curriculum.enabled"          : True,
+            "curriculum.swap_epoch"       : cls.CURRICULUM_SWAP_EPOCH,
+            f"{warmup}use_param_l1"       : True,
+            f"{warmup}weight_param_l1"    : 1.0,
+            f"{complete}use_param_l1"     : True,
+            f"{complete}weight_param_l1"  : 1.0,
+        }
+
+        for use_key, weight_key, weight in cls.COMPLETE_TERMS:
+            enable[f"{complete}{use_key}"]    = True
+            enable[f"{complete}{weight_key}"] = weight
 
         return [
             {
                 "label"   : "curriculum",
                 "group"   : "schedule",
-                "enable"  : {"curriculum.enabled": True},
+                "enable"  : enable,
                 "degrade" : {"curriculum.enabled": False},
-            },
-            {
-                "label"   : "warmup_loss",
-                "group"   : "schedule",
-                "enable"  : {f"{prefix}use_param_l1": True, f"{prefix}weight_param_l1": 1.0, f"{prefix}use_mse_curve": True,  f"{prefix}weight_mse_curve": 1.0},
-                "degrade" : {f"{prefix}use_mse_curve": False, f"{prefix}weight_mse_curve": 0.0},
             },
         ]
 
@@ -217,9 +240,9 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "physics_loss", "class_imbalance", "warmup_loss", "curriculum",
-        "augmentation", "output_clamp", "ifg_phase", "pass_mag",
-        "out_sigma", "out_mu", "out_amp", "architecture",
+        "curriculum", "augmentation", "output_clamp",
+        "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
+        "architecture",
     )
 
     @classmethod
