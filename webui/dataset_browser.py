@@ -10,6 +10,8 @@ class DatasetBrowser:
     DATA_MARKER     = "data"
     PARAMS_DIR      = "params"
     PARAM_SUFFIX    = ".npy"
+    PARAM_META      = "param_extraction_meta.json"
+    PARAM_FILE      = "parameters.npy"
     MAX_DEPTH       = 3
     CHECKPOINT_NAME = "best_model.pt"
     INFERENCE_DIR   = "inference"
@@ -79,6 +81,28 @@ class DatasetBrowser:
 
         self.logger.info(f"params: found {len(files)} under {params_dir}")
         return {"ok": True, "dataset": str(dataset), "params_root": str(params_dir), "files": files}
+
+    def param_trials(self, raw_base: str) -> dict:
+        base = self._directory(raw_base)
+        if base is None:
+            return {"ok": False, "error": f"not a directory: {raw_base}"}
+
+        entries = []
+        for marker in sorted(base.rglob(self.PARAM_META)):
+            run_dir = marker.parent
+            if not (run_dir / self.PARAM_FILE).is_file():
+                continue
+
+            rel   = run_dir.relative_to(base)
+            parts = rel.parts
+            entries.append({
+                "name"    : str(rel),
+                "path"    : str(run_dir),
+                "dataset" : parts[0] if len(parts) > 1 else "",
+            })
+
+        self.logger.info(f"param_trials: listed {len(entries)} under {base}")
+        return {"ok": True, "base": str(base), "trials": entries}
 
     def _has_inference(self, run_dir: Path) -> bool:
         inference_dir = run_dir / self.INFERENCE_DIR

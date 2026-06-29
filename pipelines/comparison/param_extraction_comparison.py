@@ -24,6 +24,7 @@ class ParamTrial:
     sigma_init_divisor  : float
     fit_amplitude       : bool
     fit_mean            : bool
+    dataset             : str = ""
     metrics             : dict = field(default_factory=dict)
 
     @property
@@ -32,28 +33,39 @@ class ParamTrial:
 
     @property
     def label(self) -> str:
-        return self.name.replace("params_sigmaonly_", "")
+        base = Path(self.name).name.replace("params_sigmaonly_", "")
+        return f"{self.dataset} · {base}" if self.dataset else base
 
 
 class ParamTrialCollector:
+    MARKER = "param_extraction_meta.json"
+
     def __init__(self, params_dir: Path, run_tags: list[str], logger: Logger) -> None:
         self.params_dir = params_dir
         self.run_tags   = run_tags
         self.logger     = logger
+
+    def _is_trial(self, run_dir: Path) -> bool:
+        return (run_dir / self.MARKER).exists() and (run_dir / "parameters.npy").exists()
 
     def _discover_tags(self) -> list[str]:
         if self.run_tags:
             return list(self.run_tags)
 
         return [
-            entry.name
-            for entry in sorted(self.params_dir.iterdir())
-            if entry.is_dir() and (entry / "parameters.npy").exists() and (entry / "param_extraction_meta.json").exists()
+            str(marker.parent.relative_to(self.params_dir))
+            for marker in sorted(self.params_dir.rglob(self.MARKER))
+            if (marker.parent / "parameters.npy").exists()
         ]
+
+    def _dataset_of(self, tag: str) -> str:
+        parts = Path(tag).parts
+        return parts[0] if len(parts) > 1 else ""
 
     def _build_trial(self, tag: str) -> ParamTrial:
         run_dir = self.params_dir / tag
-        meta    = FileIO.load_json(run_dir / "param_extraction_meta.json")
+        meta    = FileIO.load_json(run_dir / self.MARKER)
+        base    = Path(tag).name
 
         return ParamTrial(
             name               = tag,
@@ -61,8 +73,9 @@ class ParamTrialCollector:
             k_max              = int(meta["k_max"]),
             lambda_k           = float(meta["lambda_k"]),
             sigma_init_divisor = float(meta["sigma_init_divisor"]),
-            fit_amplitude      = "fitamp" in tag,
-            fit_mean           = "fitmu"  in tag,
+            fit_amplitude      = "fitamp" in base,
+            fit_mean           = "fitmu"  in base,
+            dataset            = self._dataset_of(tag),
         )
 
     def collect(self) -> list[ParamTrial]:
@@ -70,6 +83,10 @@ class ParamTrialCollector:
 
         trials = []
         for tag in self._discover_tags():
+            if not self._is_trial(self.params_dir / tag):
+                self.logger.error(f"Not a parameter-extraction trial: {self.params_dir / tag}")
+                continue
+
             trial = self._build_trial(tag)
             self.logger.info(f"{trial.name:<48} K={trial.k_max} free/gauss={trial.free_per_gaussian}")
             trials.append(trial)
@@ -77,7 +94,7 @@ class ParamTrialCollector:
         if not trials:
             self.logger.error(f"No parameter-extraction trials found under {self.params_dir}")
 
-        return sorted(trials, key=lambda item: (item.k_max, item.name))
+        return sorted(trials, key=lambda item: (item.k_max, item.dataset, item.name))
 
 
 class ParamMetrics:
@@ -85,16 +102,19 @@ class ParamMetrics:
     EPSILON           = 1e-12
     COLLAPSE_RATE     = 0.01
 
-    def __init__(self, params_dir: Path, pixel_sample: int, block_size: int, logger: Logger) -> None:
-        self.params_dir   = params_dir
-        self.pixel_sample = pixel_sample
-        self.block_size   = block_size
-        self.logger       = logger
+    def __init__(self, pixel_sample: int, block_size: int, logger: Logger) -> None:
+        self.pixel_sample  = pixel_sample
+        self.block_size    = block_size
+        self.logger        = logger
+        self._height_cache = {}
 
-    @property
-    def height_bins(self) -> int:
-        tomogram = np.load(self.params_dir.parent / "data" / "tomogram_full.npy", mmap_mode="r")
-        return int(tomogram.shape[0])
+    def _height_bins(self, trial: ParamTrial) -> int:
+        tomogram_path = trial.run_dir.parent.parent / "data" / "tomogram_full.npy"
+        if tomogram_path not in self._height_cache:
+            tomogram = np.load(tomogram_path, mmap_mode="r")
+            self._height_cache[tomogram_path] = int(tomogram.shape[0])
+
+        return self._height_cache[tomogram_path]
 
     def _load(self, trial: ParamTrial) -> tuple:
         meta        = FileIO.load_json(trial.run_dir / "param_extraction_meta.json")
@@ -169,9 +189,10 @@ class ParamMetrics:
             "k_ambiguous_fraction"        : float(per_k_summary["k_ambiguous_fraction"]),
         }
 
-    def compute(self, trial: ParamTrial, n_data: int) -> dict:
+    def compute(self, trial: ParamTrial) -> dict:
         self.logger.subsection(f"Measuring {trial.name}")
 
+        n_data = self._height_bins(trial)
         meta, summary, diagnostics, parameters = self._load(trial)
 
         return self._summarise(trial, meta, summary, diagnostics, parameters, n_data)
@@ -356,11 +377,10 @@ class ParamExtractionComparisonPipeline:
         return collector.collect()
 
     def _measure(self, trials: list[ParamTrial]) -> None:
-        metrics = ParamMetrics(Path(self.config.params_dir), self.config.pixel_sample, self.config.block_size, self.logger)
-        n_data  = metrics.height_bins
+        metrics = ParamMetrics(self.config.pixel_sample, self.config.block_size, self.logger)
 
         for trial in trials:
-            trial.metrics = metrics.compute(trial, n_data)
+            trial.metrics = metrics.compute(trial)
 
     def _plot(self, trials: list[ParamTrial]) -> list[Path]:
         if not self.config.make_plots:

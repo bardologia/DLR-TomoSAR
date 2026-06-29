@@ -2772,7 +2772,7 @@ class ConfigForm {
       run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
     },
     compare_param_extraction_trials: {
-      run_tags: { mode: "runs_compare", multi: true, baseFrom: "params_dir" },
+      run_tags: { mode: "param_trials", multi: true, baseFrom: "params_dir" },
     },
   };
 
