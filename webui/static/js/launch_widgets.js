@@ -3347,7 +3347,6 @@ class ConfigForm {
     cell.className = "term-control";
 
     const toggle = this._switchControl(lead);
-    cell.appendChild(toggle.el);
     this.controls[lead.path] = { leaf: lead, reset: toggle.reset };
     this.states.push({ leaf: lead, row, section: lead.section });
 
@@ -3365,6 +3364,8 @@ class ConfigForm {
       this.controls[weight.path] = { leaf: weight, reset: control.reset };
       this.states.push({ leaf: weight, row, section: weight.section });
     }
+
+    cell.appendChild(toggle.el);
 
     row.appendChild(cell);
     return row;
