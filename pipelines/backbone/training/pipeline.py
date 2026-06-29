@@ -288,10 +288,17 @@ class TrainScheduler:
 
     SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "secondary_trials", "patch_trials", "input_trials", "ablation_features", "ablation_catalog", "ablation_include_full", "gpus", "poll_interval_s")
 
+    MODE_SUBDIRS = {"ablation": "ablation"}
+
     def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
         self.config       = config
         self.entry_script = Path(entry_script)
-        self.log_dir      = Path(config.logdir) / "batch_train_logs"
+
+        base_logdir       = Path(config.logdir)
+        subdir            = self.MODE_SUBDIRS.get(config.trials_mode)
+        self.runs_root    = base_logdir / subdir if subdir else base_logdir
+
+        self.log_dir      = self.runs_root / "batch_train_logs"
         self.results_path = self.log_dir / "train_scheduler_results.json"
 
         self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
@@ -320,7 +327,7 @@ class TrainScheduler:
         raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'secondary', 'patch', 'input' or 'ablation'")
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
-        argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name})
+        argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name, "logdir": str(self.runs_root)})
 
         return GpuJob(
             name     = run_name,

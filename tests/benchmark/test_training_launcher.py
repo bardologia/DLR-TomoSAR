@@ -104,3 +104,35 @@ def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):
     assert ran.get("scheduler_ran") is True
     assert ran["entry_script"] == entry
     assert "single_ran" not in ran
+
+
+def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
+    import pipelines.backbone.training.pipeline as backbone_pipeline
+    from configuration.training import BackboneEntryConfig
+
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "ablation"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    assert scheduler.runs_root == tmp_path / "ablation"
+    assert scheduler.log_dir   == tmp_path / "ablation" / "batch_train_logs"
+
+    job = scheduler._job("model_abl-0-full", {"curriculum.enabled": True})
+
+    assert job.command[-2:]    == ["--logdir", str(tmp_path / "ablation")]
+    assert job.log_path        == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
+
+
+def test_non_ablation_scheduler_keeps_flat_runs_root(tmp_path):
+    import pipelines.backbone.training.pipeline as backbone_pipeline
+    from configuration.training import BackboneEntryConfig
+
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "curriculum"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    assert scheduler.runs_root == tmp_path
