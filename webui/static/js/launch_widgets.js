@@ -2759,6 +2759,12 @@ class ConfigForm {
     xray_weights: {
       run_filter: { mode: "runs", multi: true, baseFrom: "runs_dir", checkpointOnly: true },
     },
+    analyze_preprocessing: {
+      run_tags: { mode: "runs", multi: true, baseFrom: "runs_dir" },
+    },
+    analyze_param_extraction: {
+      run_tags: { mode: "runs", multi: true, baseFrom: "params_dir" },
+    },
     compare_trials: {
       run_tags: { mode: "runs_compare", multi: true, baseFrom: "runs_dir" },
     },
