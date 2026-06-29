@@ -3321,53 +3321,57 @@ class ConfigForm {
     }
 
     const label = isTermGate ? leadName.slice(4) : leadName;
-    const row = this._buildGateRow(lead, weight, label);
-    body.appendChild(row);
+    body.appendChild(this._buildGateRow(lead, label));
 
-    const gatedRows = rest.map((leaf) => {
+    const gatedRows = [];
+
+    if (weight) {
+      body.appendChild(this._buildWeightRow(weight));
+      gatedRows.push(this.states[this.states.length - 1]);
+    }
+
+    rest.forEach((leaf) => {
       const dependent = body.appendChild(this._buildRow(leaf, section));
       dependent.classList.add("cfg-edit__row--dependent");
-      return this.states[this.states.length - 1];
+      gatedRows.push(this.states[this.states.length - 1]);
     });
 
-    this.gates.push({ leaf: lead, states: gatedRows, sections: [], weightEl: row.querySelector(".term-weight") });
+    this.gates.push({ leaf: lead, states: gatedRows, sections: [] });
   }
 
-  _buildGateRow(lead, weight, label) {
+  _buildGateRow(lead, label) {
     const row = document.createElement("div");
-    row.className = "cfg-edit__row cfg-edit__row--gate";
-    row.title = weight ? `--${lead.path} · --${weight.path}` : `--${lead.path}`;
+    row.className = "cfg-edit__row cfg-edit__row--bool cfg-edit__row--gate";
+    row.title = `--${lead.path}`;
 
     const name = document.createElement("div");
     name.className = "cfg-edit__name";
     name.textContent = label;
     row.appendChild(name);
 
-    const cell = document.createElement("div");
-    cell.className = "term-control";
-
     const toggle = this._switchControl(lead);
+    row.appendChild(toggle.el);
     this.controls[lead.path] = { leaf: lead, reset: toggle.reset };
     this.states.push({ leaf: lead, row, section: lead.section });
+    return row;
+  }
 
-    if (weight) {
-      const wrap = document.createElement("div");
-      wrap.className = "term-weight";
-      const tag = document.createElement("span");
-      tag.className = "term-weight__tag";
-      tag.textContent = "weight";
-      const control = this._numberControl(weight);
-      control.input.title = `--${weight.path}`;
-      wrap.appendChild(tag);
-      wrap.appendChild(control.input);
-      cell.appendChild(wrap);
-      this.controls[weight.path] = { leaf: weight, reset: control.reset };
-      this.states.push({ leaf: weight, row, section: weight.section });
-    }
+  _buildWeightRow(weight) {
+    const row = document.createElement("div");
+    row.className = "cfg-edit__row cfg-edit__row--dependent cfg-edit__row--gateweight";
+    row.title = `--${weight.path}`;
 
-    cell.appendChild(toggle.el);
+    const name = document.createElement("div");
+    name.className = "cfg-edit__name";
+    name.textContent = "weight";
+    row.appendChild(name);
 
-    row.appendChild(cell);
+    const control = this._numberControl(weight);
+    control.input.title = `--${weight.path}`;
+    row.appendChild(control.input);
+
+    this.controls[weight.path] = { leaf: weight, reset: control.reset };
+    this.states.push({ leaf: weight, row, section: weight.section });
     return row;
   }
 
@@ -3427,7 +3431,7 @@ class ConfigForm {
       const sections = [...this.panels.keys()].filter((name) => name.startsWith(`${section}.complete`));
 
       if (states.length || sections.length) {
-        this.gates.push({ leaf: lead, states, sections, weightEl: null });
+        this.gates.push({ leaf: lead, states, sections });
       }
     });
   }
@@ -3593,7 +3597,6 @@ class ConfigForm {
 
     this.gates.forEach((gate) => {
       const open = this._effective(gate.leaf) === "True";
-      if (gate.weightEl) gate.weightEl.hidden = !open;
       if (!open) {
         gate.states.forEach(({ row }) => (row.dataset.gated = "1"));
         gate.sections.forEach((section) => this.gatedSections.add(section));
