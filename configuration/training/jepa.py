@@ -103,7 +103,6 @@ class JepaEntryConfig:
 
     embedding_loss : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
     param_loss     : LossConfig          = field(default_factory=lambda: LossConfig(use_param_l1=True, weight_param_l1=1.0))
-    overfit        : OverfitConfig       = field(default_factory=OverfitConfig)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
     paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)

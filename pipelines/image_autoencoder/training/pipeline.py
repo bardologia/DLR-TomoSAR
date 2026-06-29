@@ -23,7 +23,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
             gaussian          = base.gaussian,
             image_autoencoder = self.autoencoder_cfg,
             ae_loss           = entry_config.ae_loss,
-            overfit           = entry_config.overfit,
+            overfit           = self.overfit,
         )
         trainer_config.inherit_shared_from(base)
         return trainer_config

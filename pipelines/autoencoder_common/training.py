@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from configuration.training              import OverfitConfig
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.config.run_metadata   import TrainingRunMetadata
 from tools.runtime.reproducibility   import Reproducibility
@@ -11,8 +12,9 @@ class AutoencoderTrainingPipeline:
     run_label     = None
     trainer_class = None
 
-    def __init__(self, entry_config, split_regions=None) -> None:
+    def __init__(self, entry_config, split_regions=None, overfit=None) -> None:
         self.entry   = entry_config
+        self.overfit = overfit if overfit is not None else OverfitConfig(enabled=False)
         self.factory = ConfigFactory(entry_config)
         Reproducibility.seed_everything(entry_config.seed)
 

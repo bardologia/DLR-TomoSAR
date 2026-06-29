@@ -5,6 +5,7 @@ from pathlib import Path
 import optuna
 import pytest
 
+from configuration.training import OverfitConfig
 from pipelines.tuning.trial  import TrialTrainer, TrialProfileAeTrainer, TrialImageAeTrainer, TrialJepaTrainer
 from pipelines.tuning.tuners import AeTuner, JepaTuner
 
@@ -145,7 +146,7 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path):
     captured = {}
 
     class CaptureAePipeline:
-        def __init__(self, entry, trial):
+        def __init__(self, entry, trial, overfit=None):
             captured["entry"] = entry
             captured["trial"] = trial
 
@@ -160,6 +161,7 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path):
         tune_cfg           = tune_cfg,
         log_dir            = str(tmp_path),
         logger             = fake_logger,
+        overfit            = OverfitConfig(enabled=False),
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
@@ -181,7 +183,7 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path):
 
 def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_path):
     class FakeAePipeline:
-        def __init__(self, entry, trial):
+        def __init__(self, entry, trial, overfit=None):
             self.entry = entry
 
         def run(self):
@@ -195,6 +197,7 @@ def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_pat
         tune_cfg           = tune_cfg,
         log_dir            = str(tmp_path),
         logger             = fake_logger,
+        overfit            = OverfitConfig(enabled=False),
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
@@ -207,7 +210,7 @@ def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tm
     captured = {}
 
     class CaptureImageAePipeline:
-        def __init__(self, entry, trial):
+        def __init__(self, entry, trial, overfit=None):
             captured["entry"] = entry
 
         def run(self):
@@ -222,6 +225,7 @@ def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tm
         tune_cfg           = tune_cfg,
         log_dir            = str(tmp_path),
         logger             = fake_logger,
+        overfit            = OverfitConfig(enabled=False),
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
@@ -260,7 +264,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
     captured = {}
 
     class CaptureJepaPipeline:
-        def __init__(self, entry, trial):
+        def __init__(self, entry, trial, overfit=None):
             captured["entry"] = entry
 
         def run(self):
@@ -275,6 +279,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
         tune_cfg         = tune_cfg,
         log_dir          = str(tmp_path),
         logger           = fake_logger,
+        overfit          = OverfitConfig(enabled=False),
     )
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
@@ -296,6 +301,7 @@ def test_jepa_tuner_space_uses_arch_params_only(fake_logger, tune_cfg, tmp_path)
         tune_cfg         = tune_cfg,
         log_dir          = str(tmp_path),
         logger           = fake_logger,
+        overfit          = OverfitConfig(enabled=False),
     )
 
     assert tuner.space == FakeJepaConfig.tunable_arch_params()

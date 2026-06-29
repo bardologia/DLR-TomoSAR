@@ -63,7 +63,6 @@ class TuningOrchestrator:
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
             ae_loss         = self.config.ae_loss,
-            overfit         = self.config.overfit,
             paths           = self.config.paths,
             training        = self.config.training,
         )
@@ -75,7 +74,6 @@ class TuningOrchestrator:
             seed        = self.config.tuning.base_seed,
             n_gaussians = self.config.n_gaussians,
             ae_loss     = self.config.image_ae_loss,
-            overfit     = self.config.overfit,
             paths       = self.config.paths,
             training    = self.config.training,
         )
@@ -97,7 +95,6 @@ class TuningOrchestrator:
             target_provider            = jepa.target_provider,
             embedding_loss             = jepa.embedding_loss,
             param_loss                 = jepa.param_loss,
-            overfit                    = self.config.overfit,
             paths                      = self.config.paths,
             training                   = self.config.training,
         )
@@ -297,6 +294,7 @@ class TuningOrchestrator:
                 tune_cfg           = tune_cfg,
                 log_dir            = str(self.run_dir / model_name),
                 logger             = logger,
+                overfit            = self.config.overfit,
             )
         elif self.config.training_type == "image_autoencoder":
             from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
@@ -311,6 +309,7 @@ class TuningOrchestrator:
                 tune_cfg           = tune_cfg,
                 log_dir            = str(self.run_dir / model_name),
                 logger             = logger,
+                overfit            = self.config.overfit,
             )
         elif self.config.training_type == "jepa":
             tuner = JepaTuner(
@@ -320,6 +319,7 @@ class TuningOrchestrator:
                 tune_cfg         = tune_cfg,
                 log_dir          = str(self.run_dir / model_name),
                 logger           = logger,
+                overfit          = self.config.overfit,
             )
         else:
             trainer_cfg, dataset_cfg = self._build_base_configs()

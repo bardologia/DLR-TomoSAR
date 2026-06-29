@@ -55,7 +55,6 @@ class ProfileAeEntryConfig:
     ae_model_name : str                   = "mlp_ae"
     autoencoder   : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
     ae_loss       : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
-    overfit       : OverfitConfig         = field(default_factory=OverfitConfig)
     geometry      : GeometryConfig        = field(default_factory=GeometryConfig)
 
     paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)

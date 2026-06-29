@@ -258,7 +258,6 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
-        trainer_config.overfit    = self.config.overfit
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()

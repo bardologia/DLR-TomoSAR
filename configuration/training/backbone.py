@@ -152,7 +152,6 @@ class BackboneEntryConfig:
     training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
     pretrain   : PretrainConfig       = field(default_factory=PretrainConfig)
     curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)
-    overfit    : OverfitConfig        = field(default_factory=OverfitConfig)
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
     input      : InputConfig          = field(default_factory=InputConfig.full_stack)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)

@@ -139,7 +139,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_jepa(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.jepa.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
+        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
 
     def _jepa_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import JepaEntryConfig
@@ -159,7 +159,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
             target_provider            = jepa.target_provider,
             embedding_loss             = jepa.embedding_loss,
-            overfit                    = cv.overfit,
             geometry                   = cv.geometry,
             paths                      = cv.paths,
             training                   = cv.training,
@@ -168,7 +167,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
+        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
 
     def _ae_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import ProfileAeEntryConfig
@@ -186,7 +185,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             ae_model_name   = ae.ae_model_name,
             autoencoder     = ae.autoencoder,
             ae_loss         = ae.ae_loss,
-            overfit         = cv.overfit,
             geometry        = cv.geometry,
             paths           = cv.paths,
             training        = cv.training,

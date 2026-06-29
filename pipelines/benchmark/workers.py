@@ -56,7 +56,7 @@ class BenchmarkWorker:
             enabled_losses = {},
         )
 
-    def _ae_entry_config(self, model_name: str, logdir: Path, overfit, run_name: str | None = None, seed: int | None = None):
+    def _ae_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
         from configuration.training import ProfileAeEntryConfig
         from models.profile_autoencoder                        import PROFILE_AE_CONFIG_REGISTRY
 
@@ -70,12 +70,11 @@ class BenchmarkWorker:
             ae_model_name   = model_name,
             autoencoder     = PROFILE_AE_CONFIG_REGISTRY[model_name](),
             ae_loss         = self.config.ae_loss,
-            overfit         = overfit,
             paths           = self.config.paths,
             training        = self.config.training,
         )
 
-    def _jepa_entry_config(self, model_name: str, logdir: Path, overfit, run_name: str | None = None, seed: int | None = None):
+    def _jepa_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
         from configuration.training import JepaEntryConfig
 
         jepa = self.config.jepa
@@ -91,7 +90,6 @@ class BenchmarkWorker:
             profile_autoencoder_mode   = jepa.profile_autoencoder_mode,
             target_provider            = jepa.target_provider,
             embedding_loss             = jepa.embedding_loss,
-            overfit                    = overfit,
             paths                      = self.config.paths,
             training                   = self.config.training,
         )
@@ -220,8 +218,8 @@ class OverfitWorker(BenchmarkWorker):
         overfit = self._overfit_config()
 
         def run_body():
-            entry                   = self._ae_entry_config(model_name, stage_dir, overfit, run_name=run_name, seed=seed)
-            (train_losses, _, _), _ = TrainingPipeline(entry).run()
+            entry                   = self._ae_entry_config(model_name, stage_dir, run_name=run_name, seed=seed)
+            (train_losses, _, _), _ = TrainingPipeline(entry, overfit=overfit).run()
 
             return float(train_losses[-1]) if train_losses else None
 
@@ -237,8 +235,8 @@ class OverfitWorker(BenchmarkWorker):
         overfit = self._overfit_config()
 
         def run_body():
-            entry                   = self._jepa_entry_config(model_name, stage_dir, overfit, run_name=run_name, seed=seed)
-            (train_losses, _, _), _ = TrainingPipeline(entry).run()
+            entry                   = self._jepa_entry_config(model_name, stage_dir, run_name=run_name, seed=seed)
+            (train_losses, _, _), _ = TrainingPipeline(entry, overfit=overfit).run()
 
             return float(train_losses[-1]) if train_losses else None
 
@@ -266,18 +264,16 @@ class TrainingWorker(BenchmarkWorker):
         run_name = self._run_name(model_name, seed)
 
         if self.config.training_type == "profile_autoencoder":
-            from configuration.training import OverfitConfig
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-            entry = self._ae_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False), run_name=run_name, seed=seed)
+            entry = self._ae_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
             TrainingPipeline(entry).run()
             return
 
         if self.config.training_type == "jepa":
-            from configuration.training import OverfitConfig
             from pipelines.jepa.training.pipeline      import TrainingPipeline
 
-            entry = self._jepa_entry_config(model_name, self.run_dir / "training", OverfitConfig(enabled=False), run_name=run_name, seed=seed)
+            entry = self._jepa_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
             TrainingPipeline(entry).run()
             return
 

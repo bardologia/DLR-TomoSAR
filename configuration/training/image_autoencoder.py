@@ -49,7 +49,6 @@ class ImageAeEntryConfig:
     ae_model_name     : str                        = "conv2d_ae"
     image_autoencoder : ImageAutoencoderBaseConfig = field(default_factory=Conv2dImageAutoencoderConfig)
     ae_loss           : ImageAeLossConfig          = field(default_factory=ImageAeLossConfig)
-    overfit           : OverfitConfig              = field(default_factory=OverfitConfig)
     geometry          : GeometryConfig             = field(default_factory=GeometryConfig)
 
     paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)

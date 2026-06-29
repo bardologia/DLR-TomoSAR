@@ -69,13 +69,13 @@ class EntryConfigTrainRunner(SingleTrainRunner):
 
     def _overfit_loss(self):
         pretrain       = self.config.pretrain
+        overfit        = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
         entry          = copy.deepcopy(self.config)
-        entry.overfit  = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
         entry.run_name = f"{self.label}_pretrain_overfit"
         entry.logdir   = Path(self.config.logdir) / "pretrain" / "overfit"
         entry          = self._overfit_entry(entry)
 
-        (train_losses, _val_losses, _test_losses), _run_dir = self.pipeline_class(entry).run()
+        (train_losses, _val_losses, _test_losses), _run_dir = self.pipeline_class(entry, overfit=overfit).run()
 
         return float(train_losses[-1]) if train_losses else None
 
