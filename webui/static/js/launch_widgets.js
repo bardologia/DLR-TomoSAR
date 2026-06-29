@@ -2127,6 +2127,10 @@ class AblationBuilder {
     const leaf = this.byPath.get(path);
     const type = leaf ? leaf.type : null;
 
+    if (path === "backbone_name" && this.view.modelFamilies && this.view.modelFamilies.length) {
+      return this._backboneSelect(value, onCommit);
+    }
+
     if (type === "bool") {
       const btn       = document.createElement("button");
       btn.type        = "button";
@@ -2165,6 +2169,38 @@ class AblationBuilder {
       input.addEventListener("change", () => onCommit(input.value));
     }
     return input;
+  }
+
+  _backboneSelect(value, onCommit) {
+    const select     = document.createElement("select");
+    select.className = "run-select exp-ablation__input exp-ablation__select";
+
+    const current = value === undefined || value === null ? "" : String(value);
+    const known   = new Set();
+
+    (this.view.modelFamilies || []).forEach((family) => {
+      const group   = document.createElement("optgroup");
+      group.label   = family.family;
+      family.models.forEach((model) => {
+        const opt       = document.createElement("option");
+        opt.value       = model.key;
+        opt.textContent = model.recommended ? `${model.name} (recommended)` : model.name || model.key;
+        group.appendChild(opt);
+        known.add(model.key);
+      });
+      select.appendChild(group);
+    });
+
+    if (current && !known.has(current)) {
+      const opt       = document.createElement("option");
+      opt.value       = current;
+      opt.textContent = current;
+      select.insertBefore(opt, select.firstChild);
+    }
+
+    select.value = current;
+    select.addEventListener("change", () => onCommit(select.value));
+    return select;
   }
 
   _gpusSuffix() {
