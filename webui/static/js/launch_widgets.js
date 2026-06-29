@@ -3284,7 +3284,7 @@ class ConfigForm {
 
   _buildGateRow(lead, weight, label) {
     const row = document.createElement("div");
-    row.className = "cfg-edit__row";
+    row.className = "cfg-edit__row cfg-edit__row--gate";
     row.title = weight ? `--${lead.path} · --${weight.path}` : `--${lead.path}`;
 
     const name = document.createElement("div");
@@ -3343,6 +3343,7 @@ class ConfigForm {
       row.classList.add(pickerSpec.multi ? "cfg-edit__row--board" : "cfg-edit__row--wide");
     } else if (choices) {
       control = this._choiceControl(leaf, choices);
+      row.classList.add("cfg-edit__row--choice");
     } else if (!leaf.editable) {
       control = this._textControl(leaf);
       control.input.disabled = true;
@@ -3350,6 +3351,7 @@ class ConfigForm {
       control.input.title = "not overridable from the command line";
     } else if (leaf.type === "bool") {
       control = this._switchControl(leaf);
+      row.classList.add("cfg-edit__row--bool");
     } else if (leaf.type === "int" || leaf.type === "float") {
       control = new window.NumberField(this, leaf, short).build();
       row.classList.add("cfg-edit__row--num");
