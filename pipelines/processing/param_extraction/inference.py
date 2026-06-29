@@ -164,10 +164,9 @@ class ParamExtractionInferenceScheduler:
         if not sessions:
             raise RuntimeError("No parameter-extraction trials to infer")
 
-        slots = max(1, min(self.config.max_sessions, len(sessions)))
-        self.logger.subsection(f"Dispatching {len(sessions)} trials across {slots} concurrent slots")
+        self.logger.subsection(f"Dispatching {len(sessions)} trials sequentially")
 
-        runner    = ProcessPoolRunner(logger=self.logger, max_workers=slots)
+        runner    = ProcessPoolRunner(logger=self.logger, max_workers=1)
         completed = runner.run(sessions, run_param_inference_session)
 
         results = {}

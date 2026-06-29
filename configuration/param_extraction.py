@@ -171,5 +171,4 @@ class ParamExtractionInferenceConfig:
     threshold_factor : float = 0.25
     truncation_index : int   = 170
 
-    make_plots   : bool = True
-    max_sessions : int  = 4
+    make_plots : bool = True

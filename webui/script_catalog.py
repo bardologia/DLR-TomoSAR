@@ -77,13 +77,13 @@ class ScriptCatalog:
             "title"     : "Analyze Preprocessing",
             "category"  : "Analysis",
             "purpose"   : "Render the stack-overview plots (SLC amplitudes, flattened interferograms, DEM) for one or more preprocessing trials, decoupled from the tomogram/interferogram generation step.",
-            "essentials": ["runs_dir", "run_tags", "max_amplitude_clip", "max_sessions"],
+            "essentials": ["runs_dir", "run_tags", "max_amplitude_clip"],
         },
         "analyze_param_extraction": {
             "title"     : "Analyze Param Extraction",
             "category"  : "Analysis",
             "purpose"   : "Recompute the Gaussian-fit metrics, summary, and diagnostic plots for one or more parameter-extraction trials, decoupled from the GPU fitting step.",
-            "essentials": ["params_dir", "run_tags", "threshold_factor", "truncation_index", "make_plots", "max_sessions"],
+            "essentials": ["params_dir", "run_tags", "threshold_factor", "truncation_index", "make_plots"],
         },
         "compare_trials": {
             "title"     : "Compare Trials",

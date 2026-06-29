@@ -19,7 +19,6 @@ def main() -> None:
     logger.kv_table({
         "Runs dir" : str(config.runs_dir),
         "Trials"   : len(config.run_tags) if config.run_tags else "auto",
-        "Sessions" : config.max_sessions,
     }, title="Configuration")
 
     PreprocessingInferenceScheduler(config, logger).run()

@@ -153,8 +153,7 @@ class PreProcessEntryConfig:
         [20, 10],
     ])
 
-    effort       : str = "high"
-    max_sessions : int = 4
+    effort : str = "high"
 
     dataset_name         : Optional[str] = None
     dataset_type         : str           = "FSAR"
@@ -181,4 +180,3 @@ class PreprocessInferenceConfig:
     run_tags : list = field(default_factory=list)
 
     max_amplitude_clip : float = 1.25
-    max_sessions       : int   = 4

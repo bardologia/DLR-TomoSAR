@@ -22,7 +22,6 @@ def main() -> None:
         "Params dir" : str(config.params_dir),
         "Trials"     : len(config.run_tags) if config.run_tags else "auto",
         "Make plots" : config.make_plots,
-        "Sessions"   : config.max_sessions,
     }, title="Configuration")
 
     ParamExtractionInferenceScheduler(config, logger).run()

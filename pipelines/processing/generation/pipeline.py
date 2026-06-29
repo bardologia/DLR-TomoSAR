@@ -130,18 +130,16 @@ def run_preprocess_session(session: PreProcessSession) -> dict[str, Path]:
 
 
 class PreProcessScheduler:
-    def __init__(self, sessions: list[PreProcessSession], max_sessions: int, logger: Logger) -> None:
-        self.sessions     = sessions
-        self.max_sessions = max_sessions
-        self.logger       = logger
+    def __init__(self, sessions: list[PreProcessSession], logger: Logger) -> None:
+        self.sessions = sessions
+        self.logger   = logger
 
     def run(self) -> dict[str, dict[str, Path]]:
-        slots   = max(1, min(self.max_sessions, len(self.sessions)))
         results = {}
 
-        self.logger.subsection(f"Dispatching {len(self.sessions)} sessions across {slots} concurrent slots")
+        self.logger.subsection(f"Dispatching {len(self.sessions)} sessions sequentially")
 
-        runner    = ProcessPoolRunner(logger=self.logger, max_workers=slots)
+        runner    = ProcessPoolRunner(logger=self.logger, max_workers=1)
         completed = runner.run(self.sessions, run_preprocess_session)
 
         for session, outputs in completed:

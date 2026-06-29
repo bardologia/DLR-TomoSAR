@@ -21,7 +21,7 @@ from tools.monitoring.logger                  import Logger
 
 
 def main() -> None:
-    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, runs win filters as concurrent sessions").apply()
+    config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, runs win filters as sequential sessions").apply()
     logger = Logger(log_dir="logs", name="pre_process")
 
     global_crop    = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
@@ -31,7 +31,6 @@ def main() -> None:
     logger.kv_table({
         "Win filters"  : ", ".join(str(win) for win in config.win_list),
         "Runs"         : len(config.win_list),
-        "Max sessions" : config.max_sessions,
         "Crop"         : global_crop.as_tuple(),
     }, title="Configuration")
 
@@ -70,7 +69,7 @@ def main() -> None:
 
         sessions.append(PreProcessSession(index=index, total=len(config.win_list), dataset_name=dataset_name, config=processing_config))
 
-    scheduler = PreProcessScheduler(sessions=sessions, max_sessions=config.max_sessions, logger=logger)
+    scheduler = PreProcessScheduler(sessions=sessions, logger=logger)
     scheduler.run()
 
     logger.close()
