@@ -2097,19 +2097,29 @@ class AblationBuilder {
     path.className   = "exp-ablation__field exp-ablation__field--path";
     path.setAttribute("list", this.datalistId);
 
-    const before = document.createElement("input");
-    before.type        = "text";
-    before.placeholder = "before";
-    before.className   = "exp-ablation__field exp-ablation__field--value";
+    let before  = this._addValueField(false, "before", "");
+    let after   = this._addValueField(false, "after", "");
+    let isModel = false;
 
-    const after = document.createElement("input");
-    after.type        = "text";
-    after.placeholder = "after";
-    after.className   = "exp-ablation__field exp-ablation__field--value";
+    const swap = (next) => {
+      const freshBefore = this._addValueField(next, "before", before.value);
+      const freshAfter  = this._addValueField(next, "after", after.value);
+      form.replaceChild(freshBefore, before);
+      form.replaceChild(freshAfter, after);
+      before  = freshBefore;
+      after   = freshAfter;
+      isModel = next;
+    };
+
+    path.addEventListener("input", () => {
+      const next = path.value.trim() === "backbone_name" && !!(this.view.modelFamilies && this.view.modelFamilies.length);
+      if (next !== isModel) swap(next);
+    });
 
     const add = LaunchWidgetDom.mini("add path", () => {
       if (this._addPath(index, path.value, before.value, after.value)) {
-        path.value   = "";
+        path.value = "";
+        swap(false);
         before.value = "";
         after.value  = "";
       }
@@ -2121,6 +2131,21 @@ class AblationBuilder {
     form.appendChild(after);
     form.appendChild(add);
     return form;
+  }
+
+  _addValueField(isModel, placeholder, current) {
+    if (isModel) {
+      const select = this._backboneSelect(current, () => {});
+      select.classList.add("exp-ablation__field", "exp-ablation__field--value");
+      return select;
+    }
+
+    const input       = document.createElement("input");
+    input.type        = "text";
+    input.placeholder = placeholder;
+    input.className   = "exp-ablation__field exp-ablation__field--value";
+    input.value       = current === undefined || current === null ? "" : String(current);
+    return input;
   }
 
   _valueEditor(path, value, onCommit) {
