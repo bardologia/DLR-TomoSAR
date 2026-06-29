@@ -270,7 +270,7 @@ def test_ablation_catalog_default_is_the_standard_set():
 
     assert labels == [
         "capon_cycle", "covariance_match", "coherence_resyn", "moments", "total_power",
-        "curriculum", "augmentation", "output_clamp",
+        "curriculum", "warmup_loss", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
         "architecture",
     ]
@@ -296,10 +296,15 @@ def test_ablation_catalog_standard_categories_present():
     assert imbalance["enable"]["curriculum.warmup.presence_balance"]  is True
     assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
 
+    warmup = catalog["warmup_loss"]
+    assert warmup["enable"]["curriculum.warmup.use_l1_curve"]    is True
+    assert warmup["enable"]["curriculum.warmup.param_matching"]  == "hungarian"
+    assert warmup["degrade"]["curriculum.warmup.use_param_l1"]   is True
+    assert warmup["degrade"]["curriculum.warmup.param_matching"] == "sort"
+
     curriculum = catalog["curriculum"]
-    assert curriculum["enable"]["curriculum.warmup.param_matching"]   == "sort"
-    assert curriculum["enable"]["curriculum.complete.param_matching"] == "hungarian"
     assert curriculum["enable"]["curriculum.complete.use_l1_curve"]   is True
+    assert curriculum["enable"]["curriculum.complete.param_matching"] == "hungarian"
     assert curriculum["degrade"]["curriculum.enabled"]               is False
 
 

@@ -91,13 +91,9 @@ class AblationCatalog:
         warmup   = cls.WARMUP_PREFIX
         complete = cls.COMPLETE_PREFIX
 
-        enable = {
+        curriculum_enable = {
             "curriculum.enabled"          : True,
             "curriculum.swap_epoch"       : cls.CURRICULUM_SWAP_EPOCH,
-            f"{warmup}use_param_l1"       : True,
-            f"{warmup}weight_param_l1"    : 1.0,
-            f"{warmup}use_l1_curve"       : False,
-            f"{warmup}param_matching"     : cls.PARAM_MATCH_BASELINE,
             f"{complete}use_param_l1"     : False,
             f"{complete}use_l1_curve"     : True,
             f"{complete}weight_l1_curve"  : 1.0,
@@ -106,9 +102,26 @@ class AblationCatalog:
 
         return [
             {
+                "label"   : "warmup_loss",
+                "group"   : "warmup",
+                "enable"  : {
+                    f"{warmup}use_param_l1"    : False,
+                    f"{warmup}use_l1_curve"    : True,
+                    f"{warmup}weight_l1_curve" : 1.0,
+                    f"{warmup}param_matching"  : cls.PARAM_MATCH_FULL,
+                },
+                "degrade" : {
+                    f"{warmup}use_l1_curve"    : False,
+                    f"{warmup}weight_l1_curve" : 0.0,
+                    f"{warmup}use_param_l1"    : True,
+                    f"{warmup}weight_param_l1" : 1.0,
+                    f"{warmup}param_matching"  : cls.PARAM_MATCH_BASELINE,
+                },
+            },
+            {
                 "label"   : "curriculum",
                 "group"   : "schedule",
-                "enable"  : enable,
+                "enable"  : curriculum_enable,
                 "degrade" : {"curriculum.enabled": False},
             },
         ]
@@ -229,7 +242,7 @@ class AblationCatalog:
 
     DEFAULT_ORDER = (
         "capon_cycle", "covariance_match", "coherence_resyn", "moments", "total_power",
-        "curriculum", "augmentation", "output_clamp",
+        "curriculum", "warmup_loss", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_mu", "out_amp",
         "architecture",
     )
