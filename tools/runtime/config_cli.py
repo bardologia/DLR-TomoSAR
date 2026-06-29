@@ -4,6 +4,7 @@ import argparse
 import ast
 import json
 from dataclasses import fields, is_dataclass
+from enum        import Enum
 from pathlib     import Path
 
 from .detacher import Detacher
@@ -34,7 +35,7 @@ class ConfigCli:
         self.parser.add_argument("--detach", "--nohup", action="store_true", dest="_detach")
 
         for path, value in self._leaves(config):
-            if value is not None and not isinstance(value, _SUPPORTED_TYPES):
+            if value is not None and not isinstance(value, (*_SUPPORTED_TYPES, Enum)):
                 continue
 
             options = [f"--{path}"]
@@ -96,6 +97,9 @@ class ConfigCli:
                 yield path, value
 
     def _coerce(self, raw: str, current):
+        if isinstance(current, Enum):
+            return type(current)(raw.strip())
+
         if isinstance(current, bool):
             lowered = raw.strip().lower()
             if lowered in ("true", "1", "yes", "on"):
@@ -162,6 +166,8 @@ class ConfigCli:
         for path, value in cls._leaves(config):
             if isinstance(value, Path):
                 mapping[path] = str(value)
+            elif isinstance(value, Enum):
+                mapping[path] = value.value
             elif isinstance(value, tuple):
                 mapping[path] = list(value)
             elif value is None or isinstance(value, _SUPPORTED_TYPES):
@@ -200,6 +206,8 @@ class ConfigCli:
             value = mapping[leaf]
             if isinstance(current, Path) and isinstance(value, str):
                 value = Path(value)
+            elif isinstance(current, Enum) and not isinstance(value, Enum):
+                value = type(current)(value)
             elif isinstance(current, tuple) and isinstance(value, list):
                 value = tuple(value)
 
@@ -213,6 +221,8 @@ class ConfigCli:
         for path, value in overrides.items():
             if isinstance(value, bool):
                 rendered = "true" if value else "false"
+            elif isinstance(value, Enum):
+                rendered = str(value.value)
             elif isinstance(value, tuple):
                 rendered = str(list(value))
             else:

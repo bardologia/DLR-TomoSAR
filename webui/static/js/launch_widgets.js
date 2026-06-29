@@ -3411,6 +3411,7 @@ class ConfigForm {
   }
 
   _choicesFor(leaf) {
+    if (Array.isArray(leaf.choices) && leaf.choices.length) return leaf.choices;
     const map = ConfigForm.CHOICES[this.key];
     return map ? map[leaf.path] || null : null;
   }
