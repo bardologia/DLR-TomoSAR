@@ -157,7 +157,7 @@ class StatusBoard {
       `<section class="sboard sboard--procs" aria-label="Processes">` +
       `<header class="sboard__cap"><span>processes &middot; ${this._esc(sys.user || "user")}</span><span class="sboard__n" id="sb-proc-n"></span></header>` +
       `<div class="ptable">` +
-      `<div class="ptable__row ptable__row--head"><span>pid</span><span>cpu%</span><span>mem</span><span class="ptable__gpu">gpu</span><span>s</span><span>command</span></div>` +
+      `<div class="ptable__row ptable__row--head"><span>pid</span><span>cpu%</span><span title="proportional set size: shared pages split across the processes mapping them, so these rows sum to real memory use (unlike RSS, which double-counts shared pages)">mem</span><span class="ptable__gpu">gpu</span><span>s</span><span>command</span></div>` +
       `<div class="ptable__body" id="sb-procs"></div>` +
       `</div>` +
       `</section>` +
@@ -677,7 +677,7 @@ class StatusBoard {
         `<div class="ptable__row${run}">` +
         `<span class="ptable__pid">${p.pid}</span>` +
         `<span class="ptable__cpu ${cls}">${p.cpu.toFixed(1)}</span>` +
-        `<span>${this._mb(p.rss)}</span>` +
+        `<span>${this._mb(p.pss != null ? p.pss : p.rss)}</span>` +
         `<span class="ptable__gpu">${p.gpu ? this._mb(p.gpu * 1048576) : "--"}</span>` +
         `<span class="ptable__state">${this._esc(p.state)}</span>` +
         `<span class="ptable__cmd" title="${this._esc(p.cmd)}">${this._esc(p.cmd)}</span>` +

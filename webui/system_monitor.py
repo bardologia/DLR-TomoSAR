@@ -111,7 +111,22 @@ class SystemMonitor:
         self.prev_proc   = {p: j for p, j in self.prev_proc.items() if p in seen}
 
         rows.sort(key=lambda r: (-r["cpu"], -r["gpu"], -r["rss"]))
-        return rows[: self.PROC_LIMIT]
+        top = rows[: self.PROC_LIMIT]
+
+        for row in top:
+            pss         = self._pss(row["pid"])
+            row["pss"]  = pss if pss is not None else row["rss"]
+
+        return top
+
+    def _pss(self, pid: int) -> int | None:
+        try:
+            for line in open(f"/proc/{pid}/smaps_rollup"):
+                if line.startswith("Pss:"):
+                    return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            return None
+        return None
 
     def _gpu_devices(self) -> list[dict]:
         try:
