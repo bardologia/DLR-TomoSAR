@@ -63,6 +63,11 @@ class PatchDataset(Dataset):
         self.output_channel_indices = output_config.selected_indices(n_gaussians = n_gaussians)
         self.gt_channels            = len(self.output_channel_indices)
 
+        available_gt_channels = int(gt_parameters.shape[0])
+        required_gt_channels  = (max(self.output_channel_indices) + 1) if self.output_channel_indices else 0
+        if required_gt_channels > available_gt_channels:
+            raise ValueError(f"Configured n_gaussians={n_gaussians} indexes ground-truth parameter channel {required_gt_channels - 1} but the dataset provides only {available_gt_channels} ({available_gt_channels // 3} Gaussians). Set n_gaussians to match the parameter extraction used for this dataset.")
+
     def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
         primary_data        = complex_patch[                       : 1                                              ]
         secondaries_data    = complex_patch[1                      : 1 + self.n_secondaries                         ]
