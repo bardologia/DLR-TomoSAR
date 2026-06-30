@@ -65,7 +65,7 @@ class ScriptCatalog:
             "title"     : "Benchmark",
             "category"  : "Experiments",
             "purpose"   : "Benchmark capacity-matched architecture trade-offs, sweeping every permutation of architecture and selected loss component (one architecture + one loss component per run).",
-            "essentials": ["run_tag", "gpus", "sweep_loss_components", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["run_tag", "gpus", "n_gaussians", "sweep_loss_components", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "cross_validate": {
             "title"     : "Cross-validate",
