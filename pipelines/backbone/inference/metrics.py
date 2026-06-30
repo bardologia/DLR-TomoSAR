@@ -269,9 +269,10 @@ class Metrics:
         }
 
     def _active_count_stats(self) -> Dict[str, float]:
-        pp  = self.result.params_pred
-        pg  = self.result.params_gt
-        n_K = self.n_gaussians
+        pp      = self.result.params_pred
+        pg      = self.result.params_gt
+        n_K     = self.n_gaussians
+        aligned = GaussianMatcher().aligned_prediction(pp, pg, n_K)
         out: Dict[str, float] = {}
 
         H, W       = pg.shape[-2:]
@@ -279,11 +280,12 @@ class Metrics:
         pred_count = np.zeros((H, W), dtype=np.int32)
 
         for k in range(n_K):
-            gt_active   = pg[3 * k] >= 1e-3
-            pred_active = pp[3 * k] >= 1e-3
+            gt_active      = pg[3 * k]      >= 1e-3
+            pred_active    = pp[3 * k]      >= 1e-3
+            aligned_active = aligned[3 * k] >= 1e-3
 
             out[f"slot_{k}_active_gt_frac"]   = float(gt_active.mean())
-            out[f"slot_{k}_active_pred_frac"] = float(pred_active.mean())
+            out[f"slot_{k}_active_pred_frac"] = float(aligned_active.mean())
 
             gt_count   += gt_active.astype(np.int32)
             pred_count += pred_active.astype(np.int32)

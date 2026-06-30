@@ -213,6 +213,23 @@ def test_active_count_stats_identical_perfect_agreement():
     assert "count_acc_pred1" not in out
 
 
+def test_active_count_stats_per_slot_pred_is_permutation_invariant():
+    H, W = 5, 5
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0],  gt[1]  = 1.0, -10.0
+    gt[3],  gt[4]  =  1.0,  10.0
+    gt[6],  gt[7]  =  1.0,  40.0
+
+    order = [2, 0, 1, 3, 4]
+    pred  = _reorder_groups(gt, order)
+
+    out = Metrics(_make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt), _x_axis(), N_GAUSSIANS)._active_count_stats()
+
+    for k in range(N_GAUSSIANS):
+        assert out[f"slot_{k}_active_pred_frac"] == pytest.approx(out[f"slot_{k}_active_gt_frac"])
+
+
 def test_active_count_stats_undercount_when_pred_drops_slot():
     H, W   = 4, 4
     gt     = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
