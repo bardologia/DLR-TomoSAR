@@ -9,13 +9,15 @@ matplotlib.use("Agg")
 import numpy as np
 import pytest
 
-from configuration.param_extraction import FitSettings, FitMode
+from pathlib import Path
+
+from configuration.param_extraction import ExtractParamsEntryConfig, FitSettings, FitMode
 from pipelines.processing.param_extraction.metrics import (
     FittingMetricsCalculator,
     KSelectionDiagnostics,
     SnrEstimator,
 )
-from pipelines.processing.param_extraction.pipeline import ParameterExtractor
+from pipelines.processing.param_extraction.pipeline import ExtractionPlanResolver, ParameterExtractor
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 from tools.data.gaussians     import GaussianMixture
 from tools.data.preprocessing import ProfilePreprocessor
@@ -30,6 +32,50 @@ TRUNCATION_INDEX = 170
 ACTIVITY_THRESH  = 0.001
 
 _HAS_JAX = importlib.util.find_spec("jax") is not None
+
+
+def test_plan_resolver_expands_full_product():
+    entry = ExtractParamsEntryConfig(
+        fit_k_values      = [3, 5],
+        fit_lambda_values = [1e-2, 1e-1],
+        fit_modes         = ["sigma", "sigma_amp", "sigma_amp_mu"],
+    )
+    dataset_dirs = [Path("/data/a"), Path("/data/b")]
+
+    plans = ExtractionPlanResolver(entry, dataset_dirs).resolve()
+
+    assert len(plans) == 2 * 2 * 2 * 3
+
+    subdirs = {plan.output_subdir_name for plan in plans}
+    assert len(subdirs) == 2 * 2 * 3
+
+
+def test_plan_resolver_maps_modes_to_free_flags():
+    entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "sigma_amp", "sigma_amp_mu"])
+
+    plans  = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
+    flags  = [(p.fit_settings.fit_config.fit_amplitude, p.fit_settings.fit_config.fit_mean) for p in plans]
+
+    assert flags == [(False, False), (True, False), (True, True)]
+
+
+def test_plan_resolver_rejects_empty_axis():
+    entry = ExtractParamsEntryConfig(fit_k_values=[])
+    with pytest.raises(ValueError):
+        ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
+
+
+def test_plan_resolver_rejects_fixed_suffix_for_multi_permutation():
+    entry = ExtractParamsEntryConfig(fit_k_values=[3, 5], output_suffix="fixed")
+    with pytest.raises(ValueError):
+        ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
+
+
+def test_plan_resolver_allows_fixed_suffix_for_single_permutation():
+    entry = ExtractParamsEntryConfig(fit_k_values=[5], fit_lambda_values=[1e-2], fit_modes=["sigma"], output_suffix="fixed")
+    plans = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
+    assert len(plans) == 1
+    assert plans[0].output_suffix_value == "fixed"
 
 
 @pytest.fixture(scope="module")

@@ -19,6 +19,18 @@ class FitMode:
         fit_amplitude      : bool  = False
         fit_mean           : bool  = False
 
+    MODE_PRESETS = {
+        "sigma"        : (False, False),
+        "sigma_amp"    : (True,  False),
+        "sigma_amp_mu" : (True,  True),
+    }
+
+    @classmethod
+    def free_flags(cls, mode: str) -> Tuple[bool, bool]:
+        if mode not in cls.MODE_PRESETS:
+            raise ValueError(f"Unknown fit mode '{mode}'. Known modes: {', '.join(cls.MODE_PRESETS)}")
+        return cls.MODE_PRESETS[mode]
+
 
 FitConfig = FitMode.SigmaOnly
 
@@ -152,11 +164,10 @@ class ExtractParamsEntryConfig:
     output_suffix : str | None   = None
     height_range  : tuple | None = None
 
-    fit_k_max              : int   = 5
-    fit_lambda_k           : float = 1e-2
+    fit_k_values           : list  = field(default_factory=lambda: [5])
+    fit_lambda_values      : list  = field(default_factory=lambda: [1e-2])
+    fit_modes              : list  = field(default_factory=lambda: ["sigma", "sigma_amp", "sigma_amp_mu"])
     fit_sigma_init_divisor : float = 4.0
-    fit_amplitude          : bool  = False
-    fit_mean               : bool  = False
 
     gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
     range_batch_size  : int  = 3500

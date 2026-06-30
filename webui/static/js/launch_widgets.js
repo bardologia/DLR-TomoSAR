@@ -2684,6 +2684,148 @@ class GpuPicker {
 
 
 
+class MultiValueField {
+  constructor(view, leaf, spec) {
+    this.view  = view;
+    this.leaf  = leaf;
+    this.spec  = spec;
+    this.el    = null;
+    this.chips = null;
+    this.input = null;
+    this.count = null;
+    this.reset = () => this._paint();
+  }
+
+  build() {
+    this.el           = document.createElement("div");
+    this.el.className = "picker multivalue";
+
+    const chips     = document.createElement("div");
+    chips.className = "multivalue__chips";
+    this.chips      = chips;
+    this.el.appendChild(chips);
+
+    if (!this.spec.choices) {
+      const entry     = document.createElement("input");
+      entry.className = "cfg-edit__input multivalue__entry";
+      entry.type      = "text";
+      entry.spellcheck = false;
+      entry.placeholder = this.spec.placeholder || "add value, Enter";
+      entry.addEventListener("keydown", (event) => this._onKey(event));
+      entry.addEventListener("blur", () => this._commitEntry());
+      this.input = entry;
+      this.el.appendChild(entry);
+    }
+
+    const note     = document.createElement("p");
+    note.className = "picker__note";
+    this.count     = note;
+    this.el.appendChild(note);
+
+    this._paint();
+    return { el: this.el, input: this.input || this.el, reset: this.reset };
+  }
+
+  _values() {
+    try {
+      const parsed = PythonLiteral.parse(this.view._effective(this.leaf));
+      return Array.isArray(parsed) ? parsed.slice() : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _cast(token) {
+    if (!this.spec.numeric) return token;
+    const value = Number(token);
+    if (!Number.isFinite(value)) return null;
+    return this.spec.integer ? Math.trunc(value) : value;
+  }
+
+  _emit(values) {
+    this.view._setValue(this.leaf, PythonLiteral.render(values));
+    this._paint();
+  }
+
+  _onKey(event) {
+    if (event.key !== "Enter" && event.key !== ",") return;
+    event.preventDefault();
+    this._commitEntry();
+  }
+
+  _commitEntry() {
+    if (!this.input) return;
+    const tokens = this.input.value.split(",").map((part) => part.trim()).filter(Boolean);
+    if (!tokens.length) return;
+
+    const values = this._values();
+    tokens.forEach((token) => {
+      const cast = this._cast(token);
+      if (cast !== null && !values.some((existing) => existing === cast)) values.push(cast);
+    });
+
+    this.input.value = "";
+    this._emit(values);
+  }
+
+  _toggleChoice(value) {
+    const values = this._values();
+    const index  = values.indexOf(value);
+    if (index >= 0) values.splice(index, 1);
+    else            values.push(value);
+
+    const ordered = this.spec.choices.map((choice) => choice.value).filter((choice) => values.includes(choice));
+    this._emit(ordered);
+  }
+
+  _removeValue(value) {
+    this._emit(this._values().filter((existing) => existing !== value));
+  }
+
+  _paint() {
+    const values = this._values();
+    this.chips.innerHTML = "";
+
+    if (this.spec.choices) {
+      this.spec.choices.forEach((choice) => {
+        const on        = values.includes(choice.value);
+        const chip      = document.createElement("button");
+        chip.type       = "button";
+        chip.className  = "multivalue__choice" + (on ? " is-on" : "");
+        chip.textContent = choice.label;
+        chip.title      = `--${this.leaf.path} · ${choice.value}`;
+        chip.setAttribute("aria-pressed", String(on));
+        chip.addEventListener("click", () => this._toggleChoice(choice.value));
+        this.chips.appendChild(chip);
+      });
+    } else {
+      values.forEach((value) => {
+        const chip      = document.createElement("span");
+        chip.className  = "multivalue__chip";
+        const label     = document.createElement("span");
+        label.textContent = String(value);
+        const remove    = document.createElement("button");
+        remove.type     = "button";
+        remove.className = "multivalue__x";
+        remove.innerHTML = "&times;";
+        remove.title    = "remove";
+        remove.addEventListener("click", () => this._removeValue(value));
+        chip.appendChild(label);
+        chip.appendChild(remove);
+        this.chips.appendChild(chip);
+      });
+    }
+
+    if (this.count) {
+      this.count.textContent = values.length
+        ? `${values.length} value${values.length === 1 ? "" : "s"} · ${PythonLiteral.render(values)}`
+        : (this.spec.empty || "select at least one value");
+      this.count.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
+    }
+  }
+}
+
+
 class ConfigForm {
   constructor() {
     this.dirty            = {};
@@ -2860,6 +3002,18 @@ class ConfigForm {
     },
     compare_param_extraction_trials: {
       run_tags: { mode: "param_trials", multi: true, baseFrom: "params_dir" },
+    },
+  };
+
+  static MULTI_VALUE = {
+    extract_params: {
+      fit_k_values:      { numeric: true, integer: true, placeholder: "add K, Enter", empty: "select at least one K" },
+      fit_lambda_values: { numeric: true, placeholder: "add lambda, Enter", empty: "select at least one lambda" },
+      fit_modes:         { empty: "select at least one fit mode", choices: [
+        { value: "sigma",        label: "sigma only" },
+        { value: "sigma_amp",    label: "sigma + amplitude" },
+        { value: "sigma_amp_mu", label: "sigma + amplitude + mean" },
+      ] },
     },
   };
 
@@ -3451,9 +3605,13 @@ class ConfigForm {
 
     let control;
     const pickerSpec = leaf.editable ? this._pickerSpec(leaf) : null;
+    const multiSpec  = leaf.editable ? this._multiValueSpec(leaf) : null;
     const choices    = leaf.editable ? this._choicesFor(leaf) : null;
     if (leaf.editable && this._isGpuField(leaf) && window.GpuPicker) {
       control = new window.GpuPicker(this, leaf).build();
+      row.classList.add("cfg-edit__row--board");
+    } else if (multiSpec && window.MultiValueField) {
+      control = new window.MultiValueField(this, leaf, multiSpec).build();
       row.classList.add("cfg-edit__row--board");
     } else if (pickerSpec && window.DatasetPicker) {
       control = new window.DatasetPicker(this, leaf, pickerSpec).build();
@@ -3521,6 +3679,11 @@ class ConfigForm {
 
   _pickerSpec(leaf) {
     const specs = ConfigForm.PICKERS[this.key];
+    return specs ? specs[leaf.path] : null;
+  }
+
+  _multiValueSpec(leaf) {
+    const specs = ConfigForm.MULTI_VALUE[this.key];
     return specs ? specs[leaf.path] : null;
   }
 
@@ -3770,6 +3933,7 @@ window.PythonLiteral     = PythonLiteral;
 window.GpuCardSelect     = GpuCardSelect;
 window.GpuPicker         = GpuPicker;
 window.NumberField       = NumberField;
+window.MultiValueField   = MultiValueField;
 window.LaunchWidgetDom   = LaunchWidgetDom;
 window.ModelTogglePanel  = ModelTogglePanel;
 window.ModelCardPanel    = ModelCardPanel;

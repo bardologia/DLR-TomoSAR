@@ -80,10 +80,21 @@ def test_suffix_encodes_free_flags():
     assert full.output_suffix_value.endswith("_fitamp_fitmu")
 
 
-def test_entry_config_free_flags_default_off():
+def test_entry_config_fit_modes_default_sweep():
     cfg = ExtractParamsEntryConfig()
-    assert cfg.fit_amplitude is False
-    assert cfg.fit_mean      is False
+    assert cfg.fit_modes == ["sigma", "sigma_amp", "sigma_amp_mu"]
+    assert all(mode in FitMode.MODE_PRESETS for mode in cfg.fit_modes)
+
+
+def test_fit_mode_free_flags_mapping():
+    assert FitMode.free_flags("sigma")        == (False, False)
+    assert FitMode.free_flags("sigma_amp")    == (True,  False)
+    assert FitMode.free_flags("sigma_amp_mu") == (True,  True)
+
+
+def test_fit_mode_free_flags_rejects_unknown():
+    with pytest.raises(ValueError):
+        FitMode.free_flags("quartic")
 
 
 def test_fit_settings_default_factory_independent():
@@ -160,7 +171,8 @@ def test_extraction_discover_tomogram_missing_raises(tmp_path):
 
 def test_extract_params_entry_defaults():
     cfg = ExtractParamsEntryConfig()
-    assert cfg.fit_k_max > 0
+    assert cfg.fit_k_values      == [5]
+    assert cfg.fit_lambda_values == [1e-2]
     assert cfg.parameter_workers > 0
     assert cfg.range_batch_size > 0
     assert isinstance(cfg.gpu_device_ids, list)
