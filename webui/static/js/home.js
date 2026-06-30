@@ -392,10 +392,12 @@ class StatusBoard {
   }
 
   _renderImpact(impact) {
-    const sig    = impact.signals || {};
-    const active = impact.active || [];
-    const mine   = active.filter((a) => a.mine);
-    const others = active.filter((a) => !a.mine);
+    const sig        = impact.signals || {};
+    const active     = impact.active || [];
+    const leak       = active.find((a) => a.kind === "leak");
+    const contention = active.filter((a) => a.kind !== "leak");
+    const mine       = contention.filter((a) => a.mine);
+    const others     = contention.filter((a) => !a.mine);
 
     this._autoNuke = !!impact.auto_nuke;
     const armBtn = document.getElementById("sb-impact-arm");
@@ -410,7 +412,7 @@ class StatusBoard {
     const cpu  = sig.cpu || {};
     const swap = sig.swap || {};
 
-    const contended = new Set(active.map((a) => a.kind));
+    const contended = new Set(contention.map((a) => a.kind));
     const gauge = (psiId, shareId, psiVal, shareVal, kind) => {
       this._txt(psiId, `<b>${(psiVal || 0).toFixed(0)}</b> %`);
       this._bar(`${psiId}-bar`, psiVal || 0);
@@ -431,15 +433,20 @@ class StatusBoard {
     const light   = document.getElementById("sb-impact-light");
     const verdict = document.getElementById("sb-impact-verdict");
     const lede    = document.getElementById("sb-impact-lede");
-    const culprit = mine.some((a) => a.level === "danger") ? "danger" : mine.length ? "warn" : "clear";
-    if (light)   light.className = `impact__light is-${culprit}`;
-    if (verdict) verdict.textContent = culprit === "clear" ? (others.length ? "busy, not you" : "all clear") : "you are the cause";
+    let culprit = mine.some((a) => a.level === "danger") ? "danger" : mine.length ? "warn" : "clear";
+    if (culprit === "clear" && leak) culprit = "warn";
+    if (light) light.className = `impact__light is-${culprit}`;
+    if (verdict) {
+      verdict.textContent = mine.length ? "you are the cause" : leak ? "ram climbing" : others.length ? "busy, not you" : "all clear";
+    }
     if (lede) {
       lede.textContent = mine.length
         ? "Your jobs are stalling other users on the resources flagged below."
-        : others.length
-          ? "The server is contended, but your jobs are not the dominant cause."
-          : "No contention: other users are not being slowed by your jobs.";
+        : leak
+          ? "No contention yet, but a process of yours is steadily accumulating RAM — see below."
+          : others.length
+            ? "The server is contended, but your jobs are not the dominant cause."
+            : "No contention: other users are not being slowed by your jobs.";
     }
 
     const alarmBox = document.getElementById("sb-impact-alarms");

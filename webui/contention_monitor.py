@@ -25,6 +25,11 @@ class ContentionMonitor:
     SUSTAIN      = 2
     NUKE_SUSTAIN = 6
     NUKE_COOLDOWN = 120.0
+    LEAK_WINDOW_SAMPLES = 48
+    LEAK_RECENT_SAMPLES = 12
+    LEAK_RSS_FLOOR_GB   = 1.5
+    LEAK_GROWTH_MBPM    = 120.0
+    LEAK_RECENT_MB      = 60.0
 
     def __init__(self, paths, logger: WebLogger, nuke) -> None:
         self.paths   = paths
@@ -46,6 +51,8 @@ class ContentionMonitor:
         self.auto_nuke  = False
         self.nuke_streak = 0
         self.last_nuke  = 0.0
+
+        self.proc_hist = {}
 
         self.prev_swap = None
         self.prev_disk = None
@@ -110,7 +117,7 @@ class ContentionMonitor:
         swap = self._read_swap(dt)
         mem  = self._read_memory()
         disk = self._read_disk(dt)
-        mine = self._read_mine(dt)
+        mine = self._read_mine(now, dt)
 
         self.prev_t = now
 
@@ -127,6 +134,7 @@ class ContentionMonitor:
             "io"   : {**disk, "mine_mbs": mine["io_mbs"], "mine_share": min(io_share, 1.0)},
             "cpu"  : {"load_ratio": os.getloadavg()[0] / self.cores, "mine_pct": mine["cpu_pct"], "mine_share": min(cpu_share, 1.0)},
             "mine" : {"nproc": mine["nproc"], "rss_gb": mine["rss_gb"]},
+            "leak" : mine["leak"],
         }
 
     def _read_psi(self) -> dict:
@@ -228,11 +236,13 @@ class ContentionMonitor:
             return (nums[0], nums[2], nums[3], nums[4], nums[6], nums[7], nums[9])
         return None
 
-    def _read_mine(self, dt: float) -> dict:
+    def _read_mine(self, now: float, dt: float) -> dict:
         rss        = 0
         jiffies    = 0
         io_bytes   = 0
         nproc      = 0
+        per_rss    = {}
+        per_comm   = {}
 
         for entry in os.listdir("/proc"):
             if not entry.isdigit():
@@ -246,14 +256,18 @@ class ContentionMonitor:
                 continue
 
             try:
+                comm     = stat[stat.index("(") + 1 : stat.rindex(")")]
                 fields   = stat[stat.rindex(")") + 2:].split()
+                proc_rss = int(fields[21]) * self.page
                 jiffies += int(fields[11]) + int(fields[12])
-                rss     += int(fields[21]) * self.page
+                rss     += proc_rss
                 nproc   += 1
             except (ValueError, IndexError):
                 continue
 
-            io_bytes += self._pid_io(pid)
+            io_bytes        += self._pid_io(pid)
+            per_rss [pid]    = proc_rss
+            per_comm[pid]    = comm
 
         prev           = self.prev_mine
         self.prev_mine = (jiffies, io_bytes)
@@ -264,7 +278,42 @@ class ContentionMonitor:
             cpu_pct = max(0.0, 100.0 * (jiffies - prev[0]) / self.clk / dt)
             io_mbs  = max(0.0, (io_bytes - prev[1]) / dt / (1024.0 ** 2))
 
-        return {"nproc": nproc, "rss_gb": rss / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs}
+        leak = self._growth_candidate(now, per_rss, per_comm)
+
+        return {"nproc": nproc, "rss_gb": rss / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak}
+
+    def _growth_candidate(self, now: float, per_rss: dict, per_comm: dict) -> dict | None:
+        for pid in [p for p in self.proc_hist if p not in per_rss]:
+            del self.proc_hist[pid]
+        for pid, proc_rss in per_rss.items():
+            self.proc_hist.setdefault(pid, deque(maxlen=self.LEAK_WINDOW_SAMPLES)).append((now, proc_rss))
+
+        best = None
+        for pid, hist in self.proc_hist.items():
+            if len(hist) < self.LEAK_RECENT_SAMPLES:
+                continue
+
+            t_first, r_first = hist[0]
+            t_last,  r_last  = hist[-1]
+            span             = t_last - t_first
+            rss_gb           = r_last / (1024.0 ** 3)
+            if span < 1.0 or rss_gb < self.LEAK_RSS_FLOOR_GB:
+                continue
+
+            rate_mbpm  = (r_last - r_first) / span * 60.0 / (1024.0 ** 2)
+            recent_ref = hist[max(0, len(hist) - 1 - self.LEAK_RECENT_SAMPLES)][1]
+            recent_mb  = (r_last - recent_ref) / (1024.0 ** 2)
+            if rate_mbpm < self.LEAK_GROWTH_MBPM or recent_mb < self.LEAK_RECENT_MB:
+                continue
+
+            if best is None or rate_mbpm > best["rate_mbpm"]:
+                best = {"pid": pid, "comm": per_comm.get(pid, "?"), "rss_gb": rss_gb, "rate_mbpm": rate_mbpm, "growth_gb": (r_last - r_first) / (1024.0 ** 3), "window_min": span / 60.0}
+
+        if best is None:
+            return None
+
+        best["message"] = f"process {best['comm']} (pid {best['pid']}) is accumulating RAM: {best['rss_gb']:.1f} GB now, +{best['growth_gb']:.1f} GB in {best['window_min']:.0f} min ({best['rate_mbpm']:.0f} MB/min, still climbing)"
+        return best
 
     def _pid_io(self, pid: int) -> int:
         try:
@@ -307,6 +356,10 @@ class ContentionMonitor:
                     f"CPU saturated: load/core {cpu['load_ratio']:.2f}, tasks stalled {psi['cpu']['some']:.0f}%; "
                     f"you use {cpu['mine_share']:.0%} of all cores ({cpu['mine_pct']:.0f}% busy)")
 
+        leak = signals.get("leak")
+        self._track("leak", "warn", leak is not None, leak is None, True,
+                    leak["message"] if leak else "")
+
         self._check_nuke()
 
     def _check_nuke(self) -> None:
@@ -315,7 +368,7 @@ class ContentionMonitor:
                 self.nuke_streak = 0
                 return
 
-            severe = [a for a in self.active.values() if a["mine"] and a["level"] == "danger"]
+            severe = [a for a in self.active.values() if a["mine"] and a["level"] == "danger" and a["kind"] != "leak"]
             if severe:
                 self.nuke_streak += 1
             else:
