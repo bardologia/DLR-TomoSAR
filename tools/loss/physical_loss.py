@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import torch
 
+from torch.utils.checkpoint import checkpoint
+
 
 class PhysicalLoss:
     @staticmethod
@@ -170,14 +172,15 @@ class PhysicalLoss:
         den = torch.zeros_like(t0)
 
         for i in range(n_tracks):
-            for j in range(n_tracks):
+            for j in range(i, n_tracks):
                 kz_difference = kz_map[:, i] - kz_map[:, j]
+                weight        = 1.0 if i == j else 2.0
 
-                delta = PhysicalLoss._synthesise_pair(diff,   kz_difference, x_axis, dx)
-                ref   = PhysicalLoss._synthesise_pair(target, kz_difference, x_axis, dx)
+                delta = checkpoint(PhysicalLoss._synthesise_pair, diff,   kz_difference, x_axis, dx, use_reentrant=False)
+                ref   = checkpoint(PhysicalLoss._synthesise_pair, target, kz_difference, x_axis, dx, use_reentrant=False)
 
-                num = num + delta.abs() ** 2
-                den = den + ref.abs() ** 2
+                num = num + weight * delta.abs() ** 2
+                den = den + weight * ref.abs() ** 2
 
         return PhysicalLoss.masked_mean(num / den.clamp(min=1e-12), mask)
 
