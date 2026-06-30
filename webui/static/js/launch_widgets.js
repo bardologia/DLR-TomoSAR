@@ -2188,10 +2188,11 @@ class AblationBuilder {
         onCommit(raw === "" ? null : Number(raw));
       });
     } else {
+      const structured = value !== null && typeof value === "object";
       input.type        = "text";
-      input.value       = value === undefined || value === null ? "" : String(value);
+      input.value       = value === undefined || value === null ? "" : (structured ? PythonLiteral.render(value) : String(value));
       input.placeholder = value === undefined ? "unset" : "";
-      input.addEventListener("change", () => onCommit(input.value));
+      input.addEventListener("change", () => onCommit(structured ? PythonLiteral.parse(input.value) : input.value));
     }
     return input;
   }
