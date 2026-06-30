@@ -43,25 +43,27 @@ class DatasetBrowser:
         self.logger.info(f"datasets: listed {len(entries)} under {base}")
         return {"ok": True, "base": str(base), "datasets": entries}
 
-    def runs(self, raw_base: str) -> dict:
-        base = self._directory(raw_base)
-        if base is None:
-            return {"ok": False, "error": f"not a directory: {raw_base}"}
+    def runs(self, raw_bases: list[str]) -> dict:
+        roots = [resolved for resolved in (self._directory(raw) for raw in raw_bases) if resolved is not None]
+        if not roots:
+            return {"ok": False, "error": f"no run roots: {raw_bases}"}
 
         entries = []
-        for entry in sorted(base.iterdir()):
-            if not entry.is_dir() or entry.name.startswith("."):
-                continue
+        for base in roots:
+            for entry in sorted(base.iterdir()):
+                if not entry.is_dir() or entry.name.startswith("."):
+                    continue
 
-            entries.append({
-                "name"           : entry.name,
-                "path"           : str(entry),
-                "has_checkpoint" : (entry / self.CHECKPOINT_NAME).is_file(),
-                "has_inference"  : self._has_inference(entry),
-            })
+                entries.append({
+                    "name"           : entry.name,
+                    "path"           : str(entry),
+                    "has_checkpoint" : (entry / self.CHECKPOINT_NAME).is_file(),
+                    "has_inference"  : self._has_inference(entry),
+                })
 
-        self.logger.info(f"runs: listed {len(entries)} under {base}")
-        return {"ok": True, "base": str(base), "runs": entries}
+        base_label = ", ".join(str(root) for root in roots)
+        self.logger.info(f"runs: listed {len(entries)} under {base_label}")
+        return {"ok": True, "base": base_label, "runs": entries}
 
     def params(self, raw_dataset: str) -> dict:
         dataset = self._directory(raw_dataset)

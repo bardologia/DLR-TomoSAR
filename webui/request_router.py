@@ -103,7 +103,7 @@ class RequestRouter:
             return
         if path == "/api/fs/runs":
             query  = parse_qs(urlparse(handler.path).query)
-            result = self.datasets.runs((query.get("base") or [""])[0])
+            result = self.datasets.runs(query.get("base") or [])
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path == "/api/fs/param_trials":

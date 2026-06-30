@@ -2967,6 +2967,10 @@ class ConfigForm {
     "jepa.image_autoencoder_run": { mode: "runs", baseFrom: "jepa.image_autoencoder_logdir", checkpointOnly: true },
   };
 
+  static INFER_PICKERS = {
+    run_filter: { mode: "runs", multi: true, baseFrom: "logs_dirs", multiBase: true },
+  };
+
   static PICKERS = {
     extract_params: {
       dataset_filter: { mode: "datasets", multi: true, baseFrom: "dataset_base_path", validOnly: true },
@@ -2982,9 +2986,9 @@ class ConfigForm {
     benchmark:         ConfigForm.EXPERIMENT_PICKERS,
     cross_validate:    ConfigForm.EXPERIMENT_PICKERS,
     tune:              ConfigForm.TUNE_PICKERS,
-    infer: {
-      run_filter: { mode: "runs", multi: true, baseFrom: "logs_dir" },
-    },
+    infer_backbone:            ConfigForm.INFER_PICKERS,
+    infer_profile_autoencoder: ConfigForm.INFER_PICKERS,
+    infer_image_autoencoder:   ConfigForm.INFER_PICKERS,
     xray_weights: {
       run_filter: { mode: "runs", multi: true, baseFrom: "runs_dir", checkpointOnly: true },
     },

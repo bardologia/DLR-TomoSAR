@@ -27,6 +27,21 @@ class DatasetPicker {
     this.options = [];
     this.selected = new Set();
     this.reloadTimer = null;
+    this.baseLabel = "";
+  }
+
+  _baseList() {
+    if (!this.spec.multiBase) {
+      const base = this._base();
+      return base ? [base] : [];
+    }
+    const source = this.spec.baseFrom ? this.view._leafByPath(this.spec.baseFrom) : null;
+    const raw = source ? this.view._effective(source) : "";
+    try {
+      const parsed = window.PythonLiteral.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch (e) {}
+    return raw ? [String(raw)] : [];
   }
 
   build() {
@@ -249,19 +264,22 @@ class DatasetPicker {
   }
 
   async _loadMulti() {
-    const mode = DatasetPicker.MULTI_MODES[this.spec.mode];
-    const base = this._base();
+    const mode  = DatasetPicker.MULTI_MODES[this.spec.mode];
+    const bases = this._baseList();
 
     this.count.textContent = "listing...";
     this.hint.textContent = "";
 
-    const res = await window.apiGet(`${mode.endpoint}?base=${encodeURIComponent(base || "")}`);
+    const query = (bases.length ? bases : [""]).map((b) => `base=${encodeURIComponent(b)}`).join("&");
+    const res   = await window.apiGet(`${mode.endpoint}?${query}`);
     if (!res.ok) {
       this.items = [];
       this.count.textContent = `no ${mode.noun}`;
       this.body.innerHTML = `<p class="picker__empty">${res.error || `could not list ${mode.noun}`}</p>`;
       return;
     }
+
+    this.baseLabel = res.base || bases.join(", ");
 
     this.items = (res[mode.key] || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
     this.selected = new Set(this._selectedNames());
@@ -276,7 +294,7 @@ class DatasetPicker {
     this.body.innerHTML = "";
 
     if (!this.items.length) {
-      this.body.appendChild(Object.assign(document.createElement("p"), { className: "picker__empty", textContent: `no ${mode.noun} in ${this._base()}` }));
+      this.body.appendChild(Object.assign(document.createElement("p"), { className: "picker__empty", textContent: `no ${mode.noun} in ${this.baseLabel || this._baseList().join(", ")}` }));
       return;
     }
 
