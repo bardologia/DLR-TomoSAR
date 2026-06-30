@@ -270,9 +270,10 @@ def test_ablation_catalog_default_is_the_standard_set():
 
     assert labels == [
         "covariance_match", "coherence_resyn",
-        "curriculum", "warmup_loss", "lr_warmup", "lr_per_group", "augmentation", "output_clamp",
-        "ifg_phase", "pass_mag", "out_sigma", "out_amp",
-        "architecture",
+        "curriculum", "augmentation", "architecture",
+        "warmup_loss", "lr_per_group", "lr_warmup",
+        "out_sigma", "out_amp", "ifg_phase", "pass_mag",
+        "output_clamp",
     ]
     assert "out_mu" not in labels
     for feature in features:
