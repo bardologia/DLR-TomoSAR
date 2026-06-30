@@ -24,6 +24,7 @@ class PreprocessingComparisonConfig:
     pixel_sample : int = 200000
     block_size   : int = 8
     range_chunk  : int = 512
+    workers      : int = 4
 
     make_plots : bool          = True
     output_dir : Optional[Path] = None

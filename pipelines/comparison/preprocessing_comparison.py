@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib     import Path
+import os
+
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses        import dataclass, field
+from pathlib            import Path
 
 import numpy as np
 
@@ -78,37 +81,37 @@ class WindowTrialCollector:
 class WindowMetrics:
 
     SPURIOUS_FRACTION = 0.3
+    FLOOR_FRACTION    = 0.25
 
-    def __init__(self, block_size: int, range_chunk: int, logger: Logger) -> None:
-        self.block_size  = block_size
-        self.range_chunk = range_chunk
-        self.logger      = logger
+    def __init__(self, pixel_sample: int, block_size: int, range_chunk: int, logger: Logger) -> None:
+        self.pixel_sample = pixel_sample
+        self.block_size   = block_size
+        self.range_chunk  = range_chunk
+        self.logger       = logger
 
-    def _contrast(self, tomogram: np.ndarray) -> np.ndarray:
-        estimator = SnrEstimator(logger=self.logger, range_chunk=self.range_chunk)
-        return estimator.run(tomogram)
+    def _range_starts(self, ranges: int, azimuths: int) -> list[int]:
+        starts = list(range(0, ranges, self.range_chunk))
 
-    def _shape_maps(self, tomogram: np.ndarray) -> tuple:
-        elevations, azimuths, ranges = tomogram.shape
+        if self.pixel_sample <= 0:
+            return starts
 
-        peak_map     = np.zeros((azimuths, ranges), dtype=np.float32)
-        spurious_map = np.zeros((azimuths, ranges), dtype=np.float32)
+        target_columns = max(self.range_chunk, self.pixel_sample // max(azimuths, 1))
+        target_chunks  = max(1, -(-target_columns // self.range_chunk))
 
-        for start in range(0, ranges, self.range_chunk):
-            stop = min(start + self.range_chunk, ranges)
-            amp  = np.abs(tomogram[:, :, start:stop]).astype(np.float32)
+        if target_chunks >= len(starts):
+            return starts
 
-            peak = amp.max(axis=0)
-            peak_map[:, start:stop] = peak
+        picks = np.unique(np.linspace(0, len(starts) - 1, target_chunks).astype(np.int64))
 
-            middle  = amp[1:-1]
-            is_peak = (middle > amp[:-2]) & (middle >= amp[2:]) & (middle > self.SPURIOUS_FRACTION * peak[None, :, :])
+        return [starts[index] for index in picks]
 
-            spurious_map[:, start:stop] = is_peak.sum(axis=0)
+    def _chunk_maps(self, amp: np.ndarray) -> tuple:
+        contrast, peak = SnrEstimator.contrast_from_amplitude(amp, self.FLOOR_FRACTION)
 
-            del amp
+        middle  = amp[1:-1]
+        is_peak = (middle > amp[:-2]) & (middle >= amp[2:]) & (middle > self.SPURIOUS_FRACTION * peak[None, :, :])
 
-        return peak_map, spurious_map
+        return contrast, peak, is_peak.sum(axis=0).astype(np.float32)
 
     def _summarise(self, contrast: np.ndarray, peak_map: np.ndarray, spurious_map: np.ndarray) -> dict:
         valid = np.isfinite(contrast)
@@ -124,14 +127,35 @@ class WindowMetrics:
         }
 
     def compute(self, trial: WindowTrial) -> dict:
-        self.logger.subsection(f"Measuring {trial.name}")
+        tomogram             = np.load(trial.tomogram_path, mmap_mode="r")
+        _, azimuths, ranges  = tomogram.shape
 
-        tomogram = np.load(trial.tomogram_path, mmap_mode="r")
+        starts = self._range_starts(ranges, azimuths)
 
-        contrast            = self._contrast(tomogram)
-        peak_map, spurious  = self._shape_maps(tomogram)
+        sampled = "all" if len(starts) == len(range(0, ranges, self.range_chunk)) else f"{len(starts)} of {len(range(0, ranges, self.range_chunk))}"
+        self.logger.subsection(f"Measuring {trial.name} (range chunks: {sampled})")
 
-        return self._summarise(contrast, peak_map, spurious)
+        contrast_columns = []
+        peak_columns     = []
+        spurious_columns = []
+
+        for start in starts:
+            stop = min(start + self.range_chunk, ranges)
+            amp  = np.abs(tomogram[:, :, start:stop]).astype(np.float32)
+
+            contrast, peak, spurious = self._chunk_maps(amp)
+
+            contrast_columns.append(contrast)
+            peak_columns.append(peak)
+            spurious_columns.append(spurious)
+
+            del amp
+
+        contrast_map = np.concatenate(contrast_columns, axis=1)
+        peak_map     = np.concatenate(peak_columns,     axis=1)
+        spurious_map = np.concatenate(spurious_columns, axis=1)
+
+        return self._summarise(contrast_map, peak_map, spurious_map)
 
 
 class WindowComparisonPlots(PlotBase):
@@ -243,10 +267,26 @@ class PreprocessingComparisonPipeline:
         collector = WindowTrialCollector(Path(self.config.runs_dir), list(self.config.run_tags), self.logger)
         return collector.collect()
 
+    def _worker_count(self, n_trials: int) -> int:
+        requested = int(getattr(self.config, "workers", 0))
+        if requested > 0:
+            return min(requested, n_trials)
+
+        return max(1, min(n_trials, (os.cpu_count() or 2)))
+
     def _measure(self, trials: list[WindowTrial]) -> None:
-        metrics = WindowMetrics(self.config.block_size, self.config.range_chunk, self.logger)
-        for trial in trials:
-            trial.metrics = metrics.compute(trial)
+        metrics = WindowMetrics(self.config.pixel_sample, self.config.block_size, self.config.range_chunk, self.logger)
+        workers = self._worker_count(len(trials))
+
+        if workers <= 1:
+            for trial in trials:
+                trial.metrics = metrics.compute(trial)
+            return
+
+        self.logger.info(f"Measuring {len(trials)} trials across {workers} workers")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for trial, result in zip(trials, pool.map(metrics.compute, trials)):
+                trial.metrics = result
 
     def _plot(self, trials: list[WindowTrial]) -> list[Path]:
         if not self.config.make_plots:
