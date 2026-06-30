@@ -19,21 +19,29 @@ class SnrEstimator:
         self.floor_fraction = floor_fraction
         self.range_chunk    = range_chunk
 
+    @staticmethod
+    def contrast_from_amplitude(amp : np.ndarray, floor_fraction : float) -> Tuple[np.ndarray, np.ndarray]:
+        n_floor = max(1, int(round(amp.shape[0] * floor_fraction)))
+
+        peak  = amp.max(axis=0)
+        floor = np.partition(amp, n_floor - 1, axis=0)[:n_floor].mean(axis=0)
+        valid = (peak > 0.0) & (floor > 0.0)
+
+        ratio    = np.maximum(peak, 1e-12) / np.maximum(floor, 1e-12)
+        contrast = np.where(valid, 10.0 * np.log10(ratio), np.nan).astype(np.float32)
+
+        return contrast, peak.astype(np.float32)
+
     def run(self, tomogram : np.ndarray) -> np.ndarray:
         H, Az, R    = tomogram.shape
-        n_floor     = max(1, int(round(H * self.floor_fraction)))
         contrast_db = np.full((Az, R), np.nan, dtype=np.float32)
 
         for r_start in range(0, R, self.range_chunk):
             r_end = min(r_start + self.range_chunk, R)
             amp   = np.abs(tomogram[:, :, r_start:r_end]).astype(np.float32)
 
-            peak  = amp.max(axis=0)
-            floor = np.partition(amp, n_floor - 1, axis=0)[:n_floor].mean(axis=0)
-            valid = (peak > 0.0) & (floor > 0.0)
-
-            ratio                         = np.maximum(peak, 1e-12) / np.maximum(floor, 1e-12)
-            contrast_db[:, r_start:r_end] = np.where(valid, 10.0 * np.log10(ratio), np.nan).astype(np.float32)
+            contrast, _                   = self.contrast_from_amplitude(amp, self.floor_fraction)
+            contrast_db[:, r_start:r_end] = contrast
 
             del amp
 
