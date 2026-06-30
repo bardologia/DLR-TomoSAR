@@ -62,22 +62,24 @@ class ExampleFitPlotter(PlotBase):
     def _reconstruct_pixel(self, params : np.ndarray, height_axis : np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
         return GaussianMixture.evaluate_pixel(params, height_axis, self.n_gaussians)
 
-    def _extract_pixel_profiles(self, tomogram_path : Path, all_pixels : np.ndarray) -> Dict[Tuple[int, int], np.ndarray]:
+    def _extract_pixel_profiles(self, tomogram_path : Path, all_pixels : np.ndarray) -> Dict[Tuple[int, int], Tuple[np.ndarray, np.ndarray]]:
         tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r")
 
-        pixel_profiles : Dict[Tuple[int, int], np.ndarray] = {}
+        pixel_profiles : Dict[Tuple[int, int], Tuple[np.ndarray, np.ndarray]] = {}
         for az, rg in all_pixels.tolist():
             raw                      = np.abs(np.array(tomogram_mmap[:, az, rg])).astype(np.float32)
-            pixel_profiles[(az, rg)] = ProfilePreprocessor.apply(raw, self.threshold_factor, self.truncation_index)
+            processed                = ProfilePreprocessor.apply(raw, self.threshold_factor, self.truncation_index)
+            pixel_profiles[(az, rg)] = (raw, processed)
 
         del tomogram_mmap
         gc.collect()
 
         return pixel_profiles
 
-    def _plot_pixel_fit(self, height_axis, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir) -> Path:
+    def _plot_pixel_fit(self, height_axis, raw, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir) -> Path:
         fig, ax = plt.subplots(figsize=(5.6, 4.4))
-        ax.plot(height_axis, profile, color="black",   lw=1.5, label="data", zorder=4)
+        ax.plot(height_axis, raw,     color="0.62",    lw=1.0, label="raw profile", zorder=3)
+        ax.plot(height_axis, profile, color="black",   lw=1.5, label="fit target", zorder=4)
         ax.plot(height_axis, total,   color=k_color,   lw=1.4, ls="--", label="fit", zorder=5)
 
         for k, comp in enumerate(comps):
@@ -131,17 +133,19 @@ class ExampleFitPlotter(PlotBase):
             k_dir.mkdir(parents=True, exist_ok=True)
 
             for az, rg in pixels.tolist():
-                profile = pixel_profiles.get((az, rg))
-                if profile is None:
+                entry = pixel_profiles.get((az, rg))
+                if entry is None:
                     continue
 
-                profile = profile.astype(np.float64)
-                params  = parameters_array[:, az, rg].astype(np.float64)
+                raw, profile = entry
+                raw          = raw.astype(np.float64)
+                profile      = profile.astype(np.float64)
+                params       = parameters_array[:, az, rg].astype(np.float64)
                 total, comps = self._reconstruct_pixel(params, height_axis.astype(np.float64))
                 residual = profile - total
                 r2_val   = float(r2_map[az, rg]) if np.isfinite(r2_map[az, rg]) else float("nan")
 
-                saved[f"k{K}_az{az}_rg{rg}_fit"]      = self._plot_pixel_fit(height_axis, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir)
+                saved[f"k{K}_az{az}_rg{rg}_fit"]      = self._plot_pixel_fit(height_axis, raw, profile, total, comps, params, comp_colors, k_color, k_label, az, rg, r2_val, k_dir)
                 saved[f"k{K}_az{az}_rg{rg}_residual"] = self._plot_pixel_residual(height_axis, residual, az, rg, r2_val, k_dir)
 
         return saved
