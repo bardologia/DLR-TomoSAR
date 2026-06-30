@@ -95,7 +95,6 @@ class LossCurriculumConfig:
     warmup   : LossConfig = field(default_factory=LossConfig)
     complete : LossConfig = field(default_factory=LossConfig)
 
-    reset_early_stopping : bool = False
     reset_lr             : bool = False
     reset_warmup         : bool = False
     reset_optimizer      : bool = False

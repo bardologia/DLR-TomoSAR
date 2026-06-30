@@ -28,9 +28,8 @@ class CurriculumController:
         self.criterion.set_curriculum(lc.complete)
         self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
 
-        if lc.reset_early_stopping:
-            self.early_stopping.reset()
-            self.logger.subsection("Early stopping reset.")
+        self.early_stopping.reset()
+        self.logger.subsection("Early stopping reset.")
 
         if lc.reset_lr:
             self.lr_scheduler.reset(epoch_offset=epoch)
@@ -139,9 +138,7 @@ class Trainer(BaseTrainer):
         self.docs.emit(train_loader, self.device)
 
     def _before_epoch(self, epoch: int) -> None:
-        swapped = self.curriculum_controller.maybe_swap(epoch)
-        if swapped and not self.curriculum.reset_early_stopping:
-            self.logger.warning("Curriculum loss swapped but early stopping not reset; best_val_loss spans two loss scales and is not comparable across the swap epoch.")
+        self.curriculum_controller.maybe_swap(epoch)
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
         phase = self._curriculum_phase(epoch)

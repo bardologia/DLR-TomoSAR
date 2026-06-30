@@ -6,7 +6,7 @@ class AblationCatalog:
     WARMUP_PREFIX   = "curriculum.warmup."
     COMPLETE_PREFIX = "curriculum.complete."
 
-    CURRICULUM_SWAP_EPOCH = 30
+    CURRICULUM_SWAP_EPOCH = 15
 
     PARAM_MATCH_BASELINE = "sorted_gt"
     PARAM_MATCH_FULL     = "hungarian"
