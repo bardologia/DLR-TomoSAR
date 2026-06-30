@@ -429,7 +429,7 @@ class StatusBoard {
 
     this._txt("sb-impact-swap", `<b>${(swap.out_mbs || 0).toFixed(1)}</b> MB/s`);
     this._txt("sb-impact-iorate", `<b>${(io.util || 0).toFixed(0)}</b> %`);
-    this._txt("sb-impact-mine", `<b>${(sig.mine || {}).nproc || 0}</b> &middot; ${((sig.mine || {}).rss_gb || 0).toFixed(1)}G`);
+    this._txt("sb-impact-mine", `<b>${(sig.mine || {}).nproc || 0}</b> &middot; ${((sig.mine || {}).mem_gb || 0).toFixed(1)}G`);
 
     const top = sig.top;
     const topEl = document.getElementById("sb-impact-top");

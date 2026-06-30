@@ -8,6 +8,8 @@ import subprocess
 import threading
 import time
 
+from proc_stats import ProcStats
+
 
 class SystemMonitor:
 
@@ -114,19 +116,10 @@ class SystemMonitor:
         top = rows[: self.PROC_LIMIT]
 
         for row in top:
-            pss         = self._pss(row["pid"])
+            pss         = ProcStats.pss(row["pid"])
             row["pss"]  = pss if pss is not None else row["rss"]
 
         return top
-
-    def _pss(self, pid: int) -> int | None:
-        try:
-            for line in open(f"/proc/{pid}/smaps_rollup"):
-                if line.startswith("Pss:"):
-                    return int(line.split()[1]) * 1024
-        except (OSError, ValueError, IndexError):
-            return None
-        return None
 
     def _gpu_devices(self) -> list[dict]:
         try:

@@ -7,6 +7,7 @@ import time
 from collections import deque
 from datetime    import datetime
 
+from proc_stats import ProcStats
 from web_logger import WebLogger
 
 
@@ -28,7 +29,7 @@ class ContentionMonitor:
     NUKE_COOLDOWN = 120.0
     LEAK_WINDOW_SAMPLES = 48
     LEAK_RECENT_SAMPLES = 12
-    LEAK_RSS_FLOOR_GB   = 1.5
+    LEAK_MEM_FLOOR_GB   = 1.5
     LEAK_GROWTH_MBPM    = 120.0
     LEAK_RECENT_MB      = 60.0
 
@@ -123,7 +124,7 @@ class ContentionMonitor:
         self.prev_t = now
 
         mem_used_gb  = mem["used_gb"]
-        mem_share    = (mine["rss_gb"] / mem_used_gb) if mem_used_gb > 0 else 0.0
+        mem_share    = (mine["mem_gb"] / mem_used_gb) if mem_used_gb > 0 else 0.0
         cpu_capacity = self.cores * 100.0
         cpu_share    = (mine["cpu_pct"] / cpu_capacity) if cpu_capacity > 0 else 0.0
         io_share     = (mine["io_mbs"] / disk["total_mbs"]) if disk["total_mbs"] > 0.05 else 0.0
@@ -131,10 +132,10 @@ class ContentionMonitor:
         return {
             "psi"  : psi,
             "swap" : swap,
-            "mem"  : {"used_pct": mem["used_pct"], "mine_gb": mine["rss_gb"], "mine_share": min(mem_share, 1.0)},
+            "mem"  : {"used_pct": mem["used_pct"], "mine_gb": mine["mem_gb"], "mine_share": min(mem_share, 1.0)},
             "io"   : {**disk, "mine_mbs": mine["io_mbs"], "mine_share": min(io_share, 1.0)},
             "cpu"  : {"load_ratio": os.getloadavg()[0] / self.cores, "mine_pct": mine["cpu_pct"], "mine_share": min(cpu_share, 1.0)},
-            "mine" : {"nproc": mine["nproc"], "rss_gb": mine["rss_gb"]},
+            "mine" : {"nproc": mine["nproc"], "mem_gb": mine["mem_gb"]},
             "leak" : mine["leak"],
             "top"  : mine["top"],
         }
@@ -239,11 +240,11 @@ class ContentionMonitor:
         return None
 
     def _scan(self, now: float, dt: float) -> dict:
-        rss        = 0
+        mine_mem   = 0
         jiffies    = 0
         io_bytes   = 0
         nproc      = 0
-        per_rss    = {}
+        per_mem    = {}
         per_comm   = {}
         user_rss   = {}
         user_n     = {}
@@ -273,11 +274,13 @@ class ContentionMonitor:
                 top = (proc_rss, pid, comm, uid)
 
             if uid == self.uid:
+                proc_pss      = ProcStats.pss(pid)
+                proc_mem      = proc_pss if proc_pss is not None else proc_rss
                 jiffies      += j
-                rss          += proc_rss
+                mine_mem     += proc_mem
                 nproc        += 1
                 io_bytes     += self._pid_io(pid)
-                per_rss [pid] = proc_rss
+                per_mem [pid] = proc_mem
                 per_comm[pid] = comm
 
         prev           = self.prev_mine
@@ -289,9 +292,9 @@ class ContentionMonitor:
             cpu_pct = max(0.0, 100.0 * (jiffies - prev[0]) / self.clk / dt)
             io_mbs  = max(0.0, (io_bytes - prev[1]) / dt / (1024.0 ** 2))
 
-        leak = self._growth_candidate(now, per_rss, per_comm)
+        leak = self._growth_candidate(now, per_mem, per_comm)
 
-        return {"nproc": nproc, "rss_gb": rss / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak, "top": self._top_consumer(user_rss, user_n, top)}
+        return {"nproc": nproc, "mem_gb": mine_mem / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak, "top": self._top_consumer(user_rss, user_n, top)}
 
     def _top_consumer(self, user_rss: dict, user_n: dict, top: tuple) -> dict | None:
         if not user_rss:
@@ -317,11 +320,11 @@ class ContentionMonitor:
         except KeyError:
             return str(uid)
 
-    def _growth_candidate(self, now: float, per_rss: dict, per_comm: dict) -> dict | None:
-        for pid in [p for p in self.proc_hist if p not in per_rss]:
+    def _growth_candidate(self, now: float, per_mem: dict, per_comm: dict) -> dict | None:
+        for pid in [p for p in self.proc_hist if p not in per_mem]:
             del self.proc_hist[pid]
-        for pid, proc_rss in per_rss.items():
-            self.proc_hist.setdefault(pid, deque(maxlen=self.LEAK_WINDOW_SAMPLES)).append((now, proc_rss))
+        for pid, proc_mem in per_mem.items():
+            self.proc_hist.setdefault(pid, deque(maxlen=self.LEAK_WINDOW_SAMPLES)).append((now, proc_mem))
 
         best = None
         for pid, hist in self.proc_hist.items():
@@ -331,8 +334,8 @@ class ContentionMonitor:
             t_first, r_first = hist[0]
             t_last,  r_last  = hist[-1]
             span             = t_last - t_first
-            rss_gb           = r_last / (1024.0 ** 3)
-            if span < 1.0 or rss_gb < self.LEAK_RSS_FLOOR_GB:
+            mem_gb           = r_last / (1024.0 ** 3)
+            if span < 1.0 or mem_gb < self.LEAK_MEM_FLOOR_GB:
                 continue
 
             rate_mbpm  = (r_last - r_first) / span * 60.0 / (1024.0 ** 2)
@@ -342,12 +345,12 @@ class ContentionMonitor:
                 continue
 
             if best is None or rate_mbpm > best["rate_mbpm"]:
-                best = {"pid": pid, "comm": per_comm.get(pid, "?"), "rss_gb": rss_gb, "rate_mbpm": rate_mbpm, "growth_gb": (r_last - r_first) / (1024.0 ** 3), "window_min": span / 60.0}
+                best = {"pid": pid, "comm": per_comm.get(pid, "?"), "mem_gb": mem_gb, "rate_mbpm": rate_mbpm, "growth_gb": (r_last - r_first) / (1024.0 ** 3), "window_min": span / 60.0}
 
         if best is None:
             return None
 
-        best["message"] = f"process {best['comm']} (pid {best['pid']}) is accumulating RAM: {best['rss_gb']:.1f} GB now, +{best['growth_gb']:.1f} GB in {best['window_min']:.0f} min ({best['rate_mbpm']:.0f} MB/min, still climbing)"
+        best["message"] = f"process {best['comm']} (pid {best['pid']}) is accumulating RAM: {best['mem_gb']:.1f} GB now, +{best['growth_gb']:.1f} GB in {best['window_min']:.0f} min ({best['rate_mbpm']:.0f} MB/min, still climbing)"
         return best
 
     def _pid_io(self, pid: int) -> int:
