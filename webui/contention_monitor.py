@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pwd
 import threading
 import time
 from collections import deque
@@ -117,7 +118,7 @@ class ContentionMonitor:
         swap = self._read_swap(dt)
         mem  = self._read_memory()
         disk = self._read_disk(dt)
-        mine = self._read_mine(now, dt)
+        mine = self._scan(now, dt)
 
         self.prev_t = now
 
@@ -135,6 +136,7 @@ class ContentionMonitor:
             "cpu"  : {"load_ratio": os.getloadavg()[0] / self.cores, "mine_pct": mine["cpu_pct"], "mine_share": min(cpu_share, 1.0)},
             "mine" : {"nproc": mine["nproc"], "rss_gb": mine["rss_gb"]},
             "leak" : mine["leak"],
+            "top"  : mine["top"],
         }
 
     def _read_psi(self) -> dict:
@@ -236,21 +238,23 @@ class ContentionMonitor:
             return (nums[0], nums[2], nums[3], nums[4], nums[6], nums[7], nums[9])
         return None
 
-    def _read_mine(self, now: float, dt: float) -> dict:
+    def _scan(self, now: float, dt: float) -> dict:
         rss        = 0
         jiffies    = 0
         io_bytes   = 0
         nproc      = 0
         per_rss    = {}
         per_comm   = {}
+        user_rss   = {}
+        user_n     = {}
+        top        = (0, None, "", self.uid)
 
         for entry in os.listdir("/proc"):
             if not entry.isdigit():
                 continue
             pid = int(entry)
             try:
-                if os.stat(f"/proc/{pid}").st_uid != self.uid:
-                    continue
+                uid  = os.stat(f"/proc/{pid}").st_uid
                 stat = open(f"/proc/{pid}/stat").read()
             except OSError:
                 continue
@@ -259,15 +263,22 @@ class ContentionMonitor:
                 comm     = stat[stat.index("(") + 1 : stat.rindex(")")]
                 fields   = stat[stat.rindex(")") + 2:].split()
                 proc_rss = int(fields[21]) * self.page
-                jiffies += int(fields[11]) + int(fields[12])
-                rss     += proc_rss
-                nproc   += 1
+                j        = int(fields[11]) + int(fields[12])
             except (ValueError, IndexError):
                 continue
 
-            io_bytes        += self._pid_io(pid)
-            per_rss [pid]    = proc_rss
-            per_comm[pid]    = comm
+            user_rss[uid] = user_rss.get(uid, 0) + proc_rss
+            user_n  [uid] = user_n.get(uid, 0) + 1
+            if proc_rss > top[0]:
+                top = (proc_rss, pid, comm, uid)
+
+            if uid == self.uid:
+                jiffies      += j
+                rss          += proc_rss
+                nproc        += 1
+                io_bytes     += self._pid_io(pid)
+                per_rss [pid] = proc_rss
+                per_comm[pid] = comm
 
         prev           = self.prev_mine
         self.prev_mine = (jiffies, io_bytes)
@@ -280,7 +291,31 @@ class ContentionMonitor:
 
         leak = self._growth_candidate(now, per_rss, per_comm)
 
-        return {"nproc": nproc, "rss_gb": rss / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak}
+        return {"nproc": nproc, "rss_gb": rss / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak, "top": self._top_consumer(user_rss, user_n, top)}
+
+    def _top_consumer(self, user_rss: dict, user_n: dict, top: tuple) -> dict | None:
+        if not user_rss:
+            return None
+
+        lead_uid             = max(user_rss, key=user_rss.get)
+        top_rss, top_pid, top_comm, top_uid = top
+
+        return {
+            "user"        : self._username(lead_uid),
+            "rss_gb"      : user_rss[lead_uid] / (1024.0 ** 3),
+            "nproc"       : user_n[lead_uid],
+            "is_mine"     : lead_uid == self.uid,
+            "proc_pid"    : top_pid,
+            "proc_user"   : self._username(top_uid),
+            "proc_comm"   : top_comm,
+            "proc_rss_gb" : top_rss / (1024.0 ** 3),
+        }
+
+    def _username(self, uid: int) -> str:
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return str(uid)
 
     def _growth_candidate(self, now: float, per_rss: dict, per_comm: dict) -> dict | None:
         for pid in [p for p in self.proc_hist if p not in per_rss]:
@@ -332,14 +367,16 @@ class ContentionMonitor:
         disk = signals["io"]
         cpu  = signals["cpu"]
 
+        top        = signals.get("top")
         mem_breach = psi["mem"]["some"] >= self.MEM_PSI_SOME or swap["out_mbs"] >= self.SWAP_OUT_MBS
         mem_clear  = psi["mem"]["some"] < self.MEM_PSI_SOME * self.CLEAR_MARGIN and swap["out_mbs"] < self.SWAP_OUT_MBS
         mem_mine   = mem["mine_share"] >= self.SHARE
         mem_level  = "danger" if (psi["mem"]["full"] >= self.MEM_PSI_FULL or swap["out_mbs"] >= self.SWAP_OUT_MBS) else "warn"
         swap_note  = f", swapping out {swap['out_mbs']:.1f} MB/s" if swap["out_mbs"] >= self.SWAP_OUT_MBS else ""
+        culprit    = f"; dominant consumer is {top['user']} ({top['rss_gb']:.0f} GB across {top['nproc']} procs, biggest pid {top['proc_pid']} {top['proc_comm']} {top['proc_rss_gb']:.0f} GB)" if (top and not mem_mine and not top["is_mine"]) else ""
         self._track("mem", mem_level, mem_breach, mem_clear, mem_mine,
                     f"memory contention: tasks stalled {psi['mem']['some']:.0f}% of the time{swap_note}; "
-                    f"you hold {mem['mine_share']:.0%} of used RAM ({mem['mine_gb']:.1f} GB)")
+                    f"you hold {mem['mine_share']:.0%} of used RAM ({mem['mine_gb']:.1f} GB){culprit}")
 
         io_breach = psi["io"]["some"] >= self.IO_PSI_SOME or disk["util"] >= self.IO_UTIL
         io_clear  = psi["io"]["some"] < self.IO_PSI_SOME * self.CLEAR_MARGIN and disk["util"] < self.IO_UTIL * self.CLEAR_MARGIN

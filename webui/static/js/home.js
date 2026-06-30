@@ -110,6 +110,7 @@ class StatusBoard {
       `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
       `<div><dt id="sb-impact-iorate">--</dt><dd>disk busy</dd></div>` +
       `<div><dt id="sb-impact-mine">--</dt><dd>your procs</dd></div>` +
+      `<div><dt id="sb-impact-top">--</dt><dd>top ram user</dd></div>` +
       `</dl>` +
       `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
@@ -430,6 +431,13 @@ class StatusBoard {
     this._txt("sb-impact-iorate", `<b>${(io.util || 0).toFixed(0)}</b> %`);
     this._txt("sb-impact-mine", `<b>${(sig.mine || {}).nproc || 0}</b> &middot; ${((sig.mine || {}).rss_gb || 0).toFixed(1)}G`);
 
+    const top = sig.top;
+    const topEl = document.getElementById("sb-impact-top");
+    if (topEl) {
+      topEl.innerHTML = top ? `<b>${this._esc(top.user)}</b> &middot; ${(top.rss_gb || 0).toFixed(1)}G` : "--";
+      topEl.classList.toggle("is-other", !!(top && !top.is_mine));
+    }
+
     const light   = document.getElementById("sb-impact-light");
     const verdict = document.getElementById("sb-impact-verdict");
     const lede    = document.getElementById("sb-impact-lede");
@@ -445,7 +453,9 @@ class StatusBoard {
         : leak
           ? "No contention yet, but a process of yours is steadily accumulating RAM — see below."
           : others.length
-            ? "The server is contended, but your jobs are not the dominant cause."
+            ? (top && !top.is_mine
+                ? `The server is contended, but not by you — dominant consumer is ${top.user} (${(top.rss_gb || 0).toFixed(0)} GB, ${top.nproc} procs).`
+                : "The server is contended, but your jobs are not the dominant cause.")
             : "No contention: other users are not being slowed by your jobs.";
     }
 
