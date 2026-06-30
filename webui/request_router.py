@@ -27,6 +27,7 @@ from results_browser        import ResultsBrowser
 from script_catalog         import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor         import SystemMonitor
+from contention_monitor      import ContentionMonitor
 from tensorboard_manager    import TensorboardManager
 from web_logger             import WebLogger
 
@@ -41,7 +42,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -59,6 +60,7 @@ class RequestRouter:
         self.nuke        = nuke
         self.system      = system
         self.watchdog    = watchdog
+        self.contention  = contention
         self.gpu_guard   = gpu_guard
         self.tensorboard = tensorboard
         self.results     = results
@@ -261,6 +263,7 @@ class RequestRouter:
         if path == "/api/system":
             payload              = self.system.snapshot()
             payload["alerts"]    = self.watchdog.state()
+            payload["impact"]    = self.contention.state()
             payload["gpu_guard"] = self.gpu_guard.state()
             self._send_json(handler, payload)
             return

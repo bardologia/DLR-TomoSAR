@@ -352,8 +352,8 @@ main { margin-left: var(--navw); }
 .sboard--gpualarm {
   grid-column: 1 / -1; position: relative; overflow: hidden;
   border-color: rgba(185, 28, 28, 0.5);
-  display: flex; flex-direction: column; gap: 14px;
 }
+.sboard--gpualarm:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
 .sboard--gpualarm.is-firing { border-color: rgba(185, 28, 28, 0.95); background: rgba(185, 28, 28, 0.06); }
 @media (prefers-reduced-motion: no-preference) {
   .sboard--gpualarm.is-firing { animation: gpualarm-flash 1.4s ease-in-out infinite; }
@@ -363,6 +363,71 @@ main { margin-left: var(--navw); }
   0%, 100% { box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.25), 0 0 0 0 rgba(185, 28, 28, 0); }
   50%      { box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.75), 0 0 22px -4px rgba(185, 28, 28, 0.45); }
 }
+
+/* neighbour impact */
+.sboard--impact { grid-column: 1 / -1; }
+.impact__light { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); margin-left: auto; flex: 0 0 auto; }
+.impact__light.is-clear  { background: var(--accent-2); }
+.impact__light.is-warn   { background: var(--warn); }
+.impact__light.is-danger { background: var(--danger); }
+.impact__light.is-clear  ~ .sboard__n { color: var(--accent-2); }
+.impact__light.is-warn   ~ .sboard__n { color: var(--warn); }
+.impact__light.is-danger ~ .sboard__n { color: var(--danger); }
+.impact__lede { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); margin: 0 0 14px; line-height: 1.5; }
+
+.impact__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.impact__cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.impact__k { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.impact__v { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.impact__v b { font-size: 18px; color: var(--ink); font-weight: 500; }
+.impact__share { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+.impact__share b { color: var(--ink-dim); font-weight: 500; }
+.impact__share.is-dominant { color: var(--danger); }
+.impact__share.is-dominant b { color: var(--danger); font-weight: 700; }
+.bar--share { height: 4px; margin-top: 2px; }
+.bar__fill--share, .bar__fill--share.is-hot { background: var(--accent-2); }
+.impact__share.is-dominant + .bar .bar__fill--share { background: var(--danger); }
+
+.impact__stats {
+  display: flex; gap: 26px; margin: 16px 0 0; padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+}
+.impact__stats dt { font-size: 16px; color: var(--ink); }
+.impact__stats dt b { font-weight: 600; }
+.impact__stats dd { margin: 2px 0 0; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+
+.impact__alarms { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.impact__alarms:empty { display: none; }
+.impact__alarm {
+  display: flex; flex-direction: column; gap: 3px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+  padding: 8px 11px; border-radius: 4px; border-left: 3px solid var(--line); background: var(--bg-1);
+}
+.impact__alarm--warn   { border-left-color: var(--warn); }
+.impact__alarm--danger { border-left-color: var(--danger); }
+.impact__alarm:not(.is-mine) { opacity: 0.62; }
+.impact__alarm-tag { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.impact__alarm.is-mine .impact__alarm-tag { color: var(--danger); }
+.impact__alarm-msg { color: var(--ink-dim); }
+
+/* neighbour impact banner */
+.sboard--impactbanner {
+  grid-column: 1 / -1; position: relative; overflow: hidden;
+  border-color: rgba(185, 28, 28, 0.5);
+}
+.sboard--impactbanner:not([hidden]) { display: flex; align-items: flex-start; gap: 13px; }
+.sboard--impactbanner.is-warn   { border-color: rgba(161, 98, 7, 0.7);  background: rgba(161, 98, 7, 0.06); }
+.sboard--impactbanner.is-danger { border-color: rgba(185, 28, 28, 0.95); background: rgba(185, 28, 28, 0.07); }
+@media (prefers-reduced-motion: no-preference) {
+  .sboard--impactbanner.is-danger { animation: gpualarm-flash 1.4s ease-in-out infinite; }
+}
+.impactbanner__sym { font-size: 22px; line-height: 1; color: var(--danger); flex: 0 0 auto; }
+.sboard--impactbanner.is-warn .impactbanner__sym { color: var(--warn); }
+.impactbanner__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.impactbanner__head { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--danger); }
+.sboard--impactbanner.is-warn .impactbanner__head { color: var(--warn); }
+.impactbanner__line { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink-dim); }
 
 /* alarm header bar */
 .alarm__bar {

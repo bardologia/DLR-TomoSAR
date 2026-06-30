@@ -18,6 +18,7 @@ from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from request_router         import RequestRouter
 from resource_watchdog      import ResourceWatchdog
+from contention_monitor     import ContentionMonitor
 from results_browser        import ResultsBrowser
 from script_catalog         import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
@@ -63,6 +64,7 @@ class WebUIServer:
         self.nuke        = ProcessNuke(self.logger)
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
+        self.contention  = ContentionMonitor(self.paths, self.logger)
         self.gpu_guard   = GpuWatchdog(self.system, self.paths, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
         self.results     = ResultsBrowser(self.logger)
@@ -87,6 +89,7 @@ class WebUIServer:
             nuke        = self.nuke,
             system      = self.system,
             watchdog    = self.watchdog,
+            contention  = self.contention,
             gpu_guard   = self.gpu_guard,
             tensorboard = self.tensorboard,
             results     = self.results,
@@ -97,6 +100,7 @@ class WebUIServer:
     def serve(self) -> None:
         self._report_ready()
         self.watchdog.start()
+        self.contention.start()
         self.gpu_guard.start()
 
         server        = ThreadingHTTPServer((self.host, self.port), _Handler)

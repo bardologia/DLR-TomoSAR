@@ -82,6 +82,8 @@ class StatusBoard {
     ].map(([v, k]) => `<div><dt>${v}</dt><dd>${k}</dd></div>`).join("");
 
     this.els.board.innerHTML =
+      `<section class="sboard sboard--impactbanner" id="sb-impact-banner" aria-label="Neighbour impact alarm" hidden></section>` +
+
       `<section class="sboard sboard--alerts" id="sb-alerts" aria-label="Alerts" hidden></section>` +
 
       `<section class="sboard sboard--gpualarm" id="sb-gpu-guard" aria-label="GPU intrusion alarm" hidden></section>` +
@@ -94,6 +96,22 @@ class StatusBoard {
       `<i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
       `<span class="wd__status" id="sb-wd-status">--</span>` +
       `<dl class="wd__limits">${limitCells}</dl>` +
+      `</section>` +
+
+      `<section class="sboard sboard--impact" aria-label="Neighbour impact">` +
+      `<header class="sboard__cap"><span>neighbour impact</span><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
+      `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
+      `<div class="impact__grid">` +
+      `<div class="impact__cell"><span class="impact__k">memory stall</span><span class="impact__v" id="sb-impact-mem-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-mem-psi-bar"></i></div><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><span class="impact__k">disk stall</span><span class="impact__v" id="sb-impact-io-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-io-psi-bar"></i></div><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><span class="impact__k">cpu stall</span><span class="impact__v" id="sb-impact-cpu-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-cpu-psi-bar"></i></div><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
+      `</div>` +
+      `<dl class="impact__stats">` +
+      `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
+      `<div><dt id="sb-impact-iorate">--</dt><dd>disk busy</dd></div>` +
+      `<div><dt id="sb-impact-mine">--</dt><dd>your procs</dd></div>` +
+      `</dl>` +
+      `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
 
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
@@ -197,6 +215,7 @@ class StatusBoard {
     if (window.serverScene && window.serverScene.feed) window.serverScene.feed(sys);
     this._renderWatchdog(sys.alerts || {});
     this._renderAlerts(sys.alerts || {});
+    this._renderImpact(sys.impact || {});
     this._renderGpuGuard(sys.gpu_guard || {});
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
@@ -344,6 +363,79 @@ class StatusBoard {
 
     box.hidden = false;
     box.innerHTML = `<header class="sboard__cap"><span>alerts</span><span class="sboard__n">${active.length} active</span></header><div class="alert__list">${chips}${log}</div>`;
+  }
+
+  _renderImpact(impact) {
+    const sig    = impact.signals || {};
+    const active = impact.active || [];
+    const mine   = active.filter((a) => a.mine);
+    const others = active.filter((a) => !a.mine);
+
+    const psi  = sig.psi || {};
+    const mem  = sig.mem || {};
+    const io   = sig.io || {};
+    const cpu  = sig.cpu || {};
+    const swap = sig.swap || {};
+
+    const contended = new Set(active.map((a) => a.kind));
+    const gauge = (psiId, shareId, psiVal, shareVal, kind) => {
+      this._txt(psiId, `<b>${(psiVal || 0).toFixed(0)}</b> %`);
+      this._bar(`${psiId}-bar`, psiVal || 0);
+      const sharePct = (shareVal || 0) * 100;
+      this._txt(shareId, `your share <b>${sharePct.toFixed(0)}</b>%`);
+      const shareEl = document.getElementById(shareId);
+      if (shareEl) shareEl.classList.toggle("is-dominant", sharePct >= 50 && contended.has(kind));
+      this._bar(`${shareId}-bar`, sharePct);
+    };
+    gauge("sb-impact-mem-psi", "sb-impact-mem-share", (psi.mem || {}).some, mem.mine_share, "mem");
+    gauge("sb-impact-io-psi",  "sb-impact-io-share",  (psi.io  || {}).some, io.mine_share, "io");
+    gauge("sb-impact-cpu-psi", "sb-impact-cpu-share", (psi.cpu || {}).some, cpu.mine_share, "cpu");
+
+    this._txt("sb-impact-swap", `<b>${(swap.out_mbs || 0).toFixed(1)}</b> MB/s`);
+    this._txt("sb-impact-iorate", `<b>${(io.util || 0).toFixed(0)}</b> %`);
+    this._txt("sb-impact-mine", `<b>${(sig.mine || {}).nproc || 0}</b> &middot; ${((sig.mine || {}).rss_gb || 0).toFixed(1)}G`);
+
+    const light   = document.getElementById("sb-impact-light");
+    const verdict = document.getElementById("sb-impact-verdict");
+    const lede    = document.getElementById("sb-impact-lede");
+    const culprit = mine.some((a) => a.level === "danger") ? "danger" : mine.length ? "warn" : "clear";
+    if (light)   light.className = `impact__light is-${culprit}`;
+    if (verdict) verdict.textContent = culprit === "clear" ? (others.length ? "busy, not you" : "all clear") : "you are the cause";
+    if (lede) {
+      lede.textContent = mine.length
+        ? "Your jobs are stalling other users on the resources flagged below."
+        : others.length
+          ? "The server is contended, but your jobs are not the dominant cause."
+          : "No contention: other users are not being slowed by your jobs.";
+    }
+
+    const alarmBox = document.getElementById("sb-impact-alarms");
+    if (alarmBox) {
+      alarmBox.innerHTML = active.map((a) =>
+        `<div class="impact__alarm impact__alarm--${a.level === "danger" ? "danger" : "warn"}${a.mine ? " is-mine" : ""}">` +
+        `<span class="impact__alarm-tag">${a.mine ? "you" : "others"} &middot; ${this._esc(a.kind)}</span>` +
+        `<span class="impact__alarm-msg">${this._esc(a.message)}</span></div>`
+      ).join("");
+    }
+
+    const banner = document.getElementById("sb-impact-banner");
+    if (banner) {
+      if (mine.length) {
+        const worst = mine.some((a) => a.level === "danger") ? "danger" : "warn";
+        banner.hidden = false;
+        banner.className = `sboard sboard--impactbanner is-${worst}`;
+        banner.innerHTML =
+          `<span class="impactbanner__sym" aria-hidden="true">&#9888;</span>` +
+          `<div class="impactbanner__body"><span class="impactbanner__head">you are slowing other users</span>` +
+          mine.map((a) => `<span class="impactbanner__line">${this._esc(a.message)}</span>`).join("") +
+          `</div>`;
+        if (!this._impactWasFiring) { this._impactWasFiring = true; this._alarm(worst === "danger"); }
+      } else {
+        banner.hidden = true;
+        banner.innerHTML = "";
+        this._impactWasFiring = false;
+      }
+    }
   }
 
   _renderGpuGuard(guard) {
