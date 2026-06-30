@@ -366,7 +366,7 @@ main { margin-left: var(--navw); }
 
 /* neighbour impact */
 .sboard--impact { grid-column: 1 / -1; }
-.impact__light { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); margin-left: auto; flex: 0 0 auto; }
+.impact__light { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); flex: 0 0 auto; }
 .impact__light.is-clear  { background: var(--accent-2); }
 .impact__light.is-warn   { background: var(--warn); }
 .impact__light.is-danger { background: var(--danger); }
@@ -374,6 +374,20 @@ main { margin-left: var(--navw); }
 .impact__light.is-warn   ~ .sboard__n { color: var(--warn); }
 .impact__light.is-danger ~ .sboard__n { color: var(--danger); }
 .impact__lede { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); margin: 0 0 14px; line-height: 1.5; }
+
+.impact__arm {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-dim); background: var(--bg-1);
+  border: 1px solid var(--line); border-radius: 3px; padding: 3px 9px; cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.impact__arm:hover { border-color: var(--line-strong); color: var(--ink); }
+.impact__arm.is-armed { color: #fff; background: var(--danger); border-color: var(--danger); font-weight: 700; }
+.impact__arm:disabled { opacity: 0.5; cursor: default; }
+
+.impact__alarm.is-event { opacity: 0.85; }
+.impact__alarm.is-event .impact__alarm-tag { color: var(--ink-faint); }
 
 .impact__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .impact__cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }

@@ -99,7 +99,7 @@ class StatusBoard {
       `</section>` +
 
       `<section class="sboard sboard--impact" aria-label="Neighbour impact">` +
-      `<header class="sboard__cap"><span>neighbour impact</span><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
+      `<header class="sboard__cap"><span>neighbour impact</span><button type="button" class="impact__arm" id="sb-impact-arm" title="When armed, auto-nukes all your processes if you slow other users too much">auto-nuke: --</button><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
       `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
       `<div class="impact__grid">` +
       `<div class="impact__cell"><span class="impact__k">memory stall</span><span class="impact__v" id="sb-impact-mem-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-mem-psi-bar"></i></div><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
@@ -179,6 +179,7 @@ class StatusBoard {
     this.coreEls = [...this.els.board.querySelectorAll(".cpu__cell")];
 
     this._wireNuke();
+    this._wireImpactArm();
 
     if (!window.REDUCED_MOTION && window.gsap) {
       gsap.from(this.els.board.querySelectorAll(".sboard"), { opacity: 0, y: 16, duration: 0.7, stagger: 0.08, ease: "expo.out" });
@@ -207,6 +208,31 @@ class StatusBoard {
       } finally {
         btn.disabled = false;
         btn.classList.remove("is-firing");
+      }
+    });
+  }
+
+  _wireImpactArm() {
+    const btn = document.getElementById("sb-impact-arm");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      const arming = !this._autoNuke;
+      if (arming) {
+        const ok = window.confirm("ARM AUTO-NUKE: if your jobs slow other users too much (severe memory/disk stalling that you are the dominant cause of, sustained ~30s), this will SIGTERM/SIGKILL every process running under your user, sparing only the web UI. Arm it?");
+        if (!ok) return;
+      }
+      btn.disabled = true;
+      try {
+        const res = await window.apiPost("/api/impact/arm", { armed: arming });
+        if (res && typeof res.auto_nuke === "boolean") {
+          this._autoNuke = res.auto_nuke;
+          window.toast(`auto-nuke ${res.auto_nuke ? "armed" : "disarmed"}`, res.auto_nuke ? "warn" : "ok");
+        }
+      } catch (e) {
+        window.toast("auto-nuke toggle failed: network error", "error");
+      } finally {
+        btn.disabled = false;
       }
     });
   }
@@ -371,6 +397,13 @@ class StatusBoard {
     const mine   = active.filter((a) => a.mine);
     const others = active.filter((a) => !a.mine);
 
+    this._autoNuke = !!impact.auto_nuke;
+    const armBtn = document.getElementById("sb-impact-arm");
+    if (armBtn) {
+      armBtn.textContent = this._autoNuke ? "auto-nuke: ARMED" : "auto-nuke: off";
+      armBtn.classList.toggle("is-armed", this._autoNuke);
+    }
+
     const psi  = sig.psi || {};
     const mem  = sig.mem || {};
     const io   = sig.io || {};
@@ -411,11 +444,17 @@ class StatusBoard {
 
     const alarmBox = document.getElementById("sb-impact-alarms");
     if (alarmBox) {
-      alarmBox.innerHTML = active.map((a) =>
+      const cards = active.map((a) =>
         `<div class="impact__alarm impact__alarm--${a.level === "danger" ? "danger" : "warn"}${a.mine ? " is-mine" : ""}">` +
         `<span class="impact__alarm-tag">${a.mine ? "you" : "others"} &middot; ${this._esc(a.kind)}</span>` +
         `<span class="impact__alarm-msg">${this._esc(a.message)}</span></div>`
       ).join("");
+      const events = (impact.events || []).slice(-3).reverse().map((e) =>
+        `<div class="impact__alarm impact__alarm--${e.kind === "auto_nuke" ? "danger" : "warn"} is-event">` +
+        `<span class="impact__alarm-tag">${this._esc(e.time.replace("T", " "))} &middot; ${this._esc(e.kind)}</span>` +
+        `<span class="impact__alarm-msg">${this._esc(e.message)}</span></div>`
+      ).join("");
+      alarmBox.innerHTML = cards + events;
     }
 
     const banner = document.getElementById("sb-impact-banner");

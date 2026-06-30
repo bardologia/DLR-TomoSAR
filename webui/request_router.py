@@ -302,6 +302,11 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
+        if path == "/api/impact/arm":
+            result = self.contention.arm(bool(body.get("armed")))
+            self._send_json(handler, result)
+            return
+
         if path == "/api/cubes/load":
             result = self.cubes.start_load(body.get("id", ""))
             self._send_json(handler, result, 200 if result.get("ok") else 400)

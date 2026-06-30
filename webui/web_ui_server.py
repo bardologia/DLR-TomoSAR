@@ -64,7 +64,7 @@ class WebUIServer:
         self.nuke        = ProcessNuke(self.logger)
         self.system      = SystemMonitor(self.paths)
         self.watchdog    = ResourceWatchdog(self.processes, self.logger)
-        self.contention  = ContentionMonitor(self.paths, self.logger)
+        self.contention  = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard   = GpuWatchdog(self.system, self.paths, self.logger)
         self.tensorboard = TensorboardManager(self.paths, self.logger)
         self.results     = ResultsBrowser(self.logger)

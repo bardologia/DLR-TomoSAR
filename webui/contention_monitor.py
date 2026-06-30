@@ -23,10 +23,13 @@ class ContentionMonitor:
     SWAP_OUT_MBS = 0.5
     CLEAR_MARGIN = 0.8
     SUSTAIN      = 2
+    NUKE_SUSTAIN = 6
+    NUKE_COOLDOWN = 120.0
 
-    def __init__(self, paths, logger: WebLogger) -> None:
+    def __init__(self, paths, logger: WebLogger, nuke) -> None:
         self.paths   = paths
         self.logger  = logger
+        self.nuke    = nuke
         self.lock    = threading.Lock()
         self.armed   = False
         self.uid     = os.getuid()
@@ -40,6 +43,10 @@ class ContentionMonitor:
         self.events  = deque(maxlen=20)
         self.streaks = {}
 
+        self.auto_nuke  = False
+        self.nuke_streak = 0
+        self.last_nuke  = 0.0
+
         self.prev_swap = None
         self.prev_disk = None
         self.prev_mine = None
@@ -51,26 +58,37 @@ class ContentionMonitor:
         self.armed = True
         self.logger.muted(f"contention monitor armed (device {self.device or 'n/a'}, share {self.SHARE:.0%})")
 
+    def arm(self, value: bool) -> dict:
+        with self.lock:
+            self.auto_nuke = bool(value)
+            if not self.auto_nuke:
+                self.nuke_streak = 0
+        self.logger.warning(f"auto-nuke {'ARMED' if self.auto_nuke else 'disarmed'} (fires after {self.NUKE_SUSTAIN * self.INTERVAL:.0f}s of severe self-caused contention)")
+        return self.state()
+
     def state(self) -> dict:
         limits = {
-            "mem_psi_some" : self.MEM_PSI_SOME,
-            "io_psi_some"  : self.IO_PSI_SOME,
-            "cpu_psi_some" : self.CPU_PSI_SOME,
-            "load_ratio"   : self.LOAD_RATIO,
-            "swap_out_mbs" : self.SWAP_OUT_MBS,
-            "share"        : self.SHARE,
-            "interval"     : self.INTERVAL,
+            "mem_psi_some"  : self.MEM_PSI_SOME,
+            "io_psi_some"   : self.IO_PSI_SOME,
+            "cpu_psi_some"  : self.CPU_PSI_SOME,
+            "load_ratio"    : self.LOAD_RATIO,
+            "swap_out_mbs"  : self.SWAP_OUT_MBS,
+            "share"         : self.SHARE,
+            "interval"      : self.INTERVAL,
+            "nuke_after_s"  : self.NUKE_SUSTAIN * self.INTERVAL,
         }
 
         with self.lock:
             return {
-                "armed"     : self.armed,
-                "device"    : self.device,
-                "limits"    : limits,
-                "signals"   : dict(self.signals),
-                "impacting" : any(a["mine"] for a in self.active.values()),
-                "active"    : list(self.active.values()),
-                "events"    : list(self.events),
+                "armed"      : self.armed,
+                "auto_nuke"  : self.auto_nuke,
+                "nuke_streak": self.nuke_streak,
+                "device"     : self.device,
+                "limits"     : limits,
+                "signals"    : dict(self.signals),
+                "impacting"  : any(a["mine"] for a in self.active.values()),
+                "active"     : list(self.active.values()),
+                "events"     : list(self.events),
             }
 
     def _watch(self) -> None:
@@ -288,6 +306,39 @@ class ContentionMonitor:
         self._track("cpu", "warn", cpu_breach, cpu_clear, cpu_mine,
                     f"CPU saturated: load/core {cpu['load_ratio']:.2f}, tasks stalled {psi['cpu']['some']:.0f}%; "
                     f"you use {cpu['mine_share']:.0%} of all cores ({cpu['mine_pct']:.0f}% busy)")
+
+        self._check_nuke()
+
+    def _check_nuke(self) -> None:
+        with self.lock:
+            if not self.auto_nuke:
+                self.nuke_streak = 0
+                return
+
+            severe = [a for a in self.active.values() if a["mine"] and a["level"] == "danger"]
+            if severe:
+                self.nuke_streak += 1
+            else:
+                self.nuke_streak = 0
+            streak  = self.nuke_streak
+            reasons = [a["message"] for a in severe]
+
+        if streak < self.NUKE_SUSTAIN:
+            return
+
+        now = time.monotonic()
+        if now - self.last_nuke < self.NUKE_COOLDOWN:
+            return
+
+        self.last_nuke   = now
+        self.nuke_streak = 0
+        detail  = reasons[0] if reasons else "severe self-caused contention"
+        result  = self.nuke.nuke()
+        message = f"AUTO-NUKE fired after {self.NUKE_SUSTAIN * self.INTERVAL:.0f}s slowing other users ({detail}); terminated {result.get('signalled', 0)}, force-killed {result.get('killed', 0)}"
+
+        with self.lock:
+            self.events.append({"kind": "auto_nuke", "level": "danger", "message": message, "time": datetime.now().isoformat(timespec="seconds")})
+        self.logger.error(message)
 
     def _track(self, kind: str, level: str, breached: bool, cleared: bool, mine: bool, message: str) -> None:
         if breached:
