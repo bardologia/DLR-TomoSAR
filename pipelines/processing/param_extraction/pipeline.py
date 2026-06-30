@@ -175,6 +175,7 @@ class ParameterExtractor:
         adam_b2              : float               = 0.999,
         gpu_pixel_batch_size : int                 = 8192,
         init_workers         : int | None          = None,
+        peak_initialiser     : object | None        = None,
     ) -> None:
 
         from pipelines.processing.param_extraction.sigma import SigmaFittingExtractor
@@ -210,6 +211,7 @@ class ParameterExtractor:
             sigma_init_divisor   = sigma_init_divisor,
             gpu_pixel_batch_size = gpu_pixel_batch_size,
             init_workers         = init_workers,
+            peak_initialiser     = peak_initialiser,
         )
 
         self.logger.section("[Parameter Extractor Initialized]")
@@ -241,7 +243,7 @@ class ParameterExtractor:
 
 
 class ParamExtractionPipeline:
-    def __init__(self, config: ExtractionConfig, logger: Logger | None = None) -> None:
+    def __init__(self, config: ExtractionConfig, logger: Logger | None = None, peak_initialiser: object | None = None) -> None:
         self.config           = config
         self.tomogram_path    = config.discover_tomogram_path()
         self.height_range     = config.discover_height_range()
@@ -263,6 +265,7 @@ class ParamExtractionPipeline:
             adam_b2              = config.adam_b2,
             gpu_pixel_batch_size = config.gpu_pixel_batch_size,
             init_workers         = config.parameter_workers,
+            peak_initialiser     = peak_initialiser,
         )
         self.metadata_manager = ExtractionMetadataManager(config, logger=self.logger)
         self.parameter_io     = ParameterIO(logger=self.logger)

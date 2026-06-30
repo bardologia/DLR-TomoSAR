@@ -17,12 +17,15 @@ def main() -> None:
 
     EnvironmentPinner.gpus(config.gpu_device_ids)
 
-    from pipelines.processing.param_extraction.pipeline import DatasetQueueResolver, ExtractionPlanResolver, ParamExtractionPipeline
+    from pipelines.processing.param_extraction.pipeline           import DatasetQueueResolver, ExtractionPlanResolver, ParamExtractionPipeline
+    from pipelines.processing.param_extraction.sigma.initialiser  import PeakInitialiser
 
     logger       = Logger(log_dir="logs", name="extract_params")
     base_path    = Path(config.dataset_base_path)
     dataset_dirs = DatasetQueueResolver(base_path, config.dataset_filter).resolve()
     plans        = ExtractionPlanResolver(config, dataset_dirs).resolve()
+
+    peak_initialiser = PeakInitialiser(n_workers=config.parameter_workers)
 
     logger.section("Extraction queue")
     logger.kv_table({
@@ -37,13 +40,16 @@ def main() -> None:
         "GPUs"          : config.gpu_device_ids,
     }, title="Configuration")
 
-    for index, extraction_config in enumerate(plans):
-        logger.section(f"[Run {index + 1}/{len(plans)}] {extraction_config.processed_data_path.name} :: {extraction_config.output_subdir_name}")
+    try:
+        for index, extraction_config in enumerate(plans):
+            logger.section(f"[Run {index + 1}/{len(plans)}] {extraction_config.processed_data_path.name} :: {extraction_config.output_subdir_name}")
 
-        pipeline = ParamExtractionPipeline(extraction_config)
-        outputs  = pipeline.run()
+            pipeline = ParamExtractionPipeline(extraction_config, peak_initialiser=peak_initialiser)
+            outputs  = pipeline.run()
 
-        logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+            logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+    finally:
+        peak_initialiser.close()
 
     logger.close()
 

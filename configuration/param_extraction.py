@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib     import Path
 from typing      import Optional, Tuple
@@ -171,7 +172,7 @@ class ExtractParamsEntryConfig:
 
     gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
     range_batch_size  : int  = 3500
-    parameter_workers : int  = 100
+    parameter_workers : int  = field(default_factory=lambda: min(64, os.cpu_count() or 16))
 
 
 @dataclass

@@ -35,6 +35,7 @@ class SigmaFittingExtractor:
         sigma_init_divisor  : float               = 1.0,
         gpu_pixel_batch_size: int                 = 8192,
         init_workers        : Optional[int]       = None,
+        peak_initialiser    : Optional[PeakInitialiser] = None,
     ) -> None:
 
         self.fit_settings         = fit_settings
@@ -54,9 +55,15 @@ class SigmaFittingExtractor:
         self.fit_mean             = bool(fit_settings.fit_config.fit_mean)
         self.amp_mask             = jnp.float32(1.0 if self.fit_amplitude else 0.0)
         self.mu_mask              = jnp.float32(1.0 if self.fit_mean      else 0.0)
-        self._init_workers        = 80 if init_workers is None else init_workers
+        self._init_workers        = min(32, os.cpu_count() or 8) if init_workers is None else init_workers
 
-        self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
+        if peak_initialiser is not None:
+            self._peak_initialiser = peak_initialiser
+            self._owns_initialiser = False
+        else:
+            self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
+            self._owns_initialiser = True
+
         self._best_k_selector  = BestKSelector(k_max=k_max, lambda_k=lambda_k, logger=logger)
 
         kernel, n_devices, backend, active_devices = KernelBackendSelector().select()
@@ -410,7 +417,8 @@ class SigmaFittingExtractor:
                 mse_maps, penalised_maps, best_k_map,
             )
         finally:
-            self._peak_initialiser.close()
+            if self._owns_initialiser:
+                self._peak_initialiser.close()
             jax.clear_caches()
             gc.collect()
 

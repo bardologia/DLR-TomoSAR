@@ -15,7 +15,7 @@ class PeakInitialiser:
         list(self._pool.map(abs, range(n_workers)))
 
     def close(self) -> None:
-        self._pool.shutdown(wait=False, cancel_futures=True)
+        self._pool.shutdown(wait=True, cancel_futures=True)
 
     @staticmethod
     def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
