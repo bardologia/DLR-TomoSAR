@@ -119,6 +119,12 @@ class AblationCatalog:
                 },
             },
             {
+                "label"   : "lr_warmup",
+                "group"   : "schedule",
+                "enable"  : {"warmup.warmup_enabled": True},
+                "degrade" : {"warmup.warmup_enabled": False},
+            },
+            {
                 "label"   : "curriculum",
                 "group"   : "schedule",
                 "enable"  : curriculum_enable,
@@ -242,7 +248,7 @@ class AblationCatalog:
 
     DEFAULT_ORDER = (
         "covariance_match", "coherence_resyn",
-        "curriculum", "warmup_loss", "augmentation", "output_clamp",
+        "curriculum", "warmup_loss", "lr_warmup", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_amp",
         "architecture",
     )
