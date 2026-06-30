@@ -11,6 +11,14 @@ class AblationCatalog:
     PARAM_MATCH_BASELINE = "sorted_gt"
     PARAM_MATCH_FULL     = "hungarian"
 
+    GROUP_LR_DEFAULTS = (
+        ("encoder_lr",     3e-4),
+        ("bottleneck_lr",  3e-4),
+        ("decoder_lr",     3e-4),
+        ("output_head_lr", 1e-3),
+    )
+    SINGLE_GROUP_LR = 3e-4
+
     FULL_ARCHITECTURE     = "unet_skip"
     BASELINE_ARCHITECTURE = "unet"
 
@@ -123,6 +131,12 @@ class AblationCatalog:
                 "group"   : "schedule",
                 "enable"  : {"warmup.warmup_enabled": True},
                 "degrade" : {"warmup.warmup_enabled": False},
+            },
+            {
+                "label"   : "lr_per_group",
+                "group"   : "optimizer",
+                "enable"  : {"model_overrides": {key: lr                  for key, lr in cls.GROUP_LR_DEFAULTS}},
+                "degrade" : {"model_overrides": {key: cls.SINGLE_GROUP_LR for key, _  in cls.GROUP_LR_DEFAULTS}},
             },
             {
                 "label"   : "curriculum",
@@ -248,7 +262,7 @@ class AblationCatalog:
 
     DEFAULT_ORDER = (
         "covariance_match", "coherence_resyn",
-        "curriculum", "warmup_loss", "lr_warmup", "augmentation", "output_clamp",
+        "curriculum", "warmup_loss", "lr_warmup", "lr_per_group", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_amp",
         "architecture",
     )

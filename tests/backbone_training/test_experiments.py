@@ -270,7 +270,7 @@ def test_ablation_catalog_default_is_the_standard_set():
 
     assert labels == [
         "covariance_match", "coherence_resyn",
-        "curriculum", "warmup_loss", "lr_warmup", "augmentation", "output_clamp",
+        "curriculum", "warmup_loss", "lr_warmup", "lr_per_group", "augmentation", "output_clamp",
         "ifg_phase", "pass_mag", "out_sigma", "out_amp",
         "architecture",
     ]
@@ -326,6 +326,12 @@ def test_ablation_catalog_standard_categories_present():
     lr_warmup = catalog["lr_warmup"]
     assert lr_warmup["enable"]["warmup.warmup_enabled"]  is True
     assert lr_warmup["degrade"]["warmup.warmup_enabled"] is False
+
+    lr_per_group = catalog["lr_per_group"]
+    assert lr_per_group["enable"]["model_overrides"]["output_head_lr"]  == 1e-3
+    assert lr_per_group["enable"]["model_overrides"]["encoder_lr"]      == 3e-4
+    assert set(lr_per_group["degrade"]["model_overrides"].values())     == {3e-4}
+    assert set(lr_per_group["degrade"]["model_overrides"])              == set(lr_per_group["enable"]["model_overrides"])
 
 
 def test_ablation_catalog_as_dict_covers_loss_terms():
