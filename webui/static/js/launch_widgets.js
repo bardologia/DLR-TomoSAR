@@ -3020,6 +3020,26 @@ class ConfigForm {
         { value: "sigma_amp_mu", label: "sigma + amplitude + mean" },
       ] },
     },
+    benchmark: {
+      sweep_loss_components: { empty: "select at least one loss component to sweep", choices: [
+        { value: "param_l1",           label: "Param L1 (baseline)" },
+        { value: "param_huber",        label: "Param Huber" },
+        { value: "param_mse",          label: "Param MSE" },
+        { value: "mse_curve",          label: "MSE curve" },
+        { value: "l1_curve",           label: "L1 curve" },
+        { value: "huber_curve",        label: "Huber curve" },
+        { value: "charbonnier_curve",  label: "Charbonnier curve" },
+        { value: "cosine_curve",       label: "Cosine curve" },
+        { value: "ssim_curve",         label: "SSIM curve" },
+        { value: "spectral_coh",       label: "Spectral coherence" },
+        { value: "smoothness_tv",      label: "Smoothness TV" },
+        { value: "total_power_relerr", label: "Total power rel. error" },
+        { value: "moments",            label: "Moments" },
+        { value: "coherence_resyn",    label: "Coherence resynthesis" },
+        { value: "covariance_match",   label: "Covariance match" },
+        { value: "capon_cycle",        label: "Capon cycle" },
+      ] },
+    },
   };
 
   static GPU_FIELDS = ["gpu", "gpus", "gpu_device_ids"];

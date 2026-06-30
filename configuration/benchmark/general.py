@@ -101,6 +101,8 @@ class BenchmarkConfig:
     n_gaussians     : int        = 5
     poll_interval_s : float      = 5.0
 
+    sweep_loss_components : list[str] = field(default_factory=lambda: ["param_l1"])
+
     def runs_size_match(self) -> bool:
         return self.training_type == "backbone"
 

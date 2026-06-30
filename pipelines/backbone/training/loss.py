@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import torch
 
+from configuration.training     import LossConfig, LossCurriculumConfig
 from tools.data.gaussians     import GaussianClamp, GaussianCurve, GaussianHead
 from tools.loss.curve_loss    import CurveLoss
 from tools.loss.param_loss    import ParamLoss, ParamMatcher
@@ -31,6 +32,32 @@ LOSS_TERMS = (
     LossTerm("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv",      "norm"),
     LossTerm("param_l1",           "use_param_l1",           "weight_param_l1",           "norm"),
 )
+
+
+class LossComponentCatalog:
+    _TERMS = {term.name: term for term in LOSS_TERMS}
+
+    @classmethod
+    def names(cls) -> tuple[str, ...]:
+        return tuple(term.name for term in LOSS_TERMS)
+
+    @classmethod
+    def standalone(cls, name: str) -> LossConfig:
+        if name not in cls._TERMS:
+            raise KeyError(f"unknown loss component '{name}'; valid: {', '.join(cls.names())}")
+
+        term = cls._TERMS[name]
+        cfg  = LossConfig()
+
+        setattr(cfg, term.use_flag,   True)
+        setattr(cfg, term.weight_key, 1.0)
+
+        return cfg
+
+    @classmethod
+    def curriculum(cls, name: str) -> LossCurriculumConfig:
+        cfg = cls.standalone(name)
+        return LossCurriculumConfig(enabled=False, warmup=cfg, complete=cfg)
 
 
 class Loss:

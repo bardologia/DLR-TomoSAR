@@ -18,8 +18,17 @@ class BenchmarkWorker:
         self.run_dir = Path(config.paths.log_base_dir) / run_tag
         self.factory = ConfigFactory(config)
 
-    def _run_name(self, model_name: str, seed: int | None) -> str:
-        return model_name if seed is None else SeedSet.run_name(model_name, seed)
+    def _run_name(self, model_name: str, component: str | None, seed: int | None) -> str:
+        unit = model_name if component is None else f"{model_name}__{component}"
+        return unit if seed is None else SeedSet.run_name(unit, seed)
+
+    def _apply_loss_component(self, trainer_config, component: str | None) -> None:
+        if component is None:
+            return
+
+        from pipelines.backbone.training.loss import LossComponentCatalog
+
+        trainer_config.curriculum = LossComponentCatalog.curriculum(component)
 
     def _size_overrides(self, model_name: str) -> dict:
         size_match_path = self.run_dir / "pipeline" / "size_match.json"
@@ -161,8 +170,8 @@ class OverfitWorker(BenchmarkWorker):
 
         self._finalize_overfit(result, result_path)
 
-    def run(self, model_name: str, seed: int | None = None) -> None:
-        run_name = self._run_name(model_name, seed)
+    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
+        run_name = self._run_name(model_name, loss_component, seed)
 
         if self.config.training_type == "profile_autoencoder":
             self._run_ae(model_name, run_name, seed)
@@ -184,8 +193,11 @@ class OverfitWorker(BenchmarkWorker):
         model_config = OverfitModelPreparer(model_config).prepare()
 
         def run_body():
+            trainer_config = self.factory.overfit_trainer_config(logdir=stage_dir)
+            self._apply_loss_component(trainer_config, loss_component)
+
             pipeline = TrainingPipeline(
-                trainer_config = self.factory.overfit_trainer_config(logdir=stage_dir),
+                trainer_config = trainer_config,
                 dataset_config = self.factory.overfit_dataset_config(),
                 backbone_name  = model_name,
                 model_config   = model_config,
@@ -260,8 +272,8 @@ class MaxBatchWorker(BenchmarkWorker):
 
 
 class TrainingWorker(BenchmarkWorker):
-    def run(self, model_name: str, seed: int | None = None) -> None:
-        run_name = self._run_name(model_name, seed)
+    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
+        run_name = self._run_name(model_name, loss_component, seed)
 
         if self.config.training_type == "profile_autoencoder":
             from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
@@ -290,8 +302,11 @@ class TrainingWorker(BenchmarkWorker):
         if measured_batch is not None:
             self.config.training.batch_size = measured_batch
 
+        trainer_config = self.factory.training_trainer_config(logdir=stage_dir)
+        self._apply_loss_component(trainer_config, loss_component)
+
         pipeline = TrainingPipeline(
-            trainer_config = self.factory.training_trainer_config(logdir=stage_dir),
+            trainer_config = trainer_config,
             dataset_config = self.factory.training_dataset_config(),
             backbone_name  = model_name,
             model_config   = model_config,
@@ -303,11 +318,11 @@ class TrainingWorker(BenchmarkWorker):
 
 
 class InferenceWorker(BenchmarkWorker):
-    def run(self, model_name: str, seed: int | None = None) -> None:
+    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
         from pipelines.backbone.inference.pipeline import InferencePipeline
         from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
-        run_directory = self.run_dir / "training" / self._run_name(model_name, seed)
+        run_directory = self.run_dir / "training" / self._run_name(model_name, loss_component, seed)
 
         components = InferenceComponentsResolver.for_run(run_directory)
         pipeline   = InferencePipeline(self.factory.inference_config(run_directory), components=components)

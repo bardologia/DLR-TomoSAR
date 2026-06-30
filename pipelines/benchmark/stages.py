@@ -15,14 +15,42 @@ from tools.monitoring.logger                    import Logger
 
 
 class SeedExpandedStage:
+    def _components(self, config: BenchmarkConfig) -> list[str | None]:
+        if config.training_type != "backbone":
+            return [None]
+
+        components = list(config.sweep_loss_components)
+        if not components:
+            raise SystemExit("sweep_loss_components is empty; select at least one loss component to sweep")
+
+        from pipelines.backbone.training.loss import LossComponentCatalog
+
+        valid   = set(LossComponentCatalog.names())
+        unknown = [component for component in components if component not in valid]
+        if unknown:
+            raise SystemExit(f"unknown loss component(s) {unknown}; valid: {', '.join(sorted(valid))}")
+
+        return components
+
+    def _unit_base(self, model: str, component: str | None) -> str:
+        return model if component is None else f"{model}__{component}"
+
     def _expand(self, config: BenchmarkConfig, models: list[str]) -> list[str]:
-        units      = SeedSet.units(models, config.seeds)
+        pairs      = [(model, component) for model in models for component in self._components(config)]
+        self._pair = {self._unit_base(model, component): (model, component) for model, component in pairs}
+
+        units      = SeedSet.units(list(self._pair.keys()), config.seeds)
         self._unit = {name: (base, seed) for base, seed, name in units}
+
         return [name for _, _, name in units]
 
     def _seed_command(self, action: str, name: str) -> list[str]:
-        base, seed = self._unit[name]
-        return [sys.executable, str(self.entry_script), "--worker", action, "--model", base, *SeedSet.cli_args(seed), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)]
+        base, seed       = self._unit[name]
+        model, component = self._pair[base]
+
+        loss_args = ["--loss-component", component] if component is not None else []
+
+        return [sys.executable, str(self.entry_script), "--worker", action, "--model", model, *loss_args, *SeedSet.cli_args(seed), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)]
 
 
 class OverfitStage(SeedExpandedStage, ExperimentStage):

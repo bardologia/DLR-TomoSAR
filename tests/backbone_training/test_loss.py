@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from configuration.training.general.loss import LossConfig
-from pipelines.backbone.training.loss    import LOSS_TERMS, Loss
+from pipelines.backbone.training.loss    import LOSS_TERMS, Loss, LossComponentCatalog
 
 from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
 
@@ -23,6 +23,34 @@ def test_loss_terms_table_is_consistent():
         assert term.use_flag.startswith("use_")
         assert term.weight_key.startswith("weight_")
         assert term.space in ("norm", "denorm")
+
+
+def test_catalog_names_match_loss_terms():
+    assert LossComponentCatalog.names() == tuple(term.name for term in LOSS_TERMS)
+
+
+def test_catalog_standalone_enables_only_the_named_term():
+    for term in LOSS_TERMS:
+        cfg = LossComponentCatalog.standalone(term.name)
+
+        assert getattr(cfg, term.use_flag)   is True
+        assert getattr(cfg, term.weight_key) == 1.0
+
+        other_flags_off = [not getattr(cfg, other.use_flag) for other in LOSS_TERMS if other.name != term.name]
+        assert all(other_flags_off)
+
+
+def test_catalog_rejects_unknown_component():
+    with pytest.raises(KeyError):
+        LossComponentCatalog.standalone("not_a_real_loss")
+
+
+def test_catalog_curriculum_is_disabled_with_matching_phases():
+    curriculum = LossComponentCatalog.curriculum("covariance_match")
+
+    assert curriculum.enabled is False
+    assert curriculum.warmup.use_covariance_match   is True
+    assert curriculum.complete.use_covariance_match is True
 
 
 def test_forward_returns_finite_scalar_total():
