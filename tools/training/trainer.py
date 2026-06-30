@@ -36,10 +36,11 @@ class BaseTrainer:
         self.model  = model.to(self.device)
         self.x_axis = torch.tensor(x_axis, device=self.device, dtype=torch.float32)
 
-        self.epochs               = config.training.epochs
-        self.validation_frequency = config.training.validation_frequency
-        self.accumulation_steps   = config.training.gradient_accumulation_steps
-        self.use_amp              = config.training.use_amp
+        self.epochs                  = config.training.epochs
+        self.validation_frequency    = config.training.validation_frequency
+        self.accumulation_steps      = config.training.gradient_accumulation_steps
+        self.use_amp                 = config.training.use_amp
+        self.abort_on_nonfinite_loss = config.training.abort_on_nonfinite_loss
 
         param_groups = self._build_param_groups()
 
@@ -156,7 +157,17 @@ class BaseTrainer:
                 loss = loss_dict["total_loss"] / self.accumulation_steps
 
                 if not torch.isfinite(loss):
-                    raise FloatingPointError(f"{self.stage_name} loss is non-finite at step {self.global_step}")
+                    if self.abort_on_nonfinite_loss:
+                        raise FloatingPointError(f"{self.stage_name} loss is non-finite at step {self.global_step}")
+
+                    self.logger.warning(f"{self.stage_name} loss is non-finite at step {self.global_step}; skipping batch (abort_on_nonfinite_loss disabled).")
+                    self.optimizer.zero_grad(set_to_none=True)
+                    self.warmup.step()
+                    self.global_step += 1
+                    self.tracker.set_step(self.global_step)
+                    _prog.update(_task, advance=1)
+                    continue
+
                 loss.backward()
 
                 if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:

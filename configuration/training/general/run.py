@@ -29,6 +29,7 @@ class TrainingQueueConfig:
 
     use_amp                     : bool = False
     gradient_accumulation_steps : int  = 1
+    abort_on_nonfinite_loss     : bool = True
 
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256

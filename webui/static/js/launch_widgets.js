@@ -2856,7 +2856,7 @@ class ConfigForm {
     ["slot presence", /presence|focal|active_normalization|active_weight|inactive_weight/],
     ["regularization", /smooth|_tv$/],
     ["physics", /total_power|moments|coherence_resyn|covariance_match|capon_|^physics_|wavelength|slant_range|look_angle|baseline|kz_values|height_axis/],
-    ["schedule", /epoch|validation|scheduler|warmup|eta_min/],
+    ["schedule", /epoch|validation|scheduler|warmup|eta_min|abort_on_nonfinite/],
     ["early stopping", /^early_stop/],
     ["image autoencoder", /image_autoencoder|image_ae_finetune|image_ae_loss/],
     ["profile autoencoder", /profile_autoencoder|target_provider|ema_decay|ae_finetune|^pixel_subsample$|keep_empty/],

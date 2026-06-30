@@ -25,6 +25,7 @@ class TrainingLoopConfig:
     gradient_accumulation_steps : int  = 1
     log_debug                   : bool = True
     log_all_losses              : bool = False
+    abort_on_nonfinite_loss     : bool = True
 
 
 @dataclass
