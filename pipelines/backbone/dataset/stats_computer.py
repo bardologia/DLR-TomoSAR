@@ -68,32 +68,36 @@ class StatsComputer:
         n_batches_est     = max(len(subset) // max(batch_size, 1), 1)
         vals_per_ch_batch = {g: max(64, max_vals_per_group // (n_batches_est * max(len(channels), 1))) for g, channels in group_channels.items()}
 
-        loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+        loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False, collate_fn=StatsComputer._collate_inputs)
         rng    = np.random.default_rng(42)
 
-        for batch in loader:
-            inp = batch[0] if isinstance(batch, (tuple, list)) else batch
-            arr = np.asarray(inp, dtype=np.float32)
+        for samples in loader:
+            try:
+                batches = [np.stack(samples, axis=0)]
+            except ValueError:
+                batches = [sample[np.newaxis] for sample in samples]
 
-            if arr.ndim == 3:
-                arr = arr[np.newaxis]
+            for arr in batches:
+                for g, channels in group_channels.items():
+                    if g not in needs_data:
+                        continue
 
-            for g, channels in group_channels.items():
-                if g not in needs_data:
-                    continue
+                    budget = vals_per_ch_batch[g]
 
-                budget = vals_per_ch_batch[g]
+                    for ch in channels:
+                        flat = arr[:, ch].ravel()
 
-                for ch in channels:
-                    flat = arr[:, ch].ravel()
+                        if len(flat) > budget:
+                            idx  = rng.choice(len(flat), budget, replace=False)
+                            flat = flat[idx]
 
-                    if len(flat) > budget:
-                        idx  = rng.choice(len(flat), budget, replace=False)
-                        flat = flat[idx]
-
-                    collected[g].append(flat)
+                        collected[g].append(flat)
 
         return {g: np.concatenate(v) for g, v in collected.items() if v}
+
+    @staticmethod
+    def _collate_inputs(items) -> list[np.ndarray]:
+        return [np.asarray(item[0] if isinstance(item, (tuple, list)) else item, dtype=np.float32) for item in items]
 
     @staticmethod
     def _fit_input(logger : Logger, group_keys : list[str], strategies : dict[str, ChannelStrategy], collected : dict[str, np.ndarray]) -> ChannelStats:
