@@ -7,7 +7,7 @@ import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
 from pipelines.shared.comparison.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
-from pipelines.benchmark.workers                       import BenchmarkWorker
+from pipelines.shared.training.worker_base             import WorkerBase
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
 from tools.data.io                                      import FileIO
 from tools.data.regions                                import SplitRegions
@@ -103,7 +103,7 @@ class FoldCollector(TrialCollector):
         return base_records, records_by_split
 
 
-class CrossValidationWorker(BenchmarkWorker):
+class CrossValidationWorker(WorkerBase):
     def __init__(self, config: CrossValidationConfig, run_tag: str) -> None:
         super().__init__(config=config, run_tag=run_tag)
         self.factory = FoldConfigFactory(config)

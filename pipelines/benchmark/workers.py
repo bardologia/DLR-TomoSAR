@@ -5,15 +5,13 @@ from pathlib import Path
 from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config.config_factory            import ConfigFactory
 from pipelines.shared.training.seed_sweep                import SeedSet
+from pipelines.shared.training.worker_base              import WorkerBase
 from tools.data.io                              import FileIO
-from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
 
 
-class BenchmarkWorker:
+class BenchmarkWorker(WorkerBase):
     def __init__(self, config: BenchmarkConfig, run_tag: str) -> None:
-        self.config  = config
-        self.run_tag = run_tag
-        self.run_dir = Path(config.paths.log_base_dir) / run_tag
+        super().__init__(config, run_tag)
         self.factory = ConfigFactory(config)
 
     def _run_name(self, model_name: str, component: str | None, seed: int | None) -> str:
@@ -53,15 +51,6 @@ class BenchmarkWorker:
             raise SystemExit(f"model '{model_name}' has no usable measured batch size: {entry}")
 
         return int(entry["batch_size"])
-
-    def _probe_config(self) -> LossScaleProbeConfig:
-        return LossScaleProbeConfig(
-            enabled        = False,
-            n_batches      = 100,
-            reference      = "param_l1",
-            exit_after     = True,
-            enabled_losses = {},
-        )
 
     def _ae_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
         from configuration.training import ProfileAeEntryConfig
