@@ -4,7 +4,7 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import argparse
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from _bootstrap import EnvironmentPinner
@@ -40,7 +40,7 @@ def main() -> None:
         if args.study_name is None or args.storage_url is None:
             sys.exit("ERROR: --worker requires --study-name and --storage-url")
 
-        tag    = args.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+        tag    = args.run_tag or RunTag.now()
         config = TuningEntryConfig()
         if args.run_dir:
             config = ConfigCli.load_resolved(config, Path(args.run_dir) / "resolved_config.json")
@@ -57,7 +57,7 @@ def main() -> None:
     else:
         cli    = ConfigCli(TuningEntryConfig(), description="Optuna hyperparameter tuning")
         config = cli.apply()
-        tag    = args.run_tag or config.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+        tag    = args.run_tag or config.run_tag or RunTag.now()
 
         if args.resume:
             if args.run_tag is None and config.run_tag is None:

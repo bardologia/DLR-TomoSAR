@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 from typing   import Any, Dict, List, Optional, Tuple
 
@@ -770,7 +770,7 @@ class Report:
         lines: List[str] = []
         lines.append("# TomoSAR Inference Report")
         lines.append("")
-        lines.append(f"_Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_")
+        lines.append(f"_Generated on {RunTag.timestamp()}_")
         lines.append("")
 
         lines += self._build_run_summary()

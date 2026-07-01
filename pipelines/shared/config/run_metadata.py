@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from tools.runtime.run_tag import RunTag
+
 from dataclasses import asdict
-from datetime    import datetime
 from pathlib     import Path
 
 import torch
@@ -21,7 +22,7 @@ class TrainingRunMetadata:
         self.model_name     = model_name
         self.base_logdir    = Path(base_logdir)
 
-        timestamp     = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp     = RunTag.now()
         resolved_name = run_name or f"run_{model_name}_{timestamp}"
 
         self.run_directory      = self.base_logdir / resolved_name

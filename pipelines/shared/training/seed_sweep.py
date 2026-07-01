@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from tools.runtime.run_tag import RunTag
+
 from dataclasses import replace
-from datetime    import datetime
 from typing      import Callable
 
 
@@ -41,7 +42,7 @@ class SeedSweepRunner:
         return SeedSet.resolve(getattr(self.config, "seeds", None), self.config.seed)
 
     def _base_run_name(self) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = RunTag.now()
         return self.config.run_name or f"run_{timestamp}"
 
     def _run_seed(self, base_name: str, seed: int):

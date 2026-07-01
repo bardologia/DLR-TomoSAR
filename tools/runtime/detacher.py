@@ -4,7 +4,7 @@ import os
 import signal
 import subprocess
 import sys
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 
@@ -33,7 +33,7 @@ class Detacher:
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        stamp    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stamp    = RunTag.now()
         name     = Path(sys.argv[0]).stem
         log_path = self.log_dir / f"{name}_{stamp}.out"
 

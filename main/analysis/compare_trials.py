@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from _bootstrap import EnvironmentPinner
@@ -22,7 +22,7 @@ def main() -> None:
 
     runs_dir  = Path(config.runs_dir)
     base_out  = Path(config.output_dir) if config.output_dir else runs_dir / "_comparison"
-    out_dir   = base_out / datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_dir   = base_out / RunTag.now()
 
     with Logger(log_dir=str(out_dir / "logs"), name="compare_trials") as logger:
         logger.section("Trial comparison")

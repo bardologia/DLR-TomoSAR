@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import os
 import re
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 from typing   import List
 
@@ -15,7 +15,7 @@ class ReportAssets:
     def __init__(self, base: Path, embed_images: bool = False, timestamp: str | None = None) -> None:
         self.base         = Path(base)
         self.embed_images = embed_images
-        self.timestamp    = timestamp if timestamp is not None else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.timestamp    = timestamp if timestamp is not None else RunTag.timestamp()
 
     def rel(self, target: Path) -> str:
         return Path(os.path.relpath(Path(target).resolve(), self.base.resolve())).as_posix()

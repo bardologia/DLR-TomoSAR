@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.inference import InferenceConfig
@@ -13,7 +13,7 @@ class InferenceMetadata:
         paths       = config.paths
 
         base = config.run_directory / "inference"
-        self.output_dir     = base / config.output_subdir if config.output_subdir else base / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.output_dir     = base / config.output_subdir if config.output_subdir else base / RunTag.now()
         self.figures_dir    = self.output_dir / paths.figures_subdir
         self.animations_dir = self.output_dir / paths.animations_subdir
         self.logs_dir       = self.output_dir / paths.logs_subdir

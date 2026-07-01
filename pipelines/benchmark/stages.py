@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from tools.runtime.run_tag import RunTag
+
 import sys
 from dataclasses import asdict
-from datetime    import datetime
 from pathlib     import Path
 
 from configuration.benchmark import BenchmarkConfig
@@ -98,7 +99,7 @@ class MaxBatchStage(ExperimentStage):
 
         lines = [
             "# Maximum Batch Size Report",
-            f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  —  run tag `{self.run_tag}`_\n",
+            f"\n_Generated {RunTag.timestamp()}  —  run tag `{self.run_tag}`_\n",
             f"Largest power-of-two batch size whose peak training memory stays under **{budget:g} GB** and below **{ceiling}**.",
             f"Measured at patch size {self.config.training.patch_size[0]} with {self.config.size_match.in_channels} input channels.\n",
             "## Results\n",
@@ -195,7 +196,7 @@ class SizeMatchStage(ExperimentStage):
     def _write_report(self, records: dict, target: int) -> None:
         lines = [
             "# Capacity Matching Report",
-            f"\n_Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  —  run tag `{self.run_tag}`_\n",
+            f"\n_Generated {RunTag.timestamp()}  —  run tag `{self.run_tag}`_\n",
             f"Reference model `{self.config.size_match.reference_model}` at **{target:,}** parameters.",
             f"Counting performed with {self.config.size_match.in_channels} input channels, {self.config.n_gaussians * 3} output channels, image size {self.config.training.patch_size[0]}.\n",
             "## Matched Widths\n",
@@ -291,7 +292,7 @@ class ComparisonStage(ExperimentStage):
         collector = BenchmarkSeedCollector(run_dir=self.run_dir, logger=self.logger)
         records   = collector.collect()
 
-        out_dir = self.run_dir / "comparison" / datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_dir = self.run_dir / "comparison" / RunTag.now()
 
         report = ComparisonReport(
             records         = records,

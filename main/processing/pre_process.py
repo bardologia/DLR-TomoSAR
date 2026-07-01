@@ -5,7 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import _bootstrap
 
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 
 from configuration.sar.processing_config import (
     CropRegion,
@@ -25,7 +25,7 @@ def main() -> None:
     logger = Logger(log_dir="logs", name="pre_process")
 
     global_crop    = CropRegion(azimuth_start=config.azimuth_start, azimuth_end=config.azimuth_end, range_start=config.range_start, range_end=config.range_end)
-    run_identifier = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_identifier = RunTag.now()
 
     logger.section("Pre-processing queue")
     logger.kv_table({

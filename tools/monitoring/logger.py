@@ -6,6 +6,8 @@ from datetime   import datetime
 from pathlib    import Path
 from typing     import Any, Mapping, Optional, Sequence
 
+from tools.runtime.run_tag import RunTag
+
 from rich.console import Console
 from rich.live    import Live
 from rich.logging import RichHandler
@@ -310,7 +312,7 @@ class Logger:
             table.add_row(func_name, nc, f"{tt:.6f}", f"{per_call_total:.6f}", f"{ct:.6f}", f"{per_call_cum:.6f}", f"{filename}:{lineno}")
 
         doc = MarkdownDoc("Profiler Results")
-        doc.paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        doc.paragraph(f"Generated: {RunTag.timestamp()}")
         doc.table(table)
         doc.save(output)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.cross_validation import CrossValidationConfig
@@ -140,7 +140,7 @@ class CrossValidationReportStage(ExperimentStage):
         collector = FoldCollector(run_dir=self.run_dir, splits=splits, logger=self.logger)
         base_records, records_by_split = collector.collect_by_split()
 
-        out_dir = self.run_dir / "reports" / datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_dir = self.run_dir / "reports" / RunTag.now()
 
         report = CrossValidationReport(
             base_records     = base_records,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.cross_validation import CrossValidationConfig
@@ -15,7 +15,7 @@ class CrossValidationPipeline:
     def __init__(self, config: CrossValidationConfig, entry_script: Path) -> None:
         self.config       = config
         self.entry_script = entry_script
-        self.run_tag      = config.run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.run_tag      = config.run_tag or RunTag.now()
 
         self.run_dir      = Path(config.paths.log_base_dir) / self.run_tag
         self.pipeline_dir = self.run_dir / "pipeline"
@@ -59,7 +59,7 @@ class CrossValidationPipeline:
     def _mark_stage(self, stage_name: str, status: str) -> None:
         self.state["stages"][stage_name] = {
             "status"    : status,
-            "timestamp" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp" : RunTag.timestamp(),
         }
 
         FileIO.save_json(self.state, self.state_path, indent=2)

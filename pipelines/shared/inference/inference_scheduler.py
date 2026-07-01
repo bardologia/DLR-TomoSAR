@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.inference       import InferenceEntryConfig
@@ -17,7 +17,7 @@ class InferenceScheduler:
         self.entry_script = entry_script
         self.run_type     = run_type
         self.logs_dirs    = [Path(d) for d in config.logs_dirs]
-        self.work_dir     = Path("logs") / "inference" / run_type / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.work_dir     = Path("logs") / "inference" / run_type / RunTag.now()
 
     def _roots(self, logger: Logger) -> list[Path]:
         present = [root for root in self.logs_dirs if root.is_dir()]

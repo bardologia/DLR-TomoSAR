@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 import numpy as np
@@ -37,7 +37,7 @@ class CrossValidationReport:
         self.seed_dispersion  = seed_dispersion or {}
         self.has_seed_sweep   = any(entry["n_seeds"] > 1 for entry in self.seed_dispersion.values())
         self.grouper          = MetricSectionGrouper()
-        self.timestamp        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.timestamp        = RunTag.timestamp()
 
     def _seed_std(self, fold_name: str, split: str | None, key: str) -> float | None:
         entry = self.seed_dispersion.get(fold_name)

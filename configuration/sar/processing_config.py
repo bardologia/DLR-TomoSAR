@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from tools.runtime.run_tag import RunTag
+
 import math
 import os
 from dataclasses import dataclass, field
-from datetime    import datetime
 from pathlib     import Path
 from typing      import ClassVar, Dict, List, Optional, Tuple
 
@@ -131,7 +132,7 @@ class ProcessingConfig:
 
     def __post_init__(self) -> None:
         if self.paths.run_subdirectory is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = RunTag.now()
             self.paths.run_subdirectory = f"run_{self.tomogram_tag}_{timestamp}"
 
 @dataclass
