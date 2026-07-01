@@ -8,7 +8,7 @@ import optuna
 import pytest
 
 from optuna.trial             import TrialState
-from pipelines.tuning.pipeline import TuningOrchestrator
+from pipelines.tuning.pipeline import TuningScheduler
 
 
 class StubLogger:
@@ -47,9 +47,9 @@ def _make_config(tmp_path: Path, n_trials: int = 10):
     )
 
 
-def _orchestrator(tmp_path: Path, n_trials: int = 10) -> TuningOrchestrator:
+def _orchestrator(tmp_path: Path, n_trials: int = 10) -> TuningScheduler:
     cfg  = _make_config(tmp_path, n_trials=n_trials)
-    orch = TuningOrchestrator("testtag", cfg, entry_script=tmp_path / "entry.py")
+    orch = TuningScheduler("testtag", cfg, entry_script=tmp_path / "entry.py")
     orch.logger = StubLogger()
     return orch
 

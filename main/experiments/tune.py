@@ -29,7 +29,8 @@ def main() -> None:
         EnvironmentPinner.threads()
 
     from configuration.tuning import TuningEntryConfig
-    from pipelines.tuning.pipeline               import TuningOrchestrator
+    from pipelines.tuning.pipeline               import TuningScheduler
+    from pipelines.tuning.workers                import TuningWorker
     from tools.runtime.config_cli                import ConfigCli
 
     entry_script = Path(__file__).resolve()
@@ -45,8 +46,8 @@ def main() -> None:
         if args.run_dir:
             config = ConfigCli.load_resolved(config, Path(args.run_dir) / "resolved_config.json")
 
-        orchestrator = TuningOrchestrator(tag=tag, config=config, entry_script=entry_script)
-        orchestrator.run_worker(
+        worker = TuningWorker(tag=tag, config=config)
+        worker.run_worker(
             model_name  = args.model,
             gpu_id      = args.gpu,
             n_trials    = args.n_trials,
@@ -70,8 +71,8 @@ def main() -> None:
             config = ConfigCli.load_resolved(TuningEntryConfig(), resolved_path)
             config = ConfigCli.apply_overrides(config, cli.overrides)
 
-        orchestrator = TuningOrchestrator(tag=tag, config=config, entry_script=entry_script)
-        orchestrator.schedule(target_model=args.model, resume=args.resume)
+        scheduler = TuningScheduler(tag=tag, config=config, entry_script=entry_script)
+        scheduler.schedule(target_model=args.model, resume=args.resume)
 
 
 if __name__ == "__main__":
