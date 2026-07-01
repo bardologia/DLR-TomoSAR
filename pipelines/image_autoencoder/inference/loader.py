@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib     import Path
 
-import numpy as np
 from torch.utils.data import DataLoader
 
 from configuration.inference.image_autoencoder import ImageAeInferenceConfig
@@ -13,7 +12,6 @@ from pipelines.backbone.dataset.stats          import Stats
 from pipelines.backbone.inference.loader       import RunLoader
 from pipelines.shared.config.config_persistence       import ImageAutoencoderConfigIO
 from tools.data.regions                        import CropRegion
-from tools.monitoring.logger                   import Logger
 
 
 @dataclass
@@ -34,9 +32,6 @@ class ImageAeRun:
 
 
 class ImageAeRunLoader(RunLoader):
-    def __init__(self, run_directory: Path, logger: Logger) -> None:
-        super().__init__(run_directory, logger)
-
     def _read_run_summary(self) -> dict:
         summary = self._read_json("run_summary.json")
 
