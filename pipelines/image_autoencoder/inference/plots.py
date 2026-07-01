@@ -9,17 +9,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from tools.reporting.plotting import PlotBase
+from pipelines.autoencoder_common.inference.plots import AePlotsBase
 
 
-class ImageAePlots(PlotBase):
+class ImageAePlots(AePlotsBase):
     INTENSITY_CMAP = "viridis"
     ERROR_CMAP     = "magma"
-
-    def __init__(self, fig_dpi: int = 150, save_dpi: int = 300) -> None:
-        self.fig_dpi  = fig_dpi
-        self.save_dpi = save_dpi
-        self._apply_style()
+    ERROR_XLABEL   = r"$\log_{10}$ per-patch MSE"
 
     def _patch_triplet(self, gt: np.ndarray, pred: np.ndarray, mse: float, label: str, rank: int, figures_dir: Path) -> List[Path]:
         stem = figures_dir / "reconstructions" / f"{label}_{rank + 1:02d}"
@@ -41,18 +37,6 @@ class ImageAePlots(PlotBase):
             paths.extend(self._patch_triplet(gt[idx, 0], pred[idx, 0], float(mse[idx]), label, rank, figures_dir))
 
         return paths
-
-    def _error_histogram(self, mse: np.ndarray, figures_dir: Path) -> Path:
-        fig, ax = plt.subplots(figsize=(6.2, 4.0))
-
-        values = np.log10(np.maximum(mse, 1e-12))
-        ax.hist(values, bins=self._bins(values), color="#34495e", edgecolor="white", linewidth=0.3)
-
-        ax.set_xlabel(r"$\log_{10}$ per-patch MSE")
-        ax.set_ylabel("count")
-        ax.set_title("Reconstruction error distribution")
-
-        return self._save(fig, figures_dir / "error_histogram.png")
 
     def _channel_mse(self, channel_mse: List[float], figures_dir: Path) -> Path:
         fig, ax = plt.subplots(figsize=(6.2, 4.0))
@@ -88,31 +72,6 @@ class ImageAePlots(PlotBase):
         ax.set_ylim(lo, hi)
 
         return self._save(fig, figures_dir / "intensity_scatter.png")
-
-    def _embedding_norm(self, embeddings: np.ndarray, figures_dir: Path) -> Path:
-        norms = np.linalg.norm(embeddings, axis=1)
-
-        fig, ax = plt.subplots(figsize=(6.2, 4.0))
-        ax.hist(norms, bins=self._bins(norms), color="#117a65", edgecolor="white", linewidth=0.3)
-
-        ax.set_xlabel("embedding L2 norm")
-        ax.set_ylabel("count")
-        ax.set_title("Latent embedding norm distribution")
-
-        return self._save(fig, figures_dir / "embedding_norm.png")
-
-    def _bins(self, values: np.ndarray, target: int = 60) -> int:
-        finite = np.asarray(values)[np.isfinite(values)]
-        if finite.size < 2:
-            return 1
-
-        lo, hi = float(finite.min()), float(finite.max())
-        spread = hi - lo
-        floor  = np.spacing(max(abs(lo), abs(hi), 1.0)) * target
-        if spread <= floor:
-            return 1
-
-        return min(target, finite.size)
 
     def compose(self, result, channel_mse: List[float], mse: np.ndarray, cfg, figures_dir: Path) -> Dict[str, List[Path]]:
         gt   = result.gt
