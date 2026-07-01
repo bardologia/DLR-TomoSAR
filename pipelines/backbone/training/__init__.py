@@ -9,7 +9,7 @@ def __getattr__(name):
         from pipelines.shared.config.run_metadata import TrainingRunMetadata
         return TrainingRunMetadata
     if name == "SingleTrainRunner":
-        from pipelines.backbone.training.pipeline import SingleTrainRunner
+        from pipelines.backbone.training.launcher import SingleTrainRunner
         return SingleTrainRunner
     raise AttributeError(f"module 'backbone.training' has no attribute '{name}'")
 

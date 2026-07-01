@@ -16,7 +16,7 @@ def main() -> None:
 
     EnvironmentPinner.gpu(args.gpu, expandable_segments=True)
 
-    from pipelines.backbone.training.pipeline import BackboneTrainingLauncher
+    from pipelines.backbone.training.launcher import BackboneTrainingLauncher
     BackboneTrainingLauncher(entry_script=Path(__file__).resolve()).run()
 
 
