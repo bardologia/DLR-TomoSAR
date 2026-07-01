@@ -169,10 +169,17 @@ def test_overfit_key_strips_loss_component_but_keeps_seed():
     assert TrialCollector._overfit_key("unet")                         == "unet"
 
 
-def test_loss_agnostic_overfit_result_attaches_to_every_component(tmp_path, logger_stub):
+def test_model_of_strips_both_loss_component_and_seed():
+    assert TrialCollector._model_of("unet__covariance_match_seed3") == "unet"
+    assert TrialCollector._model_of("resunet_multihead__mse_curve") == "resunet_multihead"
+    assert TrialCollector._model_of("unet_seed2")                   == "unet"
+    assert TrialCollector._model_of("unet")                         == "unet"
+
+
+def test_size_match_and_overfit_attach_to_every_component(tmp_path, logger_stub):
     pipe = tmp_path / "pipeline"
     pipe.mkdir(parents=True)
-    _write_json(pipe / "size_match.json", {})
+    _write_json(pipe / "size_match.json", {"unet": {"parameters": 12345, "overrides": {}}})
     _write_json(pipe / "overfit_results.json", [
         {"model": "unet", "status": "PASS", "final_loss": 1e-4, "converged": True},
     ])
@@ -185,7 +192,9 @@ def test_loss_agnostic_overfit_result_attaches_to_every_component(tmp_path, logg
 
     assert {record.name for record in records} == {"unet__param_l1", "unet__covariance_match"}
     for record in records:
-        assert record.overfit["final_loss"] == pytest.approx(1e-4)
+        assert record.overfit["final_loss"]      == pytest.approx(1e-4)
+        assert record.size_match["parameters"]   == 12345
+        assert record.parameters                 == 12345
 
 
 def test_seed_collector_single_run_is_identity(tmp_path, logger_stub):
