@@ -341,6 +341,5 @@ class StatsComputer:
             logger        = logger,
         )
 
-        merged       = Stats.merge(input_only, output_only)
-        merged.clamp = normalization.clamp()
+        merged = Stats.merge(input_only, output_only, normalization.clamp())
         return merged

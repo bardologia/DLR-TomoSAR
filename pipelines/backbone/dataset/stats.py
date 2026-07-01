@@ -50,8 +50,9 @@ class Stats:
         return cls(input_stats = input_stats, output_stats = output_stats, clamp = clamp)
 
     @classmethod
-    def merge(cls, input_only: "Stats", output_only: "Stats") -> "Stats":
+    def merge(cls, input_only: "Stats", output_only: "Stats", clamp: OutputClampConfig) -> "Stats":
         return cls(
             input_stats  = input_only.input_stats,
             output_stats = output_only.output_stats,
+            clamp        = clamp,
         )
