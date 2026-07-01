@@ -15,7 +15,7 @@ from configuration.param_extraction import ExtractParamsEntryConfig, FitSettings
 from pipelines.processing.param_extraction.metrics import (
     FittingMetricsCalculator,
     KSelectionDiagnostics,
-    SnrEstimator,
+    ContrastEstimator,
 )
 from pipelines.processing.param_extraction.pipeline import ExtractionPlanResolver, ParameterExtractor
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
@@ -266,7 +266,7 @@ def test_stored_mse_matches_reconstruction_from_params(tomogram_full, parameters
 @pytest.mark.real_data
 def test_snr_estimator_runs(tomogram_full, logger):
     win = np.array(tomogram_full[:, :32, :32])
-    snr = SnrEstimator(logger).run(win)
+    snr = ContrastEstimator(logger).run(win)
 
     assert snr.shape == (32, 32)
     finite = snr[np.isfinite(snr)]

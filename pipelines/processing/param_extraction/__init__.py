@@ -1,5 +1,5 @@
 from configuration.param_extraction    import ExtractionConfig
-from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator, KSelectionDiagnostics, SnrEstimator
+from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator, KSelectionDiagnostics, ContrastEstimator
 from pipelines.processing.param_extraction.pipeline import DatasetQueueResolver, ExtractionMetadataManager, ParameterExtractor, ParameterIO, ParamExtractionPipeline
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 
@@ -13,5 +13,5 @@ __all__ = [
     "ParameterExtractor",
     "ParameterIO",
     "ParamExtractionPipeline",
-    "SnrEstimator",
+    "ContrastEstimator",
 ]

@@ -13,7 +13,7 @@ from tools.data.gaussians     import GaussianMixture
 from tools.monitoring.logger  import Logger
 
 
-class SnrEstimator:
+class ContrastEstimator:
     def __init__(self, logger : Logger, floor_fraction : float = 0.25, range_chunk : int = 512) -> None:
         self.logger         = logger
         self.floor_fraction = floor_fraction
@@ -144,7 +144,7 @@ class FittingMetricsCalculator:
         self.truncation_index = truncation_index
         self.amp_threshold    = amp_threshold
 
-        self.snr_estimator = SnrEstimator(logger=logger)
+        self.contrast_estimator = ContrastEstimator(logger=logger)
         self.k_diagnostics = KSelectionDiagnostics(k_max=n_gaussians, logger=logger)
 
     @staticmethod
@@ -283,7 +283,7 @@ class FittingMetricsCalculator:
         self.logger.subsection(f"Height range    : [{height_range[0]:.1f}, {height_range[1]:.1f}] m")
 
         self.logger.subsection("Computing per-pixel peak-to-floor contrast map (peak over lowest-quartile profile amplitude, uncalibrated proxy)")
-        snr_db_map = self.snr_estimator.run(tomogram)
+        snr_db_map = self.contrast_estimator.run(tomogram)
 
         self.logger.subsection(f"Applying fitter preprocessing for R² (threshold_factor={self.threshold_factor}, truncation_index={self.truncation_index})")
         tomogram = ProfilePreprocessor.apply(tomogram, self.threshold_factor, self.truncation_index)

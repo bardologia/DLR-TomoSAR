@@ -10,7 +10,7 @@ import numpy as np
 
 from pipelines.comparison.metric_table           import MetricTableRenderer
 from pipelines.comparison.spatial_stats          import SpatialDispersion
-from pipelines.processing.param_extraction.metrics import SnrEstimator
+from pipelines.processing.param_extraction.metrics import ContrastEstimator
 from tools.data.io                               import FileIO
 from tools.reporting.markdown                    import MarkdownDoc
 from tools.reporting.plotting                    import PlotBase
@@ -106,7 +106,7 @@ class WindowMetrics:
         return [starts[index] for index in picks]
 
     def _chunk_maps(self, amp: np.ndarray) -> tuple:
-        contrast, peak = SnrEstimator.contrast_from_amplitude(amp, self.FLOOR_FRACTION)
+        contrast, peak = ContrastEstimator.contrast_from_amplitude(amp, self.FLOOR_FRACTION)
 
         middle  = amp[1:-1]
         is_peak = (middle > amp[:-2]) & (middle >= amp[2:]) & (middle > self.SPURIOUS_FRACTION * peak[None, :, :])
