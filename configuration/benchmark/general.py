@@ -6,7 +6,8 @@ from configuration.benchmark.jepa       import JepaBenchConfig
 from configuration.dataset              import AugmentationConfig, InputConfig
 from configuration.normalization.general import NormalizationConfig
 from configuration.sar.geometry_config  import GeometryConfig
-from configuration.training.general.loss import LossConfig
+from configuration.training.backbone     import default_curriculum
+from configuration.training.general.loss import LossCurriculumConfig
 from configuration.training.general.run import RunPathsConfig, TrainingQueueConfig
 
 
@@ -95,7 +96,7 @@ class BenchmarkConfig:
     geometry      : GeometryConfig      = field(default_factory=GeometryConfig)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
-    loss          : LossConfig          = field(default_factory=LossConfig)
+    curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
     predict_presence : bool             = False
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)

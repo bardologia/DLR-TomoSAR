@@ -146,7 +146,7 @@ class ConfigFactory:
         from pipelines.backbone.training.loss import LossComponentCatalog
 
         overfit    = self.config.overfit
-        gate_loss  = LossComponentCatalog.standalone("param_l1", base=self.config.loss)
+        gate_loss  = LossComponentCatalog.standalone("param_l1", base=self.config.curriculum.complete)
 
         return BackboneTrainerConfig(
             **self._base_trainer_kwargs(logdir),

@@ -16,7 +16,7 @@ from configuration.training.general.runtime     import IOConfig, MemoryConfig, O
 from configuration.training.general.pretraining import PretrainConfig
 
 
-def _default_curriculum() -> LossCurriculumConfig:
+def default_curriculum() -> LossCurriculumConfig:
     warmup = LossConfig(
         use_l1_curve             = True,
         weight_l1_curve          = 1.0,
@@ -172,7 +172,7 @@ class BackboneEntryConfig:
     paths      : RunPathsConfig       = field(default_factory=RunPathsConfig)
     training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
     pretrain   : PretrainConfig       = field(default_factory=PretrainConfig)
-    curriculum : LossCurriculumConfig = field(default_factory=_default_curriculum)
+    curriculum : LossCurriculumConfig = field(default_factory=default_curriculum)
     geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
     input      : InputConfig          = field(default_factory=InputConfig.full_stack)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
