@@ -10,7 +10,7 @@ from typing      import Optional
 import torch
 
 from tools                            import NullLogger, NullTracker
-from pipelines.backbone.training.loss import LOSS_TERMS
+from pipelines.backbone.training.loss_terms import LOSS_TERMS
 
 
 @dataclass

@@ -22,7 +22,7 @@ class BenchmarkWorker(WorkerBase):
         if component is None:
             return
 
-        from pipelines.backbone.training.loss import LossComponentCatalog
+        from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
         trainer_config.curriculum = LossComponentCatalog.curriculum(component, base=self.config.curriculum.complete)
 

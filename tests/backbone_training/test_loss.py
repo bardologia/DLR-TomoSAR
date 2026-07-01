@@ -5,7 +5,8 @@ import pytest
 import torch
 
 from configuration.training.general.loss import LossConfig
-from pipelines.backbone.training.loss    import LOSS_TERMS, Loss, LossComponentCatalog
+from pipelines.backbone.training.loss       import Loss
+from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
 from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
 

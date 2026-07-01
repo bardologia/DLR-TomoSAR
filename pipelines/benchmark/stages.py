@@ -25,7 +25,7 @@ class SeedExpandedStage:
         if not components:
             raise SystemExit("sweep_loss_components is empty; select at least one loss component to sweep")
 
-        from pipelines.backbone.training.loss import LossComponentCatalog
+        from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
         valid   = set(LossComponentCatalog.names())
         unknown = [component for component in components if component not in valid]
