@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from pipelines.benchmark.results import BenchmarkSeedCollector, ComparisonReport, TrialCollector, TrialRecord
+from pipelines.benchmark.results import BenchmarkSeedCollector
+from pipelines.shared.comparison.comparison_report import ComparisonReport
+from pipelines.shared.comparison.trial_collection import TrialCollector, TrialRecord
 
 from tools.data.io import FileIO
 

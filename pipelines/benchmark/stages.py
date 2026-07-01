@@ -7,7 +7,8 @@ from dataclasses import asdict
 from pathlib     import Path
 
 from configuration.benchmark import BenchmarkConfig
-from pipelines.benchmark.results                import BenchmarkSeedCollector, ComparisonReport
+from pipelines.benchmark.results                import BenchmarkSeedCollector
+from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
 from pipelines.shared.training.seed_sweep                import SeedSet
 from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage

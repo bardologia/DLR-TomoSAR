@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from configuration.cross_validation import CrossValidationConfig, FoldConfig
-from pipelines.benchmark.results      import TrialRecord
+from pipelines.shared.comparison.trial_collection import TrialRecord
 from pipelines.cross_validation.cv_report import CrossValidationReport
 from pipelines.cross_validation.folds     import FoldNaming, FoldPlanner
 from tools.monitoring.logger              import Logger
