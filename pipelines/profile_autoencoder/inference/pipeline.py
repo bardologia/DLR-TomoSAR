@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 import numpy as np
@@ -11,23 +10,12 @@ from pipelines.profile_autoencoder.inference.metrics     import ProfileAeMetrics
 from pipelines.profile_autoencoder.inference.plots       import ProfileAePlots
 from pipelines.profile_autoencoder.inference.predictor   import ProfileAePredictor
 from pipelines.profile_autoencoder.inference.report      import ProfileAeReport
-from tools.data.io                                       import FileIO
+from pipelines.autoencoder_common.inference.metadata     import AeInferenceMetadata
 from tools.monitoring.logger                             import Logger
 
 
-class ProfileAeInferenceMetadata:
-    def __init__(self, config: ProfileAeInferenceConfig) -> None:
-        paths = config.paths
-
-        base = config.run_directory / "inference" / "profile_ae"
-        self.output_dir   = base / config.output_subdir if config.output_subdir else base / RunTag.now()
-        self.figures_dir  = self.output_dir / paths.figures_subdir
-        self.logs_dir     = self.output_dir / paths.logs_subdir
-        self.metrics_path = self.output_dir / paths.metrics_filename
-        self.report_path  = self.output_dir / paths.report_filename
-
-    def create_dirs(self) -> None:
-        FileIO.ensure_dirs(self.output_dir, self.figures_dir, self.logs_dir)
+class ProfileAeInferenceMetadata(AeInferenceMetadata):
+    SUBDIR = "profile_ae"
 
 
 class ProfileAeInferencePipeline:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.inference.image_autoencoder        import ImageAeInferenceConfig
@@ -9,23 +8,12 @@ from pipelines.image_autoencoder.inference.metrics    import ImageAeMetrics
 from pipelines.image_autoencoder.inference.plots      import ImageAePlots
 from pipelines.image_autoencoder.inference.predictor  import ImageAePredictor
 from pipelines.image_autoencoder.inference.report     import ImageAeReport
-from tools.data.io                                    import FileIO
+from pipelines.autoencoder_common.inference.metadata  import AeInferenceMetadata
 from tools.monitoring.logger                          import Logger
 
 
-class ImageAeInferenceMetadata:
-    def __init__(self, config: ImageAeInferenceConfig) -> None:
-        paths = config.paths
-
-        base = config.run_directory / "inference" / "image_ae"
-        self.output_dir   = base / config.output_subdir if config.output_subdir else base / RunTag.now()
-        self.figures_dir  = self.output_dir / paths.figures_subdir
-        self.logs_dir     = self.output_dir / paths.logs_subdir
-        self.metrics_path = self.output_dir / paths.metrics_filename
-        self.report_path  = self.output_dir / paths.report_filename
-
-    def create_dirs(self) -> None:
-        FileIO.ensure_dirs(self.output_dir, self.figures_dir, self.logs_dir)
+class ImageAeInferenceMetadata(AeInferenceMetadata):
+    SUBDIR = "image_ae"
 
 
 class ImageAeInferencePipeline:
