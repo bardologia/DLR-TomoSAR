@@ -143,7 +143,10 @@ class ConfigFactory:
         )
 
     def overfit_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
-        overfit = self.config.overfit
+        from pipelines.backbone.training.loss import LossComponentCatalog
+
+        overfit    = self.config.overfit
+        gate_loss  = LossComponentCatalog.standalone("param_l1", base=self.config.loss)
 
         return BackboneTrainerConfig(
             **self._base_trainer_kwargs(logdir),
@@ -167,8 +170,8 @@ class ConfigFactory:
 
             curriculum = LossCurriculumConfig(
                 enabled  = False,
-                warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-                complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
+                warmup   = gate_loss,
+                complete = gate_loss,
             ),
         )
 

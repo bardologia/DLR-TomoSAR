@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections import namedtuple
 
 import torch
@@ -42,21 +43,24 @@ class LossComponentCatalog:
         return tuple(term.name for term in LOSS_TERMS)
 
     @classmethod
-    def standalone(cls, name: str) -> LossConfig:
+    def standalone(cls, name: str, base: LossConfig | None = None) -> LossConfig:
         if name not in cls._TERMS:
             raise KeyError(f"unknown loss component '{name}'; valid: {', '.join(cls.names())}")
 
-        term = cls._TERMS[name]
-        cfg  = LossConfig()
+        cfg = copy.deepcopy(base) if base is not None else LossConfig()
 
+        for other in LOSS_TERMS:
+            setattr(cfg, other.use_flag, False)
+
+        term = cls._TERMS[name]
         setattr(cfg, term.use_flag,   True)
         setattr(cfg, term.weight_key, 1.0)
 
         return cfg
 
     @classmethod
-    def curriculum(cls, name: str) -> LossCurriculumConfig:
-        cfg = cls.standalone(name)
+    def curriculum(cls, name: str, base: LossConfig | None = None) -> LossCurriculumConfig:
+        cfg = cls.standalone(name, base=base)
         return LossCurriculumConfig(enabled=False, warmup=cfg, complete=cfg)
 
 
