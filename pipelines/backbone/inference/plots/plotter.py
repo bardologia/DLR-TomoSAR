@@ -8,7 +8,7 @@ from pipelines.backbone.inference.plots.track import TrackPlotter
 from pipelines.backbone.inference.plots.organization import SlotOrganizationPlotter
 
 
-class Ploter(PlotTools):
+class Plotter(PlotTools):
     def __init__(
         self,
         cmap     : str  = "jet",

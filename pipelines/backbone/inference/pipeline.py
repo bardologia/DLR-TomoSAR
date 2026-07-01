@@ -11,7 +11,7 @@ from pipelines.backbone.inference.figures     import FigureComposer
 from pipelines.backbone.inference.loader      import RunLoader
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics     import Metrics
-from pipelines.backbone.inference.plots       import Ploter
+from pipelines.backbone.inference.plots       import Plotter
 from pipelines.backbone.inference.predictor   import Predictor
 from pipelines.backbone.inference.report      import Report, ReportPayloadBuilder
 from tools.monitoring.logger                  import Logger
@@ -29,7 +29,7 @@ class InferencePipeline:
         self.config     = config
         self.components = components if components is not None else InferenceComponents()
 
-    def _setup(self, cfg: InferenceConfig) -> tuple[InferenceMetadata, Logger, Ploter]:
+    def _setup(self, cfg: InferenceConfig) -> tuple[InferenceMetadata, Logger, Plotter]:
         meta = InferenceMetadata(cfg)
         meta.create_dirs()
         np.random.seed(cfg.seed)
@@ -43,7 +43,7 @@ class InferencePipeline:
             "Device":        cfg.device,
         })
 
-        plotter = Ploter(
+        plotter = Plotter(
             cmap      = cfg.cmap_intensity,
             err_cmap  = cfg.cmap_error,
             normalize = cfg.normalize_intensity,

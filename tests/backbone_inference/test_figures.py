@@ -14,7 +14,7 @@ from tools.data.regions import CropRegion
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics  import Metrics, Result
 from pipelines.backbone.inference.figures  import Animator, FigureComposer
-from pipelines.backbone.inference.plots    import Ploter
+from pipelines.backbone.inference.plots    import Plotter
 
 
 N_GAUSSIANS = 2
@@ -112,7 +112,7 @@ def _composer(tmp_path):
     cfg  = InferenceConfig(run_directory=tmp_path, output_subdir="fig", device="cpu", normalize_intensity=False)
     meta = InferenceMetadata(cfg)
     meta.create_dirs()
-    plotter = Ploter(normalize=False)
+    plotter = Plotter(normalize=False)
     return FigureComposer(plotter=plotter, meta=meta, logger=_SilentLogger(), cfg=cfg), meta
 
 

@@ -9,7 +9,7 @@ from configuration.inference import InferenceConfig
 from pipelines.backbone.inference.animation import Animator
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics    import Metrics, Result
-from pipelines.backbone.inference.plots      import Ploter
+from pipelines.backbone.inference.plots      import Plotter
 from tools                                   import ProfileNormalizer
 from tools.monitoring.logger                 import Logger
 
@@ -17,7 +17,7 @@ from tools.monitoring.logger                 import Logger
 class FigureComposer:
     def __init__(
         self,
-        plotter : Ploter,
+        plotter : Plotter,
         meta    : InferenceMetadata,
         logger  : Logger,
         cfg     : InferenceConfig,

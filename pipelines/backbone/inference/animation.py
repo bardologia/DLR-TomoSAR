@@ -14,7 +14,7 @@ import numpy             as np
 from PIL  import Image
 from tqdm import tqdm
 
-from pipelines.backbone.inference.plots import PlotTools, Ploter
+from pipelines.backbone.inference.plots import PlotTools, Plotter
 from tools.monitoring.logger            import Logger
 
 
@@ -206,7 +206,7 @@ class Animator:
         rg_offset    : int,
         full_cube    : np.ndarray | None = None,
     ) -> Path:
-        plt.rcParams.update(Ploter.SCIENTIFIC_RC)
+        plt.rcParams.update(Plotter.SCIENTIFIC_RC)
         plt.rcParams["figure.dpi"]  = self.dpi
         plt.rcParams["savefig.dpi"] = self.dpi
 
@@ -221,7 +221,7 @@ class Animator:
         samples     = [get_slice(int(i)) for i in sample_idx]
         pred_sample = np.stack([s[0] for s in samples])
         gt_sample   = np.stack([s[1] for s in samples])
-        vmin, vmax  = Ploter._shared_clim(pred_sample, gt_sample)
+        vmin, vmax  = Plotter._shared_clim(pred_sample, gt_sample)
         emax_gt     = float(np.percentile(np.abs(pred_sample - gt_sample), 99.0))
 
         if emax_gt <= 0.0:

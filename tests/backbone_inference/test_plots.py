@@ -7,8 +7,8 @@ matplotlib.use("Agg")
 import numpy as np
 import pytest
 
-from pipelines.backbone.inference.plots          import Ploter, PlotTools, SlicePlotter, ParamPlotter, SlotPlotter, TrackPlotter
-from pipelines.backbone.inference.plots.plotter  import Ploter as PloterClass
+from pipelines.backbone.inference.plots          import Plotter, PlotTools, SlicePlotter, ParamPlotter, SlotPlotter, TrackPlotter
+from pipelines.backbone.inference.plots.plotter  import Plotter as PloterClass
 from tools.baselines.containers import TrackBaselines, TrackProfiles
 
 
@@ -50,12 +50,12 @@ def _x_axis():
 
 
 def test_ploter_composes_subplotters():
-    p = Ploter()
+    p = Plotter()
     assert isinstance(p.slice, SlicePlotter)
     assert isinstance(p.param, ParamPlotter)
     assert isinstance(p.slot,  SlotPlotter)
     assert isinstance(p.track, TrackPlotter)
-    assert PloterClass is Ploter
+    assert PloterClass is Plotter
 
 
 def test_plottools_imshow_panel(tmp_path):
