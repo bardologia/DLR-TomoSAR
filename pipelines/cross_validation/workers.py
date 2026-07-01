@@ -23,10 +23,10 @@ class FoldCollector(TrialCollector):
         self.splits          = splits
         self.seed_dispersion = {}
 
-    def _aggregate_sources(self) -> tuple[dict, dict, dict]:
+    def _aggregate_sources(self) -> tuple[dict, dict]:
         training_results = {r["name"]: r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
 
-        return {}, {}, training_results
+        return {}, training_results
 
     def _group_by_fold(self, records: list[TrialRecord]) -> list[tuple[str, list[TrialRecord]]]:
         groups: dict[str, list[TrialRecord]] = {}
