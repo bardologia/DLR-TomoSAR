@@ -4,7 +4,6 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import argparse
-import sys
 from pathlib import Path
 
 from _bootstrap import EnvironmentPinner

@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-import sys
 from pathlib import Path
 
 from _bootstrap import EnvironmentPinner
