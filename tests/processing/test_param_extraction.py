@@ -17,7 +17,8 @@ from pipelines.processing.param_extraction.metrics import (
     KSelectionDiagnostics,
     ContrastEstimator,
 )
-from pipelines.processing.param_extraction.pipeline import ExtractionPlanResolver, ParameterExtractor
+from pipelines.processing.param_extraction.pipeline import ParameterExtractor
+from pipelines.processing.param_extraction.queue    import ExtractionPlanResolver
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 from tools.data.gaussians     import GaussianMixture
 from tools.data.preprocessing import ProfilePreprocessor

@@ -4,7 +4,7 @@ import gc
 from pathlib import Path
 
 from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator
-from pipelines.processing.param_extraction.pipeline import ParameterIO
+from pipelines.processing.param_extraction.io      import ParameterIO
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                                  import FileIO

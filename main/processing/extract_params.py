@@ -17,7 +17,8 @@ def main() -> None:
 
     EnvironmentPinner.gpus(config.gpu_device_ids)
 
-    from pipelines.processing.param_extraction.pipeline           import DatasetQueueResolver, ExtractionPlanResolver, ParamExtractionPipeline
+    from pipelines.processing.param_extraction.pipeline           import ParamExtractionPipeline
+    from pipelines.processing.param_extraction.queue              import DatasetQueueResolver, ExtractionPlanResolver
     from pipelines.processing.param_extraction.sigma.initialiser  import PeakInitialiser
 
     logger       = Logger(log_dir="logs", name="extract_params")
