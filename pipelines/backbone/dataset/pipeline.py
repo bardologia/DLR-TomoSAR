@@ -64,7 +64,7 @@ class DatasetPipeline:
         path = Path(self.config.preprocessing_run_directory) / "meta" / GeometryField.FILENAME
 
         if not path.is_file():
-            raise FileNotFoundError(f"A per-pixel physics-geometry loss term is active but {path} is missing; run scripts/backfill_geometry_field.py for this dataset first.")
+            raise FileNotFoundError(f"A per-pixel physics-geometry loss term is active but {path} is missing; this dataset predates automatic geometry-field generation, re-run preprocessing for it.")
 
         field = GeometryField.load(path).subset(self.config.secondary_labels)
 

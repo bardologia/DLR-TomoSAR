@@ -11,7 +11,7 @@ from tools.sar.geometry_field import GeometryField
 def _geometry_field(meta_dir) -> GeometryField:
     path = meta_dir / GeometryField.FILENAME
     if not path.exists():
-        pytest.skip(f"{path} not present; run scripts/backfill_geometry_field.py")
+        pytest.skip(f"{path} not present; re-run preprocessing for this dataset")
 
     return GeometryField.load(path)
 

@@ -8,8 +8,8 @@ from configuration.sar.processing_config       import ProcessingConfig
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
 from tools                                     import FileIO, ProcessPoolRunner
 from tools.monitoring.logger                   import Logger
-from tools.sar                                 import InterferogramLauncher, TomogramLauncher, TrackParameters
-from tools.baselines                           import TrackBaselines
+from tools.sar                                 import GeometryField, GeometryFieldBuilder, InterferogramLauncher, TomogramLauncher, TrackParameters
+from tools.baselines                           import TrackBaselines, TrackProfiles
 
 
 class ProcessingPipeline:
@@ -84,6 +84,23 @@ class ProcessingPipeline:
 
         return primary_path, secondaries_path, interferograms_path
 
+    def _stage_geometry_field(self) -> Path:
+        parameters_path = self.config.paths.metadata_directory / TrackParameters.FILENAME
+        profiles_path   = self.artifact_registry.artifact_path("track_profiles")
+        out_path        = self.config.paths.metadata_directory / GeometryField.FILENAME
+
+        self.logger.subsection("[Active] Building per-pixel geometry field for the physics loss")
+        parameters = TrackParameters.load(parameters_path)
+        profiles   = TrackProfiles.load(profiles_path)
+        field      = GeometryFieldBuilder(parameters, profiles, self.config.crop).build()
+
+        field.save(out_path)
+        self.logger.kv_table({name: str(value) for name, value in field.describe().items()}, title="Geometry Field")
+
+        gc.collect()
+
+        return out_path
+
     def run(self) -> dict[str, Path]:
         self.logger.section("[Pre-Processing Pipeline Execution]")
 
@@ -92,6 +109,8 @@ class ProcessingPipeline:
         full_tomo_path, full_dem_path = self._stage_tomogram()
 
         primary_path, secondaries_path, interferograms_path = self._stage_inputs()
+
+        geometry_field_path = self._stage_geometry_field()
 
         self.metadata_manager.save_dataset_layout(pass_labels=self._pass_labels)
 
@@ -103,6 +122,7 @@ class ProcessingPipeline:
             "primary"        : primary_path,
             "secondaries"    : secondaries_path,
             "interferograms" : interferograms_path,
+            "geometry_field" : geometry_field_path,
             "run_directory"  : self.config.paths.run_directory,
         }
 
