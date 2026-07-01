@@ -22,7 +22,6 @@ class TrainingQueueConfig:
     batch_size           : int             = 256
     num_workers          : int             = 4
     prefetch_factor      : int             = 2
-    warmup_steps         : int             = 200
     eta_min              : float           = 1e-6
     early_stop_patience  : int             = 30
     log_all_losses       : bool            = False
@@ -39,6 +38,8 @@ class TrainingQueueConfig:
     scheduler_gamma     : float         = 0.1
     scheduler_power     : float         = 1.0
 
+    warmup_enabled    : bool       = True
+    warmup_steps      : int        = 200
     warmup_mode       : WarmupMode = WarmupMode.LINEAR
     warmup_poly_power : float      = 2.0
 

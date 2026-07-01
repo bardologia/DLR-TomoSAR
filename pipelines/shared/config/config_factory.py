@@ -120,7 +120,7 @@ class ConfigFactory:
             **self._base_trainer_kwargs(logdir),
 
             early_stopping = EarlyStoppingConfig(patience=training.early_stop_patience, restore_best=True),
-            warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=True, warmup_mode=training.warmup_mode.value, warmup_poly_power=training.warmup_poly_power),
+            warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=training.warmup_enabled, warmup_mode=training.warmup_mode.value, warmup_poly_power=training.warmup_poly_power),
             scheduler      = SchedulerConfig(type=training.scheduler_type.value, epochs=scheduler_epochs, eta_min=training.eta_min, step_size=training.scheduler_step_size, gamma=training.scheduler_gamma, power=training.scheduler_power),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, lr_scale=lr_scale),
 
@@ -130,6 +130,7 @@ class ConfigFactory:
                 use_amp                     = training.use_amp,
                 gradient_accumulation_steps = training.gradient_accumulation_steps,
                 log_all_losses              = training.log_all_losses,
+                abort_on_nonfinite_loss     = training.abort_on_nonfinite_loss,
             ),
 
             overfit = OverfitConfig(enabled=False),

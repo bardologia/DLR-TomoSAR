@@ -169,6 +169,27 @@ def test_training_trainer_config_epochs_propagate(factory, tmp_path):
 
 
 @pytest.mark.real_data
+def test_training_trainer_config_warmup_propagates(factory, tmp_path):
+    training                = factory.config.training
+    training.warmup_enabled = False
+    training.warmup_steps   = 42
+
+    trainer_config = factory.training_trainer_config(tmp_path / "logdir")
+
+    assert trainer_config.warmup.warmup_enabled is False
+    assert trainer_config.warmup.warmup_steps   == 42
+
+
+@pytest.mark.real_data
+def test_training_trainer_config_abort_flag_propagates(factory, tmp_path):
+    factory.config.training.abort_on_nonfinite_loss = False
+
+    trainer_config = factory.training_trainer_config(tmp_path / "logdir")
+
+    assert trainer_config.training.abort_on_nonfinite_loss is False
+
+
+@pytest.mark.real_data
 def test_training_trainer_config_lr_scale_with_batch(factory, tmp_path):
     training = factory.config.training
     training.scale_lr_with_batch = True
