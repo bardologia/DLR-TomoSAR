@@ -193,12 +193,16 @@ class OverfitWorker(BenchmarkWorker):
         model_config = OverfitModelPreparer(model_config).prepare()
 
         def run_body():
-            trainer_config = self.factory.overfit_trainer_config(logdir=stage_dir)
+            trainer_config          = self.factory.overfit_trainer_config(logdir=stage_dir)
+            trainer_config.geometry = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
             self._apply_loss_component(trainer_config, loss_component)
+
+            dataset_config              = self.factory.overfit_dataset_config()
+            dataset_config.input_config = self.config.input
 
             pipeline = TrainingPipeline(
                 trainer_config = trainer_config,
-                dataset_config = self.factory.overfit_dataset_config(),
+                dataset_config = dataset_config,
                 backbone_name  = model_name,
                 model_config   = model_config,
                 seed           = self.config.overfit.seed if seed is None else seed,
@@ -302,12 +306,16 @@ class TrainingWorker(BenchmarkWorker):
         if measured_batch is not None:
             self.config.training.batch_size = measured_batch
 
-        trainer_config = self.factory.training_trainer_config(logdir=stage_dir)
+        trainer_config          = self.factory.training_trainer_config(logdir=stage_dir)
+        trainer_config.geometry = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
         self._apply_loss_component(trainer_config, loss_component)
+
+        dataset_config              = self.factory.training_dataset_config()
+        dataset_config.input_config = self.config.input
 
         pipeline = TrainingPipeline(
             trainer_config = trainer_config,
-            dataset_config = self.factory.training_dataset_config(),
+            dataset_config = dataset_config,
             backbone_name  = model_name,
             model_config   = model_config,
             seed           = self.config.seed if seed is None else seed,

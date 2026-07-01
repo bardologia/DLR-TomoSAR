@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from configuration.benchmark.jepa       import JepaBenchConfig
+from configuration.dataset              import AugmentationConfig, InputConfig
+from configuration.normalization.general import NormalizationConfig
+from configuration.sar.geometry_config  import GeometryConfig
 from configuration.training.general.run import RunPathsConfig, TrainingQueueConfig
 
 
@@ -86,6 +89,12 @@ class BenchmarkConfig:
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
+
+    input         : InputConfig         = field(default_factory=InputConfig.full_stack)
+    geometry      : GeometryConfig      = field(default_factory=GeometryConfig)
+    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    predict_presence : bool             = False
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)
     jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)

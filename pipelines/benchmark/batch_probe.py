@@ -49,6 +49,9 @@ class MaxBatchProbe:
         dataset_config = factory.training_dataset_config()
         trainer_config = factory.training_trainer_config(logdir=self.work_dir)
 
+        dataset_config.input_config = self.config.input
+        trainer_config.geometry     = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=factory._secondary_labels())
+
         gaussian_cfg               = trainer_config.gaussian
         dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
 

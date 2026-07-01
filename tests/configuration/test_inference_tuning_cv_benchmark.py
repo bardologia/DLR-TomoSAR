@@ -189,6 +189,19 @@ def test_benchmark_config_subconfigs():
     assert isinstance(cfg.jepa, JepaBenchConfig)
 
 
+def test_benchmark_config_exposes_training_recipe_sections():
+    from configuration.dataset               import AugmentationConfig, InputConfig
+    from configuration.normalization.general import NormalizationConfig
+    from configuration.sar.geometry_config   import GeometryConfig
+
+    cfg = BenchmarkConfig()
+    assert isinstance(cfg.input, InputConfig)
+    assert isinstance(cfg.geometry, GeometryConfig)
+    assert isinstance(cfg.normalization, NormalizationConfig)
+    assert isinstance(cfg.augmentation, AugmentationConfig)
+    assert cfg.predict_presence is False
+
+
 def test_dataloader_tuning_entry_lists_independent():
     a = DataLoaderTuningEntryConfig()
     b = DataLoaderTuningEntryConfig()
