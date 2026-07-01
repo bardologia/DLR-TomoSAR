@@ -55,9 +55,8 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         return self.config.ae_model_name
 
     def _build_pretrain_trainer(self, logger):
-        import numpy as np
-
         from pipelines.backbone.dataset.pipeline import DatasetPipeline
+        from tools.data.gaussians                import GaussianAxis
 
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
         pipeline = TrainingPipeline(self.config)
@@ -68,7 +67,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
         dataset_pipeline      = DatasetPipeline(dataset_config, work_dir, logger=logger, seed=self.config.seed)
         profile_length        = dataset_pipeline.profile_length
-        dataset_config.x_axis = np.linspace(gaussian_config.x_min, gaussian_config.x_max, profile_length, dtype=np.float32)
+        dataset_config.x_axis = GaussianAxis.build(gaussian_config.x_min, gaussian_config.x_max, profile_length)
 
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
 

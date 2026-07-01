@@ -12,6 +12,7 @@ from models.profile_autoencoder                          import get_profile_auto
 from pipelines.shared.dataset.dataset_spatial                    import Layout
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
+from tools.data.gaussians                                import GaussianAxis
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
 from pipelines.shared.config.config_persistence                 import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 from tools.data.io                                       import FileIO
@@ -55,7 +56,7 @@ class ProfileAeRunLoader:
 
         param_arrays = cropper.load_split(config.split)
         x_len        = cropper.profile_length()
-        x_axis       = np.linspace(dataset_config.x_min, dataset_config.x_max, x_len, dtype=np.float32)
+        x_axis       = GaussianAxis.build(dataset_config.x_min, dataset_config.x_max, x_len)
 
         dataset = ProfileDataset(
             param_arrays    = param_arrays,

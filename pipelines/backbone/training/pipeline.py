@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from models                                  import BACKBONE_IMAGE_SIZE_MODELS
-from tools.data.gaussians                    import GaussianHead
+from tools.data.gaussians                    import GaussianAxis, GaussianHead
 from configuration.dataset import DatasetConfig
 from configuration.training import BackboneTrainerConfig, BackboneEntryConfig
 from pipelines.shared.training.seed_sweep             import SeedSweepRunner
@@ -112,7 +112,7 @@ class TrainingPipeline:
 
         x_axis_length = self.dataset_pipeline.layout.profile_length
 
-        self.dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length, dtype=np.float32)
+        self.dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length)
 
         train_loader, val_loader, test_loader, datasets = self.dataset_pipeline.run()
 
@@ -175,7 +175,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         dataset_pipeline      = DatasetPipeline(config=dataset_config, training_run_directory=work_dir, logger=logger, seed=self.config.seed, height_axis_convention=trainer_config.geometry.height_axis_convention, build_geometry_field=physics_geometry_active(trainer_config))
         profile_length        = dataset_pipeline.layout.profile_length
-        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
+        dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length)
 
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
         dataset                                            = datasets["train"]

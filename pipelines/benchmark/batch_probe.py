@@ -12,7 +12,7 @@ from models                             import BACKBONE_CONFIG_REGISTRY, BACKBON
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 from pipelines.backbone.training.trainer import Trainer
 from pipelines.shared.config.config_factory     import ConfigFactory
-from tools.data.gaussians                import GaussianHead
+from tools.data.gaussians                import GaussianAxis, GaussianHead
 from tools.monitoring.logger             import Logger
 from tools.runtime.reproducibility       import Reproducibility
 from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMemoryProbe
@@ -58,7 +58,7 @@ class MaxBatchProbe:
         dataset_pipeline = DatasetPipeline(config=dataset_config, training_run_directory=self.work_dir, logger=self.logger, seed=self.seed)
 
         profile_length        = dataset_pipeline.layout.profile_length
-        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
+        dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length)
 
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
 

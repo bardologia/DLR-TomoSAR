@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import numpy as np
-
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
+from tools.data.gaussians                import GaussianAxis
 
 
 class BackboneDatasetPreparation:
@@ -19,7 +18,7 @@ class BackboneDatasetPreparation:
 
         dataset_pipeline = DatasetPipeline(self.dataset_config, self.run_meta.run_directory, logger=self.logger, seed=self.seed)
         x_len            = dataset_pipeline.profile_length
-        x_axis           = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, x_len, dtype=np.float32)
+        x_axis           = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, x_len)
 
         self.dataset_config.x_axis = x_axis
 

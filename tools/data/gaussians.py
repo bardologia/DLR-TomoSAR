@@ -6,6 +6,12 @@ import numpy as np
 import torch
 
 
+class GaussianAxis:
+    @staticmethod
+    def build(x_min: float, x_max: float, length: int) -> np.ndarray:
+        return np.linspace(x_min, x_max, length, dtype=np.float32)
+
+
 class GaussianMixture:
     SIGMA_FLOOR = 1e-6
     EXPON_FLOOR = -100.0

@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as functional
 from torch.utils.data import Dataset
 
-from tools.data.gaussians import GaussianHead, GaussianMixture
+from tools.data.gaussians import GaussianAxis, GaussianHead, GaussianMixture
 
 
 FEED_MODES = ("synthetic", "profile_autoencoder", "image_autoencoder", "backbone")
@@ -156,7 +156,7 @@ class ImageFeedAdapter:
         dataset_pipeline = DatasetPipeline(dataset_config, self.work_dir, logger=self.logger, seed=self.config.seed)
         profile_length   = dataset_pipeline.profile_length
 
-        dataset_config.x_axis = np.linspace(gaussian_config.x_min, gaussian_config.x_max, profile_length, dtype=np.float32)
+        dataset_config.x_axis = GaussianAxis.build(gaussian_config.x_min, gaussian_config.x_max, profile_length)
 
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
 
@@ -247,7 +247,7 @@ class BackboneFeedAdapter:
         dataset_pipeline = DatasetPipeline(dataset_config, self.work_dir, logger=self.logger, seed=self.config.seed)
         profile_length   = dataset_pipeline.profile_length
 
-        dataset_config.x_axis = np.linspace(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length, dtype=np.float32)
+        dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length)
 
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
 

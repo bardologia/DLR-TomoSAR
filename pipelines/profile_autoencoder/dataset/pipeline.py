@@ -10,6 +10,7 @@ from configuration.dataset import ProfileDatasetConfig
 from pipelines.profile_autoencoder.dataset.augmentation  import ProfileAugmenter
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.shared.dataset.loaders                            import Loader
+from tools.data.gaussians                                        import GaussianAxis
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStatsComputer
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
 from pipelines.shared.dataset.dataset_spatial                    import Layout
@@ -41,7 +42,7 @@ class ProfileDatasetPipeline:
 
     def _build_axis(self) -> Tuple[np.ndarray, int]:
         x_len  = self.cropper.profile_length()
-        x_axis = np.linspace(self.config.x_min, self.config.x_max, x_len, dtype=np.float32)
+        x_axis = GaussianAxis.build(self.config.x_min, self.config.x_max, x_len)
 
         return x_axis, x_len
 
