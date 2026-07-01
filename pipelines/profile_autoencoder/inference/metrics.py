@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 
-from tools.data.io import FileIO
+from pipelines.autoencoder_common.inference.metrics import AeMetricsBase
 
 
-class ProfileAeMetrics:
-    EPS          = 1e-8
+class ProfileAeMetrics(AeMetricsBase):
     AMP_ZERO_THR = 1e-3
 
     def __init__(self, result, x_axis: np.ndarray, normalizer) -> None:
-        self.gt         = result.gt.astype(np.float64)
-        self.pred       = result.pred.astype(np.float64)
-        self.emb        = result.embeddings.astype(np.float64)
-        self.x_axis     = np.asarray(x_axis, dtype=np.float64)
-        self.normalizer = normalizer
+        super().__init__(result, normalizer)
 
+        self.x_axis = np.asarray(x_axis, dtype=np.float64)
         self.active = self.gt.max(axis=1) > self.AMP_ZERO_THR
 
     def per_curve_mse(self) -> np.ndarray:
@@ -88,15 +82,6 @@ class ProfileAeMetrics:
             "peak_amplitude_rel_err_mean" : float(np.mean(np.abs(amp_pred - amp_gt) / (amp_gt + self.EPS))),
         }
 
-    def _embedding_stats(self) -> dict:
-        dim_std = np.std(self.emb, axis=0)
-
-        return {
-            "embedding_norm_mean" : float(np.mean(np.linalg.norm(self.emb, axis=1))),
-            "embedding_dim_std_mean" : float(np.mean(dim_std)),
-            "embedding_active_dim_fraction" : float(np.mean(dim_std > 1e-4)),
-        }
-
     def compute(self) -> dict:
         metrics = {
             "n_curves"         : int(self.gt.shape[0]),
@@ -112,7 +97,3 @@ class ProfileAeMetrics:
         metrics.update(self._embedding_stats())
 
         return metrics
-
-    @staticmethod
-    def write_json(metrics: dict, path: Path) -> Path:
-        return FileIO.save_json(metrics, Path(path), indent=4)

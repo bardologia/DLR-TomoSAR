@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 
-from tools.data.io import FileIO
+from pipelines.autoencoder_common.inference.metrics import AeMetricsBase
 
 
-class ImageAeMetrics:
-    EPS = 1e-8
-
+class ImageAeMetrics(AeMetricsBase):
     def __init__(self, result, normalizer) -> None:
-        self.gt         = result.gt.astype(np.float64)
-        self.pred       = result.pred.astype(np.float64)
-        self.emb        = result.embeddings.astype(np.float64)
-        self.normalizer = normalizer
+        super().__init__(result, normalizer)
 
-        self.n_patches = self.gt.shape[0]
+        self.n_patches  = self.gt.shape[0]
         self.n_channels = self.gt.shape[1]
 
     def per_patch_mse(self) -> np.ndarray:
@@ -63,15 +56,6 @@ class ImageAeMetrics:
             "channel_mae" : [float(v) for v in channel_mae],
         }
 
-    def _embedding_stats(self) -> dict:
-        dim_std = np.std(self.emb, axis=0)
-
-        return {
-            "embedding_norm_mean"           : float(np.mean(np.linalg.norm(self.emb, axis=1))),
-            "embedding_dim_std_mean"        : float(np.mean(dim_std)),
-            "embedding_active_dim_fraction" : float(np.mean(dim_std > 1e-4)),
-        }
-
     def compute(self) -> dict:
         metrics = {
             "n_patches"      : int(self.n_patches),
@@ -87,7 +71,3 @@ class ImageAeMetrics:
         metrics.update(self._embedding_stats())
 
         return metrics
-
-    @staticmethod
-    def write_json(metrics: dict, path: Path) -> Path:
-        return FileIO.save_json(metrics, Path(path), indent=4)
