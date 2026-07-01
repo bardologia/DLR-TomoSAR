@@ -11,6 +11,7 @@ from configuration.training.general import (
     ResourceConfig,
     LossConfig,
     LossCurriculumConfig,
+    ParamMatching,
     SharedSubConfigInheritance,
     PretrainConfig,
 )

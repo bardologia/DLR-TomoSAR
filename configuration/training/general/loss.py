@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum        import Enum
+
+
+class ParamMatching(str, Enum):
+    HUNGARIAN = "hungarian"
+    SORTED_GT = "sorted_gt"
 
 
 @dataclass
@@ -47,7 +53,7 @@ class LossConfig:
 
     param_weights : tuple = (1.0, 1.0, 1.0)
 
-    param_matching : str = "hungarian"
+    param_matching : ParamMatching = ParamMatching.HUNGARIAN
 
     use_active_normalization : bool  = False
     presence_balance         : bool  = False

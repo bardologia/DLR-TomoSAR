@@ -85,7 +85,7 @@ class Loss:
         self.logger.kv_table({
             "Sample points":  x_axis.shape[0],
             "Log all losses": self.log_all_losses,
-            "Param matching": cfg.param_matching,
+            "Param matching": cfg.param_matching.value,
         })
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
 
@@ -127,7 +127,7 @@ class Loss:
         self.loss_generation += 1
 
         self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
-        self.logger.subsection(f"Param matching (curriculum complete): {complete_cfg.param_matching}")
+        self.logger.subsection(f"Param matching (curriculum complete): {complete_cfg.param_matching.value}")
         self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
         self.log_slot_presence_config(complete_cfg, title="Slot-Presence Loss Config (curriculum complete)")
 
@@ -178,7 +178,7 @@ class Loss:
         gt      = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
         gt_phys = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
 
-        pred, pred_phys, gt, gt_phys = ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=self.loss_cfg.param_matching)
+        pred, pred_phys, gt, gt_phys = ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=self.loss_cfg.param_matching.value)
 
         effective_gaussians = min(num_gaussians, gt_gaussians)
 

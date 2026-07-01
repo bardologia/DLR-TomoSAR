@@ -46,14 +46,14 @@ def test_catalog_rejects_unknown_component():
 
 
 def test_catalog_standalone_inherits_shared_knobs_from_base():
-    from configuration.training import LossConfig
+    from configuration.training import LossConfig, ParamMatching
 
-    base = LossConfig(param_matching="sort", param_weights=(2.0, 3.0, 4.0), use_mse_curve=True, weight_mse_curve=5.0)
+    base = LossConfig(param_matching=ParamMatching.SORTED_GT, param_weights=(2.0, 3.0, 4.0), use_mse_curve=True, weight_mse_curve=5.0)
     cfg  = LossComponentCatalog.standalone("param_l1", base=base)
 
     assert cfg.use_param_l1   is True
     assert cfg.weight_param_l1 == 1.0
-    assert cfg.param_matching == "sort"
+    assert cfg.param_matching == ParamMatching.SORTED_GT
     assert cfg.param_weights  == (2.0, 3.0, 4.0)
     assert cfg.use_mse_curve  is False
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from configuration.training.general.loss import ParamMatching
+
 
 class AblationCatalog:
 
@@ -8,8 +10,8 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 15
 
-    PARAM_MATCH_BASELINE = "sorted_gt"
-    PARAM_MATCH_FULL     = "hungarian"
+    PARAM_MATCH_BASELINE = ParamMatching.SORTED_GT
+    PARAM_MATCH_FULL     = ParamMatching.HUNGARIAN
 
     GROUP_LR_DEFAULTS = (
         ("encoder_lr",     3e-4),
