@@ -16,6 +16,7 @@ from pipelines.backbone.training.experiments import AblationTrialPlanner, Curric
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.backbone.training.trainer     import Trainer
+from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.seed_sweep      import SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
 from tools.data.gaussians     import GaussianAxis, GaussianHead
@@ -36,7 +37,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         return self.config.backbone_name
 
     def _build_pretrain_trainer(self, logger):
-        from models import BACKBONE_CONFIG_REGISTRY, get_backbone
+        from models import get_backbone
 
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
 
@@ -57,9 +58,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
         dataset                                            = datasets["train"]
 
-        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
-        for attribute, value in self.config.model_overrides.items():
-            setattr(model_config, attribute, value)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
         in_channels  = dataset.input_channels
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians, gaussian_cfg.predict_presence)
@@ -77,7 +76,6 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
     def _overfit_loss(self):
         from configuration.training      import OverfitConfig
-        from models                      import BACKBONE_CONFIG_REGISTRY
         from tools.training.pretraining.overfit_gate import OverfitModelPreparer
 
         pretrain = self.config.pretrain
@@ -88,9 +86,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
         trainer_config.overfit    = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
 
-        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
-        for attribute, value in self.config.model_overrides.items():
-            setattr(model_config, attribute, value)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
         model_config = OverfitModelPreparer(model_config).prepare()
 
         dataset_config              = self.factory.training_dataset_config()
@@ -129,17 +125,13 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         return InferencePipeline(inference_config).run()
 
     def run(self):
-        from models import BACKBONE_CONFIG_REGISTRY
-
         self._pretrain_preflight()
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
-        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
-        for attribute, value in self.config.model_overrides.items():
-            setattr(model_config, attribute, value)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input

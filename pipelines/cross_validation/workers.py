@@ -114,13 +114,10 @@ class CrossValidationWorker(WorkerBase):
 
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
-        from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
+        from pipelines.shared.model.model_builder import ModelBuilder
 
-        model_config = BACKBONE_CONFIG_REGISTRY[self.config.backbone_name]()
-
-        for attribute, value in self.config.model_overrides.items():
-            setattr(model_config, attribute, value)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
         dataset_config               = self.factory.training_dataset_config()
         dataset_config.split_regions = split_regions
