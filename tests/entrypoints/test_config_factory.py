@@ -93,41 +93,6 @@ def test_training_dataset_config_propagates_loader_settings(factory):
     assert dataset_config.pin_memory      is True
 
 
-@pytest.mark.real_data
-def test_overfit_dataset_config_window_geometry(factory, dataset_json):
-    overfit        = factory.config.overfit
-    dataset_config = factory.overfit_dataset_config()
-    crop           = dataset_json["global_crop"]
-
-    train = dataset_config.split_regions.train
-    assert train.azimuth_start == overfit.azimuth_start
-    assert train.azimuth_end   == overfit.azimuth_start + overfit.azimuth_lines
-    assert train.range_start   == crop[2]
-    assert train.range_end     == crop[2] + overfit.range_lines
-
-
-@pytest.mark.real_data
-def test_overfit_dataset_config_shares_one_crop(factory):
-    dataset_config = factory.overfit_dataset_config()
-
-    train = dataset_config.split_regions.train
-    val   = dataset_config.split_regions.val
-    test  = dataset_config.split_regions.test
-
-    assert train.as_tuple() == val.as_tuple() == test.as_tuple()
-
-
-@pytest.mark.real_data
-def test_overfit_dataset_config_disables_augmentation(factory):
-    augmentation = factory.overfit_dataset_config().augmentation
-
-    assert augmentation.p_flip_h    == 0.0
-    assert augmentation.p_flip_v    == 0.0
-    assert augmentation.p_rot90     == 0.0
-    assert augmentation.p_amp_scale == 0.0
-    assert augmentation.p_noise     == 0.0
-
-
 def test_inference_config_propagates_run_directory(bare_factory, tmp_path):
     run_directory = tmp_path / "run"
 
@@ -207,14 +172,3 @@ def test_training_trainer_config_lr_scale_disabled(factory, tmp_path):
     trainer_config = factory.training_trainer_config(tmp_path / "logdir")
 
     assert trainer_config.optimizer.lr_scale == pytest.approx(1.0)
-
-
-@pytest.mark.real_data
-def test_overfit_trainer_config_enables_overfit(factory, tmp_path):
-    overfit        = factory.config.overfit
-    trainer_config = factory.overfit_trainer_config(tmp_path / "logdir")
-
-    assert trainer_config.overfit.enabled        is True
-    assert trainer_config.overfit.max_steps      == overfit.max_steps
-    assert trainer_config.overfit.stop_threshold == overfit.stop_threshold
-    assert trainer_config.warmup.warmup_enabled  is False

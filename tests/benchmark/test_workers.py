@@ -7,9 +7,8 @@ import pytest
 from pipelines.benchmark.workers import (
     BenchmarkWorker,
     MaxBatchWorker,
-    OverfitModelPreparer,
-    OverfitWorker,
 )
+from tools.training.pretraining.overfit_gate import OverfitModelPreparer
 
 from configuration.benchmark import BenchmarkConfig
 from models import BACKBONE_CONFIG_REGISTRY
@@ -107,67 +106,6 @@ def test_probe_config_is_disabled(config):
 
     assert probe.enabled is False
     assert probe.exit_after is True
-
-
-def test_overfit_final_loss_extracts_last_train_loss(config):
-    worker = OverfitWorker(config, "tag")
-
-    assert worker._final_loss(([1.0, 0.5, 0.1], [], [])) == pytest.approx(0.1)
-
-
-def test_overfit_final_loss_none_for_empty(config):
-    worker = OverfitWorker(config, "tag")
-
-    assert worker._final_loss(([], [], [])) is None
-    assert worker._final_loss(None) is None
-
-
-def _result(status, final_loss, threshold, error=None):
-    return {
-        "model"      : "unet",
-        "status"     : status,
-        "final_loss" : final_loss,
-        "converged"  : None,
-        "threshold"  : threshold,
-        "error"      : error,
-    }
-
-
-def test_finalize_overfit_marks_converged(config, tmp_path):
-    worker      = OverfitWorker(config, "tag")
-    config.overfit.require_convergence = False
-    result      = _result("PASS", final_loss=1e-4, threshold=1e-3)
-    result_path = tmp_path / "overfit_result.json"
-
-    worker._finalize_overfit(result, result_path)
-
-    assert result["converged"] is True
-    assert result["status"]    == "PASS"
-    assert result_path.exists()
-
-
-def test_finalize_overfit_fails_without_final_loss(config, tmp_path):
-    worker      = OverfitWorker(config, "tag")
-    result      = _result("PASS", final_loss=None, threshold=1e-3)
-    result_path = tmp_path / "overfit_result.json"
-
-    with pytest.raises(SystemExit):
-        worker._finalize_overfit(result, result_path)
-
-    assert result["status"] == "FAIL"
-
-
-def test_finalize_overfit_fails_on_nonconvergence_when_required(config, tmp_path):
-    worker      = OverfitWorker(config, "tag")
-    config.overfit.require_convergence = True
-    result      = _result("PASS", final_loss=1.0, threshold=1e-3)
-    result_path = tmp_path / "overfit_result.json"
-
-    with pytest.raises(SystemExit):
-        worker._finalize_overfit(result, result_path)
-
-    assert result["status"]   == "FAIL"
-    assert result["converged"] is False
 
 
 def test_max_batch_worker_invokes_real_probe(config, monkeypatch):

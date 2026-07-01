@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import traceback
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config.config_factory            import ConfigFactory
 from pipelines.shared.training.seed_sweep                import SeedSet
 from tools.data.io                              import FileIO
-from tools.training.pretraining.overfit_gate    import OverfitGate
 from pipelines.backbone.training.loss_probe     import LossScaleProbeConfig
 
 
@@ -102,160 +100,6 @@ class BenchmarkWorker:
             paths                      = self.config.paths,
             training                   = self.config.training,
         )
-
-    def _finalize_overfit(self, result: dict, result_path: Path) -> None:
-        OverfitGate.evaluate(result, self.config.overfit.require_convergence)
-
-        FileIO.save_json(result, result_path, indent=2)
-
-        if result["status"] == "FAIL":
-            raise SystemExit(1)
-
-
-class OverfitModelPreparer:
-    def __init__(self, model_config) -> None:
-        self.model_config = model_config
-
-    def _disable_regularization(self) -> None:
-        for attribute in ("dropout", "attention_dropout", "stochastic_depth_rate"):
-            if hasattr(self.model_config, attribute):
-                setattr(self.model_config, attribute, 0.0)
-
-        for attribute in vars(self.model_config):
-            if attribute.endswith("_wd"):
-                setattr(self.model_config, attribute, 0.0)
-
-    def _boost_learning_rates(self) -> None:
-        for attribute in vars(self.model_config):
-            if attribute.endswith("_lr"):
-                setattr(self.model_config, attribute, getattr(self.model_config, attribute) * 10.0)
-
-    def prepare(self):
-        self._disable_regularization()
-        self._boost_learning_rates()
-
-        return self.model_config
-
-
-class OverfitWorker(BenchmarkWorker):
-    def _final_loss(self, outputs) -> float | None:
-        if not isinstance(outputs, (tuple, list)) or len(outputs) == 0:
-            return None
-
-        train_losses = outputs[0]
-        if not isinstance(train_losses, (list, tuple)) or len(train_losses) == 0:
-            return None
-
-        return float(train_losses[-1])
-
-    def _execute_overfit(self, model_name: str, threshold: float, result_path: Path, run_body) -> None:
-        result = {
-            "model"      : model_name,
-            "status"     : None,
-            "final_loss" : None,
-            "converged"  : None,
-            "threshold"  : threshold,
-            "error"      : None,
-        }
-
-        try:
-            result["final_loss"] = run_body()
-            result["status"]     = "PASS"
-        except SystemExit:
-            result["status"] = "PASS"
-            result["error"]  = "worker exited via SystemExit before reporting a final loss"
-        except Exception:
-            result["status"] = "FAIL"
-            result["error"]  = traceback.format_exc()
-
-        self._finalize_overfit(result, result_path)
-
-    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
-        run_name = self._run_name(model_name, loss_component, seed)
-
-        if self.config.training_type == "profile_autoencoder":
-            self._run_ae(model_name, run_name, seed)
-            return
-        if self.config.training_type == "jepa":
-            self._run_jepa(model_name, run_name, seed)
-            return
-
-        from models                               import BACKBONE_CONFIG_REGISTRY
-        from pipelines.backbone.training.pipeline import TrainingPipeline
-
-        stage_dir    = self.run_dir / "overfit"
-        result_path  = stage_dir / run_name / "overfit_result.json"
-        model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
-
-        for attribute, value in self._size_overrides(model_name).items():
-            setattr(model_config, attribute, value)
-
-        model_config = OverfitModelPreparer(model_config).prepare()
-
-        def run_body():
-            trainer_config          = self.factory.overfit_trainer_config(logdir=stage_dir)
-            trainer_config.geometry = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-
-            dataset_config              = self.factory.overfit_dataset_config()
-            dataset_config.input_config = self.config.input
-
-            pipeline = TrainingPipeline(
-                trainer_config = trainer_config,
-                dataset_config = dataset_config,
-                backbone_name  = model_name,
-                model_config   = model_config,
-                seed           = self.config.overfit.seed if seed is None else seed,
-                run_name       = run_name,
-            )
-
-            return self._final_loss(pipeline.run(probe_config=self._probe_config()))
-
-        self._execute_overfit(run_name, self.config.overfit.stop_threshold, result_path, run_body)
-
-    def _overfit_config(self):
-        from configuration.training import OverfitConfig
-
-        gate = self.config.overfit
-        return OverfitConfig(
-            enabled        = True,
-            max_steps      = gate.max_steps,
-            stop_threshold = gate.stop_threshold,
-            batch_size     = gate.batch_size,
-        )
-
-    def _run_ae(self, model_name: str, run_name: str, seed: int | None) -> None:
-        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
-
-        gate        = self.config.overfit
-        stage_dir   = self.run_dir / "overfit"
-        result_path = stage_dir / run_name / "overfit_result.json"
-
-        overfit = self._overfit_config()
-
-        def run_body():
-            entry                   = self._ae_entry_config(model_name, stage_dir, run_name=run_name, seed=seed)
-            (train_losses, _, _), _ = TrainingPipeline(entry, overfit=overfit).run()
-
-            return float(train_losses[-1]) if train_losses else None
-
-        self._execute_overfit(run_name, gate.stop_threshold, result_path, run_body)
-
-    def _run_jepa(self, model_name: str, run_name: str, seed: int | None) -> None:
-        from pipelines.jepa.training.pipeline import TrainingPipeline
-
-        gate        = self.config.overfit
-        stage_dir   = self.run_dir / "overfit"
-        result_path = stage_dir / run_name / "overfit_result.json"
-
-        overfit = self._overfit_config()
-
-        def run_body():
-            entry                   = self._jepa_entry_config(model_name, stage_dir, run_name=run_name, seed=seed)
-            (train_losses, _, _), _ = TrainingPipeline(entry, overfit=overfit).run()
-
-            return float(train_losses[-1]) if train_losses else None
-
-        self._execute_overfit(run_name, gate.stop_threshold, result_path, run_body)
 
 
 class MaxBatchWorker(BenchmarkWorker):

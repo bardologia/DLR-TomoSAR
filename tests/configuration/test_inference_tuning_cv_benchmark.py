@@ -16,7 +16,6 @@ from configuration.cross_validation.jepa                 import JepaCvConfig
 from configuration.cross_validation.profile_autoencoder  import AeCvConfig
 
 from configuration.benchmark.general          import (
-    OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
     InferenceQueueConfig,
@@ -39,7 +38,6 @@ DEFAULT_CONFIGS = [
     JepaCvConfig,
     AeCvConfig,
     RunPathsConfig,
-    OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
     TrainingQueueConfig,
@@ -183,7 +181,6 @@ def test_benchmark_config_dispatch_methods():
 
 def test_benchmark_config_subconfigs():
     cfg = BenchmarkConfig()
-    assert isinstance(cfg.overfit, OverfitGateConfig)
     assert isinstance(cfg.max_batch, MaxBatchConfig)
     assert isinstance(cfg.size_match, SizeMatchConfig)
     assert isinstance(cfg.jepa, JepaBenchConfig)

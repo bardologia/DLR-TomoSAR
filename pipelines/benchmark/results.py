@@ -39,8 +39,6 @@ class BenchmarkSeedCollector(TrialCollector):
         metric_means, metric_std = SeedAggregation.aggregate([run.metrics for run in runs], metric_keys)
         ckpt_means, ckpt_std     = SeedAggregation.aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
 
-        overfit_losses = [run.overfit.get("final_loss") for run in runs]
-        overfit_losses = [value for value in overfit_losses if isinstance(value, (int, float))]
         durations      = [run.training_result.get("duration_s") for run in runs]
         durations      = [value for value in durations if isinstance(value, (int, float))]
 
@@ -49,12 +47,6 @@ class BenchmarkSeedCollector(TrialCollector):
         record.training_result = {
             "status"     : "DONE" if all(run.training_result.get("status") == "DONE" for run in runs) else "PARTIAL",
             "duration_s" : float(np.mean(durations)) if durations else None,
-        }
-        record.overfit = {
-            **representative.overfit,
-            "status"     : "PASS" if all(run.overfit.get("status") == "PASS" for run in runs) else "FAIL",
-            "final_loss" : float(np.mean(overfit_losses)) if overfit_losses else None,
-            "converged"  : all(run.overfit.get("converged") for run in runs) if all("converged" in run.overfit for run in runs) else None,
         }
 
         dispersion = {
@@ -129,10 +121,6 @@ class ComparisonReport(ComparisonReportBase):
             lines += self._capacity_table()
             lines.append("")
 
-        lines += ["## Overfit Gate\n"]
-        lines += self._overfit_table()
-        lines.append("")
-
         lines += ["## Training\n"]
         lines += self._training_table()
         lines.append("")
@@ -158,17 +146,6 @@ class ComparisonReport(ComparisonReportBase):
             overrides  = ", ".join(f"`{k}={v}`" for k, v in r.size_match["overrides"].items()) if "overrides" in r.size_match and r.size_match["overrides"] else "_(defaults)_"
 
             table.add_row(f"`{r.name}`", parameters, deviation, scale, overrides)
-
-        return table.render()
-
-    def _overfit_table(self) -> list[str]:
-        table = MarkdownTable(["Model", "Status", "Final loss", "Converged"])
-
-        for r in self.records:
-            final_loss = f"{r.overfit['final_loss']:.4e}" if r.overfit.get("final_loss") is not None else "—"
-            converged  = {True: "yes", False: "no"}.get(r.overfit.get("converged"), "—")
-
-            table.add_row(f"`{r.name}`", r.overfit.get("status", "—"), final_loss, converged)
 
         return table.render()
 
@@ -334,7 +311,6 @@ class ComparisonReport(ComparisonReportBase):
                 "run_dir"         : str(r.run_dir),
                 "parameters"      : r.parameters,
                 "size_match"      : r.size_match,
-                "overfit"         : r.overfit,
                 "training_result" : r.training_result,
                 "checkpoint"      : r.checkpoint,
                 "run_summary"     : r.run_summary,

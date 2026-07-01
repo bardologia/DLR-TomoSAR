@@ -67,10 +67,9 @@ def test_runs_gating_for_profile_autoencoder(tmp_path):
     assert config.runs_inference() is False
 
 
-def _patch_stage_methods(pipeline, monkeypatch, order, gate_passed=True):
+def _patch_stage_methods(pipeline, monkeypatch, order):
     monkeypatch.setattr(pipeline, "_run_size_match",  lambda: order.append("size_match") or {})
     monkeypatch.setattr(pipeline, "_run_max_batch",   lambda: order.append("max_batch") or {})
-    monkeypatch.setattr(pipeline, "_run_overfit_gate", lambda: order.append("overfit") or gate_passed)
     monkeypatch.setattr(pipeline, "_run_training",    lambda: order.append("training") or [{"status": "DONE"}])
     monkeypatch.setattr(pipeline, "_run_inference",   lambda: order.append("inference") or [{"status": "DONE"}])
     monkeypatch.setattr(pipeline, "_run_comparison",  lambda: order.append("comparison") or (Path("/tmp/cmp")))
@@ -85,28 +84,10 @@ def test_run_executes_stages_in_expected_order(tmp_path, monkeypatch):
 
     pipeline.run()
 
-    assert order == ["size_match", "overfit", "max_batch", "training", "inference", "comparison"]
+    assert order == ["size_match", "max_batch", "training", "inference", "comparison"]
 
     state = FileIO.load_json(pipeline.state_path)
     assert state["stages"]["pipeline"]["status"] == "completed"
-
-
-@pytest.mark.slow
-def test_run_aborts_when_gate_fails(tmp_path, monkeypatch):
-    config           = _config(tmp_path)
-    config.overfit.abort_on_fail = True
-    pipeline         = BenchmarkPipeline(config, entry_script=ENTRY)
-
-    order = []
-    _patch_stage_methods(pipeline, monkeypatch, order, gate_passed=False)
-
-    with pytest.raises(SystemExit):
-        pipeline.run()
-
-    assert "training" not in order
-
-    state = FileIO.load_json(pipeline.state_path)
-    assert state["stages"]["pipeline"]["status"] == "aborted"
 
 
 @pytest.mark.slow

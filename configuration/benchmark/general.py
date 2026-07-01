@@ -12,19 +12,6 @@ from configuration.training.general.run import RunPathsConfig, TrainingQueueConf
 
 
 @dataclass
-class OverfitGateConfig:
-    max_steps           : int   = 30000
-    stop_threshold      : float = 0.03
-    batch_size          : int   = 9
-    azimuth_start       : int   = 1000
-    azimuth_lines       : int   = 128
-    range_lines         : int   = 128
-    seed                : int   = 42
-    require_convergence : bool  = True
-    abort_on_fail       : bool  = True
-
-
-@dataclass
 class MaxBatchConfig:
     vram_budget_gb : float = 40.0
     max_batch      : int   = 512
@@ -85,7 +72,6 @@ class BenchmarkConfig:
     training_type : str = "backbone"
 
     paths      : RunPathsConfig         = field(default_factory=RunPathsConfig)
-    overfit    : OverfitGateConfig      = field(default_factory=OverfitGateConfig)
     max_batch  : MaxBatchConfig         = field(default_factory=MaxBatchConfig)
     size_match : SizeMatchConfig        = field(default_factory=SizeMatchConfig)
     training   : TrainingQueueConfig    = field(default_factory=TrainingQueueConfig)

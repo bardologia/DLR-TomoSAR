@@ -94,36 +94,6 @@ def test_training_dataset_config_paths_and_patch(test_data_dir, params_dir):
 
 
 @pytest.mark.real_data
-def test_overfit_dataset_config_uses_same_crop_for_all_splits(test_data_dir, params_dir):
-    factory = _factory(test_data_dir, params_dir)
-    factory.config.overfit.azimuth_start = 1000
-    factory.config.overfit.azimuth_lines = 64
-    factory.config.overfit.range_lines   = 64
-
-    cfg  = factory.overfit_dataset_config()
-    crop = factory.global_crop()
-
-    assert cfg.split_regions.train.as_tuple() == cfg.split_regions.val.as_tuple()
-    assert cfg.split_regions.val.as_tuple()   == cfg.split_regions.test.as_tuple()
-    assert cfg.split_regions.train.azimuth_start == 1000
-    assert cfg.split_regions.train.azimuth_end   == 1064
-    assert cfg.split_regions.train.range_start   == crop.range_start
-    assert cfg.split_regions.train.range_end     == crop.range_start + 64
-
-
-@pytest.mark.real_data
-def test_overfit_dataset_config_disables_augmentation(test_data_dir, params_dir):
-    factory = _factory(test_data_dir, params_dir)
-    cfg     = factory.overfit_dataset_config()
-
-    assert cfg.augmentation.p_flip_h    == 0.0
-    assert cfg.augmentation.p_flip_v    == 0.0
-    assert cfg.augmentation.p_rot90     == 0.0
-    assert cfg.augmentation.p_amp_scale == 0.0
-    assert cfg.augmentation.p_noise     == 0.0
-
-
-@pytest.mark.real_data
 def test_inference_config_propagates_queue_settings(test_data_dir, params_dir):
     factory = _factory(test_data_dir, params_dir)
     factory.config.inference.split           = "test"

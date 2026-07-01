@@ -49,7 +49,6 @@ class TrialRecord:
     trainer_config  : dict        = field(default_factory=dict)
     run_summary     : dict        = field(default_factory=dict)
     checkpoint      : dict        = field(default_factory=dict)
-    overfit         : dict        = field(default_factory=dict)
     training_result : dict        = field(default_factory=dict)
     inference_dir   : Path | None = None
     metrics         : dict        = field(default_factory=dict)
@@ -126,26 +125,18 @@ class TrialCollector:
     def _attach_figures(self, record: TrialRecord, inference_dir: Path) -> None:
         record.figures = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
 
-    def _aggregate_sources(self) -> tuple[dict, dict, dict]:
+    def _aggregate_sources(self) -> tuple[dict, dict]:
         size_match       = self._optional_json(self.pipeline_dir / "size_match.json")
-        overfit_results  = {r["model"]: r for r in FileIO.load_json(self.pipeline_dir / "overfit_results.json")}
         training_results = {r["name"]:  r for r in FileIO.load_json(self.pipeline_dir / "training_results.json")}
 
-        return size_match, overfit_results, training_results
+        return size_match, training_results
 
     @staticmethod
     def _model_of(trial_name: str) -> str:
         return SeedSet.base(trial_name).split("__")[0]
 
-    @staticmethod
-    def _overfit_key(trial_name: str) -> str:
-        base   = SeedSet.base(trial_name)
-        suffix = trial_name[len(base):]
-
-        return f"{TrialCollector._model_of(trial_name)}{suffix}"
-
     def collect(self) -> list[TrialRecord]:
-        size_match, overfit_results, training_results = self._aggregate_sources()
+        size_match, training_results = self._aggregate_sources()
 
         if not self.training_dir.is_dir():
             self.logger.error(f"No training directory found at: {self.training_dir}")
@@ -158,7 +149,6 @@ class TrialCollector:
             record.size_match      = size_match.get(self._model_of(trial_dir.name), {})
             record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
             record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.overfit         = overfit_results.get(self._overfit_key(trial_dir.name), {})
             record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
             record.parameters      = self._parse_parameters(trial_dir, record.size_match)
             record.checkpoint      = self._read_checkpoint(trial_dir)

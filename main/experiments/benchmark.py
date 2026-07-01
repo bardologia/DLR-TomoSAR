@@ -27,13 +27,12 @@ def _worker(stage: str, model_name: str, seed: int | None, gpu_id: int, run_tag:
     EnvironmentPinner.gpu(gpu_id)
 
     from configuration.benchmark import BenchmarkConfig
-    from pipelines.benchmark.workers                import InferenceWorker, MaxBatchWorker, OverfitWorker, TrainingWorker
+    from pipelines.benchmark.workers                import InferenceWorker, MaxBatchWorker, TrainingWorker
     from tools.runtime.config_cli                   import ConfigCli
 
     config = ConfigCli.load_worker_config(BenchmarkConfig(), run_tag, run_dir)
 
     workers = {
-        "overfit"  : OverfitWorker,
         "maxbatch" : MaxBatchWorker,
         "train"    : TrainingWorker,
         "infer"    : InferenceWorker,
@@ -49,7 +48,7 @@ def _worker(stage: str, model_name: str, seed: int | None, gpu_id: int, run_tag:
 
 def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--worker",         type=str, default=None, choices=["overfit", "maxbatch", "train", "infer"])
+    parser.add_argument("--worker",         type=str, default=None, choices=["maxbatch", "train", "infer"])
     parser.add_argument("--model",          type=str, default=None)
     parser.add_argument("--loss-component", type=str, default=None)
     parser.add_argument("--seed",           type=int, default=None)

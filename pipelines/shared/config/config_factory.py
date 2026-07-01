@@ -70,38 +70,6 @@ class ConfigFactory:
             pin_memory      = True,
         )
 
-    def overfit_dataset_config(self) -> DatasetConfig:
-        crop    = self.global_crop()
-        overfit = self.config.overfit
-
-        azimuth_end  = overfit.azimuth_start + overfit.azimuth_lines
-        range_end    = crop.range_start + overfit.range_lines
-        overfit_crop = CropRegion(overfit.azimuth_start, azimuth_end, crop.range_start, range_end)
-
-        return DatasetConfig(
-            preprocessing_run_directory = self.config.paths.dataset_path,
-            parameters_path             = self.config.paths.parameters_path,
-            secondary_labels            = self._secondary_labels(),
-
-            split_regions = SplitRegions(
-                train = overfit_crop,
-                val   = overfit_crop,
-                test  = overfit_crop,
-            ),
-
-            input_config  = self.benchmark_input_config(),
-            output_config = self._output_config(),
-            normalization = self._normalization(),
-
-            augmentation = AugmentationConfig(
-                p_flip_h    = 0.0,
-                p_flip_v    = 0.0,
-                p_rot90     = 0.0,
-                p_amp_scale = 0.0,
-                p_noise     = 0.0,
-            ),
-        )
-
     def _base_trainer_kwargs(self, logdir: Path) -> dict:
         training = self.config.training
         return {
@@ -139,39 +107,6 @@ class ConfigFactory:
                 enabled  = False,
                 warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_weights=(1.0, 1.0, 1.0)),
                 complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-            ),
-        )
-
-    def overfit_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
-        from pipelines.backbone.training.loss import LossComponentCatalog
-
-        overfit    = self.config.overfit
-        gate_loss  = LossComponentCatalog.standalone("param_l1")
-
-        return BackboneTrainerConfig(
-            **self._base_trainer_kwargs(logdir),
-
-            early_stopping = EarlyStoppingConfig(patience=9999, restore_best=False),
-            warmup         = WarmupConfig(warmup_enabled=False),
-            scheduler      = SchedulerConfig(type=self.config.training.scheduler_type.value, epochs=overfit.max_steps, eta_min=1e-6, step_size=self.config.training.scheduler_step_size, gamma=self.config.training.scheduler_gamma, power=self.config.training.scheduler_power),
-            optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0),
-
-            training = TrainingLoopConfig(
-                epochs               = overfit.max_steps,
-                validation_frequency = 9999,
-            ),
-
-            overfit = OverfitConfig(
-                enabled        = True,
-                max_steps      = overfit.max_steps,
-                stop_threshold = overfit.stop_threshold,
-                batch_size     = overfit.batch_size,
-            ),
-
-            curriculum = LossCurriculumConfig(
-                enabled  = False,
-                warmup   = gate_loss,
-                complete = gate_loss,
             ),
         )
 

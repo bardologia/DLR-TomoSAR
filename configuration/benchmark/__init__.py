@@ -1,5 +1,4 @@
 from configuration.benchmark.general import (
-    OverfitGateConfig,
     MaxBatchConfig,
     SizeMatchConfig,
     InferenceQueueConfig,

@@ -201,7 +201,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
     def _overfit_loss(self):
         from configuration.training      import OverfitConfig
         from models                      import BACKBONE_CONFIG_REGISTRY
-        from pipelines.benchmark.workers import OverfitModelPreparer
+        from tools.training.pretraining.overfit_gate import OverfitModelPreparer
 
         pretrain = self.config.pretrain
         work_dir = Path(self.config.logdir) / "pretrain" / "overfit"
