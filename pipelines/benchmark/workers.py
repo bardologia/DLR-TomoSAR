@@ -195,7 +195,6 @@ class OverfitWorker(BenchmarkWorker):
         def run_body():
             trainer_config          = self.factory.overfit_trainer_config(logdir=stage_dir)
             trainer_config.geometry = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-            self._apply_loss_component(trainer_config, loss_component)
 
             dataset_config              = self.factory.overfit_dataset_config()
             dataset_config.input_config = self.config.input

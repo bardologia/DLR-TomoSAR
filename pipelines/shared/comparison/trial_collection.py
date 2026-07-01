@@ -133,6 +133,14 @@ class TrialCollector:
 
         return size_match, overfit_results, training_results
 
+    @staticmethod
+    def _overfit_key(trial_name: str) -> str:
+        base   = SeedSet.base(trial_name)
+        suffix = trial_name[len(base):]
+        model  = base.split("__")[0]
+
+        return f"{model}{suffix}"
+
     def collect(self) -> list[TrialRecord]:
         size_match, overfit_results, training_results = self._aggregate_sources()
 
@@ -147,7 +155,7 @@ class TrialCollector:
             record.size_match      = size_match.get(SeedSet.base(trial_dir.name), {})
             record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
             record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.overfit         = overfit_results[trial_dir.name] if trial_dir.name in overfit_results else {}
+            record.overfit         = overfit_results.get(self._overfit_key(trial_dir.name), {})
             record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
             record.parameters      = self._parse_parameters(trial_dir, record.size_match)
             record.checkpoint      = self._read_checkpoint(trial_dir)

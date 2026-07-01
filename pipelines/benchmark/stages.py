@@ -54,6 +54,9 @@ class SeedExpandedStage:
 
 
 class OverfitStage(SeedExpandedStage, ExperimentStage):
+    def _components(self, config: BenchmarkConfig) -> list[str | None]:
+        return [None]
+
     def __init__(self, config: BenchmarkConfig, entry_script: Path, run_tag: str, models: list[str], logger: Logger) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger, entry_script=entry_script)
         self.names        = self._expand(config, models)
