@@ -3,10 +3,10 @@ from __future__ import annotations
 import gc
 from pathlib import Path
 
-from pipelines.processing.generation.plots import StackPlotter
+from pipelines.processing.generation.plots         import StackPlotter
+from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                         import FileIO
 from tools.monitoring.logger               import Logger
-from tools.orchestration.pool              import ProcessPoolRunner
 
 
 class StackInferencePipeline:
@@ -111,29 +111,23 @@ def run_stack_inference_session(session: StackInferenceSession) -> dict[str, Pat
     return session.execute()
 
 
-class PreprocessingInferenceScheduler:
+class PreprocessingInferenceScheduler(SequentialSessionScheduler):
+    EMPTY_MESSAGE = "No preprocessing trials to infer"
+    SESSION_NOUN  = "trials"
+
     def __init__(self, config, logger: Logger) -> None:
+        super().__init__(logger)
         self.config = config
-        self.logger = logger
 
     def _sessions(self) -> list[StackInferenceSession]:
         run_dirs = StackInferenceTrialCollector(Path(self.config.runs_dir), list(self.config.run_tags), self.logger).collect()
         return [StackInferenceSession(run_dir, self.config.max_amplitude_clip) for run_dir in run_dirs]
 
-    def run(self) -> dict[str, dict[str, Path]]:
-        sessions = self._sessions()
-        if not sessions:
-            raise RuntimeError("No preprocessing trials to infer")
+    def _session_runner(self):
+        return run_stack_inference_session
 
-        self.logger.subsection(f"Dispatching {len(sessions)} trials sequentially")
+    def _result_key(self, session) -> str:
+        return session.run_dir.name
 
-        runner    = ProcessPoolRunner(logger=self.logger, max_workers=1)
-        completed = runner.run(sessions, run_stack_inference_session)
-
-        results = {}
-        for session, outputs in completed:
-            results[session.run_dir.name] = outputs
-            self.logger.section(f"[Trial] {session.run_dir.name} completed")
-            self.logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
-
-        return results
+    def _completion_message(self, session) -> str:
+        return f"[Trial] {session.run_dir.name} completed"

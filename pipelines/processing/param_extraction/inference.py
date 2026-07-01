@@ -6,9 +6,9 @@ from pathlib import Path
 from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator
 from pipelines.processing.param_extraction.pipeline import ParameterIO
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
+from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                                  import FileIO
 from tools.monitoring.logger                        import Logger
-from tools.orchestration.pool                       import ProcessPoolRunner
 
 
 class ParamRunInferencePipeline:
@@ -150,29 +150,26 @@ def run_param_inference_session(session: ParamInferenceSession) -> dict[str, Pat
     return session.execute()
 
 
-class ParamExtractionInferenceScheduler:
+class ParamExtractionInferenceScheduler(SequentialSessionScheduler):
+    EMPTY_MESSAGE = "No parameter-extraction trials to infer"
+    SESSION_NOUN  = "trials"
+
     def __init__(self, config, logger: Logger) -> None:
+        super().__init__(logger)
         self.config = config
-        self.logger = logger
 
     def _sessions(self) -> list[ParamInferenceSession]:
         run_dirs = ParamInferenceTrialCollector(Path(self.config.params_dir), list(self.config.run_tags), self.logger).collect()
         return [ParamInferenceSession(run_dir, self.config.make_plots, self.config.threshold_factor, self.config.truncation_index) for run_dir in run_dirs]
 
-    def run(self) -> dict[str, dict[str, Path]]:
-        sessions = self._sessions()
-        if not sessions:
-            raise RuntimeError("No parameter-extraction trials to infer")
+    def _session_runner(self):
+        return run_param_inference_session
 
-        self.logger.subsection(f"Dispatching {len(sessions)} trials sequentially")
+    def _result_key(self, session) -> str:
+        return session.run_dir.name
 
-        runner    = ProcessPoolRunner(logger=self.logger, max_workers=1)
-        completed = runner.run(sessions, run_param_inference_session)
+    def _completion_message(self, session) -> str:
+        return f"[Trial] {session.run_dir.name} completed"
 
-        results = {}
-        for session, outputs in completed:
-            results[session.run_dir.name] = outputs
-            self.logger.section(f"[Trial] {session.run_dir.name} completed")
-            self.logger.kv_table({name: str(path) for name, path in outputs.items() if name != "plots"}, title="Outputs")
-
-        return results
+    def _outputs_table(self, outputs: dict) -> dict:
+        return {name: str(path) for name, path in outputs.items() if name != "plots"}

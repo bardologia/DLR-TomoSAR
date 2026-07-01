@@ -6,7 +6,8 @@ from typing  import Tuple
 
 from configuration.sar.processing_config       import ProcessingConfig
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
-from tools                                     import FileIO, ProcessPoolRunner
+from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
+from tools                                     import FileIO
 from tools.monitoring.logger                   import Logger
 from tools.sar                                 import GeometryField, GeometryFieldBuilder, InterferogramLauncher, TomogramLauncher, TrackParameters
 from tools.baselines                           import TrackBaselines, TrackProfiles
@@ -149,26 +150,22 @@ def run_preprocess_session(session: PreProcessSession) -> dict[str, Path]:
     return session.execute()
 
 
-class PreProcessScheduler:
+class PreProcessScheduler(SequentialSessionScheduler):
     def __init__(self, sessions: list[PreProcessSession], logger: Logger) -> None:
+        super().__init__(logger)
         self.sessions = sessions
-        self.logger   = logger
 
-    def run(self) -> dict[str, dict[str, Path]]:
-        results = {}
+    def _sessions(self) -> list[PreProcessSession]:
+        return self.sessions
 
-        self.logger.subsection(f"Dispatching {len(self.sessions)} sessions sequentially")
+    def _session_runner(self):
+        return run_preprocess_session
 
-        runner    = ProcessPoolRunner(logger=self.logger, max_workers=1)
-        completed = runner.run(self.sessions, run_preprocess_session)
+    def _result_key(self, session) -> str:
+        return session.dataset_name
 
-        for session, outputs in completed:
-            results[session.dataset_name] = outputs
-
-            self.logger.section(f"[Session {session.index + 1}/{session.total}] {session.dataset_name} completed")
-            self.logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
-
-        return results
+    def _completion_message(self, session) -> str:
+        return f"[Session {session.index + 1}/{session.total}] {session.dataset_name} completed"
 
 
 
