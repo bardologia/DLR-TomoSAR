@@ -1,32 +1,19 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
+from pathlib import Path
 
 from configuration.cross_validation import CrossValidationConfig
-from tools.runtime.config_cli                          import ConfigCli
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldPlanner
 from pipelines.cross_validation.stages                 import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
-from tools.data.io                                     import FileIO
-from tools.monitoring.logger                           import Logger
+from pipelines.shared.orchestration.staged_pipeline    import StagedPipeline
 
 
-class CrossValidationPipeline:
+class CrossValidationPipeline(StagedPipeline):
+    LOGGER_NAME = "cross_validation_pipeline"
+
     def __init__(self, config: CrossValidationConfig, entry_script: Path) -> None:
-        self.config       = config
-        self.entry_script = entry_script
-        self.run_tag      = config.run_tag or RunTag.now()
-
-        self.run_dir      = Path(config.paths.log_base_dir) / self.run_tag
-        self.pipeline_dir = self.run_dir / "pipeline"
-        self.state_path   = self.pipeline_dir / "state.json"
-
-        FileIO.ensure_dir(self.pipeline_dir)
-        ConfigCli.save_resolved(config, self.pipeline_dir / "resolved_config.json")
-
-        self.logger  = Logger(log_dir=str(self.pipeline_dir), name="cross_validation_pipeline")
+        super().__init__(config, entry_script)
         self.factory = FoldConfigFactory(config)
-        self.state   = {"run_tag": self.run_tag, "stages": {}}
 
     def _run_training(self) -> list[dict]:
         stage   = FoldTrainingStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, logger=self.logger)
@@ -55,14 +42,6 @@ class CrossValidationPipeline:
 
         self._mark_stage("reports", "completed")
         return out_dir
-
-    def _mark_stage(self, stage_name: str, status: str) -> None:
-        self.state["stages"][stage_name] = {
-            "status"    : status,
-            "timestamp" : RunTag.timestamp(),
-        }
-
-        FileIO.save_json(self.state, self.state_path, indent=2)
 
     def run(self) -> None:
         planner = self.factory.planner()

@@ -1,33 +1,20 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
+from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
 from models                                     import config_registry
-from tools.data.io                              import FileIO
-from tools.runtime.config_cli                   import ConfigCli
-from tools.monitoring.logger                    import Logger
+from pipelines.shared.orchestration.staged_pipeline import StagedPipeline
 
 from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatchStage, SizeMatchStage, TrainingStage
 
 
-class BenchmarkPipeline:
+class BenchmarkPipeline(StagedPipeline):
+    LOGGER_NAME = "benchmark_pipeline"
+
     def __init__(self, config: BenchmarkConfig, entry_script: Path) -> None:
-        self.config       = config
-        self.entry_script = entry_script
-        self.run_tag      = config.run_tag or RunTag.now()
-
-        self.run_dir      = Path(config.paths.log_base_dir) / self.run_tag
-        self.pipeline_dir = self.run_dir / "pipeline"
-        self.state_path   = self.pipeline_dir / "state.json"
-
-        FileIO.ensure_dir(self.pipeline_dir)
-        ConfigCli.save_resolved(config, self.pipeline_dir / "resolved_config.json")
-
-        self.logger = Logger(log_dir=str(self.pipeline_dir), name="benchmark_pipeline")
+        super().__init__(config, entry_script)
         self.models = [m for m in self._registry().keys() if m not in set(config.skip_models)]
-        self.state  = {"run_tag": self.run_tag, "stages": {}}
 
     def _registry(self) -> dict:
         return config_registry(self.config.training_type)
@@ -68,14 +55,6 @@ class BenchmarkPipeline:
 
         self._mark_stage("comparison", "completed")
         return out_dir
-
-    def _mark_stage(self, stage_name: str, status: str) -> None:
-        self.state["stages"][stage_name] = {
-            "status"    : status,
-            "timestamp" : RunTag.timestamp(),
-        }
-
-        FileIO.save_json(self.state, self.state_path, indent=2)
 
     def run(self) -> None:
         self.logger.section("Benchmark pipeline")
