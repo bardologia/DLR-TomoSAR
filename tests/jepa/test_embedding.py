@@ -53,12 +53,17 @@ class _IdentityNormalizer:
 
 
 def _build_case(z_offset: float = 0.0, flip: bool = False):
+    torch.manual_seed(0)
+
     n_gaussians, n_elev, spatial, emb_dim = 2, 8, 3, 4
     x_axis = np.linspace(-4.0, 4.0, n_elev).astype(np.float32)
     x      = x_axis.reshape(1, 1, -1, 1, 1)
 
-    gt_params = torch.rand(2, n_gaussians * 3, spatial, spatial) + 0.1
-    gt_np     = gt_params.numpy().astype(np.float32)
+    gt_params           = torch.rand(2, n_gaussians * 3, spatial, spatial) + 0.1
+    gt_params[:, 1::3]  = torch.rand(2, n_gaussians, spatial, spatial) * 6.0 - 3.0
+    gt_params[:, 2::3] += 0.5
+
+    gt_np = gt_params.numpy().astype(np.float32)
     gt_gauss  = gt_np.reshape(2, n_gaussians, 3, spatial, spatial)
     gt_curves = torch.from_numpy(GaussianReconstructor.reconstruct_batch(gt_gauss, x).astype(np.float32))
 
