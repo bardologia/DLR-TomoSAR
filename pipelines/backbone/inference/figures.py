@@ -553,6 +553,8 @@ class FigureComposer:
 
         if result.reduced is not None:
             self._compose_reduced(result, run, global_metrics, x_axis_np, indices, figure_paths)
+        else:
+            self.logger.subsection("Reduced-baseline figures skipped: no reduced comparison was computed for this run.")
 
         return figure_paths
 

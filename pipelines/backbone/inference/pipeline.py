@@ -111,25 +111,35 @@ class InferencePipeline:
         return global_metrics
 
     def _synthesize_reduced(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, indices: dict, logger: Logger) -> None:
-        if not cfg.compute_reduced or run.secondary_labels is None:
+        if not cfg.compute_reduced:
+            logger.section("[Inference: Reduced Capon Baseline skipped]")
+            logger.subsection("compute_reduced is disabled; the NN-vs-reduced-vs-GT comparison is absent from metrics, figures, and report.")
+            global_metrics["reduced_status"] = "skipped: compute_reduced disabled"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        if run.secondary_labels is None:
+            logger.section("[Inference: Reduced Capon Baseline skipped]")
+            logger.subsection("Run uses the full secondary stack; the reduced tomogram would equal the ground-truth tomogram, so no baseline comparison exists.")
+            global_metrics["reduced_status"] = "skipped: full secondary stack"
+            Metrics.write_json(global_metrics, meta.metrics_path)
             return
 
         from pipelines.backbone.inference.reduced import ReducedTomogramSynthesizer
 
-        synth          = ReducedTomogramSynthesizer(run, meta, cfg, logger)
-        reduced_curves = synth.run(result.gt_curves)
-
-        if reduced_curves is None:
-            return
+        synth     = ReducedTomogramSynthesizer(run, meta, cfg, logger)
+        synthesis = synth.run(result.gt_curves)
 
         comparison = Metrics(result, x_axis_np, run.n_gaussians).reduced_comparison(
-            reduced_curves,
+            synthesis.curves,
             elev_indices  = indices["all_elev_idx"],
             range_indices = indices["all_range_idx"],
             az_indices    = indices["all_az_idx"],
         )
 
         result.reduced = comparison
+        global_metrics["reduced_status"] = "computed"
+        global_metrics.update(synthesis.orientation)
         global_metrics.update(comparison.metrics)
         Metrics.write_json(global_metrics, meta.metrics_path)
 

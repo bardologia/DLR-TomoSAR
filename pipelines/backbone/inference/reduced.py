@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing  import List, Optional
+from typing  import Dict, List
 
 import numpy as np
 
@@ -10,9 +11,16 @@ from pipelines.backbone.inference.loader             import Run
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from tools                                    import FileIO
 from tools.monitoring.logger                  import Logger
+from tools.data.preprocessing                 import ProfileNormalizer
 from tools.data.regions                       import CropRegion
 from tools.sar                                import TomogramLauncher
 from tools.baselines                          import SecondarySelection
+
+
+@dataclass
+class ReducedSynthesis:
+    curves      : np.ndarray
+    orientation : Dict[str, float]
 
 
 class ReducedTomogramSynthesizer:
@@ -89,9 +97,9 @@ class ReducedTomogramSynthesizer:
         if (az, rg) != (region.azimuth_size, region.range_size):
             raise ValueError(f"Reduced tomogram spatial shape {(az, rg)} does not match the split region {(region.azimuth_size, region.range_size)}.")
 
-    def _report_orientation(self, reduced: np.ndarray, gt_curves: np.ndarray) -> None:
-        gt_profile  = np.asarray(gt_curves).mean(axis=(1, 2))
-        red_profile = reduced.mean(axis=(1, 2))
+    def _report_orientation(self, reduced: np.ndarray, gt_curves: np.ndarray) -> Dict[str, float]:
+        gt_profile  = ProfileNormalizer.unit_area(np.asarray(gt_curves)).mean(axis=(1, 2))
+        red_profile = ProfileNormalizer.unit_area(reduced).mean(axis=(1, 2))
 
         gt_centered  = gt_profile  - gt_profile.mean()
         red_centered = red_profile - red_profile.mean()
@@ -108,12 +116,13 @@ class ReducedTomogramSynthesizer:
         if corr_flipped > corr_direct:
             self.logger.subsection("WARNING: flipped elevation orientation correlates better with GT; verify the Capon elevation sign on the server.")
 
-    def run(self, gt_curves: np.ndarray) -> Optional[np.ndarray]:
-        self.logger.section("[Inference: Reduced Capon Baseline]")
+        return {
+            "reduced_orientation_corr_aligned" : corr_direct,
+            "reduced_orientation_corr_flipped" : corr_flipped,
+        }
 
-        if self._run.secondary_labels is None:
-            self.logger.subsection("Run uses the full secondary stack; reduced tomogram equals the ground-truth tomogram. Skipping.")
-            return None
+    def run(self, gt_curves: np.ndarray) -> ReducedSynthesis:
+        self.logger.section("[Inference: Reduced Capon Baseline]")
 
         state  = self._load_processing_state()
         select = self._select_indices()
@@ -139,11 +148,11 @@ class ReducedTomogramSynthesizer:
         reduced = np.load(str(tomogram_path), allow_pickle=False).astype(np.float32)
 
         self._validate_alignment(reduced)
-        self._report_orientation(reduced, gt_curves)
+        orientation = self._report_orientation(reduced, gt_curves)
 
         if self.cfg.save_cubes:
             np.save(self.meta.cube_dir / "reduced_curves.npy", reduced)
 
         self.logger.subsection(f"Reduced tomogram ready : shape {reduced.shape}")
 
-        return reduced
+        return ReducedSynthesis(curves=reduced, orientation=orientation)

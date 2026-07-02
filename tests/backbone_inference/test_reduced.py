@@ -89,7 +89,7 @@ def test_build_spec_carries_track_selection_and_crop():
     assert spec["stack_identifier"] == "stackX"
 
 
-def test_report_orientation_aligned_better_than_flipped():
+def test_report_orientation_returns_persistable_correlations():
     region  = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
     synth   = _make_synth(x_axis_length=20, region=region)
 
@@ -98,12 +98,21 @@ def test_report_orientation_aligned_better_than_flipped():
     gt      = np.broadcast_to(profile[:, None, None], (20, 4, 4)).astype(np.float32)
     reduced = gt.copy()
 
-    synth._report_orientation(reduced, gt)
+    orientation = synth._report_orientation(reduced, gt)
+
+    assert orientation["reduced_orientation_corr_aligned"] == pytest.approx(1.0, abs=1e-5)
+    assert orientation["reduced_orientation_corr_aligned"] > orientation["reduced_orientation_corr_flipped"]
 
 
-def test_run_returns_none_for_full_stack():
-    region = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
-    synth  = _make_synth(x_axis_length=10, region=region, secondary_labels=None)
+def test_report_orientation_detects_flipped_axis():
+    region  = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
+    synth   = _make_synth(x_axis_length=20, region=region)
 
-    gt = np.zeros((10, 4, 4), dtype=np.float32)
-    assert synth.run(gt) is None
+    x       = np.linspace(0, 1, 20)
+    profile = np.exp(-((x - 0.3) ** 2) / 0.01).astype(np.float32)
+    gt      = np.broadcast_to(profile[:, None, None], (20, 4, 4)).astype(np.float32)
+    reduced = gt[::-1].copy()
+
+    orientation = synth._report_orientation(reduced, gt)
+
+    assert orientation["reduced_orientation_corr_flipped"] > orientation["reduced_orientation_corr_aligned"]
