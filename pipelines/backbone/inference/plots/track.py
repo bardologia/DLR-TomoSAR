@@ -32,6 +32,27 @@ class TrackPlotter(PlotTools):
 
         return self._save(fig, out_path)
 
+    def plot_phase_agreement(self, labels: List[str], aligned: List[float], flipped: List[float], source: str, out_path: Path) -> Path:
+        fig, ax = plt.subplots(figsize=(6.4, 3.8))
+
+        positions = np.arange(len(labels), dtype=np.float64)
+        width     = 0.38
+
+        ax.bar(positions - width / 2, aligned, width, color="C0", label="aligned kz")
+        ax.bar(positions + width / 2, flipped, width, color="C3", label="flipped kz")
+
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, fontsize=8)
+        ax.set_ylim(0.0, 1.0)
+        ax.set_xlabel("secondary pass")
+        ax.set_ylabel("mean resultant length")
+        ax.set_title(f"Measured-interferogram phase agreement ({source} curves)")
+        ax.legend(framealpha=0.9, fontsize=8)
+        ax.grid(True, axis="y", linewidth=0.3, alpha=0.4)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
     def plot_track_profiles(self, profiles, out_dir: Path, split_azimuth: Optional[Tuple[int, int]] = None) -> List[Path]:
         azimuth = profiles.azimuth_axis
         paths   = []

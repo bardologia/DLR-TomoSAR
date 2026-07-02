@@ -145,6 +145,29 @@ class InferencePipeline:
 
         logger.subsection(f"Reduced baseline merged : relative MSE reduction = {comparison.metrics['relative_mse_reduction']:.4f}, NN beats reduced on {comparison.metrics['fraction_pred_beats_reduced'] * 100.0:.1f}% of pixels")
 
+    def _evaluate_data_consistency(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, logger: Logger) -> None:
+        if not cfg.compute_data_consistency:
+            logger.section("[Inference: Data Consistency skipped]")
+            logger.subsection("compute_data_consistency is disabled; interferometric-consistency metrics are absent from metrics, figures, and report.")
+            global_metrics["data_consistency_status"] = "skipped: compute_data_consistency disabled"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        from pipelines.backbone.inference.data_consistency import DataConsistencyEvaluator
+
+        evaluator   = DataConsistencyEvaluator(run, cfg, logger)
+        consistency = evaluator.run(result.pred_curves, result.gt_curves, x_axis_np)
+
+        result.data_consistency = consistency
+        global_metrics["data_consistency_status"] = "computed"
+        global_metrics.update(consistency.metrics)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        if cfg.save_cubes:
+            np.save(meta.cube_dir / "physics_coherence_error.npy",  consistency.coherence_error_map)
+            np.save(meta.cube_dir / "physics_covariance_error.npy", consistency.covariance_error_map)
+            np.save(meta.cube_dir / "physics_valid_mask.npy",       consistency.valid_mask)
+
     def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
         return composer.compose(
             result         = result,
@@ -190,6 +213,7 @@ class InferencePipeline:
         global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
 
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
+        self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
 
         figure_paths = {}
         gif_paths    = {}

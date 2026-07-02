@@ -28,6 +28,55 @@ class FigureComposer:
         self.logger  = logger
         self.cfg     = cfg
 
+    def _compose_data_consistency(self, result: Result, figure_paths: Dict[str, List[Path]]) -> None:
+        slice_plotter = self.plotter.slice
+        track_plotter = self.plotter.track
+        meta          = self.meta
+        consistency   = result.data_consistency
+
+        physics_dir = meta.figures_dir / "data_consistency"
+
+        figure_paths["coherence_error_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = consistency.coherence_error_map,
+            title      = "Per-pixel coherence-resynthesis error (pred vs GT, log scale)",
+            label      = "mean |Δγ|² over tracks",
+            out_path   = physics_dir / "coherence_error_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = self.cfg.cmap_error,
+            log        = True,
+        )]
+
+        figure_paths["covariance_error_map"] = [slice_plotter.plot_pixel_metric_map(
+            metric_map = consistency.covariance_error_map,
+            title      = "Per-pixel covariance-matching error (pred vs GT, log scale)",
+            label      = "relative covariance error",
+            out_path   = physics_dir / "covariance_error_map.png",
+            az_offset  = result.azimuth_offset,
+            rg_offset  = result.range_offset,
+            cmap       = self.cfg.cmap_error,
+            log        = True,
+        )]
+
+        secondaries = consistency.track_labels[1:]
+        metrics     = consistency.metrics
+        agreement   = []
+
+        for source in ("gt", "pred"):
+            aligned = [metrics[f"phase_agreement_{source}_track_{label}"]         for label in secondaries]
+            flipped = [metrics[f"phase_agreement_{source}_flipped_track_{label}"] for label in secondaries]
+
+            agreement.append(track_plotter.plot_phase_agreement(
+                labels   = secondaries,
+                aligned  = aligned,
+                flipped  = flipped,
+                source   = source,
+                out_path = physics_dir / f"phase_agreement_{source}.png",
+            ))
+
+        figure_paths["phase_agreement"] = agreement
+        self.logger.subsection(f"Data-consistency figures : {physics_dir}")
+
     def _compose_reduced(
         self,
         result         : Result,
@@ -555,6 +604,11 @@ class FigureComposer:
             self._compose_reduced(result, run, global_metrics, x_axis_np, indices, figure_paths)
         else:
             self.logger.subsection("Reduced-baseline figures skipped: no reduced comparison was computed for this run.")
+
+        if result.data_consistency is not None:
+            self._compose_data_consistency(result, figure_paths)
+        else:
+            self.logger.subsection("Data-consistency figures skipped: no interferometric-consistency evaluation was computed for this run.")
 
         return figure_paths
 

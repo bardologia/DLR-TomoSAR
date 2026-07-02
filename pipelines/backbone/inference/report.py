@@ -280,6 +280,7 @@ class Report:
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
         out += self._build_reduced_headline()
+        out += self._build_data_consistency_headline()
 
         return out
 
@@ -497,6 +498,32 @@ class Report:
 
         return out
 
+    def _build_data_consistency_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "physics_coherence_error_mean" not in gm:
+            return []
+
+        out = [f"\n### {self._next_subsection()} Interferometric data consistency\n"]
+        out.append(
+            "The predicted and GT elevation profiles are reprojected to normalised track coherences and "
+            "pair covariances through the per-pixel kz geometry field — the same steering machinery the "
+            "physics loss trains on. Phase agreement compares the multilooked measured interferogram phase "
+            "against the coherence phase synthesised from the curves; the flipped column uses the conjugate "
+            "steering and should stay below the aligned one when the kz sign convention is correct.\n"
+        )
+        out.append(self._three_col_table([
+            ("Coherence error mean",       gm["physics_coherence_error_mean"],   "Mean |Δγ|² over tracks, pred vs GT, power-masked"),
+            ("Coherence error p95",        gm["physics_coherence_error_p95"],    "95th percentile of the per-pixel error"),
+            ("Covariance error mean",      gm["physics_covariance_error_mean"],  "Relative pair-covariance mismatch, pred vs GT"),
+            ("Valid fraction",             gm["physics_valid_fraction"],         "Pixels above the physics power floor"),
+            ("Phase agreement GT",         gm["phase_agreement_gt_mean"],        "Measured phase vs GT-synthesised coherence"),
+            ("Phase agreement GT flipped", gm["phase_agreement_gt_flipped_mean"],"Same with conjugate steering (kz sign check)"),
+            ("Phase agreement pred",       gm["phase_agreement_pred_mean"],      "Measured phase vs pred-synthesised coherence"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
+
     _IMPROVEMENT_KEYS = frozenset({
         "improvement_pixel_mse_mean", "improvement_pixel_mse_median",
         "fraction_pred_beats_reduced", "relative_mse_reduction",
@@ -510,6 +537,10 @@ class Report:
     @staticmethod
     def _is_reduced_key(k: str) -> bool:
         return ("_red" in k) or k.startswith("ssim_red") or ("predn" in k)
+
+    @staticmethod
+    def _is_physics_key(k: str) -> bool:
+        return k.startswith("physics_") or k.startswith("phase_agreement_")
 
     @staticmethod
     def _is_occupancy_key(k: str) -> bool:
@@ -531,6 +562,7 @@ class Report:
             "3.8 NN improvement over baseline":   {},
             "3.9 Slot occupancy & active count":  {},
             "3.10 Matched Gaussian errors (permutation-invariant)": {},
+            "3.11 Interferometric data consistency": {},
         }
 
         for k, v in sorted(gm.items()):
@@ -538,8 +570,10 @@ class Report:
                 continue
             if "_raw" in k or k in ("tracks", "track_positions", "split", "split_region"):
                 continue
-            if k in self._DATASET_KEYS:
+            if k in self._DATASET_KEYS or k.endswith("_status"):
                 groups["3.1 Dataset statistics"][k] = v
+            elif self._is_physics_key(k):
+                groups["3.11 Interferometric data consistency"][k] = v
             elif k.startswith("matched_"):
                 groups["3.10 Matched Gaussian errors (permutation-invariant)"][k] = v
             elif self._is_occupancy_key(k):
@@ -704,6 +738,7 @@ class Report:
             out += self.assets.images("elev_metric_curves", fp["elev_metric_curves"])
 
         out += self._build_reduced_figures()
+        out += self._build_data_consistency_figures()
 
         if gp:
             out.append("\n## 10. Animations\n")
@@ -762,6 +797,30 @@ class Report:
         if fp.get("elev_metric_curves_reduced"):
             out.append("\n### 9.7 Reduced per-elevation-bin metrics (MAE, RMSE, R², cross-entropy)\n")
             out += self.assets.images("elev_metric_curves_reduced", fp["elev_metric_curves_reduced"])
+
+        return out
+
+    def _build_data_consistency_figures(self) -> List[str]:
+        fp = self.figure_paths
+
+        keys = ("coherence_error_map", "covariance_error_map", "phase_agreement")
+        if not any(fp.get(k) for k in keys):
+            return []
+
+        out = ["\n## 9b. Interferometric data consistency\n"]
+        out.append(
+            "Predicted and GT profiles are reprojected to track coherences and pair covariances through the "
+            "per-pixel kz geometry field, and the measured multilooked interferogram phase is compared against "
+            "the coherence phase synthesised from the curves. In the phase-agreement panels, the aligned bars "
+            "should dominate the flipped ones; the reverse indicates an inverted kz sign convention "
+            "(capon_phase_sign) for the stack.\n"
+        )
+
+        self._section(out, (
+            ("coherence_error_map",  "9b.1 Per-pixel coherence-resynthesis error (pred vs GT)"),
+            ("covariance_error_map", "9b.2 Per-pixel covariance-matching error (pred vs GT)"),
+            ("phase_agreement",      "9b.3 Measured-interferogram phase agreement per secondary pass"),
+        ))
 
         return out
 

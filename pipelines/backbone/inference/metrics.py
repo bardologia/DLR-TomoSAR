@@ -43,9 +43,10 @@ class Result:
     azimuth_offset     : int
     range_offset       : int
 
-    params_pred : Optional[np.ndarray]        = None
-    params_gt   : Optional[np.ndarray]        = None
-    reduced     : Optional[ReducedComparison] = None
+    params_pred      : Optional[np.ndarray]        = None
+    params_gt        : Optional[np.ndarray]        = None
+    reduced          : Optional[ReducedComparison] = None
+    data_consistency : Optional[object]            = None
 
 
 class Metrics:
