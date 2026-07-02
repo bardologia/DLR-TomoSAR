@@ -42,13 +42,11 @@ def test_dict_structure_and_consistency(kind):
     recon, image = _image_pair()
     out          = _loss(kind)(recon, image)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
+    assert set(out.keys()) == {"total_loss", "components", "monitor", "occupancy", "physical"}
     assert set(out["components"].keys()) == {"image_recon"}
-    assert set(out["weighted"].keys())   == {"image_recon"}
     assert out["monitor"] == {}
 
     assert torch.equal(out["total_loss"], out["components"]["image_recon"])
-    assert torch.equal(out["total_loss"], out["weighted"]["image_recon"])
 
 
 @pytest.mark.parametrize("kind", ["mse", "l1", "huber"])

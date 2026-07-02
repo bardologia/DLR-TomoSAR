@@ -257,7 +257,6 @@ class Loss:
         computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map)
 
         components : dict = {}
-        weighted   : dict = {}
         monitor    : dict = {}
         occupancy  : dict = {}
         physical   : dict = {}
@@ -289,27 +288,17 @@ class Loss:
                     continue
 
             if is_used:
-                eff_w                  = getattr(cfg, term.weight_key)
+                eff_w                 = getattr(cfg, term.weight_key)
                 components[term.name] = val
-                weighted[term.name]   = eff_w * val
-                total_loss             = total_loss + weighted[term.name]
-                weight_sum            += eff_w
-
-                if self.log_all_losses:
-                    monitor[f"{term.name}_{term.space}"] = val
+                total_loss            = total_loss + eff_w * val
+                weight_sum           += eff_w
 
             else:
                 monitor[f"{term.name}_{term.space}"] = val
 
-        if cfg.use_param_l1:
-            eff_w = cfg.weight_param_l1
-            for pname, pval in per_param_l1.items():
-                components[f"param_l1/{pname}"] = pval
-                weighted[f"param_l1/{pname}"]   = eff_w * pval
-
-        if self.log_all_losses:
-            for pname, pval in per_param_l1.items():
-                monitor[f"param_l1/{pname}_norm"] = pval
+        per_param_target = components if cfg.use_param_l1 else monitor
+        for pname, pval in per_param_l1.items():
+            per_param_target[f"param_l1/{pname}"] = pval
 
         if self.slot_presence_active:
             occupancy = self._occupancy(pred_params_phys, gt_phys)
@@ -320,7 +309,6 @@ class Loss:
         return {
             "total_loss" : total_loss,
             "components" : components,
-            "weighted"   : weighted,
             "monitor"    : monitor,
             "occupancy"  : occupancy,
             "physical"   : physical,

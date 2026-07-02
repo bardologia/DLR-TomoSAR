@@ -35,7 +35,7 @@ def test_loss_returns_finite_scalar(autoencoder, x_axis, norm_stats, profile_nor
 
     out = loss(z_hat, gt)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
+    assert set(out.keys()) == {"total_loss", "components", "monitor", "occupancy", "physical"}
     assert out["total_loss"].ndim == 0
     assert torch.isfinite(out["total_loss"])
     assert "embedding_mse" in out["components"]
@@ -119,17 +119,16 @@ def test_loss_curve_recon_flows_to_decoder(x_axis, norm_stats, profile_normalize
     assert decoder_has_grad
 
 
-def test_loss_weighted_scales_components(x_axis, norm_stats, profile_normalizer):
+def test_loss_total_scales_components_by_weight(x_axis, norm_stats, profile_normalizer):
     autoencoder = make_autoencoder("none")
     emb_cfg     = EmbeddingLossConfig(use_embedding_mse=True, weight_embedding_mse=3.0, use_curve_recon=False)
     loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
     z_hat, gt   = random_inputs(requires_grad=False)
 
-    out      = loss(z_hat, gt)
-    raw      = out["components"]["embedding_mse"]
-    weighted = out["weighted"]["embedding_mse"]
+    out = loss(z_hat, gt)
+    raw = out["components"]["embedding_mse"]
 
-    assert weighted.item() == pytest.approx(3.0 * raw.item(), rel=1e-6)
+    assert out["total_loss"].item() == pytest.approx(3.0 * raw.item(), rel=1e-6)
 
 
 def test_loss_unknown_curve_kind_raises(x_axis, norm_stats, profile_normalizer):

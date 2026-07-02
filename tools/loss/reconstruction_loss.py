@@ -28,9 +28,8 @@ class ReconstructionLoss:
 
         return {
             "total_loss" : value,
-            "components"  : {self.component: value},
-            "weighted"    : {self.component: value},
-            "monitor"     : {},
-            "occupancy"   : {},
-            "physical"    : {},
+            "components" : {self.component: value},
+            "monitor"    : {},
+            "occupancy"  : {},
+            "physical"   : {},
         }

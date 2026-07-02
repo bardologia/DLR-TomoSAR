@@ -103,7 +103,7 @@ def test_forward_returns_finite_scalar_total():
 
     out  = loss(pred, gt)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
+    assert set(out.keys()) == {"total_loss", "components", "monitor", "occupancy", "physical"}
     assert out["total_loss"].ndim == 0
     assert torch.isfinite(out["total_loss"]).item()
 
@@ -152,7 +152,7 @@ def test_prepare_clamps_prediction_so_invalid_identical_params_are_nonzero():
     assert out["total_loss"].item() > 0.0
 
 
-def test_weighted_components_scale_with_eff_weight():
+def test_single_term_total_equals_component_after_normalisation():
     cfg  = LossConfig(use_param_l1=True, weight_param_l1=2.0)
     loss = build_loss(n_gaussians=2, loss_cfg=cfg)
     pred = param_tensor(2, 2, 6, 6, seed=7)
@@ -160,9 +160,7 @@ def test_weighted_components_scale_with_eff_weight():
 
     out  = loss(pred, gt)
 
-    expected = cfg.weight_param_l1 * out["components"]["param_l1"].item()
-
-    assert out["weighted"]["param_l1"].item() == pytest.approx(expected, rel=1e-5)
+    assert out["total_loss"].item() == pytest.approx(out["components"]["param_l1"].item(), rel=1e-5)
 
 
 def test_curve_term_wiring_mse():
@@ -188,6 +186,7 @@ def test_log_all_losses_populates_monitor():
 
     assert "mse_curve"   in monitor_terms
     assert "param_huber" in monitor_terms
+    assert not any(key.startswith("param_l1") for key in out["monitor"])
     assert len(out["monitor"]) > len(out["components"])
 
 
@@ -302,7 +301,7 @@ def test_total_loss_is_weighted_normalised_mean():
     out  = loss(pred, gt)
 
     weight_sum   = cfg.weight_param_l1 + cfg.weight_mse_curve
-    summed       = sum(v.item() for k, v in out["weighted"].items() if "/" not in k)
+    summed       = cfg.weight_param_l1 * out["components"]["param_l1"].item() + cfg.weight_mse_curve * out["components"]["mse_curve"].item()
     expected     = summed / weight_sum
 
     assert out["total_loss"].item() == pytest.approx(expected, rel=1e-4)

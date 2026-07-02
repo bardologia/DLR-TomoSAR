@@ -20,31 +20,27 @@ class Loss:
     def loss_generation(self) -> int:
         return 0
 
-    def _embedding_terms(self, z_hat, z_star) -> tuple[torch.Tensor, dict, dict]:
+    def _embedding_terms(self, z_hat, z_star) -> tuple[torch.Tensor, dict]:
         cfg        = self.emb_cfg
         components = {}
-        weighted   = {}
         total      = torch.zeros((), dtype=z_hat.dtype, device=z_hat.device)
 
         if cfg.use_embedding_mse:
             val = CurveLoss.mse_diff(z_hat - z_star)
             components["embedding_mse"] = val
-            weighted["embedding_mse"]   = cfg.weight_embedding_mse * val
             total = total + cfg.weight_embedding_mse * val
 
         if cfg.use_embedding_cosine:
             val = CurveLoss.cosine(z_hat, z_star, axis=1)
             components["embedding_cosine"] = val
-            weighted["embedding_cosine"]   = cfg.weight_embedding_cosine * val
             total = total + cfg.weight_embedding_cosine * val
 
         if cfg.use_embedding_smoothl1:
             val = CurveLoss.smooth_l1_diff(z_hat - z_star, cfg.smoothl1_beta)
             components["embedding_smoothl1"] = val
-            weighted["embedding_smoothl1"]   = cfg.weight_embedding_smoothl1 * val
             total = total + cfg.weight_embedding_smoothl1 * val
 
-        return total, components, weighted
+        return total, components
 
     def __call__(self, z_hat, gt_params_norm) -> dict:
         with torch.no_grad():
@@ -56,7 +52,7 @@ class Loss:
         z_star_raw = self.target_provider.target(self.autoencoder.encoder, gt_curve_n)
         z_star_n   = self.autoencoder.normalize_embedding(z_star_raw)
 
-        total, components, weighted = self._embedding_terms(z_hat_n, z_star_n)
+        total, components = self._embedding_terms(z_hat_n, z_star_n)
 
         if self.emb_cfg.use_curve_recon:
             cfg       = self.emb_cfg
@@ -69,9 +65,7 @@ class Loss:
             elif cfg.curve_kind == "charbonnier": c_val = CurveLoss.charbonnier_diff(diff, cfg.charbonnier_eps)
             else:                                 raise ValueError(f"Unknown curve loss kind '{cfg.curve_kind}'. Available: mse, l1, huber, charbonnier")
 
-            w = cfg.weight_curve_recon
             components["curve_recon"] = c_val
-            weighted["curve_recon"]   = w * c_val
-            total = total + w * c_val
+            total = total + cfg.weight_curve_recon * c_val
 
-        return {"total_loss": total, "components": components, "weighted": weighted, "monitor": {}, "occupancy": {}, "physical": {}}
+        return {"total_loss": total, "components": components, "monitor": {}, "occupancy": {}, "physical": {}}

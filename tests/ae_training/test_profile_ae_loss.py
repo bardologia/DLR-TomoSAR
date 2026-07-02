@@ -42,13 +42,11 @@ def test_dict_structure_and_consistency(kind):
     recon, curve = _curve_pair()
     out          = _loss(kind)(recon, curve)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
+    assert set(out.keys()) == {"total_loss", "components", "monitor", "occupancy", "physical"}
     assert set(out["components"].keys()) == {"curve_recon"}
-    assert set(out["weighted"].keys())   == {"curve_recon"}
     assert out["monitor"] == {}
 
     assert torch.equal(out["total_loss"], out["components"]["curve_recon"])
-    assert torch.equal(out["total_loss"], out["weighted"]["curve_recon"])
 
 
 @pytest.mark.parametrize("kind", ["mse", "l1", "huber"])
