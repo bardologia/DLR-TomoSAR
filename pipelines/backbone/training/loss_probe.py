@@ -62,8 +62,10 @@ class LossScaleProbe:
                 if i >= self.probe_cfg.n_batches:
                     break
 
-                inputs, targets = batch[0].to(device), batch[1].to(device)
-                result          = criterion(model(inputs), targets)
+                inputs  = batch[0].to(device)
+                targets = batch[1].to(device)
+                kz_map  = batch[2].to(device) if len(batch) > 2 and batch[2] is not None else None
+                result  = criterion(model(inputs), targets, kz_map)
 
                 for name, val in result["components"].items():
                     if "/" not in name:
