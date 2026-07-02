@@ -3,10 +3,12 @@ from __future__ import annotations
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-import _bootstrap
+from _bootstrap import EnvironmentPinner
 
 
 def main() -> None:
+    EnvironmentPinner.threads()
+
     from configuration.sar.processing_config           import PreprocessInferenceConfig
     from pipelines.processing.generation.inference      import PreprocessingInferenceScheduler
     from tools.runtime.config_cli                       import ConfigCli

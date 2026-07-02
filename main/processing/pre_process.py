@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-import _bootstrap
+from _bootstrap import EnvironmentPinner
 
 from tools.runtime.run_tag import RunTag
 
@@ -21,6 +21,8 @@ from tools.monitoring.logger                  import Logger
 
 
 def main() -> None:
+    EnvironmentPinner.threads()
+
     config = ConfigCli(PreProcessEntryConfig(), description="SAR pre-processing, runs win filters as sequential sessions").apply()
     logger = Logger(log_dir="logs", name="pre_process")
 
