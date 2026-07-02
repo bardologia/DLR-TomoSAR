@@ -146,6 +146,8 @@ class BaseTrainer:
         n_batches  = len(loader)
         clear_n    = self.config.memory.clear_cache_every_n_steps
 
+        window_has_grads = False
+
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch + 1}/{self.epochs}[/section] - train", total=n_batches)
 
@@ -156,34 +158,33 @@ class BaseTrainer:
                     loss_dict = self._compute_loss(batch)
                 loss = loss_dict["total_loss"] / self.accumulation_steps
 
-                if not torch.isfinite(loss):
+                if torch.isfinite(loss):
+                    loss.backward()
+                    window_has_grads = True
+
+                    loss_sum += loss.item() * self.accumulation_steps
+                    n += 1
+                    aggregator.add(loss_dict)
+
+                else:
                     if self.abort_on_nonfinite_loss:
                         raise FloatingPointError(f"{self.stage_name} loss is non-finite at step {self.global_step}")
 
                     self.logger.warning(f"{self.stage_name} loss is non-finite at step {self.global_step}; skipping batch (abort_on_nonfinite_loss disabled).")
-                    self.optimizer.zero_grad(set_to_none=True)
-                    self.warmup.step()
-                    self.global_step += 1
-                    self.tracker.set_step(self.global_step)
-                    _prog.update(_task, advance=1)
-                    continue
-
-                loss.backward()
 
                 if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
-                    grad_norm = self.grad_clipper.maybe_clip(self.model, self.global_step)
-                    self.grad_clipper.record(grad_norm, self.global_step)
-                    self.optimizer.step()
-                    self.optimizer.zero_grad(set_to_none=True)
-                    self._on_optimizer_step()
+                    if window_has_grads:
+                        grad_norm = self.grad_clipper.maybe_clip(self.model, self.global_step)
+                        self.grad_clipper.record(grad_norm, self.global_step)
+                        self.optimizer.step()
+                        self.optimizer.zero_grad(set_to_none=True)
+                        self._on_optimizer_step()
+                        self.warmup.step()
 
-                self.warmup.step()
+                    window_has_grads = False
+
                 self.global_step += 1
                 self.tracker.set_step(self.global_step)
-
-                loss_sum += loss.item() * self.accumulation_steps
-                n += 1
-                aggregator.add(loss_dict)
 
                 if clear_n > 0 and self.global_step % clear_n == 0:
                     self._clear_cuda_cache()
