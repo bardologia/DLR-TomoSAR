@@ -11,9 +11,9 @@ def _default_embedding_loss():
 
 
 def _default_param_loss():
-    from configuration.training.general.loss import LossConfig
+    from configuration.training.jepa import default_param_loss
 
-    return LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    return default_param_loss()
 
 
 @dataclass
