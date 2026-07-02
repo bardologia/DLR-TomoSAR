@@ -134,7 +134,6 @@ def test_slice_plotter_profiles(tmp_path):
     params = _params()
     gt     = _curves(params, x_axis)
     pred   = gt + 0.01
-    pixel  = SlicePlotter.curve_pixel_metrics(pred, gt) if hasattr(SlicePlotter, "curve_pixel_metrics") else None
 
     pm = {
         "mse": ((pred - gt) ** 2).mean(0),

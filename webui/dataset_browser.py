@@ -136,10 +136,7 @@ class DatasetBrowser:
         yield from self._walk(params_dir, 0)
 
     def _walk(self, directory: Path, depth: int):
-        try:
-            entries = sorted(directory.iterdir())
-        except OSError:
-            return
+        entries = sorted(directory.iterdir())
 
         for entry in entries:
             if entry.is_file() and entry.suffix.lower() == self.PARAM_SUFFIX:

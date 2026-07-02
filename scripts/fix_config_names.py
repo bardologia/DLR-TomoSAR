@@ -4,6 +4,11 @@ import json
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from tools.monitoring.logger import Logger
+
 
 class ConfigNameKeyFixer:
     TARGET_KEY = "model_name"
@@ -11,7 +16,8 @@ class ConfigNameKeyFixer:
     FILENAMES  = ("model_config.json", "profile_autoencoder_config.json", "image_autoencoder_config.json")
 
     def __init__(self, root: Path) -> None:
-        self.root = Path(root)
+        self.root   = Path(root)
+        self.logger = Logger(log_dir="logs", name="fix_config_names")
 
     def discover(self) -> list:
         paths = []
@@ -42,12 +48,12 @@ class ConfigNameKeyFixer:
         for path in paths:
             if self.fix_file(path):
                 fixed += 1
-                print(f"fixed    {path}")
+                self.logger.ok(f"fixed {path}")
             else:
                 skipped += 1
-                print(f"ok       {path}")
+                self.logger.info(f"ok {path}")
 
-        print(f"\n{fixed} renamed, {skipped} already on '{self.TARGET_KEY}', {len(paths)} files total under {self.root}")
+        self.logger.info(f"{fixed} renamed, {skipped} already on '{self.TARGET_KEY}', {len(paths)} files total under {self.root}")
 
 
 if __name__ == "__main__":

@@ -21,8 +21,9 @@ class RegistryFactory:
             return self.config_registry[key](**overrides)
 
         for attribute, value in overrides.items():
-            if hasattr(config, attribute):
-                setattr(config, attribute, value)
+            if not hasattr(config, attribute):
+                raise AttributeError(f"Unknown {self.kind} config override '{attribute}' for {type(config).__name__}")
+            setattr(config, attribute, value)
         return config
 
     def build(self, name: str, config=None, **overrides):

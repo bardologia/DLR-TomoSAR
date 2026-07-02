@@ -224,5 +224,5 @@ class FittingResultPlotter(PlotBase):
         saved.update(self._run_metrics_and_snr(metrics_dict, r2_map, summary, dirs))
         saved.update(self._run_example_fits(parameters_array, metrics_dict, r2_map, height_axis, tomogram_path, dirs))
 
-        self.logger.subsection(f"Saved {len(saved)} figures → {self._images_dir}")
+        self.logger.subsection(f"Saved {len(saved)} figures -> {self._images_dir}")
         return saved

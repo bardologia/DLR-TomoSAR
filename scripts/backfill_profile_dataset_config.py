@@ -12,6 +12,7 @@ from configuration.training.general.run         import TrainingQueueConfig
 from configuration.dataset.profile_autoencoder  import ProfileAugmentationConfig, ProfileDatasetConfig
 from pipelines.shared.config.config_persistence        import ProfileDatasetConfigIO
 from tools.data.regions                         import CropRegion, SplitRegions
+from tools.monitoring.logger                     import Logger
 
 
 class ProfileDatasetConfigBackfiller:
@@ -27,6 +28,8 @@ class ProfileDatasetConfigBackfiller:
         self.train_azimuth = tuple(train_azimuth) if train_azimuth else defaults.train_azimuth
         self.val_azimuth   = tuple(val_azimuth)   if val_azimuth   else defaults.val_azimuth
         self.test_azimuth  = tuple(test_azimuth)  if test_azimuth  else defaults.test_azimuth
+
+        self.logger = Logger(log_dir="logs", name="backfill_profile_dataset_config")
 
     def _load_metadata(self):
         summary = json.loads((self.meta_directory / "run_summary.json").read_text(encoding="utf-8"))
@@ -93,7 +96,7 @@ class ProfileDatasetConfigBackfiller:
 
     def run(self) -> None:
         if ProfileDatasetConfigIO.exists(self.meta_directory):
-            print(f"ok       {self.meta_directory / ProfileDatasetConfigIO.FILENAME} already present; nothing to do.")
+            self.logger.ok(f"{self.meta_directory / ProfileDatasetConfigIO.FILENAME} already present; nothing to do.")
             return
 
         _summary, trainer = self._load_metadata()
@@ -105,11 +108,11 @@ class ProfileDatasetConfigBackfiller:
 
         out_path = ProfileDatasetConfigIO.save(config, self.meta_directory)
 
-        print(f"preprocessing : {preprocessing_dir}")
-        print(f"parameters    : {parameters_path}")
-        print(f"gaussians     : Ng={config.n_gaussians}  x=[{config.x_min}, {config.x_max}]")
-        print(f"test split    : {config.split_regions.test.as_tuple()}  (override with --test-azimuth if the run used a custom split)")
-        print(f"wrote         : {out_path}")
+        self.logger.info(f"preprocessing : {preprocessing_dir}")
+        self.logger.info(f"parameters    : {parameters_path}")
+        self.logger.info(f"gaussians     : Ng={config.n_gaussians}  x=[{config.x_min}, {config.x_max}]")
+        self.logger.info(f"test split    : {config.split_regions.test.as_tuple()}  (override with --test-azimuth if the run used a custom split)")
+        self.logger.ok(f"wrote {out_path}")
 
 
 def main() -> None:

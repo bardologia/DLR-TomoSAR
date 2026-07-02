@@ -36,18 +36,6 @@ class ExtractionPlanResolver:
         self.entry_config = entry_config
         self.dataset_dirs = dataset_dirs
 
-    def resolve(self) -> list[ExtractionConfig]:
-        self._validate()
-
-        plans = []
-        for processed_data_path in self.dataset_dirs:
-            for k_max in self.entry_config.fit_k_values:
-                for lambda_k in self.entry_config.fit_lambda_values:
-                    for mode in self.entry_config.fit_modes:
-                        plans.append(self._build_plan(processed_data_path, k_max, lambda_k, mode))
-
-        return plans
-
     def _validate(self) -> None:
         for name in ("fit_k_values", "fit_lambda_values", "fit_modes"):
             value = getattr(self.entry_config, name)
@@ -83,3 +71,15 @@ class ExtractionPlanResolver:
             range_batch_size  = self.entry_config.range_batch_size,
             parameter_workers = self.entry_config.parameter_workers,
         )
+
+    def resolve(self) -> list[ExtractionConfig]:
+        self._validate()
+
+        plans = []
+        for processed_data_path in self.dataset_dirs:
+            for k_max in self.entry_config.fit_k_values:
+                for lambda_k in self.entry_config.fit_lambda_values:
+                    for mode in self.entry_config.fit_modes:
+                        plans.append(self._build_plan(processed_data_path, k_max, lambda_k, mode))
+
+        return plans

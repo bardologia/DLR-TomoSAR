@@ -267,7 +267,7 @@ class PreprocessingComparisonPipeline:
         return collector.collect()
 
     def _worker_count(self, n_trials: int) -> int:
-        requested = int(getattr(self.config, "workers", 0))
+        requested = int(self.config.workers)
         if requested > 0:
             return min(requested, n_trials)
 

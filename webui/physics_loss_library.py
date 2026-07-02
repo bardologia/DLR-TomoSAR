@@ -5,7 +5,7 @@ class PhysicsLossLibrary:
 
     def _intro(self) -> dict:
         return {
-            "kicker" : "training objective · signal-model supervision",
+            "kicker" : "training objective, signal-model supervision",
             "title"  : "The physics loss terms",
             "lead"   : "Five optional loss terms that do not compare curves bin by bin. Each one pushes the predicted Gaussian-mixture tomogram back through the TomoSAR forward model, extracts a physical quantity, and matches it against the same quantity computed from the ground-truth profile. They supervise what the radar actually measures, not the shape of a fitted spectrum.",
             "points" : [
@@ -72,7 +72,7 @@ class PhysicsLossLibrary:
                 "tagline"    : "Does the profile carry the right total backscatter?",
                 "role"       : "radiometric",
                 "role_label" : "kept, but biased",
-                "quantity"   : "Integrated reflectivity (mass m₀)",
+                "quantity"   : "Integrated reflectivity (mass m0)",
                 "invariant"  : "Absolute power",
                 "cost"       : 1,
                 "cost_label" : "cheapest",

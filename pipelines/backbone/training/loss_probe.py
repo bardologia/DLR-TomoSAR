@@ -144,7 +144,7 @@ class LossScaleProbe:
         if not math.isfinite(weight):
             return "skipped: raw<=0"
 
-        return f"{weight:.6f}" + ("  ← reference" if name == ref else "")
+        return f"{weight:.6f}" + ("  (reference)" if name == ref else "")
 
     def run(self, train_loader, model, device, x_axis: torch.Tensor) -> dict[str, float]:
         if not self.probe_cfg.enabled:

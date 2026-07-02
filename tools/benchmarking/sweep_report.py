@@ -10,7 +10,7 @@ class SweepReport:
     def __init__(self, results: list[dict], wait_threshold: float = 0.05) -> None:
         self.wait_threshold = float(wait_threshold)
         self.frame          = pd.DataFrame(results)
-        self.ok_frame       = self.frame[self.frame["status"] == "ok"].copy() if "status" in self.frame else self.frame.copy()
+        self.ok_frame       = self.frame[self.frame["status"] == "ok"].copy()
 
     @property
     def dataframe(self):

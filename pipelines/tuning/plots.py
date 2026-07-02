@@ -6,7 +6,6 @@ from pathlib   import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import optuna
 import optuna.visualization.matplotlib as ovm
 
@@ -55,12 +54,8 @@ class StudyPlotter(PlotBase):
     def _render_single(self, study: optuna.Study, out_dir: Path) -> list[Path]:
         saved = []
         for name, plotter in self._plotters(study).items():
-            try:
-                axes = plotter()
-                saved.append(self._save_study_figure(axes.figure, out_dir / f"{name}.png"))
-            except Exception as exc:
-                self.logger.warning(f"Study plot '{name}' skipped: {exc}")
-                plt.close("all")
+            axes = plotter()
+            saved.append(self._save_study_figure(axes.figure, out_dir / f"{name}.png"))
 
         return saved
 
@@ -70,12 +65,8 @@ class StudyPlotter(PlotBase):
 
         for name, plotter in (("slice", ovm.plot_slice), ("rank", ovm.plot_rank)):
             for param in params:
-                try:
-                    axes = plotter(study, params=[param])
-                    saved.append(self._save_study_figure(axes.figure, out_dir / name / f"{param}.png"))
-                except Exception as exc:
-                    self.logger.warning(f"Study plot '{name}/{param}' skipped: {exc}")
-                    plt.close("all")
+                axes = plotter(study, params=[param])
+                saved.append(self._save_study_figure(axes.figure, out_dir / name / f"{param}.png"))
 
         return saved
 
@@ -84,12 +75,8 @@ class StudyPlotter(PlotBase):
         saved  = []
 
         for p1, p2 in combinations(params, 2):
-            try:
-                axes = ovm.plot_contour(study, params=[p1, p2])
-                saved.append(self._save_study_figure(axes.figure, out_dir / "contour" / f"{p1}__{p2}.png"))
-            except Exception as exc:
-                self.logger.warning(f"Study plot 'contour/{p1}__{p2}' skipped: {exc}")
-                plt.close("all")
+            axes = ovm.plot_contour(study, params=[p1, p2])
+            saved.append(self._save_study_figure(axes.figure, out_dir / "contour" / f"{p1}__{p2}.png"))
 
         return saved
 
