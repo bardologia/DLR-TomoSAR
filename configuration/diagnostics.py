@@ -113,10 +113,10 @@ class WeightXrayEntryConfig:
         )
 
         return WeightXrayConfig(
-            checkpoint_path     = run_dir,
-            output_dir          = Path(run_dir) / self.output_subdir,
-            checkpoint_filename = self.checkpoint_filename,
-            thresholds          = thresholds,
+            checkpoint_path      = run_dir,
+            output_dir           = Path(run_dir) / self.output_subdir,
+            checkpoint_filename  = self.checkpoint_filename,
+            thresholds           = thresholds,
             svd_max_dim          = self.svd_max_dim,
             duplicate_max_units  = self.duplicate_max_units,
             max_layer_histograms = self.max_layer_histograms,

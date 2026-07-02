@@ -109,9 +109,9 @@ class ResMlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
 
 @dataclass
 class TcnAutoencoderConfig(ProfileAutoencoderBaseConfig):
-    seq_channels    : int = 128
-    seq_kernel_size : int = 3
-    depth           : int = 4
+    seq_channels    : int   = 128
+    seq_kernel_size : int   = 3
+    depth           : int   = 4
     dropout         : float = 0.0
 
     @classmethod
@@ -127,9 +127,9 @@ class TcnAutoencoderConfig(ProfileAutoencoderBaseConfig):
 
 @dataclass
 class GruAutoencoderConfig(ProfileAutoencoderBaseConfig):
-    hidden_dim    : int  = 224
-    depth         : int  = 2
-    bidirectional : bool = True
+    hidden_dim    : int   = 224
+    depth         : int   = 2
+    bidirectional : bool  = True
     dropout       : float = 0.0
 
     @classmethod
@@ -144,12 +144,12 @@ class GruAutoencoderConfig(ProfileAutoencoderBaseConfig):
 
 @dataclass
 class CnnAttnAutoencoderConfig(ProfileAutoencoderBaseConfig):
-    seq_channels    : int = 32
-    seq_kernel_size : int = 5
-    patch_size      : int = 8
-    hidden_dim      : int = 192
-    depth           : int = 2
-    num_heads       : int = 4
+    seq_channels    : int   = 32
+    seq_kernel_size : int   = 5
+    patch_size      : int   = 8
+    hidden_dim      : int   = 192
+    depth           : int   = 2
+    num_heads       : int   = 4
     dropout         : float = 0.0
 
     @classmethod

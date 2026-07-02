@@ -23,7 +23,7 @@ class TransUNet(nn.Module):
         cnn_features        = config.cnn_features
         bottleneck_channels = cnn_features[-1] * config.bottleneck_factor
 
-        self.encoder_blocks = nn.ModuleList()
+        self.encoder_blocks    = nn.ModuleList()
         self.downsample_layers = nn.ModuleList()
         channels = config.in_channels
         for feature_size in cnn_features:

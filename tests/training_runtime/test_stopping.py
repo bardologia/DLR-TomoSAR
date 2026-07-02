@@ -107,8 +107,8 @@ def test_overfit_disabled_passes_loaders_through(logger):
 
 
 def test_overfit_setup_loaders_replicates_single_batch(logger):
-    mgr   = OverfitManager(_overfit_config(enabled=True, max_steps=6, batch_size=2), logger)
-    batch = (torch.arange(8).reshape(4, 2),)
+    mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=6, batch_size=2), logger)
+    batch  = (torch.arange(8).reshape(4, 2),)
     loader = [batch, batch, batch]
 
     data_loader, val_loader, test_loader = mgr.setup_loaders(loader, loader, loader)
@@ -121,8 +121,8 @@ def test_overfit_setup_loaders_replicates_single_batch(logger):
 
 
 def test_overfit_planned_epochs(logger):
-    mgr   = OverfitManager(_overfit_config(enabled=True, max_steps=10, batch_size=1), logger)
-    batch = (torch.zeros(4, 1),)
+    mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=10, batch_size=1), logger)
+    batch  = (torch.zeros(4, 1),)
     loader = [batch, batch, batch, batch]
 
     mgr.setup_loaders(loader, loader, loader)
@@ -130,8 +130,8 @@ def test_overfit_planned_epochs(logger):
 
 
 def test_overfit_check_stop_on_max_steps(logger):
-    mgr   = OverfitManager(_overfit_config(enabled=True, max_steps=4, batch_size=1, stop_threshold=0.0), logger)
-    batch = (torch.zeros(2, 1),)
+    mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=4, batch_size=1, stop_threshold=0.0), logger)
+    batch  = (torch.zeros(2, 1),)
     loader = [batch, batch]
 
     mgr.setup_loaders(loader, loader, loader)
@@ -140,8 +140,8 @@ def test_overfit_check_stop_on_max_steps(logger):
 
 
 def test_overfit_check_stop_on_threshold(logger):
-    mgr   = OverfitManager(_overfit_config(enabled=True, max_steps=100, batch_size=1, stop_threshold=0.01), logger)
-    batch = (torch.zeros(2, 1),)
+    mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=100, batch_size=1, stop_threshold=0.01), logger)
+    batch  = (torch.zeros(2, 1),)
     loader = [batch, batch]
 
     mgr.setup_loaders(loader, loader, loader)

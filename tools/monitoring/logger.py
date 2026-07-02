@@ -90,13 +90,13 @@ def get_console() -> Console:
     global _CONSOLE
     if _CONSOLE is None:
         _CONSOLE = Console(
-            theme=_THEME, 
-            highlight=False, 
-            soft_wrap=False, 
-            force_terminal=True,
-            color_system="truecolor",
-            legacy_windows=False,
-            no_color=False
+            theme          = _THEME,
+            highlight      = False,
+            soft_wrap      = False,
+            force_terminal = True,
+            color_system   = "truecolor",
+            legacy_windows = False,
+            no_color       = False,
         )
     return _CONSOLE
 

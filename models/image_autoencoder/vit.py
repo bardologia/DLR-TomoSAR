@@ -11,13 +11,13 @@ from models.blocks                                       import PatchEmbedding, 
 class ViTImageEncoder(nn.Module):
     def __init__(self, config: ViTImageAutoencoderConfig) -> None:
         super().__init__()
-        self.patch_embed = PatchEmbedding(config.in_channels, config.hidden_dim, config.patch_size)
-        self.pos_conv    = nn.Conv2d(config.hidden_dim, config.hidden_dim, kernel_size=3, padding=1, groups=config.hidden_dim)
-        self.blocks      = nn.ModuleList([
+        self.patch_embed  = PatchEmbedding(config.in_channels, config.hidden_dim, config.patch_size)
+        self.pos_conv     = nn.Conv2d(config.hidden_dim, config.hidden_dim, kernel_size=3, padding=1, groups=config.hidden_dim)
+        self.blocks       = nn.ModuleList([
             TransformerBlock(config.hidden_dim, config.num_heads, config.mlp_ratio, dropout=config.dropout, ffn_activation=config.activation)
             for _ in range(max(1, config.depth))
         ])
-        self.norm        = nn.LayerNorm(config.hidden_dim)
+        self.norm         = nn.LayerNorm(config.hidden_dim)
         self.to_embedding = nn.Conv2d(config.hidden_dim, config.embedding_dim, kernel_size=1)
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:

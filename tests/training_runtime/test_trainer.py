@@ -49,9 +49,9 @@ def test_update_optimizer_sets_lrs_and_logs(tracker):
     model = torch.nn.Linear(4, 2)
     shim  = _shim(model)
 
-    param_groups   = [{"params": list(model.parameters()), "lr": 0.01, "name": "main"}]
-    shim.optimizer = BaseTrainer._build_optimizer(shim, param_groups)
-    shim.tracker   = tracker
+    param_groups     = [{"params": list(model.parameters()), "lr": 0.01, "name": "main"}]
+    shim.optimizer   = BaseTrainer._build_optimizer(shim, param_groups)
+    shim.tracker     = tracker
     shim.global_step = 5
 
     BaseTrainer._update_optimizer(shim, [0.123])

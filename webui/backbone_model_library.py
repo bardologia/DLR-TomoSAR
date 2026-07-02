@@ -131,7 +131,7 @@ class BackboneModelLibrary:
             config        = getattr(module, class_name)()
             activation    = getattr(config, "activation", self.FALLBACK_ACTIVATION)
             normalization = getattr(config, "normalization", self.FALLBACK_NORMALIZATION)
-            resolved[key]      = (str(activation).lower(), str(normalization).lower())
+            resolved[key] = (str(activation).lower(), str(normalization).lower())
 
         return resolved
 

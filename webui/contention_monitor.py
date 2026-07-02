@@ -17,15 +17,15 @@ class ContentionMonitor:
     SECTOR       = 512
     SHARE        = 0.5
     MEM_PSI_SOME = 10.0
-    MEM_PSI_FULL = 3.0
-    IO_PSI_SOME  = 25.0
-    IO_UTIL      = 80.0
-    CPU_PSI_SOME = 40.0
-    LOAD_RATIO   = 1.0
-    SWAP_OUT_MBS = 0.5
-    CLEAR_MARGIN = 0.8
-    SUSTAIN      = 2
-    NUKE_SUSTAIN = 6
+    MEM_PSI_FULL  = 3.0
+    IO_PSI_SOME   = 25.0
+    IO_UTIL       = 80.0
+    CPU_PSI_SOME  = 40.0
+    LOAD_RATIO    = 1.0
+    SWAP_OUT_MBS  = 0.5
+    CLEAR_MARGIN  = 0.8
+    SUSTAIN       = 2
+    NUKE_SUSTAIN  = 6
     NUKE_COOLDOWN = 120.0
     LEAK_WINDOW_SAMPLES = 48
     LEAK_RECENT_SAMPLES = 12
@@ -50,9 +50,9 @@ class ContentionMonitor:
         self.events  = deque(maxlen=20)
         self.streaks = {}
 
-        self.auto_nuke  = False
+        self.auto_nuke   = False
         self.nuke_streak = 0
-        self.last_nuke  = 0.0
+        self.last_nuke   = 0.0
 
         self.proc_hist = {}
 

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.dataset import ProfileDatasetConfig
-from configuration.training import ProfileAeTrainerConfig
-from models.profile_autoencoder                             import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
+from configuration.dataset                          import ProfileDatasetConfig
+from configuration.training                         import ProfileAeTrainerConfig
+from models.profile_autoencoder                     import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
 from pipelines.autoencoder_common.training          import AutoencoderTrainingPipeline
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
-from pipelines.shared.model.model_builder                    import ModelBuilder
-from pipelines.shared.training.training_runner               import EntryConfigTrainRunner
+from pipelines.shared.model.model_builder           import ModelBuilder
+from pipelines.shared.training.training_runner      import EntryConfigTrainRunner
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from pipelines.shared.config.config_persistence            import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from pipelines.shared.config.config_persistence     import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):

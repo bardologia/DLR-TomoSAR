@@ -19,10 +19,10 @@ class UNetPlusPlus(nn.Module):
 
         level_0, level_1, level_2, level_3 = feature_sizes
         bottleneck_width = level_3 * config.bottleneck_factor
-        dropout = config.dropout
-        act = config.activation
-        norm = config.normalization
-        bias = config.conv_bias
+        dropout          = config.dropout
+        act              = config.activation
+        norm             = config.normalization
+        bias             = config.conv_bias
 
         self.pool           = nn.MaxPool2d(2)
         self._upsample_mode = config.upsample_mode

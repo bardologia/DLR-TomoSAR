@@ -46,7 +46,7 @@ class EmbeddingLossConfig:
 
 @dataclass
 class JepaTrainerConfig(SharedSubConfigInheritance):
-    gaussian            : object
+    gaussian       : object
     autoencoder    : ProfileAutoencoderBaseConfig | None = None
     embedding_loss : EmbeddingLossConfig          = field(default_factory=EmbeddingLossConfig)
 

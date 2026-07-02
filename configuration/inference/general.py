@@ -17,7 +17,7 @@ class InferencePaths:
 
 @dataclass
 class InferenceConfig:
-    run_directory       : Path
+    run_directory : Path
     output_subdir : Optional[str] = None
     device        : str           = "cuda"
     seed          : int           = 0

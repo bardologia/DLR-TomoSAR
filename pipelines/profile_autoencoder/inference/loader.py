@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 
 from configuration.inference.profile_autoencoder         import ProfileAeInferenceConfig
 from models.profile_autoencoder                          import get_profile_autoencoder
-from pipelines.shared.dataset.dataset_spatial                    import Layout
+from pipelines.shared.dataset.dataset_spatial            import Layout
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from tools.data.gaussians                                import GaussianAxis
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
-from pipelines.shared.config.config_persistence                 import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
+from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
 from tools.data.io                                       import FileIO
 from tools.data.regions                                  import CropRegion
 from tools.monitoring.logger                             import Logger

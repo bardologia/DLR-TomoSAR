@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.dataset                      import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from tools.data.regions                         import CropRegion
 from configuration.sar.gaussian_config          import GaussianConfig
 from models                                     import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
@@ -16,9 +16,9 @@ from pipelines.backbone.dataset.datasets        import PatchDataset
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
 from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
-from pipelines.shared.dataset.dataset_spatial           import Layout
+from pipelines.shared.dataset.dataset_spatial   import Layout
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
-from pipelines.shared.config.config_persistence        import BackboneModelConfigIO
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO
 from tools.data.io                              import FileIO
 from tools.monitoring.logger                    import Logger
 from tools.baselines                            import TrackBaselines, TrackProfiles
@@ -27,7 +27,7 @@ from tools.baselines                            import TrackBaselines, TrackProf
 @dataclass
 class Run:
     model            : object
-    backbone_name       : str
+    backbone_name    : str
     in_channels      : int
     out_channels     : int
     x_axis           : np.ndarray
@@ -244,7 +244,7 @@ class RunLoader:
 
         self.logger.section(f"[Model]         : '{backbone_name}'")
         self.logger.kv_table({
-            "Checkpoint":  ckpt_path,
+            "Checkpoint":   ckpt_path,
             "In channels":  in_channels,
             "Out channels": out_channels,
             "K gaussians":  n_gaussians,
@@ -252,15 +252,15 @@ class RunLoader:
 
         self.logger.section(f"[Split]         : '{split}'")
         self.logger.kv_table({
-            "Patches":      grid.grid.number_of_patches,
-            "Azimuth size": region.azimuth_size,
-            "Range size":   region.range_size,
+            "Patches":       grid.grid.number_of_patches,
+            "Azimuth size":  region.azimuth_size,
+            "Range size":    region.range_size,
             "X-axis length": x_axis.size,
         })
 
         return Run(
             model            = model,
-            backbone_name       = backbone_name,
+            backbone_name    = backbone_name,
             in_channels      = in_channels,
             out_channels     = out_channels,
             x_axis           = x_axis,

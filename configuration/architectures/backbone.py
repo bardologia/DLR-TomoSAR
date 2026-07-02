@@ -125,9 +125,9 @@ class UNetMultiHeadConfig:
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         return [g for g in [
-            {'params': list(model.encoder.parameters()),                                                                      'lr': self.encoder_lr,    'weight_decay': self.encoder_wd,    'name': 'encoder'},
-            {'params': list(model.bottleneck.parameters()),                                                                   'lr': self.bottleneck_lr, 'weight_decay': self.bottleneck_wd, 'name': 'bottleneck'},
-            {'params': list(model.decoder.parameters()),                                                                      'lr': self.decoder_lr,    'weight_decay': self.decoder_wd,    'name': 'decoder'},
+            {'params': list(model.encoder.parameters()),                                                                           'lr': self.encoder_lr,    'weight_decay': self.encoder_wd,    'name': 'encoder'},
+            {'params': list(model.bottleneck.parameters()),                                                                        'lr': self.bottleneck_lr, 'weight_decay': self.bottleneck_wd, 'name': 'bottleneck'},
+            {'params': list(model.decoder.parameters()),                                                                           'lr': self.decoder_lr,    'weight_decay': self.decoder_wd,    'name': 'decoder'},
             {'params': list(model.head_amp.parameters()) + list(model.head_mu.parameters()) + list(model.head_sigma.parameters()), 'lr': self.heads_lr,      'weight_decay': self.heads_wd,      'name': 'heads'},
         ] if len(g['params']) > 0]
 
@@ -373,12 +373,12 @@ class AttentionUNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"                   : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
-            "bottleneck_factor"          : {"type": "categorical",         "choices": [1, 2, 4]},
-            "attention_intermediate_ratio": {"type": "float",              "low": 0.25, "high": 0.75},
-            "activation"                 : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
-            "normalization"              : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
-            "upsample_mode"              : {"type": "categorical",         "choices": ["convtranspose", "bilinear"]},
+            "features"                     : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
+            "bottleneck_factor"            : {"type": "categorical",         "choices": [1, 2, 4]},
+            "attention_intermediate_ratio" : {"type": "float",              "low": 0.25, "high": 0.75},
+            "activation"                   : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
+            "normalization"                : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
+            "upsample_mode"                : {"type": "categorical",         "choices": ["convtranspose", "bilinear"]},
         }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:

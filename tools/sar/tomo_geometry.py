@@ -27,11 +27,11 @@ class TomoGeometry:
 
     def describe(self) -> dict:
         return {
-            "Tracks":       self.n_tracks,
-            "kz min":       f"{float(self.kz.min()):.4f} rad/m",
-            "kz max":       f"{float(self.kz.max()):.4f} rad/m",
-            "Wavelength":   f"{self.cfg.wavelength} m",
-            "Slant range":  f"{self.cfg.slant_range} m",
-            "kz source":    "explicit kz_values" if len(self.cfg.kz_values) > 0 else "baselines via 4*pi*b/(lambda*r0)",
+            "Tracks":           self.n_tracks,
+            "kz min":           f"{float(self.kz.min()):.4f} rad/m",
+            "kz max":           f"{float(self.kz.max()):.4f} rad/m",
+            "Wavelength":       f"{self.cfg.wavelength} m",
+            "Slant range":      f"{self.cfg.slant_range} m",
+            "kz source":        "explicit kz_values" if len(self.cfg.kz_values) > 0 else "baselines via 4*pi*b/(lambda*r0)",
             "Baselines origin": getattr(self.cfg, "baselines_origin", "config"),
         }

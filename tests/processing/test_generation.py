@@ -123,9 +123,9 @@ def test_config_state_roundtrip(tmp_path, crop_from_state, logger):
     dump_path = manager.save_pipeline_configuration()
     loaded    = json.loads(dump_path.read_text())
 
-    assert loaded["crop"]["azimuth_start"]               == crop_from_state.azimuth_start
+    assert loaded["crop"]["azimuth_start"]                 == crop_from_state.azimuth_start
     assert loaded["tomogram_config"]["max_amplitude_clip"] == CLIP
-    assert loaded["dataset_type"]                        == "FSAR"
+    assert loaded["dataset_type"]                          == "FSAR"
 
 
 @pytest.mark.real_data

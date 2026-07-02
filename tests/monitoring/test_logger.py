@@ -176,7 +176,7 @@ def test_ok_writes_plus_marker(tmp_path):
 
 def test_fmt_float_uses_six_sig():
     assert Logger._fmt(3.14159265) == "3.14159"
-    assert Logger._fmt(1000000.0) == "1e+06"
+    assert Logger._fmt(1000000.0)  == "1e+06"
 
 
 def test_fmt_non_float_is_str():

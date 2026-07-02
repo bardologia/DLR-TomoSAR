@@ -38,7 +38,7 @@ def test_aligned_prediction_invariant_to_pred_slot_order():
         pred[3 * k + 2] += 0.2 * rng.standard_normal((4, 4)).astype(np.float32)
 
     matcher = GaussianMatcher()
-    base    = matcher.aligned_prediction(pred,                          gt, N_K)
+    base     = matcher.aligned_prediction(pred,                          gt, N_K)
     shuffled = matcher.aligned_prediction(_reorder(pred, [2, 0, 4, 1, 3]), gt, N_K)
 
     assert np.allclose(base, shuffled, atol=1e-5, equal_nan=True)

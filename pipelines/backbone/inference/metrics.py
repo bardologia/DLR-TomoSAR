@@ -91,8 +91,8 @@ class Metrics:
         seed       : int = 0,
     ) -> Dict[str, np.ndarray]:
 
-        flat       = metric_map.reshape(-1)
-        H, W       = metric_map.shape
+        flat      = metric_map.reshape(-1)
+        H, W      = metric_map.shape
         rng       = np.random.default_rng(seed)
         valid_idx = np.where(np.isfinite(flat))[0]
         order     = valid_idx[np.argsort(flat[valid_idx])]

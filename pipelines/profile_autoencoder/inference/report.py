@@ -7,21 +7,21 @@ class ProfileAeReport(AeReportBase):
     DOC_TITLE = "Profile Autoencoder Inference Report"
 
     METRIC_GROUPS = [
-        ("Dataset",                 ["n_curves", "n_active_curves", "profile_length", "embedding_dim"]),
-        ("Reconstruction (physical)", ["mse_mean", "mse_median", "mae_mean", "rmse", "max_abs_error_mean", "r2"]),
+        ("Dataset",                     ["n_curves", "n_active_curves", "profile_length", "embedding_dim"]),
+        ("Reconstruction (physical)",   ["mse_mean", "mse_median", "mae_mean", "rmse", "max_abs_error_mean", "r2"]),
         ("Reconstruction (normalized)", ["mse_mean_normalized", "mae_mean_normalized"]),
-        ("Profile shape",           ["pearson_mean", "pearson_median", "relative_l2_mean", "relative_l2_median"]),
-        ("Power and peak",          ["power_rel_error_mean", "power_rel_error_median", "peak_location_mae", "peak_amplitude_rel_err_mean"]),
-        ("Latent embedding",        ["embedding_norm_mean", "embedding_dim_std_mean", "embedding_active_dim_fraction"]),
+        ("Profile shape",               ["pearson_mean", "pearson_median", "relative_l2_mean", "relative_l2_median"]),
+        ("Power and peak",              ["power_rel_error_mean", "power_rel_error_median", "peak_location_mae", "peak_amplitude_rel_err_mean"]),
+        ("Latent embedding",            ["embedding_norm_mean", "embedding_dim_std_mean", "embedding_active_dim_fraction"]),
     ]
 
     FIGURE_SECTIONS = [
-        ("Mean profile",        ["mean_profile"]),
-        ("Error distribution",  ["error_histogram"]),
-        ("Integrated power",    ["power_scatter"]),
-        ("Embedding norm",      ["embedding_norm"]),
-        ("Best reconstructions",  ["best"]),
-        ("Worst reconstructions", ["worst"]),
+        ("Mean profile",           ["mean_profile"]),
+        ("Error distribution",     ["error_histogram"]),
+        ("Integrated power",       ["power_scatter"]),
+        ("Embedding norm",         ["embedding_norm"]),
+        ("Best reconstructions",   ["best"]),
+        ("Worst reconstructions",  ["worst"]),
         ("Random reconstructions", ["random"]),
     ]
 

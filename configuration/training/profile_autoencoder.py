@@ -22,20 +22,20 @@ class ProfileAeLossConfig:
 
 @dataclass
 class ProfileAeTrainerConfig(SharedSubConfigInheritance):
-    gaussian            : object
+    gaussian         : object
     autoencoder      : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    ae_loss          : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
-    geometry         : GeometryConfig        = field(default_factory=GeometryConfig)
-    early_stopping   : EarlyStoppingConfig   = field(default_factory=EarlyStoppingConfig)
-    warmup           : WarmupConfig          = field(default_factory=WarmupConfig)
-    scheduler        : SchedulerConfig       = field(default_factory=SchedulerConfig)
-    io               : IOConfig              = field(default_factory=IOConfig)
-    optimizer        : OptimizerConfig       = field(default_factory=OptimizerConfig)
-    training         : TrainingLoopConfig    = field(default_factory=TrainingLoopConfig)
-    overfit          : OverfitConfig         = field(default_factory=OverfitConfig)
-    resources        : ResourceConfig        = field(default_factory=ResourceConfig)
-    memory           : MemoryConfig          = field(default_factory=MemoryConfig)
-    gradient_clipper : GradientClipperConfig = field(default_factory=GradientClipperConfig)
+    ae_loss          : ProfileAeLossConfig          = field(default_factory=ProfileAeLossConfig)
+    geometry         : GeometryConfig               = field(default_factory=GeometryConfig)
+    early_stopping   : EarlyStoppingConfig          = field(default_factory=EarlyStoppingConfig)
+    warmup           : WarmupConfig                 = field(default_factory=WarmupConfig)
+    scheduler        : SchedulerConfig              = field(default_factory=SchedulerConfig)
+    io               : IOConfig                     = field(default_factory=IOConfig)
+    optimizer        : OptimizerConfig              = field(default_factory=OptimizerConfig)
+    training         : TrainingLoopConfig           = field(default_factory=TrainingLoopConfig)
+    overfit          : OverfitConfig                = field(default_factory=OverfitConfig)
+    resources        : ResourceConfig               = field(default_factory=ResourceConfig)
+    memory           : MemoryConfig                 = field(default_factory=MemoryConfig)
+    gradient_clipper : GradientClipperConfig        = field(default_factory=GradientClipperConfig)
 
 
 @dataclass

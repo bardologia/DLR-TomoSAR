@@ -166,9 +166,9 @@ class PmapSigmaAdamKernel:
         n_steps=2000, lr=1e-2, b1=0.9, b2=0.999,
     ):
         n, K = sigmas_init.shape
-        H   = profiles.shape[1]
-        D   = self._n_devices
-        pad = (-n) % D
+        H    = profiles.shape[1]
+        D    = self._n_devices
+        pad  = (-n) % D
 
         if pad > 0:
             z_K         = jnp.zeros((pad, K), dtype=jnp.float32)

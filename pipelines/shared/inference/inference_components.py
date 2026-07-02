@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipelines.backbone.inference.pipeline import InferenceComponents
-from pipelines.jepa.inference.pipeline     import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
-from pipelines.shared.config.config_persistence   import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
+from pipelines.backbone.inference.pipeline      import InferenceComponents
+from pipelines.jepa.inference.pipeline          import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
 
 
 class InferenceComponentsResolver:

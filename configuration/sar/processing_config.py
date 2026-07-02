@@ -150,7 +150,7 @@ class PreProcessEntryConfig:
     beamforming_method : str   = "Capon"
     filter_method      : str   = "Boxcar"
     height_range       : tuple = (-20.0, 80.0)
-    win_list             : list  = field(default_factory=lambda: [
+    win_list           : list  = field(default_factory=lambda: [
         [20, 10],
     ])
 

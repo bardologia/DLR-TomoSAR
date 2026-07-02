@@ -155,20 +155,20 @@ class BackboneEntryConfig:
     run_name        : str | None = None
     backbone_name   : str        = "resunet"
     gpu             : int        = 0
-    seed             : int        = 0
-    seeds            : list[int]  = field(default_factory=list)
-    n_gaussians      : int        = 5
+    seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=list)
+    n_gaussians     : int        = 5
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
-    paths      : RunPathsConfig       = field(default_factory=RunPathsConfig)
-    training   : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
-    pretrain   : PretrainConfig       = field(default_factory=PretrainConfig)
-    curriculum : LossCurriculumConfig = field(default_factory=default_curriculum)
-    geometry   : GeometryConfig       = field(default_factory=GeometryConfig)
-    input      : InputConfig          = field(default_factory=InputConfig.full_stack)
-    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
-    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    paths         : RunPathsConfig       = field(default_factory=RunPathsConfig)
+    training      : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
+    pretrain      : PretrainConfig       = field(default_factory=PretrainConfig)
+    curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
+    geometry      : GeometryConfig       = field(default_factory=GeometryConfig)
+    input         : InputConfig          = field(default_factory=InputConfig.full_stack)
+    normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
 
     probe_enabled    : bool = False
     probe_n_batches  : int  = 1000

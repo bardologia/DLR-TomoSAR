@@ -5,17 +5,17 @@ from pathlib import Path
 
 import torch
 
-from configuration.training import JepaTrainerConfig, OverfitConfig
+from configuration.training                              import JepaTrainerConfig, OverfitConfig
 from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from models.profile_autoencoder                                  import get_profile_autoencoder
+from models.profile_autoencoder                          import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
-from pipelines.shared.config.config_factory                     import ConfigFactory
-from pipelines.shared.config.run_metadata                       import TrainingRunMetadata
-from pipelines.shared.dataset.dataset_prep                        import BackboneDatasetPreparation
-from pipelines.shared.training.training_runner                    import EntryConfigTrainRunner
+from pipelines.shared.config.config_factory              import ConfigFactory
+from pipelines.shared.config.run_metadata                import TrainingRunMetadata
+from pipelines.shared.dataset.dataset_prep               import BackboneDatasetPreparation
+from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
-from pipelines.shared.config.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
+from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from pipelines.backbone.inference.pipeline               import InferencePipeline
 from pipelines.shared.inference.inference_components     import InferenceComponentsResolver
 from tools.runtime.reproducibility                       import Reproducibility

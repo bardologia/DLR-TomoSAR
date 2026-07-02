@@ -29,7 +29,7 @@ class TrainingPipeline:
 
         self.trainer_config = trainer_config
         self.dataset_config = dataset_config
-        self.backbone_name     = backbone_name
+        self.backbone_name  = backbone_name
         self.model_config   = model_config
         self.image_size     = patch_height
         self.seed           = seed

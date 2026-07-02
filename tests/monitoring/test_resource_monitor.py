@@ -11,14 +11,14 @@ from tools.monitoring.resource_monitor import ResourceMonitor
 
 class FakeConfig:
     def __init__(self, **kwargs):
-        self.enabled           = kwargs.get("enabled", True)
-        self.poll_interval_sec = kwargs.get("poll_interval_sec", 0.05)
+        self.enabled            = kwargs.get("enabled", True)
+        self.poll_interval_sec  = kwargs.get("poll_interval_sec", 0.05)
         self.log_to_tensorboard = kwargs.get("log_to_tensorboard", True)
-        self.warn_ram_pct      = kwargs.get("warn_ram_pct", 90.0)
-        self.warn_vram_pct     = kwargs.get("warn_vram_pct", 90.0)
-        self.warn_swap_pct     = kwargs.get("warn_swap_pct", 50.0)
-        self.warn_shm_pct      = kwargs.get("warn_shm_pct", 80.0)
-        self.warn_cooldown_sec = kwargs.get("warn_cooldown_sec", 30.0)
+        self.warn_ram_pct       = kwargs.get("warn_ram_pct", 90.0)
+        self.warn_vram_pct      = kwargs.get("warn_vram_pct", 90.0)
+        self.warn_swap_pct      = kwargs.get("warn_swap_pct", 50.0)
+        self.warn_shm_pct       = kwargs.get("warn_shm_pct", 80.0)
+        self.warn_cooldown_sec  = kwargs.get("warn_cooldown_sec", 30.0)
 
 
 class CollectingLogger:

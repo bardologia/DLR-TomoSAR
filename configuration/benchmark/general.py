@@ -22,12 +22,12 @@ class MaxBatchConfig:
 
 @dataclass
 class SizeMatchConfig:
-    reference_model : str         = "unet"
-    tolerance       : float       = 0.05
-    max_iterations  : int         = 100
-    scale_low       : float       = 0.05
-    scale_high      : float       = 8.0
-    in_channels     : int         = 9
+    reference_model : str             = "unet"
+    tolerance       : float           = 0.05
+    max_iterations  : int             = 100
+    scale_low       : float           = 0.05
+    scale_high      : float           = 8.0
+    in_channels     : int             = 9
     locked_params   : tuple[str, ...] = ("embedding_dim", "embedding_dims")
 
 
@@ -77,10 +77,10 @@ class BenchmarkConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    input         : InputConfig         = field(default_factory=InputConfig.full_stack)
-    geometry      : GeometryConfig      = field(default_factory=GeometryConfig)
-    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
-    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    input         : InputConfig          = field(default_factory=InputConfig.full_stack)
+    geometry      : GeometryConfig       = field(default_factory=GeometryConfig)
+    normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
     curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)

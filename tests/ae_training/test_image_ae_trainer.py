@@ -33,11 +33,11 @@ def _tiny_model():
 
 
 def _trainer_config(cfg, epochs=2):
-    tc                       = ImageAeTrainerConfig(gaussian=None, image_autoencoder=cfg, ae_loss=ImageAeLossConfig(recon_kind="mse"))
-    tc.training              = TrainingLoopConfig(epochs=epochs, validation_frequency=1, use_amp=False)
-    tc.resources             = ResourceConfig(enabled=False)
+    tc                         = ImageAeTrainerConfig(gaussian=None, image_autoencoder=cfg, ae_loss=ImageAeLossConfig(recon_kind="mse"))
+    tc.training                = TrainingLoopConfig(epochs=epochs, validation_frequency=1, use_amp=False)
+    tc.resources               = ResourceConfig(enabled=False)
     tc.early_stopping.patience = 1000
-    tc.warmup.warmup_steps   = 0
+    tc.warmup.warmup_steps     = 0
     return tc
 
 

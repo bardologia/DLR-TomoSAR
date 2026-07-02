@@ -6,14 +6,14 @@ from typing  import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader
 
-from configuration.dataset import ProfileDatasetConfig
+from configuration.dataset                               import ProfileDatasetConfig
 from pipelines.profile_autoencoder.dataset.augmentation  import ProfileAugmenter
 from pipelines.profile_autoencoder.dataset.datasets      import ProfileDataset
-from pipelines.shared.dataset.loaders                            import Loader
-from tools.data.gaussians                                        import GaussianAxis
+from pipelines.shared.dataset.loaders                    import Loader
+from tools.data.gaussians                                import GaussianAxis
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStatsComputer
 from pipelines.profile_autoencoder.dataset.splitting     import ParameterCropper
-from pipelines.shared.dataset.dataset_spatial                    import Layout
+from pipelines.shared.dataset.dataset_spatial            import Layout
 from tools.monitoring.logger                             import Logger
 
 

@@ -18,17 +18,17 @@ class _Logger:
 
 def _pretrain(**overrides):
     base = dict(
-        find_batch_size = False,
-        tune_loader     = False,
-        vram_budget_gb  = 10.0,
-        max_batch       = 8,
-        measure_steps   = 1,
-        worker_counts   = (0,),
+        find_batch_size  = False,
+        tune_loader      = False,
+        vram_budget_gb   = 10.0,
+        max_batch        = 8,
+        measure_steps    = 1,
+        worker_counts    = (0,),
         prefetch_factors = (2,),
-        warmup_batches  = 1,
-        timed_batches   = 1,
+        warmup_batches   = 1,
+        timed_batches    = 1,
         data_wait_target = 0.05,
-        seed = 0,
+        seed             = 0,
     )
     base.update(overrides)
     return SimpleNamespace(**base)

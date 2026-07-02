@@ -81,7 +81,7 @@ class AttentionUNet(nn.Module):
         feature_sizes       = config.features
         bottleneck_channels = feature_sizes[-1] * config.bottleneck_factor
 
-        self.encoder_blocks = nn.ModuleList()
+        self.encoder_blocks    = nn.ModuleList()
         self.downsample_layers = nn.ModuleList()
         channels = config.in_channels
         for feature_size in feature_sizes:
