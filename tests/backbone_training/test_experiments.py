@@ -325,8 +325,8 @@ def test_ablation_catalog_standard_categories_present():
     assert curriculum["degrade"]["curriculum.enabled"]               is False
 
     lr_warmup = catalog["lr_warmup"]
-    assert lr_warmup["enable"]["warmup.warmup_enabled"]  is True
-    assert lr_warmup["degrade"]["warmup.warmup_enabled"] is False
+    assert lr_warmup["enable"]["training.warmup_enabled"]  is True
+    assert lr_warmup["degrade"]["training.warmup_enabled"] is False
 
     lr_per_group = catalog["lr_per_group"]
     assert lr_per_group["enable"]["model_overrides"]["output_head_lr"]  == 1e-3
@@ -385,3 +385,41 @@ def test_secondary_from_dataset_loads_candidates(test_data_dir):
 
     assert len(plans) >= 1
     assert all("paths.secondary_labels" in overrides for _, overrides in plans)
+
+
+def test_ablation_catalog_paths_are_entry_config_leaves():
+    from configuration.training  import BackboneEntryConfig
+    from tools.runtime.config_cli import ConfigCli
+
+    leaves  = {path for path, _ in ConfigCli._leaves(BackboneEntryConfig())}
+    unknown = [
+        (feature["label"], side, path)
+        for feature in AblationCatalog.features()
+        for side in ("enable", "degrade")
+        for path in feature.get(side, {})
+        if path not in leaves
+    ]
+
+    assert unknown == []
+
+
+def test_ablation_default_plan_round_trips_through_config_cli():
+    from configuration.training  import BackboneEntryConfig
+    from tools.runtime.config_cli import ConfigCli
+
+    config  = BackboneEntryConfig()
+    planner = AblationTrialPlanner(config.backbone_name, config.ablation_features, config.ablation_include_full)
+
+    plans = planner.plan()
+    assert len(plans) == len(config.ablation_features) + 1
+
+    for run_name, overrides in plans:
+        argv  = ConfigCli.to_argv({**overrides, "run_name": run_name, "logdir": "/tmp/abl"})
+        trial = ConfigCli(BackboneEntryConfig()).apply(argv + ["--trial"])
+        assert trial.run_name == run_name
+
+    full     = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-0-full"]) + ["--trial"])
+    baseline = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-{len(config.ablation_features)}-baseline"]) + ["--trial"])
+    assert full.training.warmup_enabled     is True
+    assert baseline.training.warmup_enabled is False
+    assert baseline.curriculum.enabled      is False

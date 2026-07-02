@@ -131,8 +131,8 @@ class AblationCatalog:
             {
                 "label"   : "lr_warmup",
                 "group"   : "schedule",
-                "enable"  : {"warmup.warmup_enabled": True},
-                "degrade" : {"warmup.warmup_enabled": False},
+                "enable"  : {"training.warmup_enabled": True},
+                "degrade" : {"training.warmup_enabled": False},
             },
             {
                 "label"   : "lr_per_group",
