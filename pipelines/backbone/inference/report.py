@@ -289,45 +289,6 @@ class Report:
         self._subsection_index += 1
         return f"2.{self._subsection_index}"
 
-    def _build_matched_headline(self) -> List[str]:
-        gm = self.global_metrics
-        if "matched_mu_mae" not in gm:
-            return []
-
-        n_K = self.run_summary["n_gaussians"]
-        out = [f"\n### {self._next_subsection()} Permutation-invariant matched Gaussian errors\n"]
-        out.append(
-            "Each pixel's predicted Gaussians are Hungarian-matched to its GT Gaussians on |Δμ| before "
-            "scoring, so the errors are independent of slot ordering. A match counts as a detection hit when "
-            f"|Δμ| ≤ {self._fmt(gm['matched_tol'])} elevation units.\n"
-        )
-        out.append(self._three_col_table([
-            ("Matched μ MAE",   gm["matched_mu_mae"],    "Mean |Δμ| over matched pairs (all counts)"),
-            ("Matched μ RMSE",  gm["matched_mu_rmse"],   "Root mean squared Δμ"),
-            ("Matched σ MAE",   gm["matched_sig_mae"],   "Mean |Δσ| over matched pairs"),
-            ("Detection recall",     gm["matched_recall"],    "Share of GT Gaussians matched within tolerance"),
-            ("Detection precision",  gm["matched_precision"], "Share of predicted Gaussians matching a GT within tolerance"),
-            ("Detection F1",         gm["matched_f1"],        "Harmonic mean of recall and precision"),
-        ], header=("Metric", "Value", "Description")))
-        out.append("")
-
-        present = [k for k in range(1, n_K + 1) if f"matched_recall_gt{k}" in gm or f"matched_mu_mae_gt{k}" in gm]
-
-        if present:
-            out.append("**By GT count** (recall = recovery; precision = filler-free; μ MAE = placement)\n")
-            table = MarkdownTable(("GT count", "Recall ↑", "Precision ↑", "Matched μ MAE ↓"))
-            for k in present:
-                table.add_row(
-                    str(k),
-                    self._fmt(gm.get(f"matched_recall_gt{k}",    float("nan"))),
-                    self._fmt(gm.get(f"matched_precision_gt{k}", float("nan"))),
-                    self._fmt(gm.get(f"matched_mu_mae_gt{k}",    float("nan"))),
-                )
-            out += table.render()
-            out.append("")
-
-        return out
-
     def _build_active_count_headline(self) -> List[str]:
         gm = self.global_metrics
         if "active_frac_gt" not in gm:
@@ -368,6 +329,45 @@ class Report:
 
         out.append(self._three_col_table(agree_rows, header=("Metric", "Fraction", "Description")))
         out.append("")
+
+        return out
+
+    def _build_matched_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "matched_mu_mae" not in gm:
+            return []
+
+        n_K = self.run_summary["n_gaussians"]
+        out = [f"\n### {self._next_subsection()} Permutation-invariant matched Gaussian errors\n"]
+        out.append(
+            "Each pixel's predicted Gaussians are Hungarian-matched to its GT Gaussians on |Δμ| before "
+            "scoring, so the errors are independent of slot ordering. A match counts as a detection hit when "
+            f"|Δμ| ≤ {self._fmt(gm['matched_tol'])} elevation units.\n"
+        )
+        out.append(self._three_col_table([
+            ("Matched μ MAE",   gm["matched_mu_mae"],    "Mean |Δμ| over matched pairs (all counts)"),
+            ("Matched μ RMSE",  gm["matched_mu_rmse"],   "Root mean squared Δμ"),
+            ("Matched σ MAE",   gm["matched_sig_mae"],   "Mean |Δσ| over matched pairs"),
+            ("Detection recall",     gm["matched_recall"],    "Share of GT Gaussians matched within tolerance"),
+            ("Detection precision",  gm["matched_precision"], "Share of predicted Gaussians matching a GT within tolerance"),
+            ("Detection F1",         gm["matched_f1"],        "Harmonic mean of recall and precision"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        present = [k for k in range(1, n_K + 1) if f"matched_recall_gt{k}" in gm or f"matched_mu_mae_gt{k}" in gm]
+
+        if present:
+            out.append("**By GT count** (recall = recovery; precision = filler-free; μ MAE = placement)\n")
+            table = MarkdownTable(("GT count", "Recall (higher better)", "Precision (higher better)", "Matched μ MAE (lower better)"))
+            for k in present:
+                table.add_row(
+                    str(k),
+                    self._fmt(gm.get(f"matched_recall_gt{k}",    float("nan"))),
+                    self._fmt(gm.get(f"matched_precision_gt{k}", float("nan"))),
+                    self._fmt(gm.get(f"matched_mu_mae_gt{k}",    float("nan"))),
+                )
+            out += table.render()
+            out.append("")
 
         return out
 
@@ -463,6 +463,29 @@ class Report:
 
         return out
 
+    def _build_jepa_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "jepa_embedding_mse" not in gm:
+            return []
+
+        out = [f"\n### {self._next_subsection()} JEPA embedding diagnostics\n"]
+        out.append(
+            "The JEPA objective is measured directly in embedding space: the backbone's predicted profile "
+            "embedding is compared against the checkpoint encoder's embedding of the GT curve, both in the "
+            "decoder's normalised embedding space. The decoder-only error isolates the profile-autoencoder "
+            "reconstruction floor; the full-chain error is the decoded prediction against the GT curve in "
+            "normalised curve space, so chain − decoder gauges how much error the predictor itself adds.\n"
+        )
+        out.append(self._three_col_table([
+            ("Embedding MSE",           gm["jepa_embedding_mse"],    "Predicted vs target embedding, normalised space"),
+            ("Embedding cosine",        gm["jepa_embedding_cosine"], "Mean cosine similarity along the embedding dimension"),
+            ("Decoder-only MSE (norm)", gm["jepa_decode_mse_norm"],  "decode(encode(GT)) vs GT, normalised curves"),
+            ("Full-chain MSE (norm)",   gm["jepa_chain_mse_norm"],   "decode(predicted embedding) vs GT, normalised curves"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
+
     def _build_reduced_headline(self) -> List[str]:
         gm = self.global_metrics
         if "improvement_pixel_mse_mean" not in gm:
@@ -495,29 +518,6 @@ class Report:
             ("SSIM range mean",   gm["ssim_red_range_mean"],   "Cross-sectional planes"),
             ("SSIM azimuth mean", gm["ssim_red_azimuth_mean"], "Cross-sectional planes"),
         ], header=("Metric", "Reduced vs GT", "Description")))
-        out.append("")
-
-        return out
-
-    def _build_jepa_headline(self) -> List[str]:
-        gm = self.global_metrics
-        if "jepa_embedding_mse" not in gm:
-            return []
-
-        out = [f"\n### {self._next_subsection()} JEPA embedding diagnostics\n"]
-        out.append(
-            "The JEPA objective is measured directly in embedding space: the backbone's predicted profile "
-            "embedding is compared against the checkpoint encoder's embedding of the GT curve, both in the "
-            "decoder's normalised embedding space. The decoder-only error isolates the profile-autoencoder "
-            "reconstruction floor; the full-chain error is the decoded prediction against the GT curve in "
-            "normalised curve space, so chain − decoder gauges how much error the predictor itself adds.\n"
-        )
-        out.append(self._three_col_table([
-            ("Embedding MSE",           gm["jepa_embedding_mse"],    "Predicted vs target embedding, normalised space"),
-            ("Embedding cosine",        gm["jepa_embedding_cosine"], "Mean cosine similarity along the embedding dimension"),
-            ("Decoder-only MSE (norm)", gm["jepa_decode_mse_norm"],  "decode(encode(GT)) vs GT, normalised curves"),
-            ("Full-chain MSE (norm)",   gm["jepa_chain_mse_norm"],   "decode(predicted embedding) vs GT, normalised curves"),
-        ], header=("Metric", "Value", "Description")))
         out.append("")
 
         return out

@@ -36,16 +36,16 @@ class Layout:
             "Parameters":      self.parameters_path,
         })
 
+    @property
+    def profile_length(self) -> int:
+        tomogram = np.load(str(self.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
+        return int(tomogram.shape[0])
+
     def artifact_path(self, artifact_key: str) -> Path:
         if artifact_key == "parameters":
             return self.parameters_path
 
         return self.data_directory / self.artifacts[artifact_key]
-
-    @property
-    def profile_length(self) -> int:
-        tomogram = np.load(str(self.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
-        return int(tomogram.shape[0])
 
     def secondary_indices(self, secondary_labels) -> list | None:
         if secondary_labels is None:

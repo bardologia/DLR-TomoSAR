@@ -168,5 +168,5 @@ class ExampleFitPlotter(PlotBase):
         self.logger.subsection(f"Extracting {all_pixels.shape[0]} pixel profiles for example fits")
         pixel_profiles = self._extract_pixel_profiles(tomogram_path, all_pixels)
 
-        self.logger.subsection(f"Plotting example fits  ({self.n_fits_per_k} pixels × up to {self.n_gaussians} K groups)")
+        self.logger.subsection(f"Plotting example fits  ({self.n_fits_per_k} pixels, up to {self.n_gaussians} K groups)")
         return self._plot_example_fits(parameters_array, pixel_profiles, height_axis, pixels_by_k, r2_map, out_dir)

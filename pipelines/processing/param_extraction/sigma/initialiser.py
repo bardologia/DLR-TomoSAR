@@ -14,9 +14,6 @@ class PeakInitialiser:
         self._pool     = ProcessPoolExecutor(max_workers=n_workers)
         list(self._pool.map(abs, range(n_workers)))
 
-    def close(self) -> None:
-        self._pool.shutdown(wait=True, cancel_futures=True)
-
     @staticmethod
     def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         chunk_N, H = raw_chunk.shape
@@ -93,3 +90,6 @@ class PeakInitialiser:
         sigs = np.concatenate([r[2] for r in chunk_results], axis=0)
 
         return amps, mus, sigs
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=True, cancel_futures=True)
