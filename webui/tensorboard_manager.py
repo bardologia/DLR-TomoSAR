@@ -87,6 +87,41 @@ class TensorboardManager:
 
         return {"ok": True, **self._view(record)}
 
+    def running_logdir(self, logdir: str) -> str | None:
+        logdir = str(logdir)
+        with self.lock:
+            for record in self.instances.values():
+                if record["logdir"] == logdir and record["status"] in ("starting", "running") and record["process"].poll() is None:
+                    return record["id"]
+        return None
+
+    def list_logdirs(self, runs_root: str) -> dict:
+        root = Path(runs_root).expanduser()
+        if not root.is_dir():
+            return {"ok": False, "error": f"runs root not found: {runs_root}"}
+
+        entries = []
+        for entry in sorted(root.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+
+            entries.append({
+                "name"      : entry.name,
+                "path"      : str(entry),
+                "run_count" : self._count_event_runs(entry),
+                "running"   : self.running_logdir(str(entry)),
+            })
+
+        self.logger.info(f"tensorboard logdirs: listed {len(entries)} under {root}")
+        return {"ok": True, "runs_root": str(root), "logdirs": entries}
+
+    def _count_event_runs(self, directory: Path) -> int:
+        parents = set()
+        for event in directory.rglob("*tfevents*"):
+            if event.is_file():
+                parents.add(event.parent)
+        return len(parents)
+
     def get(self, tb_id: str) -> dict | None:
         with self.lock:
             return self.instances.get(tb_id)

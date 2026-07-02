@@ -498,9 +498,17 @@
         </p>
       </div>
       <div class="tb-actions">
+        <button class="btn btn--mini" id="tb-browse">Browse runs</button>
         <button class="btn btn--mini" id="tb-open" disabled>Open in tab</button>
         <button class="btn btn--mini btn--danger" id="tb-stop" disabled>Stop</button>
       </div>
+    </div>
+    <div class="tb-picker" id="tb-picker" hidden>
+      <div class="tb-picker__head">
+        <span class="tb-picker__title">Run directories</span>
+        <span class="tb-picker__root" id="tb-picker-root"></span>
+      </div>
+      <div class="tb-picker__list" id="tb-picker-list"></div>
     </div>
     <div class="tb-strip" id="tb-strip" aria-label="TensorBoard instances"></div>
     <div class="tb-stage">
@@ -595,7 +603,7 @@
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/tomogram.js?v=20260616b"></script>
-<script src="/static/js/tensorboard.js?v=20260608r"></script>
+<script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260624d"></script>
 </body>

@@ -255,6 +255,15 @@ class RequestRouter:
         if path == "/api/tensorboard":
             self._send_json(handler, {"instances": self.tensorboard.list_instances()})
             return
+        if path == "/api/tensorboard/logdirs":
+            interpreter = self._preferred_interpreter("train_backbone")
+            runs_root   = self._runs_root("train_backbone", interpreter)
+            if not runs_root:
+                self._send_json(handler, {"ok": False, "error": "could not resolve runs root"}, 400)
+                return
+            result = self.tensorboard.list_logdirs(runs_root)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/gpu-guard/history":
             query  = parse_qs(urlparse(handler.path).query)
             limit  = int((query.get("limit") or ["100"])[0])
@@ -360,6 +369,12 @@ class RequestRouter:
                 return str(leaves[leaf])
 
         return None
+
+    def _runs_root(self, key: str, interpreter: str) -> str | None:
+        logdir = self._training_logdir(key, {}, interpreter)
+        if not logdir:
+            return None
+        return str(Path(logdir).parent)
 
     def _proxy_tensorboard(self, handler) -> None:
         segments = handler.path.split("/")

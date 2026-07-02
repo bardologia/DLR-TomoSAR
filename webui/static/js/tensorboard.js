@@ -16,12 +16,17 @@ class TensorboardView {
     this.openBtn = document.getElementById("tb-open");
     this.stopBtn = document.getElementById("tb-stop");
     this.startBtn = document.getElementById("tb-start");
+    this.browseBtn = document.getElementById("tb-browse");
+    this.picker = document.getElementById("tb-picker");
+    this.pickerRoot = document.getElementById("tb-picker-root");
+    this.pickerList = document.getElementById("tb-picker-list");
 
     this.instances = [];
     this.selectedId = null;
     this.loadedUrl = null;
     this.timer = null;
     this.active = false;
+    this.pickerOpen = false;
 
     this.openBtn.addEventListener("click", () => {
       const inst = this._selected();
@@ -29,6 +34,7 @@ class TensorboardView {
     });
     this.stopBtn.addEventListener("click", () => this._stop());
     this.startBtn.addEventListener("click", () => this._start());
+    this.browseBtn.addEventListener("click", () => this._toggleBrowse());
   }
 
   _seedSettings() {
@@ -55,6 +61,7 @@ class TensorboardView {
     this.active = false;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this._closeBrowse();
   }
 
   async refresh() {
@@ -160,6 +167,87 @@ class TensorboardView {
     this.selectedId = null;
     this.loadedUrl = null;
     this.frame.src = "about:blank";
+    this.refresh();
+  }
+
+  _toggleBrowse() {
+    if (this.pickerOpen) {
+      this._closeBrowse();
+      return;
+    }
+    this.pickerOpen = true;
+    this.picker.hidden = false;
+    this.browseBtn.classList.add("is-active");
+    this._loadLogdirs();
+  }
+
+  _closeBrowse() {
+    this.pickerOpen = false;
+    this.picker.hidden = true;
+    this.browseBtn.classList.remove("is-active");
+  }
+
+  async _loadLogdirs() {
+    this.pickerList.innerHTML = `<p class="tb-picker__msg">Scanning run directories…</p>`;
+    this.pickerRoot.textContent = "";
+    let data;
+    try {
+      data = await window.apiGet("/api/tensorboard/logdirs");
+    } catch (e) {
+      this.pickerList.innerHTML = `<p class="tb-picker__msg">Could not read run directories.</p>`;
+      return;
+    }
+    if (!data || data.error || data.ok === false) {
+      this.pickerList.innerHTML = `<p class="tb-picker__msg">${(data && data.error) || "No runs root available."}</p>`;
+      return;
+    }
+    this.pickerRoot.textContent = data.runs_root || "";
+    this._renderPicker(data.logdirs || []);
+  }
+
+  _renderPicker(logdirs) {
+    this.pickerList.innerHTML = "";
+    const withRuns = logdirs.filter((d) => d.run_count > 0);
+    if (!withRuns.length) {
+      this.pickerList.innerHTML = `<p class="tb-picker__msg">No directories with TensorBoard event data found.</p>`;
+      return;
+    }
+    withRuns.forEach((dir) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "tb-logdir" + (dir.running ? " is-running" : "");
+      row.title = dir.path;
+      const runs = dir.run_count === 1 ? "1 run" : `${dir.run_count} runs`;
+      const state = dir.running ? "live" : "launch";
+      row.innerHTML =
+        `<span class="tb-logdir__name">${dir.name}</span>` +
+        `<span class="tb-logdir__count">${runs}</span>` +
+        `<span class="tb-logdir__state">${state}</span>`;
+      row.addEventListener("click", () => this._launchLogdir(dir));
+      this.pickerList.appendChild(row);
+    });
+  }
+
+  async _launchLogdir(dir) {
+    if (dir.running) {
+      this.selectedId = dir.running;
+      this._closeBrowse();
+      this._render();
+      return;
+    }
+    try {
+      const res = await window.apiPost("/api/tensorboard/start", { logdir: dir.path });
+      if (res && res.error) {
+        window.toast(res.error, "error");
+        return;
+      }
+      if (res && res.id) this.selectedId = res.id;
+      window.toast(`TensorBoard starting over ${dir.name}`, "ok");
+    } catch (e) {
+      window.toast("Could not start TensorBoard", "error");
+      return;
+    }
+    this._closeBrowse();
     this.refresh();
   }
 }
