@@ -95,8 +95,8 @@ class CurveLoss:
             return F.conv2d(z, kernel, padding=padding)
 
         def ssim_slice(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-            xy_min = torch.min(x.min(), y.min()).detach()
-            xy_max = torch.max(x.max(), y.max()).detach()
+            xy_min = torch.minimum(x.amin(dim=(1, 2, 3), keepdim=True), y.amin(dim=(1, 2, 3), keepdim=True)).detach()
+            xy_max = torch.maximum(x.amax(dim=(1, 2, 3), keepdim=True), y.amax(dim=(1, 2, 3), keepdim=True)).detach()
             rng    = (xy_max - xy_min).clamp(min=1e-6)
             x      = (x - xy_min) / rng
             y      = (y - xy_min) / rng
