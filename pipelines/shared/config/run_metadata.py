@@ -30,12 +30,10 @@ class TrainingRunMetadata:
         self.docs_directory     = self.run_directory / "docs"
         self.logs_directory     = self.run_directory / "logs"
         self.metadata_directory = self.run_directory / "meta"
-        self.checkpoint_dir     = self.run_directory / "checkpoints"
 
         FileIO.ensure_dirs(
             self.run_directory, self.tensorboard_dir, self.docs_directory,
             self.logs_directory, self.metadata_directory,
-            self.checkpoint_dir,
         )
 
         self.writer = SummaryWriter(log_dir=str(self.tensorboard_dir))
@@ -77,7 +75,7 @@ class TrainingRunMetadata:
 
         return out_path
 
-    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int, n_gaussians: int = 0) -> Path:
+    def save_run_summary(self, model_name: str, in_channels: int, out_channels: int, x_axis_length: int, n_gaussians: int = 0, seed: int = 0) -> Path:
         out_path = self.metadata_directory / "run_summary.json"
 
         payload  = {
@@ -89,6 +87,7 @@ class TrainingRunMetadata:
             "framework"        : "pytorch",
             "n_devices"        : torch.cuda.device_count() if torch.cuda.is_available() else 0,
             "n_gaussians"      : n_gaussians,
+            "seed"             : seed,
         }
 
         FileIO.save_json(payload, out_path)

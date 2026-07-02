@@ -68,7 +68,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         run_meta.save_trainer_config()
         ProfileAutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
         ProfileDatasetConfigIO.save(profile_config, run_meta.metadata_directory)
-        run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
+        run_meta.save_run_summary("profile_ae", in_channels=x_len, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len, seed=self.entry.seed)
 
 
 class SingleTrainRunner(EntryConfigTrainRunner):

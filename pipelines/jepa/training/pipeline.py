@@ -152,7 +152,7 @@ class TrainingPipeline:
         if self.image_ae_cfg is not None:
             ImageAutoencoderConfigIO.save(self.image_ae_cfg, self.image_ae_model_name, run_meta.metadata_directory)
 
-        run_meta.save_run_summary(self.backbone_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len)
+        run_meta.save_run_summary(self.backbone_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len, seed=self.entry.seed)
 
     def _profile_normalizer(self, run_meta, logger):
         if self.autoencoder_cfg is None:

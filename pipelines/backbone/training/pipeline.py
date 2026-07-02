@@ -119,6 +119,7 @@ class TrainingPipeline:
             out_channels     = out_channels,
             x_axis_length    = x_axis_length,
             n_gaussians      = n_gaussians,
+            seed             = self.seed,
         )
 
         trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)

@@ -45,7 +45,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
     def _save_metadata(self, run_meta, in_channels: int, x_len: int) -> None:
         run_meta.save_trainer_config()
         ImageAutoencoderConfigIO.save(self.autoencoder_cfg, self.ae_model_name, run_meta.metadata_directory)
-        run_meta.save_run_summary("image_ae", in_channels=in_channels, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len)
+        run_meta.save_run_summary("image_ae", in_channels=in_channels, out_channels=self.autoencoder_cfg.embedding_dim, x_axis_length=x_len, seed=self.entry.seed)
 
 
 class SingleTrainRunner(EntryConfigTrainRunner):

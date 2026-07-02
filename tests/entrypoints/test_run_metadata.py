@@ -41,14 +41,12 @@ def test_subdirectories_created(metadata):
     assert metadata.docs_directory.is_dir()
     assert metadata.logs_directory.is_dir()
     assert metadata.metadata_directory.is_dir()
-    assert metadata.checkpoint_dir.is_dir()
 
 
 @pytest.mark.real_data
 def test_subdirectories_nested_under_run_directory(metadata):
     assert metadata.tensorboard_dir.parent    == metadata.run_directory
     assert metadata.docs_directory.parent      == metadata.run_directory
-    assert metadata.checkpoint_dir.parent      == metadata.run_directory
     assert metadata.metadata_directory.parent  == metadata.run_directory
 
 

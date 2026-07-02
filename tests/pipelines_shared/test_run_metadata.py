@@ -29,7 +29,6 @@ def test_directory_layout_created(tmp_path):
         assert meta.docs_directory.is_dir()
         assert meta.logs_directory.is_dir()
         assert meta.metadata_directory.is_dir()
-        assert meta.checkpoint_dir.is_dir()
     finally:
         meta.close()
 
