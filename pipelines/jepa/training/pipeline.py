@@ -16,8 +16,6 @@ from pipelines.shared.dataset.dataset_prep               import BackboneDatasetP
 from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
-from pipelines.backbone.inference.pipeline               import InferencePipeline
-from pipelines.shared.inference.inference_components     import InferenceComponentsResolver
 from tools.runtime.reproducibility                       import Reproducibility
 
 
@@ -255,6 +253,9 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
         results, run_directory = TrainingPipeline(self.config).run()
         if self.config.infer_after:
+            from pipelines.backbone.inference.pipeline           import InferencePipeline
+            from pipelines.shared.inference.inference_components import InferenceComponentsResolver
+
             inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
             components       = InferenceComponentsResolver.for_run(Path(run_directory))
             InferencePipeline(inference_config, components=components).run()

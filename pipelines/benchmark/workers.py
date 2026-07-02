@@ -3,19 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from configuration.training  import JepaEntryConfig, ProfileAeEntryConfig
-from models                  import BACKBONE_CONFIG_REGISTRY
-from pipelines.backbone.inference.pipeline           import InferencePipeline
-from pipelines.backbone.training.loss_terms          import LossComponentCatalog
-from pipelines.backbone.training.pipeline            import TrainingPipeline as BackboneTrainingPipeline
-from pipelines.benchmark.batch_probe                 import MaxBatchProbe
-from pipelines.jepa.training.pipeline                import TrainingPipeline as JepaTrainingPipeline
-from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as ProfileAeTrainingPipeline
-from pipelines.shared.config.config_factory          import ConfigFactory
-from pipelines.shared.inference.inference_components import InferenceComponentsResolver
-from pipelines.shared.training.seed_sweep            import SeedSet
-from pipelines.shared.training.worker_base           import WorkerBase
-from tools.data.io                                   import FileIO
+from pipelines.shared.config.config_factory            import ConfigFactory
+from pipelines.shared.training.seed_sweep                import SeedSet
+from pipelines.shared.training.worker_base              import WorkerBase
+from tools.data.io                              import FileIO
 
 
 class BenchmarkWorker(WorkerBase):
@@ -30,6 +21,8 @@ class BenchmarkWorker(WorkerBase):
     def _apply_loss_component(self, trainer_config, component: str | None) -> None:
         if component is None:
             return
+
+        from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
         trainer_config.curriculum = LossComponentCatalog.curriculum(component, base=self.config.curriculum.complete)
 
@@ -60,6 +53,8 @@ class BenchmarkWorker(WorkerBase):
         return int(entry["batch_size"])
 
     def _ae_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
+        from configuration.training import ProfileAeEntryConfig
+
         return ProfileAeEntryConfig(
             run_name        = run_name or model_name,
             seed            = self.config.seed if seed is None else seed,
@@ -74,6 +69,8 @@ class BenchmarkWorker(WorkerBase):
         )
 
     def _jepa_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
+        from configuration.training import JepaEntryConfig
+
         jepa = self.config.jepa
 
         return JepaEntryConfig(
@@ -94,6 +91,8 @@ class BenchmarkWorker(WorkerBase):
 
 class MaxBatchWorker(BenchmarkWorker):
     def run(self, model_name: str) -> None:
+        from pipelines.benchmark.batch_probe import MaxBatchProbe
+
         stage_dir   = self.run_dir / "max_batch"
         result_path = stage_dir / model_name / "max_batch_result.json"
 
@@ -111,14 +110,21 @@ class TrainingWorker(BenchmarkWorker):
         run_name = self._run_name(model_name, loss_component, seed)
 
         if self.config.training_type == "profile_autoencoder":
+            from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
+
             entry = self._ae_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
-            ProfileAeTrainingPipeline(entry).run()
+            TrainingPipeline(entry).run()
             return
 
         if self.config.training_type == "jepa":
+            from pipelines.jepa.training.pipeline      import TrainingPipeline
+
             entry = self._jepa_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
-            JepaTrainingPipeline(entry).run()
+            TrainingPipeline(entry).run()
             return
+
+        from models                               import BACKBONE_CONFIG_REGISTRY
+        from pipelines.backbone.training.pipeline import TrainingPipeline
 
         stage_dir    = self.run_dir / "training"
         model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
@@ -137,7 +143,7 @@ class TrainingWorker(BenchmarkWorker):
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input
 
-        pipeline = BackboneTrainingPipeline(
+        pipeline = TrainingPipeline(
             trainer_config = trainer_config,
             dataset_config = dataset_config,
             backbone_name  = model_name,
@@ -151,6 +157,9 @@ class TrainingWorker(BenchmarkWorker):
 
 class InferenceWorker(BenchmarkWorker):
     def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
+        from pipelines.backbone.inference.pipeline import InferencePipeline
+        from pipelines.shared.inference.inference_components import InferenceComponentsResolver
+
         run_directory = self.run_dir / "training" / self._run_name(model_name, loss_component, seed)
 
         components = InferenceComponentsResolver.for_run(run_directory)

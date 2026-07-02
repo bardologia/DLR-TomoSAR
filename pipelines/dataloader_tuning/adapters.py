@@ -9,16 +9,6 @@ import torch
 import torch.nn.functional as functional
 from torch.utils.data import Dataset
 
-from configuration.training import BackboneEntryConfig, ProfileAeEntryConfig
-from configuration.training.image_autoencoder import ImageAeEntryConfig
-from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from models.image_autoencoder import get_image_autoencoder
-from models.profile_autoencoder import get_profile_autoencoder
-from pipelines.backbone.dataset.pipeline import DatasetPipeline
-from pipelines.image_autoencoder.training.pipeline import TrainingPipeline as ImageTrainingPipeline
-from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
-from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as ProfileTrainingPipeline
-from pipelines.shared.config.config_factory import ConfigFactory
 from tools.data.gaussians import GaussianAxis, GaussianHead, GaussianMixture
 
 
@@ -90,15 +80,20 @@ class ProfileFeedAdapter:
         return batch.to(device, non_blocking=True).unsqueeze(-1).unsqueeze(-1)
 
     def _training_pipeline(self):
+        from configuration.training import ProfileAeEntryConfig
+        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
+
         entry = ProfileAeEntryConfig(n_gaussians=self.config.n_gaussians, ae_model_name=self.model_name, seed=self.config.seed)
         entry.paths.dataset_path    = self.config.paths.dataset_path
         entry.paths.parameters_path = self.config.paths.parameters_path
         entry.pixel_subsample       = self.config.pixel_subsample
         entry.keep_empty_frac       = self.config.keep_empty_frac
 
-        return ProfileTrainingPipeline(entry)
+        return TrainingPipeline(entry)
 
     def _dataset(self, training_pipeline):
+        from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
+
         profile_dataset_config = training_pipeline._profile_dataset_config()
         dataset_pipeline       = ProfileDatasetPipeline(profile_dataset_config, self.work_dir, logger=self.logger, seed=self.config.seed)
 
@@ -107,6 +102,8 @@ class ProfileFeedAdapter:
         return datasets["train"], profile_length
 
     def _model(self, training_pipeline, profile_length: int):
+        from models.profile_autoencoder import get_profile_autoencoder
+
         model, _ = get_profile_autoencoder(self.model_name, training_pipeline.autoencoder_cfg, profile_length=profile_length)
         return model
 
@@ -139,13 +136,18 @@ class ImageFeedAdapter:
         return batch[0].to(device, non_blocking=True)
 
     def _training_pipeline(self):
+        from configuration.training.image_autoencoder import ImageAeEntryConfig
+        from pipelines.image_autoencoder.training.pipeline import TrainingPipeline
+
         entry = ImageAeEntryConfig(n_gaussians=self.config.n_gaussians, ae_model_name=self.model_name, seed=self.config.seed)
         entry.paths.dataset_path    = self.config.paths.dataset_path
         entry.paths.parameters_path = self.config.paths.parameters_path
 
-        return ImageTrainingPipeline(entry)
+        return TrainingPipeline(entry)
 
     def _dataset(self, training_pipeline):
+        from pipelines.backbone.dataset.pipeline import DatasetPipeline
+
         dataset_config  = training_pipeline.dataset_config
         gaussian_config = training_pipeline.trainer_config.gaussian
 
@@ -161,6 +163,8 @@ class ImageFeedAdapter:
         return datasets["train"]
 
     def _model(self, training_pipeline, input_channels: int):
+        from models.image_autoencoder import get_image_autoencoder
+
         model, _ = get_image_autoencoder(self.model_name, training_pipeline.autoencoder_cfg, in_channels=input_channels)
         return model
 
@@ -195,6 +199,8 @@ class SyntheticFeedAdapter:
         return batch.to(device, non_blocking=True).unsqueeze(-1).unsqueeze(-1)
 
     def build(self) -> FeedTarget:
+        from models.profile_autoencoder import get_profile_autoencoder
+
         dataset = SyntheticCurveDataset(self.config.synthetic_samples, self.config.synthetic_length, self.config.seed)
         model, _ = get_profile_autoencoder(self.model_name, None, profile_length=self.config.synthetic_length)
 
@@ -222,12 +228,17 @@ class BackboneFeedAdapter:
         return batch[0].to(device, non_blocking=True)
 
     def _config_factory(self):
+        from configuration.training          import BackboneEntryConfig
+        from pipelines.shared.config.config_factory import ConfigFactory
+
         entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed, n_gaussians=self.config.n_gaussians)
         entry.paths = self.config.paths
 
         return ConfigFactory(entry)
 
     def _dataset(self, factory):
+        from pipelines.backbone.dataset.pipeline import DatasetPipeline
+
         dataset_config = factory.training_dataset_config()
         gaussian_cfg   = factory.training_trainer_config(logdir=self.work_dir).gaussian
 
@@ -243,6 +254,8 @@ class BackboneFeedAdapter:
         return datasets["train"], dataset_config, gaussian_cfg
 
     def _model(self, dataset, dataset_config, gaussian_cfg):
+        from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+
         in_channels  = dataset.input_channels
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
