@@ -8,8 +8,8 @@ from configuration.normalization.general    import ChannelStats, ChannelStrategy
 from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.stats         import Stats
 
-ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma", "dem/elevation"]
-ZSCORE_SLOTS       = ["out/mu", "pass/phase", "ifg/phase", "pass/raw_re_im", "ifg/raw_re_im"]
+ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma"]
+ZSCORE_SLOTS       = ["out/mu", "pass/phase", "ifg/phase", "pass/raw_re_im", "ifg/raw_re_im", "dem/elevation"]
 
 AMP_THR        = 1e-2
 SCALE_FLOOR    = 1e-8

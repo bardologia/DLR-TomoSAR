@@ -178,7 +178,7 @@ class LaunchLayout:
                 {"path": "out_amp",    "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p · per-slot"}},
                 {"path": "out_mu",     "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore · per-slot"}},
                 {"path": "out_sigma",  "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p · per-slot"}},
-                {"path": "dem",        "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p · per-slot"}},
+                {"path": "dem",        "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore · per-slot"}},
             ]},
             {"title": "Clamp", "fields": [
                 {"gate": "clamp_output", "fields": ["clamp_floor", "clamp_ceil"]},

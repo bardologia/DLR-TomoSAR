@@ -108,7 +108,7 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
     "out/mu"          : Presets.ZSCORE,
     "out/sigma"       : Presets.ROBUST_IQR_LOG1P,
 
-    "dem/elevation"   : Presets.ROBUST_IQR_LOG1P,
+    "dem/elevation"   : Presets.ZSCORE,
 }
 
 
