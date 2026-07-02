@@ -67,14 +67,14 @@ class AblationView extends ConfigForm {
 
     this.dirty         = {};
     this.controls      = {};
+    this.dependents    = {};
     this.states        = [];
-    this.panels        = new Map();
-    this.bands         = [];
     this.gates         = [];
-    this.gatedSections = new Set();
-    this.classColors   = new Map();
+    this.sections      = [];
+    this.pairs         = [];
+    this.activeSection = null;
     this.query         = "";
-    this.showAll       = false;
+    this.builder       = null;
 
     this.host.appendChild(this._buildBar());
 
@@ -164,36 +164,20 @@ class AblationView extends ConfigForm {
     if (trials) this._setValue(trials, "True");
   }
 
-  _renderConfig() {
-    const host   = this.configHost;
-    host.innerHTML = "";
-    const cfg    = this.config;
-    const byPath = this.byPath;
-
-    this.overrideSections = this._detectOverrideSections(cfg.leaves);
-
-    host.appendChild(this._buildToolbar(cfg));
-
-    const modelNameLeaf = byPath.get("backbone_name");
-    const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
-
-    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && leaf.path === modelNameLeaf.path));
-    const claimed = new Set(pinned.map((leaf) => leaf.path));
-    if (cardPanel) claimed.add(modelNameLeaf.path);
-
-    this.builder = new window.AblationBuilder(this, byPath);
-    this.builder.claimed.forEach((path) => claimed.add(path));
-
-    if (byPath.get("trials_enabled") && byPath.get("warmup_losses") && byPath.get("complete_losses")) {
-      const fanout = new window.ExperimentBuilder(this, byPath);
-      fanout.claimed.forEach((path) => claimed.add(path));
+  _buildSpecialPanel(panel) {
+    if (panel.panel === "experiment_builder") {
+      this.builder = new window.AblationBuilder(this, this.byPath);
+      return this.builder.build();
     }
+    return super._buildSpecialPanel(panel);
+  }
 
-    if (pinned.length) host.appendChild(this._buildPins(pinned));
-    if (cardPanel) host.appendChild(cardPanel.build());
-    host.appendChild(this.builder.build());
+  _renderConfig() {
+    const host     = this.configHost;
+    host.innerHTML = "";
 
-    this._renderBands(host, claimed);
+    host.appendChild(this._buildToolbar(this.config));
+    this._renderLayout(host, this.config);
   }
 
   _active() {

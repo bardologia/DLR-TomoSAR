@@ -4,21 +4,6 @@ class LaunchView extends ConfigForm {
 
   static FOLLOW_INFER = new Set(["train_backbone", "train_jepa"]);
 
-
-
-  static TRAINING_TYPES = [
-    ["backbone", "Backbone"],
-    ["profile_autoencoder", "Profile AE"],
-    ["jepa", "JEPA"],
-  ];
-
-  static TRAINING_TYPES_TUNE = [
-    ["backbone", "Backbone"],
-    ["profile_autoencoder", "Profile AE"],
-    ["image_autoencoder", "Image AE"],
-    ["jepa", "JEPA"],
-  ];
-
   static MODEL_KEY_TYPE = {
     train_backbone:             "backbone",
     train_profile_autoencoder:  "profile_autoencoder",
@@ -140,13 +125,6 @@ class LaunchView extends ConfigForm {
     },
   };
 
-  static TYPE_TABS = {
-    benchmark:      { field: "training_type", options: LaunchView.TRAINING_TYPES },
-    cross_validate: { field: "training_type", options: LaunchView.TRAINING_TYPES },
-    tune:           { field: "training_type", options: LaunchView.TRAINING_TYPES_TUNE },
-  };
-
-
   constructor(runConsole, project) {
     super();
     this.runConsole = runConsole;
@@ -154,58 +132,55 @@ class LaunchView extends ConfigForm {
     this.key = null;
     this.detail = null;
     this.config = null;
-    this.dirty = {};
-    this.controls = {};
-    this.dependents = {};
-    this.states = [];
-    this.panels = new Map();
-    this.bands = [];
-    this.gates = [];
-    this.gatedSections = new Set();
-    this.classColors = new Map();
-    this.query = "";
-    this.showAll = false;
-    this.overrideSections = { suppressed: new Set(), labels: new Map() };
-    this.modelFamilies = null;
     this.modelEndpoint = null;
-    this.pinsEl = null;
     this.builder = null;
     this.detach = true;
     this.cmdEl = null;
     this.manifestEl = null;
     this.launchBtn = null;
-    this.countEl = null;
     this.active = false;
     this.loadSeq = 0;
     this._wireTabs();
     this._wireKeys();
   }
 
-  async show(key) {
+  _resetState() {
+    this.dirty         = {};
+    this.controls      = {};
+    this.dependents    = {};
+    this.states        = [];
+    this.gates         = [];
+    this.sections      = [];
+    this.pairs         = [];
+    this.byPath        = new Map();
+    this.activeSection = null;
+    this.query         = "";
+    this.modelFamilies = null;
+    this.modelEndpoint = null;
+    this.layoutEl      = null;
+    this.navHost       = null;
+    this.pinsEl        = null;
+    this.nomatchEl     = null;
+    this.countEl       = null;
+    this.builder       = null;
+    this.detach        = true;
+  }
+
+  async show(param) {
     this.active = true;
-    if (key === this.key && this.config) return;
+    const [key, section] = param.split("/");
+
+    if (key === this.key && this.config) {
+      if (section) this._setActiveSection(section);
+      return;
+    }
 
     const seq = ++this.loadSeq;
     this.key = key;
     this.detail = null;
     this.config = null;
-    this.dirty = {};
-    this.controls = {};
-    this.dependents = {};
-    this.states = [];
-    this.panels = new Map();
-    this.bands = [];
-    this.gates = [];
-    this.gatedSections = new Set();
-    this.classColors = new Map();
-    this.query = "";
-    this.showAll = false;
-    this.overrideSections = { suppressed: new Set(), labels: new Map() };
-    this.modelFamilies = null;
-    this.modelEndpoint = null;
-    this.pinsEl = null;
-    this.builder = null;
-    this.detach = true;
+    this._resetState();
+    this.activeSection = section || null;
 
     this._renderSkeleton();
 
@@ -230,7 +205,7 @@ class LaunchView extends ConfigForm {
     }
     this.config = cfg;
 
-    if (cfg.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "backbone_name" || leaf.path === "ae_model_name")) {
+    if (this._usesModelPanels(cfg)) {
       const endpoint = this._modelFamiliesEndpoint();
       const models   = await window.apiGet(endpoint);
       if (seq !== this.loadSeq) return;
@@ -242,26 +217,20 @@ class LaunchView extends ConfigForm {
     this._refresh();
   }
 
+  _usesModelPanels(cfg) {
+    return cfg.layout.sections.some((section) => section.panels.some((panel) => panel.kind === "special" && panel.panel !== "experiment_builder"));
+  }
+
   _activeTrainingType() {
     if (LaunchView.MODEL_KEY_TYPE[this.key]) return LaunchView.MODEL_KEY_TYPE[this.key];
 
-    const typeTab = LaunchView.TYPE_TABS[this.key];
-    if (typeTab && this.config) {
-      const leaf = this.config.leaves.find((l) => l.path === typeTab.field);
+    const typeTab = this.config ? this.config.layout.type_tab : null;
+    if (typeTab) {
+      const leaf = this.byPath.get(typeTab.field);
       if (leaf) return this._effective(leaf);
     }
 
     return "backbone";
-  }
-
-  _modelNameLeaf(byPath) {
-    const type = this._activeTrainingType();
-
-    if (type === "profile_autoencoder" || type === "image_autoencoder") {
-      return byPath.get("ae_model_name") || byPath.get("autoencoder.ae_model_name") || null;
-    }
-
-    return byPath.get("backbone_name") || byPath.get("ae_model_name");
   }
 
   _modelFamiliesEndpoint() {
@@ -272,8 +241,7 @@ class LaunchView extends ConfigForm {
   }
 
   async _reloadModelsForType() {
-    if (!this.config) return;
-    if (!this.config.leaves.some((leaf) => leaf.path === "skip_models" || leaf.path === "backbone_name" || leaf.path === "ae_model_name")) return;
+    if (!this.config || !this._usesModelPanels(this.config)) return;
 
     const endpoint = this._modelFamiliesEndpoint();
     if (endpoint === this.modelEndpoint) return;
@@ -285,6 +253,11 @@ class LaunchView extends ConfigForm {
     this.modelEndpoint = endpoint;
     this.modelFamilies = (models && models.families) || [];
 
+    const dirty         = this.dirty;
+    const activeSection = this.activeSection;
+    this._resetState();
+    this.dirty         = dirty;
+    this.activeSection = activeSection;
     this._renderConfig(this.config);
     this._refresh();
   }
@@ -580,7 +553,7 @@ class LaunchView extends ConfigForm {
     const facts = [["entry config", this.detail.config_class || "none"]];
     if (this.config) {
       facts.push(["fields", String(this.config.leaves.length)]);
-      facts.push(["sections", String(this.panels.size)]);
+      facts.push(["sections", String(this.sections.length)]);
     }
     facts.forEach(([term, value]) => {
       const dt = document.createElement("dt");
@@ -741,12 +714,10 @@ class LaunchView extends ConfigForm {
       return;
     }
 
-    const byPath  = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
+    this.byPath = new Map(cfg.leaves.map((leaf) => [leaf.path, leaf]));
 
-    this.overrideSections = this._detectOverrideSections(cfg.leaves);
-
-    const typeTab  = LaunchView.TYPE_TABS[this.key];
-    const typeLeaf = typeTab ? byPath.get(typeTab.field) : null;
+    const typeTab  = cfg.layout.type_tab || null;
+    const typeLeaf = typeTab ? this.byPath.get(typeTab.field) : null;
 
     const modelType = LaunchView.MODEL_KEY_TYPE[this.key] || (typeLeaf ? this._effective(typeLeaf) : null);
     const meaning   = (modelType && LaunchView.MODEL_MEANINGS[modelType]) || LaunchView.PROCESS_MEANINGS[this.key] || null;
@@ -756,40 +727,19 @@ class LaunchView extends ConfigForm {
 
     host.appendChild(this._buildToolbar(cfg));
 
-    if (typeLeaf) this._renderTypeTab(typeTab, typeLeaf);
-
-    const modelNameLeaf = this._modelNameLeaf(byPath);
-    const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
-
-    const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && modelNameLeaf && leaf.path === modelNameLeaf.path)).filter((leaf) => !(typeLeaf && leaf.path === typeLeaf.path));
-    const claimed = new Set(pinned.map((leaf) => leaf.path));
-    if (cardPanel) claimed.add(modelNameLeaf.path);
-    if (typeLeaf) claimed.add(typeLeaf.path);
-
-    const modelLeaf  = byPath.get("skip_models");
-    const modelPanel = modelLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelTogglePanel(this, modelLeaf) : null;
-    if (modelPanel) claimed.add("skip_models");
-
-    if (byPath.get("trials_enabled") && byPath.get("warmup_losses") && byPath.get("complete_losses")) {
-      const candidate = new window.ExperimentBuilder(this, byPath);
-      if (candidate.terms.length) {
-        this.builder = candidate;
-        candidate.claimed.forEach((path) => claimed.add(path));
-      }
+    if (typeLeaf) {
+      this._renderTypeTab(typeTab, typeLeaf);
+      this.controls[typeLeaf.path] = { leaf: typeLeaf, reset: () => {} };
     }
 
-    ["ablation_features", "ablation_catalog", "ablation_include_full"].forEach((path) => {
-      if (byPath.get(path)) claimed.add(path);
-    });
-
-    if (pinned.length) host.appendChild(this._buildPins(pinned));
-    if (cardPanel) host.appendChild(cardPanel.build());
-    if (this.builder) host.appendChild(this.builder.build());
-    if (modelPanel) host.appendChild(modelPanel.build());
-
-    this._renderBands(host, claimed);
+    this._renderLayout(host, cfg);
 
     this._renderFacts();
+  }
+
+  _navigate(key) {
+    window.history.replaceState(null, "", `#/launch/${this.key}/${key}`);
+    this._setActiveSection(key);
   }
 
   _commandText() {
