@@ -11,139 +11,98 @@ class ScriptCatalog:
             "title"     : "Pre-process",
             "category"  : "Data",
             "purpose"   : "Ingest raw F-SAR products, beamform the tomogram, and form interferograms.",
-            "essentials": ["dataset_name", "effort", "azimuth_start", "azimuth_end", "range_start", "range_end", "polarisation", "base_directory"],
         },
         "extract_params": {
             "title"     : "Extract Parameters",
             "category"  : "Data",
             "purpose"   : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets. Sweeps every permutation of the selected datasets, K values, lambda values, and fit modes.",
-            "essentials": ["dataset_base_path", "dataset_filter", "gpu_device_ids", "output_prefix", "fit_k_values", "fit_lambda_values", "fit_modes", "fit_sigma_init_divisor"],
         },
         "train_backbone": {
             "title"     : "Train Backbone",
             "category"  : "Training",
             "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, warmup-only losses, secondary-track selections, or input-channel ablations.",
-            "essentials": ["run_name", "backbone_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path", "curriculum.warmup.param_matching", "curriculum.complete.param_matching"],
         },
         "train_profile_autoencoder": {
             "title"     : "Train Profile Autoencoder",
             "category"  : "Training",
             "purpose"   : "Train the per-pixel profile autoencoder that learns the latent embedding targets consumed by JEPA.",
-            "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "train_image_autoencoder": {
             "title"     : "Train Image Autoencoder",
             "category"  : "Training",
             "purpose"   : "Train the 2D image autoencoder that learns the latent input embedding consumed as a JEPA front-end.",
-            "essentials": ["run_name", "ae_model_name", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "train_jepa": {
             "title"     : "Train JEPA",
             "category"  : "Training",
             "purpose"   : "Train the JEPA predictor in latent space. Operates in three modes depending on which autoencoder runs are selected: backbone + profile autoencoder, image autoencoder + backbone, or image autoencoder + backbone + profile autoencoder. Each autoencoder is imported pretrained and either frozen or fine-tuned.",
-            "essentials": ["run_name", "backbone_name", "profile_autoencoder_mode", "profile_autoencoder_logdir", "profile_autoencoder_run", "image_autoencoder_mode", "image_autoencoder_logdir", "image_autoencoder_run", "gpu", "logdir", "paths.dataset_path", "paths.parameters_path"],
         },
         "infer_backbone": {
             "title"     : "Infer Backbone",
             "category"  : "Inference",
             "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs.",
-            "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
         "infer_profile_autoencoder": {
             "title"     : "Infer Profile AE",
             "category"  : "Inference",
             "purpose"   : "Profile-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone profile-autoencoder runs.",
-            "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
         "infer_image_autoencoder": {
             "title"     : "Infer Image AE",
             "category"  : "Inference",
             "purpose"   : "Image-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone image-autoencoder runs.",
-            "essentials": ["logs_dirs", "run_filter", "gpus"],
         },
         "benchmark": {
             "title"     : "Benchmark",
             "category"  : "Experiments",
             "purpose"   : "Benchmark capacity-matched architecture trade-offs, sweeping every permutation of architecture and selected loss component (one architecture + one loss component per run).",
-            "essentials": ["run_tag", "gpus", "n_gaussians", "sweep_loss_components", "curriculum.complete.param_matching", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "cross_validate": {
             "title"     : "Cross-validate",
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
-            "essentials": ["backbone_name", "run_tag", "gpus", "curriculum.complete.param_matching", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
-        },
-        "analyze_preprocessing": {
-            "title"     : "Analyze Preprocessing",
-            "category"  : "Analysis",
-            "purpose"   : "Render the stack-overview plots (SLC amplitudes, flattened interferograms, DEM) for one or more preprocessing trials, decoupled from the tomogram/interferogram generation step.",
-            "essentials": ["runs_dir", "run_tags", "max_amplitude_clip"],
-        },
-        "analyze_param_extraction": {
-            "title"     : "Analyze Param Extraction",
-            "category"  : "Analysis",
-            "purpose"   : "Recompute the Gaussian-fit metrics, summary, and diagnostic plots for one or more parameter-extraction trials, decoupled from the GPU fitting step.",
-            "essentials": ["params_dir", "run_tags", "threshold_factor", "truncation_index", "make_plots"],
-        },
-        "compare_trials": {
-            "title"     : "Compare Trials",
-            "category"  : "Analysis",
-            "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
-            "essentials": ["runs_dir", "run_tags"],
-        },
-        "compare_preprocessing_trials": {
-            "title"     : "Compare Preprocessing",
-            "category"  : "Analysis",
-            "purpose"   : "Compare preprocessing trials that differ by multilook window size. Surfaces the bias-variance trade-off per window (contrast, residual speckle, spurious peaks, azimuth correlation length) as descriptive tables and plots, without forcing a single winner.",
-            "essentials": ["runs_dir", "run_tags"],
-        },
-        "compare_param_extraction_trials": {
-            "title"     : "Compare Param Extraction",
-            "category"  : "Analysis",
-            "purpose"   : "Compare Gaussian-fit parameter-extraction trials grouped by number of Gaussians K. Ranks within each K family on complexity-penalised BIC, variance explained, spatial coherence, and selection decisiveness, and exposes slot-collapse diagnostics. The K families are treated as separate deliverables.",
-            "essentials": ["params_dir", "run_tags"],
-        },
-        "xray_weights": {
-            "title"     : "X-Ray Weights",
-            "category"  : "Analysis",
-            "purpose"   : "Scan a runs directory, select one or more checkpoints, and diagnose each: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics inside each run directory.",
-            "essentials": ["runs_dir", "run_filter", "checkpoint_filename", "make_plots", "dead_abs_threshold", "rank_ratio_warn"],
         },
         "tune": {
             "title"     : "Tune",
             "category"  : "Experiments",
             "purpose"   : "Run the Optuna hyperparameter search, resumable in chunks.",
-            "essentials": ["run_tag", "gpus", "training_type", "jepa.profile_autoencoder_run", "jepa.image_autoencoder_run"],
         },
         "tune_dataloader": {
             "title"     : "Feed Tuner",
             "category"  : "Experiments",
             "purpose"   : "Sweep DataLoader settings (batch size, workers, prefetch, pin-memory) per training mode and recommend the configuration that keeps the GPU fed, ending data starvation.",
-            "essentials": ["mode", "gpu", "batch_sizes", "worker_counts", "prefetch_factors", "timed_batches", "paths.dataset_path", "paths.parameters_path"],
+        },
+        "analyze_preprocessing": {
+            "title"     : "Analyze Preprocessing",
+            "category"  : "Analysis",
+            "purpose"   : "Render the stack-overview plots (SLC amplitudes, flattened interferograms, DEM) for one or more preprocessing trials, decoupled from the tomogram/interferogram generation step.",
+        },
+        "analyze_param_extraction": {
+            "title"     : "Analyze Param Extraction",
+            "category"  : "Analysis",
+            "purpose"   : "Recompute the Gaussian-fit metrics, summary, and diagnostic plots for one or more parameter-extraction trials, decoupled from the GPU fitting step.",
+        },
+        "compare_trials": {
+            "title"     : "Compare Trials",
+            "category"  : "Analysis",
+            "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
+        },
+        "compare_preprocessing_trials": {
+            "title"     : "Compare Preprocessing",
+            "category"  : "Analysis",
+            "purpose"   : "Compare preprocessing trials that differ by multilook window size. Surfaces the bias-variance trade-off per window (contrast, residual speckle, spurious peaks, azimuth correlation length) as descriptive tables and plots, without forcing a single winner.",
+        },
+        "compare_param_extraction_trials": {
+            "title"     : "Compare Param Extraction",
+            "category"  : "Analysis",
+            "purpose"   : "Compare Gaussian-fit parameter-extraction trials grouped by number of Gaussians K. Ranks within each K family on complexity-penalised BIC, variance explained, spatial coherence, and selection decisiveness, and exposes slot-collapse diagnostics. The K families are treated as separate deliverables.",
+        },
+        "xray_weights": {
+            "title"     : "X-Ray Weights",
+            "category"  : "Analysis",
+            "purpose"   : "Scan a runs directory, select one or more checkpoints, and diagnose each: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics inside each run directory.",
         },
     }
-
-    ORDER = [
-        "pre_process",
-        "extract_params",
-        "train_backbone",
-        "train_profile_autoencoder",
-        "train_image_autoencoder",
-        "train_jepa",
-        "infer_backbone",
-        "infer_profile_autoencoder",
-        "infer_image_autoencoder",
-        "benchmark",
-        "cross_validate",
-        "tune",
-        "tune_dataloader",
-        "analyze_preprocessing",
-        "analyze_param_extraction",
-        "compare_trials",
-        "compare_preprocessing_trials",
-        "compare_param_extraction_trials",
-        "xray_weights",
-    ]
 
     GROUPS = {
         "train": {
@@ -208,7 +167,7 @@ class ScriptCatalog:
 
     def list_scripts(self) -> list[dict]:
         entries = []
-        for key in self.ORDER:
+        for key in self.META:
             spec = self.paths.script_entry(key)
             if not spec["path"].exists():
                 continue
