@@ -78,14 +78,14 @@ class DialGauge extends CanvasBase {
     const h   = this.h;
     ctx.clearRect(0, 0, w, h);
 
-    const r  = Math.min((w - 10) / 2, (h - 8) / 1.62);
+    const r  = Math.min((w - 14) / 2, (h - 12) / 1.60);
     const cx = w / 2;
-    const cy = 4 + r;
+    const cy = 7 + r;
     const lw = Math.max(2.5, r * 0.075);
 
     this._arc(ctx, cx, cy, r, this.a0, this.a1, "rgba(255, 255, 255, 0.08)", lw, null);
     this.zones.forEach((z) => {
-      this._arc(ctx, cx, cy, r, this._angle(z.from), this._angle(z.to), `rgba(${z.color}, 0.5)`, lw, null);
+      this._arc(ctx, cx, cy, r + lw * 0.85, this._angle(z.from), this._angle(z.to), `rgba(${z.color}, 0.75)`, Math.max(1.5, lw * 0.38), null);
     });
     if (this.v > this.min) {
       this._arc(ctx, cx, cy, r, this.a0, this._angle(this.v), `rgba(${this.color}, 0.9)`, lw, `rgba(${this.color}, 0.5)`);

@@ -362,10 +362,10 @@ main { margin-left: var(--navw); }
 /* gpu deck */
 .sboard__gpugrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .sboard__gpugrid { grid-template-columns: 1fr; }
 }
 
@@ -384,7 +384,7 @@ main { margin-left: var(--navw); }
 .gcard__head { display: flex; align-items: baseline; gap: 10px; font-family: var(--mono); min-width: 0; }
 .gcard__idx { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dk-acc); white-space: nowrap; }
 .gcard__name { flex: 1; font-size: 11.5px; color: var(--dk-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gcard__cluster { display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin-top: 4px; min-width: 0; }
+.gcard__cluster { display: flex; align-items: flex-end; justify-content: space-evenly; gap: 4px; margin-top: 4px; min-width: 0; }
 .gcard__vramrow { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .gcard__vlabel { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dk-faint); }
 .gseg { display: block; flex: 1 1 auto; min-width: 0; height: 13px; }
@@ -699,13 +699,10 @@ main { margin-left: var(--navw); }
 .impact__arm.is-armed { color: #fff; background: #b91c1c; border-color: #7f1010; font-weight: 700; }
 .impact__arm:disabled { opacity: 0.5; cursor: default; }
 
-.impact__grid { display: flex; flex-direction: column; gap: 14px; }
-.impact__cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.impact__k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dk-faint); }
-.impact__v { font-family: var(--mono); font-size: 11.5px; color: var(--dk-dim); }
-.impact__v b { font-size: 15px; color: var(--dk-ink); font-weight: 500; }
-.impact__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.impact__share { font-family: var(--mono); font-size: 10.5px; color: var(--dk-faint); margin-top: 3px; }
+.impact__grid { display: flex; justify-content: space-between; gap: 8px; }
+.impact__cell { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; flex: 1 1 0; }
+.impact__cell .bar { width: 100%; }
+.impact__share { font-family: var(--mono); font-size: 10.5px; color: var(--dk-faint); margin-top: 3px; white-space: nowrap; }
 .impact__share b { color: var(--dk-dim); font-weight: 500; }
 .impact__share.is-dominant { color: var(--dk-danger); }
 .impact__share.is-dominant b { color: var(--dk-danger); font-weight: 700; }

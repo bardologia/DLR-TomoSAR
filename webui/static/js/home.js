@@ -153,9 +153,9 @@ class StatusBoard {
       `<header class="sboard__cap"><span>neighbour impact</span><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
       `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
       `<div class="impact__grid">` +
-      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">memory stall</span><span class="impact__v" id="sb-impact-mem-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-mem-psi-bar"></i></div><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">disk stall</span><span class="impact__v" id="sb-impact-io-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-io-psi-bar"></i></div><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">cpu stall</span><span class="impact__v" id="sb-impact-cpu-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-cpu-psi-bar"></i></div><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-mem-dial"></canvas><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-io-dial"></canvas><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-cpu-dial"></canvas><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
       `</div>` +
       `<dl class="impact__stats">` +
       `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
@@ -196,6 +196,12 @@ class StatusBoard {
     this.cpuDial = new window.DialGauge(document.getElementById("sb-cpu-dial"), { big: true, label: "BUSY %", color: "111, 155, 255", majors: 5, minors: 4, zones: [{ from: 75, to: 90, color: "251, 191, 36" }, { from: 90, to: 100, color: "248, 113, 113" }] });
     this.ramTank = new window.TankGauge(document.getElementById("sb-ram-tank"), { color: "45, 212, 191" });
     this.swapTank = new window.TankGauge(document.getElementById("sb-swap-tank"), { color: "167, 139, 250" });
+
+    this.impactDials = {
+      mem: new window.DialGauge(document.getElementById("sb-impact-mem-dial"), { label: "MEM STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 10, to: 25, color: "251, 191, 36" }, { from: 25, to: 100, color: "248, 113, 113" }] }),
+      io:  new window.DialGauge(document.getElementById("sb-impact-io-dial"),  { label: "DISK STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 25, to: 60, color: "251, 191, 36" }, { from: 60, to: 100, color: "248, 113, 113" }] }),
+      cpu: new window.DialGauge(document.getElementById("sb-impact-cpu-dial"), { label: "CPU STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 40, to: 70, color: "251, 191, 36" }, { from: 70, to: 100, color: "248, 113, 113" }] }),
+    };
     this.coreEls = [...this.els.board.querySelectorAll(".cpu__cell")];
 
     this._wireNuke();
@@ -436,18 +442,19 @@ class StatusBoard {
     const swap = sig.swap || {};
 
     const contended = new Set(contention.map((a) => a.kind));
-    const gauge = (psiId, shareId, psiVal, shareVal, kind) => {
-      this._txt(psiId, `<b>${(psiVal || 0).toFixed(0)}</b> %`);
-      this._bar(`${psiId}-bar`, psiVal || 0);
+    const gauge = (kind, psiVal, shareVal) => {
+      const dial = (this.impactDials || {})[kind];
+      if (dial) dial.set(psiVal || 0);
+      const shareId  = `sb-impact-${kind}-share`;
       const sharePct = (shareVal || 0) * 100;
       this._txt(shareId, `your share <b>${sharePct.toFixed(0)}</b>%`);
       const shareEl = document.getElementById(shareId);
       if (shareEl) shareEl.classList.toggle("is-dominant", sharePct >= 50 && contended.has(kind));
       this._bar(`${shareId}-bar`, sharePct);
     };
-    gauge("sb-impact-mem-psi", "sb-impact-mem-share", (psi.mem || {}).some, mem.mine_share, "mem");
-    gauge("sb-impact-io-psi",  "sb-impact-io-share",  (psi.io  || {}).some, io.mine_share, "io");
-    gauge("sb-impact-cpu-psi", "sb-impact-cpu-share", (psi.cpu || {}).some, cpu.mine_share, "cpu");
+    gauge("mem", (psi.mem || {}).some, mem.mine_share);
+    gauge("io",  (psi.io  || {}).some, io.mine_share);
+    gauge("cpu", (psi.cpu || {}).some, cpu.mine_share);
 
     this._txt("sb-impact-swap", `<b>${(swap.out_mbs || 0).toFixed(1)}</b> MB/s`);
     this._txt("sb-impact-iorate", `<b>${(io.util || 0).toFixed(0)}</b> %`);
