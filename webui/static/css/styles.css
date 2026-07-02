@@ -2387,6 +2387,52 @@ main { margin-left: var(--navw); }
 .cube-pick .tb-strip { margin-bottom: 10px; }
 .cube-hint { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); margin: 0; }
 
+.cube-grouplist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cube-group {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  overflow: hidden;
+  align-self: start;
+}
+.cube-group.is-open { border-color: var(--line-strong); }
+.cube-group__head {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 9px 12px;
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink);
+  text-align: left;
+}
+.cube-group__head:hover { color: var(--ink); background: var(--line); }
+.cube-group__chev {
+  flex: none; width: 0; height: 0;
+  border-left: 5px solid var(--ink-faint); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform 0.18s var(--ease);
+}
+.cube-group.is-open .cube-group__chev { transform: rotate(90deg); }
+.cube-group__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cube-group__count {
+  flex: none; min-width: 20px; padding: 1px 7px; border-radius: var(--r-pill);
+  background: var(--line-strong); color: var(--ink-dim);
+  font-size: 11px; text-align: center;
+}
+.cube-group__body { display: none; flex-direction: column; padding: 4px; border-top: 1px solid var(--line); }
+.cube-group.is-open .cube-group__body { display: flex; }
+.cube-run {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 7px 9px; border-radius: var(--r-btn, 8px);
+  background: none; border: 1px solid transparent; cursor: pointer;
+  font-family: var(--mono); text-align: left;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.cube-run:hover { background: var(--line); }
+.cube-run.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cube-run__name { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cube-run__stamp { font-size: 11px; color: var(--ink-faint); }
+
 .cube-progress { max-width: 520px; margin: 12px 0 0; }
 .cube-progress__track { height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
 .cube-progress__fill { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.3s ease; }

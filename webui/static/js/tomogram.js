@@ -39,6 +39,7 @@ class TomogramView {
 
     this.cubes = [];
     this.selectedId = null;
+    this.openGroups = new Set();
     this.meta = null;
     this.space = "physical";
     this.point = null;
@@ -134,17 +135,56 @@ class TomogramView {
 
   _renderStrip() {
     this.strip.innerHTML = "";
+
+    const groups = new Map();
     this.cubes.forEach((cube) => {
-      const pill = document.createElement("button");
-      pill.type = "button";
-      pill.className = "tb-pill" + (cube.id === this.selectedId ? " is-active" : "");
-      pill.title = cube.id;
-      pill.innerHTML =
-        `<span class="tb-pill__name">${this._esc(cube.group)}/${this._esc(cube.run)}</span>` +
-        `<span class="tb-pill__state">${this._esc(cube.stamp)}</span>`;
-      pill.addEventListener("click", () => this.select(cube.id));
-      this.strip.appendChild(pill);
+      if (!groups.has(cube.group)) groups.set(cube.group, []);
+      groups.get(cube.group).push(cube);
     });
+
+    const selectedGroup = (this.cubes.find((c) => c.id === this.selectedId) || {}).group;
+
+    groups.forEach((cubes, group) => {
+      const isOpen = this.openGroups.has(group) || group === selectedGroup;
+      const label  = group === "." ? "runs" : group;
+
+      const card = document.createElement("div");
+      card.className = "cube-group" + (isOpen ? " is-open" : "");
+
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "cube-group__head";
+      head.title = label;
+      head.innerHTML =
+        `<span class="cube-group__chev" aria-hidden="true"></span>` +
+        `<span class="cube-group__name">${this._esc(label)}</span>` +
+        `<span class="cube-group__count">${cubes.length}</span>`;
+      head.addEventListener("click", () => this._toggleGroup(group));
+      card.appendChild(head);
+
+      const body = document.createElement("div");
+      body.className = "cube-group__body";
+      cubes.forEach((cube) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "cube-run" + (cube.id === this.selectedId ? " is-active" : "");
+        row.title = cube.id;
+        row.innerHTML =
+          `<span class="cube-run__name">${this._esc(cube.run)}</span>` +
+          `<span class="cube-run__stamp">${this._esc(cube.stamp)}</span>`;
+        row.addEventListener("click", () => this.select(cube.id));
+        body.appendChild(row);
+      });
+      card.appendChild(body);
+
+      this.strip.appendChild(card);
+    });
+  }
+
+  _toggleGroup(group) {
+    if (this.openGroups.has(group)) this.openGroups.delete(group);
+    else this.openGroups.add(group);
+    this._renderStrip();
   }
 
   async select(cubeId) {
