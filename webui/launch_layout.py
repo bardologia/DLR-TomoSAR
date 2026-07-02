@@ -117,7 +117,12 @@ class LaunchLayout:
                 "scheduler_power",
                 {"path": "eta_min", "widget": NUM_ETA_MIN},
                 {"path": "early_stop_patience", "widget": NUM_PATIENCE},
+                "early_stop_min_delta",
                 "log_all_losses",
+                "resume",
+            ]},
+            {"title": "Weight averaging", "fields": [
+                {"gate": "use_ema", "fields": ["ema_decay"]},
             ]},
             {"title": "LR warmup", "fields": [
                 {"gate": "warmup_enabled", "fields": [{"path": "warmup_steps", "widget": NUM_STEPS}, "warmup_mode", "warmup_poly_power"]},
