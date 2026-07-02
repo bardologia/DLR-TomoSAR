@@ -52,5 +52,5 @@ class TrainingQueueConfig:
     patch_size           : tuple[int, int] = (64, 64)
     patch_stride         : int             = 32
     train_azimuth        : tuple[int, int] = (1000, 13000)
-    val_azimuth          : tuple[int, int] = (13000, 14500)
-    test_azimuth         : tuple[int, int] = (14500, 16000)
+    val_azimuth          : tuple[int, int] = (13064, 14500)
+    test_azimuth         : tuple[int, int] = (14564, 16000)
