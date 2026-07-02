@@ -17,7 +17,7 @@ class RunPathsConfig:
 @dataclass
 class TrainingQueueConfig:
     epochs               : int             = 60
-    scheduler_epochs     : int | None      = 60
+    scheduler_epochs     : int | None      = None
     validation_frequency : int             = 1
     batch_size           : int             = 256
     num_workers          : int             = 4
