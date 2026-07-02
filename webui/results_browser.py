@@ -22,7 +22,7 @@ class ResultsBrowser:
         ("benchmark",        ("pipeline/resolved_config.json", "results/benchmark_overview.md", "benchmark_overview.md")),
         ("preprocess",       ("images/slc", "images/interferograms", "images/dem")),
         ("param extraction", ("images/colormaps", "images/example_fits", "fit_report.md")),
-        ("training",         ("docs/trainer_config.json", "checkpoints", "tensorboard")),
+        ("training",         ("docs/trainer_config.json", "last.pt", "tensorboard")),
         ("inference",        ("inference", "figures", "animations")),
     )
 
