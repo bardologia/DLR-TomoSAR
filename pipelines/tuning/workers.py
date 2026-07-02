@@ -4,8 +4,12 @@ from pathlib import Path
 
 import optuna
 
+from configuration.training                 import ImageAeEntryConfig, JepaEntryConfig, ProfileAeEntryConfig
 from models                                 import BACKBONE_CONFIG_REGISTRY
+from models.image_autoencoder               import IMAGE_AE_CONFIG_REGISTRY
+from models.profile_autoencoder             import PROFILE_AE_CONFIG_REGISTRY
 from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.tuning.trial                 import TrialImageAePipeline, TrialProfileAePipeline
 from pipelines.tuning.tuners                import AeTuner, JepaTuner, Tuner
 from tools.monitoring.logger                import Logger
 
@@ -19,8 +23,6 @@ class TuningWorker:
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def _ae_entry_template(self):
-        from configuration.training import ProfileAeEntryConfig
-
         return ProfileAeEntryConfig(
             seed            = self.config.tuning.base_seed,
             n_gaussians     = self.config.n_gaussians,
@@ -32,8 +34,6 @@ class TuningWorker:
         )
 
     def _image_ae_entry_template(self):
-        from configuration.training import ImageAeEntryConfig
-
         return ImageAeEntryConfig(
             seed        = self.config.tuning.base_seed,
             n_gaussians = self.config.n_gaussians,
@@ -43,8 +43,6 @@ class TuningWorker:
         )
 
     def _jepa_entry_template(self):
-        from configuration.training import JepaEntryConfig
-
         jepa = self.config.jepa
 
         return JepaEntryConfig(
@@ -73,9 +71,6 @@ class TuningWorker:
 
     def _build_tuner(self, model_name: str, tune_cfg, logger: Logger):
         if self.config.training_type == "profile_autoencoder":
-            from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
-            from pipelines.tuning.trial      import TrialProfileAePipeline
-
             return AeTuner(
                 model_name         = model_name,
                 config_cls         = PROFILE_AE_CONFIG_REGISTRY[model_name],
@@ -88,9 +83,6 @@ class TuningWorker:
             )
 
         if self.config.training_type == "image_autoencoder":
-            from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
-            from pipelines.tuning.trial    import TrialImageAePipeline
-
             return AeTuner(
                 model_name         = model_name,
                 config_cls         = IMAGE_AE_CONFIG_REGISTRY[model_name],

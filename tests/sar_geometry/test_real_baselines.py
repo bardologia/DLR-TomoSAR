@@ -4,11 +4,11 @@ import math
 
 import numpy as np
 import pytest
+import torch
 
 from configuration.sar.geometry_config import GeometryConfig
 from tools.baselines.containers         import TrackBaselines, TrackProfiles
 from tools.sar.tomo_geometry            import TomoGeometry
-import torch
 
 
 @pytest.mark.real_data

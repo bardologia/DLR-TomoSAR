@@ -9,8 +9,9 @@ from typing      import Optional
 
 import torch
 
-from tools                            import NullLogger, NullTracker
+from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
+from tools                                  import NullLogger, NullTracker
 
 
 @dataclass
@@ -41,8 +42,6 @@ class LossScaleProbe:
                 setattr(self.loss_cfg, term.weight_key, 1.0)
 
     def _build_criterion(self, x_axis: torch.Tensor):
-        from pipelines.backbone.training.loss import Loss
-
         return Loss(
             x_axis       = x_axis,
             logger       = NullLogger(),

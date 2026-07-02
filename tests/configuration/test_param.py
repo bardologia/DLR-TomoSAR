@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 from pathlib import Path
 
 import pytest
@@ -141,8 +142,6 @@ def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction
 
 
 def test_extraction_discover_height_range_from_state(tmp_path):
-    import json
-
     meta = tmp_path / "meta"
     meta.mkdir()
     (meta / "config_state.json").write_text(json.dumps({"tomogram_config": {"height_range": [-20.0, 80.0]}}))

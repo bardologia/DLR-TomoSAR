@@ -14,7 +14,8 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from script_config_resolver import ScriptConfigResolver
+from configuration.training.general.ablation import AblationCatalog
+from script_config_resolver                    import ScriptConfigResolver
 
 
 @pytest.fixture(scope="module")
@@ -36,8 +37,6 @@ def test_container_leaves_render_as_python_literals(backbone_leaves):
 
 
 def test_ablation_leaves_expose_the_catalog(backbone_leaves):
-    from configuration.training.general.ablation import AblationCatalog
-
     by_path  = {leaf["path"]: leaf for leaf in backbone_leaves}
     features = ast.literal_eval(by_path["ablation_features"]["value"])
     catalog  = ast.literal_eval(by_path["ablation_catalog"]["value"])

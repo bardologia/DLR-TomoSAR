@@ -13,6 +13,7 @@ from configuration.sar.processing_config import (
 from configuration.sar.gaussian_config import GaussianConfig
 
 from tests.configuration._helpers import make_crop
+from tools.data.regions           import CropRegion
 
 
 @pytest.mark.real_data
@@ -99,8 +100,6 @@ def test_config_state_height_range_drives_gaussian(config_state_json):
 
 @pytest.mark.real_data
 def test_config_state_crop_round_trips_through_processing(config_state_json):
-    from tools.data.regions import CropRegion
-
     crop_state = config_state_json["crop"]
     crop       = CropRegion(**crop_state)
     cfg        = ProcessingConfig(crop=crop)

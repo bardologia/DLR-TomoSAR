@@ -5,10 +5,13 @@ import inspect
 import pytest
 import torch
 
-from pipelines.benchmark.batch_probe import MaxBatchProbe
-from tools.training.pretraining.batch_finder import TrainStepMemoryProbe
-
+import pipelines.benchmark.batch_probe as module
 from configuration.benchmark import BenchmarkConfig
+from pipelines.backbone.training.loss_terms import LossComponentCatalog
+from pipelines.backbone.training.pipeline import TrainingPipeline
+from pipelines.benchmark.batch_probe import MaxBatchProbe
+from tools.monitoring.logger import Logger
+from tools.training.pretraining.batch_finder import TrainStepMemoryProbe
 
 
 GPU = pytest.mark.skipif(not torch.cuda.is_available(), reason="batch probe memory measurement requires CUDA")
@@ -56,8 +59,6 @@ def test_build_trainer_constructs_real_trainer():
 
 
 def test_build_context_imports_real_dataset_and_trainer_pipeline():
-    import pipelines.benchmark.batch_probe as module
-
     source = inspect.getsource(module)
 
     assert "DatasetPipeline" in source
@@ -80,7 +81,6 @@ def test_run_catches_exceptions_and_reports_failure_dict(monkeypatch, tmp_path):
     probe.work_dir      = tmp_path / "work"
     probe.work_dir.mkdir(parents=True, exist_ok=True)
 
-    from tools.monitoring.logger import Logger
     probe.logger = Logger(log_dir=str(tmp_path / "logs"), name="probe", level="INFO")
 
     monkeypatch.setattr(probe, "_measure_context", lambda: (_ for _ in ()).throw(RuntimeError("no cuda")))
@@ -112,9 +112,6 @@ def test_build_context_probes_with_the_swept_loss_union():
 
 
 def test_probe_curriculum_activates_geometry_field_for_physics_sweeps():
-    from pipelines.backbone.training.loss_terms import LossComponentCatalog
-    from pipelines.backbone.training.pipeline   import TrainingPipeline
-
     config = BenchmarkConfig()
 
     config.sweep_loss_components = ["param_l1"]

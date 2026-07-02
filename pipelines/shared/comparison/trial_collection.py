@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 import numpy as np
+import torch
 
 from pipelines.shared.training.seed_sweep import SeedSet
 from tools.data.io               import FileIO
@@ -84,8 +85,6 @@ class TrialCollector:
         return size_match["parameters"] if "parameters" in size_match else None
 
     def _read_checkpoint(self, trial_dir: Path) -> dict:
-        import torch
-
         checkpoint_path = next(trial_dir.rglob("best_model.pt"), None)
         if checkpoint_path is None:
             return {}

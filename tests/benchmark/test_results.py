@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 
@@ -124,8 +125,6 @@ def test_collector_attaches_inference_metrics_and_media(tmp_path, logger_stub):
 
 
 def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
-    import numpy as np
-
     pipe = tmp_path / "pipeline"
     pipe.mkdir(parents=True)
     _write_json(pipe / "size_match.json", {"unet": {"parameters": 100, "overrides": {}}})

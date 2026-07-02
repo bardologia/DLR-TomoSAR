@@ -9,8 +9,10 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from configuration.architectures.image_autoencoder import Conv2dImageAutoencoderConfig
+from configuration.training import ImageAeEntryConfig
 from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
 from configuration.training.image_autoencoder import ImageAeLossConfig, ImageAeTrainerConfig
+from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
 from pipelines.image_autoencoder.training import pipeline as image_pipeline
 from pipelines.shared.config.run_metadata import TrainingRunMetadata
 
@@ -112,9 +114,6 @@ def test_saved_checkpoint_is_loadable(tmp_path):
 
 
 def test_autoencoder_config_follows_ae_model_name():
-    from configuration.training import ImageAeEntryConfig
-    from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
-
     entry = ImageAeEntryConfig(ae_model_name="conv2d_ae", model_overrides={"embedding_dim": 48})
     cfg   = image_pipeline.TrainingPipeline._autoencoder_config(image_pipeline.TrainingPipeline.__new__(image_pipeline.TrainingPipeline), entry)
 

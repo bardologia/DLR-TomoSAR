@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
@@ -35,8 +36,6 @@ def test_thread_vars_cover_all_blas_backends():
 
 
 def test_threads_sets_documented_env_vars(clean_env):
-    import os
-
     EnvironmentPinner.threads()
 
     for key in THREAD_KEYS:
@@ -44,8 +43,6 @@ def test_threads_sets_documented_env_vars(clean_env):
 
 
 def test_threads_accepts_custom_count(clean_env):
-    import os
-
     EnvironmentPinner.threads(1)
 
     for key in THREAD_KEYS:
@@ -53,16 +50,12 @@ def test_threads_accepts_custom_count(clean_env):
 
 
 def test_gpu_sets_cuda_visible_devices(clean_env):
-    import os
-
     EnvironmentPinner.gpu(gpu_id=3)
 
     assert os.environ["CUDA_VISIBLE_DEVICES"] == "3"
 
 
 def test_gpu_also_pins_threads(clean_env):
-    import os
-
     EnvironmentPinner.gpu(gpu_id=0)
 
     for key in THREAD_KEYS:
@@ -70,40 +63,30 @@ def test_gpu_also_pins_threads(clean_env):
 
 
 def test_gpu_expandable_segments_toggles_alloc_conf(clean_env):
-    import os
-
     EnvironmentPinner.gpu(gpu_id=1, expandable_segments=True)
 
     assert os.environ["PYTORCH_CUDA_ALLOC_CONF"] == "expandable_segments:True"
 
 
 def test_gpu_without_expandable_segments_leaves_alloc_conf_unset(clean_env):
-    import os
-
     EnvironmentPinner.gpu(gpu_id=1, expandable_segments=False)
 
     assert "PYTORCH_CUDA_ALLOC_CONF" not in os.environ
 
 
 def test_gpus_joins_ids(clean_env):
-    import os
-
     EnvironmentPinner.gpus([0, 1, 2, 3])
 
     assert os.environ["CUDA_VISIBLE_DEVICES"] == "0,1,2,3"
 
 
 def test_gpus_coerces_to_int_strings(clean_env):
-    import os
-
     EnvironmentPinner.gpus(["1", 2])
 
     assert os.environ["CUDA_VISIBLE_DEVICES"] == "1,2"
 
 
 def test_gpus_pins_threads(clean_env):
-    import os
-
     EnvironmentPinner.gpus([0])
 
     for key in THREAD_KEYS:

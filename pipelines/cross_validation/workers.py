@@ -6,12 +6,19 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.shared.comparison.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
-from pipelines.shared.training.worker_base             import WorkerBase
-from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
-from tools.data.io                                      import FileIO
-from tools.data.regions                                import SplitRegions
-from tools.monitoring.logger                           import Logger
+from configuration.training         import JepaEntryConfig, ProfileAeEntryConfig
+from pipelines.backbone.inference.pipeline           import InferencePipeline
+from pipelines.backbone.training.pipeline            import TrainingPipeline as BackboneTrainingPipeline
+from pipelines.cross_validation.folds                import FoldConfigFactory, FoldNaming
+from pipelines.jepa.training.pipeline                import TrainingPipeline as JepaTrainingPipeline
+from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as ProfileAeTrainingPipeline
+from pipelines.shared.comparison.trial_collection    import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.inference.inference_components import InferenceComponentsResolver
+from pipelines.shared.model.model_builder            import ModelBuilder
+from pipelines.shared.training.worker_base           import WorkerBase
+from tools.data.io                                   import FileIO
+from tools.data.regions                              import SplitRegions
+from tools.monitoring.logger                         import Logger
 
 
 class FoldCollector(TrialCollector):
@@ -114,9 +121,6 @@ class CrossValidationWorker(WorkerBase):
 
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
-        from pipelines.backbone.training.pipeline import TrainingPipeline
-        from pipelines.shared.model.model_builder import ModelBuilder
-
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.run_dir / "folds")
@@ -126,7 +130,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         dataset_config               = self.factory.training_dataset_config()
         dataset_config.split_regions = split_regions
 
-        pipeline = TrainingPipeline(
+        pipeline = BackboneTrainingPipeline(
             trainer_config = trainer_config,
             dataset_config = dataset_config,
             backbone_name  = self.config.backbone_name,
@@ -138,13 +142,9 @@ class FoldTrainingWorker(CrossValidationWorker):
         pipeline.run(probe_config=self._probe_config())
 
     def _run_jepa(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
-        from pipelines.jepa.training.pipeline import TrainingPipeline
-
-        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
+        JepaTrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
 
     def _jepa_entry_config(self, run_name: str, seed: int | None):
-        from configuration.training import JepaEntryConfig
-
         cv   = self.config
         jepa = cv.jepa
 
@@ -166,13 +166,9 @@ class FoldTrainingWorker(CrossValidationWorker):
         )
 
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
-        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
-
-        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
+        ProfileAeTrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
 
     def _ae_entry_config(self, run_name: str, seed: int | None):
-        from configuration.training import ProfileAeEntryConfig
-
         cv = self.config
         ae = cv.autoencoder
 
@@ -208,9 +204,6 @@ class FoldTrainingWorker(CrossValidationWorker):
 
 class FoldInferenceWorker(CrossValidationWorker):
     def run(self, fold_index: int, split: str, seed: int | None = None) -> None:
-        from pipelines.backbone.inference.pipeline import InferencePipeline
-        from pipelines.shared.inference.inference_components import InferenceComponentsResolver
-
         run_directory = self.run_dir / "folds" / FoldNaming.run_name(fold_index, seed)
 
         components = InferenceComponentsResolver.for_run(run_directory)

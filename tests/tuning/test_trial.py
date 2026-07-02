@@ -5,6 +5,8 @@ from pathlib import Path
 import optuna
 import pytest
 
+import pipelines.tuning.trial as trial_mod
+
 from configuration.training import OverfitConfig
 from pipelines.tuning.trial  import TrialTrainer, TrialProfileAeTrainer, TrialImageAeTrainer, TrialJepaTrainer
 from pipelines.tuning.tuners import AeTuner, JepaTuner
@@ -258,8 +260,6 @@ class FakeJepaEntry:
 
 
 def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_path, monkeypatch):
-    import pipelines.tuning.trial as trial_mod
-
     captured = {}
 
     class CaptureJepaPipeline:

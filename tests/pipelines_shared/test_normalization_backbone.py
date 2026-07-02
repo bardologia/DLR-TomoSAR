@@ -4,9 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.normalization.general     import ChannelStats, ChannelStrategy, NormMethod
+from configuration.dataset                    import InputConfig, OutputConfig, Representation
+from configuration.normalization.general      import ChannelStats, ChannelStrategy, NormMethod
+from pipelines.backbone.dataset.datasets      import PatchDataset
 from pipelines.backbone.dataset.normalizer    import Normalizer
+from pipelines.backbone.dataset.spatial       import Patcher
 from pipelines.backbone.dataset.stats         import Stats
+from pipelines.backbone.dataset.stats_computer import StatsComputer
+from tools.monitoring.logger                  import Logger
 
 
 def _zscore_stats() -> Stats:
@@ -88,12 +93,6 @@ def test_missing_output_stats_raises():
 @pytest.mark.real_data
 @pytest.mark.slow
 def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, parameters):
-    from configuration.dataset                      import InputConfig, OutputConfig, Representation
-    from pipelines.backbone.dataset.datasets        import PatchDataset
-    from pipelines.backbone.dataset.stats_computer  import StatsComputer
-    from pipelines.backbone.dataset.spatial         import Patcher
-    from tools.monitoring.logger                    import Logger
-
     ifg     = np.ascontiguousarray(np.asarray(interferograms[:4, :24, :24]))
     primary = ifg[:1]
     inputs  = np.concatenate([primary, ifg], axis=0)

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-
 from dataclasses import asdict
 from pathlib     import Path
 
@@ -14,6 +12,7 @@ from configuration.training import BackboneTrainerConfig
 from pipelines.shared.config.config_persistence    import BackboneModelConfigIO
 from tools.data.io                          import FileIO
 from tools.monitoring.logger                import Logger
+from tools.runtime.run_tag                  import RunTag
 
 
 class TrainingRunMetadata:

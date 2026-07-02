@@ -10,8 +10,9 @@ from configuration.training.jepa      import EmbeddingLossConfig
 from pipelines.jepa.training.coupling import CouplingMode, TargetProvider
 from pipelines.jepa.training.loss     import Loss as EmbeddingLoss
 from pipelines.jepa.training.trainer  import JepaModule, Trainer
+from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
-from tests.jepa.conftest import EMBEDDING_DIM, N_GAUSSIANS, SPATIAL, make_autoencoder
+from tests.jepa.conftest import EMBEDDING_DIM, IdentityNormStats, N_GAUSSIANS, SPATIAL, make_autoencoder
 
 
 def build_module():
@@ -73,8 +74,6 @@ def make_trainer_shim(target_kind="stopgrad", trainable=True):
     mode.apply(module.profile_autoencoder)
 
     x_axis             = torch.linspace(-4.0, 4.0, module.profile_autoencoder.config.profile_length)
-    from tests.jepa.conftest import IdentityNormStats
-    from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
     norm_stats         = IdentityNormStats()
     profile_normalizer = ProfileNormalizer(ProfileStats(loc=0.0, scale=1.0))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 import sys
 from pathlib import Path
@@ -38,8 +39,6 @@ def test_tomogram_build_spec_serialises_tomogram_config():
 
 
 def test_tomogram_build_spec_is_json_serialisable():
-    import json
-
     spec = TomogramLauncher.build_spec(_config(), Path("/a"), Path("/b"))
 
     assert json.loads(json.dumps(spec))["dem_path"] == "/b"
@@ -83,8 +82,6 @@ def test_interferogram_build_spec_includes_pyrat_threads():
 
 
 def test_interferogram_build_spec_is_json_serialisable():
-    import json
-
     spec = InterferogramLauncher.build_spec(
         _config(),
         primary_path        = Path("/p"),

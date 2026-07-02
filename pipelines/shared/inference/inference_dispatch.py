@@ -3,13 +3,16 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib     import Path
 
+from pipelines.backbone.inference.pipeline import InferencePipeline
+from pipelines.image_autoencoder.inference.pipeline import ImageAeInferencePipeline
+from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferencePipeline
+
 
 class BackboneInferenceRunner:
     def __init__(self, entry_config) -> None:
         self.entry = entry_config
 
     def run(self, run_directory: Path) -> None:
-        from pipelines.backbone.inference.pipeline import InferencePipeline
         from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
         config     = replace(self.entry.inference, run_directory=Path(run_directory), output_subdir=None)
@@ -23,8 +26,6 @@ class ProfileAeInferenceRunner:
         self.entry = entry_config
 
     def run(self, run_directory: Path) -> None:
-        from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferencePipeline
-
         config = replace(self.entry.profile_inference, run_directory=Path(run_directory), output_subdir=None)
 
         ProfileAeInferencePipeline(config).run()
@@ -35,8 +36,6 @@ class ImageAeInferenceRunner:
         self.entry = entry_config
 
     def run(self, run_directory: Path) -> None:
-        from pipelines.image_autoencoder.inference.pipeline import ImageAeInferencePipeline
-
         config = replace(self.entry.image_inference, run_directory=Path(run_directory), output_subdir=None)
 
         ImageAeInferencePipeline(config).run()

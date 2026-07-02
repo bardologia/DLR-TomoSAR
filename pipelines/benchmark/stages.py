@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-
 import sys
 from dataclasses import asdict
 from pathlib     import Path
 
 from configuration.benchmark import BenchmarkConfig
+from pipelines.backbone.training.loss_terms    import LossComponentCatalog
 from pipelines.benchmark.results                import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
@@ -14,6 +13,7 @@ from pipelines.shared.training.seed_sweep                import SeedSet
 from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.data.io                              import FileIO
 from tools.monitoring.logger                    import Logger
+from tools.runtime.run_tag                     import RunTag
 
 
 class SeedExpandedStage:
@@ -24,8 +24,6 @@ class SeedExpandedStage:
         components = list(config.sweep_loss_components)
         if not components:
             raise SystemExit("sweep_loss_components is empty; select at least one loss component to sweep")
-
-        from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
         valid   = set(LossComponentCatalog.names())
         unknown = [component for component in components if component not in valid]

@@ -15,6 +15,7 @@ from pipelines.benchmark.stages import (
 
 from configuration.benchmark import BenchmarkConfig
 from tools.data.io import FileIO
+from tools.orchestration import QueuedInferenceStage, QueuedTrainingStage
 
 
 class _SilentLogger:
@@ -125,8 +126,6 @@ def test_sizematch_load_cached_returns_when_complete(config, logger_stub):
 
 
 def test_training_and_inference_stages_subclass_queued_bases(config, logger_stub):
-    from tools.orchestration import QueuedInferenceStage, QueuedTrainingStage
-
     train = TrainingStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
     infer = InferenceStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 

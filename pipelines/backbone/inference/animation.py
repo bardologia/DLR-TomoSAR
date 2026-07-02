@@ -144,10 +144,6 @@ class Animator:
 
     @staticmethod
     def _render_frame(spec: FrameSpec) -> tuple[int, bytes]:
-        import matplotlib.pyplot as plt
-        import numpy as np
-        from io import BytesIO
-
         g, p = spec.gt, spec.pred
         eg   = np.abs(p - g)
 
@@ -188,11 +184,7 @@ class Animator:
 
     @staticmethod
     def _init_worker() -> None:
-        import matplotlib
         matplotlib.use("Agg")
-        import matplotlib.pyplot
-        import numpy
-        import io
 
     def walk_gif(
         self,

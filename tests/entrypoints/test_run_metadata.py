@@ -8,6 +8,7 @@ import pytest
 from configuration.benchmark import BenchmarkConfig
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.config.run_metadata import TrainingRunMetadata
+from tools.monitoring.logger import Logger
 
 
 @pytest.fixture
@@ -111,8 +112,6 @@ def test_owns_logger_when_none_passed(metadata):
 
 @pytest.mark.real_data
 def test_does_not_own_external_logger(trainer_config, tmp_path):
-    from tools.monitoring.logger import Logger
-
     logger = Logger(log_dir=str(tmp_path / "ext_logs"), name="external")
     try:
         meta = TrainingRunMetadata(trainer_config, "resunet", tmp_path / "runs", run_name="ext", logger=logger)

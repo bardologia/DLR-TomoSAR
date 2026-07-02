@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 
 from tools.training                          import BaseTrainer
 from pipelines.backbone.training.loss        import Loss
+from pipelines.backbone.training.loss_probe  import LossScaleProbe
 from pipelines.backbone.training.docs        import TrainingDocs
 from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures
 
@@ -180,8 +181,6 @@ class Trainer(BaseTrainer):
     def maybe_run_loss_probe(self, train_loader, probe_config=None) -> None:
         if probe_config is None or not probe_config.enabled:
             return
-
-        from pipelines.backbone.training.loss_probe import LossScaleProbe
 
         probe = LossScaleProbe(
             probe_cfg    = probe_config,

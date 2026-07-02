@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pipelines.backbone.training.launcher as backbone_pipeline
+from configuration.training import BackboneEntryConfig
+from pipelines.shared.training import training_launcher as mod
+
 
 def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
-    from pipelines.shared.training import training_launcher as mod
-
     captured = {}
     resolved = object()
 
@@ -35,9 +37,6 @@ def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
 
 
 def test_backbone_launcher_trial_runs_single_runner(monkeypatch):
-    import pipelines.backbone.training.launcher as backbone_pipeline
-    from configuration.training import BackboneEntryConfig
-
     ran = {}
 
     class FakeSingleRunner:
@@ -69,8 +68,6 @@ def test_backbone_launcher_trial_runs_single_runner(monkeypatch):
 
 
 def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):
-    import pipelines.backbone.training.launcher as backbone_pipeline
-
     ran = {}
 
     class FakeSingleRunner:
@@ -107,9 +104,6 @@ def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):
 
 
 def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
-    import pipelines.backbone.training.launcher as backbone_pipeline
-    from configuration.training import BackboneEntryConfig
-
     config             = BackboneEntryConfig()
     config.logdir      = tmp_path
     config.trials_mode = "ablation"
@@ -126,9 +120,6 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
 
 
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    import pipelines.backbone.training.launcher as backbone_pipeline
-    from configuration.training import BackboneEntryConfig
-
     for mode in ("curriculum", "warmup", "presence", "secondary", "patch", "input", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path

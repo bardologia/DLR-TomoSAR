@@ -7,8 +7,10 @@ from types   import SimpleNamespace
 import optuna
 import pytest
 
-from optuna.trial             import TrialState
-from pipelines.tuning.pipeline import TuningScheduler
+from configuration.architectures.backbone import UNetConfig
+from optuna.trial                         import TrialState
+from pipelines.tuning.pipeline            import TuningScheduler
+from pipelines.tuning.tuners              import ParamSampler
 
 
 class StubLogger:
@@ -72,7 +74,6 @@ def test_search_space_matches_config_union(tmp_path):
     orch  = _orchestrator(tmp_path)
     space = orch._search_space("unet")
 
-    from configuration.architectures.backbone import UNetConfig
     expected = {**UNetConfig.tunable_lr_params(), **UNetConfig.tunable_arch_params()}
     assert space == expected
 
@@ -149,8 +150,6 @@ def test_tune_model_extracts_synthetic_optimum_and_persists(tmp_path, monkeypatc
     optimum = "gelu"
 
     def fake_dispatch(model_name, counts):
-        from pipelines.tuning.tuners import ParamSampler
-
         sampler = ParamSampler()
         study   = orch._load_or_create_study(model_name)
 

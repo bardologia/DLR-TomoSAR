@@ -4,12 +4,11 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.training.general.loss import LossConfig
+from configuration.training.general.loss import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
 from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
-
 import tools
 
 
@@ -47,8 +46,6 @@ def test_catalog_rejects_unknown_component():
 
 
 def test_catalog_standalone_inherits_shared_knobs_from_base():
-    from configuration.training import LossConfig, ParamMatching
-
     base = LossConfig(param_matching=ParamMatching.SORTED_GT, param_weights=(2.0, 3.0, 4.0), use_mse_curve=True, weight_mse_curve=5.0)
     cfg  = LossComponentCatalog.standalone("param_l1", base=base)
 
@@ -147,7 +144,7 @@ def test_amp_gradient_survives_below_physical_floor():
     loss(pred, gt)["total_loss"].backward()
 
     assert torch.isfinite(pred.grad).all().item()
-    assert pred.grad[:, 0].abs().sum().item() > 0.0
+    assert pred.grad[:, 0].abs().sum().item() > 1e-5
 
 
 def test_identical_valid_params_give_zero_param_loss():

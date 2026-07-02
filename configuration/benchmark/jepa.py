@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
+from configuration.training.jepa import EmbeddingLossConfig
+
 
 def _default_embedding_loss():
-    from configuration.training.jepa import EmbeddingLossConfig
-
     return EmbeddingLossConfig()
 
 

@@ -592,7 +592,7 @@ class EquationLibrary:
                 {
                     "title" : "Physical parameter bounds",
                     "tex"   : r"a \in \left[0,\ a_{\max}\right], \qquad \mu \in \left[x_{\min},\ x_{\max}\right], \qquad \sigma \in \left[\tfrac{\Delta x}{2},\ \tfrac{x_{\max} - x_{\min}}{2}\right]",
-                    "note"  : "Denormalised predictions are clamped to these bounds before curve reconstruction, using a straight-through leaky clamp (slope 0.01) so gradients survive saturation, then renormalised (gaussian_utils.py).",
+                    "note"  : "Denormalised predictions are clamped to these bounds before curve reconstruction, using a straight-through leaky clamp (slope 0.1, GaussianConfig.clamp_leaky_slope) so gradients survive saturation, then renormalised (gaussian_utils.py). Three leaky floors stack at amplitude 0 (decompress, clamp, compress), so the below-floor recovery gradient scales as slope cubed.",
                     "vars"  : [
                         {"sym": r"a",         "desc": "predicted amplitude"},
                         {"sym": r"a_{\max}",  "desc": "amp_max = 1000"},

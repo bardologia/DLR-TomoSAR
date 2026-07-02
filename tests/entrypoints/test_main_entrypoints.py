@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from configuration.inference import InferenceEntryConfig
 from tools.runtime.config_cli import ConfigCli
 
 
@@ -209,8 +210,6 @@ def test_config_cli_apply_no_args_returns_unmodified_config(name):
 
 
 def test_config_cli_rejects_unknown_override():
-    from configuration.inference import InferenceEntryConfig
-
     cli = ConfigCli(InferenceEntryConfig())
 
     with pytest.raises(ValueError):

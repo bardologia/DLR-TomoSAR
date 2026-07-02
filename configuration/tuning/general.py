@@ -3,20 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run     import RunPathsConfig, TrainingQueueConfig
-from configuration.tuning.jepa              import JepaTuneConfig
-from configuration.training.general.runtime import OverfitConfig
+from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.runtime     import OverfitConfig
+from configuration.training.image_autoencoder   import ImageAeLossConfig
+from configuration.training.profile_autoencoder import ProfileAeLossConfig
+from configuration.tuning.jepa                  import JepaTuneConfig
 
 
 def _default_ae_loss():
-    from configuration.training.profile_autoencoder import ProfileAeLossConfig
-
     return ProfileAeLossConfig()
 
 
 def _default_image_ae_loss():
-    from configuration.training.image_autoencoder import ImageAeLossConfig
-
     return ImageAeLossConfig()
 
 

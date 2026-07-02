@@ -6,6 +6,7 @@ import torch
 from configuration.training.jepa      import EmbeddingLossConfig
 from pipelines.jepa.training.coupling import TargetProvider
 from pipelines.jepa.training.loss     import Loss as EmbeddingLoss
+from tools.data.gaussians             import GaussianCurve
 
 from tests.jepa.conftest import EMBEDDING_DIM, N_GAUSSIANS, SPATIAL, make_autoencoder
 
@@ -69,7 +70,6 @@ def test_loss_zero_on_matching_embeddings(x_axis, norm_stats, profile_normalizer
 
     with torch.no_grad():
         gt_phys    = norm_stats.denormalize_output(gt.float())
-        from tools.data.gaussians import GaussianCurve
         gt_curve   = GaussianCurve.reconstruct(gt_phys, x_axis, 3)
         gt_curve_n = profile_normalizer.normalize(gt_curve)
         z_star     = autoencoder.encoder(gt_curve_n)
@@ -87,7 +87,6 @@ def test_loss_increases_with_divergence(x_axis, norm_stats, profile_normalizer):
     gt = torch.rand(2, N_GAUSSIANS * 3, SPATIAL, SPATIAL)
 
     with torch.no_grad():
-        from tools.data.gaussians import GaussianCurve
         gt_curve   = GaussianCurve.reconstruct(gt.float(), x_axis, 3)
         gt_curve_n = profile_normalizer.normalize(gt_curve)
         z_star     = autoencoder.encoder(gt_curve_n)

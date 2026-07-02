@@ -7,12 +7,14 @@ from typing      import Dict, List, Type
 import numpy as np
 
 from configuration.inference import InferenceConfig
+from pipelines.backbone.inference.data_consistency import DataConsistencyEvaluator
 from pipelines.backbone.inference.figures     import FigureComposer
 from pipelines.backbone.inference.loader      import RunLoader
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics     import Metrics
 from pipelines.backbone.inference.plots       import Plotter
 from pipelines.backbone.inference.predictor   import Predictor
+from pipelines.backbone.inference.reduced     import ReducedTomogramSynthesizer
 from pipelines.backbone.inference.report      import Report, ReportPayloadBuilder
 from tools.monitoring.logger                  import Logger
 
@@ -142,8 +144,6 @@ class InferencePipeline:
             Metrics.write_json(global_metrics, meta.metrics_path)
             return
 
-        from pipelines.backbone.inference.reduced import ReducedTomogramSynthesizer
-
         synth     = ReducedTomogramSynthesizer(run, meta, cfg, logger)
         synthesis = synth.run(result.gt_curves)
 
@@ -169,8 +169,6 @@ class InferencePipeline:
             global_metrics["data_consistency_status"] = "skipped: compute_data_consistency disabled"
             Metrics.write_json(global_metrics, meta.metrics_path)
             return
-
-        from pipelines.backbone.inference.data_consistency import DataConsistencyEvaluator
 
         evaluator   = DataConsistencyEvaluator(run, cfg, logger)
         consistency = evaluator.run(result.pred_curves, result.gt_curves, x_axis_np)

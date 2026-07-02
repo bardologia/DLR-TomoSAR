@@ -25,7 +25,6 @@ class ParameterExtractor:
         init_workers         : int | None          = None,
         peak_initialiser     : object | None        = None,
     ) -> None:
-
         from pipelines.processing.param_extraction.sigma import SigmaFittingExtractor
 
         self.parameter_extraction = parameter_extraction

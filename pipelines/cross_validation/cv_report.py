@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import math
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
+from pathlib import Path
 
 import numpy as np
 
@@ -13,6 +12,7 @@ from tools                            import FileIO, MetricSectionGrouper
 from tools.metrics.scoring            import FiniteScalar
 from tools.monitoring.logger          import Logger
 from tools.reporting.markdown         import MarkdownTable, ScalarFormatter
+from tools.runtime.run_tag            import RunTag
 
 
 class CrossValidationReport:

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from pipelines.profile_autoencoder.dataset.datasets import ProfileDataset
 from pipelines.profile_autoencoder.dataset.normalization import (
     ProfileNormalizer,
     ProfileStats,
@@ -57,8 +58,6 @@ def test_normalize_dtype_is_float32_numpy():
 @pytest.mark.real_data
 @pytest.mark.slow
 def test_fit_real_profiles_finite_and_roundtrip(parameters, tmp_path):
-    from pipelines.profile_autoencoder.dataset.datasets import ProfileDataset
-
     params = [np.ascontiguousarray(np.asarray(parameters[:, :40, :40]))]
     x_axis = np.linspace(0.0, 1.0, 150, dtype=np.float32)
     logger = Logger(log_dir=str(tmp_path / "logs"), name="prof_norm", level="ERROR")

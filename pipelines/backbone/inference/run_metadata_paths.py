@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
+from pathlib import Path
 
 from configuration.inference import InferenceConfig
 from tools.data.io           import FileIO
+from tools.runtime.run_tag   import RunTag
 
 
 class InferenceMetadata:

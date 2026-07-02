@@ -5,7 +5,8 @@ from pathlib import Path
 
 import optuna
 
-from tools.data.io import FileIO
+from pipelines.tuning.trial import TrialJepaPipeline, TrialPipeline
+from tools.data.io          import FileIO
 
 
 class ParamSampler:
@@ -101,8 +102,6 @@ class Tuner:
             setattr(model_config, k, v)
 
     def _objective(self, trial: optuna.Trial) -> float:
-        from pipelines.tuning.trial import TrialPipeline
-
         model_config = self.model_config_cls()
         self._apply_params(trial, model_config)
 
@@ -225,8 +224,6 @@ class JepaTuner:
         self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
 
     def _objective(self, trial: optuna.Trial) -> float:
-        from pipelines.tuning.trial import TrialJepaPipeline
-
         sampled = self.sampler.sample(trial, self.space)
 
         entry                 = copy.deepcopy(self.entry_template)

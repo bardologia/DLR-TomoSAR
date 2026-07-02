@@ -9,13 +9,14 @@ from pathlib     import Path
 import torch
 
 from configuration.training import BackboneEntryConfig
-from models                 import BACKBONE_IMAGE_SIZE_MODELS
+from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.backbone.training.trainer     import Trainer
+from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.seed_sweep      import SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
@@ -27,8 +28,6 @@ from tools.runtime.config_cli import ConfigCli
 
 class SingleTrainRunner(BaseSingleTrainRunner):
     def __init__(self, config) -> None:
-        from pipelines.shared.config.config_factory import ConfigFactory
-
         super().__init__(config)
         self.factory = ConfigFactory(config)
 
@@ -37,8 +36,6 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         return self.config.backbone_name
 
     def _build_pretrain_trainer(self, logger):
-        from models import get_backbone
-
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
 
         trainer_config            = self.factory.training_trainer_config(logdir=work_dir)

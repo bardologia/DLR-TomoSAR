@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-
 from dataclasses import replace
 from typing      import Callable
+
+from tools.runtime.run_tag import RunTag
 
 
 class SeedSet:

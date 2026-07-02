@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 
 import matplotlib
@@ -17,9 +18,10 @@ from pipelines.processing.param_extraction.metrics import (
     KSelectionDiagnostics,
     ContrastEstimator,
 )
-from pipelines.processing.param_extraction.pipeline import ParameterExtractor
-from pipelines.processing.param_extraction.queue    import ExtractionPlanResolver
-from pipelines.processing.param_extraction.plots    import FittingResultPlotter
+from pipelines.processing.param_extraction.pipeline  import ParameterExtractor
+from pipelines.processing.param_extraction.inference import ParamRunInferencePipeline
+from pipelines.processing.param_extraction.queue     import ExtractionPlanResolver
+from pipelines.processing.param_extraction.plots     import FittingResultPlotter
 from tools.data.gaussians     import GaussianMixture
 from tools.data.preprocessing import ProfilePreprocessor
 from tools.monitoring.logger  import Logger
@@ -382,10 +384,6 @@ def test_fitting_result_plotter_smoke(tomogram_full, parameters, fit_diagnostics
 
 @pytest.mark.real_data
 def test_param_run_inference_pipeline_smoke(tomogram_full, parameters, fit_diagnostics, logger, tmp_path):
-    import json
-
-    from pipelines.processing.param_extraction.inference import ParamRunInferencePipeline
-
     a0, a1, r0, r1 = 0, 48, 0, 48
 
     run_dir = tmp_path / "params_run"

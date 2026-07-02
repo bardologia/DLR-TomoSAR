@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from configuration.inference.general  import InferencePaths, InferenceConfig
-from configuration.inference.backbone import InferenceEntryConfig
+from configuration.inference.general             import InferencePaths, InferenceConfig
+from configuration.inference.backbone            import InferenceEntryConfig
+from configuration.inference.image_autoencoder   import ImageAeInferenceConfig
+from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
 
 from configuration.tuning.general import TuningConfig, TuningEntryConfig
 from configuration.tuning.jepa    import JepaTuneConfig
@@ -24,7 +26,12 @@ from configuration.benchmark.general          import (
 )
 from configuration.benchmark.jepa             import JepaBenchConfig
 from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
-from configuration.training.general.run        import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
+from configuration.training.profile_autoencoder import ProfileAeLossConfig
+
+from configuration.dataset               import AugmentationConfig, InputConfig
+from configuration.normalization.general import NormalizationConfig
+from configuration.sar.geometry_config   import GeometryConfig
 
 
 DEFAULT_CONFIGS = [
@@ -83,9 +90,6 @@ def test_inference_entry_config_holds_inference():
 
 
 def test_inference_entry_config_holds_every_family():
-    from configuration.inference.image_autoencoder   import ImageAeInferenceConfig
-    from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
-
     cfg = InferenceEntryConfig()
 
     assert isinstance(cfg.logs_dirs, list) and len(cfg.logs_dirs) == 4
@@ -111,8 +115,6 @@ def test_tuning_entry_config_subconfigs():
 
 
 def test_tuning_entry_ae_loss_default_factory():
-    from configuration.training.profile_autoencoder import ProfileAeLossConfig
-
     cfg = TuningEntryConfig()
     assert isinstance(cfg.ae_loss, ProfileAeLossConfig)
 
@@ -187,10 +189,6 @@ def test_benchmark_config_subconfigs():
 
 
 def test_benchmark_config_exposes_training_recipe_sections():
-    from configuration.dataset               import AugmentationConfig, InputConfig
-    from configuration.normalization.general import NormalizationConfig
-    from configuration.sar.geometry_config   import GeometryConfig
-
     cfg = BenchmarkConfig()
     assert isinstance(cfg.input, InputConfig)
     assert isinstance(cfg.geometry, GeometryConfig)

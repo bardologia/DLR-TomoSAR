@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import pandas             as pd
+
 
 class SweepReport:
     def __init__(self, results: list[dict], wait_threshold: float = 0.05) -> None:
-        import pandas as pd
-
         self.wait_threshold = float(wait_threshold)
         self.frame          = pd.DataFrame(results)
         self.ok_frame       = self.frame[self.frame["status"] == "ok"].copy() if "status" in self.frame else self.frame.copy()
@@ -48,14 +49,10 @@ class SweepReport:
         }
 
     def _new_axes(self):
-        import matplotlib.pyplot as plt
-
         figure, axes = plt.subplots(figsize=(7.0, 4.5))
         return figure, axes
 
     def _save(self, figure, axes, fig_dir: Path, name: str) -> Path:
-        import matplotlib.pyplot as plt
-
         fig_dir = Path(fig_dir)
         fig_dir.mkdir(parents=True, exist_ok=True)
 

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import sys
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
+from pathlib import Path
 
 from configuration.cross_validation import CrossValidationConfig
 from pipelines.cross_validation.cv_report              import CrossValidationReport
@@ -11,6 +10,7 @@ from pipelines.cross_validation.workers                import FoldCollector
 from pipelines.shared.training.seed_sweep                       import SeedSet
 from tools                                             import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.monitoring.logger                           import Logger
+from tools.runtime.run_tag                             import RunTag
 
 
 class FoldTrainingStage(QueuedTrainingStage):

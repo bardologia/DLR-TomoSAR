@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from configuration.benchmark.jepa       import JepaBenchConfig
-from configuration.dataset              import AugmentationConfig, InputConfig
-from configuration.normalization.general import NormalizationConfig
-from configuration.sar.geometry_config  import GeometryConfig
-from configuration.training.backbone     import default_curriculum
-from configuration.training.general.loss import LossCurriculumConfig
-from configuration.training.general.run import RunPathsConfig, TrainingQueueConfig
+from configuration.benchmark.jepa               import JepaBenchConfig
+from configuration.dataset                      import AugmentationConfig, InputConfig
+from configuration.normalization.general        import NormalizationConfig
+from configuration.sar.geometry_config          import GeometryConfig
+from configuration.training.backbone            import default_curriculum
+from configuration.training.general.loss        import LossCurriculumConfig
+from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
+from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
 
 @dataclass
@@ -62,8 +63,6 @@ class ComparisonReportConfig:
 
 
 def _default_ae_loss():
-    from configuration.training.profile_autoencoder import ProfileAeLossConfig
-
     return ProfileAeLossConfig()
 
 

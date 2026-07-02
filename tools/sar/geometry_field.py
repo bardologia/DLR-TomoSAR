@@ -7,7 +7,7 @@ from typing      import ClassVar
 
 import numpy as np
 
-from tools.baselines.containers import TrackProfiles
+from tools.baselines.containers import SecondarySelection, TrackProfiles
 from tools.sar.track_parameters import TrackParameters
 
 
@@ -61,8 +61,6 @@ class GeometryField:
         return scale * self.perpendicular_baseline() / denominator
 
     def subset(self, secondary_labels) -> "GeometryField":
-        from tools.baselines.containers import SecondarySelection
-
         if secondary_labels is None:
             return self
 

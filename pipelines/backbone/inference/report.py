@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-from pathlib  import Path
-from typing   import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing  import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from tools.reporting.reporting import ReportAssets
 from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
+from tools.runtime.run_tag     import RunTag
 
 
 class ReportPayloadBuilder:

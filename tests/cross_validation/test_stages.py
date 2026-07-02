@@ -11,6 +11,7 @@ from pipelines.cross_validation.stages import (
     FoldInferenceStage,
     FoldTrainingStage,
 )
+import pipelines.cross_validation.stages as stages_module
 from tools.monitoring.logger import Logger
 
 
@@ -206,7 +207,6 @@ def test_report_stage_invokes_collector_and_report(tmp_path, monkeypatch):
             seen["wrote"] = True
             return [seen["out_dir"] / "cv_aggregate_report.md"]
 
-    import pipelines.cross_validation.stages as stages_module
     monkeypatch.setattr(stages_module, "FoldCollector",        FakeCollector, raising=True)
     monkeypatch.setattr(stages_module, "CrossValidationReport", FakeReport,    raising=True)
 
@@ -243,7 +243,6 @@ def test_report_stage_model_name_for_profile_autoencoder(tmp_path, monkeypatch):
         def write_all(self):
             return []
 
-    import pipelines.cross_validation.stages as stages_module
     monkeypatch.setattr(stages_module, "FoldCollector",        FakeCollector, raising=True)
     monkeypatch.setattr(stages_module, "CrossValidationReport", FakeReport,    raising=True)
 

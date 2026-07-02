@@ -6,8 +6,6 @@ from datetime   import datetime
 from pathlib    import Path
 from typing     import Any, Mapping, Optional, Sequence
 
-from tools.runtime.run_tag import RunTag
-
 from rich.console import Console
 from rich.live    import Live
 from rich.logging import RichHandler
@@ -28,6 +26,7 @@ from rich.text  import Text
 from rich.theme import Theme
 
 from tools.reporting.markdown import MarkdownDoc, MarkdownTable
+from tools.runtime.run_tag import RunTag
 
 
 class LiveMonitor:

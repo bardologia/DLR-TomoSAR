@@ -7,6 +7,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy             as np
 import pytest
+from PIL import Image
 
 from tools.reporting.plotting import PlotBase
 
@@ -270,8 +271,6 @@ def test_imshow_figure_saves_to_path(plotter, small_field, tmp_path):
 
 @pytest.mark.slow
 def test_imshow_figure_saved_dpi(plotter, small_field, tmp_path):
-    from PIL import Image
-
     out = plotter._imshow_figure(
         small_field,
         x_label = "x",

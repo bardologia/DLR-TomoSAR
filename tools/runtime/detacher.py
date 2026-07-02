@@ -4,8 +4,9 @@ import os
 import signal
 import subprocess
 import sys
+from pathlib import Path
+
 from tools.runtime.run_tag import RunTag
-from pathlib  import Path
 
 
 class Detacher:

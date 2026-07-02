@@ -4,11 +4,11 @@ from pathlib import Path
 from typing  import List, Tuple
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy             as np
+
+matplotlib.use("Agg")
 
 
 class PlotBase:

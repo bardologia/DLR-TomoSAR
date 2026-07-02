@@ -6,7 +6,7 @@ import numpy as np
 
 from configuration.dataset  import DatasetConfig
 from configuration.training import BackboneTrainerConfig
-from models                 import BACKBONE_IMAGE_SIZE_MODELS
+from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline  import DatasetPipeline
 from pipelines.backbone.training.trainer  import Trainer
 from pipelines.shared.config.run_metadata import TrainingRunMetadata
@@ -67,8 +67,6 @@ class TrainingPipeline:
         return any(getattr(cfg, flag, False) for cfg in loss_cfgs for flag in flags)
 
     def _build_model(self, in_channels: int, out_channels: int):
-        from models import get_backbone
-
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size

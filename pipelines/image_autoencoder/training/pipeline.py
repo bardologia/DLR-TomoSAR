@@ -5,11 +5,13 @@ from pathlib import Path
 from configuration.training import ImageAeTrainerConfig
 from models.image_autoencoder                        import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
 from pipelines.autoencoder_common.training           import AutoencoderTrainingPipeline
+from pipelines.backbone.dataset.pipeline             import DatasetPipeline
 from pipelines.shared.dataset.dataset_prep                   import BackboneDatasetPreparation
 from pipelines.shared.model.model_builder                     import ModelBuilder
 from pipelines.shared.training.training_runner                import EntryConfigTrainRunner
 from pipelines.image_autoencoder.training.trainer    import Trainer
 from pipelines.shared.config.config_persistence             import ImageAutoencoderConfigIO
+from tools.data.gaussians                            import GaussianAxis
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):
@@ -57,9 +59,6 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         return self.config.ae_model_name
 
     def _build_pretrain_trainer(self, logger):
-        from pipelines.backbone.dataset.pipeline import DatasetPipeline
-        from tools.data.gaussians                import GaussianAxis
-
         work_dir = Path(self.config.logdir) / "pretrain" / "context"
         pipeline = TrainingPipeline(self.config)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -80,8 +81,6 @@ def test_save_json_indent_applied(tmp_path):
 
 
 def test_save_json_serializes_nonjson_via_default(tmp_path):
-    from pathlib import Path
-
     path = tmp_path / "p.json"
     FileIO.save_json({"path": Path("/x/y")}, path)
 

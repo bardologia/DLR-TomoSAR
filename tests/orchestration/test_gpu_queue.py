@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import signal
 import sys
 from pathlib import Path
 
@@ -189,8 +190,6 @@ def test_mixed_success_and_failure(tmp_path, logger):
 
 
 def test_signal_handlers_restored_after_run(tmp_path):
-    import signal
-
     before_term = signal.getsignal(signal.SIGTERM)
     before_int  = signal.getsignal(signal.SIGINT)
 

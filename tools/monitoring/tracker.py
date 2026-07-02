@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from typing     import Any, Mapping, Optional
 
 import numpy as np
+import torch
 
 
 class Tracker:
@@ -71,8 +72,6 @@ class Tracker:
             pass
 
     def log_memory(self, step=None, device=None) -> None:
-        import torch
-
         if self.writer is None or not torch.cuda.is_available():
             return
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 
 import matplotlib
 matplotlib.use("Agg")
@@ -11,6 +12,7 @@ import pytest
 from configuration.sar.processing_config import ProcessingConfig, PathConfig
 from pipelines.processing.generation.plots     import StackPlotter
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
+from pipelines.processing.generation.inference import StackInferencePipeline
 from tools.data.regions import CropRegion
 from tools.monitoring.logger import Logger
 
@@ -20,7 +22,6 @@ CLIP = 1.25
 
 @pytest.fixture(scope="module")
 def logger():
-    import tempfile
     return Logger(log_dir=tempfile.mkdtemp(), name="test_gen", level="ERROR")
 
 
@@ -176,8 +177,6 @@ def test_stackplotter_smoke(tmp_path, primary, secondaries, interferograms, dem_
 
 @pytest.mark.real_data
 def test_stack_inference_pipeline_smoke(tmp_path, primary, secondaries, interferograms, dem_full, pass_labels, logger):
-    from pipelines.processing.generation.inference import StackInferencePipeline
-
     az, rg = slice(0, 24), slice(0, 24)
 
     run_dir  = tmp_path / "trial"

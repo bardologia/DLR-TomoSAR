@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from configuration.cross_validation import CrossValidationConfig, FoldConfig
+import pipelines.backbone.inference.pipeline as pipeline_module
+import pipelines.backbone.training.pipeline  as backbone_pipeline_module
 from pipelines.cross_validation.folds   import FoldNaming
 from pipelines.cross_validation.workers import (
     CrossValidationWorker,
@@ -102,8 +105,6 @@ def test_collector_split_view_empty_when_metrics_absent(tmp_path):
 
 
 def test_collector_aggregates_seeds_per_fold(tmp_path):
-    import numpy as np
-
     names     = ["fold_0_seed1", "fold_0_seed2", "fold_1_seed1", "fold_1_seed2"]
     inference = {
         "fold_0_seed1": {"test": {"curve_rmse_gt": 2.0}},
@@ -225,7 +226,6 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
         def run(self):
             captured["ran"] = True
 
-    import pipelines.backbone.inference.pipeline as pipeline_module
     monkeypatch.setattr(pipeline_module, "InferencePipeline", FakePipeline, raising=True)
 
     worker.run(1, "test")
@@ -239,8 +239,6 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
 
 @pytest.mark.real_data
 def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypatch):
-    import pipelines.backbone.training.pipeline as backbone_pipeline_module
-
     config = worker_config(test_data_dir, "backbone")
     worker = FoldTrainingWorker(config, run_tag="rt")
 

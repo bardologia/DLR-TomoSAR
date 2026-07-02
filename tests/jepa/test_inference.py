@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import types
 
 import numpy as np
@@ -17,6 +18,7 @@ from pipelines.jepa.training.trainer         import JepaModule
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
 from tests.jepa.conftest import EMBEDDING_DIM, PROFILE_LENGTH, SPATIAL, make_autoencoder
+from tools.data.gaussians import GaussianReconstructor
 
 
 def build_inference_module():
@@ -130,7 +132,6 @@ class FakeProgress:
 
 class FakeLogger:
     def __init__(self):
-        import contextlib
         self._cm = contextlib.contextmanager(self._track)
 
     def _track(self, transient=False):
@@ -221,7 +222,6 @@ def test_jepa_curve_predictor_zero_error_on_identical_output(tmp_path):
     captured = {}
 
     def model_fn(images):
-        from tools.data.gaussians import GaussianReconstructor
         gt_params = run["gt"][:, : n_gaussians * 3].cpu().numpy().astype(np.float32)
         batch     = gt_params.shape[0]
         gt_gauss  = gt_params.reshape(batch, n_gaussians, 3, spatial, spatial)

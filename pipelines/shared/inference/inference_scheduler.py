@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import sys
-from tools.runtime.run_tag import RunTag
 from pathlib  import Path
 
 from configuration.inference       import InferenceEntryConfig
 from pipelines.shared.inference.run_classifier import RunClassifier
+from tools.monitoring.logger       import Logger
 from tools.orchestration.gpu_queue import GpuJob, GpuJobResult, GpuQueue
 from tools.runtime.config_cli      import ConfigCli
-from tools.monitoring.logger       import Logger
+from tools.runtime.run_tag         import RunTag
 
 
 class InferenceScheduler:

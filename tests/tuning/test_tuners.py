@@ -4,6 +4,8 @@ import json
 
 import optuna
 
+import pipelines.tuning.trial as trial_mod
+
 from pipelines.tuning.tuners               import ParamSampler, BestConfigWriter, Tuner
 from configuration.architectures.backbone  import UNetConfig
 
@@ -195,8 +197,6 @@ def test_tuner_apply_params_sets_attrs_from_sampled(fake_logger, tune_cfg, tmp_p
 
 
 def test_tuner_run_optimizes_with_injected_objective(fake_logger, tune_cfg, tmp_path, monkeypatch):
-    import pipelines.tuning.trial as trial_mod
-
     optimum_dropout = 0.0
 
     class FakePipeline:
@@ -228,8 +228,6 @@ def test_tuner_run_optimizes_with_injected_objective(fake_logger, tune_cfg, tmp_
 
 
 def test_tuner_objective_materializes_trial_config(fake_logger, tune_cfg, tmp_path, monkeypatch):
-    import pipelines.tuning.trial as trial_mod
-
     captured = {}
 
     class CapturePipeline:

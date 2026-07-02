@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses        import dataclass, field
 from pathlib            import Path
 
-import numpy as np
+import matplotlib.pyplot as plt
+import numpy             as np
 
 from pipelines.comparison.metric_table           import MetricTableRenderer
 from pipelines.comparison.spatial_stats          import SpatialDispersion
@@ -171,8 +172,6 @@ class WindowComparisonPlots(PlotBase):
         self.out_dir = out_dir
 
     def _bar(self, labels: list[str], values: list[float], y_label: str, title: str, path: Path):
-        import matplotlib.pyplot as plt
-
         self._apply_style()
 
         fig, ax = plt.subplots(figsize=(6.0, 4.0))

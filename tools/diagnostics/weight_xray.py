@@ -6,6 +6,8 @@ from pathlib import Path
 import torch
 
 from configuration.diagnostics import WeightXrayConfig, WeightXrayEntryConfig
+from tools.diagnostics.weight_xray_plots import WeightXrayPlots
+from tools.diagnostics.weight_xray_report import WeightXrayReport
 from tools.runtime.run_selector                    import RunSelector
 
 from .weight_xray_analysis import IssueDetector, LayerReport, WeightAnalyzer, XraySummarizer
@@ -75,13 +77,9 @@ class WeightXray:
         if not self.config.make_plots:
             return []
 
-        from tools.diagnostics.weight_xray_plots import WeightXrayPlots
-
         return WeightXrayPlots(self.config).render(reports, state_dict)
 
     def _report(self, reports: list[LayerReport], summary: dict, plot_paths: list[Path]) -> dict:
-        from tools.diagnostics.weight_xray_report import WeightXrayReport
-
         return WeightXrayReport(self.config).write(self.logger, reports, summary, plot_paths)
 
     def run(self) -> dict:

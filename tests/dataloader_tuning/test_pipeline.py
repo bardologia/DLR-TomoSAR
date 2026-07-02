@@ -9,7 +9,7 @@ import torch
 from pipelines.dataloader_tuning.pipeline import DataLoaderTuningPipeline
 
 from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
-from tools.benchmarking import LoaderSpec
+from tools.benchmarking import LoaderSpec, SweepReport
 
 
 def _config(tmp_path, **kwargs):
@@ -114,8 +114,6 @@ def test_final_config_uses_recommendation_defaults(tmp_path):
 def test_final_config_overrides_from_refine_report(tmp_path):
     config   = _config(tmp_path)
     pipeline = DataLoaderTuningPipeline(config)
-
-    from tools.benchmarking import SweepReport
 
     refine_records = [
         _ok_record(512, 4, 8, False, 5000.0),

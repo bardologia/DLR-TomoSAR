@@ -5,6 +5,7 @@ import types
 
 import pytest
 
+import tools.monitoring.resource_monitor as rm
 from tools.monitoring.resource_monitor import ResourceMonitor
 
 
@@ -321,8 +322,6 @@ def test_run_survives_sample_exception(monkeypatch):
 
 
 def test_nvml_unavailable_path_has_no_gpu_handles(monkeypatch):
-    import tools.monitoring.resource_monitor as rm
-
     def fail_init():
         raise RuntimeError("no nvml")
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from configuration.sar.geometry_config import GeometryConfig
+from configuration.training import BackboneEntryConfig
 from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
@@ -13,6 +15,7 @@ from pipelines.backbone.training.experiments import (
     SlotPresenceTrialPlanner,
     WarmupTrialPlanner,
 )
+from tools.runtime.config_cli import ConfigCli
 
 
 CANDIDATES = ["PS04", "PS06", "PS08", "PS10", "PS12", "PS14"]
@@ -368,8 +371,6 @@ def test_ablation_catalog_covers_normalization_and_clamp():
 
 @pytest.mark.real_data
 def test_input_from_dataset_uses_full_stack(test_data_dir):
-    from configuration.sar.geometry_config import GeometryConfig
-
     planner = InputTrialPlanner.from_dataset("resunet", _default_input_trials(), GeometryConfig(), test_data_dir)
 
     plans = planner.plan()
@@ -383,8 +384,6 @@ def test_input_from_dataset_uses_full_stack(test_data_dir):
 
 @pytest.mark.real_data
 def test_secondary_from_dataset_loads_candidates(test_data_dir):
-    from configuration.sar.geometry_config import GeometryConfig
-
     trials  = SecondaryTrialsConfig(strategy="consecutive", n_secondaries=2, block_step=1)
     planner = SecondaryTrialPlanner.from_dataset("resunet", trials, GeometryConfig(), test_data_dir)
 
@@ -395,9 +394,6 @@ def test_secondary_from_dataset_loads_candidates(test_data_dir):
 
 
 def test_ablation_catalog_paths_are_entry_config_leaves():
-    from configuration.training  import BackboneEntryConfig
-    from tools.runtime.config_cli import ConfigCli
-
     leaves  = {path for path, _ in ConfigCli._leaves(BackboneEntryConfig())}
     unknown = [
         (feature["label"], side, path)
@@ -411,9 +407,6 @@ def test_ablation_catalog_paths_are_entry_config_leaves():
 
 
 def test_ablation_default_plan_round_trips_through_config_cli():
-    from configuration.training  import BackboneEntryConfig
-    from tools.runtime.config_cli import ConfigCli
-
     config  = BackboneEntryConfig()
     planner = AblationTrialPlanner(config.backbone_name, config.ablation_features, config.ablation_include_full)
 

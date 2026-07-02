@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-import numpy as np
+import matplotlib.pyplot as plt
+import numpy             as np
 
 from pipelines.comparison.metric_table   import MetricTableRenderer
 from pipelines.comparison.spatial_stats   import SpatialDispersion
@@ -220,8 +221,6 @@ class ParamComparisonPlots(PlotBase):
         return [self.PALETTE[index[trial.k_max] % len(self.PALETTE)] for trial in trials]
 
     def _bar(self, trials: list[ParamTrial], key: str, y_label: str, title: str, path: Path):
-        import matplotlib.pyplot as plt
-
         self._apply_style()
 
         labels = [trial.label for trial in trials]

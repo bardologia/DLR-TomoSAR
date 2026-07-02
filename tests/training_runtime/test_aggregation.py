@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import torch
-
 import pytest
+import torch
 
 from tools.training.aggregation import MetricAggregator
 

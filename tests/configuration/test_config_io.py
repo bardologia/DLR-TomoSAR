@@ -14,6 +14,8 @@ from models.backbone            import BACKBONE_CONFIG_REGISTRY
 from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
 from models.image_autoencoder   import IMAGE_AE_CONFIG_REGISTRY
 
+from tools.data.io import FileIO
+
 
 BACKBONE_CASES = [pytest.param(name, id=name) for name in BACKBONE_CONFIG_REGISTRY]
 PROFILE_CASES  = [pytest.param(name, id=name) for name in PROFILE_AE_CONFIG_REGISTRY]
@@ -80,8 +82,6 @@ def test_backbone_config_io_normalizes_name(tmp_path):
 def test_backbone_config_io_excludes_shape_logger_types(tmp_path):
     config  = BACKBONE_CONFIG_REGISTRY["unet"]()
     BackboneModelConfigIO.save(config, "unet", tmp_path)
-
-    from tools.data.io import FileIO
 
     payload = FileIO.load_json(tmp_path / BackboneModelConfigIO.FILENAME)
     assert "shape_logger_types" not in payload["config"]

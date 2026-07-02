@@ -10,9 +10,12 @@ from torch.utils.data import DataLoader
 
 from configuration.architectures.profile_autoencoder import MlpAutoencoderConfig
 from configuration.dataset import ProfileDatasetConfig, SplitRegions
+from configuration.training import ProfileAeEntryConfig
 from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig, ProfileAeTrainerConfig
+from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
 from pipelines.profile_autoencoder.training import pipeline as profile_pipeline
+from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 from pipelines.shared.config.run_metadata import TrainingRunMetadata
 from tools.data.regions import CropRegion
 
@@ -118,10 +121,6 @@ def test_saved_checkpoint_is_loadable(tmp_path):
 
 
 def test_autoencoder_config_follows_ae_model_name():
-    from configuration.training import ProfileAeEntryConfig
-    from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
-    from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
-
     entry = ProfileAeEntryConfig(ae_model_name="gru_ae", model_overrides={"embedding_dim": 48})
     cfg   = TrainingPipeline._autoencoder_config(TrainingPipeline.__new__(TrainingPipeline), entry)
 
