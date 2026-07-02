@@ -207,6 +207,9 @@ class LaunchLayout:
             {"title": "Reduced baseline", "fields": [
                 {"gate": "compute_reduced", "fields": ["reduced_effort", "reduced_cache_subdir", "reduced_env_name", "reduced_pyrat_dir"]},
             ]},
+            {"title": "Data consistency", "fields": [
+                {"gate": "compute_data_consistency", "fields": ["height_axis_convention", "physics_floor", "phase_multilook"]},
+            ]},
             {"title": "Profile picks", "fields": ["n_best_profiles", "n_worst_profiles", "n_random_profiles", {"path": "profile_seed", "widget": NUM_SEED}]},
             {"title": "Slices", "fields": ["n_range_slices", "n_azimuth_slices", "n_elevation_slices"]},
             {"title": "GIFs", "fields": ["gif_axes", "gif_fps", "gif_max_frames", {"path": "gif_dpi", "widget": NUM_DPI}]},

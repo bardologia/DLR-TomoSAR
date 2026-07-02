@@ -8,6 +8,7 @@ from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
 from gpu_watchdog            import GpuWatchdog
+from launch_layout           import LaunchLayout
 from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
 from physics_loss_library   import PhysicsLossLibrary
@@ -51,6 +52,7 @@ class WebUIServer:
 
         self.resolver    = ScriptConfigResolver(self.paths)
         self.catalog     = ScriptCatalog(self.paths, self.resolver)
+        self.layout      = LaunchLayout()
         self.configs     = ConfigRegistry(self.paths)
         self.equations   = EquationLibrary()
         self.physics_loss = PhysicsLossLibrary()
@@ -76,6 +78,7 @@ class WebUIServer:
             logger      = self.logger,
             catalog     = self.catalog,
             resolver    = self.resolver,
+            layout      = self.layout,
             configs     = self.configs,
             equations   = self.equations,
             physics_loss = self.physics_loss,
