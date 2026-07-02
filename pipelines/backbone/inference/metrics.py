@@ -12,6 +12,7 @@ from tqdm            import tqdm
 
 from tools.data.io               import FileIO
 from tools.data.preprocessing    import ProfileNormalizer
+from tools.loss.param_loss       import ParamMatcher
 from tools.metrics.gaussian_matching import GaussianMatcher
 from tools.metrics.slot_organization import SlotOrganization
 from tools.metrics.scoring       import R2, RelativeImprovement
@@ -280,9 +281,9 @@ class Metrics:
         pred_count = np.zeros((H, W), dtype=np.int32)
 
         for k in range(n_K):
-            gt_active      = pg[3 * k]      >= 1e-3
-            pred_active    = pp[3 * k]      >= 1e-3
-            aligned_active = aligned[3 * k] >= 1e-3
+            gt_active      = pg[3 * k]      > ParamMatcher.ACTIVE_AMP_THR
+            pred_active    = pp[3 * k]      > ParamMatcher.ACTIVE_AMP_THR
+            aligned_active = aligned[3 * k] > ParamMatcher.ACTIVE_AMP_THR
 
             out[f"slot_{k}_active_gt_frac"]   = float(gt_active.mean())
             out[f"slot_{k}_active_pred_frac"] = float(aligned_active.mean())
@@ -328,8 +329,8 @@ class Metrics:
         mu_gt    = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
         sig_gt   = np.stack([pg[3 * k + 2] for k in range(n_K)], axis=0).reshape(n_K, -1)
 
-        act_pred = amp_pred >= 1e-3
-        act_gt   = amp_gt   >= 1e-3
+        act_pred = amp_pred > ParamMatcher.ACTIVE_AMP_THR
+        act_gt   = amp_gt   > ParamMatcher.ACTIVE_AMP_THR
         gt_count = act_gt.sum(axis=0).astype(np.int64)
 
         n_buckets        = n_K + 1

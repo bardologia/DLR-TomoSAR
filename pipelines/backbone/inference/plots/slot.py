@@ -11,6 +11,7 @@ import numpy                as np
 from matplotlib.patches     import Patch
 
 from pipelines.backbone.inference.plots.base import PlotTools
+from tools.loss.param_loss                    import ParamMatcher
 
 
 class SlotPlotter(PlotTools):
@@ -22,7 +23,7 @@ class SlotPlotter(PlotTools):
         out_dir      : Path,
         az_offset    : int,
         rg_offset    : int,
-        amp_threshold: float = 1e-3,
+        amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
         gt_count   = np.zeros(params_gt  .shape[-2:], dtype=np.int32)

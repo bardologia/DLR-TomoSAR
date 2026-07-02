@@ -10,6 +10,7 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 from pipelines.backbone.inference.plots.base import PlotTools
+from tools.loss.param_loss                    import ParamMatcher
 from tools.metrics.slot_organization          import SlotOrganization
 
 
@@ -19,7 +20,7 @@ class SlotOrganizationPlotter(PlotTools):
         params_pred  : np.ndarray,
         n_gaussians  : int,
         out_dir      : Path,
-        amp_threshold: float = 1e-3,
+        amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
         usage   = SlotOrganization.usage_fractions(params_pred, n_gaussians, amp_threshold)
@@ -49,7 +50,7 @@ class SlotOrganizationPlotter(PlotTools):
         n_gaussians  : int,
         out_dir      : Path,
         bins         : int   = 80,
-        amp_threshold: float = 1e-3,
+        amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
         amp_all = np.stack([params_pred[3 * k] for k in range(n_gaussians)], axis=0).reshape(n_gaussians, -1)
@@ -108,7 +109,7 @@ class SlotOrganizationPlotter(PlotTools):
         params_pred  : np.ndarray,
         n_gaussians  : int,
         out_dir      : Path,
-        amp_threshold: float = 1e-3,
+        amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
         counts = SlotOrganization.mu_rank_matrix(params_pred, n_gaussians, amp_threshold)
@@ -132,7 +133,7 @@ class SlotOrganizationPlotter(PlotTools):
         params_gt    : np.ndarray,
         n_gaussians  : int,
         out_dir      : Path,
-        amp_threshold: float = 1e-3,
+        amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
         counts = SlotOrganization.assignment_matrix(params_pred, params_gt, n_gaussians, amp_threshold)

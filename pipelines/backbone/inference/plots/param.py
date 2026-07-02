@@ -10,6 +10,7 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 from pipelines.backbone.inference.plots.base import PlotTools
+from tools.loss.param_loss                    import ParamMatcher
 from tools.metrics.gaussian_matching          import GaussianMatcher
 
 
@@ -31,7 +32,7 @@ class ParamPlotter(PlotTools):
             amp_ch = 3 * k
             if matched and amp_ch < params_gt.shape[0]:
                 gt_amp_flat = params_gt[amp_ch].reshape(-1)
-                active_mask = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
+                active_mask = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
             else:
                 active_mask = None
 
@@ -149,7 +150,7 @@ class ParamPlotter(PlotTools):
 
         for k in range(n_gaussians):
             gt_amp_flat = params_gt[3 * k].reshape(-1)
-            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat >= 1e-3)
+            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
 
             for j, (fname, lbl) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j
@@ -212,7 +213,7 @@ class ParamPlotter(PlotTools):
         paths   = []
 
         for k in range(n_gaussians):
-            gt_active = params_gt[3 * k] >= 1e-3
+            gt_active = params_gt[3 * k] > ParamMatcher.ACTIVE_AMP_THR
 
             for j, (fname, _) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from tools.loss.param_loss import ParamMatcher
+
 from tools.metrics.gaussian_matching import GaussianMatcher
 
 
 class SlotOrganization:
     @staticmethod
-    def usage_fractions(params_pred: np.ndarray, n_K: int, amp_threshold: float = 1e-3) -> np.ndarray:
+    def usage_fractions(params_pred: np.ndarray, n_K: int, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR) -> np.ndarray:
         amp = np.stack([params_pred[3 * k] for k in range(n_K)], axis=0).reshape(n_K, -1)
         return (amp >= amp_threshold).mean(axis=1).astype(np.float64)
 
@@ -25,7 +27,7 @@ class SlotOrganization:
         return h / float(np.log(p.size))
 
     @staticmethod
-    def mu_rank_matrix(params_pred: np.ndarray, n_K: int, amp_threshold: float = 1e-3) -> np.ndarray:
+    def mu_rank_matrix(params_pred: np.ndarray, n_K: int, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR) -> np.ndarray:
         amp    = np.stack([params_pred[3 * k]     for k in range(n_K)], axis=0).reshape(n_K, -1)
         mu     = np.stack([params_pred[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
         active = amp >= amp_threshold
@@ -46,7 +48,7 @@ class SlotOrganization:
         return counts
 
     @staticmethod
-    def assignment_matrix(params_pred: np.ndarray, params_gt: np.ndarray, n_K: int, amp_threshold: float = 1e-3) -> np.ndarray:
+    def assignment_matrix(params_pred: np.ndarray, params_gt: np.ndarray, n_K: int, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR) -> np.ndarray:
         sel = GaussianMatcher(amp_threshold=amp_threshold).assignment(params_pred, params_gt, n_K)
 
         amp_pred = np.stack([params_pred[3 * k] for k in range(n_K)], axis=0).reshape(n_K, -1)

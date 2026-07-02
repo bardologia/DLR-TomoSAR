@@ -4,9 +4,11 @@ from itertools import permutations
 
 import numpy as np
 
+from tools.loss.param_loss import ParamMatcher
+
 
 class GaussianMatcher:
-    def __init__(self, ppg: int = 3, amp_threshold: float = 1e-3, big: float = 1e7, chunk_size: int = 250_000) -> None:
+    def __init__(self, ppg: int = 3, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR, big: float = 1e7, chunk_size: int = 250_000) -> None:
         self.ppg           = ppg
         self.amp_threshold = amp_threshold
         self.big           = big

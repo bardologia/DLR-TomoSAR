@@ -332,7 +332,7 @@ class Report:
         n_K = self.run_summary["n_gaussians"]
         out = [f"\n### {self._next_subsection()} Slot occupancy (GT vs Pred)\n"]
         out.append(
-            "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude ≥ 1e-3), "
+            "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude > 1e-3), "
             "ground truth versus prediction, over the full stitched test cube. Because Hungarian matching "
             "makes the training loss invariant to predicted slot ordering, the raw predicted slot index is "
             "arbitrary and not comparable to the GT slot index. The per-slot predicted fractions are therefore "
