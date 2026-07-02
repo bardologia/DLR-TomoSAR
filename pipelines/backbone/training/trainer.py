@@ -71,6 +71,9 @@ class Trainer(BaseTrainer):
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
+        if self.curriculum.enabled and self.curriculum.swap_epoch >= self.epochs:
+            raise ValueError(f"curriculum.swap_epoch={self.curriculum.swap_epoch} must be below training.epochs={self.epochs}; the complete loss phase would never run")
+
         self.docs = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
 
         self.curriculum_controller = CurriculumController(
@@ -143,6 +146,10 @@ class Trainer(BaseTrainer):
     def _after_eval(self, val_loss: float, epoch: int) -> None:
         phase = self._curriculum_phase(epoch)
         self.tracker.log_scalar(f"loss_phase/{phase}/val", val_loss, epoch)
+
+        if self.early_stopping.triggered and self.curriculum.enabled and epoch < self.curriculum.swap_epoch:
+            self.logger.warning(f"Early stopping fired at epoch {epoch + 1}, before the curriculum swap at epoch {self.curriculum.swap_epoch + 1}; the complete loss phase never ran.")
+
         self._trial_callback(val_loss, epoch)
 
     def _log_train_epoch_extra(self, avg_loss: float, epoch: int) -> None:
