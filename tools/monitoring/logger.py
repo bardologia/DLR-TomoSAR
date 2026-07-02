@@ -120,13 +120,16 @@ def _make_progress(console: Console, transient: bool = False) -> Progress:
 
 class Logger:
 
-    LOG_LEVELS = {name: getattr(logging, name) for name in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")}
+    LOG_LEVELS      = {name: getattr(logging, name) for name in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")}
+    FILE_RULE_WIDTH = 100
 
     def __init__(self, log_dir: str = "logs", name: str = "experiment", level: str = "INFO", config: Any = None) -> None:
         self.log_dir    = log_dir
         self.name       = name
         self.start_time = datetime.now()
         self.config     = config
+
+        self._section_started: Optional[datetime] = None
 
         if log_dir:
             os.makedirs(self.log_dir, exist_ok=True)
@@ -165,21 +168,58 @@ class Logger:
             self.logger.addHandler(file_handler)
             self._file_handler = file_handler
 
+        self._header(log_level)
+
     def _to_file(self, message: str, level: int = logging.INFO) -> None:
         if self._file_handler is None:
             return
         self._file_handler.handle(self.logger.makeRecord(self.name, level, "", 0, message, None, None))
 
-    def section(self, title: str) -> None:
-        text = str(title).upper()
+    def _file_banner(self, line: str) -> None:
+        bar = "=" * self.FILE_RULE_WIDTH
+        self._to_file(f"\n{bar}\n{line}\n{bar}")
+
+    def _header(self, log_level: int) -> None:
+        started = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
+        level   = logging.getLevelName(log_level)
+
         self.console.print()
-        self.console.print(Rule(Text(text, style="section"), style="cyan"))
-        self._to_file(f">>> {text}")
+        self.console.print(Rule(Text(self.name, style="section"), style="cyan"))
+        self.console.print(f"  [key]Started[/key]  : [value]{started}[/value]")
+        if self._file_handler is not None:
+            self.console.print(f"  [key]Log file[/key] : [value]{self._file_handler.baseFilename}[/value]")
+
+        self._file_banner(f">>> RUN {self.name}  |  started {started}  |  level {level}")
+
+    @staticmethod
+    def _fmt_duration(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+
+        minutes, secs    = divmod(int(seconds), 60)
+        hours,   minutes = divmod(minutes, 60)
+        return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
+
+    def section(self, title: str) -> None:
+        text  = str(title).upper()
+        delta = None if self._section_started is None else self._fmt_duration((datetime.now() - self._section_started).total_seconds())
+
+        self._section_started = datetime.now()
+
+        label = Text(text, style="section")
+        if delta is not None:
+            label.append(f"  (+{delta})", style="dim")
+
+        self.console.print()
+        self.console.print(Rule(label, style="cyan"))
+
+        suffix = "" if delta is None else f"  (+{delta})"
+        self._file_banner(f">>> {text}{suffix}")
 
     def subsection(self, title: str) -> None:
         line = f"  [cyan]>[/cyan] {title}"
         self.console.print(line, style="bold white")
-        self._to_file(f"  > {title}")
+        self._to_file(f"\n  > {title}")
 
     def debug(self, message: str) -> None:    
         self.logger.debug(message)
@@ -228,8 +268,7 @@ class Logger:
         if not data:
             return
 
-        if title:
-            self._to_file(f"  > {title}")
+        self._to_file(f"\n  > {title}" if title else "")
 
         key_width = max(len(str(k)) for k in data)
         for k, v in data.items():
@@ -247,8 +286,7 @@ class Logger:
 
         self.console.print(tbl)
 
-        if title:
-            self._to_file(f"  > {title}")
+        self._to_file(f"\n  > {title}" if title else "")
 
         cells  = [[self._fmt(row.get(column, "")) for column in columns] for row in rows]
         widths = [max(len(str(columns[index])), *(len(row[index]) for row in cells)) if cells else len(str(columns[index])) for index in range(len(columns))]
@@ -260,9 +298,15 @@ class Logger:
     @contextmanager
     def timer(self, label: str):
         start = datetime.now()
-        yield
-        elapsed = (datetime.now() - start).total_seconds()
-        self.info(f"{label} completed in {elapsed:.2f}s")
+        try:
+            yield
+        except BaseException:
+            elapsed = (datetime.now() - start).total_seconds()
+            self.error(f"{label} failed after {elapsed:.2f}s")
+            raise
+        else:
+            elapsed = (datetime.now() - start).total_seconds()
+            self.info(f"{label} completed in {elapsed:.2f}s")
 
     @contextmanager
     def track(self, transient: bool = False):
@@ -279,11 +323,15 @@ class Logger:
             yield monitor
 
     def close(self) -> None:
-        elapsed = datetime.now() - self.start_time
+        elapsed          = datetime.now() - self.start_time
         hours, remainder = divmod(int(elapsed.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
 
+        self.console.print()
+        self.console.print(Rule(Text(f"END {self.name}", style="section"), style="cyan"))
+        self._file_banner(f">>> END {self.name}")
         self.logger.info(f"[End] Duration: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
         for handler in self.logger.handlers[:]:
             handler.close()
             self.logger.removeHandler(handler)
@@ -293,6 +341,8 @@ class Logger:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        if exc_type is not None:
+            self.error(f"Aborted by {exc_type.__name__}: {exc_val}")
         self.close()
         return False
 

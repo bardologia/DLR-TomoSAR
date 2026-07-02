@@ -115,6 +115,45 @@ def test_section_writes_uppercase_marker(tmp_path):
     assert ">>> DATA LOADING" in contents
 
 
+def test_section_writes_banner_rules(tmp_path):
+    logger = Logger(log_dir=str(tmp_path), name="exp_sec_bar")
+    logger.section("data loading")
+    logger.close()
+
+    contents = _read_log(tmp_path, "exp_sec_bar")
+    bar      = "=" * Logger.FILE_RULE_WIDTH
+
+    assert f"{bar}\n>>> DATA LOADING\n{bar}" in contents
+
+
+def test_second_section_includes_elapsed(tmp_path):
+    logger = Logger(log_dir=str(tmp_path), name="exp_sec_dt")
+    logger.section("first")
+    logger.section("second")
+    logger.close()
+
+    contents = _read_log(tmp_path, "exp_sec_dt")
+
+    assert ">>> FIRST\n" in contents
+    assert ">>> SECOND  (+" in contents
+
+
+def test_header_banner_written(tmp_path):
+    logger = Logger(log_dir=str(tmp_path), name="exp_head")
+    logger.close()
+
+    contents = _read_log(tmp_path, "exp_head")
+
+    assert ">>> RUN exp_head" in contents
+    assert ">>> END exp_head" in contents
+
+
+def test_fmt_duration_scales():
+    assert Logger._fmt_duration(12.34)   == "12.3s"
+    assert Logger._fmt_duration(75.0)    == "1m15s"
+    assert Logger._fmt_duration(3725.0)  == "1h02m05s"
+
+
 def test_subsection_writes_marker(tmp_path):
     logger = Logger(log_dir=str(tmp_path), name="exp_sub")
     logger.subsection("step one")
@@ -184,6 +223,19 @@ def test_timer_logs_completion(tmp_path):
     assert "phase completed in" in contents
 
 
+def test_timer_logs_failure_and_reraises(tmp_path):
+    logger = Logger(log_dir=str(tmp_path), name="exp_timer_fail")
+    with pytest.raises(ValueError):
+        with logger.timer("phase"):
+            raise ValueError("boom")
+    logger.close()
+
+    contents = _read_log(tmp_path, "exp_timer_fail")
+
+    assert "phase failed after" in contents
+    assert "phase completed in" not in contents
+
+
 def test_track_yields_progress(tmp_path):
     logger = Logger(log_dir=str(tmp_path), name="exp_track")
     with logger.track(transient=True) as progress:
@@ -215,6 +267,17 @@ def test_context_manager_closes(tmp_path):
     contents = _read_log(tmp_path, "exp_ctx")
 
     assert "inside" in contents
+    assert "[End] Duration:" in contents
+
+
+def test_context_manager_logs_exception(tmp_path):
+    with pytest.raises(RuntimeError):
+        with Logger(log_dir=str(tmp_path), name="exp_ctx_exc") as logger:
+            raise RuntimeError("model diverged")
+
+    contents = _read_log(tmp_path, "exp_ctx_exc")
+
+    assert "Aborted by RuntimeError: model diverged" in contents
     assert "[End] Duration:" in contents
 
 
