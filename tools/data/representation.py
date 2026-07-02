@@ -37,7 +37,7 @@ class Representation(Enum):
             Representation.MAG_ONLY      : ["mag"],
         }[self]
 
-    def _channels(self, data: np.ndarray) -> list[np.ndarray]:
+    def channel_values(self, data: np.ndarray) -> list[np.ndarray]:
         if self is Representation.MAG_ONLY:
             return [np.abs(data)]
 
@@ -64,7 +64,7 @@ class Representation(Enum):
 
     def convert_into(self, out: np.ndarray, data: np.ndarray) -> None:
         cpp      = _CHANNELS_PER_PASS[self.value]
-        channels = self._channels(data)
+        channels = self.channel_values(data)
 
         for c, arr in enumerate(channels):
             out[c::cpp] = arr

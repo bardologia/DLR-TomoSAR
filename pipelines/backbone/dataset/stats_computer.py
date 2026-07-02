@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-from torch.utils.data import DataLoader, Subset
 
 from configuration.dataset import InputConfig, OutputConfig
 from configuration.normalization import ChannelStats, ChannelStrategy, NormalizationConfig, NormMethod
-from tools.data.sampling               import Sampler
 from tools.monitoring.logger           import Logger
 from tools.reporting.ranges            import RangeFormatter
 
@@ -16,8 +14,8 @@ from pipelines.backbone.dataset.stats import Stats
 
 class StatsComputer:
     @staticmethod
-    def _input_to_group(input_config : InputConfig, n_secondaries : int, n_interferograms : int) -> list[str]:
-        return input_config.channel_group_keys(n_secondaries, n_interferograms)
+    def _parts(dataset) -> list:
+        return list(dataset.parts) if hasattr(dataset, "parts") else [dataset]
 
     @staticmethod
     def _log_grouping(logger : Logger, label : str, group_keys : list[str]) -> None:
@@ -38,22 +36,18 @@ class StatsComputer:
         logger.kv_table(rows)
 
     @staticmethod
-    def _get_subset(dataset, max_samples : int) -> tuple:
-        n_total = len(dataset)
-        indices = Sampler.deterministic_indices(n_total, max_samples)
-        n_use   = len(indices)
+    def _sample_flat(flat: np.ndarray, budget: int, rng: np.random.Generator) -> np.ndarray:
+        if flat.size <= budget:
+            return np.asarray(flat)
 
-        subset = Subset(dataset, indices.tolist()) if n_use < n_total else dataset
-
-        return subset, n_use, n_total
+        return flat[rng.choice(flat.size, size=budget, replace=False)]
 
     @staticmethod
     def _collect(
-        subset,
+        parts              : list,
+        input_config       : InputConfig,
         group_keys         : list[str],
         strategies         : dict[str, ChannelStrategy],
-        num_workers        : int,
-        batch_size         : int,
         max_vals_per_group : int = 1_000_000,
     ) -> dict[str, np.ndarray]:
 
@@ -65,39 +59,43 @@ class StatsComputer:
         if not collected:
             return {}
 
-        n_batches_est     = max(len(subset) // max(batch_size, 1), 1)
-        vals_per_ch_batch = {g: max(64, max_vals_per_group // (n_batches_est * max(len(channels), 1))) for g, channels in group_channels.items()}
-
-        loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False, collate_fn=StatsComputer._collate_inputs)
         rng    = np.random.default_rng(42)
+        budget = {g: max(64, max_vals_per_group // (len(channels) * len(parts))) for g, channels in group_channels.items()}
 
-        for samples in loader:
-            try:
-                batches = [np.stack(samples, axis=0)]
-            except ValueError:
-                batches = [sample[np.newaxis] for sample in samples]
+        for part in parts:
+            inputs        = part.inputs
+            n_secondaries = part.n_secondaries
 
-            for arr in batches:
-                for g, channels in group_channels.items():
-                    if g not in needs_data:
-                        continue
+            sections = [
+                (input_config.use_primary,        inputs[0:1],             input_config.primary_representation,        "pass"),
+                (input_config.use_secondaries,    inputs[1:1 + n_secondaries], input_config.secondaries_representation,    "pass"),
+                (input_config.use_interferograms, inputs[1 + n_secondaries:],  input_config.interferograms_representation, "ifg"),
+            ]
 
-                    budget = vals_per_ch_batch[g]
+            for enabled, layers, representation, prefix in sections:
+                if not enabled:
+                    continue
 
-                    for ch in channels:
-                        flat = arr[:, ch].ravel()
+                keys   = [f"{prefix}/{kind}" for kind in representation.slot_kinds]
+                needed = [key for key in keys if key in needs_data]
+                if not needed:
+                    continue
 
-                        if len(flat) > budget:
-                            idx  = rng.choice(len(flat), budget, replace=False)
-                            flat = flat[idx]
+                layer_budget = max(budget[key] for key in needed)
 
-                        collected[g].append(flat)
+                for layer in layers:
+                    sample   = StatsComputer._sample_flat(np.asarray(layer).ravel(), layer_budget, rng)
+                    channels = representation.channel_values(sample)
+
+                    for key, values in zip(keys, channels):
+                        if key in needs_data:
+                            collected[key].append(np.asarray(values[:budget[key]], dtype=np.float64))
+
+            if input_config.use_dem and "dem/elevation" in needs_data:
+                dem_flat = np.asarray(part.dem, dtype=np.float64).ravel()
+                collected["dem/elevation"].append(StatsComputer._sample_flat(dem_flat, budget["dem/elevation"], rng))
 
         return {g: np.concatenate(v) for g, v in collected.items() if v}
-
-    @staticmethod
-    def _collate_inputs(items) -> list[np.ndarray]:
-        return [np.asarray(item[0] if isinstance(item, (tuple, list)) else item, dtype=np.float32) for item in items]
 
     @staticmethod
     def _fit_input(logger : Logger, group_keys : list[str], strategies : dict[str, ChannelStrategy], collected : dict[str, np.ndarray]) -> ChannelStats:
@@ -135,32 +133,28 @@ class StatsComputer:
     @staticmethod
     def compute_input_stats(
         dataset,
-        logger           : Logger,
-        input_config     : InputConfig,
-        n_secondaries    : int,
-        n_interferograms : int,
-        normalization    : NormalizationConfig = None,
-        max_samples      : int = 0,
-        num_workers      : int = 4,
-        batch_size       : int = 512,
+        logger             : Logger,
+        input_config       : InputConfig,
+        n_secondaries      : int,
+        n_interferograms   : int,
+        normalization      : NormalizationConfig = None,
+        max_vals_per_group : int = 1_000_000,
     ) -> Stats:
 
         normalization = normalization if normalization is not None else NormalizationConfig()
+        parts         = StatsComputer._parts(dataset)
+
+        group_keys  = input_config.channel_group_keys(n_secondaries, n_interferograms)
+        in_channels = int(parts[0].input_channels)
+        if len(group_keys) != in_channels:
+            raise ValueError(f"Group key count ({len(group_keys)}) does not match the dataset input channels ({in_channels}).")
 
         logger.section("[Input Normalization Statistics]")
-        subset, n_use, n_total = StatsComputer._get_subset(dataset, max_samples)
-        sample      = dataset[0]
-        in_first    = sample[0] if isinstance(sample, (tuple, list)) else sample
-        in_channels = int(in_first.shape[0])
-
         logger.kv_table({
             "Strategy":       f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)",
-            "Samples":        f"{n_use:,} / {n_total:,}",
+            "Source":         f"{len(parts)} region array(s), up to {max_vals_per_group:,} values per group",
             "Input channels": in_channels,
         })
-
-        group_keys = StatsComputer._input_to_group(input_config, n_secondaries, n_interferograms)
-        assert len(group_keys) == in_channels, (f"Group key count ({len(group_keys)}) != tensor channels ({in_channels})")
 
         strategies = {g: normalization.strategy("input", g) for g in dict.fromkeys(group_keys)}
 
@@ -168,11 +162,11 @@ class StatsComputer:
         StatsComputer._log_grouping(logger, "Input", group_keys)
 
         collected = StatsComputer._collect(
-            subset      = subset,
-            group_keys  = group_keys,
-            strategies  = strategies,
-            num_workers = num_workers,
-            batch_size  = batch_size,
+            parts              = parts,
+            input_config       = input_config,
+            group_keys         = group_keys,
+            strategies         = strategies,
+            max_vals_per_group = max_vals_per_group,
         )
 
         input_stats = StatsComputer._fit_input(
@@ -186,13 +180,6 @@ class StatsComputer:
             input_stats  = input_stats,
             output_stats = None,
         )
-
-    @staticmethod
-    def _train_gt_parameters(dataset) -> list[np.ndarray]:
-        if hasattr(dataset, "parts"):
-            return [part.gt_parameters for part in dataset.parts]
-
-        return [dataset.gt_parameters]
 
     @staticmethod
     def _fit_output(
@@ -251,7 +238,7 @@ class StatsComputer:
         amp_threshold : float = 1e-3,
         logger        : Optional[Logger] = None,
     ) -> Stats:
-        regions = StatsComputer._train_gt_parameters(dataset)
+        regions = [part.gt_parameters for part in StatsComputer._parts(dataset)]
 
         amp_pool_vals : list[np.ndarray] = []
         mu_pool_vals  : list[np.ndarray] = []
@@ -287,21 +274,6 @@ class StatsComputer:
         )
 
     @staticmethod
-    def _detach_augmenters(dataset) -> list:
-        parts    = dataset.parts if hasattr(dataset, "parts") else [dataset]
-        detached = [(part, part.augmenter) for part in parts]
-
-        for part in parts:
-            part.augmenter = None
-
-        return detached
-
-    @staticmethod
-    def _restore_augmenters(detached: list) -> None:
-        for part, augmenter in detached:
-            part.augmenter = augmenter
-
-    @staticmethod
     def compute(
         dataset,
         logger           : Logger,
@@ -311,28 +283,18 @@ class StatsComputer:
         n_interferograms : int,
         n_gaussians      : int,
         normalization    : NormalizationConfig = None,
-        max_samples      : int = 0,
-        num_workers      : int = 4,
-        batch_size       : int = 512,
     ) -> Stats:
 
         normalization = normalization if normalization is not None else NormalizationConfig()
-        detached      = StatsComputer._detach_augmenters(dataset)
 
-        try:
-            input_only = StatsComputer.compute_input_stats(
-                dataset          = dataset,
-                logger           = logger,
-                input_config     = input_config,
-                n_secondaries    = n_secondaries,
-                n_interferograms = n_interferograms,
-                normalization    = normalization,
-                num_workers      = num_workers,
-                max_samples      = max_samples,
-                batch_size       = batch_size,
-            )
-        finally:
-            StatsComputer._restore_augmenters(detached)
+        input_only = StatsComputer.compute_input_stats(
+            dataset          = dataset,
+            logger           = logger,
+            input_config     = input_config,
+            n_secondaries    = n_secondaries,
+            n_interferograms = n_interferograms,
+            normalization    = normalization,
+        )
 
         output_only = StatsComputer.compute_output_stats(
             dataset       = dataset,
@@ -341,5 +303,4 @@ class StatsComputer:
             logger        = logger,
         )
 
-        merged = Stats.merge(input_only, output_only, normalization.clamp())
-        return merged
+        return Stats.merge(input_only, output_only, normalization.clamp())

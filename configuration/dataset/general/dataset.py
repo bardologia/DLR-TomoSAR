@@ -205,5 +205,4 @@ class DatasetConfig:
     pin_memory        : bool                 = True
     x_axis            : Optional[np.ndarray] = field(default=None, repr=False)
     n_gaussians       : int                  = 1
-    stats_max_samples : int                  = 4000
 

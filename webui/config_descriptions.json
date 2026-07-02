@@ -930,8 +930,7 @@
       "shuffle_train": "Shuffle patch order during training",
       "pin_memory": "Pin host memory for faster GPU transfer",
       "x_axis": "Elevation sampling grid for the Gaussian mixture",
-      "n_gaussians": "Number of Gaussian components in the mixture output",
-      "stats_max_samples": "Maximum number of samples used when estimating normalization statistics"
+      "n_gaussians": "Number of Gaussian components in the mixture output"
     }
   },
   "dataset/profile_autoencoder::ProfileAugmentationConfig": {

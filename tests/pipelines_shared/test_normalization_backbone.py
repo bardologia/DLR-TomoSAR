@@ -114,7 +114,7 @@ def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, pa
     logger = Logger(log_dir="logs", name="norm_real", level="ERROR")
     stats  = StatsComputer.compute(
         dataset=ds, logger=logger, input_config=ic, output_config=oc,
-        n_secondaries=0, n_interferograms=4, n_gaussians=5, num_workers=0,
+        n_secondaries=0, n_interferograms=4, n_gaussians=5,
     )
 
     assert np.all(np.isfinite(stats.input_stats.loc))
