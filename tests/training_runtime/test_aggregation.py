@@ -39,17 +39,28 @@ def test_occupancy_channel_reduces_independently():
     assert agg.reduce_occupancy()["count/exact_frac"] == pytest.approx(0.5)
 
 
-def test_disjoint_keys_accumulate_independently():
+def test_disjoint_keys_average_over_their_own_batches():
     agg = MetricAggregator()
     agg.add(_loss_dict({"a": 2.0}, {}))
     agg.add(_loss_dict({"b": 4.0}, {}))
 
     reduced = agg.reduce_components()
-    assert reduced["a"] == pytest.approx(1.0)
-    assert reduced["b"] == pytest.approx(2.0)
+    assert reduced["a"] == pytest.approx(2.0)
+    assert reduced["b"] == pytest.approx(4.0)
 
 
-def test_reduce_on_empty_uses_count_floor_of_one():
+def test_sparse_occupancy_key_not_diluted_by_absent_batches():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({}, {}, {"count/exact_frac": 0.5, "count/acc_gt3": 1.0}))
+    agg.add(_loss_dict({}, {}, {"count/exact_frac": 0.5}))
+    agg.add(_loss_dict({}, {}, {"count/exact_frac": 0.5, "count/acc_gt3": 0.0}))
+
+    reduced = agg.reduce_occupancy()
+    assert reduced["count/exact_frac"] == pytest.approx(0.5)
+    assert reduced["count/acc_gt3"]    == pytest.approx(0.5)
+
+
+def test_reduce_on_empty_returns_empty():
     agg = MetricAggregator()
     assert agg.count               == 0
     assert agg.reduce_components() == {}
