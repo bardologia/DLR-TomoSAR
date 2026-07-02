@@ -154,7 +154,7 @@ class GaussianClamp:
         def _clamp(x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
             if leaky_slope > 0.0:
                 clamped = x.clamp(lo, hi)
-                return clamped + leaky_slope * (x - clamped).detach()
+                return clamped + leaky_slope * (x - clamped)
             return x.clamp(lo, hi)
 
         for _g in range(n_gauss):

@@ -43,7 +43,7 @@ class Normalizer:
 
         return vectors
 
-    def _apply_normalization(self, tensor: Array, stats: ChannelStats, inverse: bool) -> Array:
+    def _apply_normalization(self, tensor: Array, stats: ChannelStats, inverse: bool, leaky_slope: float = 0.0) -> Array:
         is_torch = isinstance(tensor, torch.Tensor)
         vectors  = self._channel_vectors(stats)
         clamp    = self.stats.clamp
@@ -62,7 +62,7 @@ class Normalizer:
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
-                out = torch.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
+                out = torch.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled, leaky_slope), x)
 
             return out
 
@@ -76,7 +76,7 @@ class Normalizer:
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
-            out = np.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled), x)
+            out = np.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled, leaky_slope), x)
 
         return np.ascontiguousarray(out, dtype=np.float32)
 
@@ -96,5 +96,5 @@ class Normalizer:
     def denormalize_input(self, tensor: Array) -> Array:
         return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=True)
 
-    def denormalize_output(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=True)
+    def denormalize_output(self, tensor: Array, leaky_slope: float = 0.0) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=True, leaky_slope=leaky_slope)

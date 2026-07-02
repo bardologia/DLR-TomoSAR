@@ -110,15 +110,17 @@ class Loss:
 
     def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss):
         batch_size, num_channels, height, width = pred_gauss.shape
-        num_gaussians = num_channels // 3
 
-        pred      = pred_gauss.reshape(     batch_size, num_gaussians, 3, height, width)
-        pred_phys = pred_phys_gauss.reshape(batch_size, num_gaussians, 3, height, width)
+        ppg           = self.gaussian_cfg.params_per_gaussian
+        num_gaussians = num_channels // ppg
 
-        gt_gaussians = gt_gauss.shape[1] // 3
+        pred      = pred_gauss.reshape(     batch_size, num_gaussians, ppg, height, width)
+        pred_phys = pred_phys_gauss.reshape(batch_size, num_gaussians, ppg, height, width)
 
-        gt      = gt_gauss[     :, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
-        gt_phys = gt_phys_gauss[:, : gt_gaussians * 3].reshape(batch_size, gt_gaussians, 3, height, width)
+        gt_gaussians = gt_gauss.shape[1] // ppg
+
+        gt      = gt_gauss[     :, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
+        gt_phys = gt_phys_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
 
         pred, pred_phys, gt, gt_phys = ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=self.loss_cfg.param_matching.value)
 
@@ -132,12 +134,14 @@ class Loss:
         return pred, pred_phys, gt, gt_phys
 
     def _prepare(self, pred_params, gt_params):
+        leaky_slope = self.gaussian_cfg.clamp_leaky_slope
+
         pred_params_phys = GaussianClamp.apply(
-            self.norm_stats.denormalize_output(pred_params.float()),
+            self.norm_stats.denormalize_output(pred_params.float(), leaky_slope=leaky_slope),
             x_axis      = self.x_axis,
             amp_max     = self.gaussian_cfg.amp_max,
             ppg         = self.gaussian_cfg.params_per_gaussian,
-            leaky_slope = 0.01,
+            leaky_slope = leaky_slope,
         )
 
         pred_params_norm = self.norm_stats.normalize_output(pred_params_phys)
