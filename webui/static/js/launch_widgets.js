@@ -2909,12 +2909,16 @@ class ConfigForm {
       title.textContent = section.title;
       el.appendChild(title);
 
+      const body = document.createElement("div");
+      body.className = "launch-section__body";
+      el.appendChild(body);
+
       if (section.panels === null) {
-        el.appendChild(this._buildPins(layout.essentials.map((entry) => this.byPath.get(entry.path))));
+        body.appendChild(this._buildPins(layout.essentials.map((entry) => this.byPath.get(entry.path))));
       } else {
         section.panels.forEach((panel) => {
           const built = this._buildPanel(panel);
-          if (built) el.appendChild(built);
+          if (built) body.appendChild(built);
         });
       }
 
@@ -2991,6 +2995,7 @@ class ConfigForm {
   _buildFieldsPanel(panel) {
     const el = document.createElement("section");
     el.className = "cfg-panel";
+    el.dataset.cols = String(Math.min(panel.groups.length, 4));
 
     if (panel.title) {
       const head = document.createElement("header");

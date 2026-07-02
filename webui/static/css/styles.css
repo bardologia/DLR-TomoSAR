@@ -1268,13 +1268,22 @@ main { margin-left: var(--navw); }
 .launch-section__title { font-family: var(--mono); font-size: 15px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .launch-layout--single .launch-section__title { display: none; }
 
-.cfg-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.launch-section__body { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; min-width: 0; }
+.launch-section__body > .launch-pins, .launch-section__body > .model-panel, .launch-section__body > .exp-builder, .launch-section__body > .cfg-panel--pair { flex: 1 1 100%; }
+
+.cfg-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.cfg-panel[data-cols="1"] { flex: 1 1 320px; max-width: 540px; }
+.cfg-panel[data-cols="2"] { flex: 2 1 600px; max-width: 940px; }
+.cfg-panel[data-cols="3"] { flex: 3 1 860px; max-width: 1340px; }
+.cfg-panel[data-cols="4"] { flex: 1 1 100%; }
 .cfg-panel__head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
 .cfg-panel__name { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .cfg-panel__hint { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); }
-.cfg-panel__groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 16px 26px; align-items: start; }
+.cfg-panel__groups { display: block; column-width: 264px; column-gap: 26px; }
+.cfg-panel__groups > .field-group { break-inside: avoid; -webkit-column-break-inside: avoid; margin: 0 0 16px; }
+.cfg-panel__groups > .field-group:only-child { margin-bottom: 0; }
 
-.band-block { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.band-block { display: grid; gap: 8px; align-content: start; min-width: 0; break-inside: avoid; -webkit-column-break-inside: avoid; }
 
 .pair-override { background: var(--bg-1); border: 1px solid var(--line); border-radius: 2px; }
 .pair-override__head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; width: 100%; background: none; border: none; cursor: pointer; text-align: left; font: inherit; }
