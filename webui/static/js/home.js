@@ -62,7 +62,12 @@ class StatusBoard {
       ? gpus.map((g, i) =>
           `<article class="gcard" data-gpu="${i}">` +
           `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span></header>` +
-          `<div class="gcard__row"><span class="gcard__pct">--</span><span class="gcard__unit">% util</span><span class="gcard__vram">--</span></div>` +
+          `<div class="gcard__cluster">` +
+          `<canvas class="gdial gdial--sub gdial--temp"></canvas>` +
+          `<canvas class="gdial gdial--big gdial--util"></canvas>` +
+          `<canvas class="gdial gdial--sub gdial--power"></canvas>` +
+          `</div>` +
+          `<div class="gcard__vramrow"><span class="gcard__vlabel">vram</span><canvas class="gseg"></canvas><span class="gcard__vram">--</span></div>` +
           `<canvas class="gcard__graph"></canvas>` +
           `<footer class="gcard__foot"><span class="gcard__temp">--</span><span class="gcard__power">--</span><span class="gcard__legend"><i class="lg lg--util"></i>util<i class="lg lg--vram"></i>vram</span></footer>` +
           `</article>`
@@ -111,23 +116,25 @@ class StatusBoard {
       `<section class="sboard sboard--cpu" aria-label="Processor">` +
       `<header class="sboard__cap"><span>processor</span><span class="sboard__n">${sys.cpu ? sys.cpu.count : 0} cores</span></header>` +
       `<div class="cpu__top">` +
-      `<div class="cpu__big"><span class="cpu__pct" id="sb-cpu-pct">--</span><span class="cpu__unit">% busy</span></div>` +
+      `<canvas class="gdial gdial--cpu" id="sb-cpu-dial"></canvas>` +
+      `<div class="cpu__side">` +
       `<dl class="cpu__load"><div><dt id="sb-load1">--</dt><dd>load 1m</dd></div><div><dt id="sb-load5">--</dt><dd>5m</dd></div><div><dt id="sb-load15">--</dt><dd>15m</dd></div></dl>` +
-      `</div>` +
-      `<canvas class="sboard__graph" id="sb-cpu-graph"></canvas>` +
       `<div class="sboard__metric"><span>avg usage</span><span id="sb-cpu-avg">--</span></div>` +
       `<div class="bar"><i class="bar__fill" id="sb-cpu-bar"></i></div>` +
       `<div class="sboard__metric"><span>active cores</span><span id="sb-cpu-active">--</span></div>` +
       `<div class="bar"><i class="bar__fill bar__fill--cores" id="sb-cores-bar"></i></div>` +
+      `</div>` +
+      `</div>` +
+      `<canvas class="sboard__graph" id="sb-cpu-graph"></canvas>` +
       `<div class="cpu__grid" id="sb-cores">${coreCells}</div>` +
       `</section>` +
 
       `<section class="sboard sboard--mem" aria-label="Memory">` +
       `<header class="sboard__cap"><span>memory</span><span class="sboard__n" id="sb-mem-total"></span></header>` +
-      `<div class="sboard__metric"><span>ram</span><span id="sb-ram-txt">--</span></div>` +
-      `<div class="bar"><i class="bar__fill" id="sb-ram-bar"></i></div>` +
-      `<div class="sboard__metric"><span>swap</span><span id="sb-swap-txt">--</span></div>` +
-      `<div class="bar"><i class="bar__fill" id="sb-swap-bar"></i></div>` +
+      `<div class="mem__tanks">` +
+      `<div class="mem__tank"><canvas class="gtank" id="sb-ram-tank"></canvas><span class="mem__tlabel">ram</span><span class="mem__tval" id="sb-ram-txt">--</span></div>` +
+      `<div class="mem__tank"><canvas class="gtank" id="sb-swap-tank"></canvas><span class="mem__tlabel">swap</span><span class="mem__tval" id="sb-swap-txt">--</span></div>` +
+      `</div>` +
       `<canvas class="sboard__graph sboard__graph--mem" id="sb-mem-graph"></canvas>` +
       `</section>` +
 
@@ -174,14 +181,21 @@ class StatusBoard {
 
       `<section class="sboard sboard--gpuguard" id="sb-gpu-guard-panel" aria-label="GPU guard"></section>`;
 
-    this.gpuEls = [...this.els.board.querySelectorAll(".gcard")].map((card) => ({
-      pct: card.querySelector(".gcard__pct"),
+    this.gpuEls = [...this.els.board.querySelectorAll(".gcard")].map((card, i) => ({
       vramTxt: card.querySelector(".gcard__vram"),
       temp: card.querySelector(".gcard__temp"),
       who: card.querySelector(".gcard__who"),
       power: card.querySelector(".gcard__power"),
       graph: card.querySelector(".gcard__graph"),
+      dialU: new window.DialGauge(card.querySelector(".gdial--util"), { big: true, label: "UTIL %", color: "111, 155, 255", majors: 5, minors: 4 }),
+      dialT: new window.DialGauge(card.querySelector(".gdial--temp"), { min: 20, max: 100, label: "TEMP °C", color: "45, 212, 191", majors: 2, minors: 5, zones: [{ from: 70, to: 85, color: "251, 191, 36" }, { from: 85, to: 100, color: "248, 113, 113" }] }),
+      dialP: new window.DialGauge(card.querySelector(".gdial--power"), { max: (gpus[i] && gpus[i].power_limit) || 250, label: "PWR W", color: "167, 139, 250", majors: 2, minors: 5 }),
+      vseg: new window.SegMeter(card.querySelector(".gseg"), { color: "45, 212, 191" }),
     }));
+
+    this.cpuDial = new window.DialGauge(document.getElementById("sb-cpu-dial"), { big: true, label: "BUSY %", color: "111, 155, 255", majors: 5, minors: 4, zones: [{ from: 75, to: 90, color: "251, 191, 36" }, { from: 90, to: 100, color: "248, 113, 113" }] });
+    this.ramTank = new window.TankGauge(document.getElementById("sb-ram-tank"), { color: "45, 212, 191" });
+    this.swapTank = new window.TankGauge(document.getElementById("sb-swap-tank"), { color: "167, 139, 250" });
     this.coreEls = [...this.els.board.querySelectorAll(".cpu__cell")];
 
     this._wireNuke();
@@ -276,7 +290,11 @@ class StatusBoard {
       this._push(h.u, util);
       this._push(h.m, memPct);
 
-      el.pct.textContent = Math.round(util);
+      el.dialU.set(util);
+      el.dialT.set(g.temp);
+      if (g.power_limit) el.dialP.range(g.power_limit);
+      el.dialP.set(g.power);
+      el.vseg.set(memPct / 100);
       el.vramTxt.innerHTML = `<b>${this._gb(g.mem_used * 1048576)}</b> / ${this._gb(g.mem_total * 1048576)} GB`;
       el.temp.textContent = g.temp != null ? `${Math.round(g.temp)}°C` : "--";
       el.temp.className = "gcard__temp" + (g.temp >= 85 ? " is-danger" : g.temp >= 70 ? " is-warn" : "");
@@ -299,8 +317,7 @@ class StatusBoard {
       ]);
     });
 
-    const pctEl = document.getElementById("sb-cpu-pct");
-    if (pctEl) pctEl.textContent = Math.round(cpu.total || 0);
+    if (this.cpuDial) this.cpuDial.set(cpu.total || 0);
     const load = cpu.load || [];
     ["sb-load1", "sb-load5", "sb-load15"].forEach((id, i) => {
       const el = document.getElementById(id);
@@ -327,11 +344,11 @@ class StatusBoard {
 
     if (mem.total) {
       const used = mem.total - mem.available;
-      this._bar("sb-ram-bar", (100 * used) / mem.total);
+      this.ramTank.set(used / mem.total);
       this._txt("sb-ram-txt", `<b>${this._gb(used)}</b> / ${this._gb(mem.total)} GB`);
       this._txt("sb-mem-total", `${this._tb(mem.total)}`);
       const swapUsed = (mem.swap_total || 0) - (mem.swap_free || 0);
-      this._bar("sb-swap-bar", mem.swap_total ? (100 * swapUsed) / mem.swap_total : 0);
+      this.swapTank.set(mem.swap_total ? swapUsed / mem.swap_total : 0);
       this._txt("sb-swap-txt", mem.swap_total ? `<b>${this._gb(swapUsed)}</b> / ${this._gb(mem.swap_total)} GB` : "none");
       this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "45, 212, 191", fill: 0.10 }]);
     }
