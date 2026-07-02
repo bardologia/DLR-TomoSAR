@@ -126,7 +126,9 @@ class Report:
     @staticmethod
     def _padded_column(payload: Dict[str, Any], key: str, n_tracks: int) -> list:
         values = payload[key]
-        return values if len(values) == n_tracks else [float("nan")] * n_tracks
+        if len(values) != n_tracks:
+            raise ValueError(f"Track payload column '{key}' has {len(values)} entries but the run lists {n_tracks} tracks; the persisted track metadata is inconsistent.")
+        return values
 
     @staticmethod
     def _is_per_slice_ssim(k: str) -> bool:

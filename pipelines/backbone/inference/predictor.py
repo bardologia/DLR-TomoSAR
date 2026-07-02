@@ -81,9 +81,12 @@ class CubeStitcher:
         H, W         = self.grid.spatial_size
         pad_t, pad_l = self.grid.pad_top, self.grid.pad_left
 
-        weight_safe = np.where(self._weight > 0, self._weight, 1.0)
-        cube        = self._accum / weight_safe[None, :, :]
-        cube        = cube[:, pad_t:pad_t + H, pad_l:pad_l + W]
+        weight  = self._weight[pad_t:pad_t + H, pad_l:pad_l + W]
+        covered = weight > 0
+        if not covered.all():
+            raise ValueError(f"Curve stitching left {int((~covered).sum())} of {H * W} pixels uncovered; the patch grid does not tile the split region.")
+
+        cube = self._accum[:, pad_t:pad_t + H, pad_l:pad_l + W] / weight[None, :, :]
 
         return np.ascontiguousarray(cube.astype(self.dtype, copy=False))
 
