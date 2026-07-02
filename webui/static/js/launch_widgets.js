@@ -1010,24 +1010,24 @@ class ExperimentBuilder {
   }
 
   _termCatalog() {
-    const prefix = "curriculum.complete.";
-    const leaves = this.view.config.leaves.filter((leaf) => leaf.section === "curriculum.complete");
-
-    const blocks = new Map();
-    leaves.forEach((leaf) => {
-      if (!blocks.has(leaf.block)) blocks.set(leaf.block, []);
-      blocks.get(leaf.block).push(leaf);
-    });
+    const prefix  = "curriculum.complete.";
+    const leaves  = this.view.config.leaves.filter((leaf) => leaf.section === "curriculum.complete");
+    const short   = (leaf) => leaf.path.slice(prefix.length);
+    const weights = leaves.filter((leaf) => short(leaf).startsWith("weight_") && (leaf.type === "float" || leaf.type === "int"));
 
     const terms = [];
-    blocks.forEach((blockLeaves) => {
-      const short  = (leaf) => leaf.path.slice(prefix.length);
-      const use    = blockLeaves.find((leaf) => leaf.type === "bool" && short(leaf).startsWith("use_"));
-      const weight = blockLeaves.find((leaf) => short(leaf).startsWith("weight_") && (leaf.type === "float" || leaf.type === "int"));
-      if (!use || !weight) return;
+    leaves.forEach((use) => {
+      if (use.type !== "bool" || !short(use).startsWith("use_")) return;
+
+      const name   = short(use).slice(4);
+      const weight = weights.find((leaf) => {
+        const wname = short(leaf).slice(7);
+        return wname === name || name.startsWith(wname) || wname.startsWith(name);
+      });
+      if (!weight) return;
 
       const fallback = Number(weight.value);
-      terms.push({ key: short(use).slice(4), useKey: short(use), weightKey: short(weight), defaultWeight: fallback > 0 ? fallback : 1.0 });
+      terms.push({ key: name, useKey: short(use), weightKey: short(weight), defaultWeight: fallback > 0 ? fallback : 1.0 });
     });
     return terms;
   }
