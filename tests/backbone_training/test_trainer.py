@@ -149,6 +149,47 @@ def test_train_logs_throughput_and_diagnostics(tmp_path):
     assert all(tag.startswith("reconstruction/") and tag.endswith("/val") for tag, _, _ in writer.figures)
 
 
+def _loss_dict(total: float) -> dict:
+    return {"total_loss": torch.tensor(total), "components": {}, "monitor": {}, "occupancy": {}, "physical": {}}
+
+
+def test_evaluate_raises_on_nonfinite_loss(tmp_path):
+    trainer = _build_trainer(tmp_path)
+    loader  = _loader()
+
+    trainer._eval_step = lambda batch, aggregator: _loss_dict(float("nan"))
+
+    with pytest.raises(FloatingPointError):
+        trainer.evaluate(loader, epoch=0)
+
+
+def test_evaluate_skips_nonfinite_batches_when_abort_disabled(tmp_path):
+    trainer = _build_trainer(tmp_path)
+    trainer.abort_on_nonfinite_loss = False
+
+    loader  = _loader()
+    batches = iter(range(len(loader)))
+
+    trainer._eval_step = lambda batch, aggregator: _loss_dict(float("inf") if next(batches) == 0 else 2.0)
+
+    result = trainer.evaluate(loader, epoch=0)
+
+    assert result["num_batches"] == len(loader) - 1
+    assert result["avg_loss"]    == pytest.approx(2.0)
+
+
+def test_evaluate_returns_nan_when_all_batches_nonfinite(tmp_path):
+    trainer = _build_trainer(tmp_path)
+    trainer.abort_on_nonfinite_loss = False
+
+    trainer._eval_step = lambda batch, aggregator: _loss_dict(float("nan"))
+
+    result = trainer.evaluate(_loader(), epoch=0)
+
+    assert result["num_batches"] == 0
+    assert result["avg_loss"] != result["avg_loss"]
+
+
 def test_checkpoint_save_restore_round_trip(tmp_path):
     trainer = _build_trainer(tmp_path, epochs=1)
     loader  = _loader()

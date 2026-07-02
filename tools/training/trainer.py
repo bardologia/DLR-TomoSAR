@@ -255,13 +255,22 @@ class BaseTrainer:
                 for batch in loader:
                     with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
                         loss_dict = self._eval_step(batch, aggregator)
-                    loss_sum += loss_dict["total_loss"].item()
-                    n += 1
-                    aggregator.add(loss_dict)
+                    loss = loss_dict["total_loss"]
+
+                    if torch.isfinite(loss):
+                        loss_sum += loss.item()
+                        n += 1
+                        aggregator.add(loss_dict)
+
+                    elif self.abort_on_nonfinite_loss:
+                        raise FloatingPointError(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}")
+
+                    else:
+                        self.logger.warning(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}; skipping batch (abort_on_nonfinite_loss disabled).")
 
                     _prog.advance(_task)
 
-            avg = loss_sum / max(1, n)
+            avg = loss_sum / n if n > 0 else float("nan")
             self._log_epoch_metrics(stage, aggregator, epoch)
         finally:
             if self.config.memory.clear_cache_after_eval:
