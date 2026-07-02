@@ -44,6 +44,9 @@ class TrainingPipeline:
         )
         self.logger = self.run_metadata.logger
 
+        gaussian_cfg                    = trainer_config.gaussian
+        self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
+
         self.dataset_pipeline = DatasetPipeline(
             config                 = dataset_config,
             training_run_directory = self.run_metadata.run_directory,
@@ -52,6 +55,8 @@ class TrainingPipeline:
             height_axis_convention = trainer_config.geometry.height_axis_convention,
             build_geometry_field   = self.physics_geometry_active(trainer_config),
         )
+
+        self.dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, self.dataset_pipeline.layout.profile_length)
 
     @staticmethod
     def physics_geometry_active(trainer_config) -> bool:
@@ -93,12 +98,8 @@ class TrainingPipeline:
     def run(self, probe_config=None):
         self.logger.section("[PyTorch Training Pipeline Execution]")
 
-        gaussian_cfg                    = self.trainer_config.gaussian
-        self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
-
-        x_axis_length = self.dataset_pipeline.layout.profile_length
-
-        self.dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, x_axis_length)
+        gaussian_cfg  = self.trainer_config.gaussian
+        x_axis_length = int(np.asarray(self.dataset_config.x_axis).size)
 
         train_loader, val_loader, test_loader, datasets = self.dataset_pipeline.run()
 
