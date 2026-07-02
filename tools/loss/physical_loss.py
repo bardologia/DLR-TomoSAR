@@ -132,7 +132,7 @@ class PhysicalLoss:
         return (steering * curves.to(steering.dtype)).sum(dim=1) * dx
 
     @staticmethod
-    def coherence_resynthesis_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+    def coherence_resynthesis_pp_map(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> tuple:
         n_tracks = kz_map.shape[1]
 
         p0   = pred.sum(dim=1) * dx
@@ -150,7 +150,13 @@ class PhysicalLoss:
 
             val = val + (gp - gt).abs() ** 2
 
-        return PhysicalLoss.masked_mean(val / n_tracks, mask)
+        return val / n_tracks, mask
+
+    @staticmethod
+    def coherence_resynthesis_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+        val, mask = PhysicalLoss.coherence_resynthesis_pp_map(pred, target, kz_map, x_axis, dx, floor)
+
+        return PhysicalLoss.masked_mean(val, mask)
 
     @staticmethod
     def _synthesise_pair(curves: torch.Tensor, kz_difference: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
@@ -160,7 +166,7 @@ class PhysicalLoss:
         return (rotation * curves.to(rotation.dtype)).sum(dim=1) * dx
 
     @staticmethod
-    def covariance_matching_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+    def covariance_matching_pp_map(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> tuple:
         n_tracks = kz_map.shape[1]
 
         t0   = target.sum(dim=1) * dx
@@ -182,7 +188,13 @@ class PhysicalLoss:
                 num = num + weight * delta.abs() ** 2
                 den = den + weight * ref.abs() ** 2
 
-        return PhysicalLoss.masked_mean(num / den.clamp(min=1e-12), mask)
+        return num / den.clamp(min=1e-12), mask
+
+    @staticmethod
+    def covariance_matching_pp(pred: torch.Tensor, target: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float, floor: float) -> torch.Tensor:
+        val, mask = PhysicalLoss.covariance_matching_pp_map(pred, target, kz_map, x_axis, dx, floor)
+
+        return PhysicalLoss.masked_mean(val, mask)
 
     @staticmethod
     def _synthesise_covariance(curves: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
