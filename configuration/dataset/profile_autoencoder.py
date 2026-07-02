@@ -13,7 +13,7 @@ class ProfileAugmentationConfig:
     amp_scale_range : Tuple[float, float] = (0.9, 1.1)
     p_shift         : float               = 0.0
     max_shift       : int                 = 4
-    p_flip          : float               = 0.0
+    p_flip          : float               = 0.5
     p_noise         : float               = 0.0
     noise_std       : float               = 0.01
 
