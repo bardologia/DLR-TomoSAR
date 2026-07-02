@@ -67,6 +67,35 @@ def test_catalog_curriculum_is_disabled_with_matching_phases():
     assert curriculum.complete.use_covariance_match is True
 
 
+def test_catalog_combined_enables_the_union_of_terms():
+    cfg = LossComponentCatalog.combined(["param_l1", "covariance_match", "l1_curve"])
+
+    assert cfg.use_param_l1         is True
+    assert cfg.use_covariance_match is True
+    assert cfg.use_l1_curve         is True
+
+    other_flags_off = [not getattr(cfg, term.use_flag) for term in LOSS_TERMS if term.name not in ("param_l1", "covariance_match", "l1_curve")]
+    assert all(other_flags_off)
+
+
+def test_catalog_combined_rejects_empty_and_unknown():
+    with pytest.raises(ValueError):
+        LossComponentCatalog.combined([])
+
+    with pytest.raises(KeyError):
+        LossComponentCatalog.combined(["param_l1", "not_a_real_loss"])
+
+
+def test_catalog_combined_curriculum_mirrors_combined_in_both_phases():
+    curriculum = LossComponentCatalog.combined_curriculum(["param_l1", "coherence_resyn"])
+
+    assert curriculum.enabled is False
+    assert curriculum.warmup.use_param_l1          is True
+    assert curriculum.warmup.use_coherence_resyn   is True
+    assert curriculum.complete.use_param_l1        is True
+    assert curriculum.complete.use_coherence_resyn is True
+
+
 def test_forward_returns_finite_scalar_total():
     loss = build_loss(n_gaussians=2)
     pred = param_tensor(2, 2, 6, 6, seed=0)

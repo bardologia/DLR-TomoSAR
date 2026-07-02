@@ -102,3 +102,27 @@ def test_probe_init_requires_cuda_device(tmp_path):
     assert probe.device.type == "cuda"
     assert probe.budget_gb == config.max_batch.vram_budget_gb
     assert probe.ceiling   == config.max_batch.max_batch
+
+
+def test_build_context_probes_with_the_swept_loss_union():
+    source = inspect.getsource(MaxBatchProbe._build_context)
+
+    assert "LossComponentCatalog.combined_curriculum(self.config.sweep_loss_components, base=self.config.curriculum.complete)" in source
+    assert "build_geometry_field=TrainingPipeline.physics_geometry_active(trainer_config)" in source
+
+
+def test_probe_curriculum_activates_geometry_field_for_physics_sweeps():
+    from pipelines.backbone.training.loss_terms import LossComponentCatalog
+    from pipelines.backbone.training.pipeline   import TrainingPipeline
+
+    config = BenchmarkConfig()
+
+    config.sweep_loss_components = ["param_l1"]
+    plain = LossComponentCatalog.combined_curriculum(config.sweep_loss_components, base=config.curriculum.complete)
+    stub  = type("Cfg", (), {"curriculum": plain})()
+    assert TrainingPipeline.physics_geometry_active(stub) is False
+
+    config.sweep_loss_components = ["param_l1", "covariance_match"]
+    physics = LossComponentCatalog.combined_curriculum(config.sweep_loss_components, base=config.curriculum.complete)
+    stub    = type("Cfg", (), {"curriculum": physics})()
+    assert TrainingPipeline.physics_geometry_active(stub) is True

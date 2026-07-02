@@ -37,21 +37,35 @@ class LossComponentCatalog:
 
     @classmethod
     def standalone(cls, name: str, base: LossConfig | None = None) -> LossConfig:
-        if name not in cls._TERMS:
-            raise KeyError(f"unknown loss component '{name}'; valid: {', '.join(cls.names())}")
+        return cls.combined([name], base=base)
+
+    @classmethod
+    def combined(cls, names, base: LossConfig | None = None) -> LossConfig:
+        if not names:
+            raise ValueError("names must list at least one loss component")
+
+        unknown = [name for name in names if name not in cls._TERMS]
+        if unknown:
+            raise KeyError(f"unknown loss component '{unknown[0]}'; valid: {', '.join(cls.names())}")
 
         cfg = copy.deepcopy(base) if base is not None else LossConfig()
 
         for other in LOSS_TERMS:
             setattr(cfg, other.use_flag, False)
 
-        term = cls._TERMS[name]
-        setattr(cfg, term.use_flag,   True)
-        setattr(cfg, term.weight_key, 1.0)
+        for name in names:
+            term = cls._TERMS[name]
+            setattr(cfg, term.use_flag,   True)
+            setattr(cfg, term.weight_key, 1.0)
 
         return cfg
 
     @classmethod
     def curriculum(cls, name: str, base: LossConfig | None = None) -> LossCurriculumConfig:
         cfg = cls.standalone(name, base=base)
+        return LossCurriculumConfig(enabled=False, warmup=cfg, complete=cfg)
+
+    @classmethod
+    def combined_curriculum(cls, names, base: LossConfig | None = None) -> LossCurriculumConfig:
+        cfg = cls.combined(names, base=base)
         return LossCurriculumConfig(enabled=False, warmup=cfg, complete=cfg)
