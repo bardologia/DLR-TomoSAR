@@ -271,7 +271,9 @@ def test_ablation_catalog_default_is_the_standard_set():
     assert labels == [
         "covariance_match", "physics_curriculum", "coherence_resyn",
         "cosine_curve", "architecture", "augmentation",
-        "active_norm", "lr_per_group",
+        "active_norm", "lr_per_group", "lr_warmup",
+        "out_sigma", "out_amp", "ifg_phase", "pass_mag",
+        "output_clamp",
     ]
     assert "out_mu" not in labels
     for feature in features:
@@ -439,9 +441,14 @@ def test_ablation_default_plan_round_trips_through_config_cli():
     assert full.backbone_name                            == "resunet"
     assert full.curriculum.warmup.use_param_l1           is True
     assert full.curriculum.warmup.use_cosine_curve       is True
+    assert full.training.warmup_enabled                  is True
     assert baseline.curriculum.enabled                   is False
     assert baseline.backbone_name                        == "unet"
     assert baseline.curriculum.warmup.use_param_mse      is True
     assert baseline.curriculum.warmup.use_param_l1       is False
     assert baseline.curriculum.warmup.use_active_normalization is False
     assert set(baseline.model_overrides.values())        == {3e-4}
+    assert baseline.training.warmup_enabled              is False
+    assert baseline.normalization.clamp_output           is False
+    assert baseline.normalization.out_amp                == "zscore"
+    assert baseline.normalization.ifg_phase              == "fixed_div_pi"

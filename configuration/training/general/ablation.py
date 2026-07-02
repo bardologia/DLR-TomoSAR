@@ -263,7 +263,9 @@ class AblationCatalog:
     DEFAULT_ORDER = (
         "covariance_match", "physics_curriculum", "coherence_resyn",
         "cosine_curve", "architecture", "augmentation",
-        "active_norm", "lr_per_group",
+        "active_norm", "lr_per_group", "lr_warmup",
+        "out_sigma", "out_amp", "ifg_phase", "pass_mag",
+        "output_clamp",
     )
 
     @classmethod
