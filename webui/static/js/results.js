@@ -296,9 +296,12 @@ class ResultsView {
     const body = this.detailEl.querySelector("#res-body");
     if (!body) return;
 
-    if (this.view === "folder")  body.innerHTML = this._folderHtml();
-    if (this.view === "all")     body.innerHTML = this._galleryHtml();
-    if (this.view === "compare") body.innerHTML = this._compareHtml();
+    let html = "";
+    if (this.view === "folder")  html = this._folderHtml();
+    if (this.view === "all")     html = this._galleryHtml();
+    if (this.view === "compare") html = this._compareHtml();
+
+    body.innerHTML = `<div class="res-main">${html}</div>`;
 
     if (this.view === "folder") {
       this._fillMarkdown(body);
@@ -328,7 +331,7 @@ class ResultsView {
 
     if (!nav.children.length) return;
 
-    body.prepend(nav);
+    body.appendChild(nav);
     this._positionIndex();
   }
 
@@ -466,9 +469,9 @@ class ResultsView {
     const bar = this.detailEl.querySelector(".res-bar");
     if (!nav || !bar) return;
 
-    nav.style.top = `${bar.offsetHeight}px`;
+    nav.style.top = `${bar.offsetHeight + 12}px`;
 
-    const margin = bar.offsetHeight + nav.offsetHeight + 12;
+    const margin = bar.offsetHeight + 12;
     this.detailEl.querySelectorAll(".res-section, .res-index__anchor").forEach((el) => {
       el.style.scrollMarginTop = `${margin}px`;
     });
