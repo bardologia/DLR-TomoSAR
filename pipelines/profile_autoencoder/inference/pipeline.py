@@ -44,6 +44,12 @@ class ProfileAeInferencePipeline:
     def _predict(self, run, logger: Logger):
         return ProfileAePredictor(run, device=self.config.device, logger=logger).run_inference()
 
+    def _persist_embeddings(self, result, meta: ProfileAeInferenceMetadata, logger: Logger) -> Path:
+        path = meta.output_dir / "embeddings.npy"
+        np.save(path, result.embeddings)
+        logger.subsection(f"Embeddings saved : {path}  shape {result.embeddings.shape}")
+        return path
+
     def _evaluate_metrics(self, result, run, meta: ProfileAeInferenceMetadata, logger: Logger):
         metrics_obj = ProfileAeMetrics(result, run.x_axis, run.normalizer)
         metrics     = metrics_obj.compute()
@@ -89,6 +95,8 @@ class ProfileAeInferencePipeline:
 
         run    = self._load_run(logger)
         result = self._predict(run, logger)
+
+        self._persist_embeddings(result, meta, logger)
 
         metrics, metrics_obj = self._evaluate_metrics(result, run, meta, logger)
         figures              = self._compose_figures(result, run, metrics_obj, meta, logger)
