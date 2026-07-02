@@ -187,21 +187,28 @@ class App {
       profModeBtns  : [...document.querySelectorAll("#cube-prof-mode .cube-space")],
       modeBtns      : [...document.querySelectorAll(".cube-mode[data-view]")],
       views         : [...document.querySelectorAll(".cube-view[data-view]")],
-      elevGrid      : document.getElementById("cube-elev-grid"),
-      elevAt        : document.getElementById("cube-elev-at"),
-      elevFill      : document.getElementById("cube-elev-fill"),
       jumpAz        : document.getElementById("cube-jump-az"),
       jumpRg        : document.getElementById("cube-jump-rg"),
       jumpGo        : document.getElementById("cube-jump-go"),
       jumpAzRange   : document.getElementById("cube-jump-az-range"),
       jumpRgRange   : document.getElementById("cube-jump-rg-range"),
-      elevInput     : document.getElementById("cube-elev-input"),
-      elevRange     : document.getElementById("cube-elev-range"),
-      ePanels       : [...document.querySelectorAll(".cube-eplane")].map((root) => ({
-        root,
-        source : root.dataset.source,
-        canvas : root.querySelector("canvas"),
-      })),
+      sweeps        : ["elevation", "azimuth", "range"].map((axis) => {
+        const grid = document.getElementById(`cube-${axis}-grid`);
+        return {
+          axis,
+          grid,
+          at     : document.getElementById(`cube-${axis}-at`),
+          fill   : document.getElementById(`cube-${axis}-fill`),
+          input  : document.getElementById(`cube-${axis}-input`),
+          range  : document.getElementById(`cube-${axis}-range`),
+          play   : document.getElementById(`cube-${axis}-play`),
+          panels : [...grid.querySelectorAll(".cube-eplane")].map((root) => ({
+            root,
+            source : root.dataset.source,
+            canvas : root.querySelector("canvas"),
+          })),
+        };
+      }),
       panels        : [...document.querySelectorAll(".cube-slice")].map((root) => ({
         root,
         axis   : root.dataset.axis,
@@ -267,6 +274,7 @@ class App {
     if (route === "results") this.resultsView.enter();
     if (route === "feedtuner") this.feedTuner.enter();
     if (route === "cube") this.tomogramView.enter();
+    else this.tomogramView.leave();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }

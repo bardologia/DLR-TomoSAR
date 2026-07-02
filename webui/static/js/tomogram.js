@@ -1,5 +1,209 @@
 "use strict";
 
+class TomogramSweep {
+  constructor(refs, host) {
+    this.host = host;
+    this.axis = refs.axis;
+    this.grid = refs.grid;
+    this.atLabel = refs.at;
+    this.fill = refs.fill;
+    this.input = refs.input;
+    this.rangeLabel = refs.range;
+    this.playBtn = refs.play;
+    this.panels = refs.panels || [];
+
+    this.idx = 0;
+    this.steps = 1;
+    this.playing = false;
+    this.token = 0;
+    this.frameMs = 130;
+
+    if (this.grid)    this.grid.addEventListener("wheel", (ev) => this._onWheel(ev), { passive: false });
+    if (this.input)   this.input.addEventListener("change", () => this._onManual());
+    if (this.playBtn) this.playBtn.addEventListener("click", () => this.toggle());
+  }
+
+  configure() {
+    const meta = this.host.meta;
+    this.steps = this._axisSteps(meta);
+    this.idx   = Math.floor((this.steps - 1) / 2);
+
+    if (this.input) {
+      this.input.min = 1;
+      this.input.max = this.steps;
+      this.input.value = this.idx + 1;
+    }
+    if (this.rangeLabel) this.rangeLabel.textContent = this._rangeText(meta);
+
+    this.panels.forEach((panel) => {
+      panel.root.hidden = !meta.sources.includes(panel.source);
+      panel.bitmap = null;
+    });
+
+    this.stop();
+  }
+
+  applyVisibility() {
+    this.panels.forEach((panel) => {
+      panel.root.hidden = !this.host.visible.has(panel.source);
+    });
+    if (this.host.meta && !this.playing && this.host.view === this.axis) this._renderFrame();
+  }
+
+  syncSpace() {
+    if (this.host.meta && !this.playing) this._renderFrame();
+  }
+
+  render() {
+    if (this.host.meta) this._renderFrame();
+  }
+
+  play() {
+    if (!this.host.meta || this.playing) return;
+    if (this.steps < 2) { this._renderFrame(); return; }
+    this.playing = true;
+    this._syncPlayBtn();
+    this._loop();
+  }
+
+  stop() {
+    this.playing = false;
+    this._syncPlayBtn();
+  }
+
+  toggle() {
+    if (this.playing) this.stop();
+    else this.play();
+  }
+
+  async _loop() {
+    while (this.playing && this.host.meta && this.host.selectedId) {
+      await this._renderFrame();
+      if (!this.playing) break;
+      await this._sleep(this.frameMs);
+      if (!this.playing) break;
+      this.idx = (this.idx + 1) % this.steps;
+    }
+  }
+
+  _onWheel(ev) {
+    if (!this.host.meta) return;
+    ev.preventDefault();
+    this.stop();
+
+    const step = ev.deltaY > 0 ? 1 : -1;
+    const next = Math.min(this.steps - 1, Math.max(0, this.idx + step));
+    if (next === this.idx) return;
+
+    this.idx = next;
+    this._renderFrame();
+  }
+
+  _onManual() {
+    if (!this.host.meta || !this.input) return;
+    this.stop();
+    this.idx = this.host._clampInt(Number(this.input.value) - 1, this.steps);
+    this._renderFrame();
+  }
+
+  _renderFrame() {
+    if (!this.host.meta) return Promise.resolve();
+
+    this.token += 1;
+    const token = this.token;
+    this._updateLabels();
+
+    const jobs = this.panels.filter((panel) => !panel.root.hidden).map((panel) => this._fetch(panel, this.idx, token));
+    return Promise.all(jobs);
+  }
+
+  _updateLabels() {
+    const frac = this.steps > 1 ? this.idx / (this.steps - 1) : 0;
+
+    if (this.fill) this.fill.style.width = `${frac * 100}%`;
+    if (this.input && document.activeElement !== this.input) this.input.value = this.idx + 1;
+    if (this.atLabel) this.atLabel.textContent = this._atText(frac);
+  }
+
+  async _fetch(panel, idx, token) {
+    const url = this._url(panel.source, idx);
+    const skeletonTimer = panel.bitmap ? null : setTimeout(() => panel.root.classList.add("is-loading"), 120);
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+
+      const bitmap = await createImageBitmap(await res.blob());
+      if (token !== this.token) { if (bitmap.close) bitmap.close(); return; }
+
+      panel.bitmap = bitmap;
+      this._paint(panel);
+    } catch (e) {
+    } finally {
+      if (skeletonTimer) clearTimeout(skeletonTimer);
+      panel.root.classList.remove("is-loading");
+    }
+  }
+
+  _paint(panel) {
+    const bitmap = panel.bitmap;
+    const canvas = panel.canvas;
+
+    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+    }
+
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  }
+
+  _url(source, idx) {
+    const id    = encodeURIComponent(this.host.selectedId);
+    const space = this.host.space;
+
+    if (this.axis === "elevation") {
+      const frac = this.steps > 1 ? idx / (this.steps - 1) : 0;
+      return `/api/cubes/plane?id=${id}&source=${source}&frac=${frac}&space=${space}`;
+    }
+    if (this.axis === "azimuth") {
+      return `/api/cubes/slice?id=${id}&source=${source}&axis=azimuth&az=${idx}&rg=0&space=${space}`;
+    }
+    return `/api/cubes/slice?id=${id}&source=${source}&axis=range&az=0&rg=${idx}&space=${space}`;
+  }
+
+  _axisSteps(meta) {
+    if (this.axis === "elevation") {
+      const primary = meta.sources.includes("pred") ? "pred" : meta.sources[0];
+      return Math.max(1, meta.n_elev[primary] || 1);
+    }
+    if (this.axis === "azimuth") return Math.max(1, meta.n_az);
+    return Math.max(1, meta.n_rg);
+  }
+
+  _rangeText(meta) {
+    if (this.axis === "elevation") return `1–${this.steps} · ${this.host._fmt(meta.x_min)} … ${this.host._fmt(meta.x_max)}`;
+    return `1–${this.steps} · index 0–${this.steps - 1}`;
+  }
+
+  _atText(frac) {
+    if (this.axis === "elevation") {
+      const height = this.host.meta.x_min + frac * (this.host.meta.x_max - this.host.meta.x_min);
+      return `elevation ≈ ${this.host._fmt(height)} · bin ${this.idx + 1} / ${this.steps} · scroll or play to sweep`;
+    }
+    return `${this.axis} index ${this.idx} · bin ${this.idx + 1} / ${this.steps} · scroll or play to sweep`;
+  }
+
+  _syncPlayBtn() {
+    if (!this.playBtn) return;
+    this.playBtn.classList.toggle("is-playing", this.playing);
+    this.playBtn.textContent = this.playing ? "Pause" : "Play";
+  }
+
+  _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+}
+
 class TomogramView {
   static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
 
@@ -24,17 +228,11 @@ class TomogramView {
     this.spaceBtns = refs.spaceBtns || [];
     this.modeBtns = refs.modeBtns || [];
     this.viewEls = refs.views || [];
-    this.elevGrid = refs.elevGrid;
-    this.elevAt = refs.elevAt;
-    this.elevFill = refs.elevFill;
     this.jumpAz = refs.jumpAz;
     this.jumpRg = refs.jumpRg;
     this.jumpGo = refs.jumpGo;
     this.jumpAzRange = refs.jumpAzRange;
     this.jumpRgRange = refs.jumpRgRange;
-    this.elevInput = refs.elevInput;
-    this.elevRange = refs.elevRange;
-    this.ePanels = refs.ePanels || [];
     this.progress = refs.progress;
     this.progressFill = refs.progressFill;
     this.progressLabel = refs.progressLabel;
@@ -61,10 +259,10 @@ class TomogramView {
     this.ssimQueued = null;
     this.ssimFetching = false;
     this.view = "explorer";
-    this.elev = 0;
-    this.elevSteps = 1;
     this.colors = {};
     this.visible = new Set();
+
+    this.sweeps = (refs.sweeps || []).map((sweep) => new TomogramSweep(sweep, this));
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -91,14 +289,14 @@ class TomogramView {
     this.modeBtns.forEach((btn) => {
       btn.addEventListener("click", () => this._setView(btn.dataset.view));
     });
-    if (this.elevGrid) {
-      this.elevGrid.addEventListener("wheel", (ev) => this._onElevWheel(ev), { passive: false });
-    }
 
     if (this.jumpAz) this.jumpAz.addEventListener("change", () => this._setManualCut());
     if (this.jumpRg) this.jumpRg.addEventListener("change", () => this._setManualCut());
     if (this.jumpGo) this.jumpGo.addEventListener("click", () => this._setManualCut());
-    if (this.elevInput) this.elevInput.addEventListener("change", () => this._setManualElev());
+  }
+
+  leave() {
+    this._stopSweeps();
   }
 
   async enter() {
@@ -206,6 +404,7 @@ class TomogramView {
     }
     if (cubeId === this.selectedId && this.meta) return;
 
+    this._stopSweeps();
     this.selectedId = cubeId;
     this.meta = null;
     this.point = null;
@@ -327,20 +526,13 @@ class TomogramView {
     this.mapWrap.classList.add("is-loading");
     this.topdown.src = `/api/cubes/primary?id=${encodeURIComponent(this.selectedId)}`;
 
-    this.elevSteps = Math.max(1, meta.n_elev[meta.sources.includes("pred") ? "pred" : meta.sources[0]] || 1);
-    this.elev = Math.floor((this.elevSteps - 1) / 2);
     this._initCutBounds();
-    this._initElevBounds();
-    this.ePanels.forEach((panel) => {
-      panel.root.hidden = !meta.sources.includes(panel.source);
-      panel.bitmap = null;
-      panel.queued = null;
-      panel.fetching = false;
-    });
+    this.sweeps.forEach((sweep) => sweep.configure());
 
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
 
-    if (this.view === "elevation") this._renderElev();
+    const sweep = this._sweepFor(this.view);
+    if (sweep) sweep.play();
   }
 
   _setSpace(space) {
@@ -349,103 +541,30 @@ class TomogramView {
     this._syncSpaceBtns();
 
     if (!this.meta) return;
-    if (this.view === "elevation") this._renderElev();
+    const sweep = this._sweepFor(this.view);
+    if (sweep) sweep.syncSpace();
     if (this.point) this._drawSlices(this.point.az, this.point.rg);
   }
 
   _setView(view) {
-    if (!["explorer", "elevation"].includes(view) || view === this.view) return;
+    if (!["explorer", "elevation", "azimuth", "range"].includes(view) || view === this.view) return;
+
+    this._stopSweeps();
     this.view = view;
 
     this.modeBtns.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
     this.viewEls.forEach((el) => { el.hidden = el.dataset.view !== view; });
 
-    if (view === "elevation" && this.meta) this._renderElev();
+    const sweep = this._sweepFor(view);
+    if (sweep && this.meta) sweep.play();
   }
 
-  _onElevWheel(ev) {
-    if (!this.meta) return;
-    ev.preventDefault();
-
-    const step = ev.deltaY > 0 ? 1 : -1;
-    const next = Math.min(this.elevSteps - 1, Math.max(0, this.elev + step));
-    if (next === this.elev) return;
-
-    this.elev = next;
-    this._renderElev();
+  _sweepFor(view) {
+    return this.sweeps.find((sweep) => sweep.axis === view) || null;
   }
 
-  _setManualElev() {
-    if (!this.meta || !this.elevInput) return;
-    this.elev = this._clampInt(Number(this.elevInput.value) - 1, this.elevSteps);
-    this._renderElev();
-  }
-
-  _initElevBounds() {
-    if (this.elevInput) {
-      this.elevInput.min = 1;
-      this.elevInput.max = this.elevSteps;
-      this.elevInput.value = this.elev + 1;
-    }
-    if (this.elevRange) this.elevRange.textContent = `1–${this.elevSteps} · ${this._fmt(this.meta.x_min)} … ${this._fmt(this.meta.x_max)}`;
-  }
-
-  _renderElev() {
-    const frac   = this.elevSteps > 1 ? this.elev / (this.elevSteps - 1) : 0;
-    const height = this.meta.x_min + frac * (this.meta.x_max - this.meta.x_min);
-
-    this.elevAt.textContent = `elevation ≈ ${this._fmt(height)} · bin ${this.elev + 1} / ${this.elevSteps} · scroll to sweep`;
-    if (this.elevFill) this.elevFill.style.width = `${frac * 100}%`;
-    if (this.elevInput && document.activeElement !== this.elevInput) this.elevInput.value = this.elev + 1;
-
-    this.ePanels.forEach((panel) => {
-      if (panel.root.hidden) return;
-      panel.queued = frac;
-      this._elevPump(panel);
-    });
-  }
-
-  async _elevPump(panel) {
-    if (panel.fetching) return;
-    panel.fetching = true;
-
-    while (panel.queued !== null && panel.queued !== undefined) {
-      const frac = panel.queued;
-      panel.queued = null;
-      await this._fetchPlane(panel, frac);
-    }
-
-    panel.fetching = false;
-  }
-
-  async _fetchPlane(panel, frac) {
-    const space = this.space;
-    const url   = `/api/cubes/plane?id=${encodeURIComponent(this.selectedId)}&source=${panel.source}&frac=${frac}&space=${space}`;
-    const skeletonTimer = panel.bitmap ? null : setTimeout(() => panel.root.classList.add("is-loading"), 120);
-
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return;
-
-      panel.bitmap = await createImageBitmap(await res.blob());
-      this._paintPlane(panel);
-    } catch (e) {
-    } finally {
-      if (skeletonTimer) clearTimeout(skeletonTimer);
-      panel.root.classList.remove("is-loading");
-    }
-  }
-
-  _paintPlane(panel) {
-    const bitmap = panel.bitmap;
-    const canvas = panel.canvas;
-
-    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-    }
-
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  _stopSweeps() {
+    this.sweeps.forEach((sweep) => sweep.stop());
   }
 
   _setProfMode(mode) {
@@ -500,6 +619,8 @@ class TomogramView {
       });
     }
     this.slicesEl.style.setProperty("--cube-rows", String(this.visible.size));
+
+    this.sweeps.forEach((sweep) => sweep.applyVisibility());
   }
 
   _syncSpaceBtns() {

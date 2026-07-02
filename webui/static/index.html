@@ -251,6 +251,8 @@
       <div class="cube-modes" role="tablist" aria-label="Cube view">
         <button type="button" class="cube-mode is-active" data-view="explorer">Cuts</button>
         <button type="button" class="cube-mode" data-view="elevation">Elevation sweep</button>
+        <button type="button" class="cube-mode" data-view="azimuth">Azimuth sweep</button>
+        <button type="button" class="cube-mode" data-view="range">Range sweep</button>
       </div>
 
       <div class="cube-view" data-view="explorer">
@@ -350,21 +352,82 @@
       <div class="cube-view" data-view="elevation" hidden>
         <div class="cube-elev">
           <div class="cube-elev__bar">
-            <div class="cube-jump" role="group" aria-label="Set an elevation bin">
-              <span class="cube-jump__cell">
-                <label for="cube-elev-input">bin</label>
-                <input type="number" id="cube-elev-input" class="cube-jump__input" min="1" step="1" inputmode="numeric" />
-                <span class="cube-jump__range" id="cube-elev-range"></span>
-              </span>
+            <div class="cube-sweep__controls">
+              <button type="button" class="cube-sweep__play" id="cube-elevation-play">Play</button>
+              <div class="cube-jump" role="group" aria-label="Set an elevation bin">
+                <span class="cube-jump__cell">
+                  <label for="cube-elevation-input">bin</label>
+                  <input type="number" id="cube-elevation-input" class="cube-jump__input" min="1" step="1" inputmode="numeric" />
+                  <span class="cube-jump__range" id="cube-elevation-range"></span>
+                </span>
+              </div>
             </div>
-            <span class="cube-elev__at" id="cube-elev-at">Scroll over a panel to sweep the tomograms through elevation.</span>
+            <span class="cube-elev__at" id="cube-elevation-at">Play the sweep, or scroll a panel to move through elevation.</span>
             <div class="cube-spaces" role="group" aria-label="Value space">
               <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
               <button type="button" class="cube-space" data-space="normalized">Normalized</button>
             </div>
           </div>
-          <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-elev-fill"></i></div>
-          <div class="cube-elev__grid" id="cube-elev-grid">
+          <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-elevation-fill"></i></div>
+          <div class="cube-elev__grid" id="cube-elevation-grid">
+            <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
+            <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
+            <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
+          </div>
+        </div>
+      </div>
+
+      <div class="cube-view" data-view="azimuth" hidden>
+        <div class="cube-elev">
+          <div class="cube-elev__bar">
+            <div class="cube-sweep__controls">
+              <button type="button" class="cube-sweep__play" id="cube-azimuth-play">Play</button>
+              <div class="cube-jump" role="group" aria-label="Set an azimuth bin">
+                <span class="cube-jump__cell">
+                  <label for="cube-azimuth-input">bin</label>
+                  <input type="number" id="cube-azimuth-input" class="cube-jump__input" min="1" step="1" inputmode="numeric" />
+                  <span class="cube-jump__range" id="cube-azimuth-range"></span>
+                </span>
+              </div>
+            </div>
+            <span class="cube-elev__at" id="cube-azimuth-at">Play the sweep, or scroll a panel to move through azimuth.</span>
+            <div class="cube-spaces" role="group" aria-label="Value space">
+              <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+              <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+            </div>
+          </div>
+          <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-azimuth-fill"></i></div>
+          <div class="cube-elev__grid" id="cube-azimuth-grid">
+            <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
+            <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
+            <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
+          </div>
+        </div>
+      </div>
+
+      <div class="cube-view" data-view="range" hidden>
+        <div class="cube-elev">
+          <div class="cube-elev__bar">
+            <div class="cube-sweep__controls">
+              <button type="button" class="cube-sweep__play" id="cube-range-play">Play</button>
+              <div class="cube-jump" role="group" aria-label="Set a range bin">
+                <span class="cube-jump__cell">
+                  <label for="cube-range-input">bin</label>
+                  <input type="number" id="cube-range-input" class="cube-jump__input" min="1" step="1" inputmode="numeric" />
+                  <span class="cube-jump__range" id="cube-range-range"></span>
+                </span>
+              </div>
+            </div>
+            <span class="cube-elev__at" id="cube-range-at">Play the sweep, or scroll a panel to move through range.</span>
+            <div class="cube-spaces" role="group" aria-label="Value space">
+              <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+              <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+            </div>
+          </div>
+          <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-range-fill"></i></div>
+          <div class="cube-elev__grid" id="cube-range-grid">
             <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
             <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
             <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
