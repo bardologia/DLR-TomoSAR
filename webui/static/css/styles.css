@@ -2603,6 +2603,14 @@ main { margin-left: var(--navw); }
 .cube-slice canvas { width: 100%; height: clamp(120px, calc((100vh - 256px) / var(--cube-rows) - 26px), 640px); display: block; background: #fff; border: 1px solid var(--line); }
 .cube-slice__metric { display: block; margin-top: 5px; font-family: var(--mono); font-size: 11px; line-height: 1.2; color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
 
+@media (min-width: 1281px) {
+  .cube-slices { grid-template-rows: auto auto auto; row-gap: 14px; }
+  .cube-slices__bar { grid-row: 1; }
+  .cube-cutgroup { grid-row: 2 / span 2; display: grid; grid-template-rows: subgrid; }
+  .cube-cutgroup[data-axis="range"]   { grid-column: 1; }
+  .cube-cutgroup[data-axis="azimuth"] { grid-column: 2; }
+}
+
 /* per-source error metrics under the profiles */
 .cube-metrics { width: 100%; margin-top: 16px; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
 .cube-metrics th, .cube-metrics td { padding: 6px 6px; text-align: right; white-space: nowrap; }
