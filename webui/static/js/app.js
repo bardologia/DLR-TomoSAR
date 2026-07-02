@@ -190,6 +190,13 @@ class App {
       elevGrid      : document.getElementById("cube-elev-grid"),
       elevAt        : document.getElementById("cube-elev-at"),
       elevFill      : document.getElementById("cube-elev-fill"),
+      jumpAz        : document.getElementById("cube-jump-az"),
+      jumpRg        : document.getElementById("cube-jump-rg"),
+      jumpGo        : document.getElementById("cube-jump-go"),
+      jumpAzRange   : document.getElementById("cube-jump-az-range"),
+      jumpRgRange   : document.getElementById("cube-jump-rg-range"),
+      elevInput     : document.getElementById("cube-elev-input"),
+      elevRange     : document.getElementById("cube-elev-range"),
       ePanels       : [...document.querySelectorAll(".cube-eplane")].map((root) => ({
         root,
         source : root.dataset.source,

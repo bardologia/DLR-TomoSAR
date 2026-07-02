@@ -2510,6 +2510,18 @@ main { margin-left: var(--navw); }
 .cube-slices__bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; min-height: 36px; grid-column: 1 / -1; padding-bottom: 14px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
 .cube-slices__bar .btn[hidden] { display: none; }
 .cube-slices__at { font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep); }
+
+.cube-jump { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.cube-jump__cell { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.cube-jump__cell label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
+.cube-jump__input {
+  width: 5.5ch; padding: 4px 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-btn, 8px);
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  text-align: right;
+}
+.cube-jump__input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cube-jump__range { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .cube-slices__bar .cube-sources { margin-left: auto; }
 .cube-slices__bar .cube-spaces { margin-left: 0; }
 

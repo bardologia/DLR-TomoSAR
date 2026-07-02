@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 class PretrainConfig:
     find_batch_size : bool = False
     tune_loader     : bool = False
-    run_overfit     : bool = False
 
     vram_budget_gb : float = 40.0
     max_batch      : int   = 512
@@ -18,11 +17,5 @@ class PretrainConfig:
     warmup_batches   : int             = 8
     timed_batches    : int             = 60
     data_wait_target : float           = 0.05
-
-    overfit_max_steps           : int   = 30000
-    overfit_stop_threshold      : float = 0.03
-    overfit_batch_size          : int   = 9
-    overfit_require_convergence : bool  = True
-    overfit_abort_on_fail       : bool  = True
 
     seed : int = 42

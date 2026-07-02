@@ -8,10 +8,8 @@ from pipelines.benchmark.workers import (
     BenchmarkWorker,
     MaxBatchWorker,
 )
-from tools.training.pretraining.overfit_gate import OverfitModelPreparer
 
 from configuration.benchmark import BenchmarkConfig
-from models import BACKBONE_CONFIG_REGISTRY
 from tools.data.io import FileIO
 
 
@@ -20,25 +18,6 @@ def config(tmp_path):
     config                    = BenchmarkConfig()
     config.paths.log_base_dir = tmp_path
     return config
-
-
-def test_overfit_preparer_zeroes_regularization():
-    model_config = BACKBONE_CONFIG_REGISTRY["unet"]()
-    model_config.dropout = 0.3
-
-    prepared = OverfitModelPreparer(model_config).prepare()
-
-    assert prepared.dropout    == 0.0
-    assert prepared.encoder_wd == 0.0
-
-
-def test_overfit_preparer_boosts_learning_rates_tenfold():
-    model_config = BACKBONE_CONFIG_REGISTRY["unet"]()
-    base_lr      = model_config.encoder_lr
-
-    prepared = OverfitModelPreparer(model_config).prepare()
-
-    assert prepared.encoder_lr == pytest.approx(base_lr * 10.0)
 
 
 def test_run_name_encodes_component_and_seed(config):

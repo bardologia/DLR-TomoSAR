@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260702a" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260702b" />
 </head>
 <body>
 
@@ -273,6 +273,19 @@
           <div class="cube-slices__bar">
             <button type="button" class="btn btn--mini" id="cube-back" hidden>&larr; Back to primary</button>
             <span class="cube-slices__at" id="cube-slices-at"></span>
+            <div class="cube-jump" role="group" aria-label="Set a cut by azimuth and range">
+              <span class="cube-jump__cell">
+                <label for="cube-jump-az">az</label>
+                <input type="number" id="cube-jump-az" class="cube-jump__input" min="0" step="1" inputmode="numeric" />
+                <span class="cube-jump__range" id="cube-jump-az-range"></span>
+              </span>
+              <span class="cube-jump__cell">
+                <label for="cube-jump-rg">rg</label>
+                <input type="number" id="cube-jump-rg" class="cube-jump__input" min="0" step="1" inputmode="numeric" />
+                <span class="cube-jump__range" id="cube-jump-rg-range"></span>
+              </span>
+              <button type="button" class="btn btn--mini" id="cube-jump-go">Cut</button>
+            </div>
             <div class="cube-sources" id="cube-sources" role="group" aria-label="Visible sources"></div>
             <div class="cube-spaces" role="group" aria-label="Value space">
               <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
@@ -336,6 +349,13 @@
       <div class="cube-view" data-view="elevation" hidden>
         <div class="cube-elev">
           <div class="cube-elev__bar">
+            <div class="cube-jump" role="group" aria-label="Set an elevation bin">
+              <span class="cube-jump__cell">
+                <label for="cube-elev-input">bin</label>
+                <input type="number" id="cube-elev-input" class="cube-jump__input" min="1" step="1" inputmode="numeric" />
+                <span class="cube-jump__range" id="cube-elev-range"></span>
+              </span>
+            </div>
             <span class="cube-elev__at" id="cube-elev-at">Scroll over a panel to sweep the tomograms through elevation.</span>
             <div class="cube-spaces" role="group" aria-label="Value space">
               <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
@@ -602,7 +622,7 @@
 <script src="/static/js/ablation.js?v=20260625e"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
-<script src="/static/js/tomogram.js?v=20260702a"></script>
+<script src="/static/js/tomogram.js?v=20260702b"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260624d"></script>

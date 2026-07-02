@@ -10,7 +10,6 @@ import torch
 from tools.monitoring.logger              import Logger
 from tools.training.pretraining.batch_finder import BatchSizeFinder
 from tools.training.pretraining.loader_tuner import LoaderTuner
-from tools.training.pretraining.overfit_gate import OverfitGate
 
 
 @dataclass
@@ -20,7 +19,6 @@ class PretrainContext:
     to_model_input : Callable
     forward_loss   : Callable
     trial_step     : Callable[[int], float]
-    run_overfit    : Callable[[], Optional[float]]
     device         : torch.device
     use_amp        : bool  = False
     context_gb     : float = 0.0
@@ -37,7 +35,7 @@ class PretrainOrchestrator:
         self.result_dir = Path(result_dir) if result_dir is not None else None
 
     def _enabled(self) -> bool:
-        return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader or self.pretrain.run_overfit)
+        return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader)
 
     def _release_cache(self) -> None:
         gc.collect()
@@ -94,27 +92,6 @@ class PretrainOrchestrator:
         self.training.prefetch_factor = int(choice["prefetch_factor"])
         self.logger.subsection(f"Resolved loader: workers={self.training.num_workers} prefetch={self.training.prefetch_factor} (pin_memory recommendation {choice['pin_memory']})")
 
-    def _run_overfit(self, context: PretrainContext) -> None:
-        self.logger.section("[Pretrain] Overfit gate")
-
-        run_overfit = context.run_overfit
-        del context
-        self._release_cache()
-
-        result_path = self.result_dir / "pretrain_overfit_result.json" if self.result_dir is not None else None
-
-        gate = OverfitGate(
-            run_overfit         = run_overfit,
-            stop_threshold      = self.pretrain.overfit_stop_threshold,
-            logger              = self.logger,
-            label               = self.label,
-            require_convergence = self.pretrain.overfit_require_convergence,
-            abort_on_fail       = self.pretrain.overfit_abort_on_fail,
-            result_path         = result_path,
-        )
-
-        gate.run()
-
     def run(self) -> None:
         if not self._enabled():
             return
@@ -125,8 +102,4 @@ class PretrainOrchestrator:
 
         if self.pretrain.tune_loader:
             self._tune_loader(self.build())
-            self._release_cache()
-
-        if self.pretrain.run_overfit:
-            self._run_overfit(self.build())
             self._release_cache()

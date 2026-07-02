@@ -214,10 +214,6 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
         return trainer, datasets["train"], model
 
-    def _overfit_entry(self, entry):
-        entry.infer_after = False
-        return entry
-
     def run(self):
         self._pretrain_preflight()
 

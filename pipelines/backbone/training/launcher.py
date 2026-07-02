@@ -74,38 +74,6 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         return trainer, dataset, model
 
-    def _overfit_loss(self):
-        from configuration.training      import OverfitConfig
-        from tools.training.pretraining.overfit_gate import OverfitModelPreparer
-
-        pretrain = self.config.pretrain
-        work_dir = Path(self.config.logdir) / "pretrain" / "overfit"
-
-        trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
-        trainer_config.curriculum = self.config.curriculum
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-        trainer_config.overfit    = OverfitConfig(enabled=True, max_steps=pretrain.overfit_max_steps, stop_threshold=pretrain.overfit_stop_threshold, batch_size=pretrain.overfit_batch_size)
-
-        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
-        model_config = OverfitModelPreparer(model_config).prepare()
-
-        dataset_config              = self.factory.training_dataset_config()
-        dataset_config.input_config = self.config.input
-
-        pipeline = TrainingPipeline(
-            trainer_config = trainer_config,
-            dataset_config = dataset_config,
-            backbone_name  = self.config.backbone_name,
-            model_config   = model_config,
-            seed           = pretrain.seed,
-            run_name       = f"{self.config.backbone_name}_pretrain_overfit",
-        )
-
-        outputs      = pipeline.run(probe_config=self._probe_config())
-        train_losses = outputs[0] if isinstance(outputs, (tuple, list)) and outputs else None
-
-        return float(train_losses[-1]) if train_losses else None
-
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(
             enabled        = self.config.probe_enabled,

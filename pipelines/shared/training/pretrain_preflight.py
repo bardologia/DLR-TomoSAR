@@ -18,7 +18,7 @@ class PretrainPreflight:
         self.label    = label
 
     def _enabled(self) -> bool:
-        return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader or self.pretrain.run_overfit)
+        return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader)
 
     def run(self) -> None:
         if not self._enabled():

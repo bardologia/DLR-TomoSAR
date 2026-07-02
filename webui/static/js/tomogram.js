@@ -27,6 +27,13 @@ class TomogramView {
     this.elevGrid = refs.elevGrid;
     this.elevAt = refs.elevAt;
     this.elevFill = refs.elevFill;
+    this.jumpAz = refs.jumpAz;
+    this.jumpRg = refs.jumpRg;
+    this.jumpGo = refs.jumpGo;
+    this.jumpAzRange = refs.jumpAzRange;
+    this.jumpRgRange = refs.jumpRgRange;
+    this.elevInput = refs.elevInput;
+    this.elevRange = refs.elevRange;
     this.ePanels = refs.ePanels || [];
     this.progress = refs.progress;
     this.progressFill = refs.progressFill;
@@ -87,6 +94,11 @@ class TomogramView {
     if (this.elevGrid) {
       this.elevGrid.addEventListener("wheel", (ev) => this._onElevWheel(ev), { passive: false });
     }
+
+    if (this.jumpAz) this.jumpAz.addEventListener("change", () => this._setManualCut());
+    if (this.jumpRg) this.jumpRg.addEventListener("change", () => this._setManualCut());
+    if (this.jumpGo) this.jumpGo.addEventListener("click", () => this._setManualCut());
+    if (this.elevInput) this.elevInput.addEventListener("change", () => this._setManualElev());
   }
 
   async enter() {
@@ -317,6 +329,8 @@ class TomogramView {
 
     this.elevSteps = Math.max(1, meta.n_elev[meta.sources.includes("pred") ? "pred" : meta.sources[0]] || 1);
     this.elev = Math.floor((this.elevSteps - 1) / 2);
+    this._initCutBounds();
+    this._initElevBounds();
     this.ePanels.forEach((panel) => {
       panel.root.hidden = !meta.sources.includes(panel.source);
       panel.bitmap = null;
@@ -361,12 +375,28 @@ class TomogramView {
     this._renderElev();
   }
 
+  _setManualElev() {
+    if (!this.meta || !this.elevInput) return;
+    this.elev = this._clampInt(Number(this.elevInput.value) - 1, this.elevSteps);
+    this._renderElev();
+  }
+
+  _initElevBounds() {
+    if (this.elevInput) {
+      this.elevInput.min = 1;
+      this.elevInput.max = this.elevSteps;
+      this.elevInput.value = this.elev + 1;
+    }
+    if (this.elevRange) this.elevRange.textContent = `1–${this.elevSteps} · ${this._fmt(this.meta.x_min)} … ${this._fmt(this.meta.x_max)}`;
+  }
+
   _renderElev() {
     const frac   = this.elevSteps > 1 ? this.elev / (this.elevSteps - 1) : 0;
     const height = this.meta.x_min + frac * (this.meta.x_max - this.meta.x_min);
 
     this.elevAt.textContent = `elevation ≈ ${this._fmt(height)} · bin ${this.elev + 1} / ${this.elevSteps} · scroll to sweep`;
     if (this.elevFill) this.elevFill.style.width = `${frac * 100}%`;
+    if (this.elevInput && document.activeElement !== this.elevInput) this.elevInput.value = this.elev + 1;
 
     this.ePanels.forEach((panel) => {
       if (panel.root.hidden) return;
@@ -514,6 +544,30 @@ class TomogramView {
     this._enterSlices(point);
   }
 
+  _setManualCut() {
+    if (!this.meta) return;
+
+    const az = this._clampInt(this.jumpAz ? this.jumpAz.value : 0, this.meta.n_az);
+    const rg = this._clampInt(this.jumpRg ? this.jumpRg.value : 0, this.meta.n_rg);
+    const point = { az, rg, fx: (rg + 0.5) / this.meta.n_rg, fy: (az + 0.5) / this.meta.n_az };
+
+    this._follow(point, true);
+    this._enterSlices(point);
+    this._syncCutInputs(az, rg, true);
+  }
+
+  _syncCutInputs(az, rg, force = false) {
+    if (this.jumpAz && (force || document.activeElement !== this.jumpAz)) this.jumpAz.value = az;
+    if (this.jumpRg && (force || document.activeElement !== this.jumpRg)) this.jumpRg.value = rg;
+  }
+
+  _initCutBounds() {
+    if (this.jumpAz) { this.jumpAz.min = 0; this.jumpAz.max = this.meta.n_az - 1; }
+    if (this.jumpRg) { this.jumpRg.min = 0; this.jumpRg.max = this.meta.n_rg - 1; }
+    if (this.jumpAzRange) this.jumpAzRange.textContent = `0–${this.meta.n_az - 1}`;
+    if (this.jumpRgRange) this.jumpRgRange.textContent = `0–${this.meta.n_rg - 1}`;
+  }
+
   _enterSlices(point) {
     this.mode = "slices";
     this.locked = { az: point.az, rg: point.rg };
@@ -571,6 +625,7 @@ class TomogramView {
     this.point = point;
     this._moveCross(point);
     this.coords.textContent = `az = ${point.az} · rg = ${point.rg} · click to lock`;
+    this._syncCutInputs(point.az, point.rg);
 
     this._drawSlices(point.az, point.rg);
   }
@@ -926,6 +981,12 @@ class TomogramView {
 
     if (area <= 0) return values.map(() => 0);
     return values.map((v) => v / area);
+  }
+
+  _clampInt(value, count) {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(count - 1, Math.max(0, n));
   }
 
   _fmt(value) {

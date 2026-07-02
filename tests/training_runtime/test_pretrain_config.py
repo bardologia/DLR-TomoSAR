@@ -11,10 +11,8 @@ _ENTRY_CONFIGS = [BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, Im
 _EXPECTED_FLAGS = (
     "pretrain.find_batch_size",
     "pretrain.tune_loader",
-    "pretrain.run_overfit",
     "pretrain.vram_budget_gb",
     "pretrain.max_batch",
-    "pretrain.overfit_stop_threshold",
 )
 
 
@@ -32,4 +30,3 @@ def test_pretrain_defaults_are_disabled(entry_config):
 
     assert config.pretrain.find_batch_size is False
     assert config.pretrain.tune_loader     is False
-    assert config.pretrain.run_overfit     is False

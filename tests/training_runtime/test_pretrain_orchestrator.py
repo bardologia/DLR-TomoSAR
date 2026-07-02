@@ -20,7 +20,6 @@ def _pretrain(**overrides):
     base = dict(
         find_batch_size = False,
         tune_loader     = False,
-        run_overfit     = False,
         vram_budget_gb  = 10.0,
         max_batch       = 8,
         measure_steps   = 1,
@@ -29,9 +28,6 @@ def _pretrain(**overrides):
         warmup_batches  = 1,
         timed_batches   = 1,
         data_wait_target = 0.05,
-        overfit_stop_threshold      = 1.0,
-        overfit_require_convergence = False,
-        overfit_abort_on_fail       = True,
         seed = 0,
     )
     base.update(overrides)
@@ -47,17 +43,12 @@ def _context(order, training):
         order.append(("trial", batch_size))
         return 1.0 if batch_size <= 4 else 100.0
 
-    def run_overfit():
-        order.append(("overfit", training.batch_size))
-        return 0.5
-
     return PretrainContext(
         dataset        = None,
         model          = None,
         to_model_input = None,
         forward_loss   = None,
         trial_step     = trial,
-        run_overfit    = run_overfit,
         device         = torch.device("cpu"),
         use_amp        = False,
         context_gb     = 0.0,
@@ -80,7 +71,7 @@ def test_batch_finder_runs_before_tuner_and_feeds_resolved_batch(monkeypatch):
     monkeypatch.setattr(orchestrator_module, "LoaderTuner", _FakeTuner)
 
     PretrainOrchestrator(
-        pretrain_config = _pretrain(find_batch_size=True, tune_loader=True, run_overfit=True),
+        pretrain_config = _pretrain(find_batch_size=True, tune_loader=True),
         training_config = training,
         build_context   = lambda: _context(order, training),
         logger          = _Logger(),
@@ -91,12 +82,9 @@ def test_batch_finder_runs_before_tuner_and_feeds_resolved_batch(monkeypatch):
     assert training.num_workers     == 3
     assert training.prefetch_factor == 4
 
-    tune_index    = next(i for i, (kind, _) in enumerate(order) if kind == "tune")
-    overfit_index = next(i for i, (kind, _) in enumerate(order) if kind == "overfit")
+    tune_index = next(i for i, (kind, _) in enumerate(order) if kind == "tune")
 
-    assert order[tune_index]    == ("tune", 4)
-    assert order[overfit_index] == ("overfit", 4)
-    assert tune_index < overfit_index
+    assert order[tune_index] == ("tune", 4)
     assert any(kind == "trial" for kind, _ in order[:tune_index])
 
 
