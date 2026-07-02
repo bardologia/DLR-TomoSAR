@@ -279,6 +279,7 @@ class Report:
         out += self._build_slot_organization_headline()
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
+        out += self._build_jepa_headline()
         out += self._build_reduced_headline()
         out += self._build_data_consistency_headline()
 
@@ -498,6 +499,29 @@ class Report:
 
         return out
 
+    def _build_jepa_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "jepa_embedding_mse" not in gm:
+            return []
+
+        out = [f"\n### {self._next_subsection()} JEPA embedding diagnostics\n"]
+        out.append(
+            "The JEPA objective is measured directly in embedding space: the backbone's predicted profile "
+            "embedding is compared against the checkpoint encoder's embedding of the GT curve, both in the "
+            "decoder's normalised embedding space. The decoder-only error isolates the profile-autoencoder "
+            "reconstruction floor; the full-chain error is the decoded prediction against the GT curve in "
+            "normalised curve space, so chain − decoder gauges how much error the predictor itself adds.\n"
+        )
+        out.append(self._three_col_table([
+            ("Embedding MSE",           gm["jepa_embedding_mse"],    "Predicted vs target embedding, normalised space"),
+            ("Embedding cosine",        gm["jepa_embedding_cosine"], "Mean cosine similarity along the embedding dimension"),
+            ("Decoder-only MSE (norm)", gm["jepa_decode_mse_norm"],  "decode(encode(GT)) vs GT, normalised curves"),
+            ("Full-chain MSE (norm)",   gm["jepa_chain_mse_norm"],   "decode(predicted embedding) vs GT, normalised curves"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
+
     def _build_data_consistency_headline(self) -> List[str]:
         gm = self.global_metrics
         if "physics_coherence_error_mean" not in gm:
@@ -563,6 +587,7 @@ class Report:
             "3.9 Slot occupancy & active count":  {},
             "3.10 Matched Gaussian errors (permutation-invariant)": {},
             "3.11 Interferometric data consistency": {},
+            "3.12 JEPA embedding diagnostics": {},
         }
 
         for k, v in sorted(gm.items()):
@@ -574,6 +599,8 @@ class Report:
                 groups["3.1 Dataset statistics"][k] = v
             elif self._is_physics_key(k):
                 groups["3.11 Interferometric data consistency"][k] = v
+            elif k.startswith("jepa_"):
+                groups["3.12 JEPA embedding diagnostics"][k] = v
             elif k.startswith("matched_"):
                 groups["3.10 Matched Gaussian errors (permutation-invariant)"][k] = v
             elif self._is_occupancy_key(k):

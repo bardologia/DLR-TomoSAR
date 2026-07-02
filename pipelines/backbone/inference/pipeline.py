@@ -19,9 +19,10 @@ from tools.monitoring.logger                  import Logger
 
 @dataclass(frozen=True)
 class InferenceComponents:
-    loader_cls    : Type[RunLoader] = RunLoader
-    predictor_cls : Type[Predictor] = Predictor
-    param_space   : bool            = True
+    loader_cls              : Type[RunLoader] = RunLoader
+    predictor_cls           : Type[Predictor] = Predictor
+    param_space             : bool            = True
+    embedding_evaluator_cls : Type | None     = None
 
 
 class InferencePipeline:
@@ -109,6 +110,15 @@ class InferencePipeline:
 
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics
+
+    def _evaluate_embeddings(self, meta: InferenceMetadata, run, global_metrics: dict, logger: Logger) -> None:
+        if self.components.embedding_evaluator_cls is None:
+            return
+
+        evaluator = self.components.embedding_evaluator_cls(run, logger)
+
+        global_metrics.update(evaluator.run())
+        Metrics.write_json(global_metrics, meta.metrics_path)
 
     def _synthesize_reduced(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, indices: dict, logger: Logger) -> None:
         if not cfg.compute_reduced:
@@ -212,6 +222,7 @@ class InferencePipeline:
         indices        = self._compute_slice_indices(cfg, _N_elev, _az, _rg)
         global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
 
+        self._evaluate_embeddings(meta, run, global_metrics, logger)
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
 

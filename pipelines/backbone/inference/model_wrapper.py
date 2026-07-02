@@ -25,6 +25,14 @@ class ModelWrapper:
         self._x_axis              = x_axis
         self._amp_max             = amp_max
 
+    @property
+    def module(self):
+        return self._model
+
+    @property
+    def device(self):
+        return self._device
+
     def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
         if self._normalizer is not None:
             out = self._normalizer.denormalize_output(out)
