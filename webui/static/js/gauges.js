@@ -156,6 +156,146 @@ class DialGauge extends CanvasBase {
   }
 }
 
+class LinearMeter extends CanvasBase {
+
+  constructor(canvas, opts) {
+    super(canvas);
+    this.min    = opts.min != null ? opts.min : 0;
+    this.max    = opts.max != null ? opts.max : 100;
+    this.label  = opts.label || "";
+    this.unit   = opts.unit || "";
+    this.color  = opts.color || "111, 155, 255";
+    this.zones  = opts.zones || [];
+    this.digits = opts.digits != null ? opts.digits : 0;
+    this.v      = this.min;
+    this.t      = this.min;
+    this.peak   = this.min;
+    this.peakAt = 0;
+    this._raf   = null;
+    this._tick  = this._tick.bind(this);
+    this._ready = true;
+    this._draw();
+  }
+
+  onResize() {
+    if (this._ready) this._draw();
+  }
+
+  range(max) {
+    if (max != null && max > this.min && max !== this.max) this.max = max;
+  }
+
+  set(value) {
+    const now = performance.now();
+    const v   = Math.max(this.min, Math.min(this.max, value == null ? this.min : value));
+
+    if (v >= this.peak || now - this.peakAt > 60000) { this.peak = v; this.peakAt = now; }
+    this.t = v;
+
+    if (REDUCED_MOTION) { this.v = v; this._draw(); return; }
+    if (this._raf == null) this._raf = requestAnimationFrame(this._tick);
+  }
+
+  _tick() {
+    this.v += (this.t - this.v) * 0.14;
+    if (Math.abs(this.t - this.v) < (this.max - this.min) * 0.0005) {
+      this.v    = this.t;
+      this._raf = null;
+      this._draw();
+      return;
+    }
+    this._draw();
+    this._raf = requestAnimationFrame(this._tick);
+  }
+
+  _x(v, x0, x1) {
+    return x0 + ((v - this.min) / (this.max - this.min)) * (x1 - x0);
+  }
+
+  _draw() {
+    if (this.w < 60 || this.h < 30) return;
+    const ctx = this.ctx;
+    const w   = this.w;
+    const h   = this.h;
+    ctx.clearRect(0, 0, w, h);
+
+    const x0 = 2;
+    const x1 = w - 2;
+    const ty = h - 12;
+
+    ctx.font         = "600 8px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.textAlign    = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle    = "rgba(158, 173, 181, 0.85)";
+    ctx.fillText(this.label, x0, 7);
+
+    ctx.font      = "600 12.5px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(230, 240, 246, 0.95)";
+    ctx.fillText(`${this.v.toFixed(this.digits)}${this.unit}`, x1, 8);
+
+    this.zones.forEach((z) => {
+      ctx.beginPath();
+      ctx.moveTo(this._x(z.from, x0, x1), ty - 7);
+      ctx.lineTo(this._x(z.to, x0, x1), ty - 7);
+      ctx.strokeStyle = `rgba(${z.color}, 0.75)`;
+      ctx.lineWidth   = 2.5;
+      ctx.stroke();
+    });
+
+    ctx.beginPath();
+    ctx.moveTo(x0, ty);
+    ctx.lineTo(x1, ty);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+
+    if (this.v > this.min) {
+      ctx.beginPath();
+      ctx.moveTo(x0, ty);
+      ctx.lineTo(this._x(this.v, x0, x1), ty);
+      ctx.strokeStyle = `rgba(${this.color}, 0.6)`;
+      ctx.lineWidth   = 2;
+      ctx.shadowColor = `rgba(${this.color}, 0.5)`;
+      ctx.shadowBlur  = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    for (let i = 0; i <= 10; i++) {
+      const tx    = x0 + (i / 10) * (x1 - x0);
+      const major = i % 5 === 0;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty + 3);
+      ctx.lineTo(tx, ty + (major ? 9 : 6));
+      ctx.strokeStyle = major ? "rgba(220, 235, 245, 0.45)" : "rgba(220, 235, 245, 0.22)";
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+    }
+
+    if (this.peak > this.v + (this.max - this.min) * 0.01) {
+      const px = this._x(this.peak, x0, x1);
+      ctx.beginPath();
+      ctx.moveTo(px, ty - 9);
+      ctx.lineTo(px, ty - 3);
+      ctx.strokeStyle = "rgba(251, 191, 36, 0.9)";
+      ctx.lineWidth   = 1.6;
+      ctx.stroke();
+    }
+
+    const nx = this._x(this.v, x0, x1);
+    ctx.beginPath();
+    ctx.moveTo(nx, ty - 9);
+    ctx.lineTo(nx, ty + 4);
+    ctx.strokeStyle = "rgba(230, 240, 246, 0.95)";
+    ctx.lineWidth   = 1.8;
+    ctx.shadowColor = `rgba(${this.color}, 0.7)`;
+    ctx.shadowBlur  = 7;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+
 class TankGauge extends CanvasBase {
 
   constructor(canvas, opts) {
@@ -318,6 +458,7 @@ class SegMeter extends CanvasBase {
   }
 }
 
-window.DialGauge = DialGauge;
+window.DialGauge   = DialGauge;
+window.LinearMeter = LinearMeter;
 window.TankGauge = TankGauge;
 window.SegMeter  = SegMeter;

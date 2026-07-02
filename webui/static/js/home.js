@@ -63,9 +63,11 @@ class StatusBoard {
           `<article class="gcard" data-gpu="${i}">` +
           `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span></header>` +
           `<div class="gcard__cluster">` +
-          `<canvas class="gdial gdial--sub gdial--temp"></canvas>` +
           `<canvas class="gdial gdial--big gdial--util"></canvas>` +
-          `<canvas class="gdial gdial--sub gdial--power"></canvas>` +
+          `<div class="gcard__meters">` +
+          `<canvas class="gmeter gmeter--temp"></canvas>` +
+          `<canvas class="gmeter gmeter--power"></canvas>` +
+          `</div>` +
           `</div>` +
           `<div class="gcard__vramrow"><span class="gcard__vlabel">vram</span><canvas class="gseg"></canvas><span class="gcard__vram">--</span></div>` +
           `<canvas class="gcard__graph"></canvas>` +
@@ -153,9 +155,9 @@ class StatusBoard {
       `<header class="sboard__cap"><span>neighbour impact</span><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
       `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
       `<div class="impact__grid">` +
-      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-mem-dial"></canvas><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-io-dial"></canvas><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><canvas class="gdial gdial--sub" id="sb-impact-cpu-dial"></canvas><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gmeter gmeter--impact" id="sb-impact-mem-meter"></canvas><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gmeter gmeter--impact" id="sb-impact-io-meter"></canvas><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><canvas class="gmeter gmeter--impact" id="sb-impact-cpu-meter"></canvas><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
       `</div>` +
       `<dl class="impact__stats">` +
       `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
@@ -188,8 +190,8 @@ class StatusBoard {
       power: card.querySelector(".gcard__power"),
       graph: card.querySelector(".gcard__graph"),
       dialU: new window.DialGauge(card.querySelector(".gdial--util"), { big: true, label: "UTIL %", color: "111, 155, 255", majors: 5, minors: 4 }),
-      dialT: new window.DialGauge(card.querySelector(".gdial--temp"), { min: 20, max: 100, label: "TEMP °C", color: "45, 212, 191", majors: 2, minors: 5, zones: [{ from: 70, to: 85, color: "251, 191, 36" }, { from: 85, to: 100, color: "248, 113, 113" }] }),
-      dialP: new window.DialGauge(card.querySelector(".gdial--power"), { max: (gpus[i] && gpus[i].power_limit) || 250, label: "PWR W", color: "167, 139, 250", majors: 2, minors: 5 }),
+      meterT: new window.LinearMeter(card.querySelector(".gmeter--temp"), { min: 20, max: 100, label: "TEMP °C", color: "45, 212, 191", zones: [{ from: 70, to: 85, color: "251, 191, 36" }, { from: 85, to: 100, color: "248, 113, 113" }] }),
+      meterP: new window.LinearMeter(card.querySelector(".gmeter--power"), { max: (gpus[i] && gpus[i].power_limit) || 250, label: "POWER W", color: "167, 139, 250" }),
       vseg: new window.SegMeter(card.querySelector(".gseg"), { color: "45, 212, 191" }),
     }));
 
@@ -197,10 +199,10 @@ class StatusBoard {
     this.ramTank = new window.TankGauge(document.getElementById("sb-ram-tank"), { color: "45, 212, 191" });
     this.swapTank = new window.TankGauge(document.getElementById("sb-swap-tank"), { color: "167, 139, 250" });
 
-    this.impactDials = {
-      mem: new window.DialGauge(document.getElementById("sb-impact-mem-dial"), { label: "MEM STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 10, to: 25, color: "251, 191, 36" }, { from: 25, to: 100, color: "248, 113, 113" }] }),
-      io:  new window.DialGauge(document.getElementById("sb-impact-io-dial"),  { label: "DISK STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 25, to: 60, color: "251, 191, 36" }, { from: 60, to: 100, color: "248, 113, 113" }] }),
-      cpu: new window.DialGauge(document.getElementById("sb-impact-cpu-dial"), { label: "CPU STALL", color: "111, 155, 255", majors: 2, minors: 5, zones: [{ from: 40, to: 70, color: "251, 191, 36" }, { from: 70, to: 100, color: "248, 113, 113" }] }),
+    this.impactMeters = {
+      mem: new window.LinearMeter(document.getElementById("sb-impact-mem-meter"), { label: "MEM STALL %", color: "111, 155, 255", zones: [{ from: 10, to: 25, color: "251, 191, 36" }, { from: 25, to: 100, color: "248, 113, 113" }] }),
+      io:  new window.LinearMeter(document.getElementById("sb-impact-io-meter"),  { label: "DISK STALL %", color: "111, 155, 255", zones: [{ from: 25, to: 60, color: "251, 191, 36" }, { from: 60, to: 100, color: "248, 113, 113" }] }),
+      cpu: new window.LinearMeter(document.getElementById("sb-impact-cpu-meter"), { label: "CPU STALL %", color: "111, 155, 255", zones: [{ from: 40, to: 70, color: "251, 191, 36" }, { from: 70, to: 100, color: "248, 113, 113" }] }),
     };
     this.coreEls = [...this.els.board.querySelectorAll(".cpu__cell")];
 
@@ -297,9 +299,9 @@ class StatusBoard {
       this._push(h.m, memPct);
 
       el.dialU.set(util);
-      el.dialT.set(g.temp);
-      if (g.power_limit) el.dialP.range(g.power_limit);
-      el.dialP.set(g.power);
+      el.meterT.set(g.temp);
+      if (g.power_limit) el.meterP.range(g.power_limit);
+      el.meterP.set(g.power);
       el.vseg.set(memPct / 100);
       el.vramTxt.innerHTML = `<b>${this._gb(g.mem_used * 1048576)}</b> / ${this._gb(g.mem_total * 1048576)} GB`;
       el.temp.textContent = g.temp != null ? `${Math.round(g.temp)}°C` : "--";
@@ -443,8 +445,8 @@ class StatusBoard {
 
     const contended = new Set(contention.map((a) => a.kind));
     const gauge = (kind, psiVal, shareVal) => {
-      const dial = (this.impactDials || {})[kind];
-      if (dial) dial.set(psiVal || 0);
+      const meter = (this.impactMeters || {})[kind];
+      if (meter) meter.set(psiVal || 0);
       const shareId  = `sb-impact-${kind}-share`;
       const sharePct = (shareVal || 0) * 100;
       this._txt(shareId, `your share <b>${sharePct.toFixed(0)}</b>%`);
@@ -768,22 +770,37 @@ class StatusBoard {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    ctx.strokeStyle = "rgba(220, 235, 245, 0.09)";
+    ctx.fillStyle = "rgba(6, 10, 14, 0.55)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(220, 235, 245, 0.10)";
     ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
+    ctx.setLineDash([1, 4]);
+    ctx.strokeStyle = "rgba(220, 235, 245, 0.16)";
     [0.25, 0.5, 0.75].forEach((f) => {
       const y = Math.round(h * f) + 0.5;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
+      ctx.moveTo(2, y);
+      ctx.lineTo(w - 2, y);
       ctx.stroke();
     });
+    const cols = Math.max(4, Math.round(w / 46));
+    for (let c = 1; c < cols; c++) {
+      const x = Math.round((c / cols) * w) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, 2);
+      ctx.lineTo(x, h - 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
 
     const step = w / (this.histMax - 1);
     series.forEach((s) => {
       const d = s.data;
       if (d.length < 2) return;
       const x0 = w - (d.length - 1) * step;
-      const py = (v) => h - 1.5 - (v / 100) * (h - 3);
+      const py = (v) => h - 2.5 - (v / 100) * (h - 5);
 
       ctx.beginPath();
       d.forEach((v, i) => {
@@ -803,6 +820,15 @@ class StatusBoard {
       ctx.closePath();
       ctx.fillStyle = `rgba(${s.color}, ${s.fill})`;
       ctx.fill();
+
+      const hy = py(d[d.length - 1]);
+      ctx.beginPath();
+      ctx.arc(w - 2.5, hy, 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${s.color}, 1)`;
+      ctx.shadowColor = `rgba(${s.color}, 0.9)`;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
     });
   }
 
