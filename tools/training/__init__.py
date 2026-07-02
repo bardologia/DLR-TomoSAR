@@ -2,7 +2,7 @@ from .aggregation import MetricAggregator
 from .scheduling  import Scheduler, Warmup
 from .stopping    import EarlyStopping, OverfitManager
 from .gradients   import GradientClipper
-from .checkpoint  import Checkpoint
+from .checkpoint  import Checkpoint, TrainerState, WeightEma
 from .trainer     import BaseTrainer
 
 __all__ = [
@@ -13,5 +13,7 @@ __all__ = [
     "OverfitManager",
     "GradientClipper",
     "Checkpoint",
+    "TrainerState",
+    "WeightEma",
     "BaseTrainer",
 ]

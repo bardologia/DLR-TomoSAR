@@ -80,6 +80,18 @@ class Warmup:
     def is_finished(self) -> bool:
         return self.warmup_finished or not self.enabled or self.warmup_steps <= 0
 
+    def state_dict(self) -> dict:
+        return {
+            "current_step"      : self.current_step,
+            "warmup_finished"   : self.warmup_finished,
+            "logged_completion" : self._logged_completion,
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        self.current_step       = int(state["current_step"])
+        self.warmup_finished    = bool(state["warmup_finished"])
+        self._logged_completion = bool(state["logged_completion"])
+
 
 class Scheduler:
     def __init__(self, base_lrs, warmup, config, logger, tracker):
@@ -180,6 +192,18 @@ class Scheduler:
             return [lr * f for lr in self.current_lrs]
 
         return list(self.current_lrs)
+
+    def state_dict(self) -> dict:
+        return {
+            "current_lrs"    : list(self.current_lrs),
+            "epoch_offset"   : self._epoch_offset,
+            "t_max_override" : self._t_max_override,
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        self.current_lrs     = list(state["current_lrs"])
+        self._epoch_offset   = int(state["epoch_offset"])
+        self._t_max_override = state["t_max_override"]
 
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")

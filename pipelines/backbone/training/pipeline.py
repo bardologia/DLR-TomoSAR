@@ -127,6 +127,7 @@ class TrainingPipeline:
         try:
             trainer.maybe_run_loss_probe(train_loader, probe_config)
             results = trainer.train(train_loader, val_loader, test_loader)
+            self.run_metadata.save_test_metrics(trainer.test_metrics)
         finally:
             self.run_metadata.close()
 

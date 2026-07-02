@@ -167,3 +167,17 @@ def test_early_stopping_min_delta_accepts_large_gains(logger, tracker):
     assert es.counter    == 0
     assert es.best_epoch == 1
 
+
+
+def test_early_stopping_state_roundtrip(logger, tracker):
+    es = EarlyStopping(_es_config(patience=3), logger, tracker)
+    es(1.0, 0)
+    es(1.2, 1)
+
+    other = EarlyStopping(_es_config(patience=3), logger, tracker)
+    other.load_state_dict(es.state_dict())
+
+    assert other.best_loss  == pytest.approx(1.0)
+    assert other.counter    == 1
+    assert other.best_epoch == 0
+    assert other.triggered is False

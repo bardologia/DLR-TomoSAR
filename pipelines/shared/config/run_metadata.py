@@ -95,6 +95,14 @@ class TrainingRunMetadata:
 
         return out_path
 
+    def save_test_metrics(self, metrics: dict) -> Path:
+        out_path = self.metadata_directory / "test_metrics.json"
+
+        FileIO.save_json(metrics, out_path)
+        self.logger.info(f"Test metrics saved: {out_path}")
+
+        return out_path
+
     def close(self) -> None:
         if self.writer is not None:
             self.writer.flush()

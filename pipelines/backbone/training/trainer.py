@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch.utils.data import DataLoader
 
-from tools.training                   import BaseTrainer, MetricAggregator
+from tools.training                   import BaseTrainer
 from pipelines.backbone.training.loss import Loss
 from pipelines.backbone.training.docs import TrainingDocs
 
@@ -121,16 +121,6 @@ class Trainer(BaseTrainer):
 
         return self.criterion(pred_params, gt_params, kz_map)
 
-    def _eval_step(self, batch, aggregator: MetricAggregator) -> dict:
-        images    = batch[0].to(self.device)
-        gt_params = batch[1].to(self.device) if len(batch) > 1 and batch[1] is not None else None
-        kz_map    = batch[2].to(self.device) if len(batch) > 2 and batch[2] is not None else None
-
-        pred_output = self.model(images)
-        loss_dict   = self.criterion(pred_output, gt_params, kz_map)
-
-        return loss_dict
-
     def _log_train_banner(self, train_loader: DataLoader, val_loader: DataLoader, test_loader: DataLoader) -> None:
         self.logger.subsection(f"Train loader size      = {len(train_loader)}")
         self.logger.subsection(f"Validation loader size = {len(val_loader)}")
@@ -142,6 +132,11 @@ class Trainer(BaseTrainer):
 
     def _before_epoch(self, epoch: int) -> None:
         self.curriculum_controller.maybe_swap(epoch)
+
+    def _on_state_restored(self, state: dict) -> None:
+        if self.curriculum.enabled and state["epoch"] + 1 > self.curriculum.swap_epoch:
+            self.criterion.set_curriculum(self.curriculum.complete)
+            self.logger.subsection("Resumed past the curriculum swap; complete loss configuration re-applied.")
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
         phase = self._curriculum_phase(epoch)

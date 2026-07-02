@@ -99,6 +99,9 @@ class ConfigFactory:
                 gradient_accumulation_steps = training.gradient_accumulation_steps,
                 log_all_losses              = training.log_all_losses,
                 abort_on_nonfinite_loss     = training.abort_on_nonfinite_loss,
+                use_ema                     = training.use_ema,
+                ema_decay                   = training.ema_decay,
+                resume                      = training.resume,
             ),
 
             overfit = OverfitConfig(enabled=False),

@@ -51,6 +51,20 @@ class EarlyStopping:
         self.best_epoch = -1
         self.triggered  = False
 
+    def state_dict(self) -> dict:
+        return {
+            "best_loss"  : self.best_loss,
+            "counter"    : self.counter,
+            "best_epoch" : self.best_epoch,
+            "triggered"  : self.triggered,
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        self.best_loss  = state["best_loss"]
+        self.counter    = int(state["counter"])
+        self.best_epoch = int(state["best_epoch"])
+        self.triggered  = bool(state["triggered"])
+
 
 class OverfitManager:
     def __init__(self, config, logger):

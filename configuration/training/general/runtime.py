@@ -19,13 +19,16 @@ class OverfitConfig:
 
 @dataclass
 class TrainingLoopConfig:
-    epochs                      : int  = 3
-    validation_frequency        : int  = 5
-    use_amp                     : bool = False
-    gradient_accumulation_steps : int  = 1
-    log_debug                   : bool = True
-    log_all_losses              : bool = False
-    abort_on_nonfinite_loss     : bool = True
+    epochs                      : int   = 3
+    validation_frequency        : int   = 5
+    use_amp                     : bool  = False
+    gradient_accumulation_steps : int   = 1
+    log_debug                   : bool  = True
+    log_all_losses              : bool  = False
+    abort_on_nonfinite_loss     : bool  = True
+    use_ema                     : bool  = False
+    ema_decay                   : float = 0.999
+    resume                      : bool  = False
 
 
 @dataclass
