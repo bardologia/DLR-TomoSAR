@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import time
 from pathlib import Path
 
 import torch
@@ -60,7 +61,7 @@ class BaseTrainer:
         self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, config, self.logger)
         self.early_stopping   = EarlyStopping(config, self.logger, self.tracker)
         self.restore_best     = config.early_stopping.restore_best
-        self.grad_clipper     = GradientClipper(config=config, logger=self.logger, tracker=self.tracker)
+        self.grad_clipper     = GradientClipper(config=config, logger=self.logger, tracker=self.tracker, param_groups=self.optimizer.param_groups)
         self.checkpoint       = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.ema              = WeightEma(self.model, config.training.ema_decay, config.training.use_ema)
         self.overfitter       = OverfitManager(config, self.logger)
@@ -108,6 +109,9 @@ class BaseTrainer:
         pass
 
     def _before_epoch(self, epoch: int) -> None:
+        pass
+
+    def _before_validation(self, epoch: int, val_loader: DataLoader) -> None:
         pass
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
@@ -163,11 +167,19 @@ class BaseTrainer:
         clear_n    = self.config.memory.clear_cache_every_n_steps
 
         window_has_grads = False
+        nonfinite_count  = 0
+        sample_count     = 0
+        data_wait        = 0.0
+        epoch_start      = time.perf_counter()
 
         with self.logger.track(transient=True) as _prog:
             _task = _prog.add_task(f"[section]Epoch {epoch + 1}/{self.epochs}[/section] - train", total=n_batches)
 
+            fetch_start = time.perf_counter()
             for batch_idx, batch in enumerate(loader):
+                data_wait    += time.perf_counter() - fetch_start
+                sample_count += len(batch[0])
+
                 self._update_optimizer(self.lr_scheduler.effective_lrs())
 
                 with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
@@ -186,6 +198,7 @@ class BaseTrainer:
                     if self.abort_on_nonfinite_loss:
                         raise FloatingPointError(f"{self.stage_name} loss is non-finite at step {self.global_step}")
 
+                    nonfinite_count += 1
                     self.logger.warning(f"{self.stage_name} loss is non-finite at step {self.global_step}; skipping batch (abort_on_nonfinite_loss disabled).")
 
                 if (batch_idx + 1) % self.accumulation_steps == 0 or (batch_idx + 1) == n_batches:
@@ -207,14 +220,26 @@ class BaseTrainer:
                     self._clear_cuda_cache()
 
                 _prog.update(_task, advance=1)
+                fetch_start = time.perf_counter()
+
+        epoch_time = time.perf_counter() - epoch_start
 
         avg = loss_sum / max(1, n)
         self.tracker.log_scalar("loss/train", avg, epoch)
         self._log_epoch_metrics("train", aggregator, epoch)
+        self._log_throughput(epoch_time, data_wait, sample_count, nonfinite_count, epoch)
 
         self.tracker.log_memory(self.global_step)
         self._log_train_epoch_extra(avg, epoch)
         return avg
+
+    def _log_throughput(self, epoch_time: float, data_wait: float, sample_count: int, nonfinite_count: int, epoch: int) -> None:
+        elapsed = max(epoch_time, 1e-9)
+
+        self.tracker.log_scalar("throughput/samples_per_s",    sample_count / elapsed, epoch)
+        self.tracker.log_scalar("throughput/epoch_time_s",     epoch_time,             epoch)
+        self.tracker.log_scalar("throughput/data_wait_frac",   data_wait / elapsed,    epoch)
+        self.tracker.log_scalar("controls/nonfinite_batches",  float(nonfinite_count), epoch)
 
     @torch.no_grad()
     def evaluate(self, loader: DataLoader, epoch: int, stage="val"):
@@ -329,6 +354,7 @@ class BaseTrainer:
 
                         do_eval = (epoch_num % self.validation_frequency == 0) or (epoch_num == self.epochs)
                         if do_eval:
+                            self._before_validation(epoch, val_loader)
                             with self.ema.applied(self.model):
                                 val      = self.evaluate(val_loader, epoch, stage="val")
                                 val_loss = val["avg_loss"]
