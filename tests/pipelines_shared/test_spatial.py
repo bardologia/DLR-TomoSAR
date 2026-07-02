@@ -63,14 +63,14 @@ def test_extract_covers_every_pixel_when_unpadded():
 
 
 def test_reflective_padding_mode_recorded():
-    patcher = Patcher.build(spatial_size=(50, 50), patch_size=(32, 32), stride=16, use_reflective_padding=True)
+    patcher = Patcher.build(spatial_size=(50, 50), patch_size=(32, 32), stride=16, use_symmetric_padding=True)
     modes   = {coord[4][4] for coord in patcher._patch_coords if coord[4] is not None}
 
     assert modes == {"symmetric"}
 
 
 def test_constant_padding_mode_recorded():
-    patcher = Patcher.build(spatial_size=(50, 50), patch_size=(32, 32), stride=16, use_reflective_padding=False)
+    patcher = Patcher.build(spatial_size=(50, 50), patch_size=(32, 32), stride=16, use_symmetric_padding=False)
     modes   = {coord[4][4] for coord in patcher._patch_coords if coord[4] is not None}
 
     assert modes == {"constant"}

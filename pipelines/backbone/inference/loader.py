@@ -73,9 +73,9 @@ class RunLoader:
         )
 
         patch = PatchConfig(
-            size                   = tuple(payload["patch"]["size"]),
-            stride                 = int(payload["patch"]["stride"]),
-            use_reflective_padding = bool(payload["patch"]["use_reflective_padding"]),
+            size                  = tuple(payload["patch"]["size"]),
+            stride                = int(payload["patch"]["stride"]),
+            use_symmetric_padding = bool(payload["patch"]["use_symmetric_padding"]),
         )
 
         secondary_labels = payload["secondary_labels"]
@@ -140,10 +140,10 @@ class RunLoader:
         arrays = cropper.load_split(region, load_tomogram=True)
 
         grid = Patcher.build(
-            spatial_size           = (region.azimuth_size, region.range_size),
-            patch_size             = dataset_config.patch.size,
-            stride                 = dataset_config.patch.stride,
-            use_reflective_padding = dataset_config.patch.use_reflective_padding,
+            spatial_size          = (region.azimuth_size, region.range_size),
+            patch_size            = dataset_config.patch.size,
+            stride                = dataset_config.patch.stride,
+            use_symmetric_padding = dataset_config.patch.use_symmetric_padding,
         )
 
         inputs        = arrays["inputs"]

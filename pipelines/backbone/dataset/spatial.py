@@ -119,16 +119,16 @@ class Cropper:
 
 @dataclass
 class GridInfo:
-    n_v                    : int
-    n_h                    : int
-    pad_top                : int
-    pad_bot                : int
-    pad_left               : int
-    pad_right              : int
-    patch_size             : Tuple[int, int]
-    stride                 : int
-    spatial_size           : Tuple[int, int]
-    use_reflective_padding : bool = True
+    n_v                   : int
+    n_h                   : int
+    pad_top               : int
+    pad_bot               : int
+    pad_left              : int
+    pad_right             : int
+    patch_size            : Tuple[int, int]
+    stride                : int
+    spatial_size          : Tuple[int, int]
+    use_symmetric_padding : bool = True
 
     @property
     def padding_vertical(self) -> int:
@@ -149,17 +149,17 @@ class GridInfo:
 
     def as_dict(self) -> dict:
         return {
-            "n_v"                    : self.n_v,
-            "n_h"                    : self.n_h,
-            "pad_top"                : self.pad_top,
-            "pad_bot"                : self.pad_bot,
-            "pad_left"               : self.pad_left,
-            "pad_right"              : self.pad_right,
-            "patch_size"             : list(self.patch_size),
-            "stride"                 : self.stride,
-            "spatial_size"           : list(self.spatial_size),
-            "use_reflective_padding" : self.use_reflective_padding,
-            "number_of_patches"      : self.number_of_patches,
+            "n_v"                   : self.n_v,
+            "n_h"                   : self.n_h,
+            "pad_top"               : self.pad_top,
+            "pad_bot"               : self.pad_bot,
+            "pad_left"              : self.pad_left,
+            "pad_right"             : self.pad_right,
+            "patch_size"            : list(self.patch_size),
+            "stride"                : self.stride,
+            "spatial_size"          : list(self.spatial_size),
+            "use_symmetric_padding" : self.use_symmetric_padding,
+            "number_of_patches"     : self.number_of_patches,
         }
 
 
@@ -169,7 +169,7 @@ class Patcher:
         self._patch_coords = patch_coords
 
     @classmethod
-    def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : int, use_reflective_padding : bool = True) -> "Patcher":
+    def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : int, use_symmetric_padding : bool = True) -> "Patcher":
         ph, pw = patch_size
         H, W   = spatial_size
 
@@ -183,19 +183,19 @@ class Patcher:
         pad_left, pad_right = pad_h // 2, pad_h - pad_h // 2
 
         grid = GridInfo(
-            n_v                    = n_v,
-            n_h                    = n_h,
-            pad_top                = pad_top,
-            pad_bot                = pad_bot,
-            pad_left               = pad_left,
-            pad_right              = pad_right,
-            patch_size             = (ph, pw),
-            stride                 = stride,
-            spatial_size           = (H, W),
-            use_reflective_padding = use_reflective_padding,
+            n_v                   = n_v,
+            n_h                   = n_h,
+            pad_top               = pad_top,
+            pad_bot               = pad_bot,
+            pad_left              = pad_left,
+            pad_right             = pad_right,
+            patch_size            = (ph, pw),
+            stride                = stride,
+            spatial_size          = (H, W),
+            use_symmetric_padding = use_symmetric_padding,
         )
 
-        mode         = "symmetric" if use_reflective_padding else "constant"
+        mode         = "symmetric" if use_symmetric_padding else "constant"
         patch_coords = []
 
         for iv in range(n_v):

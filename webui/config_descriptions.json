@@ -897,7 +897,7 @@
     "fields": {
       "size": "Patch height and width in pixels",
       "stride": "Pixel step between adjacent patch origins",
-      "use_reflective_padding": "Reflect-pad borders so edge pixels are covered"
+      "use_symmetric_padding": "Reflect-pad borders so edge pixels are covered"
     }
   },
   "dataset/general/dataset::AugmentationConfig": {

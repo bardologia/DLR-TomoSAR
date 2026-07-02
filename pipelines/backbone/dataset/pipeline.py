@@ -98,10 +98,10 @@ class DatasetPipeline:
             spatial = (region.azimuth_size, region.range_size)
 
             patcher = Patcher.build(
-                spatial_size           = spatial,
-                patch_size             = self.config.patch.size,
-                stride                 = self.config.patch.stride,
-                use_reflective_padding = self.config.patch.use_reflective_padding,
+                spatial_size          = spatial,
+                patch_size            = self.config.patch.size,
+                stride                = self.config.patch.stride,
+                use_symmetric_padding = self.config.patch.use_symmetric_padding,
             )
 
             part = PatchDataset(

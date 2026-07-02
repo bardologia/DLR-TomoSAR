@@ -168,9 +168,9 @@ class OutputConfig:
    
 @dataclass
 class PatchConfig:
-    size                   : Tuple[int, int] = (64, 64)
-    stride                 : int             = 32
-    use_reflective_padding : bool            = True
+    size                  : Tuple[int, int] = (64, 64)
+    stride                : int             = 32
+    use_symmetric_padding : bool            = True
 
 
 @dataclass

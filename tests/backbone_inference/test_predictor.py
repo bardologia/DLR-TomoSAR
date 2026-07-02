@@ -46,7 +46,7 @@ class _IdentityNormalizer:
 
 def _build_run(n_az: int, n_rg: int, in_channels: int = 4):
     region = CropRegion(azimuth_start=0, azimuth_end=n_az, range_start=0, range_end=n_rg)
-    patch  = Patcher.build(spatial_size=(n_az, n_rg), patch_size=(PATCH, PATCH), stride=PATCH, use_reflective_padding=True)
+    patch  = Patcher.build(spatial_size=(n_az, n_rg), patch_size=(PATCH, PATCH), stride=PATCH, use_symmetric_padding=True)
     grid   = patch.grid
 
     torch.manual_seed(0)
@@ -118,7 +118,7 @@ def test_make_patch_window_unknown_raises():
 
 
 def test_cube_stitcher_single_patch_reconstructs():
-    patch = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_reflective_padding=False)
+    patch = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_symmetric_padding=False)
     grid  = patch.grid
 
     stitcher = CubeStitcher(grid, n_channels=3, window_kind="uniform")
@@ -132,7 +132,7 @@ def test_cube_stitcher_single_patch_reconstructs():
 
 
 def test_select_stitcher_takes_nearest_patch_centre():
-    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_reflective_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=1)
@@ -147,7 +147,7 @@ def test_select_stitcher_takes_nearest_patch_centre():
 
 
 def test_select_stitcher_single_patch_is_exact():
-    patcher = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_reflective_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=3)
@@ -160,7 +160,7 @@ def test_select_stitcher_single_patch_is_exact():
 
 
 def test_select_stitcher_raises_on_uncovered_pixels():
-    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_reflective_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=1)

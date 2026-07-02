@@ -58,7 +58,7 @@ class ConfigFactory:
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = split_regions,
             secondary_labels            = self._secondary_labels(),
-            patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_reflective_padding=True),
+            patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=True),
             input_config    = self.benchmark_input_config(),
             output_config   = self._output_config(),
             normalization   = self._normalization(),

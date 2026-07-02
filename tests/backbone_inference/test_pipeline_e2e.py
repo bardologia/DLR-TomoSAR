@@ -41,7 +41,7 @@ def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
             test  = CropRegion(azimuth_start=1200, azimuth_end=1296, range_start=500, range_end=596),
         ),
         secondary_labels = SECONDARY_LABELS,
-        patch            = PatchConfig(size=(64, 64), stride=32, use_reflective_padding=True),
+        patch            = PatchConfig(size=(64, 64), stride=32, use_symmetric_padding=True),
         input_config     = InputConfig(),
         output_config    = OutputConfig(),
         batch_size       = 4,
