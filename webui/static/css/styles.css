@@ -2515,11 +2515,13 @@ main { margin-left: var(--navw); }
 .cube-jump__cell { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
 .cube-jump__cell label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
 .cube-jump__input {
-  width: 5.5ch; padding: 4px 6px;
+  width: 6.5ch; padding: 4px 6px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-btn, 8px);
   font-family: var(--mono); font-size: 12px; color: var(--ink);
   text-align: right;
+  appearance: textfield; -moz-appearance: textfield;
 }
+.cube-jump__input::-webkit-outer-spin-button, .cube-jump__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cube-jump__input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .cube-jump__range { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .cube-slices__bar .cube-sources { margin-left: auto; }
