@@ -9,8 +9,8 @@ import torch
 from tools.training.stopping import EarlyStopping, OverfitManager
 
 
-def _es_config(patience=3):
-    return SimpleNamespace(early_stopping=SimpleNamespace(patience=patience))
+def _es_config(patience=3, min_delta=0.0):
+    return SimpleNamespace(early_stopping=SimpleNamespace(patience=patience, min_delta=min_delta))
 
 
 def _overfit_config(enabled=True, max_steps=10, stop_threshold=1e-4, batch_size=2):
@@ -146,3 +146,24 @@ def test_overfit_check_stop_on_threshold(logger):
 
     mgr.setup_loaders(loader, loader, loader)
     assert mgr.check_stop(0.001) is True
+
+
+def test_early_stopping_min_delta_treats_small_gains_as_no_improvement(logger, tracker):
+    es = EarlyStopping(_es_config(patience=2, min_delta=0.1), logger, tracker)
+
+    assert es(1.0, 0) is False
+    assert es(0.95, 1) is False
+    assert es(0.92, 2) is True
+    assert es.best_loss == pytest.approx(1.0)
+
+
+def test_early_stopping_min_delta_accepts_large_gains(logger, tracker):
+    es = EarlyStopping(_es_config(patience=2, min_delta=0.1), logger, tracker)
+
+    es(1.0, 0)
+    es(0.8, 1)
+
+    assert es.best_loss  == pytest.approx(0.8)
+    assert es.counter    == 0
+    assert es.best_epoch == 1
+

@@ -11,11 +11,13 @@ class EarlyStopping:
         self.logger  = logger
         self.tracker = tracker
 
-        self.patience = self.config.early_stopping.patience
+        self.patience  = self.config.early_stopping.patience
+        self.min_delta = self.config.early_stopping.min_delta
 
         self.logger.section("[Early Stopping]")
         self.logger.kv_table({
-            "Patience" : self.patience,
+            "Patience"  : self.patience,
+            "Min Delta" : self.min_delta,
         })
 
         self.best_loss  = None
@@ -24,7 +26,7 @@ class EarlyStopping:
         self.triggered  = False
 
     def __call__(self, val_loss: float, epoch: int) -> bool:
-        if self.best_loss is None or val_loss < self.best_loss:
+        if self.best_loss is None or val_loss < self.best_loss - self.min_delta:
             self.best_loss  = float(val_loss)
             self.best_epoch = int(epoch)
             self.counter    = 0

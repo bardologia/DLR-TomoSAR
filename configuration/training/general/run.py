@@ -24,11 +24,12 @@ class TrainingQueueConfig:
     prefetch_factor      : int             = 2
     eta_min              : float           = 1e-6
     early_stop_patience  : int             = 30
+    early_stop_min_delta : float           = 0.0
     log_all_losses       : bool            = False
 
-    use_amp                     : bool = False
-    gradient_accumulation_steps : int  = 1
-    abort_on_nonfinite_loss     : bool = True
+    use_amp                     : bool  = False
+    gradient_accumulation_steps : int   = 1
+    abort_on_nonfinite_loss     : bool  = True
 
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256
