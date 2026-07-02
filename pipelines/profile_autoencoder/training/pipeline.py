@@ -14,8 +14,9 @@ from pipelines.shared.config.config_persistence            import ProfileAutoenc
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):
-    run_label     = "profile_ae"
-    trainer_class = Trainer
+    run_label       = "profile_ae"
+    trainer_class   = Trainer
+    model_dim_label = "Profile Length"
 
     def _autoencoder_config(self, entry_config):
         return ModelBuilder.config_from_registry(entry_config.ae_model_name, entry_config.model_overrides, registry=PROFILE_AE_CONFIG_REGISTRY)

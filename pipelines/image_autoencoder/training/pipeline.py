@@ -13,8 +13,9 @@ from pipelines.shared.config.config_persistence             import ImageAutoenco
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):
-    run_label     = "image_ae"
-    trainer_class = Trainer
+    run_label       = "image_ae"
+    trainer_class   = Trainer
+    model_dim_label = "In Channels"
 
     def _autoencoder_config(self, entry_config):
         return ModelBuilder.config_from_registry(entry_config.ae_model_name, entry_config.model_overrides, registry=IMAGE_AE_CONFIG_REGISTRY)

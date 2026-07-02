@@ -9,8 +9,9 @@ from tools.runtime.reproducibility   import Reproducibility
 
 
 class AutoencoderTrainingPipeline:
-    run_label     = None
-    trainer_class = None
+    run_label       = None
+    trainer_class   = None
+    model_dim_label = "Model Dim"
 
     def __init__(self, entry_config, split_regions=None, overfit=None) -> None:
         self.entry   = entry_config
@@ -39,6 +40,17 @@ class AutoencoderTrainingPipeline:
     def _build_model(self, model_dim: int):
         raise NotImplementedError
 
+    def _log_model(self, logger, model, model_dim: int) -> None:
+        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+        logger.section("[Model Built]")
+        logger.kv_table({
+            "Architecture"         : self.ae_model_name,
+            self.model_dim_label   : model_dim,
+            "Embedding Dim"        : self.autoencoder_cfg.embedding_dim,
+            "Trainable Parameters" : f"{n_params:,}",
+        })
+
     def _prepare_data(self, run_meta, logger):
         raise NotImplementedError
 
@@ -63,6 +75,7 @@ class AutoencoderTrainingPipeline:
         train_loader, val_loader, x_axis, model_dim, metadata_args = self._prepare_data(run_meta, logger)
 
         model = self._build_model(model_dim)
+        self._log_model(logger, model, model_dim)
 
         self._save_metadata(run_meta, *metadata_args)
 

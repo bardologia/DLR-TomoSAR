@@ -87,7 +87,7 @@ class TrainingPipeline:
         g = self.trainer_config.gaussian
         return g.params_per_gaussian * g.n_default_gaussians
 
-    def _build_module(self, datasets, x_len: int):
+    def _build_module(self, datasets, x_len: int, logger):
         dataset_in_channels = datasets["train"].input_channels
 
         image_autoencoder = None
@@ -107,7 +107,40 @@ class TrainingPipeline:
             backbone_out = self._gaussian_out_channels()
 
         backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, x_len)
-        return JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder), backbone_cfg
+        module                 = JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)
+
+        self._log_module(logger, module, backbone, dataset_in_channels, backbone_in, backbone_out)
+        return module, backbone_cfg
+
+    def _log_module(self, logger, module, backbone, dataset_in: int, backbone_in: int, backbone_out: int) -> None:
+        backbone_params  = sum(p.numel() for p in backbone.parameters() if p.requires_grad)
+        trainable_params = sum(p.numel() for p in module.parameters() if p.requires_grad)
+
+        info = {
+            "Backbone"             : self.backbone_name,
+            "Dataset Channels"     : dataset_in,
+            "Backbone In"          : backbone_in,
+            "Backbone Out"         : backbone_out,
+            "Backbone Parameters"  : f"{backbone_params:,}",
+            "Trainable Parameters" : f"{trainable_params:,}",
+            "Target Provider"      : self.trainer_config.target_provider,
+            "Embedding Loss"       : self.trainer_config.embedding_loss,
+        }
+
+        if self.image_ae_cfg is not None:
+            info["Image AE"]            = f"{self.image_ae_model_name}  (embedding_dim={self.image_ae_cfg.embedding_dim}, mode={self.trainer_config.image_autoencoder_mode})"
+            info["Image AE Checkpoint"] = self.trainer_config.image_autoencoder_checkpoint
+        else:
+            info["Image AE"] = "disabled (backbone consumes dataset channels directly)"
+
+        if self.autoencoder_cfg is not None:
+            info["Profile AE"]            = f"{self.ae_model_name}  (embedding_dim={self.autoencoder_cfg.embedding_dim}, mode={self.trainer_config.profile_autoencoder_mode})"
+            info["Profile AE Checkpoint"] = self.trainer_config.profile_autoencoder_checkpoint
+        else:
+            info["Profile AE"] = "disabled (backbone predicts Gaussian parameters directly)"
+
+        logger.section("[JEPA Module Built]")
+        logger.kv_table(info)
 
     def _build_backbone(self, in_channels: int, out_channels: int, image_size: int):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
@@ -183,7 +216,7 @@ class TrainingPipeline:
 
         loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
 
-        model, backbone_cfg = self._build_module(datasets, x_len)
+        model, backbone_cfg = self._build_module(datasets, x_len, logger)
 
         self._save_metadata(run_meta, backbone_cfg, datasets, x_len)
 
@@ -206,7 +239,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
         loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(pipeline.dataset_config, pipeline.trainer_config, run_meta, logger, self.config.seed).run()
 
-        model, backbone_cfg = pipeline._build_module(datasets, x_len)
+        model, backbone_cfg = pipeline._build_module(datasets, x_len, logger)
         norm_stats          = datasets["train"].normalizer
         profile_normalizer  = pipeline._profile_normalizer(run_meta, logger)
 

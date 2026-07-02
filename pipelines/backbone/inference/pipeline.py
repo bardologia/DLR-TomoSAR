@@ -35,13 +35,20 @@ class InferencePipeline:
         meta.create_dirs()
         np.random.seed(cfg.seed)
 
+        evaluator = self.components.embedding_evaluator_cls
+
         logger = Logger(log_dir=str(meta.logs_dir), name="inference", level=cfg.log_level)
         logger.section("[Inference Pipeline]")
         logger.kv_table({
-            "Run Directory": cfg.run_directory,
-            "Output Dir":    meta.output_dir,
-            "Split":         cfg.split,
-            "Device":        cfg.device,
+            "Run Directory"       : cfg.run_directory,
+            "Output Dir"          : meta.output_dir,
+            "Split"               : cfg.split,
+            "Device"              : cfg.device,
+            "Checkpoint"          : cfg.checkpoint_name,
+            "Loader"              : self.components.loader_cls.__name__,
+            "Predictor"           : self.components.predictor_cls.__name__,
+            "Param Space"         : self.components.param_space,
+            "Embedding Evaluator" : evaluator.__name__ if evaluator is not None else "none",
         })
 
         plotter = Plotter(
@@ -219,8 +226,10 @@ class InferencePipeline:
         x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
         _N_elev, _az, _rg = result.pred_curves.shape
 
+        logger.section("[Inference: Metrics]")
         indices        = self._compute_slice_indices(cfg, _N_elev, _az, _rg)
         global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
+        logger.subsection(f"Global metrics written : {meta.metrics_path}")
 
         self._evaluate_embeddings(meta, run, global_metrics, logger)
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
