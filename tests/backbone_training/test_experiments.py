@@ -286,7 +286,9 @@ def test_ablation_catalog_standard_categories_present():
     assert catalog["out_amp"]["degrade"]["normalization.out_amp"]      == "zscore"
     assert catalog["pass_mag"]["degrade"]["normalization.pass_mag"]    == "zscore_log1p"
     assert catalog["ifg_phase"]["degrade"]["normalization.ifg_phase"]  == "fixed_div_pi"
-    assert catalog["augmentation"]["degrade"]["augmentation.p_noise"]  == 0.0
+    assert catalog["augmentation"]["degrade"]["augmentation.p_flip_h"] == 0.0
+    assert "augmentation.p_amp_scale" not in catalog["augmentation"]["enable"]
+    assert "augmentation.p_noise"     not in catalog["augmentation"]["enable"]
     assert "out_mu"      not in catalog
     assert "total_power" not in catalog
     assert "moments"     not in catalog
@@ -301,8 +303,9 @@ def test_ablation_catalog_standard_categories_present():
     assert coherence["degrade"]["curriculum.complete.weight_coherence_resyn"] == 0.0
 
     imbalance = catalog["class_imbalance"]
-    assert imbalance["enable"]["curriculum.warmup.presence_balance"]          is True
+    assert imbalance["enable"]["curriculum.warmup.use_active_normalization"]  is True
     assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
+    assert "curriculum.warmup.presence_balance" not in imbalance["enable"]
 
     presence = catalog["predict_presence"]
     assert presence["enable"]["predict_presence"]                      is True
@@ -310,19 +313,21 @@ def test_ablation_catalog_standard_categories_present():
     assert presence["degrade"]["curriculum.warmup.use_presence_bce"]   is False
 
     warmup = catalog["warmup_loss"]
-    assert warmup["enable"]["curriculum.warmup.use_l1_curve"]             is True
-    assert warmup["enable"]["curriculum.warmup.param_matching"]           == "hungarian"
+    assert warmup["enable"]["curriculum.warmup.use_param_l1"]             is True
+    assert warmup["enable"]["curriculum.warmup.param_matching"]           == "sorted_gt"
     assert warmup["enable"]["curriculum.warmup.use_active_normalization"] is True
-    assert warmup["enable"]["curriculum.warmup.presence_balance"]         is True
-    assert warmup["degrade"]["curriculum.warmup.use_param_l1"]            is True
-    assert warmup["degrade"]["curriculum.warmup.param_matching"]          == "sorted_gt"
+    assert warmup["enable"]["curriculum.warmup.presence_balance"]         is False
+    assert warmup["degrade"]["curriculum.warmup.use_l1_curve"]            is True
+    assert warmup["degrade"]["curriculum.warmup.param_matching"]          == "hungarian"
     assert warmup["degrade"]["curriculum.warmup.use_active_normalization"] is False
     assert warmup["degrade"]["curriculum.warmup.presence_balance"]        is False
 
     curriculum = catalog["curriculum"]
-    assert curriculum["enable"]["curriculum.complete.use_l1_curve"]   is True
-    assert curriculum["enable"]["curriculum.complete.param_matching"] == "hungarian"
-    assert curriculum["degrade"]["curriculum.enabled"]               is False
+    assert curriculum["enable"]["curriculum.complete.use_param_l1"]             is True
+    assert curriculum["enable"]["curriculum.complete.param_matching"]           == "sorted_gt"
+    assert curriculum["enable"]["curriculum.complete.use_active_normalization"] is True
+    assert curriculum["enable"]["curriculum.complete.presence_balance"]         is False
+    assert curriculum["degrade"]["curriculum.enabled"]                          is False
 
     lr_warmup = catalog["lr_warmup"]
     assert lr_warmup["enable"]["training.warmup_enabled"]  is True

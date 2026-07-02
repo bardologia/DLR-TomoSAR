@@ -18,19 +18,19 @@ from configuration.training.general.pretraining import PretrainConfig
 
 def default_curriculum() -> LossCurriculumConfig:
     warmup = LossConfig(
-        use_l1_curve             = True,
-        weight_l1_curve          = 1.0,
+        use_param_l1             = True,
+        weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = True,
+        presence_balance         = False,
     )
 
     complete = LossConfig(
-        use_l1_curve             = True,
-        weight_l1_curve          = 1.0,
+        use_param_l1             = True,
+        weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = True,
+        presence_balance         = False,
         use_coherence_resyn      = True,
         weight_coherence_resyn   = 0.05,
         use_covariance_match     = True,

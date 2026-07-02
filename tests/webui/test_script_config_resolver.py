@@ -47,4 +47,4 @@ def test_ablation_leaves_expose_the_catalog(backbone_leaves):
     assert by_path["ablation_include_full"]["value"] == "True"
 
     curriculum = catalog["curriculum"]
-    assert curriculum["enable"]["curriculum.complete.param_matching"] == "hungarian"
+    assert curriculum["enable"]["curriculum.complete.param_matching"] == "sorted_gt"

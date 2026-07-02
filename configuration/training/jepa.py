@@ -8,11 +8,21 @@ from configuration.architectures.profile_autoencoder  import ProfileAutoencoderB
 from configuration.architectures.image_autoencoder    import ImageAutoencoderBaseConfig
 from configuration.inference.general                  import InferenceConfig
 from configuration.sar.geometry_config                import GeometryConfig
-from configuration.training.general.loss              import LossConfig
+from configuration.training.general.loss              import LossConfig, ParamMatching
 from configuration.training.general.optimization      import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.general.runtime           import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
 from configuration.training.general.pretraining       import PretrainConfig
 from configuration.training.general.trainer           import SharedSubConfigInheritance
+
+
+def default_param_loss() -> LossConfig:
+    return LossConfig(
+        use_param_l1             = True,
+        weight_param_l1          = 1.0,
+        param_matching           = ParamMatching.SORTED_GT,
+        use_active_normalization = True,
+        presence_balance         = False,
+    )
 
 
 @dataclass
@@ -55,7 +65,7 @@ class JepaTrainerConfig(SharedSubConfigInheritance):
     image_ae_finetune_lr : float = 3e-5
     image_ae_finetune_wd : float = 1e-4
 
-    param_loss : LossConfig = field(default_factory=lambda: LossConfig(use_param_l1=True, weight_param_l1=1.0))
+    param_loss : LossConfig = field(default_factory=default_param_loss)
 
     geometry         : GeometryConfig        = field(default_factory=GeometryConfig)
     early_stopping   : EarlyStoppingConfig   = field(default_factory=EarlyStoppingConfig)
@@ -102,7 +112,7 @@ class JepaEntryConfig:
     image_autoencoder_mode   : str         = "frozen"
 
     embedding_loss : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
-    param_loss     : LossConfig          = field(default_factory=lambda: LossConfig(use_param_l1=True, weight_param_l1=1.0))
+    param_loss     : LossConfig          = field(default_factory=default_param_loss)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
     paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)

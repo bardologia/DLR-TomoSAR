@@ -9,12 +9,12 @@ from tools.data.regions import SplitRegions
 
 @dataclass
 class ProfileAugmentationConfig:
-    p_amp_scale     : float               = 0.5
+    p_amp_scale     : float               = 0.0
     amp_scale_range : Tuple[float, float] = (0.9, 1.1)
-    p_shift         : float               = 0.25
+    p_shift         : float               = 0.0
     max_shift       : int                 = 4
     p_flip          : float               = 0.0
-    p_noise         : float               = 0.25
+    p_noise         : float               = 0.0
     noise_std       : float               = 0.01
 
 

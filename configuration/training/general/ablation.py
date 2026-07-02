@@ -10,8 +10,8 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 15
 
-    PARAM_MATCH_BASELINE = ParamMatching.SORTED_GT
-    PARAM_MATCH_FULL     = ParamMatching.HUNGARIAN
+    PARAM_MATCH_BASELINE = ParamMatching.HUNGARIAN
+    PARAM_MATCH_FULL     = ParamMatching.SORTED_GT
 
     GROUP_LR_DEFAULTS = (
         ("encoder_lr",     3e-4),
@@ -21,7 +21,7 @@ class AblationCatalog:
     )
     SINGLE_GROUP_LR = 3e-4
 
-    FULL_ARCHITECTURE     = "unet_skip"
+    FULL_ARCHITECTURE     = "resunet"
     BASELINE_ARCHITECTURE = "unet"
 
     CHANNEL_NORMS = (
@@ -34,11 +34,8 @@ class AblationCatalog:
     )
 
     AUGMENTATION_DEFAULTS = (
-        ("p_flip_h",    0.5),
-        ("p_flip_v",    0.5),
-        ("p_rot90",     0.0),
-        ("p_amp_scale", 0.5),
-        ("p_noise",     0.25),
+        ("p_flip_h", 0.5),
+        ("p_flip_v", 0.5),
     )
 
     PHYSICS_TERMS = (
@@ -98,12 +95,15 @@ class AblationCatalog:
         complete = cls.COMPLETE_PREFIX
 
         curriculum_enable = {
-            "curriculum.enabled"          : True,
-            "curriculum.swap_epoch"       : cls.CURRICULUM_SWAP_EPOCH,
-            f"{complete}use_param_l1"     : False,
-            f"{complete}use_l1_curve"     : True,
-            f"{complete}weight_l1_curve"  : 1.0,
-            f"{complete}param_matching"   : cls.PARAM_MATCH_FULL,
+            "curriculum.enabled"                  : True,
+            "curriculum.swap_epoch"               : cls.CURRICULUM_SWAP_EPOCH,
+            f"{complete}use_l1_curve"             : False,
+            f"{complete}weight_l1_curve"          : 0.0,
+            f"{complete}use_param_l1"             : True,
+            f"{complete}weight_param_l1"          : 1.0,
+            f"{complete}param_matching"           : cls.PARAM_MATCH_FULL,
+            f"{complete}use_active_normalization" : True,
+            f"{complete}presence_balance"         : False,
         }
 
         return [
@@ -111,18 +111,19 @@ class AblationCatalog:
                 "label"   : "warmup_loss",
                 "group"   : "warmup",
                 "enable"  : {
-                    f"{warmup}use_param_l1"             : False,
-                    f"{warmup}use_l1_curve"             : True,
-                    f"{warmup}weight_l1_curve"          : 1.0,
-                    f"{warmup}param_matching"           : cls.PARAM_MATCH_FULL,
-                    f"{warmup}use_active_normalization" : True,
-                    f"{warmup}presence_balance"         : True,
-                },
-                "degrade" : {
                     f"{warmup}use_l1_curve"             : False,
                     f"{warmup}weight_l1_curve"          : 0.0,
                     f"{warmup}use_param_l1"             : True,
                     f"{warmup}weight_param_l1"          : 1.0,
+                    f"{warmup}param_matching"           : cls.PARAM_MATCH_FULL,
+                    f"{warmup}use_active_normalization" : True,
+                    f"{warmup}presence_balance"         : False,
+                },
+                "degrade" : {
+                    f"{warmup}use_param_l1"             : False,
+                    f"{warmup}weight_param_l1"          : 0.0,
+                    f"{warmup}use_l1_curve"             : True,
+                    f"{warmup}weight_l1_curve"          : 1.0,
                     f"{warmup}param_matching"           : cls.PARAM_MATCH_BASELINE,
                     f"{warmup}use_active_normalization" : False,
                     f"{warmup}presence_balance"         : False,
@@ -170,8 +171,8 @@ class AblationCatalog:
             {
                 "label"   : "class_imbalance",
                 "group"   : "class imbalance",
-                "enable"  : {f"{prefix}use_active_normalization": True,  f"{prefix}presence_balance": True,  f"{prefix}amp_focal_gamma": 2.0},
-                "degrade" : {f"{prefix}use_active_normalization": False, f"{prefix}presence_balance": False, f"{prefix}amp_focal_gamma": 0.0},
+                "enable"  : {f"{prefix}use_active_normalization": True,  f"{prefix}amp_focal_gamma": 2.0},
+                "degrade" : {f"{prefix}use_active_normalization": False, f"{prefix}amp_focal_gamma": 0.0},
             },
         ]
 
