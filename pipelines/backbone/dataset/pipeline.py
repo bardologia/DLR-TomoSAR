@@ -37,6 +37,9 @@ class DatasetPipeline:
         self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed)
         self.geometry_field  = self._load_geometry_field() if build_geometry_field else None
 
+        if self.geometry_field is not None and config.augmentation.p_rot90 > 0.0:
+            self.logger.warning("augmentation.p_rot90 > 0 has no effect: 90-degree rotations are skipped while a per-pixel geometry field is active.")
+
         ic = config.input_config
         oc = config.output_config
 
