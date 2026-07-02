@@ -116,7 +116,7 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
 class OutputClampConfig:
     enabled : bool  = True
     floor   : float = 0.0
-    ceil    : float = 80.0
+    ceil    : float = 1000.0
 
     def as_dict(self) -> dict:
         return {"enabled": self.enabled, "floor": self.floor, "ceil": self.ceil}
@@ -142,7 +142,7 @@ class NormalizationConfig:
 
     clamp_output : bool  = True
     clamp_floor  : float = 0.0
-    clamp_ceil   : float = 80.0
+    clamp_ceil   : float = 1000.0
 
     SLOT_FIELDS = {
         "pass/mag"      : "pass_mag",

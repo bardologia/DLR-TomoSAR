@@ -50,18 +50,26 @@ def test_roundtrip_torch():
     assert torch.allclose(recovered, x, atol=1e-5)
 
 
-def test_decompress_numpy_clamps_to_ceil():
+def test_decompress_numpy_clamps_to_physical_ceil():
     big = np.array([1e9])
     out = Log1pTransform.decompress(big)
 
-    assert np.isclose(out[0], np.expm1(Log1pTransform.CEIL))
+    assert np.isclose(out[0], Log1pTransform.CEIL)
 
 
-def test_decompress_torch_clamps_to_ceil():
+def test_decompress_torch_clamps_to_physical_ceil():
     big = torch.tensor([1e9])
     out = Log1pTransform.decompress(big)
 
-    assert torch.isclose(out[0], torch.expm1(torch.tensor(Log1pTransform.CEIL)))
+    assert torch.isclose(out[0], torch.tensor(Log1pTransform.CEIL))
+
+
+def test_decompress_custom_ceil_is_physical():
+    values = np.log1p(np.array([10.0, 400.0]))
+    out    = Log1pTransform.decompress(values, floor=0.0, ceil=100.0)
+
+    assert np.isclose(out[0], 10.0)
+    assert np.isclose(out[1], 100.0)
 
 
 def test_decompress_clamps_negatives():

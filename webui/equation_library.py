@@ -574,7 +574,7 @@ class EquationLibrary:
                 {
                     "title" : "Inverse normalisation",
                     "tex"   : r"x_c = \exp\!\big(\hat{x}_c\,s_c + \mu_c\big) - 1\ \ \text{(log1p)}, \qquad x_c = \hat{x}_c\,s_c + \mu_c\ \ \text{(otherwise)}",
-                    "note"  : "Used to recover physical units during loss computation and inference; the exponent argument is clamped to [0, 80] in code to prevent expm1 overflow (transforms.py Log1pTransform).",
+                    "note"  : "Used to recover physical units during loss computation and inference; the recovered value is clamped to the configured physical bounds (default [0, 1000], applied as [log1p(floor), log1p(ceil)] on the exponent argument, transforms.py Log1pTransform).",
                     "vars"  : [
                         {"sym": r"x_c",        "desc": "recovered physical-space value"},
                         {"sym": r"\hat{x}_c",  "desc": "normalised value of channel c"},
