@@ -235,3 +235,32 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
     assert captured["config"].run_directory      == expected_dir
     assert captured["config"].split              == "test"
     assert captured["config"].output_subdir      == "test"
+
+
+@pytest.mark.real_data
+def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypatch):
+    import pipelines.backbone.training.pipeline as backbone_pipeline_module
+
+    config = worker_config(test_data_dir, "backbone")
+    worker = FoldTrainingWorker(config, run_tag="rt")
+
+    captured = {}
+
+    class _FakePipeline:
+        def __init__(self, trainer_config, dataset_config, backbone_name, model_config, seed, run_name):
+            captured["trainer_config"] = trainer_config
+            captured["run_name"]       = run_name
+
+        def run(self, probe_config=None):
+            pass
+
+    monkeypatch.setattr(backbone_pipeline_module, "TrainingPipeline", _FakePipeline, raising=True)
+
+    worker.run(1, seed=7)
+
+    trainer_config = captured["trainer_config"]
+    assert trainer_config.curriculum is config.curriculum
+    assert trainer_config.curriculum.enabled is True
+    assert trainer_config.curriculum.complete.use_covariance_match is True
+    assert trainer_config.geometry.baselines_origin == str(config.geometry.baselines_file(test_data_dir))
+    assert captured["run_name"] == "fold_1_seed7"

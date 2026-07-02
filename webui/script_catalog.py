@@ -71,7 +71,7 @@ class ScriptCatalog:
             "title"     : "Cross-validate",
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
-            "essentials": ["backbone_name", "run_tag", "gpus", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
+            "essentials": ["backbone_name", "run_tag", "gpus", "curriculum.complete.param_matching", "jepa.profile_autoencoder_mode", "jepa.profile_autoencoder_run", "paths.dataset_path", "paths.parameters_path"],
         },
         "analyze_preprocessing": {
             "title"     : "Analyze Preprocessing",

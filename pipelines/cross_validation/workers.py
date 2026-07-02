@@ -119,11 +119,15 @@ class FoldTrainingWorker(CrossValidationWorker):
 
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
+        trainer_config            = self.factory.training_trainer_config(logdir=self.run_dir / "folds")
+        trainer_config.curriculum = self.config.curriculum
+        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+
         dataset_config               = self.factory.training_dataset_config()
         dataset_config.split_regions = split_regions
 
         pipeline = TrainingPipeline(
-            trainer_config = self.factory.training_trainer_config(logdir=self.run_dir / "folds"),
+            trainer_config = trainer_config,
             dataset_config = dataset_config,
             backbone_name  = self.config.backbone_name,
             model_config   = model_config,

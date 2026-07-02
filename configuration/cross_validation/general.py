@@ -10,6 +10,8 @@ from configuration.benchmark.general import (
 from configuration.cross_validation.jepa                import JepaCvConfig
 from configuration.cross_validation.profile_autoencoder import AeCvConfig
 from configuration.sar.geometry_config                  import GeometryConfig
+from configuration.training.backbone                    import default_curriculum
+from configuration.training.general.loss                import LossCurriculumConfig
 from configuration.training.general.run                 import RunPathsConfig, TrainingQueueConfig
 from configuration.training.general.runtime             import OverfitConfig
 
@@ -34,10 +36,11 @@ class CrossValidationConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    geometry    : GeometryConfig = field(default_factory=GeometryConfig)
-    overfit     : OverfitConfig  = field(default_factory=OverfitConfig)
-    jepa        : JepaCvConfig   = field(default_factory=JepaCvConfig)
-    autoencoder : AeCvConfig     = field(default_factory=AeCvConfig)
+    geometry    : GeometryConfig       = field(default_factory=GeometryConfig)
+    curriculum  : LossCurriculumConfig = field(default_factory=default_curriculum)
+    overfit     : OverfitConfig        = field(default_factory=OverfitConfig)
+    jepa        : JepaCvConfig         = field(default_factory=JepaCvConfig)
+    autoencoder : AeCvConfig           = field(default_factory=AeCvConfig)
 
     inference_splits : list[str] = field(default_factory=lambda: ["val", "test"])
 
