@@ -79,7 +79,7 @@ def test_single_scatterer_synth_phase_equals_kz_z0():
     curve, z0 = _delta(z, 12.0)
     kz_map  = _kz_map(kz, 1, 1, 1)
 
-    synth   = torch.stack([PhysicalLoss._synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
+    synth   = torch.stack([PhysicalLoss.synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
 
     expected = _wrap(kz * z0)
     measured = _wrap(torch.angle(synth))
@@ -94,7 +94,7 @@ def test_single_scatterer_synth_magnitude_is_amplitude_times_dx():
     curve, _ = _delta(z, 30.0, amp=2.5)
     kz_map  = _kz_map(kz, 1, 1, 1)
 
-    synth   = torch.stack([PhysicalLoss._synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
+    synth   = torch.stack([PhysicalLoss.synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
 
     assert torch.allclose(synth.abs(), torch.full_like(synth.abs(), 2.5 * dx), atol=1e-9)
 
@@ -107,7 +107,7 @@ def test_single_scatterer_normalized_coherence_is_unit_magnitude():
 
     p0      = curve.sum(dim=1) * dx
     kz_map  = _kz_map(kz, 1, 1, 1)
-    synth   = torch.stack([PhysicalLoss._synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
+    synth   = torch.stack([PhysicalLoss.synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
     gamma   = synth / p0.reshape(())
 
     assert torch.allclose(gamma.abs(), torch.ones_like(gamma.abs()), atol=1e-9)
@@ -118,7 +118,7 @@ def test_reference_track_zero_kz_is_real_total_power():
     dx      = _dx(z)
     curve   = _gaussian(z, 20.0, 9.0) + 0.05
 
-    synth   = PhysicalLoss._synthesise_track(curve, torch.zeros(1, 1, 1, dtype=torch.float64), z, dx)
+    synth   = PhysicalLoss.synthesise_track(curve, torch.zeros(1, 1, 1, dtype=torch.float64), z, dx)
     power   = curve.sum(dim=1) * dx
 
     assert torch.allclose(synth.real, power, atol=1e-9)
@@ -137,7 +137,7 @@ def test_two_scatterer_coherence_matches_closed_form():
 
     p0      = curve.sum(dim=1) * dx
     kz_map  = _kz_map(kz, 1, 1, 1)
-    synth   = torch.stack([PhysicalLoss._synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
+    synth   = torch.stack([PhysicalLoss.synthesise_track(curve, kz_map[:, t], z, dx) for t in range(kz.shape[0])])[:, 0, 0, 0]
     gamma   = synth / p0.reshape(())
 
     closed  = (a1 * torch.polar(torch.ones_like(kz), kz * z1) + a2 * torch.polar(torch.ones_like(kz), kz * z2)) / (a1 + a2)
@@ -157,7 +157,7 @@ def test_normalized_coherence_magnitude_never_exceeds_one():
     kz_map  = _kz_map(kz, 3, 4, 4)
 
     for t in range(kz.shape[0]):
-        gamma = PhysicalLoss._synthesise_track(curve, kz_map[:, t], z, dx) / p0
+        gamma = PhysicalLoss.synthesise_track(curve, kz_map[:, t], z, dx) / p0
 
         assert torch.all(gamma.abs() <= 1.0 + 1e-9)
 

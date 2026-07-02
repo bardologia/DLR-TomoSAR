@@ -126,7 +126,7 @@ class PhysicalLoss:
         return torch.polar(torch.ones_like(phase), phase)
 
     @staticmethod
-    def _synthesise_track(curves: torch.Tensor, kz_track: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
+    def synthesise_track(curves: torch.Tensor, kz_track: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
         steering = PhysicalLoss._track_steering(kz_track, x_axis)
 
         return (steering * curves.to(steering.dtype)).sum(dim=1) * dx
@@ -145,8 +145,8 @@ class PhysicalLoss:
         val = torch.zeros_like(p0)
 
         for track in range(n_tracks):
-            gp = PhysicalLoss._synthesise_track(pred,   kz_map[:, track], x_axis, dx) / p0c
-            gt = PhysicalLoss._synthesise_track(target, kz_map[:, track], x_axis, dx) / t0c
+            gp = PhysicalLoss.synthesise_track(pred,   kz_map[:, track], x_axis, dx) / p0c
+            gt = PhysicalLoss.synthesise_track(target, kz_map[:, track], x_axis, dx) / t0c
 
             val = val + (gp - gt).abs() ** 2
 
