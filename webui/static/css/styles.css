@@ -1248,13 +1248,13 @@ main { margin-left: var(--navw); }
 .launch__pane--source pre { margin: 0; background: var(--glass-bg); border: 1px solid var(--glass-line); border-radius: var(--r-card); padding: 20px 22px; overflow-x: auto; scrollbar-color: rgba(180, 195, 205, 0.30) transparent; }
 .launch__pane--source code { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
 
-.launch-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px; align-items: start; }
+.launch-layout { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 20px; align-items: start; }
 .launch-layout--single { grid-template-columns: minmax(0, 1fr); }
 
 .secnav { position: sticky; top: 62px; display: flex; flex-direction: column; gap: 2px; }
-.secnav__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; background: none; border: none; border-left: 2px solid transparent; border-radius: 0 var(--r-input) var(--r-input) 0; cursor: pointer; text-align: left; font: inherit; }
+.secnav__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; background: none; border: none; border-right: 2px solid transparent; border-radius: var(--r-input) 0 0 var(--r-input); cursor: pointer; text-align: left; font: inherit; }
 .secnav__item:hover { background: rgba(20, 30, 40, 0.04); }
-.secnav__item.is-active { border-left-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
+.secnav__item.is-active { border-right-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 .secnav__item[hidden] { display: none; }
 .secnav__name { font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em; color: var(--ink); }
 .secnav__item.is-active .secnav__name { color: var(--accent); }
@@ -1297,8 +1297,8 @@ main { margin-left: var(--navw); }
 
 @media (max-width: 980px) {
   .launch-layout { grid-template-columns: minmax(0, 1fr); }
-  .secnav { position: static; flex-direction: row; flex-wrap: wrap; }
-  .secnav__item { width: auto; border-left: none; border-bottom: 2px solid transparent; border-radius: var(--r-input) var(--r-input) 0 0; }
+  .secnav { position: static; order: -1; flex-direction: row; flex-wrap: wrap; }
+  .secnav__item { width: auto; border-right: none; border-bottom: 2px solid transparent; border-radius: var(--r-input) var(--r-input) 0 0; }
   .secnav__item.is-active { border-bottom-color: var(--accent); }
 }
 

@@ -2939,8 +2939,8 @@ class ConfigForm {
       this.sections.push(record);
     });
 
-    if (layout.mode === "sections") wrap.appendChild(nav);
     wrap.appendChild(main);
+    if (layout.mode === "sections") wrap.appendChild(nav);
 
     const empty = document.createElement("p");
     empty.className = "cfg-note launch-nomatch";
