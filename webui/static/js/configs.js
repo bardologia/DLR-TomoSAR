@@ -25,7 +25,7 @@ class ConfigBrowser {
 
     this.groups.forEach((g) => {
       g.classes.forEach((c) => {
-        this.flat.push({ id: `${c.module || g.module}::${c.name}`, group: g.title, module: c.module || g.module, name: c.name, fields: c.fields });
+        this.flat.push({ id: `${c.module || g.module}::${c.name}`, group: g.title, module: c.module || g.module, name: c.name, desc: c.desc, fields: c.fields });
       });
     });
 
@@ -121,11 +121,11 @@ class ConfigBrowser {
 
   _matchField(f) {
     if (!this.query) return true;
-    return this._matchText(f.name) || this._matchText(f.type) || this._matchText(f.default);
+    return this._matchText(f.name) || this._matchText(f.type) || this._matchText(f.default) || this._matchText(f.desc);
   }
 
   _classNameMatch(c) {
-    return this._matchText(c.name) || this._matchText(c.group) || this._matchText(c.module);
+    return this._matchText(c.name) || this._matchText(c.group) || this._matchText(c.module) || this._matchText(c.desc);
   }
 
   _classMatch(c) {
@@ -260,9 +260,10 @@ class ConfigBrowser {
   _row(f) {
     const kind = this._kind(f.default);
     const cell = kind === "required" ? `<span class="ctable__required">required</span>` : `<code class="ctable__default is-${kind}">${this._mark(f.default)}</code>`;
+    const desc = f.desc ? `<span class="ctable__fdesc">${this._mark(f.desc)}</span>` : "";
     return (
       `<div class="ctable__row">` +
-      `<span class="ctable__field">${this._mark(f.name)}</span>` +
+      `<span class="ctable__field"><span class="ctable__fname">${this._mark(f.name)}</span>${desc}</span>` +
       `<code class="ctable__type">${this._mark(f.type)}</code>` +
       cell +
       `</div>`
@@ -308,7 +309,9 @@ class ConfigBrowser {
       `<div class="cdetail__head">` +
       `<div><span class="cdetail__module">${this._esc(cls.group)}</span>` +
       `<h3 class="cdetail__name">${this._esc(cls.name)}</h3>` +
-      `<div class="cdetail__path">configuration/${this._esc(cls.module)}.py</div></div>` +
+      `<div class="cdetail__path">configuration/${this._esc(cls.module)}.py</div>` +
+      (cls.desc ? `<p class="cdetail__desc">${this._mark(cls.desc)}</p>` : "") +
+      `</div>` +
       `<span class="cdetail__count">${this.query && fields.length !== cls.fields.length ? `${fields.length} of ${cls.fields.length} fields` : `${fields.length} field${fields.length === 1 ? "" : "s"}`}</span>` +
       `</div>` +
       `<div class="ctable">` +

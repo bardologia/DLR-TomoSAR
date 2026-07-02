@@ -1,0 +1,1901 @@
+{
+  "architectures/backbone::UNetConfig": {
+    "summary": "Plain U-Net backbone predicting per-pixel Gaussian mixtures over elevation",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside convolutional blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::UNetMultiHeadConfig": {
+    "summary": "U-Net with separate amplitude, mean, and width prediction heads",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside convolutional blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "heads_lr": "Learning rate for the amplitude/mean/width heads",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "heads_wd": "Weight decay for the amplitude/mean/width heads",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::UNetPerGaussianConfig": {
+    "summary": "U-Net with an independent output head per Gaussian component",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian components, each with its own head",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside convolutional blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "heads_lr": "Learning rate for the per-Gaussian output heads",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "heads_wd": "Weight decay for the per-Gaussian output heads",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::ResUNetConfig": {
+    "summary": "Residual-block U-Net backbone for elevation Gaussian mixtures",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each residual encoder/decoder stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside residual blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::UNetSkipConfig": {
+    "summary": "U-Net variant with explicit learned downsample and skip layers",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside convolutional blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::AttentionUNetConfig": {
+    "summary": "U-Net with attention gates filtering skip connections",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside convolutional blocks",
+      "attention_intermediate_ratio": "Attention-gate hidden channels as fraction of gating channels",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for decoder and attention-gate parameters",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for decoder and attention-gate parameters",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::UNetPlusPlusConfig": {
+    "summary": "UNet++ with nested dense skip pathways between encoder and decoder",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder resolution level",
+      "bottleneck_factor": "Channel-width multiplier applied at the deepest node",
+      "dropout": "Dropout probability applied inside dense conv blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Upsampling method for nested nodes: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "decoder_lr": "Learning rate for dense-block and upsample parameters",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "decoder_wd": "Weight decay for dense-block and upsample parameters",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::LinkNetConfig": {
+    "summary": "LinkNet encoder-decoder with additive skip connections",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder residual stage",
+      "dropout": "Dropout probability applied inside blocks",
+      "initial_kernel_size": "Kernel size of the initial stem convolution",
+      "decoder_bottleneck_ratio": "Channel reduction ratio inside decoder bottleneck blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for stem and encoder parameters",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for stem and encoder parameters",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::SwinUNetConfig": {
+    "summary": "Swin-transformer U-shaped backbone for elevation profiles",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "image_size": "Input image side length in pixels",
+      "patch_size": "Side length of initial patch-embedding patches",
+      "embedding_dim": "Channel dimension of the first Swin stage",
+      "depths": "Number of Swin transformer blocks per stage",
+      "num_heads": "Attention heads at each Swin stage",
+      "window_size": "Side length of the local attention window",
+      "mlp_ratio": "Hidden-to-embedding expansion ratio in transformer MLP",
+      "dropout": "General dropout probability in the network",
+      "attention_dropout": "Dropout applied to attention weights",
+      "ffn_activation": "Activation in transformer feed-forward network",
+      "stochastic_depth_rate": "Maximum drop-path probability across blocks",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for patch-embed and encoder stages",
+      "decoder_lr": "Learning rate for the decoder and final upsample",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for patch-embed and encoder stages",
+      "decoder_wd": "Weight decay for the decoder and final upsample",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::TransUNetConfig": {
+    "summary": "Hybrid CNN-transformer U-Net encoder-decoder",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "image_size": "Input image side length in pixels",
+      "cnn_features": "Channel widths of the CNN encoder stages",
+      "bottleneck_factor": "Channel-width multiplier before the transformer",
+      "transformer_layers": "Number of transformer encoder layers",
+      "transformer_heads": "Attention heads in the transformer",
+      "transformer_mlp_ratio": "Hidden-to-embedding expansion ratio in transformer MLP",
+      "patch_size": "Patch size for tokenizing the CNN feature map",
+      "dropout": "General dropout probability in the network",
+      "activation": "CNN nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "CNN normalization type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "attention_dropout": "Dropout applied to attention weights",
+      "ffn_activation": "Activation in transformer feed-forward network",
+      "stochastic_depth_rate": "Maximum drop-path probability across transformer blocks",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for CNN, patch-embed, and transformer",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for CNN, patch-embed, and transformer",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::UNETRConfig": {
+    "summary": "Pure-transformer encoder with convolutional UNETR decoder",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "image_size": "Input image side length in pixels",
+      "patch_size": "Side length of transformer input patches",
+      "embedding_dim": "Token embedding dimension of the transformer",
+      "transformer_layers": "Number of transformer encoder layers",
+      "transformer_heads": "Attention heads in the transformer",
+      "transformer_mlp_ratio": "Hidden-to-embedding expansion ratio in transformer MLP",
+      "decoder_features": "Channel widths of the decoder upsampling stages",
+      "dropout": "General dropout probability in the network",
+      "activation": "Decoder nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Decoder normalization type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "attention_dropout": "Dropout applied to attention weights",
+      "ffn_activation": "Activation in transformer feed-forward network",
+      "stochastic_depth_rate": "Maximum drop-path probability across transformer blocks",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for patch-embed and transformer parameters",
+      "decoder_lr": "Learning rate for the convolutional decoder",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for patch-embed and transformer parameters",
+      "decoder_wd": "Weight decay for the convolutional decoder",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::ResUNetMultiHeadConfig": {
+    "summary": "Residual U-Net with separate amplitude, mean, and width heads",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each residual encoder/decoder stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside residual blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "heads_lr": "Learning rate for the amplitude/mean/width heads",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "heads_wd": "Weight decay for the amplitude/mean/width heads",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::ResUNetPerGaussianConfig": {
+    "summary": "Residual U-Net with one output head per Gaussian component",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian components, each with its own head",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each residual encoder/decoder stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside residual blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "heads_lr": "Learning rate for the per-Gaussian output heads",
+      "encoder_wd": "Weight decay for the encoder parameter group",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "heads_wd": "Weight decay for the per-Gaussian output heads",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::DeepLabV3PlusConfig": {
+    "summary": "DeepLabV3+ with atrous spatial pyramid pooling encoder",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder backbone stage",
+      "atrous_rates": "Dilation rates of the ASPP atrous-convolution branches",
+      "dropout": "Dropout probability applied inside blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for stem and encoder stages",
+      "aspp_lr": "Learning rate for the ASPP module",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for stem and encoder stages",
+      "aspp_wd": "Weight decay for the ASPP module",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::SegFormerLiteConfig": {
+    "summary": "Lightweight SegFormer hierarchical transformer with MLP decoder",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "embedding_dims": "Token embedding dimension at each encoder stage",
+      "depths": "Number of transformer blocks per encoder stage",
+      "num_heads": "Attention heads at each encoder stage",
+      "sr_ratios": "Spatial-reduction ratio for efficient attention per stage",
+      "mlp_ratio": "Hidden-to-embedding expansion ratio in transformer MLP",
+      "decoder_channels": "Unified channel width of the MLP decoder",
+      "dropout": "General dropout probability in the network",
+      "attention_dropout": "Dropout applied to attention weights",
+      "ffn_activation": "Activation in transformer feed-forward network",
+      "stochastic_depth_rate": "Maximum drop-path probability across blocks",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for patch-embed and encoder stages",
+      "decoder_lr": "Learning rate for decode projections and fusion",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for patch-embed and encoder stages",
+      "decoder_wd": "Weight decay for decode projections and fusion",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::ConvNeXtUNetConfig": {
+    "summary": "ConvNeXt-block U-Net backbone for elevation Gaussian mixtures",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each ConvNeXt encoder/decoder stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "blocks_per_stage": "Number of ConvNeXt blocks per stage",
+      "ffn_ratio": "Hidden expansion ratio in the pointwise MLP",
+      "ffn_activation": "Activation in the ConvNeXt feed-forward network",
+      "stochastic_depth_rate": "Maximum drop-path probability across blocks",
+      "layer_scale_init": "Initial value of per-channel layer-scale parameters",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for stem and encoder stages",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for stem and encoder stages",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::DenseUNetConfig": {
+    "summary": "Densely-connected U-Net backbone for elevation Gaussian mixtures",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "growth_rate": "Channels added by each dense layer",
+      "block_layers": "Number of dense layers per downsampling block",
+      "bottleneck_layers": "Number of dense layers in the bottleneck block",
+      "dropout": "Dropout probability applied inside dense layers",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for stem and dense-down encoder",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the dense-up decoder",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for stem and dense-down encoder",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the dense-up decoder",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::HRNetLiteConfig": {
+    "summary": "Lightweight HRNet keeping parallel multi-resolution branches",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "base_channels": "Channel width of the highest-resolution branch",
+      "n_branches": "Number of parallel multi-resolution branches",
+      "blocks_per_stage": "Residual blocks per branch stage",
+      "dropout": "Dropout probability applied inside blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for stem, transitions, stages, and fusions",
+      "decoder_lr": "Learning rate for the final multi-branch fusion",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for stem, transitions, stages, and fusions",
+      "decoder_wd": "Weight decay for the final multi-branch fusion",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::MultiResUNetConfig": {
+    "summary": "MultiRes U-Net with multi-kernel blocks and residual skip paths",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder resolution stage",
+      "bottleneck_factor": "Channel-width multiplier applied at the bottleneck stage",
+      "dropout": "Dropout probability applied inside MultiRes blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "upsample_mode": "Decoder upsampling method: convtranspose or bilinear",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for encoder blocks and residual paths",
+      "bottleneck_lr": "Learning rate for the bottleneck parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for encoder blocks and residual paths",
+      "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+      "decoder_wd": "Weight decay for the decoder parameter group",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::FPNNetConfig": {
+    "summary": "Feature-pyramid-network segmentation backbone for elevation mixtures",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder backbone stage",
+      "pyramid_channels": "Channel width of the feature pyramid levels",
+      "segmentation_convs": "Number of conv layers per segmentation branch",
+      "dropout": "Dropout probability applied inside blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for encoder and downsample layers",
+      "decoder_lr": "Learning rate for lateral, smooth, and fusion layers",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for encoder and downsample layers",
+      "decoder_wd": "Weight decay for lateral, smooth, and fusion layers",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/backbone::U2NetLiteConfig": {
+    "summary": "Lightweight U^2-Net with nested residual U-blocks",
+    "fields": {
+      "in_channels": "Input channels; SAR covariance/feature maps entering the network",
+      "out_channels": "Number of Gaussian mixture components predicted per pixel",
+      "params_per_gaussian": "Parameters per Gaussian: amplitude, mean, and width",
+      "features": "Channel width at each encoder/decoder stage",
+      "rsu_heights": "Depth of each nested residual U-block stage",
+      "dropout": "Dropout probability applied inside RSU blocks",
+      "activation": "Nonlinearity: relu, leaky_relu, gelu, or silu",
+      "normalization": "Normalization layer type: batch, instance, or group",
+      "conv_bias": "Whether convolutions include an additive bias term",
+      "init_mode": "Weight-initialization scheme; default uses framework defaults",
+      "encoder_lr": "Learning rate for the encoder RSU stages",
+      "bottleneck_lr": "Learning rate for the bridge parameter group",
+      "decoder_lr": "Learning rate for the decoder RSU stages",
+      "output_head_lr": "Learning rate for the Gaussian output head",
+      "encoder_wd": "Weight decay for the encoder RSU stages",
+      "bottleneck_wd": "Weight decay for the bridge parameter group",
+      "decoder_wd": "Weight decay for the decoder RSU stages",
+      "output_head_wd": "Weight decay for the Gaussian output head",
+      "shape_logger_types": "Layer classes whose output shapes are logged during forward"
+    }
+  },
+  "architectures/image_autoencoder::ImageAutoencoderBaseConfig": {
+    "summary": "Shared base for image autoencoder encoder/decoder architecture and optimizer settings",
+    "fields": {
+      "in_channels": "Number of input image channels fed to the encoder",
+      "embedding_dim": "Channel width of the compressed latent embedding",
+      "embedding_norm": "Normalization applied to the latent embedding; none disables it",
+      "downsample_factor": "Spatial resolution reduction factor from encoder to latent",
+      "base_channels": "Channel count of the first convolutional stage",
+      "depth": "Number of blocks or layers per encoder stage",
+      "activation": "Nonlinearity type: gelu, relu, or silu",
+      "normalization": "Normalization layer type: batch, instance, group, or layernorm",
+      "dropout": "Dropout probability applied within blocks, 0 to 1",
+      "init_mode": "Weight initialization scheme for the network",
+      "encoder_lr": "Adam learning rate for encoder parameter group",
+      "decoder_lr": "Adam learning rate for decoder parameter group",
+      "encoder_wd": "Weight decay for encoder parameters",
+      "decoder_wd": "Weight decay for decoder parameters"
+    }
+  },
+  "architectures/image_autoencoder::Conv2dImageAutoencoderConfig": {
+    "summary": "Plain 2D convolutional autoencoder variant of the image encoder/decoder",
+    "fields": {
+      "upsample_mode": "Decoder upsampling method: transposed convolution"
+    }
+  },
+  "architectures/image_autoencoder::ResNet2dImageAutoencoderConfig": {
+    "summary": "Residual-block 2D convolutional autoencoder variant",
+    "fields": {
+      "downsample_factor": "Spatial reduction factor, defaults to 2 for residual variant",
+      "upsample_mode": "Decoder upsampling method: transposed convolution"
+    }
+  },
+  "architectures/image_autoencoder::ConvNeXt2dImageAutoencoderConfig": {
+    "summary": "ConvNeXt-block 2D autoencoder variant using layernorm",
+    "fields": {
+      "normalization": "Fixed to layernorm as required by ConvNeXt blocks",
+      "downsample_factor": "Spatial reduction factor, defaults to 2",
+      "upsample_mode": "Decoder upsampling method: transposed convolution"
+    }
+  },
+  "architectures/image_autoencoder::DilatedConv2dImageAutoencoderConfig": {
+    "summary": "Dilated-convolution autoencoder preserving resolution with wide receptive field",
+    "fields": {
+      "downsample_factor": "Spatial reduction factor, defaults to 1 (no downsampling)",
+      "dilation_depth": "Number of stacked dilated convolution layers, growing receptive field"
+    }
+  },
+  "architectures/image_autoencoder::ViTImageAutoencoderConfig": {
+    "summary": "Vision-transformer autoencoder variant tokenizing the image into patches",
+    "fields": {
+      "activation": "Transformer MLP nonlinearity, defaults to gelu",
+      "normalization": "Fixed to layernorm as used in transformer blocks",
+      "patch_size": "Side length in pixels of each tokenized image patch",
+      "hidden_dim": "Transformer token embedding dimensionality",
+      "depth": "Number of stacked transformer encoder blocks",
+      "num_heads": "Number of self-attention heads per block",
+      "mlp_ratio": "Feedforward hidden size as multiple of hidden_dim"
+    }
+  },
+  "architectures/profile_autoencoder::ProfileAutoencoderBaseConfig": {
+    "summary": "Shared base for vertical-profile autoencoders: embedding size, optimisation, activation defaults",
+    "fields": {
+      "profile_length": "Number of samples along the vertical/elevation axis of each profile",
+      "embedding_dim": "Dimensionality of the compressed latent code (bottleneck width)",
+      "embedding_norm": "Normalisation applied to the latent embedding, e.g. layernorm",
+      "activation": "Nonlinearity used throughout encoder and decoder, e.g. gelu",
+      "init_mode": "Weight-initialisation scheme; default keeps framework defaults",
+      "encoder_lr": "Learning rate for the encoder parameter group",
+      "decoder_lr": "Learning rate for the decoder parameter group",
+      "encoder_wd": "Weight-decay (L2) coefficient for encoder parameters",
+      "decoder_wd": "Weight-decay (L2) coefficient for decoder parameters"
+    }
+  },
+  "architectures/profile_autoencoder::MlpAutoencoderConfig": {
+    "summary": "Plain fully-connected MLP autoencoder over the flattened profile",
+    "fields": {
+      "hidden_dim": "Width of each fully-connected hidden layer",
+      "depth": "Number of stacked hidden layers per encoder/decoder",
+      "dropout": "Dropout probability between layers; 0 disables"
+    }
+  },
+  "architectures/profile_autoencoder::Conv1dAutoencoderConfig": {
+    "summary": "1D convolutional autoencoder treating the profile as a sequence",
+    "fields": {
+      "seq_channels": "Number of feature channels in the 1D convolution layers",
+      "seq_kernel_size": "Convolution kernel width in samples along the profile"
+    }
+  },
+  "architectures/profile_autoencoder::Transformer1dAutoencoderConfig": {
+    "summary": "Transformer-based autoencoder with self-attention over profile positions",
+    "fields": {
+      "hidden_dim": "Model/token embedding width inside the transformer blocks",
+      "depth": "Number of stacked transformer encoder/decoder layers",
+      "num_heads": "Number of parallel self-attention heads per layer",
+      "dropout": "Dropout probability inside attention and feedforward; 0 disables"
+    }
+  },
+  "architectures/profile_autoencoder::ResMlpAutoencoderConfig": {
+    "summary": "Residual-MLP autoencoder with skip connections between blocks",
+    "fields": {
+      "hidden_dim": "Width of each residual MLP block",
+      "depth": "Number of stacked residual blocks per encoder/decoder",
+      "dropout": "Dropout probability within residual blocks; 0 disables"
+    }
+  },
+  "architectures/profile_autoencoder::TcnAutoencoderConfig": {
+    "summary": "Temporal convolutional network autoencoder with dilated causal convolutions",
+    "fields": {
+      "seq_channels": "Number of feature channels in each TCN convolution layer",
+      "seq_kernel_size": "Convolution kernel width in samples per TCN layer",
+      "depth": "Number of stacked dilated convolutional layers",
+      "dropout": "Dropout probability between TCN layers; 0 disables"
+    }
+  },
+  "architectures/profile_autoencoder::GruAutoencoderConfig": {
+    "summary": "Recurrent GRU autoencoder scanning the profile as a sequence",
+    "fields": {
+      "hidden_dim": "Hidden-state size of the GRU per direction",
+      "depth": "Number of stacked GRU layers",
+      "bidirectional": "Whether the GRU scans the profile in both directions",
+      "dropout": "Dropout probability between stacked GRU layers; 0 disables"
+    }
+  },
+  "architectures/profile_autoencoder::CnnAttnAutoencoderConfig": {
+    "summary": "Hybrid autoencoder: convolutional patch stem feeding attention blocks",
+    "fields": {
+      "seq_channels": "Feature channels in the convolutional front-end layers",
+      "seq_kernel_size": "Convolution kernel width in samples for the conv stem",
+      "patch_size": "Samples per profile patch tokenised for attention",
+      "hidden_dim": "Token embedding width inside the attention blocks",
+      "depth": "Number of stacked attention layers",
+      "num_heads": "Number of parallel self-attention heads per layer",
+      "dropout": "Dropout probability in conv and attention paths; 0 disables"
+    }
+  },
+  "benchmark/dataloader_tuning::DataLoaderTuningEntryConfig": {
+    "summary": "Entry point for benchmarking DataLoader throughput to find optimal loading parameters",
+    "fields": {
+      "mode": "Which model/dataset pipeline to profile (e.g. profile_autoencoder)",
+      "model_name": "Identifier of the trained run whose data pipeline is benchmarked",
+      "gpu": "CUDA device index to run the benchmark on",
+      "seed": "Random seed for reproducible sampling and shuffling",
+      "n_gaussians": "Number of Gaussian mixture components per elevation profile",
+      "use_amp": "Enable automatic mixed precision during timing runs",
+      "pixel_subsample": "Fraction of pixels retained when subsampling the dataset",
+      "keep_empty_frac": "Fraction of empty/background pixels kept in samples",
+      "batch_sizes": "Candidate batch sizes swept during tuning",
+      "worker_counts": "Candidate DataLoader worker-process counts to sweep",
+      "prefetch_factors": "Candidate per-worker prefetch factors to sweep",
+      "reference_prefetch": "Baseline prefetch factor for the reference configuration",
+      "warmup_batches": "Batches consumed before timing starts, to warm caches",
+      "timed_batches": "Number of batches measured per configuration",
+      "cpu_threads": "Thread count for CPU-side data preparation",
+      "data_wait_target": "Target GPU stall fraction waiting on data, seconds share",
+      "refine": "Run a second refinement pass around the best configuration",
+      "save_figures": "Whether to export throughput/timing plots to disk",
+      "synthetic_samples": "Number of synthetic samples generated when no real data used",
+      "synthetic_length": "Elevation-axis length of each synthetic profile",
+      "paths": "Run input/output directory locations for the benchmarked model",
+      "output_dir": "Destination directory for tuning results and figures"
+    }
+  },
+  "benchmark/general::MaxBatchConfig": {
+    "summary": "Controls the probe that finds the largest trainable batch under a VRAM limit",
+    "fields": {
+      "vram_budget_gb": "GPU memory ceiling in gigabytes the probed batch must fit",
+      "max_batch": "Upper bound on batch size the search will try",
+      "measure_steps": "Training steps run per candidate to measure peak memory",
+      "seed": "Random seed for reproducible batch-size measurement"
+    }
+  },
+  "benchmark/general::SizeMatchConfig": {
+    "summary": "Governs scaling each model to match a reference model's parameter count",
+    "fields": {
+      "reference_model": "Model whose parameter count others are scaled to match",
+      "tolerance": "Allowed fractional deviation from target parameter count",
+      "max_iterations": "Maximum search iterations to converge on matching size",
+      "scale_low": "Lower bound of the width-scaling search range",
+      "scale_high": "Upper bound of the width-scaling search range",
+      "in_channels": "Number of input channels assumed when sizing models",
+      "locked_params": "Hyperparameter names held fixed during scaling"
+    }
+  },
+  "benchmark/general::InferenceQueueConfig": {
+    "summary": "Configures batched inference runs and their diagnostic output artifacts",
+    "fields": {
+      "split": "Dataset partition to run inference on, e.g. test",
+      "checkpoint_name": "Filename of the trained weights to load",
+      "batch_size": "Inference batch size; None auto-selects",
+      "num_workers": "GPU-side data loader worker processes",
+      "cpu_workers": "CPU worker processes for postprocessing tasks",
+      "save_plots": "Whether to write static diagnostic plot images",
+      "save_animations": "Whether to render GIF animations of profiles",
+      "save_cubes": "Whether to persist reconstructed 3D reflectivity cubes",
+      "stitch_window": "Window function for stitching overlapping tiles, e.g. hann",
+      "n_best_profiles": "Count of best-fit profiles to visualize",
+      "n_worst_profiles": "Count of worst-fit profiles to visualize",
+      "n_random_profiles": "Count of randomly sampled profiles to visualize",
+      "n_range_slices": "Number of range-axis cross-section slices to plot",
+      "n_azimuth_slices": "Number of azimuth-axis cross-section slices to plot",
+      "n_elevation_slices": "Number of elevation-axis cross-section slices to plot",
+      "gif_axes": "Axes along which animation frames sweep, e.g. elevation",
+      "gif_fps": "Playback speed of animations in frames per second",
+      "gif_max_frames": "Cap on total frames rendered per animation"
+    }
+  },
+  "benchmark/general::ComparisonReportConfig": {
+    "summary": "Controls how the cross-model comparison report is assembled",
+    "fields": {
+      "embed_images": "Whether to inline images into the report rather than link"
+    }
+  },
+  "benchmark/general::BenchmarkConfig": {
+    "summary": "Top-level settings orchestrating a multi-model train, infer, and compare benchmark sweep",
+    "fields": {
+      "training_type": "Which model family to benchmark, e.g. backbone or jepa",
+      "paths": "Run directory and output path configuration",
+      "max_batch": "Settings for the maximum-batch-size probe",
+      "size_match": "Settings for matching models to reference parameter count",
+      "training": "Queued training run configuration",
+      "inference": "Batched inference and output-artifact configuration",
+      "comparison": "Cross-model comparison report configuration",
+      "input": "Input data specification; defaults to full SAR stack",
+      "geometry": "SAR acquisition geometry parameters for the stack",
+      "normalization": "Per-channel input normalization scheme configuration",
+      "augmentation": "Training data augmentation configuration",
+      "curriculum": "Staged loss curriculum schedule for training",
+      "predict_presence": "Whether models emit a per-slot presence prediction head",
+      "ae_loss": "Loss configuration for the profile autoencoder variant",
+      "jepa": "JEPA self-supervised benchmark configuration",
+      "pixel_subsample": "Fraction of pixels retained per sample, 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty-target pixels kept during training",
+      "gpus": "GPU device indices available for parallel benchmark runs",
+      "skip_models": "Model names to exclude from the sweep",
+      "run_tag": "Optional label appended to output run identifiers",
+      "resume": "Whether to continue from existing partial results",
+      "seed": "Base random seed for the benchmark",
+      "seeds": "Explicit seed list for multi-seed repeated runs",
+      "n_gaussians": "Number of Gaussian mixture components per elevation profile",
+      "poll_interval_s": "Seconds between polls of queued job status",
+      "sweep_loss_components": "Loss terms varied across the benchmark sweep"
+    }
+  },
+  "benchmark/jepa::JepaBenchConfig": {
+    "summary": "JEPA benchmark run's profile-autoencoder coupling and embedding-target settings",
+    "fields": {
+      "profile_autoencoder_logdir": "Root directory holding trained profile-autoencoder runs to load",
+      "profile_autoencoder_run": "Name of the specific autoencoder run subdirectory; None selects none",
+      "profile_autoencoder_mode": "Autoencoder coupling: 'frozen' weights or 'finetune' trainable during JEPA",
+      "target_provider": "Target embedding source: 'stopgrad', 'ema', or differentiable 'live'",
+      "embedding_loss": "Embedding-match and curve-reconstruction loss term configuration"
+    }
+  },
+  "comparison::TrialComparisonConfig": {
+    "summary": "Configures side-by-side comparison of backbone training trial run outputs",
+    "fields": {
+      "runs_dir": "Root directory holding the backbone training runs to compare",
+      "run_tags": "Run subfolder names to include; empty means all runs",
+      "compare_images": "Whether to generate static image comparisons across runs",
+      "compare_gifs": "Whether to generate animated GIF comparisons across runs",
+      "embed_images": "Embed images inline in report versus linking them externally",
+      "output_dir": "Destination for comparison artifacts; None uses a default location"
+    }
+  },
+  "comparison::PreprocessingComparisonConfig": {
+    "summary": "Configures comparison of preprocessed SAR dataset outputs across runs",
+    "fields": {
+      "runs_dir": "Root directory containing preprocessed dataset runs to compare",
+      "run_tags": "Dataset run identifiers to include; empty means all",
+      "pixel_sample": "Number of pixels randomly sampled for statistics, default 200000",
+      "block_size": "Azimuth block size in pixels for chunked reading",
+      "range_chunk": "Range lines processed per chunk, default 512",
+      "workers": "Parallel worker processes for data loading",
+      "make_plots": "Whether to render comparison plots",
+      "output_dir": "Destination for comparison outputs; None uses a default"
+    }
+  },
+  "comparison::ParamExtractionComparisonConfig": {
+    "summary": "Configures comparison of extracted-parameter dataset outputs across runs",
+    "fields": {
+      "params_dir": "Root directory holding extracted-parameter datasets to compare",
+      "run_tags": "Parameter run identifiers to include; empty means all",
+      "pixel_sample": "Number of pixels randomly sampled for statistics, default 200000",
+      "block_size": "Azimuth block size in pixels for chunked reading",
+      "range_chunk": "Range lines processed per chunk, default 512",
+      "make_plots": "Whether to render comparison plots",
+      "output_dir": "Destination for comparison outputs; None uses a default"
+    }
+  },
+  "cross_validation/general::FoldConfig": {
+    "summary": "Defines azimuth-range partitioning into cross-validation folds",
+    "fields": {
+      "n_folds": "Number of cross-validation folds to split the data into",
+      "azimuth_start": "First azimuth line index of the usable range",
+      "azimuth_end": "Last azimuth line index of the usable range"
+    }
+  },
+  "cross_validation/general::CrossValidationConfig": {
+    "summary": "Orchestrates full cross-validation runs across training, inference, and comparison",
+    "fields": {
+      "training_type": "Model family to train: backbone, jepa, or profile_autoencoder",
+      "backbone_name": "Backbone architecture identifier, e.g. resunet",
+      "model_overrides": "Per-run overrides applied to the model configuration",
+      "paths": "Run directory and logging path settings",
+      "folds": "Fold count and azimuth-range partitioning settings",
+      "training": "Queue settings governing per-fold training jobs",
+      "inference": "Queue settings governing per-fold inference jobs",
+      "comparison": "Settings for the cross-fold comparison report",
+      "geometry": "SAR acquisition geometry parameters for the stack",
+      "curriculum": "Loss curriculum schedule across training phases",
+      "overfit": "Overfit-on-subset debugging mode settings",
+      "jepa": "Cross-validation settings specific to JEPA training",
+      "autoencoder": "Cross-validation settings specific to profile-autoencoder training",
+      "inference_splits": "Dataset splits to run inference on, e.g. val and test",
+      "gpus": "GPU device indices available for scheduling jobs",
+      "run_tag": "Optional label appended to run output directory names",
+      "resume": "Whether to resume interrupted folds instead of restarting",
+      "seed": "Base random seed for reproducibility",
+      "seeds": "Multiple seeds for repeated seed-varied runs",
+      "n_gaussians": "Number of Gaussian mixture components predicted per profile",
+      "poll_interval_s": "Seconds between queue polls for job completion"
+    }
+  },
+  "cross_validation/jepa::JepaCvConfig": {
+    "summary": "Selects the pretrained profile autoencoder and target scheme for cross-validated JEPA training",
+    "fields": {
+      "profile_autoencoder_logdir": "Directory holding pretrained profile-autoencoder training runs to load from",
+      "profile_autoencoder_run": "Name of the specific autoencoder run to load; None to skip",
+      "profile_autoencoder_mode": "Autoencoder coupling: frozen weights or finetune during backbone training",
+      "target_provider": "Target embedding source: stopgrad, live, or ema teacher encoder",
+      "embedding_loss": "Weights and terms for embedding-match and curve-reconstruction losses"
+    }
+  },
+  "cross_validation/profile_autoencoder::AeCvConfig": {
+    "summary": "Cross-validation setup for the profile autoencoder: model choice, loss, and pixel sampling",
+    "fields": {
+      "ae_model_name": "Registry key selecting the profile autoencoder architecture (e.g. mlp_ae)",
+      "ae_loss": "Reconstruction loss configuration for the profile autoencoder",
+      "pixel_subsample": "Fraction of active (nonzero-amplitude) pixels kept for training; 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty (zero-amplitude) pixels retained as negatives; 0 drops all"
+    }
+  },
+  "dataset/general/dataset::InputConfig": {
+    "summary": "Selects which SAR stack channels and encodings feed the network input",
+    "fields": {
+      "use_primary": "Include the primary reference SLC pass as input",
+      "primary_representation": "Encoding of the primary pass (magnitude, phase, etc.)",
+      "use_secondaries": "Include the secondary SLC passes as input",
+      "secondaries_representation": "Encoding of each secondary pass; default magnitude only",
+      "use_interferograms": "Include interferogram channels as input",
+      "interferograms_representation": "Encoding of interferograms; default interferometric phase only",
+      "use_dem": "Append a DEM elevation channel to the input"
+    }
+  },
+  "dataset/general/dataset::OutputConfig": {
+    "summary": "Selects which per-Gaussian parameters the backbone predicts and their normalization",
+    "fields": {
+      "use_amplitude": "Predict each Gaussian's amplitude (reflectivity weight)",
+      "use_mu": "Predict each Gaussian's mean elevation position",
+      "use_sigma": "Predict each Gaussian's width along elevation",
+      "output_strategies": "Per-role normalization strategy for amp, mu, sigma channels"
+    }
+  },
+  "dataset/general/dataset::PatchConfig": {
+    "summary": "Tiling of scenes into overlapping training patches",
+    "fields": {
+      "size": "Patch height and width in pixels",
+      "stride": "Pixel step between adjacent patch origins",
+      "use_reflective_padding": "Reflect-pad borders so edge pixels are covered"
+    }
+  },
+  "dataset/general/dataset::AugmentationConfig": {
+    "summary": "Random augmentation probabilities and parameters applied to training patches",
+    "fields": {
+      "p_flip_h": "Probability of horizontal (left-right) flip",
+      "p_flip_v": "Probability of vertical (up-down) flip",
+      "p_rot90": "Probability of a 90-degree rotation",
+      "p_amp_scale": "Probability of applying random amplitude scaling",
+      "amp_scale_range": "Min-max multiplicative factor for amplitude scaling",
+      "noise_std": "Standard deviation of additive Gaussian noise",
+      "p_noise": "Probability of adding Gaussian noise"
+    }
+  },
+  "dataset/general/dataset::DatasetConfig": {
+    "summary": "Assembles the full dataset and dataloader from preprocessed SAR runs",
+    "fields": {
+      "preprocessing_run_directory": "Path to the preprocessed run outputs directory",
+      "split_regions": "Spatial regions defining train/validation/test partitioning",
+      "parameters_path": "Optional path to acquisition/geometry parameters",
+      "secondary_labels": "Identifiers of secondary passes to load from the stack",
+      "patch": "Patch tiling configuration",
+      "input_config": "Input channel selection and encoding configuration",
+      "output_config": "Predicted Gaussian-parameter output configuration",
+      "normalization": "Per-channel normalization configuration",
+      "augmentation": "Training-patch augmentation configuration",
+      "batch_size": "Number of patches per training batch",
+      "num_workers": "Dataloader worker processes for loading",
+      "prefetch_factor": "Batches prefetched per worker ahead of use",
+      "shuffle_train": "Shuffle patch order during training",
+      "pin_memory": "Pin host memory for faster GPU transfer",
+      "x_axis": "Elevation sampling grid for the Gaussian mixture",
+      "n_gaussians": "Number of Gaussian components in the mixture output"
+    }
+  },
+  "dataset/profile_autoencoder::ProfileAugmentationConfig": {
+    "summary": "Stochastic augmentations applied to vertical reflectivity profiles during training",
+    "fields": {
+      "p_amp_scale": "Probability of applying random amplitude rescaling to a profile",
+      "amp_scale_range": "Min/max multiplicative factors for amplitude scaling",
+      "p_shift": "Probability of shifting the profile along the elevation axis",
+      "max_shift": "Maximum shift magnitude in elevation bins",
+      "p_flip": "Probability of mirroring the profile along elevation; default disabled",
+      "p_noise": "Probability of adding Gaussian noise to profile amplitudes",
+      "noise_std": "Standard deviation of the additive Gaussian noise"
+    }
+  },
+  "dataset/profile_autoencoder::ProfileDatasetConfig": {
+    "summary": "Builds and loads per-pixel elevation-profile samples for autoencoder training",
+    "fields": {
+      "preprocessing_run_directory": "Directory holding the preprocessed run outputs to load profiles from",
+      "split_regions": "Spatial regions assigning pixels to train/validation/test splits",
+      "parameters_path": "Optional path to run parameters; inferred from run directory if omitted",
+      "n_gaussians": "Number of Gaussian components per elevation profile",
+      "x_min": "Lower bound of the normalized elevation axis",
+      "x_max": "Upper bound of the normalized elevation axis",
+      "pixel_subsample": "Fraction of available pixels to sample; 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty/zero-amplitude profiles retained in the dataset",
+      "amp_zero_thr": "Amplitude below this threshold marks a profile as empty",
+      "batch_size": "Number of profile samples per training batch",
+      "num_workers": "Parallel data-loading worker processes",
+      "prefetch_factor": "Batches each worker prefetches ahead of consumption",
+      "pin_memory": "Pin host memory for faster GPU transfer",
+      "shuffle_train": "Shuffle training samples each epoch",
+      "stats_max_samples": "Maximum samples used to compute normalization statistics",
+      "augmentation": "Nested configuration for profile augmentation transforms"
+    }
+  },
+  "diagnostics::WeightXrayThresholds": {
+    "summary": "Numeric thresholds classifying weight-tensor pathologies in the diagnostic report",
+    "fields": {
+      "dead_abs_threshold": "Absolute weight magnitude below which an element counts as dead",
+      "dead_fraction_warn": "Dead-weight fraction triggering a warning, here 50 percent",
+      "dead_fraction_critical": "Dead-weight fraction triggering a critical flag, here 95 percent",
+      "dead_unit_norm_frac": "Row/column norm below which a unit is considered dead",
+      "dead_unit_fraction_warn": "Fraction of dead units warned on, here 10 percent",
+      "uniform_cv_threshold": "Coefficient-of-variation floor below which weights look near-uniform",
+      "constant_std_threshold": "Standard deviation below which a tensor is deemed constant",
+      "rank_ratio_warn": "Effective-to-full rank ratio warning level, here 0.5",
+      "rank_ratio_critical": "Effective-to-full rank ratio critical level, here 0.1",
+      "explode_abs_threshold": "Absolute weight above which values flag as exploding",
+      "spectral_norm_warn": "Spectral norm above which a layer is flagged",
+      "bias_abs_threshold": "Absolute bias magnitude above which biases flag as excessive",
+      "norm_scale_dead_value": "Norm-layer scale (gamma) below which the channel is dead",
+      "norm_scale_dead_frac": "Fraction of dead norm scales warned on, here 10 percent",
+      "running_var_dead_value": "Running variance below which a BatchNorm channel is dead",
+      "running_var_dead_frac": "Fraction of dead running variances warned on",
+      "init_ratio_low": "Lower bound on observed-to-expected init std ratio",
+      "init_ratio_high": "Upper bound on observed-to-expected init std ratio",
+      "duplicate_cosine": "Cosine similarity above which two units count as duplicates",
+      "duplicate_fraction_warn": "Fraction of duplicate units warned on, here 5 percent"
+    }
+  },
+  "diagnostics::WeightXrayConfig": {
+    "summary": "Runtime settings for the weight-xray checkpoint diagnostic run and its report outputs",
+    "fields": {
+      "checkpoint_path": "Checkpoint file or directory to inspect; defaults to logs/",
+      "output_dir": "Directory where report and plots are written",
+      "checkpoint_filename": "Filename used when checkpoint_path is a directory",
+      "state_dict_keys": "Candidate top-level keys holding the model state dict",
+      "thresholds": "Nested pathology-classification thresholds used during analysis",
+      "svd_max_dim": "Maximum tensor dimension for computing SVD/rank",
+      "duplicate_max_units": "Maximum units per layer scanned for duplicates",
+      "histogram_sample_max": "Maximum weights sampled per histogram, here two million",
+      "max_layer_histograms": "Maximum number of per-layer histograms to render",
+      "make_plots": "Whether to generate diagnostic plot images",
+      "embed_images": "Whether to inline images into the markdown report"
+    }
+  },
+  "diagnostics::WeightXrayEntryConfig": {
+    "summary": "Batch entry point selecting runs and overriding weight-xray settings per run",
+    "fields": {
+      "runs_dir": "Parent directory holding backbone run subdirectories to scan",
+      "run_filter": "Run-name substrings to include; empty means all runs",
+      "checkpoint_filename": "Checkpoint filename expected inside each run directory",
+      "output_subdir": "Per-run subdirectory name for writing the report",
+      "make_plots": "Whether to generate diagnostic plot images",
+      "embed_images": "Whether to inline images into the markdown report",
+      "dead_abs_threshold": "Absolute magnitude below which a weight counts as dead",
+      "dead_fraction_warn": "Dead-weight fraction triggering a warning, here 50 percent",
+      "dead_unit_fraction_warn": "Fraction of dead units warned on, here 10 percent",
+      "uniform_cv_threshold": "Coefficient-of-variation floor for near-uniform weight detection",
+      "rank_ratio_warn": "Effective-to-full rank ratio warning level, here 0.5",
+      "explode_abs_threshold": "Absolute weight above which values flag as exploding",
+      "duplicate_cosine": "Cosine similarity above which two units count as duplicates",
+      "svd_max_dim": "Maximum tensor dimension for computing SVD/rank",
+      "duplicate_max_units": "Maximum units per layer scanned for duplicates",
+      "max_layer_histograms": "Maximum number of per-layer histograms to render"
+    }
+  },
+  "inference/backbone::InferenceEntryConfig": {
+    "summary": "Batch entry point watching run directories and dispatching backbone and autoencoder inference",
+    "fields": {
+      "logs_dirs": "Root run directories scanned for completed backbone, jepa, and autoencoder runs",
+      "run_filter": "Substrings selecting specific runs; empty processes all discovered runs",
+      "gpus": "CUDA device indices available for running inference jobs",
+      "poll_interval_s": "Seconds between successive scans of the run directories",
+      "inference": "Backbone inference settings: run path, cube saving, workers, GIF axes",
+      "profile_inference": "Configuration for profile-autoencoder inference on discovered runs",
+      "image_inference": "Configuration for image-autoencoder inference on discovered runs"
+    }
+  },
+  "inference/general::InferencePaths": {
+    "summary": "Names of output subdirectories and result files written during an inference run",
+    "fields": {
+      "figures_subdir": "Subdirectory name for saved static figures",
+      "animations_subdir": "Subdirectory name for saved GIF animations",
+      "logs_subdir": "Subdirectory name for run log files",
+      "cubes_subdir": "Subdirectory name for exported 3D reflectivity cubes",
+      "metrics_filename": "Filename for the JSON metrics summary",
+      "report_filename": "Filename for the Markdown run report"
+    }
+  },
+  "inference/general::InferenceConfig": {
+    "summary": "Drives a full tomographic inference run: I/O, device, outputs, plots, and baseline reconstruction",
+    "fields": {
+      "run_directory": "Path to the trained run holding checkpoint and metadata",
+      "output_subdir": "Optional subfolder under the run for this inference's outputs",
+      "device": "Compute device, cuda or cpu",
+      "seed": "Random seed for reproducible inference",
+      "log_level": "Logging verbosity, e.g. INFO or DEBUG",
+      "split": "Dataset partition to run on: train, val, or test",
+      "checkpoint_name": "Filename of the model weights to load from the run",
+      "batch_size": "Inference batch size; None uses a default",
+      "num_workers": "DataLoader worker processes for batch loading",
+      "cpu_workers": "CPU processes for parallel post-processing tasks",
+      "gif_workers": "Parallel processes for rendering animation frames",
+      "save_plots": "Whether to write static figures",
+      "save_animations": "Whether to render GIF animations",
+      "save_cubes": "Whether to export reconstructed 3D cubes",
+      "stitch_window": "Window function for stitching patches into full scenes",
+      "cube_dtype": "Numeric precision for saved cubes, e.g. float32",
+      "compute_reduced": "Whether to compute the Capon reduced-resolution baseline",
+      "reduced_effort": "Quality level of the reduced baseline computation",
+      "reduced_cache_subdir": "Subdirectory caching reduced-baseline intermediate data",
+      "reduced_env_name": "Conda environment providing the reduced-baseline tooling",
+      "reduced_pyrat_dir": "Optional path to the PyRAT installation for the baseline",
+      "n_best_profiles": "Count of best-fit elevation profiles to visualize",
+      "n_worst_profiles": "Count of worst-fit elevation profiles to visualize",
+      "n_random_profiles": "Count of randomly sampled profiles to visualize",
+      "profile_seed": "Seed for selecting random profiles",
+      "n_range_slices": "Number of range-axis cross-section slices to plot",
+      "n_azimuth_slices": "Number of azimuth-axis cross-section slices to plot",
+      "n_elevation_slices": "Number of elevation-axis cross-section slices to plot",
+      "gif_axes": "Axes along which to sweep animation frames",
+      "gif_fps": "Animation playback rate in frames per second",
+      "gif_max_frames": "Cap on frames per animation",
+      "gif_dpi": "Resolution of animation frames in dots per inch",
+      "cmap_intensity": "Colormap for intensity/reflectivity plots",
+      "cmap_error": "Colormap for error maps",
+      "normalize_intensity": "Whether to normalize intensity before display",
+      "fig_dpi": "On-screen figure resolution in dots per inch",
+      "save_dpi": "Saved figure resolution in dots per inch",
+      "paths": "Nested output directory and filename configuration"
+    }
+  },
+  "inference/image_autoencoder::ImageAeInferencePaths": {
+    "summary": "Names for output subdirectories and result files produced during autoencoder inference",
+    "fields": {
+      "figures_subdir": "Subdirectory name where generated figures are written",
+      "logs_subdir": "Subdirectory name where run logs are stored",
+      "metrics_filename": "Filename for the JSON of computed evaluation metrics",
+      "report_filename": "Filename for the Markdown summary report"
+    }
+  },
+  "inference/image_autoencoder::ImageAeInferenceConfig": {
+    "summary": "Runs a trained image-autoencoder checkpoint over a data split and reports reconstruction quality",
+    "fields": {
+      "run_directory": "Path to the training run holding checkpoint and outputs",
+      "output_subdir": "Optional subfolder under run for this inference's artifacts",
+      "device": "Compute device for inference, e.g. cuda or cpu",
+      "seed": "Random seed for global reproducibility",
+      "log_level": "Logging verbosity threshold, e.g. INFO or DEBUG",
+      "split": "Dataset partition to evaluate: train, val, or test",
+      "checkpoint_name": "Weight file to load from the run directory",
+      "batch_size": "Inference batch size; None uses the training default",
+      "num_workers": "Parallel data-loader worker processes",
+      "save_plots": "Whether to render and save diagnostic figures",
+      "n_best_patches": "Count of lowest-error patches to visualize",
+      "n_worst_patches": "Count of highest-error patches to visualize",
+      "n_random_patches": "Count of randomly sampled patches to visualize",
+      "n_scatter_points": "Points sampled for prediction-versus-target scatter plots",
+      "patch_seed": "Random seed for patch selection and sampling",
+      "fig_dpi": "Resolution in DPI for on-screen figure rendering",
+      "save_dpi": "Resolution in DPI for saved figure files",
+      "paths": "Nested output subdirectory and filename settings"
+    }
+  },
+  "inference/profile_autoencoder::ProfileAeInferencePaths": {
+    "summary": "Relative subdirectory and filename layout for profile autoencoder inference outputs",
+    "fields": {
+      "figures_subdir": "Subdirectory name for saved plot images",
+      "logs_subdir": "Subdirectory name for run log files",
+      "metrics_filename": "JSON file storing computed evaluation metrics",
+      "report_filename": "Markdown file summarizing the inference report"
+    }
+  },
+  "inference/profile_autoencoder::ProfileAeInferenceConfig": {
+    "summary": "Controls a profile autoencoder inference run: data, checkpoint, evaluation, and diagnostic plots",
+    "fields": {
+      "run_directory": "Path to the trained run containing checkpoint and outputs",
+      "output_subdir": "Optional subfolder under run for inference outputs; default inline",
+      "device": "Compute device, cuda or cpu",
+      "seed": "Random seed for reproducibility",
+      "log_level": "Logging verbosity, e.g. INFO or DEBUG",
+      "split": "Dataset split to evaluate: test, val, or train",
+      "checkpoint_name": "Filename of model weights to load from run",
+      "batch_size": "Pixels per inference batch; None uses full pass",
+      "num_workers": "DataLoader worker processes for loading pixels",
+      "pixel_subsample": "Fraction of pixels evaluated, 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty/zero profiles retained when subsampling",
+      "save_plots": "Whether to render and save diagnostic figures",
+      "n_best_curves": "Number of best-fit reconstructed profiles to plot",
+      "n_worst_curves": "Number of worst-fit reconstructed profiles to plot",
+      "n_random_curves": "Number of randomly sampled profiles to plot",
+      "n_scatter_points": "Maximum points shown in scatter diagnostic plots",
+      "curve_seed": "Seed for selecting random example curves",
+      "fig_dpi": "Resolution for on-screen or preview figures",
+      "save_dpi": "Resolution for saved publication-quality figures",
+      "paths": "Nested output subdirectory and filename layout config"
+    }
+  },
+  "normalization/general::ChannelStrategy": {
+    "summary": "Per-channel normalization recipe fitting location and scale from data",
+    "fields": {
+      "norm_method": "Statistic used to fit offset/scale: min-max p99.9, robust IQR, fixed pi divide, or z-score",
+      "apply_log1p": "Whether to log1p-compress non-negative values before fitting statistics"
+    }
+  },
+  "normalization/general::OutputClampConfig": {
+    "summary": "Bounds predicted output values to a valid physical range",
+    "fields": {
+      "enabled": "Whether to clamp predicted outputs to the floor-ceil interval",
+      "floor": "Lower clamp bound for outputs; default 0.0",
+      "ceil": "Upper clamp bound for outputs; default 80.0 (meters/elevation)"
+    }
+  },
+  "normalization/general::NormalizationConfig": {
+    "summary": "Selects normalization strategies per input/output channel slot and output clamping",
+    "fields": {
+      "input_strategy": "Global input preset name, or 'per_slot' for slot-specific defaults",
+      "output_strategy": "Global output preset name, or 'per_slot' for slot-specific defaults",
+      "pass_mag": "Override preset for single-pass magnitude channel; 'default' keeps slot choice",
+      "pass_phase": "Override preset for single-pass phase channel; 'default' keeps slot choice",
+      "ifg_mag": "Override preset for interferogram magnitude channel; 'default' keeps slot choice",
+      "ifg_phase": "Override preset for interferogram phase channel; 'default' keeps slot choice",
+      "out_amp": "Override preset for output Gaussian amplitude channel; 'default' keeps slot choice",
+      "out_mu": "Override preset for output Gaussian mean/height channel; 'default' keeps slot choice",
+      "out_sigma": "Override preset for output Gaussian width channel; 'default' keeps slot choice",
+      "dem": "Override preset for DEM elevation channel; 'default' keeps slot choice",
+      "clamp_output": "Whether to clamp final outputs to the floor-ceil range",
+      "clamp_floor": "Lower clamp bound applied to outputs; default 0.0",
+      "clamp_ceil": "Upper clamp bound applied to outputs; default 80.0"
+    }
+  },
+  "normalization/general::ChannelStats": {
+    "summary": "Persisted fitted normalization statistics per channel for applying transforms",
+    "fields": {
+      "loc": "Per-channel offset (mean/median/min) subtracted during normalization",
+      "scale": "Per-channel divisor (std/IQR/range/pi) applied during normalization",
+      "names": "Optional per-channel slot labels aligned with loc/scale entries",
+      "strategies": "Optional per-channel ChannelStrategy recording the fitting method used",
+      "log1p_channels": "Indices of channels that were log1p-compressed before normalization"
+    }
+  },
+  "param_extraction::FitSettings": {
+    "summary": "Optimizer settings for fitting Gaussian mixtures to vertical reflectivity profiles",
+    "fields": {
+      "max_fit_iterations": "Maximum optimizer iterations allowed per profile fit",
+      "fit_config": "Nested Gaussian-fit hyperparameters: component count, regularization, thresholds"
+    }
+  },
+  "param_extraction::ExtractionConfig": {
+    "summary": "Drives one Gaussian-parameter extraction run over a processed tomogram",
+    "fields": {
+      "processed_data_path": "Root of preprocessed run holding data/ and meta/ subfolders",
+      "pyrat_directory": "Filesystem path to the PyRAT SAR-processing installation",
+      "output_prefix": "Leading token of the generated output subdirectory name",
+      "output_suffix": "Optional naming tag overriding the auto-derived hyperparameter suffix",
+      "height_range": "Elevation min,max in metres; None reads it from metadata",
+      "fit_settings": "Nested fitting optimizer and Gaussian-fit configuration",
+      "parameter_workers": "Number of parallel CPU worker processes for extraction",
+      "range_batch_size": "Number of range lines processed together per batch",
+      "gpu_pixel_batch_size": "Pixels fitted per GPU batch during Adam optimization",
+      "adam_steps": "Number of Adam optimizer steps per fit",
+      "adam_lr": "Adam learning rate for the fitting optimizer",
+      "adam_b1": "Adam beta1 first-moment decay coefficient",
+      "adam_b2": "Adam beta2 second-moment decay coefficient"
+    }
+  },
+  "param_extraction::ExtractParamsEntryConfig": {
+    "summary": "Batch entry point sweeping extraction across datasets and hyperparameter grids",
+    "fields": {
+      "dataset_base_path": "Root directory containing the datasets to process",
+      "dataset_filter": "Substrings selecting which datasets under the base path run",
+      "pyrat_directory": "Filesystem path to the PyRAT SAR-processing installation",
+      "output_prefix": "Leading token of each generated output subdirectory name",
+      "output_suffix": "Optional naming tag overriding the auto-derived hyperparameter suffix",
+      "height_range": "Elevation min,max in metres; None reads it from metadata",
+      "fit_k_values": "List of maximum Gaussian-component counts to sweep",
+      "fit_lambda_values": "Component-count regularization strengths to sweep",
+      "fit_modes": "Which parameters stay free: sigma, sigma_amp, sigma_amp_mu",
+      "fit_sigma_init_divisor": "Divides height span to set initial Gaussian width",
+      "gpu_device_ids": "GPU indices across which work is distributed",
+      "range_batch_size": "Number of range lines processed together per batch",
+      "parameter_workers": "Parallel CPU worker count, capped at 64 or core count"
+    }
+  },
+  "param_extraction::ParamExtractionInferenceConfig": {
+    "summary": "Post-extraction analysis and plotting of fitted profile parameters",
+    "fields": {
+      "params_dir": "Directory holding extracted parameter runs to analyze",
+      "run_tags": "Identifiers selecting which parameter runs to process",
+      "threshold_factor": "Peak-detection cutoff as fraction of maximum amplitude",
+      "truncation_index": "Elevation bin index beyond which profiles are truncated",
+      "make_plots": "Whether to render diagnostic plots during analysis"
+    }
+  },
+  "sar/gaussian_config::GaussianConfig": {
+    "summary": "Parametrises the Gaussian-mixture head predicting vertical reflectivity profiles",
+    "fields": {
+      "n_default_gaussians": "Number of Gaussian components (slots) the backbone predicts per pixel",
+      "x_min": "Lower bound of the elevation/height axis in metres",
+      "x_max": "Upper bound of the elevation/height axis in metres",
+      "amp_max": "Maximum allowed Gaussian amplitude, capping predicted reflectivity peaks",
+      "params_per_gaussian": "Parameters per component: amplitude, mean, width (default 3)",
+      "predict_presence": "Whether to emit a per-slot presence/occupancy probability head"
+    }
+  },
+  "sar/geometry_config::GeometryConfig": {
+    "summary": "Acquisition geometry and interferometric baselines mapping SAR stacks to the vertical wavenumber axis",
+    "fields": {
+      "wavelength": "Radar carrier wavelength in metres (0.23 corresponds to L-band)",
+      "slant_range": "Sensor-to-target slant range distance in metres",
+      "look_angle_deg": "Radar look/incidence angle in degrees, used for perpendicular projection",
+      "baselines": "Per-track baseline offsets in metres relative to the primary acquisition",
+      "kz_values": "Explicit vertical wavenumbers per track; non-empty overrides baseline computation",
+      "baselines_source": "Resolution mode: auto, dataset (require file), or manual (use config values)",
+      "baseline_component": "Projection used: perpendicular, vertical, horizontal, or magnitude",
+      "baselines_origin": "Provenance tag of active baselines: config default or loaded file path",
+      "height_axis_convention": "Orientation of the vertical reconstruction axis, e.g. height versus elevation"
+    }
+  },
+  "sar/processing_config::TomogramConfig": {
+    "summary": "Tomographic focusing of a SAR acquisition stack into a 3D reflectivity tomogram",
+    "fields": {
+      "fusar_project_path": "Path to F-SAR project CSV listing the stack acquisitions",
+      "base_directory": "Root filesystem path where raw SAR data resides",
+      "polarisation": "Radar polarisation channel to process, e.g. hv",
+      "track_selection": "Glob pattern selecting which acquisition tracks to include",
+      "height_range": "Vertical elevation extent in metres, (minimum, maximum)",
+      "filter_method": "Covariance-estimation spatial filter, e.g. Boxcar",
+      "filter_arguments": "Filter parameters, e.g. window size in azimuth and range",
+      "beamforming_method": "Tomographic spectral estimator, e.g. Capon",
+      "beamforming_arguments": "Extra positional arguments passed to the beamformer",
+      "max_crop_azimuth_width": "Maximum azimuth pixels per processing subsection",
+      "apply_resampling": "Whether to resample the stack geometry before focusing",
+      "apply_presumming": "Whether to presum (average) acquisitions to reduce data",
+      "max_amplitude_clip": "Upper clip applied to amplitude during normalisation"
+    }
+  },
+  "sar/processing_config::ParallelConfig": {
+    "summary": "CPU parallelism budget for concurrent tomogram and interferogram computation",
+    "fields": {
+      "effort": "Parallelism intensity level: low, medium, or high",
+      "tomogram_workers": "Parallel tomogram worker processes; None auto-computes",
+      "pyrat_threads": "Threads per PyRAT interferogram job; None auto-computes",
+      "EFFORT_FRACTIONS": "Effort-to-core-fraction map: low 0.25, medium 0.5, high 0.8",
+      "THREAD_CAP": "Hard upper bound on worker threads regardless of core budget"
+    }
+  },
+  "sar/processing_config::PathConfig": {
+    "summary": "Filesystem layout for a processing run's inputs, outputs, and scratch space",
+    "fields": {
+      "main_directory": "Root dataset directory holding all run subfolders",
+      "pyrat_directory": "PyRAT working and cache directory",
+      "data_subdirectory": "Subfolder name for processed data arrays",
+      "metadata_subdirectory": "Subfolder name for run metadata files",
+      "temporary_subdirectory": "Subfolder name for transient intermediate files",
+      "run_subdirectory": "Per-run subfolder; None uses main directory directly"
+    }
+  },
+  "sar/processing_config::ProcessingConfig": {
+    "summary": "Top-level orchestration of a single tomogram preprocessing run",
+    "fields": {
+      "crop": "Azimuth and range crop region to process; required",
+      "tomogram_config": "Nested tomographic focusing and beamforming settings",
+      "parallel": "Nested CPU parallelism and worker budget settings",
+      "paths": "Nested filesystem layout for the run",
+      "dataset_type": "Sensor or dataset family, e.g. FSAR",
+      "stack_identifier": "Identifier distinguishing the acquisition stack",
+      "tomogram_output_tag": "Filename tag embedded in tomogram output artifacts",
+      "parameter_output_tag": "Filename tag embedded in parameter output artifacts",
+      "tomogram_env_name": "Conda environment name for the tomogram computation"
+    }
+  },
+  "sar/processing_config::PreProcessEntryConfig": {
+    "summary": "Entry-point parameters for a batch preprocessing run over window sweeps",
+    "fields": {
+      "azimuth_start": "Starting azimuth pixel index of the crop",
+      "azimuth_end": "Ending azimuth pixel index of the crop",
+      "range_start": "Starting range pixel index of the crop",
+      "range_end": "Ending range pixel index of the crop",
+      "fusar_project_path": "Path to F-SAR project CSV listing acquisitions",
+      "base_directory": "Root filesystem path where raw SAR data resides",
+      "track_selection": "Glob pattern selecting which tracks to include",
+      "polarisation": "Radar polarisation channel to process, e.g. hv",
+      "beamforming_method": "Tomographic spectral estimator, e.g. Capon",
+      "filter_method": "Covariance-estimation spatial filter, e.g. Boxcar",
+      "height_range": "Vertical elevation extent in metres, (minimum, maximum)",
+      "win_list": "Filter window sizes (azimuth, range) to sweep over",
+      "effort": "Parallelism intensity level: low, medium, or high",
+      "dataset_name": "Explicit output dataset name; None auto-derives it",
+      "dataset_type": "Sensor or dataset family, e.g. FSAR",
+      "stack_identifier": "Identifier distinguishing the acquisition stack",
+      "tomogram_output_tag": "Filename tag embedded in tomogram output artifacts",
+      "parameter_output_tag": "Filename tag embedded in parameter output artifacts",
+      "tomogram_env_name": "Conda environment name for the tomogram computation"
+    }
+  },
+  "sar/processing_config::PreprocessInferenceConfig": {
+    "summary": "Preparation of already-processed runs into inference-ready inputs",
+    "fields": {
+      "runs_dir": "Directory containing the preprocessed run folders",
+      "run_tags": "List of run tags identifying folders to prepare",
+      "max_amplitude_clip": "Upper clip applied to amplitude during normalisation"
+    }
+  },
+  "training/backbone::PatchTrialsConfig": {
+    "summary": "Sweep of spatial patch geometries for a patch-size trial study",
+    "fields": {
+      "sizes": "Candidate square patch edge lengths in pixels to sweep",
+      "stride_ratio": "Patch stride as fraction of size; 0.5 gives 50% overlap"
+    }
+  },
+  "training/backbone::SecondaryTrialsConfig": {
+    "summary": "Controls how secondary SAR acquisitions are chosen for stack-selection trials",
+    "fields": {
+      "strategy": "Secondary-selection scheme, e.g. consecutive, spaced, or random",
+      "n_secondaries": "Number of secondary acquisitions selected per trial",
+      "n_trials": "Count of distinct secondary-selection configurations to evaluate",
+      "mean": "Optional mean of random baseline/spacing distribution; None disables",
+      "sigma": "Optional standard deviation of random spacing; None disables",
+      "block_step": "Step between blocks when picking secondaries in blocks",
+      "spacing": "Index gap between consecutively selected secondaries",
+      "seed": "Random seed for reproducible secondary sampling"
+    }
+  },
+  "training/backbone::BackboneTrainerConfig": {
+    "summary": "Aggregates all component configs for a single backbone training run",
+    "fields": {
+      "gaussian": "Gaussian-mixture output head settings along the elevation axis",
+      "geometry": "Acquisition geometry and per-pixel kz field settings",
+      "early_stopping": "Patience and criteria for halting training early",
+      "warmup": "Learning-rate warmup schedule at training start",
+      "scheduler": "Learning-rate scheduler type and parameters",
+      "io": "Checkpoint, logging, and artifact input/output settings",
+      "optimizer": "Optimizer choice, learning rate, and weight decay",
+      "training": "Core training loop settings: epochs, batch size, iteration control",
+      "overfit": "Single-batch overfit sanity-check mode settings",
+      "curriculum": "Two-phase loss curriculum with warmup and complete stages",
+      "resources": "Compute resource allocation such as device and worker counts",
+      "memory": "Memory-management settings like pinning and cache limits",
+      "gradient_clipper": "Gradient norm/value clipping thresholds"
+    }
+  },
+  "training/backbone::BackboneEntryConfig": {
+    "summary": "Top-level entry point config for launching backbone training jobs and sweeps",
+    "fields": {
+      "run_name": "Optional label for the run; None auto-generates one",
+      "backbone_name": "Neural backbone architecture identifier, default resunet",
+      "gpu": "Primary GPU device index for a single run",
+      "seed": "Base random seed for reproducibility",
+      "seeds": "Multiple seeds to launch repeated runs; empty uses seed",
+      "n_gaussians": "Number of Gaussian components predicted per elevation profile",
+      "predict_presence": "Whether the model predicts a per-slot presence probability",
+      "logdir": "Root directory where run outputs and checkpoints are written",
+      "model_overrides": "Ad-hoc key-value overrides applied to backbone hyperparameters",
+      "paths": "Filesystem paths for data, runs, and outputs",
+      "training": "Training queue and scheduling settings for launched jobs",
+      "pretrain": "Pretraining stage configuration preceding main training",
+      "curriculum": "Loss curriculum stages seeded by default_curriculum",
+      "geometry": "Acquisition geometry and kz settings for the run",
+      "input": "Input channel selection; defaults to full-stack inputs",
+      "normalization": "Per-channel input normalization strategy settings",
+      "augmentation": "Data augmentation transforms applied during training",
+      "probe_enabled": "Whether to run a short diagnostic loss probe before training",
+      "probe_n_batches": "Number of batches processed during the probe pass",
+      "probe_reference": "Reference loss term used to gauge probe results, e.g. param_l1",
+      "probe_exit_after": "Exit after probing without proceeding to full training",
+      "infer_after": "Run inference automatically once training completes",
+      "inference": "Inference settings applied in the post-training pass",
+      "trials_enabled": "Enable multi-trial sweep mode instead of a single run",
+      "trials_mode": "Which sweep dimension to vary, e.g. curriculum",
+      "warmup_losses": "Named loss-term presets tried in the warmup phase",
+      "complete_losses": "Named loss-term presets tried in the complete phase",
+      "presence_trials": "Named combinations of presence and balance loss terms to sweep",
+      "secondary_trials": "Secondary-acquisition selection sweep configuration",
+      "patch_trials": "Patch-size and stride sweep configuration",
+      "input_trials": "Named input-channel selection presets to sweep",
+      "ablation_features": "List of feature flags included in ablation study",
+      "ablation_catalog": "Full catalog of available ablation feature definitions",
+      "ablation_include_full": "Include the full-model baseline among ablation variants",
+      "gpus": "GPU device indices available for parallel sweep execution",
+      "poll_interval_s": "Seconds between polls when scheduling queued jobs"
+    }
+  },
+  "training/general/loss::LossConfig": {
+    "summary": "Enables and weights every term of the tomographic reconstruction training loss",
+    "fields": {
+      "use_mse_curve": "Enable mean-squared-error term on the elevation reflectivity curve",
+      "weight_mse_curve": "Scaling factor applied to the MSE curve term",
+      "use_l1_curve": "Enable L1 (absolute-error) term on the reflectivity curve",
+      "weight_l1_curve": "Scaling factor applied to the L1 curve term",
+      "use_huber_curve": "Enable Huber (smooth-L1) term on the reflectivity curve",
+      "weight_huber_curve": "Scaling factor applied to the Huber curve term",
+      "huber_delta": "Transition point between quadratic and linear Huber regimes",
+      "use_charbonnier_curve": "Enable Charbonnier (robust smooth-L1) term on the curve",
+      "weight_charbonnier_curve": "Scaling factor applied to the Charbonnier curve term",
+      "charbonnier_eps": "Smoothing epsilon inside the Charbonnier square root",
+      "use_cosine_curve": "Enable cosine-similarity term aligning predicted and target curves",
+      "weight_cosine_curve": "Scaling factor applied to the cosine-similarity term",
+      "use_spectral_coherence": "Enable spectral-coherence term matching curves in frequency domain",
+      "weight_spectral_coh": "Scaling factor applied to the spectral-coherence term",
+      "spectral_coh_window": "Window length in samples for spectral-coherence estimation",
+      "use_ssim_curve": "Enable structural-similarity term on the reflectivity curve",
+      "weight_ssim_curve": "Scaling factor applied to the SSIM curve term",
+      "ssim_window_size": "SSIM Gaussian window size in samples",
+      "ssim_sigma": "Standard deviation of the SSIM Gaussian window",
+      "ssim_data_range": "Dynamic range of curve values used by SSIM",
+      "ssim_k1": "SSIM luminance stabilization constant",
+      "ssim_k2": "SSIM contrast stabilization constant",
+      "ssim_axis": "Axis along which SSIM is computed, default elevation",
+      "use_param_l1": "Enable L1 loss on predicted Gaussian mixture parameters",
+      "weight_param_l1": "Scaling factor applied to the parameter L1 term",
+      "use_param_huber": "Enable Huber loss on predicted Gaussian parameters",
+      "weight_param_huber": "Scaling factor applied to the parameter Huber term",
+      "param_huber_delta": "Huber transition point for the parameter loss",
+      "use_param_mse": "Enable MSE loss on predicted Gaussian parameters",
+      "weight_param_mse": "Scaling factor applied to the parameter MSE term",
+      "param_weights": "Per-parameter weights for amplitude, mean, width components",
+      "param_matching": "Prediction-to-target assignment: hungarian or sorted-GT",
+      "use_active_normalization": "Normalize parameter loss by number of active Gaussian slots",
+      "presence_balance": "Balance loss between active and inactive slots",
+      "active_weight": "Loss weight for active (nonzero-amplitude) slots",
+      "inactive_weight": "Loss weight for inactive (zero-amplitude) slots",
+      "amp_focal_gamma": "Focal exponent focusing amplitude loss on hard slots",
+      "amp_focal_delta": "Focal balancing constant for the amplitude loss",
+      "use_presence_bce": "Enable binary cross-entropy on slot presence prediction",
+      "weight_presence_bce": "Scaling factor applied to the presence BCE term",
+      "presence_bce_balance": "Class-balance the presence BCE across active/inactive slots",
+      "presence_gate_thr": "Probability threshold gating a slot as present",
+      "amp_zero_thr": "Amplitude below which a slot counts as inactive",
+      "amp_zero_thr_torch": "Numerical amplitude floor for tensor-side zero detection",
+      "use_smoothness_tv": "Enable total-variation smoothness penalty on the curve",
+      "weight_smoothness_tv": "Scaling factor applied to the total-variation term",
+      "use_total_power": "Enable term matching integrated total power of curves",
+      "weight_total_power": "Scaling factor applied to the total-power term",
+      "use_moments": "Enable term matching statistical moments of the curve",
+      "weight_moments": "Scaling factor applied to the moments term",
+      "moments_weights": "Per-moment weights for mass, mean, spread",
+      "use_coherence_resyn": "Enable loss re-synthesizing interferometric coherence from the curve",
+      "weight_coherence_resyn": "Scaling factor applied to the coherence-resynthesis term",
+      "use_covariance_match": "Enable matching predicted vs observed stack covariance matrices",
+      "weight_covariance_match": "Scaling factor applied to the covariance-match term",
+      "use_capon_cycle": "Enable Capon-beamforming cycle-consistency loss",
+      "weight_capon_cycle": "Scaling factor applied to the Capon-cycle term",
+      "capon_loading": "Diagonal loading regularizing the Capon covariance inverse",
+      "physics_floor": "Small floor stabilizing physics-based loss denominators"
+    }
+  },
+  "training/general/loss::LossCurriculumConfig": {
+    "summary": "Schedules a two-phase warmup-to-complete switch between loss configurations during training",
+    "fields": {
+      "enabled": "Turn on two-phase loss curriculum scheduling",
+      "swap_epoch": "Epoch at which warmup loss switches to complete loss",
+      "warmup": "Loss configuration used before the swap epoch",
+      "complete": "Loss configuration used from the swap epoch onward",
+      "reset_lr": "Reset learning rate at the curriculum swap",
+      "reset_warmup": "Restart scheduler warmup after the swap",
+      "reset_optimizer": "Reinitialize optimizer state at the swap"
+    }
+  },
+  "training/general/optimization::OptimizerConfig": {
+    "summary": "Optimizer hyperparameters driving backbone weight updates during training",
+    "fields": {
+      "lr": "Base learning rate, step size for weight updates",
+      "betas": "Adam moment decay rates for gradient and squared gradient",
+      "eps": "Numerical stability term added to denominator",
+      "weight_decay": "L2 regularization strength penalizing large weights",
+      "lr_scale": "Multiplier applied to base learning rate"
+    }
+  },
+  "training/general/optimization::SchedulerConfig": {
+    "summary": "Learning-rate schedule shaping the decay curve over training epochs",
+    "fields": {
+      "type": "Schedule shape: cosine, constant, linear, polynomial, exponential, or step",
+      "epochs": "Total training epochs the schedule spans",
+      "eta_min": "Floor learning rate reached at schedule end",
+      "step_size": "Epoch interval between decays for step schedule",
+      "gamma": "Multiplicative decay factor for step and exponential schedules",
+      "power": "Exponent controlling curvature of polynomial decay"
+    }
+  },
+  "training/general/optimization::WarmupConfig": {
+    "summary": "Initial learning-rate warmup ramp stabilizing early training steps",
+    "fields": {
+      "warmup_steps": "Number of steps to ramp up to base rate",
+      "warmup_start_factor": "Starting rate as a fraction of base rate",
+      "warmup_enabled": "Whether the warmup ramp is applied",
+      "warmup_mode": "Ramp shape: linear, cosine, exponential, or polynomial",
+      "warmup_poly_power": "Exponent for polynomial warmup ramp curvature"
+    }
+  },
+  "training/general/optimization::EarlyStoppingConfig": {
+    "summary": "Early-stopping policy halting training when validation stops improving",
+    "fields": {
+      "patience": "Epochs without improvement tolerated before stopping",
+      "restore_best": "Whether to reload best-checkpoint weights after stopping"
+    }
+  },
+  "training/general/optimization::GradientClipperConfig": {
+    "summary": "Gradient clipping strategy bounding update magnitude for stable optimization",
+    "fields": {
+      "clip_mode": "Clipping strategy: disabled, fixed, adaptive percentile, or mean-std",
+      "max_grad_norm": "Fixed norm threshold gradients are clipped to",
+      "adaptive_window": "Recent-step count for adaptive threshold statistics",
+      "adaptive_percentile": "Percentile of recent norms used as adaptive threshold",
+      "adaptive_mean_std_k": "Standard-deviation multiplier above mean for adaptive threshold",
+      "clip_epsilon": "Small constant preventing division by zero in scaling",
+      "log_histogram_freq": "Step interval between gradient histogram logs"
+    }
+  },
+  "training/general/pretraining::PretrainConfig": {
+    "summary": "Controls pre-training probes that auto-size batch and tune the data loader",
+    "fields": {
+      "find_batch_size": "Run the VRAM batch-size search probe before training",
+      "tune_loader": "Run the data-loader worker/prefetch tuning sweep",
+      "vram_budget_gb": "GPU memory ceiling in gigabytes the batch search targets",
+      "max_batch": "Upper bound on batch size the search will try",
+      "measure_steps": "Training steps timed per candidate batch size when probing memory",
+      "worker_counts": "DataLoader worker counts swept during loader tuning",
+      "prefetch_factors": "Per-worker prefetch factors swept during loader tuning",
+      "warmup_batches": "Untimed batches consumed before measurement to warm caches",
+      "timed_batches": "Number of batches timed per loader configuration for throughput",
+      "data_wait_target": "Acceptable fraction of step time spent waiting on data",
+      "seed": "Random seed for reproducible probe runs"
+    }
+  },
+  "training/general/run::RunPathsConfig": {
+    "summary": "Filesystem locations and secondary tracks for a training run",
+    "fields": {
+      "dataset_path": "Root directory of the preprocessed SAR stack dataset",
+      "parameters_path": "Path to the .npy Gaussian-fit ground-truth parameters",
+      "log_base_dir": "Base directory where run logs and checkpoints are written",
+      "secondary_labels": "Secondary acquisition tracks paired with the primary for tomography"
+    }
+  },
+  "training/general/run::TrainingQueueConfig": {
+    "summary": "Full training loop, optimization, scheduling, and data-split hyperparameters",
+    "fields": {
+      "epochs": "Total number of training epochs to run",
+      "scheduler_epochs": "Epoch horizon over which the scheduler decays; None disables",
+      "validation_frequency": "Run validation every N epochs",
+      "batch_size": "Number of patch samples per training minibatch",
+      "num_workers": "DataLoader parallel worker processes",
+      "prefetch_factor": "Batches each worker prefetches ahead",
+      "eta_min": "Minimum learning rate floor for the scheduler",
+      "early_stop_patience": "Epochs without validation improvement before stopping",
+      "log_all_losses": "Whether to log every individual loss component term",
+      "use_amp": "Enable automatic mixed-precision training",
+      "gradient_accumulation_steps": "Minibatches accumulated before an optimizer step",
+      "abort_on_nonfinite_loss": "Halt training when loss becomes NaN or infinite",
+      "scale_lr_with_batch": "Linearly scale learning rate by batch-size ratio",
+      "lr_reference_batch_size": "Baseline batch size for learning-rate scaling",
+      "scheduler_type": "Learning-rate schedule (cosine annealing, step, poly, etc.)",
+      "scheduler_step_size": "Epoch interval between step-scheduler decays",
+      "scheduler_gamma": "Multiplicative decay factor per step-scheduler drop",
+      "scheduler_power": "Exponent for the polynomial-decay schedule",
+      "warmup_enabled": "Whether to ramp learning rate at training start",
+      "warmup_steps": "Optimizer steps over which warmup ramps up",
+      "warmup_mode": "Warmup ramp shape (linear or polynomial)",
+      "warmup_poly_power": "Exponent for polynomial warmup ramp",
+      "clip_mode": "Gradient clipping strategy (fixed or adaptive)",
+      "max_grad_norm": "Gradient-norm threshold for fixed clipping",
+      "clip_adaptive_window": "Recent-step window for adaptive clip statistics",
+      "clip_adaptive_percentile": "Percentile of past norms used as adaptive clip bound",
+      "clip_adaptive_mean_std_k": "Std-dev multiplier for mean-plus-k adaptive clipping",
+      "patch_size": "Height and width in pixels of training patches",
+      "patch_stride": "Pixel stride between extracted overlapping patches",
+      "train_azimuth": "Azimuth line range assigned to the training split",
+      "val_azimuth": "Azimuth line range assigned to validation",
+      "test_azimuth": "Azimuth line range assigned to testing"
+    }
+  },
+  "training/general/runtime::IOConfig": {
+    "summary": "Output paths and logging sinks for a training run",
+    "fields": {
+      "logdir": "Filesystem directory where run logs and TensorBoard events are written",
+      "writer": "Runtime-attached TensorBoard writer handle; None until initialised"
+    }
+  },
+  "training/general/runtime::OverfitConfig": {
+    "summary": "Deliberate single-batch overfit sanity check for the backbone",
+    "fields": {
+      "enabled": "Whether to run the overfit-on-one-batch diagnostic instead of normal training",
+      "max_steps": "Maximum optimizer steps before stopping the overfit run",
+      "stop_threshold": "Loss value below which the overfit run halts early",
+      "batch_size": "Samples per step during overfit; typically 1"
+    }
+  },
+  "training/general/runtime::TrainingLoopConfig": {
+    "summary": "Core optimization loop cadence, precision, and failure handling",
+    "fields": {
+      "epochs": "Number of full passes over the training dataset",
+      "validation_frequency": "Run validation every this many epochs",
+      "use_amp": "Enable automatic mixed-precision (float16) training",
+      "gradient_accumulation_steps": "Batches accumulated before each optimizer update",
+      "log_debug": "Emit verbose per-step debug logging",
+      "log_all_losses": "Log every individual loss component, not just the total",
+      "abort_on_nonfinite_loss": "Halt training immediately if loss becomes NaN or infinite"
+    }
+  },
+  "training/general/runtime::MemoryConfig": {
+    "summary": "CUDA cache-clearing policy to curb GPU memory fragmentation",
+    "fields": {
+      "clear_cache_every_n_steps": "Empty CUDA cache at this step interval; 0 disables",
+      "clear_cache_after_eval": "Free CUDA cache after each validation pass",
+      "clear_cache_after_epoch": "Free CUDA cache at the end of each epoch"
+    }
+  },
+  "training/general/runtime::ResourceConfig": {
+    "summary": "Background hardware-utilization monitoring and threshold warnings",
+    "fields": {
+      "enabled": "Whether to run the background resource monitor",
+      "poll_interval_sec": "Seconds between successive resource-usage samples",
+      "log_to_tensorboard": "Record resource metrics as TensorBoard scalars",
+      "warn_ram_pct": "System RAM usage percentage that triggers a warning",
+      "warn_vram_pct": "GPU memory usage percentage that triggers a warning",
+      "warn_swap_pct": "Swap usage percentage that triggers a warning",
+      "warn_shm_pct": "Shared-memory (/dev/shm) usage percentage that triggers a warning",
+      "warn_cooldown_sec": "Minimum seconds between repeated warnings of the same kind"
+    }
+  },
+  "training/image_autoencoder::ImageAeLossConfig": {
+    "summary": "Reconstruction loss settings for the image autoencoder training objective",
+    "fields": {
+      "recon_kind": "Reconstruction loss type: mse, huber, or charbonnier",
+      "huber_delta": "Transition threshold between quadratic and linear regions of Huber loss",
+      "charbonnier_eps": "Smoothing epsilon in Charbonnier loss square root"
+    }
+  },
+  "training/image_autoencoder::ImageAeTrainerConfig": {
+    "summary": "Full training configuration bundling model, loss, optimization, and runtime for the image autoencoder",
+    "fields": {
+      "gaussian": "Elevation Gaussian-mixture parameterization shared across the training stack",
+      "image_autoencoder": "Autoencoder network architecture, defaulting to the Conv2d variant",
+      "ae_loss": "Reconstruction loss type and its shape parameters",
+      "geometry": "SAR acquisition geometry defining vertical/elevation axis sampling",
+      "early_stopping": "Patience and criteria for halting training on stalled validation",
+      "warmup": "Learning-rate warmup ramp at the start of training",
+      "scheduler": "Learning-rate schedule applied over the training run",
+      "io": "Checkpointing, logging, and output-writing behaviour",
+      "optimizer": "Optimizer choice, learning rate, and weight decay",
+      "training": "Epoch count, batch size, and core training-loop settings",
+      "overfit": "Single-batch overfit mode for debugging the pipeline",
+      "resources": "Device, worker, and compute-resource allocation",
+      "memory": "GPU memory management and precision settings",
+      "gradient_clipper": "Gradient-norm or value clipping to stabilize updates"
+    }
+  },
+  "training/image_autoencoder::ImageAeEntryConfig": {
+    "summary": "Top-level entry point launching a single or multi-seed image-autoencoder run",
+    "fields": {
+      "run_name": "Optional label for the run; auto-generated when None",
+      "gpu": "CUDA device index for training",
+      "seed": "Random seed for a single-run reproducibility",
+      "seeds": "List of seeds to sweep across multiple runs",
+      "n_gaussians": "Number of Gaussian components along the elevation axis",
+      "logdir": "Filesystem root where run outputs and checkpoints are written",
+      "ae_model_name": "Registry key selecting the autoencoder architecture",
+      "model_overrides": "Ad-hoc key-value overrides applied to the model config",
+      "ae_loss": "Reconstruction loss type and shape parameters",
+      "geometry": "SAR acquisition geometry defining elevation-axis sampling",
+      "paths": "Input dataset and run-directory path resolution",
+      "training": "Data-loading queue: batch size 512, 16 workers, prefetch 2",
+      "pretrain": "Pretrained-weight loading and initialization options"
+    }
+  },
+  "training/jepa::EmbeddingLossConfig": {
+    "summary": "Loss terms comparing predicted and target latent embeddings plus reconstructed profiles",
+    "fields": {
+      "use_embedding_mse": "Enable mean-squared-error term between predicted and target embeddings",
+      "weight_embedding_mse": "Scalar weight applied to the embedding MSE term",
+      "use_embedding_cosine": "Enable cosine-distance term between predicted and target embeddings",
+      "weight_embedding_cosine": "Scalar weight applied to the embedding cosine term",
+      "use_embedding_smoothl1": "Enable smooth-L1 (Huber) term on embedding differences",
+      "weight_embedding_smoothl1": "Scalar weight applied to the embedding smooth-L1 term",
+      "smoothl1_beta": "Transition threshold beta for the smooth-L1 embedding term",
+      "use_curve_recon": "Enable reconstruction loss on the decoded profile curve",
+      "weight_curve_recon": "Scalar weight applied to the curve reconstruction term",
+      "curve_kind": "Curve reconstruction metric: mse, huber, or charbonnier",
+      "huber_delta": "Delta threshold when curve_kind is huber",
+      "charbonnier_eps": "Epsilon smoothing constant when curve_kind is charbonnier"
+    }
+  },
+  "training/jepa::JepaTrainerConfig": {
+    "summary": "Full training setup for the JEPA backbone with autoencoder targets and optimization",
+    "fields": {
+      "gaussian": "Gaussian-mixture head configuration for vertical reflectivity profiles",
+      "autoencoder": "Profile autoencoder providing the latent embedding space",
+      "embedding_loss": "Latent embedding and curve reconstruction loss terms",
+      "profile_autoencoder_mode": "How profile autoencoder is used: frozen, finetune, or similar",
+      "target_provider": "Source of prediction targets: stopgrad, ema, or similar",
+      "ema_decay": "Exponential-moving-average decay for the target encoder",
+      "profile_autoencoder_checkpoint": "Path to pretrained profile autoencoder weights to load",
+      "ae_finetune_lr": "Learning rate for finetuning the profile autoencoder",
+      "ae_finetune_wd": "Weight decay for finetuning the profile autoencoder",
+      "image_autoencoder": "Image autoencoder providing the input-image latent space",
+      "image_autoencoder_mode": "How image autoencoder is used: frozen, finetune, or similar",
+      "image_autoencoder_checkpoint": "Path to pretrained image autoencoder weights to load",
+      "image_ae_finetune_lr": "Learning rate for finetuning the image autoencoder",
+      "image_ae_finetune_wd": "Weight decay for finetuning the image autoencoder",
+      "param_loss": "Loss on predicted Gaussian parameters, default L1 weight 1.0",
+      "geometry": "SAR acquisition geometry and elevation-axis configuration",
+      "early_stopping": "Criteria for halting training on stalled validation",
+      "warmup": "Learning-rate warmup schedule settings",
+      "scheduler": "Learning-rate scheduler configuration",
+      "io": "Checkpointing, logging, and output IO settings",
+      "optimizer": "Optimizer type and hyperparameters",
+      "training": "Training loop parameters such as epochs and batch size",
+      "overfit": "Single-batch overfit debugging settings",
+      "resources": "Compute resource allocation such as devices and workers",
+      "memory": "Memory-management and caching settings",
+      "gradient_clipper": "Gradient-clipping norm or value thresholds"
+    }
+  },
+  "training/jepa::JepaEntryConfig": {
+    "summary": "Top-level entry point wiring one JEPA training run and optional inference",
+    "fields": {
+      "run_name": "Human-readable name for this run, autogenerated if unset",
+      "backbone_name": "Backbone architecture identifier, default resunet",
+      "gpu": "GPU device index to train on",
+      "seed": "Random seed for a single run",
+      "seeds": "List of seeds for launching multiple repeated runs",
+      "n_gaussians": "Number of Gaussian components in the profile mixture",
+      "logdir": "Root directory for JEPA run outputs and checkpoints",
+      "model_overrides": "Dictionary of backbone hyperparameter overrides",
+      "profile_autoencoder_logdir": "Directory holding pretrained profile autoencoder runs",
+      "profile_autoencoder_run": "Name of the profile autoencoder run to load",
+      "profile_autoencoder_mode": "How profile autoencoder is used: frozen, finetune, or similar",
+      "target_provider": "Source of prediction targets: stopgrad, ema, or similar",
+      "image_autoencoder_logdir": "Directory holding pretrained image autoencoder runs",
+      "image_autoencoder_run": "Name of the image autoencoder run to load",
+      "image_autoencoder_mode": "How image autoencoder is used: frozen, finetune, or similar",
+      "embedding_loss": "Latent embedding and curve reconstruction loss terms",
+      "param_loss": "Loss on predicted Gaussian parameters, default L1 weight 1.0",
+      "geometry": "SAR acquisition geometry and elevation-axis configuration",
+      "paths": "Filesystem paths for run inputs and outputs",
+      "training": "Training queue and scheduling configuration",
+      "pretrain": "Pretraining stage configuration before main training",
+      "infer_after": "Whether to run inference automatically after training",
+      "inference": "Inference settings applied when infer_after is enabled"
+    }
+  },
+  "training/profile_autoencoder::ProfileAeLossConfig": {
+    "summary": "Reconstruction loss shape and robustness parameters for autoencoder profile fitting",
+    "fields": {
+      "curve_kind": "Reconstruction loss type: mse, huber, or charbonnier",
+      "huber_delta": "Huber loss threshold where quadratic switches to linear",
+      "charbonnier_eps": "Smoothing epsilon for the Charbonnier robust loss"
+    }
+  },
+  "training/profile_autoencoder::ProfileAeTrainerConfig": {
+    "summary": "Aggregates all subconfigs governing profile-autoencoder training",
+    "fields": {
+      "gaussian": "Gaussian-mixture profile parametrization the autoencoder targets",
+      "autoencoder": "Autoencoder architecture; defaults to MLP encoder-decoder",
+      "ae_loss": "Profile reconstruction loss settings",
+      "geometry": "SAR acquisition geometry defining elevation sampling axis",
+      "early_stopping": "Patience and criteria for halting on stalled validation",
+      "warmup": "Learning-rate warmup schedule over initial steps",
+      "scheduler": "Learning-rate scheduler settings across training",
+      "io": "Checkpointing, logging, and output writing settings",
+      "optimizer": "Optimizer type, learning rate, and weight decay",
+      "training": "Core training loop settings such as epoch count",
+      "overfit": "Small-batch overfit sanity-check settings",
+      "resources": "Device and compute-resource allocation settings",
+      "memory": "Memory-management and caching settings",
+      "gradient_clipper": "Gradient-norm clipping threshold and mode"
+    }
+  },
+  "training/profile_autoencoder::ProfileAeEntryConfig": {
+    "summary": "Top-level entry point launching one or more profile-autoencoder training runs",
+    "fields": {
+      "run_name": "Optional label for the run; auto-generated when None",
+      "gpu": "CUDA device index to train on",
+      "seed": "Random seed for a single run",
+      "seeds": "Seed list for launching multiple repeated runs",
+      "n_gaussians": "Number of Gaussian components per elevation profile",
+      "logdir": "Base directory for run outputs and checkpoints",
+      "pixel_subsample": "Fraction of pixels sampled for training; 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty/background profiles retained when subsampling",
+      "profile_augmentation": "Augmentation settings applied to input profiles",
+      "ae_model_name": "Registry key selecting the autoencoder architecture",
+      "model_overrides": "Dict overriding selected model's default hyperparameters",
+      "ae_loss": "Profile reconstruction loss settings",
+      "geometry": "SAR acquisition geometry defining elevation sampling axis",
+      "paths": "Input data and run output path locations",
+      "training": "Data-loading queue: batch size, workers, prefetch",
+      "pretrain": "Pretraining or checkpoint-warmstart settings"
+    }
+  },
+  "tuning/general::TuningConfig": {
+    "summary": "Optuna hyperparameter search controls: trial budget, seeding, pruning, and artifact emission",
+    "fields": {
+      "n_trials": "Number of Optuna trials to run in the study",
+      "n_epochs": "Training epochs evaluated per trial",
+      "base_seed": "Base RNG seed for reproducible trial sampling",
+      "early_stop_patience": "Epochs without improvement before halting a trial",
+      "pruner_n_startup_trials": "Trials run before the pruner begins acting",
+      "pruner_n_warmup_steps": "Intermediate steps per trial before pruning may occur",
+      "emit_trial_docs": "Whether to write per-trial documentation artifacts",
+      "emit_study_plots": "Whether to render study-level visualization plots"
+    }
+  },
+  "tuning/general::TuningEntryConfig": {
+    "summary": "Top-level entry point wiring a tuning run: model type, resources, data, and nested configs",
+    "fields": {
+      "training_type": "Model type to tune, e.g. backbone or autoencoder",
+      "paths": "Run and log directory locations for tuning outputs",
+      "tuning": "Nested Optuna search-control settings",
+      "gpus": "GPU device IDs available for parallel trials",
+      "skip_models": "Model names to exclude from the sweep",
+      "run_tag": "Optional label identifying this tuning run",
+      "n_gaussians": "Number of Gaussian mixture components along elevation",
+      "training": "Training queue configuration shared across trials",
+      "overfit": "Overfit-check settings for sanity validation",
+      "ae_loss": "Profile autoencoder loss configuration",
+      "image_ae_loss": "Image autoencoder loss configuration",
+      "jepa": "JEPA-specific tuning configuration",
+      "pixel_subsample": "Fraction of pixels sampled per image, 1.0 keeps all",
+      "keep_empty_frac": "Fraction of empty-profile pixels retained during training"
+    }
+  },
+  "tuning/jepa::JepaTuneConfig": {
+    "summary": "Selects pretrained autoencoders and target strategy for JEPA-backbone hyperparameter tuning",
+    "fields": {
+      "profile_autoencoder_logdir": "Directory holding pretrained profile-autoencoder runs to import from",
+      "profile_autoencoder_run": "Name of specific profile-autoencoder run; None picks default",
+      "profile_autoencoder_mode": "Coupling of profile encoder: 'frozen' or 'finetune'",
+      "image_autoencoder_logdir": "Directory holding pretrained image-autoencoder runs to import from",
+      "image_autoencoder_run": "Name of specific image-autoencoder run; None picks default",
+      "image_autoencoder_mode": "Coupling of image encoder: 'frozen' or 'finetune'",
+      "target_provider": "Embedding-target source: 'stopgrad', 'ema', or differentiable 'live'",
+      "embedding_loss": "Configuration for the embedding-matching loss between branches",
+      "param_loss": "Configuration for Gaussian-parameter reconstruction loss; L1 enabled by default"
+    }
+  }
+}

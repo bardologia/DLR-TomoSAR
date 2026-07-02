@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 from project_paths import ProjectPaths
 
 
 class ConfigRegistry:
+
+    DESCRIPTIONS_FILE = "config_descriptions.json"
 
     SECTION_TITLES = {
         "sar"              : "SAR Processing",
@@ -24,7 +27,12 @@ class ConfigRegistry:
     SECTION_ORDER = ["sar", "param", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "tuning"]
 
     def __init__(self, paths: ProjectPaths) -> None:
-        self.paths = paths
+        self.paths        = paths
+        self.descriptions = self._load_descriptions()
+
+    def _load_descriptions(self) -> dict:
+        path = Path(__file__).resolve().parent / self.DESCRIPTIONS_FILE
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def _parse_module(self, path: Path) -> list[dict]:
         try:
@@ -117,6 +125,13 @@ class ConfigRegistry:
     def _rel_module(self, path: Path) -> str:
         return path.relative_to(self.paths.config_dir).with_suffix("").as_posix()
 
+    def _attach_descriptions(self, cls: dict) -> None:
+        entry            = self.descriptions[f"{cls['module']}::{cls['name']}"]
+        cls["desc"]      = entry["summary"]
+        field_descs      = entry["fields"]
+        for field in cls["fields"]:
+            field["desc"] = field_descs[field["name"]]
+
     def collect(self) -> list[dict]:
         groups = []
         for section in self._sections():
@@ -124,6 +139,7 @@ class ConfigRegistry:
             for path in self._section_files(section):
                 for cls in self._parse_module(path):
                     cls["module"] = self._rel_module(path)
+                    self._attach_descriptions(cls)
                     classes.append(cls)
             if not classes:
                 continue
