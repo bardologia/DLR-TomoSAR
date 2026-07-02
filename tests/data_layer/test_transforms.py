@@ -80,6 +80,38 @@ def test_decompress_clamps_negatives():
     assert out_t[0].item() == 0.0
 
 
+def test_decompress_leaky_slope_leaks_past_ceiling():
+    hi  = np.log1p(Log1pTransform.CEIL)
+    out = Log1pTransform.decompress(np.array([hi + 1.0]), leaky_slope=0.1)
+
+    assert out[0] > Log1pTransform.CEIL
+
+
+def test_decompress_leaky_slope_keeps_gradient_above_ceiling():
+    x = torch.tensor([np.log1p(Log1pTransform.CEIL) + 2.0], requires_grad=True)
+
+    Log1pTransform.decompress(x, leaky_slope=0.01).sum().backward()
+
+    assert x.grad[0].item() > 0.0
+
+
+def test_decompress_leaky_slope_keeps_gradient_below_floor():
+    x = torch.tensor([-3.0], requires_grad=True)
+
+    Log1pTransform.decompress(x, leaky_slope=0.01).sum().backward()
+
+    assert x.grad[0].item() > 0.0
+
+
+def test_decompress_leaky_slope_identity_inside_bounds():
+    inside = np.log1p(np.array([1.0, 500.0]))
+
+    hard  = Log1pTransform.decompress(inside)
+    leaky = Log1pTransform.decompress(inside, leaky_slope=0.1)
+
+    assert np.allclose(hard, leaky)
+
+
 def test_compress_monotonic():
     x   = np.linspace(0.0, 100.0, 50)
     out = Log1pTransform.compress(x)

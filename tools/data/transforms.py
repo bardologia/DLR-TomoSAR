@@ -24,10 +24,10 @@ class Log1pTransform:
         if isinstance(x, torch.Tensor):
             bounded = torch.clamp(x, min=lo, max=hi) if enabled else x
             if enabled and leaky_slope > 0.0:
-                bounded = bounded + leaky_slope * torch.clamp(x - lo, max=0.0)
+                bounded = bounded + leaky_slope * (torch.clamp(x - lo, max=0.0) + torch.clamp(x - hi, min=0.0))
             return torch.expm1(bounded)
 
         bounded = np.clip(x, lo, hi) if enabled else x
         if enabled and leaky_slope > 0.0:
-            bounded = bounded + leaky_slope * np.minimum(x - lo, 0.0)
+            bounded = bounded + leaky_slope * (np.minimum(x - lo, 0.0) + np.maximum(x - hi, 0.0))
         return np.expm1(bounded)
