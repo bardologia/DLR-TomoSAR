@@ -57,8 +57,6 @@ class WarmupTrialPlanner(TrialPlanner):
 
 class SlotPresenceTrialPlanner:
 
-    ENTRY_KEYS = ("predict_presence",)
-
     def __init__(self, model_name: str, presence_trials: dict) -> None:
         self.model_name      = model_name
         self.presence_trials = presence_trials
@@ -73,10 +71,7 @@ class SlotPresenceTrialPlanner:
         overrides = {"curriculum.enabled": False}
 
         for key, value in spec.items():
-            if key in self.ENTRY_KEYS:
-                overrides[key] = value
-            else:
-                overrides[f"curriculum.warmup.{key}"] = value
+            overrides[f"curriculum.warmup.{key}"] = value
 
         return overrides
 

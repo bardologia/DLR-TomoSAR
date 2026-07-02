@@ -164,12 +164,6 @@ class AblationCatalog:
 
         return [
             {
-                "label"   : "predict_presence",
-                "group"   : "slot presence",
-                "enable"  : {"predict_presence": True,  f"{prefix}use_presence_bce": True,  f"{prefix}weight_presence_bce": 1.0},
-                "degrade" : {"predict_presence": False, f"{prefix}use_presence_bce": False, f"{prefix}weight_presence_bce": 0.0},
-            },
-            {
                 "label"   : "focal",
                 "group"   : "slot presence",
                 "enable"  : {f"{prefix}amp_focal_gamma": 2.0},

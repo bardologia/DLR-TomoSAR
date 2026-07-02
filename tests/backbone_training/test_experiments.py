@@ -51,23 +51,21 @@ def test_warmup_planner_disables_curriculum():
 def test_presence_planner_disables_curriculum():
     planner = SlotPresenceTrialPlanner(
         "resunet",
-        {"P": {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0, "use_active_normalization": True}},
+        {"AB": {"use_active_normalization": True, "presence_balance": True}},
     )
 
     plans = planner.plan()
 
     assert len(plans) == 1
-    assert [name for name, _ in plans] == ["resunet_pr-P"]
+    assert [name for name, _ in plans] == ["resunet_pr-AB"]
     assert planner.summary()["Total runs"] == 1
 
-    ov = dict(plans)["resunet_pr-P"]
+    ov = dict(plans)["resunet_pr-AB"]
 
     assert ov["curriculum.enabled"] is False
-    assert ov["predict_presence"]  is True
     assert "curriculum.warmup.param_match" not in ov
-    assert ov["curriculum.warmup.use_presence_bce"]          is True
-    assert ov["curriculum.warmup.weight_presence_bce"]       == 1.0
     assert ov["curriculum.warmup.use_active_normalization"]  is True
+    assert ov["curriculum.warmup.presence_balance"]          is True
 
 
 def test_presence_planner_default_matrix():
@@ -75,14 +73,11 @@ def test_presence_planner_default_matrix():
 
     plans = dict(planner.plan())
 
-    assert len(plans) == 20
+    assert len(plans) == 10
     assert "resunet_pr-none" in plans
     assert plans["resunet_pr-none"] == {"curriculum.enabled": False}
 
     for name, overrides in plans.items():
-        if overrides.get("predict_presence"):
-            assert overrides["curriculum.warmup.use_presence_bce"] is True
-            assert overrides["curriculum.warmup.weight_presence_bce"] > 0.0
         if overrides.get("curriculum.warmup.amp_focal_gamma"):
             assert overrides["curriculum.warmup.amp_focal_gamma"] > 0.0
 
@@ -204,9 +199,9 @@ def test_input_planner_rejects_empty_trials():
 
 
 ABL_FEATURES = [
-    {"label": "presence", "enable": {"predict_presence": True, "curriculum.warmup.use_presence_bce": True}, "degrade": {"predict_presence": False, "curriculum.warmup.use_presence_bce": False}},
-    {"label": "focal",    "enable": {"curriculum.warmup.amp_focal_gamma": 2.0},                                "degrade": {"curriculum.warmup.amp_focal_gamma": 0.0}},
-    {"label": "balance",  "enable": {"curriculum.warmup.presence_balance": True},                            "degrade": {"curriculum.warmup.presence_balance": False}},
+    {"label": "active_norm", "enable": {"curriculum.warmup.use_active_normalization": True}, "degrade": {"curriculum.warmup.use_active_normalization": False}},
+    {"label": "focal",       "enable": {"curriculum.warmup.amp_focal_gamma": 2.0},           "degrade": {"curriculum.warmup.amp_focal_gamma": 0.0}},
+    {"label": "balance",     "enable": {"curriculum.warmup.presence_balance": True},         "degrade": {"curriculum.warmup.presence_balance": False}},
 ]
 
 
@@ -218,25 +213,24 @@ def test_ablation_planner_cumulative_full_to_baseline():
 
     assert names == [
         "resunet_abl-0-full",
-        "resunet_abl-1-no_presence",
+        "resunet_abl-1-no_active_norm",
         "resunet_abl-2-no_focal",
         "resunet_abl-3-baseline",
     ]
     assert planner.summary()["Total runs"] == 4
 
     full = dict(plans)["resunet_abl-0-full"]
-    assert full["predict_presence"]                       is True
+    assert full["curriculum.warmup.use_active_normalization"] is True
     assert full["curriculum.warmup.amp_focal_gamma"]      == 2.0
     assert full["curriculum.warmup.presence_balance"]     is True
 
-    step1 = dict(plans)["resunet_abl-1-no_presence"]
-    assert step1["predict_presence"]                      is False
-    assert step1["curriculum.warmup.use_presence_bce"]    is False
+    step1 = dict(plans)["resunet_abl-1-no_active_norm"]
+    assert step1["curriculum.warmup.use_active_normalization"] is False
     assert step1["curriculum.warmup.amp_focal_gamma"]     == 2.0
     assert step1["curriculum.warmup.presence_balance"]    is True
 
     baseline = dict(plans)["resunet_abl-3-baseline"]
-    assert baseline["predict_presence"]                   is False
+    assert baseline["curriculum.warmup.use_active_normalization"] is False
     assert baseline["curriculum.warmup.amp_focal_gamma"]  == 0.0
     assert baseline["curriculum.warmup.presence_balance"] is False
 
@@ -247,7 +241,7 @@ def test_ablation_planner_without_full_run():
     plans = planner.plan()
 
     assert [name for name, _ in plans] == [
-        "unet_abl-1-no_presence",
+        "unet_abl-1-no_active_norm",
         "unet_abl-2-no_focal",
         "unet_abl-3-baseline",
     ]
@@ -320,10 +314,7 @@ def test_ablation_catalog_standard_categories_present():
     assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
     assert "curriculum.warmup.presence_balance" not in imbalance["enable"]
 
-    presence = catalog["predict_presence"]
-    assert presence["enable"]["predict_presence"]                      is True
-    assert presence["enable"]["curriculum.warmup.use_presence_bce"]    is True
-    assert presence["degrade"]["curriculum.warmup.use_presence_bce"]   is False
+    assert "predict_presence" not in catalog
 
     architecture = catalog["architecture"]
     assert architecture["enable"]["backbone_name"]                       == "resunet"

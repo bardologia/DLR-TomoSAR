@@ -73,7 +73,7 @@ class ConfigFactory:
     def _base_trainer_kwargs(self, logdir: Path) -> dict:
         training = self.config.training
         return {
-            "gaussian"         : GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians, predict_presence=getattr(self.config, "predict_presence", False)),
+            "gaussian"         : GaussianConfig.from_dataset(self.config.paths.dataset_path, n_gaussians=self.config.n_gaussians),
             "geometry"         : GeometryConfig().resolved(self.config.paths.dataset_path, secondary_labels=self._secondary_labels()),
             "gradient_clipper" : GradientClipperConfig(clip_mode=training.clip_mode.value, max_grad_norm=training.max_grad_norm, adaptive_window=training.clip_adaptive_window, adaptive_percentile=training.clip_adaptive_percentile, adaptive_mean_std_k=training.clip_adaptive_mean_std_k),
             "io"               : IOConfig(logdir=str(logdir)),

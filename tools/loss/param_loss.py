@@ -3,7 +3,6 @@ from __future__ import annotations
 import itertools
 
 import torch
-import torch.nn.functional as F
 
 
 class ParamMatcher:
@@ -96,20 +95,6 @@ class ParamLoss:
             inactive_weight = 0.5 / (1.0 - frac + ParamLoss.DENOM_FLOOR)
 
         return active * active_weight + (1.0 - active) * inactive_weight
-
-    @staticmethod
-    def presence_bce(presence_logits: torch.Tensor, active_target: torch.Tensor, balance: bool) -> torch.Tensor:
-        bce = F.binary_cross_entropy_with_logits(presence_logits, active_target, reduction="none")
-
-        if not balance:
-            return bce.mean()
-
-        frac   = active_target.mean()
-        w_pos  = 0.5 / (frac + ParamLoss.DENOM_FLOOR)
-        w_neg  = 0.5 / (1.0 - frac + ParamLoss.DENOM_FLOOR)
-        weight = active_target * w_pos + (1.0 - active_target) * w_neg
-
-        return (bce * weight).sum() / weight.sum().clamp(min=ParamLoss.DENOM_FLOOR)
 
     @staticmethod
     def focal_scale(amp_pred: torch.Tensor, amp_gt: torch.Tensor, gamma: float, delta: float) -> torch.Tensor:

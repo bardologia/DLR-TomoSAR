@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
-from tools.data.gaussians     import GaussianClamp, GaussianCurve, GaussianHead
+from tools.data.gaussians     import GaussianClamp, GaussianCurve
 from tools.loss.curve_loss    import CurveLoss
 from tools.loss.param_loss    import ParamLoss, ParamMatcher
 from tools.loss.physical_loss import PhysicalLoss
@@ -41,7 +41,7 @@ class Loss:
     @property
     def slot_presence_active(self) -> bool:
         cfg = self.loss_cfg
-        return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or cfg.use_presence_bce or self.log_all_losses)
+        return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or self.log_all_losses)
 
     def log_active_terms(self, cfg, title: str) -> None:
         active_rows = []
@@ -62,10 +62,6 @@ class Loss:
             "amp_focal_gamma":          cfg.amp_focal_gamma,
             "amp_focal_delta":          cfg.amp_focal_delta,
             "use_active_normalization": cfg.use_active_normalization,
-            "use_presence_bce":         cfg.use_presence_bce,
-            "weight_presence_bce":      cfg.weight_presence_bce,
-            "presence_bce_balance":     cfg.presence_bce_balance,
-            "presence_gate_thr":        cfg.presence_gate_thr,
         }, title=title)
 
     def set_curriculum(self, complete_cfg) -> None:
@@ -186,25 +182,8 @@ class Loss:
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
         }
 
-    def _presence_term(self, presence_logits, gt_phys):
-        cfg = self.loss_cfg
-        ppg = self.gaussian_cfg.params_per_gaussian
-
-        B, C, H, W = gt_phys.shape
-        G          = presence_logits.shape[1]
-        gt         = gt_phys.reshape(B, G, ppg, H, W)
-
-        amp        = gt[:, :, 0]
-        mu         = gt[:, :, 1]
-        active     = amp > cfg.amp_zero_thr
-        sort_key   = torch.where(active, mu, torch.full_like(mu, float("inf")))
-        sort_idx   = torch.argsort(sort_key, dim=1)
-        active_srt = torch.gather(active.to(presence_logits.dtype), dim=1, index=sort_idx)
-
-        return ParamLoss.presence_bce(presence_logits, active_srt, cfg.presence_bce_balance)
-
     @torch.no_grad()
-    def _occupancy(self, pred_params_phys, gt_phys, presence_logits) -> dict:
+    def _occupancy(self, pred_params_phys, gt_phys) -> dict:
         cfg = self.loss_cfg
         ppg = self.gaussian_cfg.params_per_gaussian
         thr = cfg.amp_zero_thr
@@ -242,22 +221,12 @@ class Loss:
             if denom > 0:
                 out[f"count/acc_gt{k}"] = ((pred_count == gt_count) & mask_k).to(pred_amp.dtype).sum() / denom.to(pred_amp.dtype)
 
-        if presence_logits is not None:
-            head_active = (torch.sigmoid(presence_logits) > cfg.presence_gate_thr).to(pred_amp.dtype)
-            head_slot   = head_active.mean(dim=(0, 2, 3))
-
-            out["pred_presence_frac"] = head_active.mean()
-            for g in range(head_slot.shape[0]):
-                out[f"pred_presence_slot{g}"] = head_slot[g]
-
         return out
 
     def __call__(self, pred_output, gt_params, kz_map=None):
         cfg = self.loss_cfg
 
-        pred_params, presence_logits = GaussianHead.split(pred_output, self.gaussian_cfg.params_per_gaussian, self.gaussian_cfg.n_default_gaussians)
-
-        pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_params, gt_params)
+        pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
 
         if kz_map is not None:
             kz_map = kz_map.to(device=pred_curves.device, dtype=pred_curves.dtype)
@@ -321,28 +290,8 @@ class Loss:
             for pname, pval in per_param_l1.items():
                 monitor[f"param_l1/{pname}_norm"] = pval
 
-        if cfg.use_presence_bce and presence_logits is None:
-            raise ValueError("use_presence_bce is enabled but the model head emits no presence channels; set predict_presence=True so the Gaussian head produces presence logits.")
-
-        if presence_logits is not None and (cfg.use_presence_bce or self.log_all_losses):
-            if cfg.use_presence_bce:
-                presence_val = self._presence_term(presence_logits, gt_phys)
-            else:
-                with torch.no_grad():
-                    presence_val = self._presence_term(presence_logits, gt_phys)
-
-            if cfg.use_presence_bce:
-                eff_w                      = cfg.weight_presence_bce
-                components["presence_bce"] = presence_val
-                weighted["presence_bce"]   = eff_w * presence_val
-                total_loss                 = total_loss + weighted["presence_bce"]
-                weight_sum                += eff_w
-
-            if self.log_all_losses:
-                monitor["presence_bce_logit"] = presence_val
-
         if self.slot_presence_active:
-            occupancy = self._occupancy(pred_params_phys, gt_phys, presence_logits)
+            occupancy = self._occupancy(pred_params_phys, gt_phys)
 
         if weight_sum > 0.0:
             total_loss = total_loss / weight_sum

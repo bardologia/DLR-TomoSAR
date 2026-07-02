@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from tools.data.gaussians import GaussianClamp, GaussianHead
+from tools.data.gaussians import GaussianClamp
 
 
 class ModelWrapper:
@@ -16,9 +16,6 @@ class ModelWrapper:
         normalizer=None,
         x_axis: torch.Tensor | None = None,
         amp_max: float | None = None,
-        n_gaussians: int = 0,
-        predict_presence: bool = False,
-        presence_gate_thr: float = 0.5,
     ) -> None:
 
         self._model               = model
@@ -27,9 +24,6 @@ class ModelWrapper:
         self._normalizer          = normalizer
         self._x_axis              = x_axis
         self._amp_max             = amp_max
-        self._n_gaussians         = n_gaussians
-        self._predict_presence    = predict_presence
-        self._presence_gate_thr   = presence_gate_thr
 
     def denormalize_output(self, out: torch.Tensor) -> torch.Tensor:
         if self._normalizer is not None:
@@ -52,11 +46,6 @@ class ModelWrapper:
         with torch.no_grad():
             out = self._model(x_t)
 
-        if self._predict_presence:
-            params, presence_logits = GaussianHead.split(out, self._params_per_gaussian, self._n_gaussians)
-            params_phys             = self.denormalize_output(params)
-            out                     = GaussianHead.gate(params_phys, presence_logits, self._params_per_gaussian, self._n_gaussians, self._presence_gate_thr)
-        else:
-            out = self.denormalize_output(out)
+        out = self.denormalize_output(out)
 
         return out.cpu().numpy()

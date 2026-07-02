@@ -105,7 +105,7 @@ class TrainingPipeline:
         train_dataset = datasets["train"]
         in_channels   = train_dataset.input_channels
         n_gaussians   = gaussian_cfg.n_default_gaussians
-        out_channels  = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, n_gaussians, gaussian_cfg.predict_presence)
+        out_channels  = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, n_gaussians)
         x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
 
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
@@ -119,7 +119,6 @@ class TrainingPipeline:
             out_channels     = out_channels,
             x_axis_length    = x_axis_length,
             n_gaussians      = n_gaussians,
-            predict_presence = gaussian_cfg.predict_presence,
         )
 
         trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)

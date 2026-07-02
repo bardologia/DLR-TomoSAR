@@ -152,7 +152,7 @@ class SizeMatcher:
         self.in_channels = config.size_match.in_channels
 
         gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, n_gaussians=config.n_gaussians)
-        self.out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, config.n_gaussians, gaussian_cfg.predict_presence)
+        self.out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, config.n_gaussians)
 
     def reference_count(self) -> int:
         reference = self.config.size_match.reference_model

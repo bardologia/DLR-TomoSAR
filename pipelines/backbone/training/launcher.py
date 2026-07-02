@@ -61,7 +61,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
         in_channels  = dataset.input_channels
-        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians, gaussian_cfg.predict_presence)
+        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.config.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:

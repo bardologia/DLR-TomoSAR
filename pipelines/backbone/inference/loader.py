@@ -118,7 +118,7 @@ class RunLoader:
 
         return ckpt, x_axis, meta
 
-    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float, n_gaussians: int, predict_presence: bool) -> ModelWrapper:
+    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
@@ -126,8 +126,6 @@ class RunLoader:
             normalizer          = Normalizer(norm_stats),
             x_axis              = torch.from_numpy(x_axis),
             amp_max             = amp_max,
-            n_gaussians         = n_gaussians,
-            predict_presence    = predict_presence,
         )
 
     def _build_dataset(self, dataset_config : DatasetConfig, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
@@ -210,8 +208,7 @@ class RunLoader:
         backbone_name      = str(run_summary["model_name"])
         in_channels        = int(run_summary["in_channels"])
         out_channels_total = int(run_summary["out_channels"])
-        predict_presence   = bool(run_summary.get("predict_presence", False))
-        n_gaussians        = int(run_summary["n_gaussians"]) if predict_presence else out_channels_total // 3
+        n_gaussians        = out_channels_total // 3
         out_channels       = 3 * n_gaussians
 
         ckpt_path = self.run_directory / checkpoint_name
@@ -224,7 +221,7 @@ class RunLoader:
         model.eval()
         norm_stats = Stats.load(self.run_directory / "meta", self.logger)
         gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
-        model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max, n_gaussians, predict_presence)
+        model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(
             dataset_config = dataset_config,

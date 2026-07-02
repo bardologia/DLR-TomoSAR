@@ -196,7 +196,6 @@ def test_benchmark_config_exposes_training_recipe_sections():
     assert isinstance(cfg.geometry, GeometryConfig)
     assert isinstance(cfg.normalization, NormalizationConfig)
     assert isinstance(cfg.augmentation, AugmentationConfig)
-    assert cfg.predict_presence is False
 
 
 def test_dataloader_tuning_entry_lists_independent():

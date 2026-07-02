@@ -83,7 +83,6 @@ class BenchmarkConfig:
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
     curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
-    predict_presence : bool             = False
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)
     jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)

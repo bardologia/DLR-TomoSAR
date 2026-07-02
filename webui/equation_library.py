@@ -873,18 +873,6 @@ class EquationLibrary:
                     ],
                 },
                 {
-                    "title" : "Slot-presence BCE (presence head)",
-                    "tex"   : r"\mathcal{L}_{\mathrm{pres}} = \frac{\sum_{b,k,h,w} w_{b,k}\,\mathrm{BCE}\!\left(z_{b,k},\, a^{\mathrm{act}}_{b,k}\right)}{\sum_{b,k,h,w} w_{b,k}}, \qquad w_{\mathrm{pos}} = \frac{0.5}{\mathrm{frac}}, \quad w_{\mathrm{neg}} = \frac{0.5}{1-\mathrm{frac}}",
-                    "note"  : "When the model carries a presence head (predict_presence adds one logit per slot), it predicts per-slot occupancy supervised by a binary cross-entropy against the mu-sorted GT activity. With presence_bce_balance the positive/negative classes are reweighted by the GT active fraction; otherwise it is a plain mean. Requires predict_presence=True or it raises (loss.py _presence_term).",
-                    "vars"  : [
-                        {"sym": r"\mathcal{L}_{\mathrm{pres}}", "desc": "slot-presence BCE loss"},
-                        {"sym": r"z_{b,k}",                     "desc": "presence logit of slot k"},
-                        {"sym": r"a^{\mathrm{act}}_{b,k}",      "desc": "GT slot activity target (mu-sorted, a > τ_a)"},
-                        {"sym": r"w_{b,k}",                     "desc": "class-balance weight (1 if unbalanced)"},
-                        {"sym": r"\mathrm{frac}",               "desc": "batch GT active fraction"},
-                    ],
-                },
-                {
                     "title" : "Normalised weighted total loss",
                     "tex"   : r"\mathcal{L}_{\mathrm{total}} = \frac{\sum_j \alpha_j\,\ell_j}{\sum_j \alpha_j}",
                     "note"  : "Sum over enabled terms divided by the total weight; returned unnormalised when no term is enabled. Each term's weight is its user-selected weight_* value directly — the user is responsible for scaling terms to comparable magnitude. A curriculum may swap the whole configuration at a fixed epoch.",

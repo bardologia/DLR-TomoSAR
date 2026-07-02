@@ -757,7 +757,6 @@
       "normalization": "Per-channel input normalization scheme configuration",
       "augmentation": "Training data augmentation configuration",
       "curriculum": "Staged loss curriculum schedule for training",
-      "predict_presence": "Whether models emit a per-slot presence prediction head",
       "ae_loss": "Loss configuration for the profile autoencoder variant",
       "jepa": "JEPA self-supervised benchmark configuration",
       "pixel_subsample": "Fraction of pixels retained per sample, 1.0 keeps all",
@@ -1264,8 +1263,7 @@
       "x_min": "Lower bound of the elevation/height axis in metres",
       "x_max": "Upper bound of the elevation/height axis in metres",
       "amp_max": "Maximum allowed Gaussian amplitude, capping predicted reflectivity peaks",
-      "params_per_gaussian": "Parameters per component: amplitude, mean, width (default 3)",
-      "predict_presence": "Whether to emit a per-slot presence/occupancy probability head"
+      "params_per_gaussian": "Parameters per component: amplitude, mean, width (default 3)"
     }
   },
   "sar/geometry_config::GeometryConfig": {
@@ -1414,7 +1412,6 @@
       "seed": "Base random seed for reproducibility",
       "seeds": "Multiple seeds to launch repeated runs; empty uses seed",
       "n_gaussians": "Number of Gaussian components predicted per elevation profile",
-      "predict_presence": "Whether the model predicts a per-slot presence probability",
       "logdir": "Root directory where run outputs and checkpoints are written",
       "model_overrides": "Ad-hoc key-value overrides applied to backbone hyperparameters",
       "paths": "Filesystem paths for data, runs, and outputs",
@@ -1435,7 +1432,7 @@
       "trials_mode": "Which sweep dimension to vary, e.g. curriculum",
       "warmup_losses": "Named loss-term presets tried in the warmup phase",
       "complete_losses": "Named loss-term presets tried in the complete phase",
-      "presence_trials": "Named combinations of presence and balance loss terms to sweep",
+      "presence_trials": "Named combinations of active-normalization, balance, and focal loss terms to sweep",
       "secondary_trials": "Secondary-acquisition selection sweep configuration",
       "patch_trials": "Patch-size and stride sweep configuration",
       "input_trials": "Named input-channel selection presets to sweep",
@@ -1487,10 +1484,6 @@
       "inactive_weight": "Loss weight for inactive (zero-amplitude) slots",
       "amp_focal_gamma": "Focal exponent focusing amplitude loss on hard slots",
       "amp_focal_delta": "Focal balancing constant for the amplitude loss",
-      "use_presence_bce": "Enable binary cross-entropy on slot presence prediction",
-      "weight_presence_bce": "Scaling factor applied to the presence BCE term",
-      "presence_bce_balance": "Class-balance the presence BCE across active/inactive slots",
-      "presence_gate_thr": "Probability threshold gating a slot as present",
       "amp_zero_thr": "Amplitude below which a slot counts as inactive",
       "amp_zero_thr_torch": "Numerical amplitude floor for tensor-side zero detection",
       "use_smoothness_tv": "Enable total-variation smoothness penalty on the curve",

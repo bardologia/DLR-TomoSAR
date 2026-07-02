@@ -62,11 +62,6 @@ class LossConfig:
     amp_focal_gamma          : float = 0.0
     amp_focal_delta          : float = 0.5
 
-    use_presence_bce     : bool  = False
-    weight_presence_bce  : float = 0.0
-    presence_bce_balance : bool  = True
-    presence_gate_thr    : float = 0.5
-
     amp_zero_thr       : float = 1e-3
     amp_zero_thr_torch : float = 1e-7
 

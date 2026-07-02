@@ -255,30 +255,6 @@ def test_active_norm_rescales_by_active_fraction():
     assert t_norm.item() > t_mean.item()
 
 
-def test_presence_bce_zero_on_confident_correct():
-    logits = torch.tensor([20.0, -20.0, 20.0, -20.0]).reshape(1, 4, 1, 1)
-    target = torch.tensor([1.0, 0.0, 1.0, 0.0]).reshape(1, 4, 1, 1)
-    val    = ParamLoss.presence_bce(logits, target, balance=False)
-    assert val.item() < 1e-6
-
-
-def test_presence_bce_balance_upweights_rare_positive():
-    logits = torch.full((1, 4, 4, 4), -10.0, dtype=torch.float64)
-    target = torch.zeros(1, 4, 4, 4, dtype=torch.float64)
-    target[:, 0] = 1.0
-
-    plain    = ParamLoss.presence_bce(logits, target, balance=False)
-    balanced = ParamLoss.presence_bce(logits, target, balance=True)
-    assert balanced.item() > plain.item()
-
-
-def test_presence_bce_gradient_flow():
-    logits = torch.randn(2, 4, 3, 3, dtype=torch.float64, requires_grad=True)
-    target = (torch.rand(2, 4, 3, 3) > 0.5).double()
-    ParamLoss.presence_bce(logits, target, balance=True).backward()
-    assert torch.isfinite(logits.grad).all()
-
-
 @pytest.mark.real_data
 def test_param_loss_on_real_parameters(parameters):
     win = np.asarray(parameters[:, :8, :8]).astype(np.float64)

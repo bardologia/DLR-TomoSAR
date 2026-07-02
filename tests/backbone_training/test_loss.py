@@ -247,31 +247,6 @@ def test_count_metrics_under_when_pred_drops_a_slot():
     assert out["occupancy"]["count/acc_gt2"].item()    == pytest.approx(0.0)
 
 
-def test_presence_bce_without_head_raises():
-    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_presence_bce=True, weight_presence_bce=1.0)
-    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
-    pred = valid_param_tensor(2, 2, 5, 5, seed=25)
-    gt   = valid_param_tensor(2, 2, 5, 5, seed=26)
-
-    with pytest.raises(ValueError, match="predict_presence"):
-        loss(pred, gt)
-
-
-def test_presence_bce_with_head_logs_component_and_occupancy():
-    cfg          = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_presence_bce=True, weight_presence_bce=1.0)
-    loss         = build_loss(n_gaussians=2, loss_cfg=cfg)
-    params       = valid_param_tensor(2, 2, 5, 5, seed=27)
-    presence     = torch.zeros(2, 2, 5, 5, dtype=torch.float32)
-    pred         = torch.cat([params, presence], dim=1)
-    gt           = valid_param_tensor(2, 2, 5, 5, seed=28)
-
-    out          = loss(pred, gt)
-
-    assert "presence_bce" in out["components"]
-    assert "presence_bce" in out["weighted"]
-    assert "pred_presence_frac" in out["occupancy"]
-
-
 def test_curriculum_swap_changes_active_terms():
     loss = build_loss(n_gaussians=2)
 

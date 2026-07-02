@@ -93,30 +93,19 @@ def _default_complete_losses() -> dict:
 def _default_presence_trials() -> dict:
     active_norm = {"use_active_normalization": True}
     balance     = {"presence_balance": True}
-    presence    = {"predict_presence": True, "use_presence_bce": True, "weight_presence_bce": 1.0}
     focal       = {"amp_focal_gamma": 2.0}
 
     return {
-        "none"        : {},
-        "A"           : {**active_norm},
-        "B"           : {**balance},
-        "P"           : {**presence},
-        "F"           : {**focal},
-        "AB"          : {**active_norm, **balance},
-        "AP"          : {**active_norm, **presence},
-        "AF"          : {**active_norm, **focal},
-        "BP"          : {**balance, **presence},
-        "BF"          : {**balance, **focal},
-        "PF"          : {**presence, **focal},
-        "ABP"         : {**active_norm, **balance, **presence},
-        "ABF"         : {**active_norm, **balance, **focal},
-        "APF"         : {**active_norm, **presence, **focal},
-        "BPF"         : {**balance, **presence, **focal},
-        "ABPF"        : {**active_norm, **balance, **presence, **focal},
-        "ABPF-bce0.5" : {**active_norm, **balance, **presence, **focal, "weight_presence_bce": 0.5},
-        "ABPF-bce2"   : {**active_norm, **balance, **presence, **focal, "weight_presence_bce": 2.0},
-        "ABPF-fg1"    : {**active_norm, **balance, **presence, **focal, "amp_focal_gamma": 1.0},
-        "ABPF-fg3"    : {**active_norm, **balance, **presence, **focal, "amp_focal_gamma": 3.0},
+        "none"     : {},
+        "A"        : {**active_norm},
+        "B"        : {**balance},
+        "F"        : {**focal},
+        "AB"       : {**active_norm, **balance},
+        "AF"       : {**active_norm, **focal},
+        "BF"       : {**balance, **focal},
+        "ABF"      : {**active_norm, **balance, **focal},
+        "ABF-fg1"  : {**active_norm, **balance, **focal, "amp_focal_gamma": 1.0},
+        "ABF-fg3"  : {**active_norm, **balance, **focal, "amp_focal_gamma": 3.0},
     }
 
 
@@ -169,7 +158,6 @@ class BackboneEntryConfig:
     seed             : int        = 0
     seeds            : list[int]  = field(default_factory=list)
     n_gaussians      : int        = 5
-    predict_presence : bool       = False
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 
