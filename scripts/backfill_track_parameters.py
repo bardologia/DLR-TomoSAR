@@ -8,16 +8,18 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from tools.baselines       import TrackBaselines
-from tools.sar             import StepParameterResolver, TrackParameterCollector, TrackParameters
+from tools.baselines         import TrackBaselines
+from tools.monitoring.logger import Logger
+from tools.sar               import StepParameterResolver, TrackParameterCollector, TrackParameters
 
 
 class TrackParameterBackfiller:
     TRACK_DEPTH = 2
 
-    def __init__(self, run_directory, remap=None, overwrite=False, dry_run=False) -> None:
+    def __init__(self, run_directory, logger: Logger, remap=None, overwrite=False, dry_run=False) -> None:
         self.run_directory  = Path(run_directory)
         self.meta_directory = self.run_directory / "meta"
+        self.logger         = logger
         self.remap          = remap
         self.overwrite      = overwrite
         self.dry_run        = dry_run
@@ -77,7 +79,7 @@ class TrackParameterBackfiller:
         out_path = self.meta_directory / TrackParameters.FILENAME
 
         if out_path.is_file() and not self.overwrite:
-            print(f"skip     {out_path} already present (use --overwrite to regenerate).")
+            self.logger.info(f"skip {out_path} already present (use --overwrite to regenerate).")
             return True
 
         baselines    = self._load_baselines()
@@ -85,16 +87,16 @@ class TrackParameterBackfiller:
         track_paths  = self._resolve_parameter_files(baselines, polarisation)
         parameters   = self._collect(track_paths)
 
-        print(f"  {'Polarisation':20s}: {polarisation}")
+        self.logger.info(f"  {'Polarisation':20s}: {polarisation}")
         for line, value in parameters.describe().items():
-            print(f"  {line:20s}: {value}")
+            self.logger.info(f"  {line:20s}: {value}")
 
         if self.dry_run:
-            print(f"dry-run  would write {out_path}")
+            self.logger.info(f"dry-run  would write {out_path}")
             return True
 
         parameters.save(out_path)
-        print(f"wrote    {out_path}  ({parameters.n_tracks} tracks)")
+        self.logger.ok(f"wrote {out_path}  ({parameters.n_tracks} tracks)")
 
         return True
 
@@ -105,6 +107,7 @@ class BackfillBatch:
         self.remap     = remap
         self.overwrite = overwrite
         self.dry_run   = dry_run
+        self.logger    = Logger(log_dir="logs", name="backfill_track_parameters")
 
     def _discover_runs(self, root: Path) -> list:
         if (root / "meta" / TrackBaselines.FILENAME).is_file():
@@ -116,20 +119,20 @@ class BackfillBatch:
         runs = [run for root in self.roots for run in self._discover_runs(root)]
 
         if not runs:
-            print("No datasets with meta/baselines.json found under the given paths.")
+            self.logger.warning("No datasets with meta/baselines.json found under the given paths.")
             return 1
 
         failures = 0
 
         for run in runs:
-            print(f"\n[{run}]")
+            self.logger.subsection(str(run))
             try:
-                TrackParameterBackfiller(run, remap=self.remap, overwrite=self.overwrite, dry_run=self.dry_run).run()
+                TrackParameterBackfiller(run, self.logger, remap=self.remap, overwrite=self.overwrite, dry_run=self.dry_run).run()
             except Exception as error:
                 failures += 1
-                print(f"FAIL     {type(error).__name__}: {error}")
+                self.logger.error(f"FAIL {type(error).__name__}: {error}")
 
-        print(f"\nDone: {len(runs) - failures}/{len(runs)} datasets backfilled, {failures} failed.")
+        self.logger.info(f"Done: {len(runs) - failures}/{len(runs)} datasets backfilled, {failures} failed.")
 
         return 1 if failures else 0
 
