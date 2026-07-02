@@ -248,7 +248,7 @@ class StatsComputer:
         dataset,
         n_gaussians   : int,
         output_config : "OutputConfig",
-        amp_threshold : float = 1e-2,
+        amp_threshold : float = 1e-3,
         logger        : Optional[Logger] = None,
     ) -> Stats:
         regions = StatsComputer._train_gt_parameters(dataset)

@@ -62,8 +62,7 @@ class LossConfig:
     amp_focal_gamma          : float = 0.0
     amp_focal_delta          : float = 0.5
 
-    amp_zero_thr       : float = 1e-3
-    amp_zero_thr_torch : float = 1e-7
+    amp_zero_thr : float = 1e-3
 
     use_smoothness_tv    : bool  = False
     weight_smoothness_tv : float = 1e-4
