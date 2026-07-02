@@ -198,11 +198,12 @@ class DatasetConfig:
     normalization    : NormalizationConfig       = field(default_factory=NormalizationConfig)
     augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)
 
-    batch_size      : int                  = 8
-    num_workers     : int                  = 16
-    prefetch_factor : int                  = 8
-    shuffle_train   : bool                 = True
-    pin_memory      : bool                 = True
-    x_axis          : Optional[np.ndarray] = field(default=None, repr=False)
-    n_gaussians     : int                  = 1
+    batch_size        : int                  = 8
+    num_workers       : int                  = 16
+    prefetch_factor   : int                  = 8
+    shuffle_train     : bool                 = True
+    pin_memory        : bool                 = True
+    x_axis            : Optional[np.ndarray] = field(default=None, repr=False)
+    n_gaussians       : int                  = 1
+    stats_max_samples : int                  = 4000
 

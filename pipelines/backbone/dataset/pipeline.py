@@ -145,7 +145,7 @@ class DatasetPipeline:
             n_gaussians      = self.config.n_gaussians,
             normalization    = self.config.normalization,
             num_workers      = self.config.num_workers,
-            max_samples      = 4000,
+            max_samples      = self.config.stats_max_samples,
         )
 
         norm_stats.save(self.training_run_directory / "meta")
