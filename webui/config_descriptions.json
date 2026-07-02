@@ -930,7 +930,8 @@
       "shuffle_train": "Shuffle patch order during training",
       "pin_memory": "Pin host memory for faster GPU transfer",
       "x_axis": "Elevation sampling grid for the Gaussian mixture",
-      "n_gaussians": "Number of Gaussian components in the mixture output"
+      "n_gaussians": "Number of Gaussian components in the mixture output",
+      "stats_max_samples": "Maximum number of samples used when estimating normalization statistics"
     }
   },
   "dataset/profile_autoencoder::ProfileAugmentationConfig": {
@@ -1091,7 +1092,11 @@
       "normalize_intensity": "Whether to normalize intensity before display",
       "fig_dpi": "On-screen figure resolution in dots per inch",
       "save_dpi": "Saved figure resolution in dots per inch",
-      "paths": "Nested output directory and filename configuration"
+      "paths": "Nested output directory and filename configuration",
+      "compute_data_consistency": "Whether to evaluate predicted profiles against the measured stack via coherence and covariance error maps; requires the per-pixel geometry field",
+      "height_axis_convention": "Axis convention used to derive per-pixel kz for data consistency: height or elevation",
+      "physics_floor": "Numerical floor applied inside the physical re-synthesis to avoid division blow-ups",
+      "phase_multilook": "Uniform multilook window size applied to interferometric phase before coherence comparison"
     }
   },
   "inference/image_autoencoder::ImageAeInferencePaths": {
@@ -1263,7 +1268,8 @@
       "x_min": "Lower bound of the elevation/height axis in metres",
       "x_max": "Upper bound of the elevation/height axis in metres",
       "amp_max": "Maximum allowed Gaussian amplitude, capping predicted reflectivity peaks",
-      "params_per_gaussian": "Parameters per component: amplitude, mean, width (default 3)"
+      "params_per_gaussian": "Parameters per component: amplitude, mean, width (default 3)",
+      "clamp_leaky_slope": "Leaky-clamp slope kept outside the valid parameter range so out-of-range predictions retain gradients; 0 gives a hard clamp"
     }
   },
   "sar/geometry_config::GeometryConfig": {
@@ -1485,7 +1491,6 @@
       "amp_focal_gamma": "Focal exponent focusing amplitude loss on hard slots",
       "amp_focal_delta": "Focal balancing constant for the amplitude loss",
       "amp_zero_thr": "Amplitude below which a slot counts as inactive",
-      "amp_zero_thr_torch": "Numerical amplitude floor for tensor-side zero detection",
       "use_smoothness_tv": "Enable total-variation smoothness penalty on the curve",
       "weight_smoothness_tv": "Scaling factor applied to the total-variation term",
       "use_total_power": "Enable term matching integrated total power of curves",
@@ -1550,7 +1555,8 @@
     "summary": "Early-stopping policy halting training when validation stops improving",
     "fields": {
       "patience": "Epochs without improvement tolerated before stopping",
-      "restore_best": "Whether to reload best-checkpoint weights after stopping"
+      "restore_best": "Whether to reload best-checkpoint weights after stopping",
+      "min_delta": "Minimum validation-loss improvement required to reset the patience counter"
     }
   },
   "training/general/optimization::GradientClipperConfig": {
@@ -1624,14 +1630,17 @@
       "patch_stride": "Pixel stride between extracted overlapping patches",
       "train_azimuth": "Azimuth line range assigned to the training split",
       "val_azimuth": "Azimuth line range assigned to validation",
-      "test_azimuth": "Azimuth line range assigned to testing"
+      "test_azimuth": "Azimuth line range assigned to testing",
+      "early_stop_min_delta": "Minimum validation-loss improvement required to reset early-stopping patience",
+      "use_ema": "Whether to maintain an exponential moving average of model weights for evaluation",
+      "ema_decay": "Decay rate of the weight EMA; closer to 1 averages over more steps",
+      "resume": "Whether to resume training from the latest checkpoint in the run directory"
     }
   },
   "training/general/runtime::IOConfig": {
     "summary": "Output paths and logging sinks for a training run",
     "fields": {
-      "logdir": "Filesystem directory where run logs and TensorBoard events are written",
-      "writer": "Runtime-attached TensorBoard writer handle; None until initialised"
+      "logdir": "Filesystem directory where run logs and TensorBoard events are written"
     }
   },
   "training/general/runtime::OverfitConfig": {
@@ -1652,7 +1661,10 @@
       "gradient_accumulation_steps": "Batches accumulated before each optimizer update",
       "log_debug": "Emit verbose per-step debug logging",
       "log_all_losses": "Log every individual loss component, not just the total",
-      "abort_on_nonfinite_loss": "Halt training immediately if loss becomes NaN or infinite"
+      "abort_on_nonfinite_loss": "Halt training immediately if loss becomes NaN or infinite",
+      "use_ema": "Whether to maintain an exponential moving average of model weights for evaluation",
+      "ema_decay": "Decay rate of the weight EMA; closer to 1 averages over more steps",
+      "resume": "Whether to resume training from the latest checkpoint in the run directory"
     }
   },
   "training/general/runtime::MemoryConfig": {
