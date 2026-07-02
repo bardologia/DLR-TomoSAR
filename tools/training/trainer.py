@@ -42,6 +42,9 @@ class BaseTrainer:
         self.use_amp                 = config.training.use_amp
         self.abort_on_nonfinite_loss = config.training.abort_on_nonfinite_loss
 
+        if self.use_amp and self.device.type == "cuda" and not torch.cuda.is_bf16_supported():
+            raise ValueError("use_amp=True autocasts to bfloat16, which this GPU does not support; disable use_amp on this device")
+
         param_groups = self._build_param_groups()
 
         lr_scale = self.config.optimizer.lr_scale
