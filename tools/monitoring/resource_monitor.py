@@ -10,6 +10,9 @@ import pynvml
 
 
 class ResourceMonitor:
+    TB_SCALARS      = ("ram_pct", "proc_rss_gb", "swap_pct", "shm_pct", "cpu_pct", "proc_cpu_pct", "disk_read_mb_s", "disk_write_mb_s")
+    TB_GPU_SCALARS  = ("util_pct", "vram_pct", "temp_c", "power_w")
+
     def __init__(self, config, logger, tracker=None, step_getter=None):
         self.cfg         = config
         self.logger      = logger
@@ -267,10 +270,17 @@ class ResourceMonitor:
 
         return metrics
 
+    def _tb_metrics(self, metrics):
+        allowed = set(self.TB_SCALARS)
+        for i in range(len(self._gpu_handles)):
+            allowed.update(f"gpu{i}_{suffix}" for suffix in self.TB_GPU_SCALARS)
+
+        return {k: v for k, v in metrics.items() if k in allowed}
+
     def _publish(self, metrics):
         step = int(self.step_getter() or 0)
         if self.log_to_tb and self.tracker is not None:
-            self.tracker.log_metrics("system/resources", metrics, step)
+            self.tracker.log_metrics("system", self._tb_metrics(metrics), step)
 
     def _run(self):
         while not self._stop_evt.is_set():

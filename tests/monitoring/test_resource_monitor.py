@@ -229,7 +229,17 @@ def test_publish_logs_to_tracker_with_step():
 
     m._publish({"ram_pct": 12.0})
 
-    assert tracker.calls == [("system/resources", {"ram_pct": 12.0}, 42)]
+    assert tracker.calls == [("system", {"ram_pct": 12.0}, 42)]
+
+
+def test_publish_filters_to_tb_whitelist():
+    cfg     = FakeConfig()
+    tracker = RecordingTracker()
+    m       = ResourceMonitor(cfg, logger=None, tracker=tracker, step_getter=lambda: 3)
+
+    m._publish({"ram_pct": 12.0, "ram_total_gb": 64.0, "vram_pct": 50.0, "proc_num_threads": 8.0, "loadavg_1m": 1.0})
+
+    assert tracker.calls == [("system", {"ram_pct": 12.0}, 3)]
 
 
 def test_publish_skipped_when_tb_disabled():
