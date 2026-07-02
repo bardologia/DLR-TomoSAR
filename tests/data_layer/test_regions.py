@@ -176,3 +176,45 @@ def test_real_crop_local_slices_index_data(config_state_json, tomogram_full):
     window = tomogram_full[:, az, rg]
 
     assert window.shape == (tomogram_full.shape[0], 32, 16)
+
+
+def test_overlaps_detects_intersection():
+    a = CropRegion(0, 100, 0, 50)
+    b = CropRegion(50, 150, 20, 80)
+    c = CropRegion(100, 200, 0, 50)
+    d = CropRegion(0, 100, 50, 100)
+
+    assert a.overlaps(b)
+    assert b.overlaps(a)
+    assert not a.overlaps(c)
+    assert not a.overlaps(d)
+
+
+def test_validate_disjoint_accepts_disjoint_splits():
+    glob   = CropRegion(0, 1000, 0, 500)
+    splits = SplitRegions.from_ratios(glob)
+
+    splits.validate_disjoint()
+
+
+def test_validate_disjoint_rejects_overlapping_splits():
+    splits = SplitRegions(
+        train = CropRegion(0, 120, 0, 50),
+        val   = CropRegion(100, 200, 0, 50),
+        test  = CropRegion(200, 300, 0, 50),
+    )
+
+    with pytest.raises(ValueError, match="overlap"):
+        splits.validate_disjoint()
+
+
+def test_validate_disjoint_rejects_overlap_within_split():
+    a = CropRegion(0, 100, 0, 50)
+    splits = SplitRegions(
+        train = [a, CropRegion(50, 150, 0, 50)],
+        val   = CropRegion(150, 200, 0, 50),
+        test  = CropRegion(200, 300, 0, 50),
+    )
+
+    with pytest.raises(ValueError, match="train\\[0\\]"):
+        splits.validate_disjoint()

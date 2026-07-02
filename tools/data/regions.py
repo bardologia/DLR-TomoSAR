@@ -34,6 +34,11 @@ class CropRegion:
     def range_size(self) -> int:
         return self.range_end - self.range_start
 
+    def overlaps(self, other: "CropRegion") -> bool:
+        azimuth_overlap = self.azimuth_start < other.azimuth_end and other.azimuth_start < self.azimuth_end
+        range_overlap   = self.range_start   < other.range_end   and other.range_start   < self.range_end
+        return azimuth_overlap and range_overlap
+
     def local_slices(self, global_crop: "CropRegion") -> Tuple[slice, slice]:
         azimuth_slice = slice(self.azimuth_start - global_crop.azimuth_start, self.azimuth_end - global_crop.azimuth_start)
         range_slice   = slice(self.range_start   - global_crop.range_start,   self.range_end   - global_crop.range_start)
@@ -79,6 +84,20 @@ class SplitRegions:
                 label = name if len(regions) == 1 else f"{name}[{index}]"
                 rows.append({"Split": label, "Crop": str(region.as_tuple()), "Azimuth (lines)": region.azimuth_size, "Range (samples)": region.range_size})
         return rows
+
+    def validate_disjoint(self) -> None:
+        labeled = []
+        for name, regions in self.region_lists():
+            for index, region in enumerate(regions):
+                label = name if len(regions) == 1 else f"{name}[{index}]"
+                labeled.append((label, region))
+
+        for i in range(len(labeled)):
+            for j in range(i + 1, len(labeled)):
+                name_a, region_a = labeled[i]
+                name_b, region_b = labeled[j]
+                if region_a.overlaps(region_b):
+                    raise ValueError(f"Split regions '{name_a}' {region_a.as_tuple()} and '{name_b}' {region_b.as_tuple()} overlap; all train/val/test regions must be spatially disjoint.")
 
     def bounding_global_crop(self) -> CropRegion:
         regions = [region for _, region_list in self.region_lists() for region in region_list]

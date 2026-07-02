@@ -166,6 +166,16 @@ class MultiRegionDataset(Dataset):
 
         first = parts[0]
 
+        for part in parts[1:]:
+            matches = (
+                part.input_channels   == first.input_channels   and
+                part.n_secondaries    == first.n_secondaries    and
+                part.n_interferograms == first.n_interferograms and
+                part.gt_channels      == first.gt_channels
+            )
+            if not matches:
+                raise ValueError(f"MultiRegionDataset parts disagree on channel structure: part '{part.split_name}' has (input={part.input_channels}, secondaries={part.n_secondaries}, interferograms={part.n_interferograms}, gt={part.gt_channels}) but the first part has (input={first.input_channels}, secondaries={first.n_secondaries}, interferograms={first.n_interferograms}, gt={first.gt_channels}).")
+
         self.input_config           = first.input_config
         self.output_config          = first.output_config
         self.split_name             = first.split_name
