@@ -23,6 +23,7 @@ class TensorboardManager:
         "train_image_autoencoder"   : ("logdir",),
         "train_jepa"                : ("logdir",),
         "benchmark"                 : ("paths.log_base_dir",),
+        "cross_validate"            : ("paths.log_base_dir",),
     }
 
     STARTUP_TIMEOUT_S = 90.0
