@@ -3,9 +3,10 @@ from __future__ import annotations
 import torch
 from torch.utils.data import DataLoader
 
-from tools.training                   import BaseTrainer
-from pipelines.backbone.training.loss import Loss
-from pipelines.backbone.training.docs import TrainingDocs
+from tools.training                          import BaseTrainer
+from pipelines.backbone.training.loss        import Loss
+from pipelines.backbone.training.docs        import TrainingDocs
+from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures
 
 
 class CurriculumController:
@@ -68,8 +69,11 @@ class Trainer(BaseTrainer):
         self.warmup_loss_cfg = config.curriculum.warmup
         self.norm_stats      = norm_stats
         self.emit_docs       = emit_docs
+        self.param_sampler   = ParamSampler(config.gaussian.params_per_gaussian, self.warmup_loss_cfg.amp_zero_thr)
 
         super().__init__(model, config, run_dir, logger, x_axis)
+
+        self.recon_figures = ReconstructionFigures(self.tracker, self.device)
 
         if self.curriculum.enabled and self.curriculum.swap_epoch >= self.epochs:
             raise ValueError(f"curriculum.swap_epoch={self.curriculum.swap_epoch} must be below training.epochs={self.epochs}; the complete loss phase would never run")
@@ -99,7 +103,7 @@ class Trainer(BaseTrainer):
         return self.model_cfg.get_param_groups(self.model)
 
     def _build_criterion(self):
-        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses)
+        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses, sampler=self.param_sampler)
 
     def _warn_nonfinite(self, tensor: torch.Tensor, name: str) -> None:
         if torch.isnan(tensor).any() or torch.isinf(tensor).any():
@@ -138,11 +142,32 @@ class Trainer(BaseTrainer):
             self.criterion.set_curriculum(self.curriculum.complete)
             self.logger.subsection("Resumed past the curriculum swap; complete loss configuration re-applied.")
 
+    def _before_validation(self, epoch: int, val_loader: DataLoader) -> None:
+        if not self.tracker.active:
+            return
+
+        self.param_sampler.begin()
+        self.recon_figures.capture_reference(val_loader)
+
     def _after_eval(self, val_loss: float, epoch: int) -> None:
+        self._log_val_diagnostics(epoch)
+
         if self.early_stopping.triggered and self.curriculum.enabled and epoch < self.curriculum.swap_epoch:
             self.logger.warning(f"Early stopping fired at epoch {epoch + 1}, before the curriculum swap at epoch {self.curriculum.swap_epoch + 1}; the complete loss phase never ran.")
 
         self._trial_callback(val_loss, epoch)
+
+    def _log_val_diagnostics(self, epoch: int) -> None:
+        if not self.tracker.active:
+            return
+
+        for name, values in self.param_sampler.histograms().items():
+            self.tracker.log_histogram(f"param_hist/{name}/val", values, epoch)
+
+        self.param_sampler.end()
+
+        with self.ema.applied(self.model):
+            self.recon_figures.log(self.model, self.criterion, epoch)
 
     def _log_train_epoch_extra(self, avg_loss: float, epoch: int) -> None:
         if self.curriculum.enabled:

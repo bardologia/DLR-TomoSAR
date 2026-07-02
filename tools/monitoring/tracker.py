@@ -60,6 +60,9 @@ class Tracker:
             except (TypeError, ValueError):
                 continue
 
+    def log_figure(self, tag, figure, step=None) -> None:
+        self._emit("add_figure", tag, figure, step, close=True)
+
     def log_histogram(self, tag, values, step=None, bins="auto") -> None:
         v = np.asarray(values).ravel().astype(np.float32)
         try:

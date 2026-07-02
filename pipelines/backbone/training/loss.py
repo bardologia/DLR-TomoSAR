@@ -11,7 +11,7 @@ from tools.sar.tomo_geometry  import TomoGeometry
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg, norm_stats, geometry_cfg, log_all_losses=False):
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg, norm_stats, geometry_cfg, log_all_losses=False, sampler=None):
         self.x_axis          = x_axis
         self.logger          = logger
         self.tracker         = tracker
@@ -20,6 +20,7 @@ class Loss:
         self.loss_cfg        = loss_cfg
         self.norm_stats      = norm_stats
         self.geometry_cfg    = geometry_cfg
+        self.sampler         = sampler
         self.geometry        = TomoGeometry(self.geometry_cfg, x_axis)
         self.dx              = float(x_axis[1] - x_axis[0])
         self.log_all_losses  = log_all_losses
@@ -171,6 +172,11 @@ class Loss:
 
         return pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves
 
+    @torch.no_grad()
+    def curves(self, pred_output, gt_params):
+        _, _, _, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
+        return pred_curves, exp_curves
+
     def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map) -> dict:
         lc = CurveLoss
         pc = PhysicalLoss
@@ -247,6 +253,9 @@ class Loss:
         cfg = self.loss_cfg
 
         pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
+
+        if self.sampler is not None and self.sampler.active:
+            self.sampler.observe(pred_params_phys)
 
         if kz_map is not None:
             kz_map = kz_map.to(device=pred_curves.device, dtype=pred_curves.dtype)

@@ -49,7 +49,7 @@ def gaussian_config(n_gaussians: int) -> GaussianConfig:
     return GaussianConfig(n_default_gaussians=n_gaussians, x_min=X_MIN, x_max=X_MAX)
 
 
-def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all_losses: bool = False, length: int = X_LEN) -> Loss:
+def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all_losses: bool = False, length: int = X_LEN, sampler=None) -> Loss:
     n_channels = n_gaussians * 3
     loss_cfg   = loss_cfg if loss_cfg is not None else LossConfig(use_param_l1=True, weight_param_l1=1.0)
 
@@ -62,6 +62,7 @@ def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all
         norm_stats     = identity_normalizer(n_channels),
         geometry_cfg   = geometry_config(),
         log_all_losses = log_all_losses,
+        sampler        = sampler,
     )
 
 

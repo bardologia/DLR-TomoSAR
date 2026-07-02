@@ -10,6 +10,7 @@ class RecordingWriter:
     def __init__(self):
         self.scalars    = []
         self.histograms = []
+        self.figures    = []
         self.flushed    = 0
         self.closed     = 0
 
@@ -18,6 +19,9 @@ class RecordingWriter:
 
     def add_histogram(self, tag, values, step, bins="auto"):
         self.histograms.append((tag, np.asarray(values), step, bins))
+
+    def add_figure(self, tag, figure, step, close=True):
+        self.figures.append((tag, figure, step, close))
 
     def flush(self):
         self.flushed += 1
@@ -155,6 +159,21 @@ def test_log_histogram_records_float32_array():
     assert values.tolist() == [1.0, 2.0, 3.0, 4.0]
     assert step == 2
     assert bins == "auto"
+
+
+def test_log_figure_delegates_with_close():
+    w = RecordingWriter()
+    t = Tracker(writer=w)
+
+    sentinel = object()
+    t.log_figure("recon/px0", sentinel, step=4)
+
+    tag, figure, step, close = w.figures[0]
+
+    assert tag    == "recon/px0"
+    assert figure is sentinel
+    assert step   == 4
+    assert close  is True
 
 
 def test_inactive_tracker_records_nothing():

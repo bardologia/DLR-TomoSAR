@@ -100,6 +100,55 @@ def test_multi_epoch_fit_records_losses(tmp_path):
     assert len(val_losses) >= 1
 
 
+class RecordingWriter:
+    def __init__(self):
+        self.scalars    = []
+        self.histograms = []
+        self.figures    = []
+
+    def add_scalar(self, tag, value, step):
+        self.scalars.append((tag, value, step))
+
+    def add_histogram(self, tag, values, step, bins="auto"):
+        self.histograms.append((tag, values, step))
+
+    def add_figure(self, tag, figure, step, close=True):
+        self.figures.append((tag, figure, step))
+
+    def flush(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def test_train_logs_throughput_and_diagnostics(tmp_path):
+    writer           = RecordingWriter()
+    model, model_cfg = tiny_model(in_channels=2, n_gaussians=2)
+    config           = tiny_trainer_config(n_gaussians=2, epochs=1)
+    config.io.writer = writer
+    logger           = Logger(log_dir=str(tmp_path / "logs"), name="trainer", level="ERROR")
+    norm_stats       = identity_normalizer(6)
+    trainer          = Trainer(model, model_cfg, x_axis_numpy(), config, tmp_path, logger, norm_stats=norm_stats, emit_docs=False)
+
+    loader = _loader()
+    trainer.train(loader, loader, loader)
+
+    scalar_tags = {tag for tag, _, _ in writer.scalars}
+
+    assert "throughput/samples_per_s"   in scalar_tags
+    assert "throughput/epoch_time_s"    in scalar_tags
+    assert "throughput/data_wait_frac"  in scalar_tags
+    assert "controls/nonfinite_batches" in scalar_tags
+    assert "optim/grad_norm"            in scalar_tags
+
+    nonfinite = [value for tag, value, _ in writer.scalars if tag == "controls/nonfinite_batches"]
+    assert nonfinite == [0.0]
+
+    assert len(writer.figures) == 4
+    assert all(tag.startswith("reconstruction/") and tag.endswith("/val") for tag, _, _ in writer.figures)
+
+
 def test_checkpoint_save_restore_round_trip(tmp_path):
     trainer = _build_trainer(tmp_path, epochs=1)
     loader  = _loader()
