@@ -114,7 +114,6 @@ class DatasetPipeline:
                 n_secondaries    = arrays["n_secondaries"],
                 n_interferograms = arrays["n_interferograms"],
                 normalizer       = normalizer,
-                x_axis           = self.config.x_axis,
                 n_gaussians      = self.config.n_gaussians,
                 augmenter        = self.augmenter,
                 dem              = arrays["dem"] if self.config.input_config.use_dem else None,

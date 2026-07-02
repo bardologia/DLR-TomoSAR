@@ -24,7 +24,6 @@ class PatchDataset(Dataset):
         n_secondaries    : int,
         n_interferograms : int,
         normalizer       : Optional[Normalizer]       = None,
-        x_axis           : Optional[np.ndarray]       = None,
         n_gaussians      : int                        = 1,
         augmenter        : Optional[SpatialAugmenter] = None,
         dem              : Optional[np.ndarray]       = None,
@@ -38,7 +37,6 @@ class PatchDataset(Dataset):
         self.output_config = output_config
         self.split_name    = split_name
         self.normalizer    = normalizer
-        self.x_axis        = x_axis
         self.n_gaussians   = n_gaussians
         self.augmenter     = augmenter
         self.dem           = dem
@@ -179,7 +177,6 @@ class MultiRegionDataset(Dataset):
         self.input_config           = first.input_config
         self.output_config          = first.output_config
         self.split_name             = first.split_name
-        self.x_axis                 = first.x_axis
         self.n_gaussians            = first.n_gaussians
         self.input_layers           = first.input_layers
         self.n_secondaries          = first.n_secondaries

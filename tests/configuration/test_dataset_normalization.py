@@ -130,7 +130,7 @@ def test_patch_config_defaults():
 
 def test_augmentation_config_probabilities_in_range():
     cfg = AugmentationConfig()
-    for name in ("p_flip_h", "p_flip_v", "p_rot90", "p_amp_scale", "p_noise"):
+    for name in ("p_flip_h", "p_flip_v", "p_rot90", "p_noise"):
         assert 0.0 <= getattr(cfg, name) <= 1.0
 
 
@@ -193,15 +193,13 @@ def test_channel_strategy_from_slot_known_keys():
 
 def test_channel_stats_round_trips():
     stats = ChannelStats(
-        loc            = [0.0, 1.0],
-        scale          = [1.0, 2.0],
-        names          = ["c0", "c1"],
-        strategies     = [Presets.ZSCORE, Presets.ROBUST_IQR],
-        log1p_channels = [0],
+        loc        = [0.0, 1.0],
+        scale      = [1.0, 2.0],
+        names      = ["c0", "c1"],
+        strategies = [Presets.ZSCORE, Presets.ROBUST_IQR],
     )
     rebuilt = ChannelStats.from_dict(stats.as_dict())
     assert rebuilt.n_channels == stats.n_channels
     assert rebuilt.loc == stats.loc
     assert rebuilt.scale == stats.scale
     assert rebuilt.names == stats.names
-    assert rebuilt.log1p_channels == stats.log1p_channels

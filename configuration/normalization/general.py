@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum        import Enum
 from typing      import Optional
 
@@ -171,11 +171,10 @@ class NormalizationConfig:
 
 @dataclass
 class ChannelStats:
-    loc            : list[float]
-    scale          : list[float]
-    names          : Optional[list[str]]             = None
-    strategies     : Optional[list[ChannelStrategy]] = None
-    log1p_channels : list[int]                       = field(default_factory=list)
+    loc        : list[float]
+    scale      : list[float]
+    names      : Optional[list[str]]             = None
+    strategies : Optional[list[ChannelStrategy]] = None
 
     @property
     def n_channels(self) -> int:
@@ -187,20 +186,19 @@ class ChannelStats:
             entry: dict = {"name": self.names[i], "loc": m, "scale": s}
             if self.strategies and i < len(self.strategies):
                 entry.update(self.strategies[i].as_dict())
-           
+
             entries.append(entry)
-       
-        return {"channels": entries, "log1p_channels": self.log1p_channels}
+
+        return {"channels": entries}
 
     @classmethod
     def from_dict(cls, payload: dict) -> "ChannelStats":
         entries    = payload["channels"]
         strategies = [ChannelStrategy.from_dict(e) for e in entries]
-      
+
         return cls(
-            loc            = [e["loc"]   for e in entries],
-            scale          = [e["scale"] for e in entries],
-            names          = [e["name"]  for e in entries],
-            strategies     = strategies,
-            log1p_channels = payload["log1p_channels"],
+            loc        = [e["loc"]   for e in entries],
+            scale      = [e["scale"] for e in entries],
+            names      = [e["name"]  for e in entries],
+            strategies = strategies,
         )

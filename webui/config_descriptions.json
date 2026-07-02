@@ -897,7 +897,7 @@
     "fields": {
       "size": "Patch height and width in pixels",
       "stride": "Pixel step between adjacent patch origins",
-      "use_symmetric_padding": "Reflect-pad borders so edge pixels are covered"
+      "use_symmetric_padding": "Symmetric-pad borders so edge pixels are covered"
     }
   },
   "dataset/general/dataset::AugmentationConfig": {
@@ -906,8 +906,6 @@
       "p_flip_h": "Probability of horizontal (left-right) flip",
       "p_flip_v": "Probability of vertical (up-down) flip",
       "p_rot90": "Probability of a 90-degree rotation",
-      "p_amp_scale": "Probability of applying random amplitude scaling",
-      "amp_scale_range": "Min-max multiplicative factor for amplitude scaling",
       "noise_std": "Standard deviation of additive Gaussian noise",
       "p_noise": "Probability of adding Gaussian noise"
     }

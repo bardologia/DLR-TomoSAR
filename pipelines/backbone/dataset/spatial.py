@@ -40,7 +40,7 @@ class Cropper:
         if tuple(parameters.shape[-2:]) != expected:
             raise ValueError(f"Parameters artifact {parameters_path} has spatial shape {tuple(parameters.shape[-2:])} but the preprocessing global crop is {expected} (azimuth, range); the parameter extraction does not belong to this dataset crop.")
 
-    def to_local_slices(self, region: CropRegion) -> Tuple[slice, slice]:
+    def _to_local_slices(self, region: CropRegion) -> Tuple[slice, slice]:
         return region.local_slices(self.layout.global_crop)
 
     def _select_channels(self, array: np.ndarray, az_slice: slice, rg_slice: slice) -> np.ndarray:
@@ -98,7 +98,7 @@ class Cropper:
         })
 
     def load_split(self, region: CropRegion, load_tomogram: bool = False) -> dict[str, np.ndarray]:
-        az_slice, rg_slice = self.to_local_slices(region)
+        az_slice, rg_slice = self._to_local_slices(region)
 
         inputs_split, n_secondaries, n_interferograms = self._stack_inputs(az_slice, rg_slice)
         parameters_split, dem_split                   = self._load_targets(az_slice, rg_slice)

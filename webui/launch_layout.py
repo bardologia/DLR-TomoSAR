@@ -190,7 +190,6 @@ class LaunchLayout:
                 {"path": "p_flip_v", "widget": NUM_PROB},
                 {"path": "p_rot90", "widget": NUM_PROB},
             ]},
-            {"title": "Amplitude", "fields": [{"path": "p_amp_scale", "widget": NUM_PROB}, "amp_scale_range"]},
             {"title": "Noise", "fields": [{"path": "p_noise", "widget": NUM_PROB}, "noise_std"]},
         ],
         "pretrain": [
