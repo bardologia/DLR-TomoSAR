@@ -97,6 +97,7 @@ class ServerScene extends CanvasBase {
   }
 
   _draw() {
+    if (this.w < 60 || this.h < 60 || this.canvas.offsetParent === null) return;
     const ctx = this.ctx;
     const w   = this.w;
     const h   = this.h;
