@@ -161,7 +161,7 @@ class Loss:
             leaky_slope = leaky_slope,
         )
 
-        pred_params_norm = self.norm_stats.normalize_output(pred_params_phys)
+        pred_params_norm = self.norm_stats.normalize_output(pred_params_phys, leaky_slope=leaky_slope)
 
         with torch.no_grad():
             gt_phys    = self.norm_stats.denormalize_output(gt_params.float())

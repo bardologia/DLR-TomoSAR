@@ -112,6 +112,26 @@ def test_decompress_leaky_slope_identity_inside_bounds():
     assert np.allclose(hard, leaky)
 
 
+def test_compress_leaky_slope_leaks_below_floor():
+    out = Log1pTransform.compress(np.array([-2.0]), leaky_slope=0.1)
+
+    assert out[0] < 0.0
+
+
+def test_compress_leaky_slope_keeps_gradient_below_floor():
+    x = torch.tensor([-2.0], requires_grad=True)
+
+    Log1pTransform.compress(x, leaky_slope=0.01).sum().backward()
+
+    assert x.grad[0].item() > 0.0
+
+
+def test_compress_leaky_slope_identity_for_nonnegative():
+    x = np.array([0.0, 1.0, 50.0])
+
+    assert np.allclose(Log1pTransform.compress(x, leaky_slope=0.1), Log1pTransform.compress(x))
+
+
 def test_compress_monotonic():
     x   = np.linspace(0.0, 100.0, 50)
     out = Log1pTransform.compress(x)

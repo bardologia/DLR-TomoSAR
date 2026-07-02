@@ -563,7 +563,7 @@ class EquationLibrary:
                 {
                     "title" : "Forward normalisation",
                     "tex"   : r"\hat{x}_c = \frac{f(x_c) - \mu_c}{s_c}, \qquad f(x_c) = \log\!\big(1 + x_c\big)\ \text{if log1p, else}\ x_c",
-                    "note"  : "Statistics are fitted on the training split only and applied identically to all splits; log1p inputs are floored at 0, and output mu and sigma pools exclude inactive slots (amplitude below 1e-2).",
+                    "note"  : "Statistics are fitted on the training split only and applied identically to all splits; log1p inputs are floored at 0 (when re-normalising predictions inside the loss the floor is leaky with clamp_leaky_slope, so amplitude gradients survive below it), and the output amplitude, mu and sigma pools exclude inactive slots (amplitude below 1e-3, stats_computer.py).",
                     "vars"  : [
                         {"sym": r"\hat{x}_c",  "desc": "normalised value of channel c"},
                         {"sym": r"x_c",        "desc": "physical-space value of channel c"},

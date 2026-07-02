@@ -58,7 +58,7 @@ class Normalizer:
             log1p     = torch.as_tensor(vectors["log1p"],     device=device).reshape(shape)
 
             if not inverse:
-                x   = torch.where(log1p, Log1pTransform.compress(tensor), tensor)
+                x   = torch.where(log1p, Log1pTransform.compress(tensor, leaky_slope), tensor)
                 out = (x - loc) * inv_scale
             else:
                 x   = tensor * scale + loc
@@ -72,7 +72,7 @@ class Normalizer:
         log1p     = vectors["log1p"].reshape(shape)
 
         if not inverse:
-            x   = np.where(log1p, Log1pTransform.compress(tensor), tensor)
+            x   = np.where(log1p, Log1pTransform.compress(tensor, leaky_slope), tensor)
             out = (x - loc) * inv_scale
         else:
             x   = tensor * scale + loc
@@ -90,8 +90,8 @@ class Normalizer:
     def normalize_input(self, tensor: Array) -> Array:
         return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=False)
 
-    def normalize_output(self, tensor: Array) -> Array:
-        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=False)
+    def normalize_output(self, tensor: Array, leaky_slope: float = 0.0) -> Array:
+        return self._apply_normalization(tensor, self._require(self.stats.output_stats, "output"), inverse=False, leaky_slope=leaky_slope)
 
     def denormalize_input(self, tensor: Array) -> Array:
         return self._apply_normalization(tensor, self._require(self.stats.input_stats, "input"), inverse=True)

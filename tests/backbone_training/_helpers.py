@@ -40,6 +40,19 @@ def identity_normalizer(n_channels: int) -> Normalizer:
     return Normalizer(Stats(input_stats=None, output_stats=stats))
 
 
+def log1p_normalizer(n_gaussians: int) -> Normalizer:
+    log1p  = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=True)
+    zscore = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False)
+
+    stats = ChannelStats(
+        loc        = [2.0, 10.0, 1.0] * n_gaussians,
+        scale      = [1.5,  8.0, 0.7] * n_gaussians,
+        names      = [f"G{g + 1}_{role}" for g in range(n_gaussians) for role in ("amp", "mu", "sigma")],
+        strategies = [log1p, zscore, log1p] * n_gaussians,
+    )
+    return Normalizer(Stats(input_stats=None, output_stats=stats))
+
+
 def geometry_config(n_tracks: int = 3) -> GeometryConfig:
     baselines = tuple(float(10 * i) for i in range(n_tracks))
     return GeometryConfig(wavelength=0.23, slant_range=5000.0, baselines=baselines)
@@ -49,7 +62,7 @@ def gaussian_config(n_gaussians: int) -> GaussianConfig:
     return GaussianConfig(n_default_gaussians=n_gaussians, x_min=X_MIN, x_max=X_MAX)
 
 
-def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all_losses: bool = False, length: int = X_LEN, sampler=None) -> Loss:
+def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all_losses: bool = False, length: int = X_LEN, sampler=None, norm_stats: Normalizer | None = None) -> Loss:
     n_channels = n_gaussians * 3
     loss_cfg   = loss_cfg if loss_cfg is not None else LossConfig(use_param_l1=True, weight_param_l1=1.0)
 
@@ -59,7 +72,7 @@ def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all
         tracker        = tools.NullTracker(),
         gaussian_cfg   = gaussian_config(n_gaussians),
         loss_cfg       = loss_cfg,
-        norm_stats     = identity_normalizer(n_channels),
+        norm_stats     = norm_stats if norm_stats is not None else identity_normalizer(n_channels),
         geometry_cfg   = geometry_config(),
         log_all_losses = log_all_losses,
         sampler        = sampler,

@@ -8,7 +8,7 @@ from configuration.training.general.loss import LossConfig
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
-from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
+from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
 
 import tools
 
@@ -130,6 +130,24 @@ def test_gradient_flows_to_predictions():
     assert pred.grad is not None
     assert torch.isfinite(pred.grad).all().item()
     assert pred.grad.abs().sum().item() > 0.0
+
+
+def test_amp_gradient_survives_below_physical_floor():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    loss = build_loss(n_gaussians=1, loss_cfg=cfg, norm_stats=log1p_normalizer(1))
+
+    gt = loss.norm_stats.normalize_output(valid_param_tensor(1, 1, 4, 4, seed=40))
+
+    pred        = torch.zeros(1, 3, 4, 4)
+    pred[:, 0]  = -8.0
+    pred[:, 1]  = 0.1
+    pred[:, 2]  = 0.2
+    pred.requires_grad_(True)
+
+    loss(pred, gt)["total_loss"].backward()
+
+    assert torch.isfinite(pred.grad).all().item()
+    assert pred.grad[:, 0].abs().sum().item() > 0.0
 
 
 def test_identical_valid_params_give_zero_param_loss():
