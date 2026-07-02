@@ -61,10 +61,10 @@ class StatusBoard {
     const gpuCards = gpus.length
       ? gpus.map((g, i) =>
           `<article class="gcard" data-gpu="${i}">` +
-          `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span><span class="gcard__temp">--</span></header>` +
+          `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span></header>` +
           `<div class="gcard__row"><span class="gcard__pct">--</span><span class="gcard__unit">% util</span><span class="gcard__vram">--</span></div>` +
           `<canvas class="gcard__graph"></canvas>` +
-          `<footer class="gcard__foot"><span class="gcard__power">--</span><span class="gcard__legend"><i class="lg lg--util"></i>util<i class="lg lg--vram"></i>vram</span></footer>` +
+          `<footer class="gcard__foot"><span class="gcard__temp">--</span><span class="gcard__power">--</span><span class="gcard__legend"><i class="lg lg--util"></i>util<i class="lg lg--vram"></i>vram</span></footer>` +
           `</article>`
         ).join("")
       : `<div class="sboard__empty">no CUDA devices visible to the backend</div>`;
@@ -88,31 +88,19 @@ class StatusBoard {
 
       `<section class="sboard sboard--gpualarm" id="sb-gpu-guard" aria-label="GPU intrusion alarm" hidden></section>` +
 
-      `<section class="sboard sboard--wd" aria-label="Resource watchdog">` +
-      `<div class="wd__state">` +
+      `<section class="sboard sboard--strip" aria-label="Resource watchdog">` +
+      `<div class="strip__seg">` +
+      `<i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<span class="wd__status" id="sb-wd-status">--</span>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<dl class="wd__limits">${limitCells}</dl>` +
+      `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-impact-arm" title="When armed, auto-nukes all your processes if you slow other users too much">auto-nuke: --</button>` +
       `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
       `<span class="wd__nuke-sym" aria-hidden="true">&#9762;</span><span class="wd__nuke-txt">NUKE</span>` +
       `</button>` +
-      `<i class="wd__light" id="sb-wd-light" aria-hidden="true"></i><span class="wd__label">watchdog</span><span class="wd__mode" id="sb-wd-mode">--</span></div>` +
-      `<span class="wd__status" id="sb-wd-status">--</span>` +
-      `<dl class="wd__limits">${limitCells}</dl>` +
-      `</section>` +
-
-      `<section class="sboard sboard--impact" aria-label="Neighbour impact">` +
-      `<header class="sboard__cap"><span>neighbour impact</span><button type="button" class="impact__arm" id="sb-impact-arm" title="When armed, auto-nukes all your processes if you slow other users too much">auto-nuke: --</button><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
-      `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
-      `<div class="impact__grid">` +
-      `<div class="impact__cell"><span class="impact__k">memory stall</span><span class="impact__v" id="sb-impact-mem-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-mem-psi-bar"></i></div><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><span class="impact__k">disk stall</span><span class="impact__v" id="sb-impact-io-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-io-psi-bar"></i></div><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
-      `<div class="impact__cell"><span class="impact__k">cpu stall</span><span class="impact__v" id="sb-impact-cpu-psi">--</span><div class="bar"><i class="bar__fill" id="sb-impact-cpu-psi-bar"></i></div><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
       `</div>` +
-      `<dl class="impact__stats">` +
-      `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
-      `<div><dt id="sb-impact-iorate">--</dt><dd>disk busy</dd></div>` +
-      `<div><dt id="sb-impact-mine">--</dt><dd>your procs</dd></div>` +
-      `<div><dt id="sb-impact-top">--</dt><dd>top ram user</dd></div>` +
-      `</dl>` +
-      `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
 
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
@@ -152,6 +140,23 @@ class StatusBoard {
       `<div class="bar"><i class="bar__fill bar__fill--user" id="sb-disk-user-bar"></i></div>` +
       `<div class="sboard__metric"><span class="sboard__path" id="sb-disk-repo-path">dlr root</span><span id="sb-disk-repo">--</span></div>` +
       `<div class="bar"><i class="bar__fill bar__fill--repo" id="sb-disk-repo-bar"></i></div>` +
+      `</section>` +
+
+      `<section class="sboard sboard--impact" aria-label="Neighbour impact">` +
+      `<header class="sboard__cap"><span>neighbour impact</span><i class="impact__light" id="sb-impact-light" aria-hidden="true"></i><span class="sboard__n" id="sb-impact-verdict">--</span></header>` +
+      `<p class="impact__lede" id="sb-impact-lede">measuring whether your jobs stall other users&hellip;</p>` +
+      `<div class="impact__grid">` +
+      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">memory stall</span><span class="impact__v" id="sb-impact-mem-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-mem-psi-bar"></i></div><span class="impact__share" id="sb-impact-mem-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-mem-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">disk stall</span><span class="impact__v" id="sb-impact-io-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-io-psi-bar"></i></div><span class="impact__share" id="sb-impact-io-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-io-share-bar"></i></div></div>` +
+      `<div class="impact__cell"><div class="impact__head"><span class="impact__k">cpu stall</span><span class="impact__v" id="sb-impact-cpu-psi">--</span></div><div class="bar"><i class="bar__fill" id="sb-impact-cpu-psi-bar"></i></div><span class="impact__share" id="sb-impact-cpu-share">your share --</span><div class="bar bar--share"><i class="bar__fill bar__fill--share" id="sb-impact-cpu-share-bar"></i></div></div>` +
+      `</div>` +
+      `<dl class="impact__stats">` +
+      `<div><dt id="sb-impact-swap">--</dt><dd>swap out</dd></div>` +
+      `<div><dt id="sb-impact-iorate">--</dt><dd>disk busy</dd></div>` +
+      `<div><dt id="sb-impact-mine">--</dt><dd>your procs</dd></div>` +
+      `<div><dt id="sb-impact-top">--</dt><dd>top ram user</dd></div>` +
+      `</dl>` +
+      `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
 
       `<section class="sboard sboard--procs" aria-label="Processes">` +
@@ -289,8 +294,8 @@ class StatusBoard {
       }
       el.power.textContent = g.power != null ? `${Math.round(g.power)}${g.power_limit ? ` / ${Math.round(g.power_limit)}` : ""} W` : "--";
       this._spark(el.graph, [
-        { data: h.m, color: "15, 118, 110", fill: 0.10 },
-        { data: h.u, color: "29, 79, 216", fill: 0.16 },
+        { data: h.m, color: "45, 212, 191", fill: 0.08 },
+        { data: h.u, color: "111, 155, 255", fill: 0.14 },
       ]);
     });
 
@@ -305,8 +310,8 @@ class StatusBoard {
     cores.forEach((u, i) => {
       const cell = this.coreEls[i];
       if (!cell) return;
-      const a = 0.05 + Math.min(1, u / 100) * 0.85;
-      cell.style.background = `rgba(29, 79, 216, ${a.toFixed(3)})`;
+      const a = 0.06 + Math.min(1, u / 100) * 0.84;
+      cell.style.background = `rgba(111, 155, 255, ${a.toFixed(3)})`;
       cell.title = `core ${i} · ${Math.round(u)}%`;
     });
 
@@ -318,7 +323,7 @@ class StatusBoard {
       this._txt("sb-cpu-avg", `<b>${avg.toFixed(1)}</b> %`);
       this._txt("sb-cpu-active", `<b>${active}</b> / ${cores.length} dispatched`);
     }
-    this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "29, 79, 216", fill: 0.16 }]);
+    this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "111, 155, 255", fill: 0.14 }]);
 
     if (mem.total) {
       const used = mem.total - mem.available;
@@ -328,7 +333,7 @@ class StatusBoard {
       const swapUsed = (mem.swap_total || 0) - (mem.swap_free || 0);
       this._bar("sb-swap-bar", mem.swap_total ? (100 * swapUsed) / mem.swap_total : 0);
       this._txt("sb-swap-txt", mem.swap_total ? `<b>${this._gb(swapUsed)}</b> / ${this._gb(mem.swap_total)} GB` : "none");
-      this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "15, 118, 110", fill: 0.12 }]);
+      this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "45, 212, 191", fill: 0.10 }]);
     }
 
     if (disk.total) {
@@ -739,7 +744,7 @@ class StatusBoard {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    ctx.strokeStyle = "rgba(20, 30, 40, 0.08)";
+    ctx.strokeStyle = "rgba(220, 235, 245, 0.09)";
     ctx.lineWidth = 1;
     [0.25, 0.5, 0.75].forEach((f) => {
       const y = Math.round(h * f) + 0.5;
@@ -762,9 +767,12 @@ class StatusBoard {
         if (i === 0) ctx.moveTo(x, py(v));
         else ctx.lineTo(x, py(v));
       });
-      ctx.strokeStyle = `rgba(${s.color}, 0.9)`;
+      ctx.strokeStyle = `rgba(${s.color}, 0.95)`;
       ctx.lineWidth = 1.4;
+      ctx.shadowColor = `rgba(${s.color}, 0.55)`;
+      ctx.shadowBlur = 6;
       ctx.stroke();
+      ctx.shadowBlur = 0;
 
       ctx.lineTo(w, h);
       ctx.lineTo(x0, h);

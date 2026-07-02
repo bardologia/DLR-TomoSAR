@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260702c" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260703a" />
 </head>
 <body>
 
@@ -48,15 +48,21 @@
   <!-- HOME -->
   <section class="page page--home is-active" data-page="home">
     <div class="status">
-      <header class="status__head">
-        <div class="status__id">
-          <p class="hero__kicker">server observatory &middot; neural SAR tomography</p>
-          <h1 class="status__host" id="status-host">&hellip;</h1>
-          <p class="status__sum" id="status-sum">connecting to backend&hellip;</p>
-        </div>
-        <canvas id="server-anim" class="status__server" role="img" aria-label="Animated server rack"></canvas>
-      </header>
-      <div class="status__board" id="status-board"></div>
+      <div class="deck">
+        <i class="deck__tick deck__tick--tl" aria-hidden="true"></i>
+        <i class="deck__tick deck__tick--tr" aria-hidden="true"></i>
+        <i class="deck__tick deck__tick--bl" aria-hidden="true"></i>
+        <i class="deck__tick deck__tick--br" aria-hidden="true"></i>
+        <header class="deck__mast">
+          <div class="status__id">
+            <p class="hero__kicker">server observatory &middot; neural SAR tomography</p>
+            <h1 class="status__host" id="status-host">&hellip;</h1>
+            <p class="status__sum" id="status-sum">connecting to backend&hellip;</p>
+          </div>
+          <canvas id="server-anim" class="status__server" role="img" aria-label="Animated server rack"></canvas>
+        </header>
+        <div class="status__board" id="status-board"></div>
+      </div>
     </div>
   </section>
 
@@ -667,8 +673,8 @@
 
 <script src="/static/js/radar.js?v=20260611z"></script>
 <script src="/static/js/tomo_anim.js?v=20260611z"></script>
-<script src="/static/js/server_anim.js?v=20260612c"></script>
-<script src="/static/js/home.js?v=20260616i"></script>
+<script src="/static/js/server_anim.js?v=20260703a"></script>
+<script src="/static/js/home.js?v=20260703a"></script>
 <script src="/static/js/process_anim.js?v=20260606r"></script>
 <script src="/static/js/diagram.js?v=20260606r"></script>
 <script src="/static/js/router.js?v=20260625a"></script>
