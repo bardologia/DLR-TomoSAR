@@ -34,6 +34,7 @@ class ProfileAeRun:
     checkpoint_meta             : dict
     preprocessing_run_directory : Path
     split_region                : CropRegion
+    amp_zero_thr                : float
 
 
 class ProfileAeRunLoader:
@@ -156,4 +157,5 @@ class ProfileAeRunLoader:
             checkpoint_meta             = ckpt_meta,
             preprocessing_run_directory = Path(dataset_config.preprocessing_run_directory),
             split_region                = region,
+            amp_zero_thr                = dataset_config.amp_zero_thr,
         )

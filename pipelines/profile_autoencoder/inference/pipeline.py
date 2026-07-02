@@ -51,7 +51,7 @@ class ProfileAeInferencePipeline:
         return path
 
     def _evaluate_metrics(self, result, run, meta: ProfileAeInferenceMetadata, logger: Logger):
-        metrics_obj = ProfileAeMetrics(result, run.x_axis, run.normalizer)
+        metrics_obj = ProfileAeMetrics(result, run.x_axis, run.normalizer, run.amp_zero_thr)
         metrics     = metrics_obj.compute()
 
         metrics["split"]        = run.split_name
@@ -78,7 +78,7 @@ class ProfileAeInferencePipeline:
         logger.section("[Profile AE Inference: Plots]")
         plots = ProfileAePlots(fig_dpi=self.config.fig_dpi, save_dpi=self.config.save_dpi)
 
-        return plots.compose(result, np.asarray(run.x_axis, dtype=np.float64), metrics_obj.per_curve_mse(), self.config, meta.figures_dir)
+        return plots.compose(result, np.asarray(run.x_axis, dtype=np.float64), metrics_obj.per_curve_mse(), self.config, meta.figures_dir, run.amp_zero_thr)
 
     def _build_report(self, meta: ProfileAeInferenceMetadata, run, metrics: dict, figures: dict) -> Path:
         return ProfileAeReport(

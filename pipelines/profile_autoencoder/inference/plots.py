@@ -62,11 +62,11 @@ class ProfileAePlots(AePlotsBase):
 
         return self._save(fig, figures_dir / "power_scatter.png")
 
-    def compose(self, result, x_axis: np.ndarray, mse: np.ndarray, cfg, figures_dir: Path) -> Dict[str, List[Path]]:
+    def compose(self, result, x_axis: np.ndarray, mse: np.ndarray, cfg, figures_dir: Path, amp_zero_thr: float) -> Dict[str, List[Path]]:
         gt   = result.gt
         pred = result.pred
 
-        active     = np.flatnonzero(gt.max(axis=1) > 1e-3)
+        active     = np.flatnonzero(gt.max(axis=1) > amp_zero_thr)
         order      = active[np.argsort(mse[active])]
         rng        = np.random.default_rng(cfg.curve_seed)
 

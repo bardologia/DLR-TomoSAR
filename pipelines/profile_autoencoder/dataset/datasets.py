@@ -18,7 +18,7 @@ class ProfileDataset(Dataset):
         x_axis          : np.ndarray,
         n_gaussians     : int,
         split_name      : str,
-        amp_zero_thr    : float = 1e-3,
+        amp_zero_thr    : float,
         pixel_subsample : float = 1.0,
         keep_empty_frac : float = 0.05,
         seed            : int   = 0,

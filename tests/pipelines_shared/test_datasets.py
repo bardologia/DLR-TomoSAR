@@ -179,7 +179,7 @@ def _profile_dataset(parameters, tmp_path, **kw):
     x_axis = np.linspace(0.0, 1.0, 150, dtype=np.float32)
     logger = Logger(log_dir=str(tmp_path / "logs"), name="prof_ds", level="ERROR")
 
-    defaults = dict(n_gaussians=5, split_name="train", keep_empty_frac=0.05, pixel_subsample=1.0, seed=0)
+    defaults = dict(n_gaussians=5, split_name="train", amp_zero_thr=1e-3, keep_empty_frac=0.05, pixel_subsample=1.0, seed=0)
     defaults.update(kw)
 
     return ProfileDataset(param_arrays=params, x_axis=x_axis, logger=logger, **defaults)

@@ -6,13 +6,12 @@ from pipelines.autoencoder_common.inference.metrics import AeMetricsBase
 
 
 class ProfileAeMetrics(AeMetricsBase):
-    AMP_ZERO_THR = 1e-3
-
-    def __init__(self, result, x_axis: np.ndarray, normalizer) -> None:
+    def __init__(self, result, x_axis: np.ndarray, normalizer, amp_zero_thr: float) -> None:
         super().__init__(result, normalizer)
 
-        self.x_axis = np.asarray(x_axis, dtype=np.float64)
-        self.active = self.gt.max(axis=1) > self.AMP_ZERO_THR
+        self.x_axis       = np.asarray(x_axis, dtype=np.float64)
+        self.amp_zero_thr = amp_zero_thr
+        self.active       = self.gt.max(axis=1) > self.amp_zero_thr
 
     def per_curve_mse(self) -> np.ndarray:
         return np.mean((self.pred - self.gt) ** 2, axis=1)

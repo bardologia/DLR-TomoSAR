@@ -46,7 +46,7 @@ def test_profile_metrics_compute_keys():
         embeddings = rng.random((10, 4)).astype(np.float32),
     )
 
-    out = ProfileAeMetrics(res, np.linspace(0.0, 1.0, 20), _Norm()).compute()
+    out = ProfileAeMetrics(res, np.linspace(0.0, 1.0, 20), _Norm(), 1e-3).compute()
 
     assert out["n_curves"] == 10
     assert out["profile_length"] == 20
