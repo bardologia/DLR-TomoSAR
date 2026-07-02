@@ -42,7 +42,7 @@ def test_dict_structure_and_consistency(kind):
     recon, image = _image_pair()
     out          = _loss(kind)(recon, image)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy"}
+    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
     assert set(out["components"].keys()) == {"image_recon"}
     assert set(out["weighted"].keys())   == {"image_recon"}
     assert out["monitor"] == {}

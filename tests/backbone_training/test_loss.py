@@ -103,7 +103,7 @@ def test_forward_returns_finite_scalar_total():
 
     out  = loss(pred, gt)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy"}
+    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
     assert out["total_loss"].ndim == 0
     assert torch.isfinite(out["total_loss"]).item()
 

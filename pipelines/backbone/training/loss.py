@@ -97,16 +97,32 @@ class Loss:
         elem_w               = weights * param_mask * presence
         elem_w[:, :, 0:1]    = elem_w[:, :, 0:1] * focal
 
+        physical = self._physical_errors(pred_phys, gt_phys, active)
+
         if kind == "l1":
-            return ParamLoss.l1(pred, gt, elem_w, ["amp", "mu", "sigma"], cfg.use_active_normalization)
+            total, per_param = ParamLoss.l1(pred, gt, elem_w, ["amp", "mu", "sigma"], cfg.use_active_normalization)
+            return total, per_param, physical
 
         if kind == "huber":
-            return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}
+            return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}, physical
 
         if kind == "mse":
-            return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}
+            return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}, physical
 
         raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1', 'huber', or 'mse'.")
+
+    @torch.no_grad()
+    def _physical_errors(self, pred_phys, gt_phys, active) -> dict:
+        diff = (pred_phys - gt_phys).abs()
+
+        active_mask = active[:, :, 0]
+        n_active    = active_mask.sum().clamp(min=1.0)
+
+        return {
+            "amp_mae"     : diff[:, :, 0].mean(),
+            "mu_mae_m"    : (diff[:, :, 1] * active_mask).sum() / n_active,
+            "sigma_mae_m" : (diff[:, :, 2] * active_mask).sum() / n_active,
+        }
 
     def _match_params(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss):
         batch_size, num_channels, height, width = pred_gauss.shape
@@ -244,6 +260,7 @@ class Loss:
         weighted   : dict = {}
         monitor    : dict = {}
         occupancy  : dict = {}
+        physical   : dict = {}
         total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
         weight_sum:    float  = 0.0
 
@@ -254,10 +271,10 @@ class Loss:
 
             if term.name == "param_l1":
                 if is_used:
-                    val, per_param_l1 = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                    val, per_param_l1, physical = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
                 elif self.log_all_losses:
                     with torch.no_grad():
-                        val, per_param_l1 = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                        val, per_param_l1, physical = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
                 else:
                     continue
             else:
@@ -306,4 +323,5 @@ class Loss:
             "weighted"   : weighted,
             "monitor"    : monitor,
             "occupancy"  : occupancy,
+            "physical"   : physical,
         }

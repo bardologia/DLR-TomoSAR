@@ -42,7 +42,7 @@ def test_dict_structure_and_consistency(kind):
     recon, curve = _curve_pair()
     out          = _loss(kind)(recon, curve)
 
-    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy"}
+    assert set(out.keys()) == {"total_loss", "components", "weighted", "monitor", "occupancy", "physical"}
     assert set(out["components"].keys()) == {"curve_recon"}
     assert set(out["weighted"].keys())   == {"curve_recon"}
     assert out["monitor"] == {}

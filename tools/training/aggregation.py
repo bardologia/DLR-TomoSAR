@@ -1,24 +1,29 @@
+import torch
+
+
 class MetricAggregator:
     def __init__(self):
         self.components_sum : dict = {}
         self.weighted_sum   : dict = {}
         self.monitor_sum    : dict = {}
         self.occupancy_sum  : dict = {}
+        self.physical_sum   : dict = {}
         self.extra_sum      : dict = {}
         self.count                = 0
 
+    @staticmethod
+    def _accumulate(store: dict, values: dict) -> None:
+        for k, v in values.items():
+            if isinstance(v, torch.Tensor):
+                v = v.detach()
+            store[k] = store.get(k, 0.0) + v
+
     def add(self, loss_dict: dict) -> None:
-        for k, v in loss_dict["components"].items():
-            self.components_sum[k] = self.components_sum.get(k, 0.0) + float(v)
-
-        for k, v in loss_dict["weighted"].items():
-            self.weighted_sum[k] = self.weighted_sum.get(k, 0.0) + float(v)
-
-        for k, v in loss_dict["monitor"].items():
-            self.monitor_sum[k] = self.monitor_sum.get(k, 0.0) + float(v)
-
-        for k, v in loss_dict["occupancy"].items():
-            self.occupancy_sum[k] = self.occupancy_sum.get(k, 0.0) + float(v)
+        self._accumulate(self.components_sum, loss_dict["components"])
+        self._accumulate(self.weighted_sum,   loss_dict["weighted"])
+        self._accumulate(self.monitor_sum,    loss_dict["monitor"])
+        self._accumulate(self.occupancy_sum,  loss_dict["occupancy"])
+        self._accumulate(self.physical_sum,   loss_dict["physical"])
 
         self.count += 1
 
@@ -28,7 +33,7 @@ class MetricAggregator:
 
     def _reduce(self, store: dict) -> dict:
         n = max(1, self.count)
-        return {k: v / n for k, v in store.items()}
+        return {k: float(v) / n for k, v in store.items()}
 
     def reduce_components(self) -> dict:
         return self._reduce(self.components_sum)
@@ -41,6 +46,9 @@ class MetricAggregator:
 
     def reduce_occupancy(self) -> dict:
         return self._reduce(self.occupancy_sum)
+
+    def reduce_physical(self) -> dict:
+        return self._reduce(self.physical_sum)
 
     def reduce_extra(self) -> dict:
         return self._reduce(self.extra_sum)

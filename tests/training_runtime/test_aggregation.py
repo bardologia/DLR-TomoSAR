@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import math
 
+import torch
+
 import pytest
 
 from tools.training.aggregation import MetricAggregator
 
 
-def _loss_dict(components, weighted, monitor, occupancy=None):
-    return {"components": components, "weighted": weighted, "monitor": monitor, "occupancy": occupancy or {}}
+def _loss_dict(components, weighted, monitor, occupancy=None, physical=None):
+    return {"components": components, "weighted": weighted, "monitor": monitor, "occupancy": occupancy or {}, "physical": physical or {}}
 
 
 def test_single_add_reduces_to_same_values():
@@ -83,3 +85,22 @@ def test_int_values_coerced_to_float():
 
     assert isinstance(agg.components_sum["a"], float)
     assert agg.components_sum["a"] == 2.0
+
+
+def test_tensor_values_accumulate_without_immediate_conversion():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({"a": torch.tensor(2.0, requires_grad=True)}, {"a": torch.tensor(6.0)}, {}))
+    agg.add(_loss_dict({"a": torch.tensor(4.0)}, {"a": torch.tensor(2.0)}, {}))
+
+    assert isinstance(agg.components_sum["a"], torch.Tensor)
+    assert agg.components_sum["a"].requires_grad is False
+    assert agg.reduce_components()["a"] == pytest.approx(3.0)
+    assert agg.reduce_weighted()["a"]   == pytest.approx(4.0)
+
+
+def test_physical_channel_reduces_independently():
+    agg = MetricAggregator()
+    agg.add(_loss_dict({}, {}, {}, physical={"mu_mae_m": torch.tensor(2.0)}))
+    agg.add(_loss_dict({}, {}, {}, physical={"mu_mae_m": torch.tensor(4.0)}))
+
+    assert agg.reduce_physical()["mu_mae_m"] == pytest.approx(3.0)

@@ -32,4 +32,5 @@ class ReconstructionLoss:
             "weighted"    : {self.component: value},
             "monitor"     : {},
             "occupancy"   : {},
+            "physical"    : {},
         }
