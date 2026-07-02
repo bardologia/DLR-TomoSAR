@@ -3,13 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from configuration.training.profile_autoencoder     import ProfileAeLossConfig
-from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 
 
 @dataclass
 class AeCvConfig:
-    ae_model_name   : str                   = "mlp_ae"
-    autoencoder     : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
+    ae_model_name   : str                 = "mlp_ae"
     ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
-    pixel_subsample : float                 = 1.0
-    keep_empty_frac : float                 = 0.05
+    pixel_subsample : float               = 1.0
+    keep_empty_frac : float               = 0.05

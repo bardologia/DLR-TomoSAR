@@ -231,7 +231,7 @@ class ModelCardPanel {
     const root     = document.createElement("section");
     root.className = "model-panel";
 
-    const isAe     = this.leaf.path === "ae_model_name";
+    const isAe     = this.leaf.path.endsWith("ae_model_name");
     const head     = document.createElement("header");
     head.className = "special-head";
     head.innerHTML = isAe

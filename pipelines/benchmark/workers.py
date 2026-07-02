@@ -54,7 +54,6 @@ class BenchmarkWorker(WorkerBase):
 
     def _ae_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
         from configuration.training import ProfileAeEntryConfig
-        from models.profile_autoencoder                        import PROFILE_AE_CONFIG_REGISTRY
 
         return ProfileAeEntryConfig(
             run_name        = run_name or model_name,
@@ -64,7 +63,6 @@ class BenchmarkWorker(WorkerBase):
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
             ae_model_name   = model_name,
-            autoencoder     = PROFILE_AE_CONFIG_REGISTRY[model_name](),
             ae_loss         = self.config.ae_loss,
             paths           = self.config.paths,
             training        = self.config.training,

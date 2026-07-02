@@ -184,7 +184,7 @@ class FoldTrainingWorker(CrossValidationWorker):
             pixel_subsample = ae.pixel_subsample,
             keep_empty_frac = ae.keep_empty_frac,
             ae_model_name   = ae.ae_model_name,
-            autoencoder     = ae.autoencoder,
+            model_overrides = cv.model_overrides,
             ae_loss         = ae.ae_loss,
             geometry        = cv.geometry,
             paths           = cv.paths,

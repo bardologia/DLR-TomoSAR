@@ -52,10 +52,10 @@ class ProfileAeEntryConfig:
 
     profile_augmentation : ProfileAugmentationConfig = field(default_factory=ProfileAugmentationConfig)
 
-    ae_model_name : str                   = "mlp_ae"
-    autoencoder   : ProfileAutoencoderBaseConfig = field(default_factory=MlpAutoencoderConfig)
-    ae_loss       : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
-    geometry      : GeometryConfig        = field(default_factory=GeometryConfig)
+    ae_model_name   : str                 = "mlp_ae"
+    model_overrides : dict                = field(default_factory=dict)
+    ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
+    geometry        : GeometryConfig      = field(default_factory=GeometryConfig)
 
     paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
     training : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))

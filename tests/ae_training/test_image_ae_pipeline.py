@@ -109,3 +109,18 @@ def test_saved_checkpoint_is_loadable(tmp_path):
 
     fresh = pipe._build_model(IN_CHANNELS)
     fresh.load_state_dict(ckpt["params"])
+
+
+def test_autoencoder_config_follows_ae_model_name():
+    from configuration.training import ImageAeEntryConfig
+    from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
+
+    entry = ImageAeEntryConfig(ae_model_name="conv2d_ae", model_overrides={"embedding_dim": 48})
+    cfg   = image_pipeline.TrainingPipeline._autoencoder_config(image_pipeline.TrainingPipeline.__new__(image_pipeline.TrainingPipeline), entry)
+
+    assert type(cfg) is type(IMAGE_AE_CONFIG_REGISTRY["conv2d_ae"]())
+    assert cfg.embedding_dim == 48
+
+    for name in IMAGE_AE_CONFIG_REGISTRY:
+        cfg = image_pipeline.TrainingPipeline._autoencoder_config(image_pipeline.TrainingPipeline.__new__(image_pipeline.TrainingPipeline), ImageAeEntryConfig(ae_model_name=name))
+        assert type(cfg) is type(IMAGE_AE_CONFIG_REGISTRY[name]())

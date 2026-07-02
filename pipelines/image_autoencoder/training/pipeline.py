@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.training import ImageAeTrainerConfig
-from models.image_autoencoder                        import get_image_autoencoder
+from models.image_autoencoder                        import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
 from pipelines.autoencoder_common.training           import AutoencoderTrainingPipeline
 from pipelines.shared.dataset.dataset_prep                   import BackboneDatasetPreparation
+from pipelines.shared.model.model_builder                     import ModelBuilder
 from pipelines.shared.training.training_runner                import EntryConfigTrainRunner
 from pipelines.image_autoencoder.training.trainer    import Trainer
 from pipelines.shared.config.config_persistence             import ImageAutoencoderConfigIO
@@ -16,7 +17,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
     trainer_class = Trainer
 
     def _autoencoder_config(self, entry_config):
-        return entry_config.image_autoencoder
+        return ModelBuilder.config_from_registry(entry_config.ae_model_name, entry_config.model_overrides, registry=IMAGE_AE_CONFIG_REGISTRY)
 
     def _build_trainer_config(self, base, entry_config):
         trainer_config = ImageAeTrainerConfig(

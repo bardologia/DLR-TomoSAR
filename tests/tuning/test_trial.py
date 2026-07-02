@@ -177,8 +177,9 @@ def test_ae_tuner_objective_materializes_entry(fake_logger, tune_cfg, tmp_path):
     assert entry.training.scheduler_epochs    == tune_cfg.n_epochs
     assert entry.training.early_stop_patience == tune_cfg.early_stop_patience
 
-    assert entry.autoencoder.embedding_dim in [16, 24, 32]
-    assert entry.autoencoder.depth         in [3, 4, 6]
+    assert entry.model_overrides["embedding_dim"] in [16, 24, 32]
+    assert entry.model_overrides["depth"]         in [3, 4, 6]
+    assert set(entry.model_overrides) == {"encoder_lr", "embedding_dim", "depth"}
 
 
 def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_path):
@@ -206,7 +207,7 @@ def test_ae_tuner_objective_returns_best_val_loss(fake_logger, tune_cfg, tmp_pat
     assert study.best_value == 0.7
 
 
-def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tmp_path):
+def test_ae_tuner_image_entry_gets_model_overrides(fake_logger, tune_cfg, tmp_path):
     captured = {}
 
     class CaptureImageAePipeline:
@@ -221,7 +222,6 @@ def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tm
         config_cls         = FakeAeConfig,
         entry_template     = FakeAeEntry(),
         trial_pipeline_cls = CaptureImageAePipeline,
-        autoencoder_attr   = "image_autoencoder",
         tune_cfg           = tune_cfg,
         log_dir            = str(tmp_path),
         logger             = fake_logger,
@@ -232,9 +232,8 @@ def test_ae_tuner_image_attr_assigns_image_autoencoder(fake_logger, tune_cfg, tm
     study.optimize(tuner._objective, n_trials=1)
 
     entry = captured["entry"]
-    assert entry.ae_model_name              == "conv2d_ae"
-    assert entry.image_autoencoder.embedding_dim in [16, 24, 32]
-    assert not hasattr(entry, "autoencoder")
+    assert entry.ae_model_name == "conv2d_ae"
+    assert entry.model_overrides["embedding_dim"] in [16, 24, 32]
 
 
 class FakeJepaConfig:

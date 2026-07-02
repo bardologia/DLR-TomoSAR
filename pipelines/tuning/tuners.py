@@ -154,13 +154,11 @@ class AeTuner:
         log_dir           : str,
         logger,
         overfit,
-        autoencoder_attr  : str = "autoencoder",
     ) -> None:
         self.model_name         = model_name
         self.config_cls         = config_cls
         self.entry_template     = entry_template
         self.trial_pipeline_cls = trial_pipeline_cls
-        self.autoencoder_attr   = autoencoder_attr
         self.tune_cfg           = tune_cfg
         self.log_dir            = log_dir
         self.logger             = logger
@@ -170,21 +168,15 @@ class AeTuner:
         self.space       = {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
         self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
 
-    def _apply_params(self, trial: optuna.Trial, ae_config) -> None:
-        sampled = self.sampler.sample(trial, self.space)
-        for k, v in sampled.items():
-            setattr(ae_config, k, v)
-
     def _objective(self, trial: optuna.Trial) -> float:
-        ae_config = self.config_cls()
-        self._apply_params(trial, ae_config)
+        sampled = self.sampler.sample(trial, self.space)
 
-        entry = copy.deepcopy(self.entry_template)
-        setattr(entry, self.autoencoder_attr, ae_config)
-        entry.ae_model_name = self.model_name
-        entry.run_name      = f"trial_{trial.number:04d}"
-        entry.seed          = self.tune_cfg.base_seed + trial.number
-        entry.logdir        = Path(self.log_dir) / "trials"
+        entry                 = copy.deepcopy(self.entry_template)
+        entry.ae_model_name   = self.model_name
+        entry.model_overrides = sampled
+        entry.run_name        = f"trial_{trial.number:04d}"
+        entry.seed            = self.tune_cfg.base_seed + trial.number
+        entry.logdir          = Path(self.log_dir) / "trials"
 
         entry.training.epochs              = self.tune_cfg.n_epochs
         entry.training.scheduler_epochs    = self.tune_cfg.n_epochs

@@ -4,9 +4,10 @@ from pathlib import Path
 
 from configuration.dataset import ProfileDatasetConfig
 from configuration.training import ProfileAeTrainerConfig
-from models.profile_autoencoder                             import get_profile_autoencoder
+from models.profile_autoencoder                             import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
 from pipelines.autoencoder_common.training          import AutoencoderTrainingPipeline
 from pipelines.profile_autoencoder.dataset.pipeline import ProfileDatasetPipeline
+from pipelines.shared.model.model_builder                    import ModelBuilder
 from pipelines.shared.training.training_runner               import EntryConfigTrainRunner
 from pipelines.profile_autoencoder.training.trainer import Trainer
 from pipelines.shared.config.config_persistence            import ProfileAutoencoderConfigIO, ProfileDatasetConfigIO
@@ -17,7 +18,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
     trainer_class = Trainer
 
     def _autoencoder_config(self, entry_config):
-        return entry_config.autoencoder
+        return ModelBuilder.config_from_registry(entry_config.ae_model_name, entry_config.model_overrides, registry=PROFILE_AE_CONFIG_REGISTRY)
 
     def _build_trainer_config(self, base, entry_config):
         trainer_config = ProfileAeTrainerConfig(

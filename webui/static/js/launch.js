@@ -254,6 +254,16 @@ class LaunchView extends ConfigForm {
     return "backbone";
   }
 
+  _modelNameLeaf(byPath) {
+    const type = this._activeTrainingType();
+
+    if (type === "profile_autoencoder" || type === "image_autoencoder") {
+      return byPath.get("ae_model_name") || byPath.get("autoencoder.ae_model_name") || null;
+    }
+
+    return byPath.get("backbone_name") || byPath.get("ae_model_name");
+  }
+
   _modelFamiliesEndpoint() {
     const type = this._activeTrainingType();
     if (type === "image_autoencoder")   return "/api/image-autoencoders";
@@ -748,7 +758,7 @@ class LaunchView extends ConfigForm {
 
     if (typeLeaf) this._renderTypeTab(typeTab, typeLeaf);
 
-    const modelNameLeaf = byPath.get("backbone_name") || byPath.get("ae_model_name");
+    const modelNameLeaf = this._modelNameLeaf(byPath);
     const cardPanel     = modelNameLeaf && this.modelFamilies && this.modelFamilies.length ? new window.ModelCardPanel(this, modelNameLeaf) : null;
 
     const pinned  = (this.detail.essentials || []).map((path) => byPath.get(path)).filter(Boolean).filter((leaf) => !(cardPanel && modelNameLeaf && leaf.path === modelNameLeaf.path)).filter((leaf) => !(typeLeaf && leaf.path === typeLeaf.path));

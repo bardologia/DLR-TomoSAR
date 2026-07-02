@@ -115,3 +115,19 @@ def test_saved_checkpoint_is_loadable(tmp_path):
 
     fresh = pipe._build_model(PROFILE_LENGTH)
     fresh.load_state_dict(ckpt["params"])
+
+
+def test_autoencoder_config_follows_ae_model_name():
+    from configuration.training import ProfileAeEntryConfig
+    from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
+    from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
+
+    entry = ProfileAeEntryConfig(ae_model_name="gru_ae", model_overrides={"embedding_dim": 48})
+    cfg   = TrainingPipeline._autoencoder_config(TrainingPipeline.__new__(TrainingPipeline), entry)
+
+    assert type(cfg) is type(PROFILE_AE_CONFIG_REGISTRY["gru_ae"]())
+    assert cfg.embedding_dim == 48
+
+    for name in PROFILE_AE_CONFIG_REGISTRY:
+        cfg = TrainingPipeline._autoencoder_config(TrainingPipeline.__new__(TrainingPipeline), ProfileAeEntryConfig(ae_model_name=name))
+        assert type(cfg) is type(PROFILE_AE_CONFIG_REGISTRY[name]())
