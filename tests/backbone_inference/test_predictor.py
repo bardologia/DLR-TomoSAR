@@ -11,7 +11,7 @@ from pipelines.backbone.dataset.spatial import Patcher
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics    import Result
-from pipelines.backbone.inference.predictor  import CubeStitcher, Predictor
+from pipelines.backbone.inference.predictor  import CubeStitcher, Predictor, SelectStitcher
 from tools.data.regions import CropRegion
 from configuration.inference import InferenceConfig
 
@@ -129,6 +129,45 @@ def test_cube_stitcher_single_patch_reconstructs():
 
     assert cube.shape == (3, 8, 8)
     assert np.allclose(cube, data)
+
+
+def test_select_stitcher_takes_nearest_patch_centre():
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_reflective_padding=False)
+    grid    = patcher.grid
+
+    stitcher = SelectStitcher(grid, n_channels=1)
+    stitcher.add_patch(0, np.full((1, 8, 8), 1.0, dtype=np.float32))
+    stitcher.add_patch(1, np.full((1, 8, 8), 2.0, dtype=np.float32))
+
+    cube = stitcher.finalize_cube()
+
+    assert cube.shape == (1, 8, 12)
+    assert np.allclose(cube[0, :, :4], 1.0)
+    assert np.allclose(cube[0, :, 8:], 2.0)
+
+
+def test_select_stitcher_single_patch_is_exact():
+    patcher = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_reflective_padding=False)
+    grid    = patcher.grid
+
+    stitcher = SelectStitcher(grid, n_channels=3)
+    data     = np.arange(3 * 8 * 8, dtype=np.float32).reshape(3, 8, 8)
+    stitcher.add_patch(0, data)
+
+    cube = stitcher.finalize_cube()
+
+    assert np.allclose(cube, data)
+
+
+def test_select_stitcher_raises_on_uncovered_pixels():
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_reflective_padding=False)
+    grid    = patcher.grid
+
+    stitcher = SelectStitcher(grid, n_channels=1)
+    stitcher.add_patch(0, np.ones((1, 8, 8), dtype=np.float32))
+
+    with pytest.raises(ValueError, match="uncovered"):
+        stitcher.finalize_cube()
 
 
 def test_predictor_run_inference_shapes(tmp_path):

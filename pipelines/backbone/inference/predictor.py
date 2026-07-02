@@ -12,6 +12,7 @@ from pipelines.backbone.inference.loader  import Run
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics import Metrics, Result
 from tools.data.gaussians                 import GaussianReconstructor
+from tools.loss.param_loss                import ParamMatcher
 from tools.monitoring.logger              import Logger
 
 
@@ -83,6 +84,56 @@ class CubeStitcher:
         weight_safe = np.where(self._weight > 0, self._weight, 1.0)
         cube        = self._accum / weight_safe[None, :, :]
         cube        = cube[:, pad_t:pad_t + H, pad_l:pad_l + W]
+
+        return np.ascontiguousarray(cube.astype(self.dtype, copy=False))
+
+
+class SelectStitcher:
+    def __init__(
+        self,
+        grid           : GridInfo,
+        n_channels     : int,
+        dtype          : str           = "float32",
+        memmap_path    : Optional[str] = None,
+    ) -> None:
+        self.grid       = grid
+        self.n_channels = int(n_channels)
+        self.dtype      = np.dtype(dtype)
+        self.centrality = CubeStitcher.make_patch_window(grid.patch_size, kind="hann")
+
+        H_pad, W_pad = grid.padded_size
+        shape_pad    = (self.n_channels, H_pad, W_pad)
+
+        if memmap_path is not None:
+            self._values = np.lib.format.open_memmap(memmap_path, mode="w+", dtype=self.dtype, shape=shape_pad)
+            self._values[...] = 0
+        else:
+            self._values = np.zeros(shape_pad, dtype=self.dtype)
+
+        self._best = np.zeros((H_pad, W_pad), dtype=np.float32)
+
+    def add_patch(self, idx: int, patch: np.ndarray) -> None:
+        ph, pw = self.grid.patch_size
+        iv, ih = divmod(idx, self.grid.n_h)
+        v0 = iv * self.grid.stride
+        h0 = ih * self.grid.stride
+
+        best   = self._best[v0:v0 + ph, h0:h0 + pw]
+        values = self._values[:, v0:v0 + ph, h0:h0 + pw]
+        take   = self.centrality > best
+
+        values[:, take] = patch[:, take].astype(self.dtype, copy=False)
+        best[take]      = self.centrality[take]
+
+    def finalize_cube(self) -> np.ndarray:
+        H, W         = self.grid.spatial_size
+        pad_t, pad_l = self.grid.pad_top, self.grid.pad_left
+
+        covered = self._best[pad_t:pad_t + H, pad_l:pad_l + W] > 0
+        if not covered.all():
+            raise ValueError(f"Parameter stitching left {int((~covered).sum())} of {H * W} pixels uncovered; the patch grid does not tile the split region.")
+
+        cube = self._values[:, pad_t:pad_t + H, pad_l:pad_l + W]
 
         return np.ascontiguousarray(cube.astype(self.dtype, copy=False))
 
@@ -165,7 +216,7 @@ class Predictor:
         pred_gauss = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
         gt_gauss   = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
 
-        sort_key   = np.where(gt_gauss[:, :, 0] < 1e-3, np.inf, gt_gauss[:, :, 1])
+        sort_key   = np.where(gt_gauss[:, :, 0] > ParamMatcher.ACTIVE_AMP_THR, gt_gauss[:, :, 1], np.inf)
         sort_idx   = np.argsort(sort_key, axis=1)
         sort_idx_e = sort_idx[:, :, None, :, :].repeat(3, axis=2)
 
@@ -192,8 +243,8 @@ class Predictor:
 
         pred_curve_stitcher = self._create_stitcher(n_elev,  "pred_curves")
         gt_curve_stitcher   = self._create_stitcher(n_elev,  "gt_curves")
-        param_pred_stitcher = self._create_stitcher(out_ch,  "params_pred")
-        gt_param_stitcher   = self._create_stitcher(n_K * 3, "params_gt")
+        param_pred_stitcher = self._create_param_stitcher(out_ch,  "params_pred")
+        gt_param_stitcher   = self._create_param_stitcher(n_K * 3, "params_gt")
 
         for batch_indices, (pred_curves, gt_curves, pred_params, gt_params) in zip(all_indices, cpu_results):
             for b, idx in enumerate(batch_indices):
@@ -217,12 +268,21 @@ class Predictor:
             memmap_path = memmap_path,
         )
 
+    def _create_param_stitcher(self, n_channels: int, name: str) -> SelectStitcher:
+        memmap_path = str(self.cube_dir / f"_tmp_{name}.npy") if self.save_cubes else None
+        return SelectStitcher(
+            grid        = self.run.grid,
+            n_channels  = n_channels,
+            dtype       = self.cube_dtype,
+            memmap_path = memmap_path,
+        )
+
     def _finalize_results(
         self,
         pred_curve_stitcher : CubeStitcher,
         gt_curve_stitcher   : CubeStitcher,
-        param_pred_stitcher : CubeStitcher,
-        gt_param_stitcher   : CubeStitcher,
+        param_pred_stitcher : SelectStitcher,
+        gt_param_stitcher   : SelectStitcher,
     ) -> Result:
 
         pred_curves_cube = pred_curve_stitcher.finalize_cube()
@@ -233,7 +293,7 @@ class Predictor:
         n_K = self.run.n_gaussians
         for k in range(n_K):
             a_gt    = params_gt_cube[3 * k]
-            mask_gt = a_gt < 1e-7
+            mask_gt = ~(a_gt > ParamMatcher.ACTIVE_AMP_THR)
             params_gt_cube[3 * k + 1][mask_gt] = np.nan
             params_gt_cube[3 * k + 2][mask_gt] = np.nan
 
