@@ -42,7 +42,7 @@ class WeightXrayConfig:
     output_dir      : Path = Path("results/weight_xray")
 
     checkpoint_filename  : str  = "best_model.pt"
-    state_dict_keys      : list = field(default_factory=lambda: ["params", "state_dict", "model_state_dict", "model", "weights", "net"])
+    state_dict_keys      : list = field(default_factory=lambda: ["params"])
 
     thresholds : WeightXrayThresholds = field(default_factory=WeightXrayThresholds)
 

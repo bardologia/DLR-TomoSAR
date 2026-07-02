@@ -49,9 +49,9 @@ class ParamRunInferencePipeline:
 
     def _summary(self, metrics_dict: dict) -> Path:
         payload = {
-            "global_summary" : metrics_dict.get("global_summary", {}),
-            "per_k_summary"  : metrics_dict.get("per_k_summary",  {}),
-            "snr_summary"    : metrics_dict.get("snr_summary",    {}),
+            "global_summary" : metrics_dict["global_summary"],
+            "per_k_summary"  : metrics_dict["per_k_summary"],
+            "snr_summary"    : metrics_dict["snr_summary"],
         }
 
         summary_path = self.run_dir / self.SUMMARY_FILENAME

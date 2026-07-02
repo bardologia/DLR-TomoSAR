@@ -61,10 +61,7 @@ class GpuWatchdog:
                     line = line.strip()
                     if not line:
                         continue
-                    try:
-                        records.append(json.loads(line))
-                    except ValueError:
-                        continue
+                    records.append(json.loads(line))
         except FileNotFoundError:
             records = []
 

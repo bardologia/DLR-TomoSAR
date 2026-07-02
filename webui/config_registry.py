@@ -35,10 +35,7 @@ class ConfigRegistry:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def _parse_module(self, path: Path) -> list[dict]:
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (OSError, SyntaxError):
-            return []
+        tree = ast.parse(path.read_text(encoding="utf-8"))
 
         classes = []
         for node in tree.body:
@@ -106,10 +103,7 @@ class ConfigRegistry:
     def _safe_unparse(self, node: ast.expr | None) -> str:
         if node is None:
             return ""
-        try:
-            return ast.unparse(node)
-        except Exception:
-            return "?"
+        return ast.unparse(node)
 
     def _sections(self) -> list[str]:
         root  = self.paths.config_dir

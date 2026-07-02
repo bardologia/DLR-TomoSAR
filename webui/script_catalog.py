@@ -172,7 +172,7 @@ class ScriptCatalog:
             if not spec["path"].exists():
                 continue
 
-            meta  = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
+            meta  = self.META[key]
             entry = self.resolver.entry_config(key)
 
             group_key, group, label = self._group_of(key)
