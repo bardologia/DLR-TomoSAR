@@ -32,8 +32,8 @@ def _trainer(tmp_path, seed: int = 0) -> SimpleNamespace:
 
     model     = TinyModel()
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-    warmup    = Warmup(_warmup_config(), logger, tracker)
-    scheduler = Scheduler([1e-3], warmup, _scheduler_config(), logger, tracker)
+    warmup    = Warmup(_warmup_config(), logger)
+    scheduler = Scheduler([1e-3], warmup, _scheduler_config(), logger)
 
     return SimpleNamespace(
         model              = model,

@@ -90,7 +90,7 @@ class GradientClipper:
         if norm > 100.0:
             self.logger.warning(f"Exploding gradient norm detected: {norm:.2f} at step {global_step}!")
 
-        self.tracker.log_scalar("train/grad_norm_before_clip", norm, global_step)
+        self.tracker.log_scalar("optim/grad_norm", norm, global_step)
 
         if self.mode == "disabled":
             return norm
@@ -106,9 +106,10 @@ class GradientClipper:
         norm_before, norm_after = self._clip(model, norm, threshold)
         clip_ratio = norm_after / (norm_before + self.epsilon)
 
-        self.tracker.log_scalar("train/grad_norm_after_clip",  norm_after,  global_step)
-        self.tracker.log_scalar("train/grad_clip_ratio",       clip_ratio,  global_step)
-        self.tracker.log_scalar("train/grad_clip_threshold",   threshold,   global_step)
+        self.tracker.log_scalar("optim/grad_clip_ratio", clip_ratio, global_step)
+
+        if self.mode != "fixed":
+            self.tracker.log_scalar("optim/grad_clip_threshold", threshold, global_step)
 
         return norm_before
 
@@ -116,4 +117,4 @@ class GradientClipper:
         self.history.append(float(grad_norm_value))
 
         if global_step % self.hist_freq == 0 and len(self.history) >= self.hist_freq:
-            self.tracker.log_histogram("train/grad_norm_dist", np.asarray(self.history[-self.hist_freq:], dtype=np.float32), global_step)
+            self.tracker.log_histogram("optim/grad_norm_hist", np.asarray(self.history[-self.hist_freq:], dtype=np.float32), global_step)

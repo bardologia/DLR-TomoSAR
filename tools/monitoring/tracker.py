@@ -53,6 +53,13 @@ class Tracker:
             except (TypeError, ValueError):
                 continue
 
+    def log_staged(self, group, values: Mapping[str, Any], stage, step=None) -> None:
+        for k, v in values.items():
+            try:
+                self._emit("add_scalar", f"{group}/{k}/{stage}", float(v), step)
+            except (TypeError, ValueError):
+                continue
+
     def log_histogram(self, tag, values, step=None, bins="auto") -> None:
         v = np.asarray(values).ravel().astype(np.float32)
         try:
@@ -67,15 +74,7 @@ class Tracker:
             return
 
         dev = device if device is not None else torch.cuda.current_device()
-        try:
-            memory = {
-                "gpu_mem_alloc_GB"      : torch.cuda.memory_allocated(dev)     / 1024 ** 3,
-                "gpu_mem_reserved_GB"   : torch.cuda.memory_reserved(dev)      / 1024 ** 3,
-                "gpu_mem_peak_alloc_GB" : torch.cuda.max_memory_allocated(dev) / 1024 ** 3,
-            }
-            self.log_metrics("system", memory, step)
-        except Exception:
-            pass
+        self.log_scalar("system/gpu_peak_alloc_gb", torch.cuda.max_memory_allocated(dev) / 1024 ** 3, step)
 
     def flush(self) -> None:
         if self.writer is not None:

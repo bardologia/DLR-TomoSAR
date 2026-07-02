@@ -139,23 +139,15 @@ class Trainer(BaseTrainer):
             self.logger.subsection("Resumed past the curriculum swap; complete loss configuration re-applied.")
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
-        phase = self._curriculum_phase(epoch)
-        self.tracker.log_scalar(f"loss_phase/{phase}/val", val_loss, epoch)
-
         if self.early_stopping.triggered and self.curriculum.enabled and epoch < self.curriculum.swap_epoch:
             self.logger.warning(f"Early stopping fired at epoch {epoch + 1}, before the curriculum swap at epoch {self.curriculum.swap_epoch + 1}; the complete loss phase never ran.")
 
         self._trial_callback(val_loss, epoch)
 
     def _log_train_epoch_extra(self, avg_loss: float, epoch: int) -> None:
-        phase = self._curriculum_phase(epoch)
-        self.tracker.log_scalar(f"loss_phase/{phase}/train", avg_loss, epoch)
-
-    def _curriculum_phase(self, epoch: int) -> str:
-        if not self.curriculum.enabled:
-            return "complete"
-
-        return "warmup" if epoch < self.curriculum.swap_epoch else "complete"
+        if self.curriculum.enabled:
+            in_complete_phase = float(epoch >= self.curriculum.swap_epoch)
+            self.tracker.log_scalar("controls/curriculum_phase", in_complete_phase, epoch)
 
     def _trial_callback(self, val_loss: float, epoch: int) -> None:
         pass

@@ -150,7 +150,7 @@ def test_record_logs_histogram_on_freq(logger, tracker):
     for step in range(1, 4):
         clip.record(float(step), global_step=step)
 
-    assert any(tag == "train/grad_norm_dist" for tag, _, _ in tracker.histograms)
+    assert any(tag == "optim/grad_norm_hist" for tag, _, _ in tracker.histograms)
 
 
 def test_check_gradients_detects_nan(logger, tracker):
@@ -169,7 +169,7 @@ def test_check_gradients_clean_returns_false(logger, tracker):
     assert clip.check_gradients(model, global_step=0) is False
 
 
-def test_fixed_clip_logs_after_clip_scalars(logger, tracker):
+def test_fixed_clip_logs_norm_and_ratio(logger, tracker):
     config = _grad_config(mode="fixed", max_grad_norm=2.5, epsilon=0.0)
     clip   = GradientClipper(config, logger, tracker)
 
@@ -177,6 +177,18 @@ def test_fixed_clip_logs_after_clip_scalars(logger, tracker):
     clip.maybe_clip(model, global_step=0)
 
     tags = {tag for tag, _, _ in tracker.scalars}
-    assert "train/grad_norm_before_clip" in tags
-    assert "train/grad_norm_after_clip"  in tags
-    assert "train/grad_clip_ratio"       in tags
+    assert "optim/grad_norm"           in tags
+    assert "optim/grad_clip_ratio"     in tags
+    assert "optim/grad_clip_threshold" not in tags
+
+
+def test_adaptive_clip_logs_threshold(logger, tracker):
+    config = _grad_config(mode="adaptive_percentile", window=2, percentile=50.0, epsilon=0.0)
+    clip   = GradientClipper(config, logger, tracker)
+
+    clip.history = [1.0, 1.0]
+    model = _model_with_grads([3.0, 4.0])
+    clip.maybe_clip(model, global_step=0)
+
+    tags = {tag for tag, _, _ in tracker.scalars}
+    assert "optim/grad_clip_threshold" in tags

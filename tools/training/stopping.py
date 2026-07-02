@@ -31,13 +31,12 @@ class EarlyStopping:
             self.best_epoch = int(epoch)
             self.counter    = 0
             stop            = False
-            self.tracker.log_scalar("early_stop/best_val_loss", self.best_loss, epoch)
 
         else:
             self.counter += 1
             stop          = (self.counter >= self.patience)
 
-        self.tracker.log_scalar("early_stop/counter", self.counter, epoch)
+        self.tracker.log_scalar("controls/early_stop_counter", self.counter, epoch)
 
         if stop:
             self.triggered = True

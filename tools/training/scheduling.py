@@ -4,10 +4,9 @@ import math
 
 
 class Warmup:
-    def __init__(self, config, logger, tracker):
+    def __init__(self, config, logger):
         self.config  = config
         self.logger  = logger
-        self.tracker = tracker
 
         self.warmup_steps        = self.config.warmup.warmup_steps
         self.warmup_start_factor = self.config.warmup.warmup_start_factor
@@ -62,7 +61,6 @@ class Warmup:
 
         self.current_step += 1
         factor             = self.factor()
-        self.tracker.log_scalar("lr/warmup_factor", factor, self.current_step)
 
         if self.current_step >= self.warmup_steps and not self.warmup_finished:
             self.warmup_finished = True
@@ -94,11 +92,10 @@ class Warmup:
 
 
 class Scheduler:
-    def __init__(self, base_lrs, warmup, config, logger, tracker):
+    def __init__(self, base_lrs, warmup, config, logger):
         self.config  = config
         self.warmup  = warmup
         self.logger  = logger
-        self.tracker = tracker
 
         self.base_lrs       = list(base_lrs)
         self.current_lrs    = list(base_lrs)

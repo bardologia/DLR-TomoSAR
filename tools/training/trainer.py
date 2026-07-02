@@ -56,8 +56,8 @@ class BaseTrainer:
         self.base_lrs  = [float(pg["lr"]) for pg in param_groups]
         self.optimizer = self._build_optimizer(param_groups)
 
-        self.warmup           = Warmup(config, self.logger, self.tracker)
-        self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, config, self.logger, self.tracker)
+        self.warmup           = Warmup(config, self.logger)
+        self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, config, self.logger)
         self.early_stopping   = EarlyStopping(config, self.logger, self.tracker)
         self.restore_best     = config.early_stopping.restore_best
         self.grad_clipper     = GradientClipper(config=config, logger=self.logger, tracker=self.tracker)
@@ -75,6 +75,8 @@ class BaseTrainer:
         self.global_step  = 0
         self.train_losses = []
         self.val_losses   = []
+
+        self._gt_occupancy_logged = set()
 
         self._update_optimizer(self.lr_scheduler.effective_lrs())
 
@@ -137,7 +139,7 @@ class BaseTrainer:
 
             param_group['lr'] = lr
             name              = param_group.get('name', str(i))
-            self.tracker.log_scalar(f"lr/{name}", lr, self.global_step)
+            self.tracker.log_scalar(f"optim/lr/{name}", lr, self.global_step)
 
     def _clear_cuda_cache(self) -> None:
         gc.collect()
@@ -208,27 +210,14 @@ class BaseTrainer:
 
         avg = loss_sum / max(1, n)
         self.tracker.log_scalar("loss/train", avg, epoch)
-        self.tracker.log_metrics("loss_components/train", aggregator.reduce_components(), epoch)
-        self.tracker.log_metrics("loss_weighted/train", aggregator.reduce_weighted(), epoch)
+        self._log_epoch_metrics("train", aggregator, epoch)
 
-        monitor = aggregator.reduce_monitor()
-        if monitor:
-            self.tracker.log_metrics("loss_all/train", monitor, epoch)
-
-        occupancy = aggregator.reduce_occupancy()
-        if occupancy:
-            self.tracker.log_metrics("occupancy/train", occupancy, epoch)
-
-        physical = aggregator.reduce_physical()
-        if physical:
-            self.tracker.log_metrics("params_physical/train", physical, epoch)
-
-        self.tracker.log_memory(epoch)
+        self.tracker.log_memory(self.global_step)
         self._log_train_epoch_extra(avg, epoch)
         return avg
 
     @torch.no_grad()
-    def evaluate(self, loader: DataLoader, epoch: int, stage="validation"):
+    def evaluate(self, loader: DataLoader, epoch: int, stage="val"):
         self.model.eval()
 
         loss_sum, n = 0.0, 0
@@ -248,21 +237,33 @@ class BaseTrainer:
                     _prog.advance(_task)
 
             avg = loss_sum / max(1, n)
-            self.tracker.log_metrics(f"loss_components/{stage}", aggregator.reduce_components(), epoch)
-            self.tracker.log_metrics(f"loss_weighted/{stage}", aggregator.reduce_weighted(), epoch)
-            if aggregator.monitor_sum:
-                self.tracker.log_metrics(f"loss_all/{stage}", aggregator.reduce_monitor(), epoch)
-            if aggregator.occupancy_sum:
-                self.tracker.log_metrics(f"occupancy/{stage}", aggregator.reduce_occupancy(), epoch)
-            if aggregator.physical_sum:
-                self.tracker.log_metrics(f"params_physical/{stage}", aggregator.reduce_physical(), epoch)
-            if aggregator.extra_sum:
-                self.tracker.log_metrics(f"permutation/{stage}", aggregator.reduce_extra(), epoch)
+            self._log_epoch_metrics(stage, aggregator, epoch)
         finally:
             if self.config.memory.clear_cache_after_eval:
                 self._clear_cuda_cache()
 
         return {"avg_loss": avg, "num_batches": n}
+
+    def _log_epoch_metrics(self, stage: str, aggregator: MetricAggregator, epoch: int) -> None:
+        self.tracker.log_staged("loss_terms", aggregator.reduce_components(), stage, epoch)
+
+        monitor = aggregator.reduce_monitor()
+        if monitor:
+            self.tracker.log_staged("loss_monitor", monitor, stage, epoch)
+
+        occupancy = aggregator.reduce_occupancy()
+        if occupancy:
+            gt_stats  = {k: v for k, v in occupancy.items() if k.startswith("gt_")}
+            pred_side = {k: v for k, v in occupancy.items() if not k.startswith("gt_")}
+            self.tracker.log_staged("occupancy", pred_side, stage, epoch)
+
+            if gt_stats and stage not in self._gt_occupancy_logged:
+                self._gt_occupancy_logged.add(stage)
+                self.logger.kv_table({k: f"{v:.4f}" for k, v in gt_stats.items()}, title=f"GT Occupancy ({stage}, dataset constants)")
+
+        physical = aggregator.reduce_physical()
+        if physical:
+            self.tracker.log_staged("param_error", physical, stage, epoch)
 
     def _maybe_resume(self, loader_generator) -> int:
         if not self.resume:
@@ -329,7 +330,7 @@ class BaseTrainer:
                         do_eval = (epoch_num % self.validation_frequency == 0) or (epoch_num == self.epochs)
                         if do_eval:
                             with self.ema.applied(self.model):
-                                val      = self.evaluate(val_loader, epoch, stage="validation")
+                                val      = self.evaluate(val_loader, epoch, stage="val")
                                 val_loss = val["avg_loss"]
                                 self.checkpoint.step(val_loss, epoch_num, self)
 

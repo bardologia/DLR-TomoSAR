@@ -57,7 +57,7 @@ def test_update_optimizer_sets_lrs_and_logs(tracker):
     BaseTrainer._update_optimizer(shim, [0.123])
 
     assert shim.optimizer.param_groups[0]["lr"] == 0.123
-    assert any(tag == "lr/main" and val == 0.123 for tag, val, _ in tracker.scalars)
+    assert any(tag == "optim/lr/main" and val == 0.123 for tag, val, _ in tracker.scalars)
 
 
 def test_capture_state_contains_model_and_axis():
