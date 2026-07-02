@@ -310,7 +310,7 @@ class BaseTrainer:
             "State path"  : str(self.state_path),
             "Next epoch"  : f"{start_epoch + 1}/{self.epochs}",
             "Global step" : self.global_step,
-            "Best val"    : f"{self.checkpoint.best_val_loss:.4f} @ epoch {self.checkpoint.best_epoch}",
+            "Best val"    : f"{self.checkpoint.best_val_loss:.4f} @ epoch {self.checkpoint.best_epoch + 1}",
         })
 
         return start_epoch
@@ -367,7 +367,7 @@ class BaseTrainer:
                             with self.ema.applied(self.model):
                                 val      = self.evaluate(val_loader, epoch, stage="val")
                                 val_loss = val["avg_loss"]
-                                self.checkpoint.step(val_loss, epoch_num, self)
+                                self.checkpoint.step(val_loss, epoch, self)
 
                             self.logger.subsection(f"Validation : loss={val_loss:.4f}  (batches={val['num_batches']})")
                             self.tracker.log_scalar("loss/val", val_loss, epoch)
@@ -395,10 +395,10 @@ class BaseTrainer:
                             train_loss    = train_loss,
                             val_loss      = val_loss,
                             best_val_loss = self.checkpoint.best_val_loss,
-                            best_epoch    = self.checkpoint.best_epoch,
+                            best_epoch    = self.checkpoint.best_epoch + 1,
                             lr            = effective_lrs[0],
                         )
-                        _prog_epochs.update(_task_epochs, advance=1, description=f"[section]Training[/section]  best_val={self.checkpoint.best_val_loss:.4f} @ ep {self.checkpoint.best_epoch}")
+                        _prog_epochs.update(_task_epochs, advance=1, description=f"[section]Training[/section]  best_val={self.checkpoint.best_val_loss:.4f} @ ep {self.checkpoint.best_epoch + 1}")
 
                         if stop or self.overfitter.check_stop(train_loss):
                             break

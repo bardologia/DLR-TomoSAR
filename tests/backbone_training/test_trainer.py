@@ -209,6 +209,20 @@ def test_checkpoint_save_restore_round_trip(tmp_path):
         assert torch.equal(param, saved["params"][name])
 
 
+def test_best_checkpoint_epoch_matches_trainer_state_convention(tmp_path):
+    trainer = _build_trainer(tmp_path, epochs=2)
+    loader  = _loader()
+
+    trainer.train(loader, loader, loader)
+
+    best = torch.load(tmp_path / "best_model.pt", map_location="cpu", weights_only=False)
+    last = torch.load(tmp_path / "last.pt",       map_location="cpu", weights_only=False)
+
+    assert best["epoch"] == best["best_epoch"]
+    assert best["epoch"] in (0, 1)
+    assert last["epoch"] == 1
+
+
 def test_restore_best_loads_best_parameters(tmp_path):
     trainer = _build_trainer(tmp_path, epochs=2)
     loader  = _loader()

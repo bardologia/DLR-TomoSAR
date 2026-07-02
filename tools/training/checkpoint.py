@@ -22,7 +22,7 @@ class Checkpoint:
         self.best_val_loss   = float("inf")
         self.best_epoch      = -1
         self.loss_generation = int(loss_generation)
-        self.logger.warning(f"Checkpoint baseline reset at epoch {epoch}: loss composition changed (generation {loss_generation}); best_val_loss is not comparable across the swap and tracking restarts on the new scale.")
+        self.logger.warning(f"Checkpoint baseline reset at epoch {epoch + 1}: loss composition changed (generation {loss_generation}); best_val_loss is not comparable across the swap and tracking restarts on the new scale.")
 
     def step(self, val_loss: float, epoch: int, trainer) -> bool:
         loss_generation = int(trainer.criterion.loss_generation)
@@ -36,7 +36,7 @@ class Checkpoint:
             self.logger.subsection(f"Checkpoint : new best  val_loss={self.best_val_loss:.4f}  -> {self.save_path}")
             return True
         else:
-            self.logger.subsection(f"Checkpoint : no improvement  (best={self.best_val_loss:.4f} @ epoch {self.best_epoch})")
+            self.logger.subsection(f"Checkpoint : no improvement  (best={self.best_val_loss:.4f} @ epoch {self.best_epoch + 1})")
             return False
 
     def save(self, trainer, path: str, epoch: int) -> None:
@@ -44,7 +44,7 @@ class Checkpoint:
         checkpoint["best_val_loss"] = self.best_val_loss
         checkpoint["best_epoch"]    = self.best_epoch
 
-        self.logger.info(f"Saving checkpoint at epoch {epoch} to {path}")
+        self.logger.info(f"Saving checkpoint at epoch {epoch + 1} to {path}")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(checkpoint, path)
 
