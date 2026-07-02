@@ -24,6 +24,19 @@ def test_secondary_selection_returns_secondary_indices():
     assert SecondarySelection.indices(labels, ["P1", "P3"]) == [0, 2]
 
 
+def test_secondary_selection_honors_requested_order():
+    labels = ["P0", "P1", "P2", "P3"]
+
+    assert SecondarySelection.indices(labels, ["P3", "P1"]) == [2, 0]
+
+
+def test_secondary_selection_rejects_duplicates():
+    labels = ["P0", "P1", "P2"]
+
+    with pytest.raises(ValueError):
+        SecondarySelection.indices(labels, ["P1", "P1"])
+
+
 def test_secondary_selection_rejects_primary():
     labels = ["P0", "P1", "P2"]
 

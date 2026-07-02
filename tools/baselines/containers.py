@@ -23,7 +23,10 @@ class SecondarySelection:
         if unknown:
             raise ValueError(f"Unknown secondary labels {unknown}; secondaries are {secondaries}")
 
-        return [index for index, label in enumerate(secondaries) if label in requested]
+        if len(set(requested)) != len(requested):
+            raise ValueError(f"secondary_labels contains duplicates: {requested}")
+
+        return [secondaries.index(label) for label in requested]
 
 
 @dataclass
