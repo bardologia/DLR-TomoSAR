@@ -159,8 +159,8 @@ class RunLoader:
             n_secondaries    = arrays["n_secondaries"],
             n_interferograms = arrays["n_interferograms"],
             normalizer       = Normalizer(norm_stats),
-            x_axis           = x_axis,
             n_gaussians      = n_gaussians,
+            dem              = arrays["dem"] if dataset_config.input_config.use_dem else None,
         )
 
         return dataset, grid, region, layout.global_crop, arrays

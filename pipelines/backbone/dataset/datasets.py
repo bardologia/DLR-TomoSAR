@@ -58,6 +58,9 @@ class PatchDataset(Dataset):
         if input_config.use_interferograms and n_interferograms == 0:
             raise ValueError("Input config requests interferograms but the dataset stack contains none. Rebuild the dataset with interferograms or set use_interferograms=False.")
 
+        if input_config.use_dem and dem is None:
+            raise ValueError("Input config requests the DEM channel but no DEM array was provided; pass the dem array from the cropper or set use_dem=False.")
+
         self.input_channels = input_config.total_channels(n_secondaries, n_interferograms)
 
         self.output_channel_indices = output_config.selected_indices(n_gaussians = n_gaussians)
@@ -93,7 +96,7 @@ class PatchDataset(Dataset):
             self.input_config.interferograms_representation.convert_into(input_tensor[offset:offset + n], interferograms_data)
             offset += n
 
-        if self.input_config.use_dem and dem_patch is not None:
+        if self.input_config.use_dem:
             input_tensor[offset] = dem_patch
             offset += 1
 
@@ -121,7 +124,7 @@ class PatchDataset(Dataset):
 
     def __getitem__(self, idx: int):
         complex_patch = self.grid.extract(self.inputs, idx)
-        dem_patch     = self.grid.extract(self.dem, idx) if (self.input_config.use_dem and self.dem is not None) else None
+        dem_patch     = self.grid.extract(self.dem, idx) if self.input_config.use_dem else None
         input_tensor  = self._build_input_tensor(complex_patch, dem_patch)
 
         gt_patch  = self.grid.extract(self.gt_parameters, idx)

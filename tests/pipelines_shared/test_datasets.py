@@ -110,6 +110,46 @@ def test_patchdataset_layer_mismatch_raises(interferograms, parameters):
 
 
 @pytest.mark.real_data
+def test_patchdataset_use_dem_without_dem_raises(interferograms, parameters):
+    ifg     = np.ascontiguousarray(np.asarray(interferograms[:3, :16, :16]))
+    inputs  = np.concatenate([ifg[:1], ifg], axis=0)
+    params  = np.ascontiguousarray(np.asarray(parameters[:, :16, :16]))
+    patcher = Patcher.build(spatial_size=(16, 16), patch_size=(8, 8), stride=8)
+    ic      = InputConfig(use_dem=True)
+
+    with pytest.raises(ValueError, match="DEM"):
+        PatchDataset(
+            inputs=inputs, gt_parameters=params, grid=patcher,
+            input_config=ic, output_config=OutputConfig(), split_name="train",
+            n_secondaries=0, n_interferograms=3, n_gaussians=5,
+        )
+
+
+@pytest.mark.real_data
+def test_patchdataset_dem_fills_last_channel(interferograms, parameters):
+    ifg     = np.ascontiguousarray(np.asarray(interferograms[:3, :24, :24]))
+    inputs  = np.concatenate([ifg[:1], ifg], axis=0)
+    params  = np.ascontiguousarray(np.asarray(parameters[:, :24, :24]))
+    dem     = np.random.default_rng(1).standard_normal((24, 24)).astype(np.float32)
+    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=8)
+    ic      = InputConfig(use_primary=True, primary_representation=Representation.MAG_ONLY,
+                          use_secondaries=False,
+                          use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,
+                          use_dem=True)
+
+    ds = PatchDataset(
+        inputs=inputs, gt_parameters=params, grid=patcher,
+        input_config=ic, output_config=OutputConfig(), split_name="val",
+        n_secondaries=0, n_interferograms=3, n_gaussians=5, dem=dem,
+    )
+
+    x, _ = ds[0]
+
+    assert x.shape == (5, 8, 8)
+    np.testing.assert_array_equal(x[-1], patcher.extract(dem, 0))
+
+
+@pytest.mark.real_data
 def test_multiregion_dataset_concatenates_parts(interferograms, parameters):
     part_a, _ = _backbone_dataset(interferograms, parameters)
     part_b, _ = _backbone_dataset(interferograms, parameters)

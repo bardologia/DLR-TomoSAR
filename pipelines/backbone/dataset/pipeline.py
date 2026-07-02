@@ -115,7 +115,7 @@ class DatasetPipeline:
                 x_axis           = self.config.x_axis,
                 n_gaussians      = self.config.n_gaussians,
                 augmenter        = self.augmenter,
-                dem              = arrays.get("dem") if self.config.input_config.use_dem else None,
+                dem              = arrays["dem"] if self.config.input_config.use_dem else None,
                 kz_field         = self._region_kz_field(region),
             )
 
