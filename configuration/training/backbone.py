@@ -23,6 +23,8 @@ def default_curriculum() -> LossCurriculumConfig:
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
         presence_balance         = False,
+        use_cosine_curve         = True,
+        weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
     )
 
     complete = LossConfig(
@@ -31,10 +33,12 @@ def default_curriculum() -> LossCurriculumConfig:
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
         presence_balance         = False,
+        use_cosine_curve         = True,
+        weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
         use_coherence_resyn      = True,
-        weight_coherence_resyn   = 0.05,
+        weight_coherence_resyn   = AblationCatalog.PHYSICS_WEIGHT,
         use_covariance_match     = True,
-        weight_covariance_match  = 0.05,
+        weight_covariance_match  = AblationCatalog.PHYSICS_WEIGHT,
     )
 
     return LossCurriculumConfig(

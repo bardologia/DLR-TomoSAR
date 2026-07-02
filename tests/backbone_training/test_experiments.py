@@ -269,11 +269,9 @@ def test_ablation_catalog_default_is_the_standard_set():
     labels   = [feature["label"] for feature in features]
 
     assert labels == [
-        "covariance_match", "coherence_resyn",
-        "curriculum", "augmentation", "architecture",
-        "warmup_loss", "lr_per_group", "lr_warmup",
-        "out_sigma", "out_amp", "ifg_phase", "pass_mag",
-        "output_clamp",
+        "covariance_match", "physics_curriculum", "coherence_resyn",
+        "cosine_curve", "architecture", "augmentation",
+        "active_norm", "lr_per_group",
     ]
     assert "out_mu" not in labels
     for feature in features:
@@ -299,8 +297,21 @@ def test_ablation_catalog_standard_categories_present():
     assert covariance["degrade"]["curriculum.complete.use_covariance_match"] is False
 
     coherence = catalog["coherence_resyn"]
-    assert coherence["enable"]["curriculum.complete.use_coherence_resyn"]    is True
+    assert coherence["enable"]["curriculum.complete.use_coherence_resyn"]     is True
     assert coherence["degrade"]["curriculum.complete.weight_coherence_resyn"] == 0.0
+    assert coherence["degrade"]["curriculum.warmup.use_coherence_resyn"]      is False
+
+    physics_curriculum = catalog["physics_curriculum"]
+    assert physics_curriculum["enable"]["curriculum.enabled"]                        is True
+    assert physics_curriculum["degrade"]["curriculum.enabled"]                       is False
+    assert physics_curriculum["degrade"]["curriculum.warmup.use_coherence_resyn"]    is True
+    assert physics_curriculum["degrade"]["curriculum.warmup.weight_coherence_resyn"] == 0.05
+
+    cosine = catalog["cosine_curve"]
+    assert cosine["enable"]["curriculum.warmup.use_cosine_curve"]    is True
+    assert cosine["enable"]["curriculum.complete.use_cosine_curve"]  is True
+    assert cosine["degrade"]["curriculum.warmup.use_cosine_curve"]   is False
+    assert cosine["degrade"]["curriculum.complete.use_cosine_curve"] is False
 
     imbalance = catalog["class_imbalance"]
     assert imbalance["enable"]["curriculum.warmup.use_active_normalization"]  is True
@@ -312,22 +323,21 @@ def test_ablation_catalog_standard_categories_present():
     assert presence["enable"]["curriculum.warmup.use_presence_bce"]    is True
     assert presence["degrade"]["curriculum.warmup.use_presence_bce"]   is False
 
-    warmup = catalog["warmup_loss"]
-    assert warmup["enable"]["curriculum.warmup.use_param_l1"]             is True
-    assert warmup["enable"]["curriculum.warmup.param_matching"]           == "sorted_gt"
-    assert warmup["enable"]["curriculum.warmup.use_active_normalization"] is True
-    assert warmup["enable"]["curriculum.warmup.presence_balance"]         is False
-    assert warmup["degrade"]["curriculum.warmup.use_l1_curve"]            is True
-    assert warmup["degrade"]["curriculum.warmup.param_matching"]          == "hungarian"
-    assert warmup["degrade"]["curriculum.warmup.use_active_normalization"] is False
-    assert warmup["degrade"]["curriculum.warmup.presence_balance"]        is False
+    architecture = catalog["architecture"]
+    assert architecture["enable"]["backbone_name"]                       == "resunet"
+    assert architecture["enable"]["curriculum.warmup.use_param_l1"]      is True
+    assert architecture["enable"]["curriculum.warmup.use_param_mse"]     is False
+    assert architecture["degrade"]["backbone_name"]                      == "unet"
+    assert architecture["degrade"]["curriculum.warmup.use_param_l1"]     is False
+    assert architecture["degrade"]["curriculum.warmup.use_param_mse"]    is True
+    assert architecture["degrade"]["curriculum.warmup.weight_param_mse"] == 1.0
 
-    curriculum = catalog["curriculum"]
-    assert curriculum["enable"]["curriculum.complete.use_param_l1"]             is True
-    assert curriculum["enable"]["curriculum.complete.param_matching"]           == "sorted_gt"
-    assert curriculum["enable"]["curriculum.complete.use_active_normalization"] is True
-    assert curriculum["enable"]["curriculum.complete.presence_balance"]         is False
-    assert curriculum["degrade"]["curriculum.enabled"]                          is False
+    active_norm = catalog["active_norm"]
+    assert active_norm["enable"]["curriculum.warmup.use_active_normalization"]  is True
+    assert active_norm["degrade"]["curriculum.warmup.use_active_normalization"] is False
+
+    assert "warmup_loss" not in catalog
+    assert "curriculum"  not in catalog
 
     lr_warmup = catalog["lr_warmup"]
     assert lr_warmup["enable"]["training.warmup_enabled"]  is True
@@ -425,6 +435,13 @@ def test_ablation_default_plan_round_trips_through_config_cli():
 
     full     = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-0-full"]) + ["--trial"])
     baseline = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-{len(config.ablation_features)}-baseline"]) + ["--trial"])
-    assert full.training.warmup_enabled     is True
-    assert baseline.training.warmup_enabled is False
-    assert baseline.curriculum.enabled      is False
+    assert full.curriculum.enabled                       is True
+    assert full.backbone_name                            == "resunet"
+    assert full.curriculum.warmup.use_param_l1           is True
+    assert full.curriculum.warmup.use_cosine_curve       is True
+    assert baseline.curriculum.enabled                   is False
+    assert baseline.backbone_name                        == "unet"
+    assert baseline.curriculum.warmup.use_param_mse      is True
+    assert baseline.curriculum.warmup.use_param_l1       is False
+    assert baseline.curriculum.warmup.use_active_normalization is False
+    assert set(baseline.model_overrides.values())        == {3e-4}

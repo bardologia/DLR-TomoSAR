@@ -46,5 +46,5 @@ def test_ablation_leaves_expose_the_catalog(backbone_leaves):
     assert set(catalog) == set(AblationCatalog.as_dict())
     assert by_path["ablation_include_full"]["value"] == "True"
 
-    curriculum = catalog["curriculum"]
-    assert curriculum["enable"]["curriculum.complete.param_matching"] == "sorted_gt"
+    physics_curriculum = catalog["physics_curriculum"]
+    assert physics_curriculum["enable"]["curriculum.enabled"] is True

@@ -10,8 +10,7 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 15
 
-    PARAM_MATCH_BASELINE = ParamMatching.HUNGARIAN
-    PARAM_MATCH_FULL     = ParamMatching.SORTED_GT
+    PARAM_MATCH_FULL = ParamMatching.SORTED_GT
 
     GROUP_LR_DEFAULTS = (
         ("encoder_lr",     3e-4),
@@ -38,10 +37,8 @@ class AblationCatalog:
         ("p_flip_v", 0.5),
     )
 
-    PHYSICS_TERMS = (
-        ("coherence_resyn",  "use_coherence_resyn",  "weight_coherence_resyn",  0.05),
-        ("covariance_match", "use_covariance_match", "weight_covariance_match", 0.05),
-    )
+    PHYSICS_WEIGHT = 0.05
+    COSINE_WEIGHT  = 0.05
 
     LOSS_TERMS = (
         ("spectral_coherence", "use_spectral_coherence", "weight_spectral_coh",  0.05),
@@ -91,43 +88,14 @@ class AblationCatalog:
 
     @classmethod
     def _schedule_features(cls) -> list[dict]:
-        warmup   = cls.WARMUP_PREFIX
-        complete = cls.COMPLETE_PREFIX
-
-        curriculum_enable = {
-            "curriculum.enabled"                  : True,
-            "curriculum.swap_epoch"               : cls.CURRICULUM_SWAP_EPOCH,
-            f"{complete}use_l1_curve"             : False,
-            f"{complete}weight_l1_curve"          : 0.0,
-            f"{complete}use_param_l1"             : True,
-            f"{complete}weight_param_l1"          : 1.0,
-            f"{complete}param_matching"           : cls.PARAM_MATCH_FULL,
-            f"{complete}use_active_normalization" : True,
-            f"{complete}presence_balance"         : False,
-        }
+        warmup = cls.WARMUP_PREFIX
 
         return [
             {
-                "label"   : "warmup_loss",
-                "group"   : "warmup",
-                "enable"  : {
-                    f"{warmup}use_l1_curve"             : False,
-                    f"{warmup}weight_l1_curve"          : 0.0,
-                    f"{warmup}use_param_l1"             : True,
-                    f"{warmup}weight_param_l1"          : 1.0,
-                    f"{warmup}param_matching"           : cls.PARAM_MATCH_FULL,
-                    f"{warmup}use_active_normalization" : True,
-                    f"{warmup}presence_balance"         : False,
-                },
-                "degrade" : {
-                    f"{warmup}use_param_l1"             : False,
-                    f"{warmup}weight_param_l1"          : 0.0,
-                    f"{warmup}use_l1_curve"             : True,
-                    f"{warmup}weight_l1_curve"          : 1.0,
-                    f"{warmup}param_matching"           : cls.PARAM_MATCH_BASELINE,
-                    f"{warmup}use_active_normalization" : False,
-                    f"{warmup}presence_balance"         : False,
-                },
+                "label"   : "physics_curriculum",
+                "group"   : "schedule",
+                "enable"  : {"curriculum.enabled": True, "curriculum.swap_epoch": cls.CURRICULUM_SWAP_EPOCH},
+                "degrade" : {"curriculum.enabled": False, f"{warmup}use_coherence_resyn": True, f"{warmup}weight_coherence_resyn": cls.PHYSICS_WEIGHT},
             },
             {
                 "label"   : "lr_warmup",
@@ -141,26 +109,40 @@ class AblationCatalog:
                 "enable"  : {"model_overrides": {key: lr                  for key, lr in cls.GROUP_LR_DEFAULTS}},
                 "degrade" : {"model_overrides": {key: cls.SINGLE_GROUP_LR for key, _  in cls.GROUP_LR_DEFAULTS}},
             },
-            {
-                "label"   : "curriculum",
-                "group"   : "schedule",
-                "enable"  : curriculum_enable,
-                "degrade" : {"curriculum.enabled": False},
-            },
         ]
 
     @classmethod
     def _physics_features(cls) -> list[dict]:
-        prefix = cls.COMPLETE_PREFIX
+        warmup   = cls.WARMUP_PREFIX
+        complete = cls.COMPLETE_PREFIX
 
         return [
             {
-                "label"   : label,
+                "label"   : "coherence_resyn",
                 "group"   : "physics",
-                "enable"  : {f"{prefix}{use_key}": True,  f"{prefix}{weight_key}": weight},
-                "degrade" : {f"{prefix}{use_key}": False, f"{prefix}{weight_key}": 0.0},
-            }
-            for label, use_key, weight_key, weight in cls.PHYSICS_TERMS
+                "enable"  : {f"{complete}use_coherence_resyn": True,  f"{complete}weight_coherence_resyn": cls.PHYSICS_WEIGHT},
+                "degrade" : {f"{complete}use_coherence_resyn": False, f"{complete}weight_coherence_resyn": 0.0, f"{warmup}use_coherence_resyn": False, f"{warmup}weight_coherence_resyn": 0.0},
+            },
+            {
+                "label"   : "covariance_match",
+                "group"   : "physics",
+                "enable"  : {f"{complete}use_covariance_match": True,  f"{complete}weight_covariance_match": cls.PHYSICS_WEIGHT},
+                "degrade" : {f"{complete}use_covariance_match": False, f"{complete}weight_covariance_match": 0.0},
+            },
+        ]
+
+    @classmethod
+    def _loss_component_features(cls) -> list[dict]:
+        warmup   = cls.WARMUP_PREFIX
+        complete = cls.COMPLETE_PREFIX
+
+        return [
+            {
+                "label"   : "cosine_curve",
+                "group"   : "loss components",
+                "enable"  : {f"{warmup}use_cosine_curve": True,  f"{warmup}weight_cosine_curve": cls.COSINE_WEIGHT, f"{complete}use_cosine_curve": True,  f"{complete}weight_cosine_curve": cls.COSINE_WEIGHT},
+                "degrade" : {f"{warmup}use_cosine_curve": False, f"{warmup}weight_cosine_curve": 0.0,               f"{complete}use_cosine_curve": False, f"{complete}weight_cosine_curve": 0.0},
+            },
         ]
 
     @classmethod
@@ -222,12 +204,26 @@ class AblationCatalog:
 
     @classmethod
     def _architecture_features(cls) -> list[dict]:
+        warmup = cls.WARMUP_PREFIX
+
         return [
             {
                 "label"   : "architecture",
                 "group"   : "architecture",
-                "enable"  : {"backbone_name": cls.FULL_ARCHITECTURE},
-                "degrade" : {"backbone_name": cls.BASELINE_ARCHITECTURE},
+                "enable"  : {
+                    "backbone_name"              : cls.FULL_ARCHITECTURE,
+                    f"{warmup}use_param_l1"      : True,
+                    f"{warmup}weight_param_l1"   : 1.0,
+                    f"{warmup}use_param_mse"     : False,
+                    f"{warmup}weight_param_mse"  : 0.0,
+                },
+                "degrade" : {
+                    "backbone_name"              : cls.BASELINE_ARCHITECTURE,
+                    f"{warmup}use_param_l1"      : False,
+                    f"{warmup}weight_param_l1"   : 0.0,
+                    f"{warmup}use_param_mse"     : True,
+                    f"{warmup}weight_param_mse"  : 1.0,
+                },
             },
         ]
 
@@ -252,6 +248,7 @@ class AblationCatalog:
             + cls._augmentation_features()
             + cls._schedule_features()
             + cls._physics_features()
+            + cls._loss_component_features()
             + cls._imbalance_features()
             + cls._slot_features()
             + cls._structural_features()
@@ -264,11 +261,9 @@ class AblationCatalog:
         return {feature["label"]: feature for feature in cls.features()}
 
     DEFAULT_ORDER = (
-        "covariance_match", "coherence_resyn",
-        "curriculum", "augmentation", "architecture",
-        "warmup_loss", "lr_per_group", "lr_warmup",
-        "out_sigma", "out_amp", "ifg_phase", "pass_mag",
-        "output_clamp",
+        "covariance_match", "physics_curriculum", "coherence_resyn",
+        "cosine_curve", "architecture", "augmentation",
+        "active_norm", "lr_per_group",
     )
 
     @classmethod
