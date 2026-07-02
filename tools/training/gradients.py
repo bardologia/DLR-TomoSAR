@@ -5,9 +5,10 @@ import torch
 
 
 class GradientClipper:
-    def __init__(self, config, logger, tracker):
-        self.logger  = logger
-        self.tracker = tracker
+    def __init__(self, config, logger, tracker, param_groups=None):
+        self.logger       = logger
+        self.tracker      = tracker
+        self.param_groups = param_groups
 
         self.mode       = config.gradient_clipper.clip_mode
         self.threshold  = config.gradient_clipper.max_grad_norm if self.mode == "fixed" else None
@@ -48,6 +49,20 @@ class GradientClipper:
         total_norm      = torch.norm(torch.stack(per_param_norms), 2)
 
         return total_norm.item()
+
+    def _log_group_norms(self, global_step: int) -> None:
+        if self.param_groups is None or len(self.param_groups) <= 1:
+            return
+
+        for i, group in enumerate(self.param_groups):
+            grads = [p.grad.detach() for p in group["params"] if p.grad is not None]
+
+            if not grads:
+                continue
+
+            group_norm = torch.norm(torch.stack(torch._foreach_norm(grads, 2)), 2).item()
+            name       = group.get("name", str(i))
+            self.tracker.log_scalar(f"optim/grad_norm/{name}", group_norm, global_step)
 
     def _clip(self, model: torch.nn.Module, norm: float, max_norm: float) -> tuple[float, float]:
         scale = min(1.0, max_norm / (norm + self.epsilon))
@@ -91,6 +106,7 @@ class GradientClipper:
             self.logger.warning(f"Exploding gradient norm detected: {norm:.2f} at step {global_step}!")
 
         self.tracker.log_scalar("optim/grad_norm", norm, global_step)
+        self._log_group_norms(global_step)
 
         if self.mode == "disabled":
             return norm

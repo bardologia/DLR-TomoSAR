@@ -182,6 +182,41 @@ def test_fixed_clip_logs_norm_and_ratio(logger, tracker):
     assert "optim/grad_clip_threshold" not in tags
 
 
+def test_per_group_norms_logged_for_multiple_groups(logger, tracker):
+    model = torch.nn.Linear(2, 1, bias=True)
+    with torch.no_grad():
+        model.weight.grad = torch.tensor([[3.0, 4.0]])
+        model.bias.grad   = torch.tensor([12.0])
+
+    param_groups = [
+        {"params": [model.weight], "name": "encoder"},
+        {"params": [model.bias],   "name": "head"},
+    ]
+
+    clip = GradientClipper(_grad_config(mode="disabled"), logger, tracker, param_groups=param_groups)
+    clip.maybe_clip(model, global_step=0)
+
+    recorded = {tag: val for tag, val, _ in tracker.scalars}
+
+    assert recorded["optim/grad_norm"]         == pytest.approx(13.0)
+    assert recorded["optim/grad_norm/encoder"] == pytest.approx(5.0)
+    assert recorded["optim/grad_norm/head"]    == pytest.approx(12.0)
+
+
+def test_per_group_norms_skipped_for_single_group(logger, tracker):
+    model = _model_with_grads([3.0, 4.0])
+
+    param_groups = [{"params": list(model.parameters()), "name": "main"}]
+
+    clip = GradientClipper(_grad_config(mode="disabled"), logger, tracker, param_groups=param_groups)
+    clip.maybe_clip(model, global_step=0)
+
+    tags = {tag for tag, _, _ in tracker.scalars}
+
+    assert "optim/grad_norm"      in tags
+    assert "optim/grad_norm/main" not in tags
+
+
 def test_adaptive_clip_logs_threshold(logger, tracker):
     config = _grad_config(mode="adaptive_percentile", window=2, percentile=50.0, epsilon=0.0)
     clip   = GradientClipper(config, logger, tracker)
