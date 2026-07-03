@@ -150,6 +150,28 @@ def test_derived_geometry_matches_acquisition(tmp_path):
     assert geometry["look_angle_far_deg"]   > geometry["look_angle_near_deg"]
 
 
+def test_validate_right_looking_accepts_right_and_rejects_left(tmp_path):
+    path = tmp_path / "pp.xml"
+    path.write_text(SAMPLE_XML, encoding="utf-8")
+
+    params = StepParameterFile(path).parse()
+    TrackParameters(labels=["FL01_PS02"], parameters=[params]).validate_right_looking()
+
+    flipped = {**params, "antdir": -1}
+    with pytest.raises(ValueError, match=r"\['FL01_PS02'\].*left-looking"):
+        TrackParameters(labels=["FL01_PS02"], parameters=[flipped]).validate_right_looking()
+
+
+def test_collector_rejects_left_looking_track(tmp_path):
+    path = tmp_path / "pp.xml"
+    path.write_text(SAMPLE_XML.replace("<value>1</value>", "<value>-1</value>", 1), encoding="utf-8")
+
+    assert StepParameterFile(path).parse()["antdir"] == -1
+
+    with pytest.raises(ValueError, match="left-looking"):
+        TrackParameterCollector({"FL01_PS02": path}).collect()
+
+
 def test_payload_roundtrip_preserves_parameters(tmp_path):
     path = tmp_path / "pp.xml"
     path.write_text(SAMPLE_XML, encoding="utf-8")

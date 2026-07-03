@@ -122,6 +122,12 @@ class TrackParameters:
     def n_tracks(self) -> int:
         return len(self.labels)
 
+    def validate_right_looking(self) -> None:
+        left = [label for label, params in zip(self.labels, self.parameters) if params["antdir"] <= 0]
+
+        if left:
+            raise ValueError(f"Tracks {left} are left-looking (antdir <= 0); the kz formula assumes a right-looking geometry, so left-looking stacks would train against sign-flipped physics. Left-looking data is not supported.")
+
     def derived(self) -> list:
         return [self._track_geometry(params) for params in self.parameters]
 
@@ -241,4 +247,7 @@ class TrackParameterCollector:
         files      = [self.track_paths[label] for label in labels]
         parameters = [StepParameterFile(path).parse() for path in files]
 
-        return TrackParameters(labels=labels, parameters=parameters, track_files=[str(f) for f in files])
+        collected = TrackParameters(labels=labels, parameters=parameters, track_files=[str(f) for f in files])
+        collected.validate_right_looking()
+
+        return collected

@@ -151,6 +151,30 @@ def test_builder_rejects_uncovered_azimuth():
         GeometryFieldBuilder(parameters, profiles, crop).build()
 
 
+def test_builder_rejects_left_looking_track():
+    parameters = TrackParameters(
+        labels     = ["REF"],
+        parameters = [{"r": [3600.0, 3700.0], "h0": 3719.0, "terrain": 684.0, "lambda": 0.2262, "antdir": -1}],
+    )
+    profiles = TrackProfiles(labels=["REF"], horizontal=np.zeros((1, 5)), vertical=np.zeros((1, 5)), azimuth_start=1000)
+    crop     = CropRegion(azimuth_start=1000, azimuth_end=1002, range_start=0, range_end=2)
+
+    with pytest.raises(ValueError, match="left-looking"):
+        GeometryFieldBuilder(parameters, profiles, crop).build()
+
+
+def test_builder_rejects_height_at_or_above_slant_range():
+    parameters = TrackParameters(
+        labels     = ["REF"],
+        parameters = [{"r": [3600.0, 3700.0], "h0": 4400.0, "terrain": 684.0, "lambda": 0.2262, "antdir": 1}],
+    )
+    profiles = TrackProfiles(labels=["REF"], horizontal=np.zeros((1, 5)), vertical=np.zeros((1, 5)), azimuth_start=1000)
+    crop     = CropRegion(azimuth_start=1000, azimuth_end=1002, range_start=0, range_end=2)
+
+    with pytest.raises(ValueError, match="slant range"):
+        GeometryFieldBuilder(parameters, profiles, crop).build()
+
+
 @pytest.mark.real_data
 def test_real_geometry_field_matches_builder(meta_dir, data_dir, dataset_json):
     parameters = TrackParameters.load(meta_dir / TrackParameters.FILENAME)

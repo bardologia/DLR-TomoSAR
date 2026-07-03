@@ -165,7 +165,11 @@ class GeometryFieldBuilder:
             raise ValueError(f"Crop range_end {self.crop.range_end} exceeds the slant-range vector length {slant_full.shape[0]} for reference track {self.parameters.reference}.")
 
         slant_range = slant_full[self.crop.range_start:self.crop.range_end]
-        look_angle  = np.arccos(np.clip(height / slant_range, -1.0, 1.0))
+
+        if height <= 0.0 or height >= float(slant_range.min()):
+            raise ValueError(f"Sensor height above terrain {height:.2f} m must be positive and below the nearest slant range {float(slant_range.min()):.2f} m for reference track {self.parameters.reference}; h0/terrain in the track parameters are corrupt, and clipping would silently yield a zero look angle and infinite kz.")
+
+        look_angle = np.arccos(np.clip(height / slant_range, -1.0, 1.0))
 
         return slant_range, look_angle
 
@@ -185,6 +189,8 @@ class GeometryFieldBuilder:
         return baseline_h, baseline_v
 
     def build(self) -> GeometryField:
+        self.parameters.validate_right_looking()
+
         labels                 = self._validate_labels()
         slant_range, look_angle = self._range_geometry()
         baseline_h, baseline_v  = self._azimuth_baselines()
