@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from tools.training.checkpoint import Checkpoint, TrainerState, WeightEma
+from tools.training.gradients  import GradientClipper
 from tools.training.scheduling import Scheduler, Warmup
 from tools.training.stopping   import EarlyStopping
 
@@ -22,6 +23,10 @@ def _scheduler_config(epochs: int = 10) -> SimpleNamespace:
 
 def _stopping_config(patience: int = 3) -> SimpleNamespace:
     return SimpleNamespace(early_stopping=SimpleNamespace(patience=patience, min_delta=0.0))
+
+
+def _clipper_config(window: int = 4) -> SimpleNamespace:
+    return SimpleNamespace(gradient_clipper=SimpleNamespace(clip_mode="adaptive_percentile", max_grad_norm=1.0, adaptive_window=window, adaptive_percentile=95.0, adaptive_mean_std_k=2.0, clip_epsilon=1e-6, log_histogram_freq=100))
 
 
 def _trainer(tmp_path, seed: int = 0) -> SimpleNamespace:
@@ -43,6 +48,7 @@ def _trainer(tmp_path, seed: int = 0) -> SimpleNamespace:
         lr_scheduler       = scheduler,
         early_stopping     = EarlyStopping(_stopping_config(), logger, tracker),
         checkpoint         = Checkpoint(logger, tracker, str(tmp_path / "best_model.pt")),
+        grad_clipper       = GradientClipper(_clipper_config(), logger, tracker),
         train_losses       = [],
         val_losses         = [],
         global_step        = 0,
@@ -70,6 +76,9 @@ def _advance(trainer) -> None:
     trainer.val_losses   = [1.1, 0.9]
     trainer.global_step  = 42
 
+    for step, norm in enumerate((0.5, 0.7, 0.6)):
+        trainer.grad_clipper.record(norm, step)
+
 
 def test_roundtrip_restores_all_components(tmp_path):
     source = _trainer(tmp_path, seed=0)
@@ -92,6 +101,7 @@ def test_roundtrip_restores_all_components(tmp_path):
     assert target.early_stopping.counter        == 1
     assert target.checkpoint.best_val_loss      == pytest.approx(0.5)
     assert target.checkpoint.best_epoch         == 3
+    assert target.grad_clipper.history          == pytest.approx([0.5, 0.7, 0.6])
 
     for key in source.model.state_dict():
         assert torch.allclose(target.model.state_dict()[key], source.model.state_dict()[key])

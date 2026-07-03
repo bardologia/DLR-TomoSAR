@@ -187,13 +187,16 @@ class BaseTrainer:
 
                 with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
                     loss_dict = self._compute_loss(batch)
-                loss = loss_dict["total_loss"] / self.accumulation_steps
+
+                window_start = (batch_idx // self.accumulation_steps) * self.accumulation_steps
+                window_len   = min(self.accumulation_steps, n_batches - window_start)
+                loss         = loss_dict["total_loss"] / window_len
 
                 if torch.isfinite(loss):
                     loss.backward()
                     window_has_grads = True
 
-                    loss_sum += loss.item() * self.accumulation_steps
+                    loss_sum += loss.item() * window_len
                     n += 1
                     aggregator.add(loss_dict)
 
@@ -227,7 +230,7 @@ class BaseTrainer:
 
         epoch_time = time.perf_counter() - epoch_start
 
-        avg = loss_sum / max(1, n)
+        avg = loss_sum / n if n > 0 else float("nan")
         self.tracker.log_scalar("loss/train", avg, epoch)
         self._log_epoch_metrics("train", aggregator, epoch)
         self._log_throughput(epoch_time, data_wait, sample_count, nonfinite_count, epoch)

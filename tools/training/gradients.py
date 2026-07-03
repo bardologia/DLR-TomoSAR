@@ -134,3 +134,10 @@ class GradientClipper:
 
         if global_step % self.hist_freq == 0 and len(self.history) >= self.hist_freq:
             self.tracker.log_histogram("optim/grad_norm_hist", np.asarray(self.history[-self.hist_freq:], dtype=np.float32), global_step)
+
+    def state_dict(self) -> dict:
+        keep = max(self.window, self.hist_freq)
+        return {"history": [float(v) for v in self.history[-keep:]]}
+
+    def load_state_dict(self, state: dict) -> None:
+        self.history = [float(v) for v in state["history"]]

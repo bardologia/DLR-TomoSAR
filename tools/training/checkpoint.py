@@ -157,6 +157,7 @@ class TrainerState:
             "scheduler"      : trainer.lr_scheduler.state_dict(),
             "early_stopping" : trainer.early_stopping.state_dict(),
             "checkpoint"     : trainer.checkpoint.state_dict(),
+            "grad_clipper"   : trainer.grad_clipper.state_dict(),
             "train_losses"   : list(trainer.train_losses),
             "val_losses"     : list(trainer.val_losses),
             "rng"            : TrainerState._rng_state(loader_generator),
@@ -181,6 +182,7 @@ class TrainerState:
         trainer.lr_scheduler.load_state_dict(state["scheduler"])
         trainer.early_stopping.load_state_dict(state["early_stopping"])
         trainer.checkpoint.load_state_dict(state["checkpoint"])
+        trainer.grad_clipper.load_state_dict(state["grad_clipper"])
 
         trainer.train_losses = list(state["train_losses"])
         trainer.val_losses   = list(state["val_losses"])
