@@ -227,7 +227,6 @@ class Logger:
     def subsection(self, title: str) -> None:
         line = f"  [cyan]>[/cyan] {title}"
         self.console.print(line, style="bold white")
-        self._file_raw()
         self._to_file(f"  > {title}")
 
     def debug(self, message: str) -> None:    
@@ -277,7 +276,6 @@ class Logger:
         if not data:
             return
 
-        self._file_raw()
         if title:
             self._to_file(f"  > {title}")
 
@@ -297,7 +295,6 @@ class Logger:
 
         self.console.print(tbl)
 
-        self._file_raw()
         if title:
             self._to_file(f"  > {title}")
 
