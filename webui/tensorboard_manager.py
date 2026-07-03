@@ -38,16 +38,35 @@ class TensorboardManager:
     def logdir_keys(self, script_key: str) -> tuple | None:
         return self.TRAINING_LOGDIRS.get(script_key)
 
+    def _alive(self, record: dict) -> bool:
+        if record["status"] not in ("starting", "running"):
+            return False
+        process = record["process"]
+        return process is None or process.poll() is None
+
     def ensure(self, logdir: str, interpreter: str) -> dict:
         logdir = str(logdir)
+        port   = self._free_port()
+        tb_id  = uuid.uuid4().hex[:8]
+
+        stderr_path = Path(tempfile.gettempdir()) / f"tensorboard_{tb_id}.log"
+
+        record = {
+            "id"          : tb_id,
+            "logdir"      : logdir,
+            "port"        : port,
+            "pid"         : None,
+            "status"      : "starting",
+            "started"     : datetime.now().isoformat(timespec="seconds"),
+            "process"     : None,
+            "stderr_path" : stderr_path,
+        }
 
         with self.lock:
-            for record in self.instances.values():
-                if record["logdir"] == logdir and record["status"] in ("starting", "running") and record["process"].poll() is None:
-                    return {"ok": True, **self._view(record)}
-
-        port  = self._free_port()
-        tb_id = uuid.uuid4().hex[:8]
+            for existing in self.instances.values():
+                if existing["logdir"] == logdir and self._alive(existing):
+                    return {"ok": True, **self._view(existing)}
+            self.instances[tb_id] = record
 
         tb_bin  = shutil.which("tensorboard")
         command = [tb_bin] if tb_bin else [interpreter, "-m", "tensorboard.main"]
@@ -60,27 +79,17 @@ class TensorboardManager:
             "--reload_interval", "30",
         ]
 
-        stderr_path = Path(tempfile.gettempdir()) / f"tensorboard_{tb_id}.log"
-
         with open(stderr_path, "wb") as stderr_file:
             try:
                 process = subprocess.Popen(argv, cwd=str(self.paths.repo_root), stdout=stderr_file, stderr=stderr_file)
             except OSError as exc:
+                with self.lock:
+                    self.instances.pop(tb_id, None)
                 return {"ok": False, "error": str(exc)}
 
-        record = {
-            "id"          : tb_id,
-            "logdir"      : logdir,
-            "port"        : port,
-            "pid"         : process.pid,
-            "status"      : "starting",
-            "started"     : datetime.now().isoformat(timespec="seconds"),
-            "process"     : process,
-            "stderr_path" : stderr_path,
-        }
-
         with self.lock:
-            self.instances[tb_id] = record
+            record["process"] = process
+            record["pid"]     = process.pid
 
         self.logger.ok(f"tensorboard {tb_id} starting on port {port} for {logdir}")
 
@@ -92,7 +101,7 @@ class TensorboardManager:
         logdir = str(logdir)
         with self.lock:
             for record in self.instances.values():
-                if record["logdir"] == logdir and record["status"] in ("starting", "running") and record["process"].poll() is None:
+                if record["logdir"] == logdir and self._alive(record):
                     return record["id"]
         return None
 
@@ -129,59 +138,71 @@ class TensorboardManager:
 
     def list_instances(self) -> list[dict]:
         with self.lock:
-            records = list(self.instances.values())
-
-        for record in records:
-            if record["status"] == "running" and record["process"].poll() is not None:
-                record["status"] = "stopped"
+            for record in self.instances.values():
+                if record["status"] == "running" and record["process"] is not None and record["process"].poll() is not None:
+                    record["status"] = "stopped"
+            records = [dict(record) for record in self.instances.values()]
 
         return [self._view(r) for r in sorted(records, key=lambda r: r["started"], reverse=True)]
 
     def stop(self, tb_id: str) -> dict:
         with self.lock:
             record = self.instances.get(tb_id)
+            if record is not None:
+                record["status"] = "stopped"
 
         if record is None:
             return {"ok": False, "error": "unknown tensorboard instance"}
 
-        if record["process"].poll() is None:
+        if record["process"] is not None and record["process"].poll() is None:
             record["process"].terminate()
 
-        record["status"] = "stopped"
         self.logger.warning(f"tensorboard {tb_id} stopped")
         return {"ok": True}
 
     def stop_all(self) -> None:
         with self.lock:
             records = list(self.instances.values())
+            for record in records:
+                record["status"] = "stopped"
 
         for record in records:
-            if record["process"].poll() is None:
+            if record["process"] is not None and record["process"].poll() is None:
                 record["process"].terminate()
-            record["status"] = "stopped"
+
+    def _mark(self, record: dict, from_status: str, to_status: str) -> bool:
+        with self.lock:
+            if record["status"] != from_status:
+                return False
+            record["status"] = to_status
+            return True
 
     def _probe(self, record: dict) -> None:
         url      = f"http://127.0.0.1:{record['port']}/tb/{record['id']}/"
         deadline = time.monotonic() + self.STARTUP_TIMEOUT_S
 
         while time.monotonic() < deadline:
+            with self.lock:
+                if record["status"] != "starting":
+                    return
+
             if record["process"].poll() is not None:
-                record["status"] = "failed"
-                self.logger.error(f"tensorboard {record['id']} exited during startup: {self._stderr_tail(record)}")
+                if self._mark(record, "starting", "failed"):
+                    self.logger.error(f"tensorboard {record['id']} exited during startup: {self._stderr_tail(record)}")
                 return
 
             try:
                 with urllib.request.urlopen(url, timeout=2):
-                    record["status"] = "running"
-                    self.logger.ok(f"tensorboard {record['id']} ready at /tb/{record['id']}/")
+                    if self._mark(record, "starting", "running"):
+                        self.logger.ok(f"tensorboard {record['id']} ready at /tb/{record['id']}/")
                     return
             except OSError:
                 time.sleep(self.PROBE_INTERVAL_S)
 
-        record["status"] = "failed"
-        if record["process"].poll() is None:
-            record["process"].terminate()
-        self.logger.error(f"tensorboard {record['id']} failed to start within {self.STARTUP_TIMEOUT_S:.0f}s: {self._stderr_tail(record)}")
+        if self._mark(record, "starting", "failed"):
+            if record["process"].poll() is None:
+                record["process"].terminate()
+            self.logger.error(f"tensorboard {record['id']} failed to start within {self.STARTUP_TIMEOUT_S:.0f}s: {self._stderr_tail(record)}")
 
     def _view(self, record: dict) -> dict:
         return {
