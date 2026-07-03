@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from typing      import Callable
+from copy   import deepcopy
+from typing import Callable
 
 from tools.runtime.run_tag import RunTag
 
@@ -39,21 +39,24 @@ class SeedSweepRunner:
         self.runner_factory = runner_factory
 
     def _seeds(self) -> list[int]:
-        return SeedSet.resolve(getattr(self.config, "seeds", None), self.config.seed)
+        return SeedSet.resolve(self.config.seeds, self.config.seed)
 
     def _base_run_name(self) -> str:
         timestamp = RunTag.now()
         return self.config.run_name or f"run_{timestamp}"
 
     def _run_seed(self, base_name: str, seed: int):
-        config = replace(self.config, seed=seed, run_name=SeedSet.run_name(base_name, seed))
+        config          = deepcopy(self.config)
+        config.seed     = seed
+        config.run_name = SeedSet.run_name(base_name, seed)
         return self.runner_factory(config).run()
 
     def run(self):
         seeds = self._seeds()
 
         if len(seeds) == 1:
-            config = replace(self.config, seed=seeds[0])
+            config      = deepcopy(self.config)
+            config.seed = seeds[0]
             return self.runner_factory(config).run()
 
         base    = self._base_run_name()
