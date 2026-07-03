@@ -4,7 +4,7 @@ from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
 from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.normalization import NormalizationConfig, Presets
+from configuration.normalization import NormalizationConfig
 from configuration.inference import InferenceConfig
 from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
@@ -37,11 +37,7 @@ class ConfigFactory:
 
     def _output_config(self) -> OutputConfig:
         norm = self._normalization()
-        if norm.output_strategy == "per_slot":
-            return OutputConfig()
-
-        strategy = Presets.by_name(norm.output_strategy)
-        return OutputConfig(output_strategies={"out/amp": strategy, "out/mu": strategy, "out/sigma": strategy})
+        return OutputConfig(output_strategies={key: norm.strategy("output", key) for key in ("out/amp", "out/mu", "out/sigma")})
 
     def training_dataset_config(self) -> DatasetConfig:
         crop     = self.global_crop()

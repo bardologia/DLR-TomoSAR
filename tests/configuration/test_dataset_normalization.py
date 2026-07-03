@@ -203,3 +203,25 @@ def test_channel_stats_round_trips():
     assert rebuilt.loc == stats.loc
     assert rebuilt.scale == stats.scale
     assert rebuilt.names == stats.names
+
+
+def test_factory_output_config_honors_out_slot_overrides():
+    from configuration.benchmark import BenchmarkConfig
+    from pipelines.shared.config.config_factory import ConfigFactory
+
+    config = BenchmarkConfig()
+    config.normalization.out_sigma = "zscore"
+
+    output = ConfigFactory(config)._output_config()
+    assert output.strategy_for("out/sigma") == Presets.ZSCORE
+    assert output.strategy_for("out/amp")   == ChannelStrategy.from_slot("out/amp")
+    assert output.strategy_for("out/mu")    == ChannelStrategy.from_slot("out/mu")
+
+
+def test_factory_output_config_defaults_match_slots():
+    from configuration.benchmark import BenchmarkConfig
+    from pipelines.shared.config.config_factory import ConfigFactory
+
+    output = ConfigFactory(BenchmarkConfig())._output_config()
+    for key in ("out/amp", "out/mu", "out/sigma"):
+        assert output.strategy_for(key) == ChannelStrategy.from_slot(key)
