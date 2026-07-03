@@ -15,7 +15,7 @@ from configuration.sar.geometry_config                  import GeometryConfig
 from configuration.training.backbone                    import default_curriculum
 from configuration.training.general.loss                import LossCurriculumConfig
 from configuration.training.general.run                 import RunPathsConfig, TrainingQueueConfig
-from configuration.training.general.runtime             import OverfitCheckConfig, OverfitConfig
+from configuration.training.general.runtime             import OverfitConfig
 
 
 @dataclass
@@ -44,7 +44,6 @@ class CrossValidationConfig:
     normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
     overfit       : OverfitConfig        = field(default_factory=OverfitConfig)
-    overfit_check : OverfitCheckConfig   = field(default_factory=OverfitCheckConfig)
     jepa          : JepaCvConfig         = field(default_factory=JepaCvConfig)
     autoencoder   : AeCvConfig           = field(default_factory=AeCvConfig)
 

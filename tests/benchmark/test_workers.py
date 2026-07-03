@@ -122,3 +122,17 @@ def test_max_batch_worker_raises_on_probe_fail(config, monkeypatch):
 
     with pytest.raises(SystemExit):
         worker.run("unet")
+
+
+def test_training_entry_configs_carry_the_overfit_check(config):
+    from pipelines.benchmark.workers import TrainingWorker
+
+    config.overfit_check.enabled = True
+    worker = TrainingWorker(config, "tag")
+
+    ae_entry   = worker._ae_entry_config("mlp_ae", worker.run_dir / "training")
+    jepa_entry = worker._jepa_entry_config("resunet", worker.run_dir / "training")
+
+    assert ae_entry.overfit_check   is config.overfit_check
+    assert jepa_entry.overfit_check is config.overfit_check
+    assert ae_entry.overfit_check.enabled is True

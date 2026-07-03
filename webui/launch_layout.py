@@ -626,7 +626,6 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
-                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},

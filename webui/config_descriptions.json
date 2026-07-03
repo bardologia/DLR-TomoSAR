@@ -848,8 +848,7 @@
       "resume": "Whether to resume interrupted folds instead of restarting",
       "seed": "Base random seed for reproducibility",
       "seeds": "Multiple seeds for repeated seed-varied runs",
-      "poll_interval_s": "Seconds between queue polls for job completion",
-      "overfit_check": "Overfit sanity-check gate run before each fold's training"
+      "poll_interval_s": "Seconds between queue polls for job completion"
     }
   },
   "cross_validation/jepa::JepaCvConfig": {

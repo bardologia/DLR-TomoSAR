@@ -133,7 +133,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             model_config   = model_config,
             seed           = self.config.seed if seed is None else seed,
             run_name       = FoldNaming.run_name(fold_index, seed),
-            overfit_check  = self.config.overfit_check,
         )
 
         pipeline.run(probe_config=self._probe_config())
@@ -163,7 +162,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             geometry                   = cv.geometry,
             paths                      = cv.paths,
             training                   = cv.training,
-            overfit_check              = cv.overfit_check,
         )
 
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
@@ -189,7 +187,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             geometry        = cv.geometry,
             paths           = cv.paths,
             training        = cv.training,
-            overfit_check   = cv.overfit_check,
         )
 
     def run(self, fold_index: int, seed: int | None = None) -> None:
