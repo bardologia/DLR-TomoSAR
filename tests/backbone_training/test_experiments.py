@@ -384,8 +384,8 @@ def test_ablation_catalog_as_dict_covers_loss_terms():
     catalog = AblationCatalog.as_dict()
 
     assert "curve_loss_mse_to_l1" not in catalog
-    assert "spectral_coherence"   in catalog
-    assert "ssim"                 in catalog
+    assert "spectral_coherence"   not in catalog
+    assert "ssim"                 not in catalog
     assert "smoothness_tv"        in catalog
 
 

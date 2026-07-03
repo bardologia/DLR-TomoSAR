@@ -542,11 +542,10 @@ class FlowLibrary:
             },
             {
                 "id": "curveshape", "title": "Shape-sensitive curve terms", "phase": "Curve loss",
-                "note": "Three terms comparing curve shape rather than magnitude: cosine over valid pixels, a windowed spectral coherence, and per-slice SSIM on jointly normalised images.",
+                "note": "Curve-shape agreement rather than magnitude: cosine distance over pixels with non-negligible ground truth.",
                 "inputs": ["yhat", "y"], "outputs": ["lj"],
                 "lines": [
                     [{"id": "lj", "tex": r"\ell_{\cos}", "role": "calculated"}, {"tex": "="}, {"tex": r"\Big\langle 1 - \tfrac{\langle\hat{y},y\rangle}{\lVert\hat{y}\rVert\,\lVert y\rVert}\Big\rangle_{\lVert y\rVert>10^{-3}}"}],
-                    [{"tex": r"\ell_{\mathrm{SSIM}} = 1 - \overline{\mathrm{SSIM}},\quad \mathrm{SSIM} = \tfrac{(2\mu_x\mu_y+C_1)(2\sigma_{xy}+C_2)}{(\mu_x^2+\mu_y^2+C_1)(\sigma_x^2+\sigma_y^2+C_2)}"}],
                 ],
             },
             {

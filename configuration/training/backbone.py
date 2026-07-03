@@ -72,8 +72,6 @@ def _default_complete_losses() -> dict:
         "huber" : ("use_huber_curve",        "weight_huber_curve"),
         "charb" : ("use_charbonnier_curve",  "weight_charbonnier_curve"),
         "cos"   : ("use_cosine_curve",       "weight_cosine_curve"),
-        "spec"  : ("use_spectral_coherence", "weight_spectral_coh"),
-        "ssim"  : ("use_ssim_curve",         "weight_ssim_curve"),
     }
     weights = [0.01, 0.05, 0.02]
 

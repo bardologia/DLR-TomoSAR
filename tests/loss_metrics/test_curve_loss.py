@@ -99,52 +99,6 @@ def test_cosine_scale_invariant():
     assert torch.allclose(base, scaled, atol=1e-6)
 
 
-def test_spectral_coherence_zero_on_identical():
-    target = _curves(9, (1, 12, 3, 3))
-    out    = CurveLoss.spectral_coherence(target.clone(), target, window=4)
-    assert out.item() < 1e-5
-
-
-def test_spectral_coherence_range():
-    pred   = _curves(10, (1, 12, 3, 3))
-    target = _curves(11, (1, 12, 3, 3))
-    out    = CurveLoss.spectral_coherence(pred, target, window=4)
-    assert 0.0 <= out.item() <= 1.0
-
-
-def test_ssim_zero_on_identical_elevation():
-    target = _curves(12, (1, 6, 5, 5))
-    out    = CurveLoss.ssim(target.clone(), target, 5, 1.5, 1.0, 0.01, 0.03, "elevation")
-    assert out.item() < 1e-4
-
-
-@pytest.mark.parametrize("axis", ["elevation", "azimuth", "range"])
-def test_ssim_axes_run_and_nonnegative(axis):
-    pred   = _curves(13, (1, 6, 5, 5))
-    target = _curves(14, (1, 6, 5, 5))
-    out    = CurveLoss.ssim(pred, target, 5, 1.5, 1.0, 0.01, 0.03, axis)
-    assert math.isfinite(out.item())
-    assert out.item() >= -1e-6
-
-
-def test_ssim_invalid_axis_raises():
-    pred = _curves(15, (1, 6, 5, 5))
-    with pytest.raises(ValueError):
-        CurveLoss.ssim(pred, pred.clone(), 5, 1.5, 1.0, 0.01, 0.03, "bogus")
-
-
-def test_gaussian_kernel_normalised_and_shape():
-    kernel = CurveLoss.gaussian_kernel(5, 1.5, torch.float64, torch.device("cpu"))
-    assert kernel.shape == (1, 1, 5, 5)
-    assert torch.allclose(kernel.sum(), torch.tensor(1.0, dtype=torch.float64))
-
-
-def test_gaussian_kernel_cached():
-    a = CurveLoss.gaussian_kernel(7, 2.0, torch.float32, torch.device("cpu"))
-    b = CurveLoss.gaussian_kernel(7, 2.0, torch.float32, torch.device("cpu"))
-    assert a is b
-
-
 def test_mse_diff_gradient_flow():
     diff = (_curves(16) - 0.5).requires_grad_(True)
     CurveLoss.mse_diff(diff).backward()
@@ -159,13 +113,6 @@ def test_cosine_gradient_flow():
     assert torch.isfinite(pred.grad).all()
 
 
-def test_ssim_gradient_flow():
-    pred   = _curves(19, (1, 6, 5, 5)).requires_grad_(True)
-    target = _curves(20, (1, 6, 5, 5))
-    CurveLoss.ssim(pred, target, 5, 1.5, 1.0, 0.01, 0.03, "elevation").backward()
-    assert torch.isfinite(pred.grad).all()
-
-
 def test_outputs_are_scalars():
     diff   = _curves(21) - 0.5
     pred   = _curves(22, (1, 8, 3, 3))
@@ -177,7 +124,6 @@ def test_outputs_are_scalars():
         CurveLoss.charbonnier_diff(diff, 1e-3),
         CurveLoss.smooth_l1_diff(diff, 1.0),
         CurveLoss.cosine(pred, target, axis=1),
-        CurveLoss.spectral_coherence(pred, target, 4),
     ):
         assert out.ndim == 0
 
@@ -191,5 +137,4 @@ def test_curve_losses_on_real_tomogram(tomogram_full):
 
     assert CurveLoss.mse_diff(pred - cur).item() >= 0.0
     assert CurveLoss.cosine(pred, cur, axis=1).item() >= 0.0
-    assert CurveLoss.spectral_coherence(pred, cur, 4).item() <= 1.0
     assert CurveLoss.mse_diff(cur - cur).item() == 0.0

@@ -41,9 +41,7 @@ class AblationCatalog:
     COSINE_WEIGHT  = 0.05
 
     LOSS_TERMS = (
-        ("spectral_coherence", "use_spectral_coherence", "weight_spectral_coh",  0.05),
-        ("ssim",               "use_ssim_curve",         "weight_ssim_curve",    0.05),
-        ("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv", 1e-4),
+        ("smoothness_tv", "use_smoothness_tv", "weight_smoothness_tv", 1e-4),
     )
 
     @classmethod

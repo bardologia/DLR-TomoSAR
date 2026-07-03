@@ -14,8 +14,6 @@ LOSS_TERMS = (
     LossTerm("huber_curve",        "use_huber_curve",        "weight_huber_curve",        "denorm"),
     LossTerm("charbonnier_curve",  "use_charbonnier_curve",  "weight_charbonnier_curve",  "denorm"),
     LossTerm("cosine_curve",       "use_cosine_curve",       "weight_cosine_curve",       "denorm"),
-    LossTerm("spectral_coh",       "use_spectral_coherence", "weight_spectral_coh",       "denorm"),
-    LossTerm("ssim_curve",         "use_ssim_curve",         "weight_ssim_curve",         "denorm"),
     LossTerm("total_power_relerr", "use_total_power",        "weight_total_power",        "denorm"),
     LossTerm("moments",            "use_moments",            "weight_moments",            "denorm"),
     LossTerm("coherence_resyn",    "use_coherence_resyn",    "weight_coherence_resyn",    "denorm"),

@@ -56,8 +56,6 @@ class LaunchLayout:
         {"value": "huber_curve",        "label": "Huber curve"},
         {"value": "charbonnier_curve",  "label": "Charbonnier curve"},
         {"value": "cosine_curve",       "label": "Cosine curve"},
-        {"value": "ssim_curve",         "label": "SSIM curve"},
-        {"value": "spectral_coh",       "label": "Spectral coherence"},
         {"value": "smoothness_tv",      "label": "Smoothness TV"},
         {"value": "total_power_relerr", "label": "Total power rel. error"},
         {"value": "moments",            "label": "Moments"},
@@ -74,8 +72,6 @@ class LaunchLayout:
                 {"gate": "use_huber_curve",       "fields": [{"path": "weight_huber_curve", "widget": NUM_WEIGHT}, "huber_delta"]},
                 {"gate": "use_charbonnier_curve", "fields": [{"path": "weight_charbonnier_curve", "widget": NUM_WEIGHT}, "charbonnier_eps"]},
                 {"gate": "use_cosine_curve",      "fields": [{"path": "weight_cosine_curve", "widget": NUM_WEIGHT}]},
-                {"gate": "use_spectral_coherence", "fields": [{"path": "weight_spectral_coh", "widget": NUM_WEIGHT}, "spectral_coh_window"]},
-                {"gate": "use_ssim_curve",        "fields": [{"path": "weight_ssim_curve", "widget": NUM_WEIGHT}, "ssim_window_size", "ssim_sigma", "ssim_data_range", "ssim_k1", "ssim_k2", "ssim_axis"]},
             ]},
             {"title": "Parameter losses", "fields": [
                 {"gate": "use_param_l1",    "fields": [{"path": "weight_param_l1", "widget": NUM_WEIGHT}]},

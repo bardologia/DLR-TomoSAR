@@ -28,19 +28,6 @@ class LossConfig:
     use_cosine_curve    : bool  = False
     weight_cosine_curve : float = 0.0
 
-    use_spectral_coherence : bool  = False
-    weight_spectral_coh    : float = 0.0
-    spectral_coh_window    : int   = 7
-
-    use_ssim_curve    : bool  = False
-    weight_ssim_curve : float = 0.0
-    ssim_window_size  : int   = 11
-    ssim_sigma        : float = 1.5
-    ssim_data_range   : float = 1.0
-    ssim_k1           : float = 0.01
-    ssim_k2           : float = 0.03
-    ssim_axis         : str   = "elevation"
-
     use_param_l1    : bool  = False
     weight_param_l1 : float = 0.1
 

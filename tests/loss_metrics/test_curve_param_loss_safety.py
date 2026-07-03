@@ -14,7 +14,7 @@ AMP_MAX = 1000.0
 HUBER_D = 1.0
 CHARB_E = 1e-3
 
-CURVE_ZERO_AT_IDENTITY = ["mse", "l1", "huber", "cosine", "spectral", "ssim"]
+CURVE_ZERO_AT_IDENTITY = ["mse", "l1", "huber", "cosine"]
 CURVE_ALL              = CURVE_ZERO_AT_IDENTITY + ["charbonnier"]
 PARAM_ALL              = ["param_l1", "param_huber", "param_mse", "tv"]
 
@@ -51,10 +51,6 @@ def _curve(name, pc, target):
         return CL.charbonnier_diff(pc - target, CHARB_E)
     if name == "cosine":
         return CL.cosine(pc, target, 1)
-    if name == "spectral":
-        return CL.spectral_coherence(pc, target, 7)
-    if name == "ssim":
-        return CL.ssim(pc, target, 11, 1.5, 1.0, 0.01, 0.03, "elevation")
 
     raise ValueError(name)
 
@@ -177,14 +173,12 @@ def test_curve_term_deterministic(parameters, name):
 
 
 @pytest.mark.real_data
-def test_cosine_and_ssim_and_spectral_are_bounded(parameters):
+def test_cosine_is_bounded(parameters):
     gt     = _gt_params(parameters)
     target = _curves(gt)
     _, pc  = _pred_curves(gt, 0.6)
 
     assert 0.0 <= float(CL.cosine(pc, target, 1).detach()) <= 2.0
-    assert 0.0 <= float(CL.spectral_coherence(pc, target, 7).detach()) <= 1.0
-    assert float(CL.ssim(pc, target, 11, 1.5, 1.0, 0.01, 0.03, "elevation").detach()) >= 0.0
 
 
 @pytest.mark.real_data

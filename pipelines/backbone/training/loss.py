@@ -50,8 +50,7 @@ class Loss:
         for term in LOSS_TERMS:
             if getattr(cfg, term.use_flag):
                 weight = getattr(cfg, term.weight_key)
-                extra  = f"  [axis={cfg.ssim_axis}]" if term.name == "ssim_curve" else ""
-                active_rows.append({"Term": term.name, "Weight": f"{weight:g}{extra}"})
+                active_rows.append({"Term": term.name, "Weight": f"{weight:g}"})
 
         self.logger.metrics_table(active_rows, ["Term", "Weight"], title=title)
 
@@ -196,8 +195,6 @@ class Loss:
             "huber_curve":        lambda: lc.huber_diff(diff, cfg.huber_delta),
             "charbonnier_curve":  lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps),
             "cosine_curve":       lambda: lc.cosine(pred_curves, exp_curves, axis=1),
-            "spectral_coh":       lambda: lc.spectral_coherence(pred_curves, exp_curves, cfg.spectral_coh_window),
-            "ssim_curve":         lambda: lc.ssim(pred_curves, exp_curves, cfg.ssim_window_size, cfg.ssim_sigma, cfg.ssim_data_range, cfg.ssim_k1, cfg.ssim_k2, cfg.ssim_axis),
             "total_power_relerr": lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor),
             "moments":            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights),
             "coherence_resyn":    coherence_resyn,
