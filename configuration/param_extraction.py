@@ -180,7 +180,4 @@ class ParamExtractionInferenceConfig:
     params_dir : Path = Path("/ste/rnd/User/vice_vi/Dataset")
     run_tags   : list = field(default_factory=list)
 
-    threshold_factor : float = 0.25
-    truncation_index : int   = 170
-
     make_plots : bool = True

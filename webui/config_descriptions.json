@@ -1253,8 +1253,6 @@
     "fields": {
       "params_dir": "Directory holding extracted parameter runs to analyze",
       "run_tags": "Identifiers selecting which parameter runs to process",
-      "threshold_factor": "Peak-detection cutoff as fraction of maximum amplitude",
-      "truncation_index": "Elevation bin index beyond which profiles are truncated",
       "make_plots": "Whether to render diagnostic plots during analysis"
     }
   },

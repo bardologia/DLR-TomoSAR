@@ -729,7 +729,6 @@ class LaunchLayout:
                             "params_dir",
                             {"path": "run_tags", "widget": {"kind": "dataset", "mode": "param_trials", "multi": True, "baseFrom": "params_dir"}},
                         ]},
-                        {"title": "Fit analysis", "fields": ["threshold_factor", "truncation_index"]},
                         {"title": "Report", "fields": ["make_plots"]},
                     ]},
                 ]},

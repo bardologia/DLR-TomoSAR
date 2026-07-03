@@ -16,13 +16,11 @@ class ParamRunInferencePipeline:
     META_FILENAME    = "param_extraction_meta.json"
     SUMMARY_FILENAME = "fit_metrics_summary.json"
 
-    def __init__(self, run_dir: Path, logger: Logger, threshold_factor: float, truncation_index: int, make_plots: bool = True) -> None:
-        self.run_dir          = Path(run_dir)
-        self.logger           = logger
-        self.threshold_factor = threshold_factor
-        self.truncation_index = truncation_index
-        self.make_plots       = make_plots
-        self.parameter_io     = ParameterIO(logger=logger)
+    def __init__(self, run_dir: Path, logger: Logger, make_plots: bool = True) -> None:
+        self.run_dir      = Path(run_dir)
+        self.logger       = logger
+        self.make_plots   = make_plots
+        self.parameter_io = ParameterIO(logger=logger)
 
         self.logger.section("[Param Extraction Inference]")
         self.logger.subsection(f"Run directory : {self.run_dir}")
@@ -40,8 +38,8 @@ class ParamRunInferencePipeline:
         calculator = FittingMetricsCalculator(
             n_gaussians      = int(meta["k_max"]),
             logger           = self.logger,
-            threshold_factor = self.threshold_factor,
-            truncation_index = self.truncation_index,
+            threshold_factor = float(meta["threshold_factor"]),
+            truncation_index = int(meta["truncation_index"]),
             amp_threshold    = float(meta["activity_threshold"]),
         )
 
@@ -68,8 +66,8 @@ class ParamRunInferencePipeline:
             output_directory = self.run_dir,
             n_gaussians      = int(meta["k_max"]),
             logger           = self.logger,
-            threshold_factor = self.threshold_factor,
-            truncation_index = self.truncation_index,
+            threshold_factor = float(meta["threshold_factor"]),
+            truncation_index = int(meta["truncation_index"]),
             amp_threshold    = float(meta["activity_threshold"]),
         )
 
@@ -131,11 +129,9 @@ class ParamInferenceTrialCollector:
 
 
 class ParamInferenceSession:
-    def __init__(self, run_dir: Path, make_plots: bool, threshold_factor: float, truncation_index: int) -> None:
-        self.run_dir          = Path(run_dir)
-        self.make_plots       = make_plots
-        self.threshold_factor = threshold_factor
-        self.truncation_index = truncation_index
+    def __init__(self, run_dir: Path, make_plots: bool) -> None:
+        self.run_dir    = Path(run_dir)
+        self.make_plots = make_plots
 
     def execute(self) -> dict[str, Path]:
         log_dir = self.run_dir / "logs"
@@ -143,7 +139,7 @@ class ParamInferenceSession:
 
         logger = Logger(log_dir=str(log_dir), name="param_extraction_inference", level="INFO")
 
-        return ParamRunInferencePipeline(self.run_dir, logger=logger, threshold_factor=self.threshold_factor, truncation_index=self.truncation_index, make_plots=self.make_plots).run()
+        return ParamRunInferencePipeline(self.run_dir, logger=logger, make_plots=self.make_plots).run()
 
 
 def run_param_inference_session(session: ParamInferenceSession) -> dict[str, Path]:
@@ -160,7 +156,7 @@ class ParamExtractionInferenceScheduler(SequentialSessionScheduler):
 
     def _sessions(self) -> list[ParamInferenceSession]:
         run_dirs = ParamInferenceTrialCollector(Path(self.config.params_dir), list(self.config.run_tags), self.logger).collect()
-        return [ParamInferenceSession(run_dir, self.config.make_plots, self.config.threshold_factor, self.config.truncation_index) for run_dir in run_dirs]
+        return [ParamInferenceSession(run_dir, self.config.make_plots) for run_dir in run_dirs]
 
     def _session_runner(self):
         return run_param_inference_session
