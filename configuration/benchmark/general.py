@@ -7,7 +7,7 @@ from configuration.dataset                      import AugmentationConfig, Input
 from configuration.normalization.general        import NormalizationConfig
 from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.backbone            import default_curriculum
-from configuration.training.general.loss        import LossCurriculumConfig
+from configuration.training.general.loss        import LossConfig
 from configuration.training.general.pretraining import PretrainConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
@@ -67,6 +67,10 @@ def _default_ae_loss():
     return ProfileAeLossConfig()
 
 
+def _default_base_loss():
+    return default_curriculum().complete
+
+
 @dataclass
 class BenchmarkConfig:
     training_type : str = "backbone"
@@ -78,11 +82,11 @@ class BenchmarkConfig:
     inference  : InferenceQueueConfig   = field(default_factory=InferenceQueueConfig)
     comparison : ComparisonReportConfig = field(default_factory=ComparisonReportConfig)
 
-    input         : InputConfig          = field(default_factory=InputConfig.full_stack)
-    geometry      : GeometryConfig       = field(default_factory=GeometryConfig)
-    normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
-    augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
-    curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
+    input         : InputConfig         = field(default_factory=InputConfig.full_stack)
+    geometry      : GeometryConfig      = field(default_factory=GeometryConfig)
+    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    loss          : LossConfig          = field(default_factory=_default_base_loss)
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)
     jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)

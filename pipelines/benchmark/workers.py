@@ -24,7 +24,7 @@ class BenchmarkWorker(WorkerBase):
 
         from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
-        trainer_config.curriculum = LossComponentCatalog.curriculum(component, base=self.config.curriculum.complete)
+        trainer_config.curriculum = LossComponentCatalog.curriculum(component, base=self.config.loss)
 
     def _size_overrides(self, model_name: str) -> dict:
         size_match_path = self.run_dir / "pipeline" / "size_match.json"

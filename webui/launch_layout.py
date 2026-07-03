@@ -543,8 +543,7 @@ class LaunchLayout:
                     ]},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
-                    {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
-                    {"kind": "pair", "title": "Loss stages", "template": "loss", "base": "curriculum.complete", "override": "curriculum.warmup"},
+                    {"kind": "fields", "title": "Base loss for swept components", "template": "loss", "at": "loss"},
                 ]},
                 {"key": "ae-loss", "title": "Autoencoder loss", "when": {"field": "training_type", "in": ["profile_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},

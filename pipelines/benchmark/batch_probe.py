@@ -53,7 +53,7 @@ class MaxBatchProbe:
 
         dataset_config.input_config = self.config.input
         trainer_config.geometry     = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=factory._secondary_labels())
-        trainer_config.curriculum   = LossComponentCatalog.combined_curriculum(self.config.sweep_loss_components, base=self.config.curriculum.complete)
+        trainer_config.curriculum   = LossComponentCatalog.combined_curriculum(self.config.sweep_loss_components, base=self.config.loss)
 
         gaussian_cfg               = trainer_config.gaussian
         dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
