@@ -199,7 +199,7 @@ class ProcessManager:
         cleaned = {}
         for path, value in (overrides or {}).items():
             if not isinstance(path, str) or not self.OVERRIDE_NAME.match(path):
-                continue
+                raise ValueError(f"invalid override key '{path}'")
             cleaned[path] = str(value)
         return cleaned
 
@@ -264,6 +264,8 @@ class ProcessManager:
         return int(match.group(1)) if match else None
 
     def _adopt_detached(self, job_id: str, pid: int, stream: JobStream) -> None:
+        token = self._pid_start_token(pid)
+
         with self.lock:
             record = self.jobs.get(job_id)
             if record is None:
@@ -275,11 +277,11 @@ class ProcessManager:
         self.logger.ok(f"job {job_id} detached, now tracking live pid {pid}")
         stream.publish({"type": "status", "status": "running", "pid": pid, "detached": True})
 
-        watcher = threading.Thread(target=self._watch_detached, args=(job_id, pid, stream), daemon=True)
+        watcher = threading.Thread(target=self._watch_detached, args=(job_id, pid, token, stream), daemon=True)
         watcher.start()
 
-    def _watch_detached(self, job_id: str, pid: int, stream: JobStream) -> None:
-        while self._pid_alive(pid):
+    def _watch_detached(self, job_id: str, pid: int, token: tuple | None, stream: JobStream) -> None:
+        while self._pid_alive(pid) and self._pid_start_token(pid) == token:
             time.sleep(2.0)
             with self.lock:
                 if self.jobs.get(job_id) is None:
@@ -292,8 +294,8 @@ class ProcessManager:
             record["status"]    = "finished"
             record["exit_code"] = None
 
-        self.logger.muted(f"detached job {job_id} (pid {pid}) exited")
-        stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "ok"})
+        self.logger.muted(f"detached job {job_id} (pid {pid}) exited, exit status unknown")
+        stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
 
     def _pid_alive(self, pid: int) -> bool:
@@ -305,6 +307,17 @@ class ProcessManager:
             return stat[stat.rindex(")") + 2] != "Z"
         except (ValueError, IndexError):
             return False
+
+    def _pid_start_token(self, pid: int) -> tuple | None:
+        try:
+            stat = open(f"/proc/{pid}/stat").read()
+        except OSError:
+            return None
+        try:
+            fields = stat[stat.rindex(")") + 2 :].split()
+            return (pid, fields[19])
+        except (ValueError, IndexError):
+            return None
 
     def stop(self, job_id: str) -> dict:
         with self.lock:
