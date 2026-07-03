@@ -98,7 +98,7 @@ class Metrics:
         order     = valid_idx[np.argsort(flat[valid_idx])]
 
         best_flat  = order[:n_best]
-        worst_flat = order[-n_worst:][::-1]
+        worst_flat = order[-n_worst:][::-1] if n_worst > 0 else order[:0]
 
         pool      = np.setdiff1d(valid_idx, np.concatenate([best_flat, worst_flat]), assume_unique=False)
         n_random  = min(n_random, pool.size)

@@ -167,6 +167,23 @@ def test_select_pixels_best_worst_random_disjoint():
     assert len(all_coords) == 3 + 3 + 4
 
 
+def test_select_pixels_zero_counts_select_nothing():
+    rng        = np.random.default_rng(4)
+    metric_map = rng.random((10, 10)).astype(np.float32)
+
+    sel = Metrics.select_pixels(metric_map, n_best=0, n_worst=0, n_random=0, seed=0)
+
+    assert sel["best"].shape[0]   == 0
+    assert sel["worst"].shape[0]  == 0
+    assert sel["random"].shape[0] == 0
+
+    sel = Metrics.select_pixels(metric_map, n_best=2, n_worst=0, n_random=5, seed=0)
+
+    assert sel["best"].shape[0]   == 2
+    assert sel["worst"].shape[0]  == 0
+    assert sel["random"].shape[0] == 5
+
+
 def test_flat_to_yx_roundtrip():
     width = 7
     flat  = np.array([0, 6, 7, 20], dtype=np.int64)
