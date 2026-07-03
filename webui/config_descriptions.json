@@ -1437,7 +1437,8 @@
       "ablation_catalog": "Full catalog of available ablation feature definitions",
       "ablation_include_full": "Include the full-model baseline among ablation variants",
       "gpus": "GPU device indices available for parallel sweep execution",
-      "poll_interval_s": "Seconds between polls when scheduling queued jobs"
+      "poll_interval_s": "Seconds between polls when scheduling queued jobs",
+      "overfit_check": "Overfit sanity-check gate run before normal training"
     }
   },
   "training/general/loss::LossConfig": {
@@ -1645,6 +1646,17 @@
       "batch_size": "Samples per step during overfit; typically 1"
     }
   },
+  "training/general/runtime::OverfitCheckConfig": {
+    "summary": "Pre-training overfit sanity gate: memorize a few examples with regularization disabled before normal training starts",
+    "fields": {
+      "enabled": "Whether to run the overfit check before normal training; a failed check aborts the run",
+      "n_examples": "Number of training examples the sanitized model must memorize",
+      "max_steps": "Optimization step budget for the check",
+      "steps_per_epoch": "Steps per check epoch; controls logging granularity",
+      "pass_loss_ratio": "Required best/initial train-loss ratio for the check to pass",
+      "stop_threshold": "Absolute loss below which the check passes and stops early"
+    }
+  },
   "training/general/runtime::TrainingLoopConfig": {
     "summary": "Core optimization loop cadence, precision, and failure handling",
     "fields": {
@@ -1724,7 +1736,8 @@
       "geometry": "SAR acquisition geometry defining elevation-axis sampling",
       "paths": "Input dataset and run-directory path resolution",
       "training": "Data-loading queue: batch size 512, 16 workers, prefetch 2",
-      "pretrain": "Pretrained-weight loading and initialization options"
+      "pretrain": "Pretrained-weight loading and initialization options",
+      "overfit_check": "Overfit sanity-check gate run before normal training"
     }
   },
   "training/jepa::EmbeddingLossConfig": {
@@ -1799,7 +1812,8 @@
       "training": "Training queue and scheduling configuration",
       "pretrain": "Pretraining stage configuration before main training",
       "infer_after": "Whether to run inference automatically after training",
-      "inference": "Inference settings applied when infer_after is enabled"
+      "inference": "Inference settings applied when infer_after is enabled",
+      "overfit_check": "Overfit sanity-check gate run before normal training"
     }
   },
   "training/profile_autoencoder::ProfileAeLossConfig": {
@@ -1846,7 +1860,8 @@
       "geometry": "SAR acquisition geometry defining elevation sampling axis",
       "paths": "Input data and run output path locations",
       "training": "Data-loading queue: batch size, workers, prefetch",
-      "pretrain": "Pretraining or checkpoint-warmstart settings"
+      "pretrain": "Pretraining or checkpoint-warmstart settings",
+      "overfit_check": "Overfit sanity-check gate run before normal training"
     }
   },
   "tuning/general::TuningConfig": {
