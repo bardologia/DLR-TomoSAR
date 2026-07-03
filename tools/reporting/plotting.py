@@ -94,6 +94,9 @@ class PlotBase:
     ):
         self._apply_style()
 
+        if not discrete and np.issubdtype(np.asarray(data).dtype, np.floating):
+            data = np.asarray(data, dtype=np.float64)
+
         fig, ax = plt.subplots(figsize=figsize)
 
         if discrete:

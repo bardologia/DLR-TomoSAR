@@ -86,6 +86,7 @@ class SlotOrganizationPlotter(PlotTools):
             fig, ax = plt.subplots(figsize=(5.6, 3.8))
             for k in range(n_gaussians):
                 v = per_slot[k]
+                v = v[(v >= bin_edges[0]) & (v <= bin_edges[-1])]
                 if v.size == 0:
                     continue
                 ax.hist(v, bins=bin_edges, density=True, histtype="step", linewidth=1.3, color=colors[k], label=f"slot {k}")

@@ -73,16 +73,21 @@ class ParamPlotter(PlotTools):
                     hi        = float(np.percentile(combined, 99.5))
                     bin_edges = np.linspace(lo, hi, bins + 1)
 
+                gt_in   = gt  [(gt   >= bin_edges[0]) & (gt   <= bin_edges[-1])]
+                pred_in = pred[(pred >= bin_edges[0]) & (pred <= bin_edges[-1])]
+                if gt_in.size == 0 and pred_in.size == 0:
+                    continue
+
                 fig, ax = plt.subplots(figsize=(4.8, 3.4))
 
-                if has_gt:
-                    ax.hist(gt, bins=bin_edges, density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
-                    ax.axvline(float(np.median(gt)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt):.3g}")
+                if gt_in.size:
+                    ax.hist(gt_in, bins=bin_edges, density=True, color="C0", alpha=0.55, label="GT", edgecolor="none")
+                    ax.axvline(float(np.median(gt_in)), color="C0", linestyle="--", linewidth=0.9, label=f"med GT={np.median(gt_in):.3g}")
 
-                if has_pred:
+                if pred_in.size:
                     pred_label = "Matched pred" if matched else "Pred"
-                    ax.hist(pred, bins=bin_edges, density=True, color="C3", alpha=0.55, label=pred_label, edgecolor="none")
-                    ax.axvline(float(np.median(pred)), color="C3", linestyle="--", linewidth=0.9, label=f"med {pred_label}={np.median(pred):.3g}")
+                    ax.hist(pred_in, bins=bin_edges, density=True, color="C3", alpha=0.55, label=pred_label, edgecolor="none")
+                    ax.axvline(float(np.median(pred_in)), color="C3", linestyle="--", linewidth=0.9, label=f"med {pred_label}={np.median(pred_in):.3g}")
 
                 tag   = "GT g" if matched else "g"
                 scope = "matched, active" if matched else "pred only"
