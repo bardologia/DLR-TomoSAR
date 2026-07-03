@@ -170,3 +170,23 @@ def test_payload_deduplicates_shared_fields():
 
     assert restored.parameters[0] == primary
     assert restored.parameters[1] == secondary
+
+
+def test_payload_rejects_extra_keys_on_secondary_track():
+    primary   = {"da": 0.61, "h0": 3719.1}
+    secondary = {"da": 0.61, "h0": 3719.0, "cal_dt": 1.5}
+
+    parameters = TrackParameters(labels=["FL01_PS02", "FL01_PS04"], parameters=[primary, secondary])
+
+    with pytest.raises(ValueError, match="extra.*cal_dt"):
+        parameters.to_payload()
+
+
+def test_payload_rejects_missing_keys_on_secondary_track():
+    primary   = {"da": 0.61, "h0": 3719.1}
+    secondary = {"da": 0.61}
+
+    parameters = TrackParameters(labels=["FL01_PS02", "FL01_PS04"], parameters=[primary, secondary])
+
+    with pytest.raises(ValueError, match="missing.*h0"):
+        parameters.to_payload()

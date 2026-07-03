@@ -157,7 +157,19 @@ class TrackParameters:
             "Look angle [deg]"   : ", ".join(f"{g['look_angle_near_deg']:.1f}-{g['look_angle_far_deg']:.1f}" for g in geometry),
         }
 
+    def _validate_key_sets(self) -> None:
+        reference_keys = set(self.parameters[0])
+
+        for label, params in zip(self.labels, self.parameters):
+            missing = reference_keys - set(params)
+            extra   = set(params) - reference_keys
+
+            if missing or extra:
+                raise ValueError(f"Track '{label}' parameter keys differ from reference '{self.reference}': missing {sorted(missing)}, extra {sorted(extra)}; a lossless shared/per-track partition is impossible.")
+
     def _partition(self) -> tuple:
+        self._validate_key_sets()
+
         shared       = {}
         varying_keys = []
 
