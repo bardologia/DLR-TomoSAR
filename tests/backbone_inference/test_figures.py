@@ -123,6 +123,11 @@ def test_animator_build_axis_bad_axis():
         animator._build_axis("bogus", cubes, _x_axis(), 0, 0)
 
 
+def test_animator_rejects_non_positive_max_frames():
+    with pytest.raises(ValueError, match="max_frames"):
+        Animator(_SilentLogger(), max_frames=0)
+
+
 @pytest.mark.slow
 def test_animator_walk_gif(tmp_path):
     x_axis = _x_axis()

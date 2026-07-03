@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
 from dataclasses        import dataclass
 from io                 import BytesIO
 from pathlib            import Path
+from typing             import Iterator
 
 import matplotlib
 
@@ -51,6 +52,9 @@ class Animator:
         max_frames  : int = 150,
         num_workers : int | None = None,
     ) -> None:
+        if max_frames < 1:
+            raise ValueError(f"max_frames must be >= 1, got {max_frames}; use a large value instead of 0 to leave GIFs uncapped.")
+
         self.logger      = logger
         self.cmap        = cmap
         self.err_cmap    = err_cmap
@@ -128,14 +132,24 @@ class Animator:
             slices = tuple(s[sort_idx] if s is not None else None for s in slices)
         return slices
 
-    def _render(self, tasks: list[FrameSpec]) -> dict[int, bytes]:
-        n_workers = self.num_workers if self.num_workers is not None else min(len(tasks), os.cpu_count() or 1)
+    def _render(self, specs: Iterator[FrameSpec], n_frames: int) -> dict[int, bytes]:
+        n_workers = self.num_workers if self.num_workers is not None else min(n_frames, os.cpu_count() or 1)
+        window    = 2 * n_workers
         png_bytes: dict[int, bytes] = {}
 
         with ProcessPoolExecutor(max_workers=n_workers, initializer=Animator._init_worker) as pool:
-            futures = {pool.submit(Animator._render_frame, t): t.frame_order for t in tasks}
-            with tqdm(total=len(futures), desc="Rendering frames", unit="frame") as pbar:
-                for fut in as_completed(futures):
+            pending: set = set()
+            with tqdm(total=n_frames, desc="Rendering frames", unit="frame") as pbar:
+                for spec in specs:
+                    if len(pending) >= window:
+                        done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                        for fut in done:
+                            order, data = fut.result()
+                            png_bytes[order] = data
+                            pbar.update(1)
+                    pending.add(pool.submit(Animator._render_frame, spec))
+
+                for fut in as_completed(pending):
                     order, data = fut.result()
                     png_bytes[order] = data
                     pbar.update(1)
@@ -186,6 +200,44 @@ class Animator:
     def _init_worker() -> None:
         matplotlib.use("Agg")
 
+    def _frame_specs(
+        self,
+        frame_indices : np.ndarray,
+        get_slice,
+        axis_spec     : dict,
+        has_full      : bool,
+        vmin          : float,
+        vmax          : float,
+        emax_gt       : float,
+    ) -> Iterator[FrameSpec]:
+
+        n_frames = len(frame_indices)
+
+        for frame_order, fi in enumerate(frame_indices):
+            i    = int(fi)
+            slc  = get_slice(i)
+            p, g = slc[0], slc[1]
+            f    = slc[2] if has_full else None
+
+            yield FrameSpec(
+                frame_order = frame_order,
+                n_frames    = n_frames,
+                gt          = g.copy(),
+                pred        = p.copy(),
+                full        = f.copy() if f is not None else None,
+                vmin        = vmin,
+                vmax        = vmax,
+                emax_gt     = emax_gt,
+                extent      = axis_spec["extent"],
+                x_label     = axis_spec["x_label"],
+                y_label     = axis_spec["y_label"],
+                cmap        = self.cmap,
+                err_cmap    = self.err_cmap,
+                dpi         = self.dpi,
+                origin      = axis_spec["origin"],
+                title       = axis_spec["title_fn"](i),
+            )
+
     def walk_gif(
         self,
         pred_cube    : np.ndarray,
@@ -219,43 +271,18 @@ class Animator:
         if emax_gt <= 0.0:
             emax_gt = 1.0
 
-        tasks: list[FrameSpec] = []
-        n_frames = len(frame_indices)
-        for frame_order, fi in enumerate(frame_indices):
-            i   = int(fi)
-            slc = get_slice(i)
-            p, g  = slc[0], slc[1]
-            f     = slc[2] if full_cube is not None else None
-            tasks.append(FrameSpec(
-                frame_order = frame_order,
-                n_frames    = n_frames,
-                gt          = g.copy(),
-                pred        = p.copy(),
-                full        = f.copy() if f is not None else None,
-                vmin        = vmin,
-                vmax        = vmax,
-                emax_gt     = emax_gt,
-                extent      = spec["extent"],
-                x_label     = spec["x_label"],
-                y_label     = spec["y_label"],
-                cmap        = self.cmap,
-                err_cmap    = self.err_cmap,
-                dpi         = self.dpi,
-                origin      = spec["origin"],
-                title       = spec["title_fn"](i),
-            ))
-
-        png_bytes = self._render(tasks)
-        frames    = [Image.open(BytesIO(png_bytes[k])).convert("P", dither=Image.Dither.NONE) for k in sorted(png_bytes)]
+        specs     = self._frame_specs(frame_indices, get_slice, spec, full_cube is not None, vmin, vmax, emax_gt)
+        png_bytes = self._render(specs, len(frame_indices))
+        decoded   = (Image.open(BytesIO(png_bytes.pop(k))).convert("P", dither=Image.Dither.NONE) for k in sorted(png_bytes))
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         duration_ms = int(round(1000.0 / max(1, self.fps)))
 
-        frames[0].save(
+        next(decoded).save(
             fp            = str(out_path),
             format        = "GIF",
             save_all      = True,
-            append_images = frames[1:],
+            append_images = decoded,
             loop          = 0,
             duration      = duration_ms,
             optimize      = False,
