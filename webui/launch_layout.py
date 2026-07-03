@@ -118,6 +118,7 @@ class LaunchLayout:
                 {"path": "early_stop_patience", "widget": NUM_PATIENCE},
                 "early_stop_min_delta",
                 "log_all_losses",
+                "log_debug",
                 "resume",
             ]},
             {"title": "Weight averaging", "fields": [

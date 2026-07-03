@@ -26,6 +26,7 @@ class TrainingQueueConfig:
     early_stop_patience  : int             = 30
     early_stop_min_delta : float           = 0.0
     log_all_losses       : bool            = False
+    log_debug            : bool            = False
 
     use_amp                     : bool  = False
     gradient_accumulation_steps : int   = 1
