@@ -278,8 +278,13 @@ class LaunchLayout:
             ]},
         ],
         "overfit": [
-            {"title": "Overfit check", "fields": [
+            {"title": "Overfit mode", "fields": [
                 {"gate": "enabled", "fields": ["max_steps", "stop_threshold", "batch_size"]},
+            ]},
+        ],
+        "overfit_check": [
+            {"title": "Overfit check", "fields": [
+                {"gate": "enabled", "fields": ["n_examples", "max_steps", "steps_per_epoch", "pass_loss_ratio", "stop_threshold"]},
             ]},
         ],
     }
@@ -386,6 +391,7 @@ class LaunchLayout:
                         {"title": None, "fields": [{"gate": "probe_enabled", "fields": ["probe_n_batches", "probe_reference", "probe_exit_after"]}]},
                     ]},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
@@ -433,6 +439,7 @@ class LaunchLayout:
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},
@@ -465,6 +472,7 @@ class LaunchLayout:
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_image", "at": "ae_loss"},
@@ -502,6 +510,7 @@ class LaunchLayout:
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Embedding loss", "template": "embedding_loss", "at": "embedding_loss"},
@@ -605,7 +614,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Fold layout", "fields": ["folds.n_folds", "folds.azimuth_start", "folds.azimuth_end", "folds.guard"]},
                     ]},
-                    {"kind": "fields", "title": "Overfit check", "template": "overfit", "at": "overfit"},
+                    {"kind": "fields", "title": "Overfit mode", "template": "overfit", "at": "overfit"},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
@@ -674,7 +683,7 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
-                    {"kind": "fields", "title": "Overfit check", "template": "overfit", "at": "overfit"},
+                    {"kind": "fields", "title": "Overfit mode", "template": "overfit", "at": "overfit"},
                 ]},
                 {"key": "loss", "title": "Loss", "when": {"field": "training_type", "in": ["backbone"]}, "panels": [
                     {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
