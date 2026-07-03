@@ -33,8 +33,10 @@ class BenchmarkWorker(WorkerBase):
 
         records = FileIO.load_json(size_match_path)
 
-        entry = records.get(model_name, {})
-        return entry.get("overrides", {})
+        if model_name not in records:
+            raise SystemExit(f"size_match.json present but missing an entry for '{model_name}'; the benchmark would silently train a capacity-unmatched model")
+
+        return records[model_name]["overrides"]
 
     def _max_batch_size(self, model_name: str) -> int | None:
         path = self.run_dir / "pipeline" / "max_batch.json"

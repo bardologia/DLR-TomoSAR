@@ -44,6 +44,16 @@ def test_size_overrides_reads_overrides(config):
     assert worker._size_overrides("unet") == {"features": [32, 64]}
 
 
+def test_size_overrides_missing_model_exits(config):
+    worker = BenchmarkWorker(config, "tag")
+    path   = worker.run_dir / "pipeline" / "size_match.json"
+
+    FileIO.save_json({"other_model": {"overrides": {}}}, path)
+
+    with pytest.raises(SystemExit, match="missing an entry for 'unet'"):
+        worker._size_overrides("unet")
+
+
 def test_max_batch_size_none_without_file(config):
     worker = BenchmarkWorker(config, "tag")
 
