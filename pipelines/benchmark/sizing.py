@@ -151,8 +151,19 @@ class SizeMatcher:
         self.image_size  = config.training.patch_size[0]
         self.in_channels = config.size_match.in_channels
 
+        self._validate_in_channels()
+
         gaussian_cfg      = GaussianConfig.from_dataset(config.paths.dataset_path, config.paths.parameters_path)
         self.out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
+
+    def _validate_in_channels(self) -> None:
+        labels = self.config.paths.secondary_labels
+        if not labels:
+            return
+
+        expected = self.config.input.total_channels(len(labels), len(labels))
+        if self.in_channels != expected:
+            raise SystemExit(f"size_match.in_channels={self.in_channels} but the input configuration yields {expected} channels for {len(labels)} secondaries; capacity matching would count the wrong width")
 
     def reference_count(self) -> int:
         reference = self.config.size_match.reference_model

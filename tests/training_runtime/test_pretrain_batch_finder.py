@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
-from tools.training.pretraining.batch_finder import BatchSizeFinder
+from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMemoryProbe
 
 
 class _Logger:
@@ -63,4 +64,23 @@ def test_result_dict_has_expected_keys():
 
     result = finder.run()
 
-    assert set(result) == {"model", "status", "batch_size", "peak_gb", "budget_gb", "ceiling", "trials", "error"}
+    assert set(result) == {"model", "status", "batch_size", "peak_gb", "budget_gb", "ceiling", "context_gb", "trials", "error"}
+
+
+def test_result_records_the_measured_context():
+    finder = BatchSizeFinder(trial_step=lambda bs: 1.0, budget_gb=4.0, ceiling=2, device=torch.device("cpu"), logger=_Logger(), context_gb=0.7)
+
+    result = finder.run()
+
+    assert result["context_gb"] == 0.7
+
+
+def test_measure_context_is_zero_without_cuda():
+    assert TrainStepMemoryProbe.measure_context(torch.device("cpu")) == 0.0
+
+
+def test_trial_raises_cleanly_when_dataset_is_smaller_than_one_batch():
+    probe = TrainStepMemoryProbe(trainer=None, dataset=[1, 2, 3], measure_steps=1, device=torch.device("cuda"), context_gb=0.0)
+
+    with pytest.raises(RuntimeError, match="fewer than one full batch"):
+        probe(batch_size=8)

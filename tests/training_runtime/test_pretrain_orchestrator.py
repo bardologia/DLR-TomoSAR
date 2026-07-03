@@ -38,13 +38,13 @@ def _training():
     return SimpleNamespace(batch_size=1, num_workers=0, prefetch_factor=2, scale_lr_with_batch=True)
 
 
-def _context(order, training):
+def _context(order, training, dataset=None):
     def trial(batch_size):
         order.append(("trial", batch_size))
         return 1.0 if batch_size <= 4 else 100.0
 
     return PretrainContext(
-        dataset        = None,
+        dataset        = dataset if dataset is not None else list(range(64)),
         model          = None,
         to_model_input = None,
         forward_loss   = None,
@@ -86,6 +86,22 @@ def test_batch_finder_runs_before_tuner_and_feeds_resolved_batch(monkeypatch):
 
     assert order[tune_index] == ("tune", 4)
     assert any(kind == "trial" for kind, _ in order[:tune_index])
+
+
+def test_batch_finder_caps_ceiling_at_dataset_size():
+    order    = []
+    training = _training()
+
+    PretrainOrchestrator(
+        pretrain_config = _pretrain(find_batch_size=True),
+        training_config = training,
+        build_context   = lambda: _context(order, training, dataset=list(range(3))),
+        logger          = _Logger(),
+        label           = "m",
+    ).run()
+
+    assert training.batch_size == 2
+    assert [size for kind, size in order if kind == "trial"] == [1, 2]
 
 
 def test_all_flags_off_is_a_noop():

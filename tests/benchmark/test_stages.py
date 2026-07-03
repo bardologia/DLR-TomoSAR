@@ -9,6 +9,7 @@ from pipelines.benchmark.stages import (
     ComparisonStage,
     InferenceStage,
     MaxBatchStage,
+    SeedExpandedStage,
     SizeMatchStage,
     TrainingStage,
 )
@@ -54,6 +55,24 @@ def test_maxbatch_missing_result_carries_budget_and_ceiling(config, logger_stub)
     assert record["status"]    == "FAIL"
     assert record["budget_gb"] == config.max_batch.vram_budget_gb
     assert record["ceiling"]   == config.max_batch.max_batch
+
+
+def test_maxbatch_pass_result_is_reused_on_resume(config, logger_stub):
+    config.resume = True
+    stage = MaxBatchStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+
+    FileIO.save_json({"model": "unet", "status": "PASS", "batch_size": 64, "peak_gb": 10.0}, stage._result_path("unet"))
+
+    assert stage._has_result("unet") is True
+
+
+def test_maxbatch_failed_result_is_reprobed_on_resume(config, logger_stub):
+    config.resume = True
+    stage = MaxBatchStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+
+    FileIO.save_json({"model": "unet", "status": "FAIL", "batch_size": None, "peak_gb": None, "error": "boom"}, stage._result_path("unet"))
+
+    assert stage._has_result("unet") is False
 
 
 def test_maxbatch_run_collects_records_keyed_by_model(config, logger_stub, monkeypatch):
@@ -163,6 +182,27 @@ def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, 
     assert collected["kwargs"]["reference_model"] == config.size_match.reference_model
     assert collected["kwargs"]["seed_dispersion"] == {"unet": {"n_seeds": 2}}
     assert "comparison" in str(out_dir)
+
+
+def test_sweep_components_empty_list_fails_for_backbone(config):
+    config.sweep_loss_components = []
+
+    with pytest.raises(SystemExit, match="sweep_loss_components is empty"):
+        SeedExpandedStage.components(config)
+
+
+def test_sweep_components_unknown_name_fails(config):
+    config.sweep_loss_components = ["nope"]
+
+    with pytest.raises(SystemExit, match="unknown loss component"):
+        SeedExpandedStage.components(config)
+
+
+def test_sweep_components_collapse_for_non_backbone(config):
+    config.training_type         = "profile_autoencoder"
+    config.sweep_loss_components = []
+
+    assert SeedExpandedStage.components(config) == [None]
 
 
 def test_training_seed_sweep_job_uses_base_model_and_seed(config, logger_stub):

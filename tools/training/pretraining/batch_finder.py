@@ -16,11 +16,27 @@ class TrainStepMemoryProbe:
         self.device        = device
         self.context_gb    = float(context_gb)
 
+    @staticmethod
+    def measure_context(device: torch.device) -> float:
+        if device.type != "cuda":
+            return 0.0
+
+        warm = torch.zeros(1, device=device)
+        del warm
+        torch.cuda.empty_cache()
+
+        free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+
+        return (total_bytes - free_bytes) / (1024.0 ** 3)
+
     def __call__(self, batch_size: int) -> float:
+        loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False, drop_last=True, num_workers=0)
+        if len(loader) == 0:
+            raise RuntimeError(f"dataset holds {len(self.dataset)} samples, fewer than one full batch of {batch_size} with drop_last=True")
+
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats(self.device)
 
-        loader   = DataLoader(self.dataset, batch_size=batch_size, shuffle=False, drop_last=True, num_workers=0)
         iterator = iter(loader)
 
         for _ in range(self.measure_steps):
@@ -88,6 +104,7 @@ class BatchSizeFinder:
             "peak_gb"    : None,
             "budget_gb"  : self.budget_gb,
             "ceiling"    : self.ceiling,
+            "context_gb" : self.context_gb,
             "trials"     : [],
             "error"      : None,
         }

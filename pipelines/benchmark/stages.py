@@ -17,7 +17,8 @@ from tools.runtime.run_tag                     import RunTag
 
 
 class SeedExpandedStage:
-    def _components(self, config: BenchmarkConfig) -> list[str | None]:
+    @classmethod
+    def components(cls, config: BenchmarkConfig) -> list[str | None]:
         if config.training_type != "backbone":
             return [None]
 
@@ -36,7 +37,8 @@ class SeedExpandedStage:
         return model if component is None else f"{model}__{component}"
 
     def _expand(self, config: BenchmarkConfig, models: list[str]) -> list[str]:
-        pairs      = [(model, component) for model in models for component in self._components(config)]
+        components = self.components(config)
+        pairs      = [(model, component) for model in models for component in components]
         self._pair = {self._unit_base(model, component): (model, component) for model, component in pairs}
 
         units      = SeedSet.units(list(self._pair.keys()), config.seeds)
@@ -65,7 +67,12 @@ class MaxBatchStage(ExperimentStage):
         return self.stage_dir / model_name / "max_batch_result.json"
 
     def _has_result(self, model_name: str) -> bool:
-        return self.config.resume and self._result_path(model_name).exists()
+        path = self._result_path(model_name)
+
+        if not self.config.resume or not path.exists():
+            return False
+
+        return FileIO.load_json(path)["status"] == "PASS"
 
     def _job(self, model_name: str) -> GpuJob:
         return GpuJob(
@@ -85,6 +92,7 @@ class MaxBatchStage(ExperimentStage):
                 "peak_gb"    : None,
                 "budget_gb"  : self.config.max_batch.vram_budget_gb,
                 "ceiling"    : self.config.max_batch.max_batch,
+                "context_gb" : None,
                 "trials"     : [],
                 "error"      : f"missing result file: {path}",
             }
@@ -92,9 +100,8 @@ class MaxBatchStage(ExperimentStage):
         return FileIO.load_json(path)
 
     def _write_report(self, records: dict) -> None:
-        budget   = self.config.max_batch.vram_budget_gb
-        ceiling  = self.config.max_batch.max_batch
-        failed   = [m for m in records if records[m]["status"] != "PASS"]
+        budget  = self.config.max_batch.vram_budget_gb
+        ceiling = self.config.max_batch.max_batch
 
         lines = [
             "# Maximum Batch Size Report",
@@ -150,6 +157,11 @@ class MaxBatchStage(ExperimentStage):
 
         for model_name in cached:
             self.logger.info(f"{model_name}: cached result reused")
+
+        if self.config.resume:
+            for model_name in pending:
+                if self._result_path(model_name).exists():
+                    self.logger.warning(f"{model_name}: previous result was not PASS, re-probing")
 
         if pending:
             self._run_queue([self._job(m) for m in pending])

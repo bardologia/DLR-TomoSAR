@@ -29,17 +29,18 @@ class SingleTrainRunner:
         trainer, dataset, model = self._build_pretrain_trainer(logger)
         trainer.model.train()
 
-        feed = TrainerFeed(trainer)
+        feed       = TrainerFeed(trainer)
+        context_gb = TrainStepMemoryProbe.measure_context(device)
 
         return PretrainContext(
             dataset        = dataset,
             model          = model,
             to_model_input = feed.to_model_input,
             forward_loss   = feed.forward_loss,
-            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, 0.0),
+            trial_step     = TrainStepMemoryProbe(trainer, dataset, self.config.pretrain.measure_steps, device, context_gb),
             device         = device,
             use_amp        = trainer.use_amp,
-            context_gb     = 0.0,
+            context_gb     = context_gb,
             on_oom         = lambda: self._release(trainer),
         )
 

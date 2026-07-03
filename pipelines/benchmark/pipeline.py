@@ -6,7 +6,7 @@ from configuration.benchmark import BenchmarkConfig
 from models                                     import config_registry
 from pipelines.shared.orchestration.staged_pipeline import StagedPipeline
 
-from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatchStage, SizeMatchStage, TrainingStage
+from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatchStage, SeedExpandedStage, SizeMatchStage, TrainingStage
 
 
 class BenchmarkPipeline(StagedPipeline):
@@ -18,6 +18,9 @@ class BenchmarkPipeline(StagedPipeline):
 
     def _registry(self) -> dict:
         return config_registry(self.config.training_type)
+
+    def _validate_sweep(self) -> None:
+        SeedExpandedStage.components(self.config)
 
     def _run_max_batch(self) -> dict:
         stage   = MaxBatchStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)
@@ -69,6 +72,8 @@ class BenchmarkPipeline(StagedPipeline):
         }, title="Configuration")
 
         try:
+            self._validate_sweep()
+
             if self.config.runs_size_match():
                 self._run_size_match()
 

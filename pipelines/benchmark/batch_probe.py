@@ -21,6 +21,8 @@ from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMe
 
 
 class MaxBatchProbe:
+    CONTEXT_WARN_GB = 1.5
+
     def __init__(self, config: BenchmarkConfig, model_name: str, overrides: dict) -> None:
         self.config     = config
         self.model_name = model_name
@@ -38,13 +40,7 @@ class MaxBatchProbe:
         self.logger     = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
 
     def _measure_context(self) -> float:
-        warm = torch.zeros(1, device=self.device)
-        del warm
-        torch.cuda.empty_cache()
-
-        free_bytes, total_bytes = torch.cuda.mem_get_info(self.device)
-
-        return (total_bytes - free_bytes) / (1024.0 ** 3)
+        return TrainStepMemoryProbe.measure_context(self.device)
 
     def _build_context(self):
         factory        = ConfigFactory(self.config)
@@ -117,6 +113,7 @@ class MaxBatchProbe:
             "peak_gb"    : None,
             "budget_gb"  : self.budget_gb,
             "ceiling"    : self.ceiling,
+            "context_gb" : None,
             "trials"     : [],
             "error"      : None,
         }
@@ -124,10 +121,20 @@ class MaxBatchProbe:
         try:
             Reproducibility.seed_everything(self.seed)
 
-            self.context_gb = self._measure_context()
+            self.context_gb      = self._measure_context()
+            result["context_gb"] = self.context_gb
             self.logger.subsection(f"CUDA context: {self.context_gb:.2f} GB")
+            if self.context_gb > self.CONTEXT_WARN_GB:
+                self.logger.warning(f"Context {self.context_gb:.2f} GB exceeds a bare CUDA context; other processes are using this GPU and shrink the measured budget")
 
             trainer_config, dataset_config, dataset, gaussian_cfg = self._build_context()
+
+            if dataset.input_channels != self.config.size_match.in_channels:
+                raise RuntimeError(f"size_match.in_channels={self.config.size_match.in_channels} but the dataset provides {dataset.input_channels} input channels; capacity matching counted the wrong width — fix size_match.in_channels and re-run size matching without resume")
+
+            ceiling = min(self.ceiling, len(dataset))
+            if ceiling < self.ceiling:
+                self.logger.warning(f"Ceiling lowered from {self.ceiling} to {ceiling}: the train split holds {len(dataset)} samples")
 
             model, model_cfg = self._build_model(dataset_config, dataset, gaussian_cfg)
             trainer          = self._build_trainer(trainer_config, dataset_config, model, model_cfg, dataset)
@@ -135,7 +142,7 @@ class MaxBatchProbe:
             finder = BatchSizeFinder(
                 trial_step = lambda batch_size: self._trial(trainer, dataset, batch_size),
                 budget_gb  = self.budget_gb,
-                ceiling    = self.ceiling,
+                ceiling    = ceiling,
                 device     = self.device,
                 logger     = self.logger,
                 model_name = self.model_name,

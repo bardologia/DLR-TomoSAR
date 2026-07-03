@@ -104,6 +104,24 @@ def test_probe_init_requires_cuda_device(tmp_path):
     assert probe.ceiling   == config.max_batch.max_batch
 
 
+def test_run_caps_the_ceiling_at_the_dataset_size():
+    source = inspect.getsource(MaxBatchProbe.run)
+
+    assert "min(self.ceiling, len(dataset))" in source
+
+
+def test_run_validates_size_match_channels_against_the_dataset():
+    source = inspect.getsource(MaxBatchProbe.run)
+
+    assert "dataset.input_channels != self.config.size_match.in_channels" in source
+
+
+def test_run_records_the_measured_context():
+    source = inspect.getsource(MaxBatchProbe.run)
+
+    assert 'result["context_gb"] = self.context_gb' in source
+
+
 def test_build_context_probes_with_the_swept_loss_union():
     source = inspect.getsource(MaxBatchProbe._build_context)
 

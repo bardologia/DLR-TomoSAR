@@ -94,6 +94,14 @@ def _config(dataset_path) -> BenchmarkConfig:
     return config
 
 
+def test_size_matcher_rejects_in_channels_drift(logger_stub):
+    config = BenchmarkConfig()
+    config.size_match.in_channels = 7
+
+    with pytest.raises(SystemExit, match="capacity matching would count the wrong width"):
+        SizeMatcher(config=config, logger=logger_stub)
+
+
 @pytest.mark.real_data
 def test_size_matcher_reference_count_matches_default_unet(test_data_dir, logger_stub):
     config  = _config(test_data_dir)

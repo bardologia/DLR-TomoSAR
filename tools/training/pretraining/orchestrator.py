@@ -45,10 +45,14 @@ class PretrainOrchestrator:
     def _find_batch_size(self, context: PretrainContext) -> None:
         self.logger.section("[Pretrain] Max batch-size finder")
 
+        ceiling = min(self.pretrain.max_batch, len(context.dataset))
+        if ceiling < self.pretrain.max_batch:
+            self.logger.subsection(f"Ceiling lowered from {self.pretrain.max_batch} to {ceiling}: the dataset holds {len(context.dataset)} samples")
+
         finder = BatchSizeFinder(
             trial_step = context.trial_step,
             budget_gb  = self.pretrain.vram_budget_gb,
-            ceiling    = self.pretrain.max_batch,
+            ceiling    = ceiling,
             device     = context.device,
             logger     = self.logger,
             model_name = self.label,
