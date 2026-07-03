@@ -31,14 +31,18 @@ class StatusBoard {
   }
 
   async _poll() {
+    if (this._polling) return;
+    this._polling = true;
+
     let sys;
     try {
       sys = await window.apiGet("/api/system");
-    } catch (e) {
-      return;
+    } finally {
+      this._polling = false;
     }
+
     if (!sys || sys.error) return;
-    if (!this.built) this._build(sys);
+    if (!this.built || (sys.gpus || []).length > this.hist.gpus.length) this._build(sys);
     this._update(sys);
   }
 
@@ -663,14 +667,31 @@ class StatusBoard {
     }).join("  ");
   }
 
+  _audioContext() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    this._actx = this._actx || new Ctx();
+
+    if (this._actx.state === "suspended" && !this._resumeHooked) {
+      this._resumeHooked = true;
+      const resume = () => {
+        this._actx.resume();
+        document.removeEventListener("pointerdown", resume);
+        document.removeEventListener("keydown", resume);
+      };
+      document.addEventListener("pointerdown", resume);
+      document.addEventListener("keydown", resume);
+      this._actx.resume();
+    }
+
+    return this._actx;
+  }
+
   _alarm(critical) {
     window.toast && window.toast(critical ? "CRITICAL: your process died after a GPU intrusion" : "GPU intrusion: another user is on a GPU you are using", "error");
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      this._actx = this._actx || new Ctx();
-      const ctx = this._actx;
-      if (ctx.state === "suspended") ctx.resume();
+      const ctx = this._audioContext();
+      if (!ctx) return;
       const t0 = ctx.currentTime;
       const beeps = critical ? [0, 0.16, 0.32, 0.48, 0.64] : [0, 0.2, 0.4];
       const freq = critical ? 1320 : 880;
@@ -735,7 +756,7 @@ class StatusBoard {
     });
 
     const row = (j, follow) => {
-      const name = this._esc(String(j.command || "").split("/").pop() || "job");
+      const name = this._esc(j.script || String(j.command || "").split(" ")[0].split("/").pop() || "job");
       const cls =
         j.status === "running" ? "is-run" :
         j.status === "failed" ? "is-fail" :
