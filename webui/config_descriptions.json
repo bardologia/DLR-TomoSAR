@@ -817,6 +817,20 @@
       "output_dir": "Destination for comparison outputs; None uses a default"
     }
   },
+  "comparison::ComparisonPathsConfig": {
+    "summary": "Locates the benchmark run directory for a standalone comparison rebuild",
+    "fields": {
+      "log_base_dir": "Root directory holding the benchmark run directories"
+    }
+  },
+  "comparison::ComparisonEntryConfig": {
+    "summary": "Entry point that rebuilds the benchmark comparison report for an existing run without re-running training or inference",
+    "fields": {
+      "run_tag": "Benchmark run tag to compare; None picks the most recent run under the log base directory",
+      "reference_model": "Model whose parameter count anchored the capacity matching, highlighted in the report",
+      "embed_images": "Embed images inline in the report versus linking them externally"
+    }
+  },
   "cross_validation/general::FoldConfig": {
     "summary": "Defines azimuth-range partitioning into cross-validation folds",
     "fields": {

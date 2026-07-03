@@ -97,6 +97,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Compare Gaussian-fit parameter-extraction trials grouped by number of Gaussians K. Ranks within each K family on complexity-penalised BIC, variance explained, spatial coherence, and selection decisiveness, and exposes slot-collapse diagnostics. The K families are treated as separate deliverables.",
         },
+        "compare_runs": {
+            "title"     : "Compare Benchmark Runs",
+            "category"  : "Analysis",
+            "purpose"   : "Rebuild the benchmark comparison report for an existing benchmark run: seed-aggregated leaderboard against the capacity-matched reference, without re-running training or inference.",
+        },
         "xray_weights": {
             "title"     : "X-Ray Weights",
             "category"  : "Analysis",
@@ -143,6 +148,7 @@ class ScriptCatalog:
                 ("compare_preprocessing_trials",    "Preprocessing"),
                 ("compare_param_extraction_trials", "Param Extraction"),
                 ("compare_trials",                  "Inference Trials"),
+                ("compare_runs",                    "Benchmark Runs"),
             ],
         },
     }

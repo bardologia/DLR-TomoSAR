@@ -555,9 +555,6 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Input channels", "template": "input", "at": "input"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
-                    {"kind": "fields", "title": "Sampling", "groups": [
-                        {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
-                    ]},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
@@ -571,6 +568,9 @@ class LaunchLayout:
                 ]},
                 {"key": "ae-loss", "title": "Autoencoder loss", "when": {"field": "training_type", "in": ["profile_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},
+                    {"kind": "fields", "title": "Sampling", "groups": [
+                        {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
+                    ]},
                 ]},
                 {"key": "jepa", "title": "JEPA", "when": {"field": "training_type", "in": ["jepa"]}, "panels": [
                     {"kind": "fields", "title": "Autoencoder runs", "groups": [
@@ -676,9 +676,6 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
-                    {"kind": "fields", "title": "Sampling", "groups": [
-                        {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
-                    ]},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
@@ -690,6 +687,9 @@ class LaunchLayout:
                 ]},
                 {"key": "ae-loss", "title": "Autoencoder loss", "when": {"field": "training_type", "in": ["profile_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},
+                    {"kind": "fields", "title": "Sampling", "groups": [
+                        {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
+                    ]},
                 ]},
                 {"key": "image-ae-loss", "title": "Image AE loss", "when": {"field": "training_type", "in": ["image_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Image AE loss", "template": "ae_loss_image", "at": "image_ae_loss"},
@@ -771,6 +771,16 @@ class LaunchLayout:
                             {"path": "run_tags", "widget": {"kind": "dataset", "mode": "runs_compare", "multi": True, "baseFrom": "runs_dir"}},
                         ]},
                         {"title": "Report", "fields": ["compare_images", "compare_gifs", "embed_images", "output_dir"]},
+                    ]},
+                ]},
+            ],
+        },
+        "compare_runs": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Run", "fields": ["paths.log_base_dir", "run_tag"]},
+                        {"title": "Report", "fields": ["reference_model", "embed_images"]},
                     ]},
                 ]},
             ],

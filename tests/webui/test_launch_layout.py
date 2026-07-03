@@ -12,11 +12,17 @@ if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
 from launch_layout            import LaunchLayout
+from project_paths            import ProjectPaths
+from script_catalog           import ScriptCatalog
 from tools.runtime.config_cli import ConfigCli
 from configuration.benchmark.general        import BenchmarkConfig
+from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
 from configuration.training                 import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
+from pipelines.backbone.training.loss_terms import LossComponentCatalog
+
+_DISPATCH_ONLY = {"generate_tomogram", "generate_interferograms"}
 
 _TRAINING_PAGES = [
     ("train_backbone",            BackboneEntryConfig),
@@ -34,6 +40,26 @@ def test_training_layout_claims_every_config_field_exactly_once(key, flow_config
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
 
     LaunchLayout().build(key, leaves)
+
+
+def test_sweep_loss_choices_match_the_component_catalog():
+    choices = {choice["value"] for choice in LaunchLayout.MULTI_SWEEP_LOSSES["choices"]}
+
+    assert choices == set(LossComponentCatalog.names())
+
+
+def test_compare_runs_layout_claims_every_config_field_exactly_once():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(ComparisonEntryConfig())]
+
+    LaunchLayout().build("compare_runs", leaves)
+
+
+def test_every_registered_script_is_reachable_from_the_catalog():
+    members = {member for group in ScriptCatalog.GROUPS.values() for member, _label in group["members"]}
+    pages   = set(ScriptCatalog.META) | members
+
+    assert set(ProjectPaths.SCRIPT_DIRS) - _DISPATCH_ONLY == pages
+    assert pages <= set(LaunchLayout.LAYOUTS)
 
 
 @pytest.mark.parametrize("key, flow_config", _TRAINING_PAGES)
