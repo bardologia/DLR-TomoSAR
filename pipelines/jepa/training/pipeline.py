@@ -13,6 +13,8 @@ from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalize
 from pipelines.shared.config.config_factory              import ConfigFactory
 from pipelines.shared.config.run_metadata                import TrainingRunMetadata
 from pipelines.shared.dataset.dataset_prep               import BackboneDatasetPreparation
+from pipelines.shared.model.model_builder                import ModelBuilder
+from pipelines.shared.training.overfit_check             import OverfitCheck
 from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
@@ -89,7 +91,27 @@ class TrainingPipeline:
         g = self.trainer_config.gaussian
         return g.params_per_gaussian * g.n_default_gaussians
 
-    def _build_module(self, datasets, x_len: int, logger):
+    def _run_overfit_check(self, run_meta, logger, datasets, x_len: int, x_axis) -> None:
+        check = OverfitCheck(self.entry.overfit_check, run_meta.run_directory, logger)
+        if not check.enabled:
+            return
+
+        gate_trainer_config = check.sanitized_trainer_config(self.trainer_config)
+
+        gate_trainer_config.param_loss.use_active_normalization = False
+        check.record("param_loss.use_active_normalization", False)
+
+        base_backbone_config = ModelBuilder.config_from_registry(self.backbone_name, self.entry.model_overrides)
+        gate_backbone_config = check.sanitized_model_config(base_backbone_config)
+
+        gate_module, gate_backbone_cfg = self._build_module(datasets, x_len, logger, backbone_config=gate_backbone_config)
+        profile_normalizer             = self._profile_normalizer(run_meta, logger)
+
+        gate_trainer = Trainer(gate_module, gate_backbone_cfg, x_axis, gate_trainer_config, check.work_directory, logger, datasets["train"].normalizer, profile_normalizer)
+
+        check.run(gate_trainer, datasets["train"])
+
+    def _build_module(self, datasets, x_len: int, logger, backbone_config=None):
         dataset_in_channels = datasets["train"].input_channels
 
         image_autoencoder = None
@@ -108,7 +130,7 @@ class TrainingPipeline:
         else:
             backbone_out = self._gaussian_out_channels()
 
-        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, x_len)
+        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, x_len, config=backbone_config)
         module                 = JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)
 
         self._log_module(logger, module, backbone, dataset_in_channels, backbone_in, backbone_out)
@@ -144,13 +166,14 @@ class TrainingPipeline:
         logger.section("[JEPA Module Built]")
         logger.kv_table(info)
 
-    def _build_backbone(self, in_channels: int, out_channels: int, image_size: int):
+    def _build_backbone(self, in_channels: int, out_channels: int, image_size: int, config=None):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
         if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
-        for k, v in self.entry.model_overrides.items():
-            overrides[k] = v
-        return get_backbone(self.backbone_name, **overrides)
+        if config is None:
+            for k, v in self.entry.model_overrides.items():
+                overrides[k] = v
+        return get_backbone(self.backbone_name, config=config, **overrides)
 
     def _load_profile_autoencoder(self):
         autoencoder, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
@@ -217,6 +240,8 @@ class TrainingPipeline:
         logger   = run_meta.logger
 
         loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
+
+        self._run_overfit_check(run_meta, logger, datasets, x_len, x_axis)
 
         model, backbone_cfg = self._build_module(datasets, x_len, logger)
 

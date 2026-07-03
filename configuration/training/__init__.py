@@ -6,6 +6,7 @@ from configuration.training.general import (
     GradientClipperConfig,
     IOConfig,
     OverfitConfig,
+    OverfitCheckConfig,
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,

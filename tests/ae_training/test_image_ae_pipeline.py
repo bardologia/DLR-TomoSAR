@@ -65,7 +65,7 @@ def test_build_model_sets_in_channels():
     cfg  = _build_cfg()
     pipe = _pipeline(cfg)
 
-    model = pipe._build_model(IN_CHANNELS)
+    model = pipe._build_model(IN_CHANNELS, cfg)
 
     assert isinstance(model, torch.nn.Module)
     assert cfg.in_channels == IN_CHANNELS
@@ -76,7 +76,7 @@ def test_orchestration_produces_checkpoint_and_metadata(tmp_path):
     pipe = _pipeline(cfg)
 
     run_meta = TrainingRunMetadata(pipe.trainer_config, "image_ae", tmp_path, "image_ae_test")
-    model    = pipe._build_model(IN_CHANNELS)
+    model    = pipe._build_model(IN_CHANNELS, cfg)
     x_axis   = np.arange(PATCH, dtype=np.float32)
 
     pipe._save_metadata(run_meta, IN_CHANNELS, PATCH)
@@ -101,7 +101,7 @@ def test_saved_checkpoint_is_loadable(tmp_path):
     pipe = _pipeline(cfg)
 
     run_meta = TrainingRunMetadata(pipe.trainer_config, "image_ae", tmp_path, "image_ae_test")
-    model    = pipe._build_model(IN_CHANNELS)
+    model    = pipe._build_model(IN_CHANNELS, cfg)
     x_axis   = np.arange(PATCH, dtype=np.float32)
 
     loader            = _loader()
@@ -109,7 +109,7 @@ def test_saved_checkpoint_is_loadable(tmp_path):
 
     ckpt = torch.load(Path(run_dir) / "best_model.pt", map_location="cpu", weights_only=False)
 
-    fresh = pipe._build_model(IN_CHANNELS)
+    fresh = pipe._build_model(IN_CHANNELS, cfg)
     fresh.load_state_dict(ckpt["params"])
 
 

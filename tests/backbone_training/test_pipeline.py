@@ -135,3 +135,48 @@ def test_training_pipeline_saves_configs(test_data_dir, params_dir, tmp_path):
 
     assert meta_dir.is_dir()
     assert len(written) > 0
+
+
+@pytest.mark.real_data
+@pytest.mark.slow
+def test_training_pipeline_overfit_check_gates_and_reports(test_data_dir, params_dir, tmp_path):
+    import json
+
+    from configuration.training import OverfitCheckConfig
+
+    dataset_config = _dataset_config(test_data_dir, params_dir)
+    trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
+
+    overfit_check = OverfitCheckConfig(enabled=True, n_examples=2, max_steps=4, steps_per_epoch=2, pass_loss_ratio=1.0)
+
+    pipeline = TrainingPipeline(
+        trainer_config = trainer_config,
+        dataset_config = dataset_config,
+        backbone_name  = "resunet",
+        model_config   = None,
+        seed           = 0,
+        run_name       = "pipeline_overfit_check",
+        overfit_check  = overfit_check,
+    )
+
+    train_losses, val_losses, best_val = pipeline.run(probe_config=None)
+
+    run_directory = pipeline.run_metadata.run_directory
+    report_path   = run_directory / "meta" / "overfit_report.json"
+
+    assert report_path.is_file()
+
+    report = json.loads(report_path.read_text())
+
+    assert report["passed"] is True
+    assert report["n_examples"] == 2
+    assert report["sanitized_overrides"]["optimizer.weight_decay"] == 0.0
+    assert report["sanitized_overrides"]["curriculum.warmup.use_active_normalization"] is False
+    assert report["sanitized_overrides"]["model.dropout"] == 0.0
+    assert report["sanitized_overrides"]["augmentation"] == "disabled"
+
+    assert not (run_directory / "overfit_check" / "best_model.pt").exists()
+    assert not (run_directory / "overfit_check" / "last.pt").exists()
+
+    assert (run_directory / "best_model.pt").exists()
+    assert len(train_losses) == 1

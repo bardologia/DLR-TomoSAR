@@ -109,6 +109,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             model_config   = model_config,
             seed           = self.config.seed,
             run_name       = self.config.run_name,
+            overfit_check  = self.config.overfit_check,
         )
 
         results = pipeline.run(probe_config=self._probe_config())

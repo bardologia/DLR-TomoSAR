@@ -12,7 +12,7 @@ from configuration.normalization.general        import NormalizationConfig
 from configuration.training.general.ablation    import AblationCatalog
 from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitCheckConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
 from configuration.training.general.pretraining import PretrainConfig
 
 
@@ -173,6 +173,8 @@ class BackboneEntryConfig:
     probe_n_batches  : int  = 1000
     probe_reference  : str  = "param_l1"
     probe_exit_after : bool = True
+
+    overfit_check : OverfitCheckConfig = field(default_factory=OverfitCheckConfig)
 
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)

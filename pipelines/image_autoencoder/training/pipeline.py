@@ -32,9 +32,9 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         trainer_config.inherit_shared_from(base)
         return trainer_config
 
-    def _build_model(self, in_channels: int):
-        self.autoencoder_cfg.in_channels = in_channels
-        model, _ = get_image_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+    def _build_model(self, in_channels: int, config):
+        config.in_channels = in_channels
+        model, _ = get_image_autoencoder(self.ae_model_name, config)
         return model
 
     def _prepare_data(self, run_meta, logger):
@@ -43,7 +43,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
 
         in_channels = datasets["train"].input_channels
 
-        return train_loader, val_loader, test_loader, x_axis, in_channels, (in_channels, x_len)
+        return train_loader, val_loader, test_loader, x_axis, in_channels, datasets, (in_channels, x_len)
 
     def _save_metadata(self, run_meta, in_channels: int, x_len: int) -> None:
         run_meta.save_trainer_config()
@@ -73,7 +73,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
 
         in_channels = datasets["train"].input_channels
-        model       = pipeline._build_model(in_channels)
+        model       = pipeline._build_model(in_channels, pipeline.autoencoder_cfg)
         trainer     = Trainer(model, pipeline.autoencoder_cfg, dataset_config.x_axis, pipeline.trainer_config, work_dir, logger)
 
         return trainer, datasets["train"], model

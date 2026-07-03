@@ -31,9 +31,9 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         trainer_config.inherit_shared_from(base)
         return trainer_config
 
-    def _build_model(self, x_len: int):
-        self.autoencoder_cfg.profile_length = x_len
-        model, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
+    def _build_model(self, x_len: int, config):
+        config.profile_length = x_len
+        model, _ = get_profile_autoencoder(self.ae_model_name, config)
         return model
 
     def _build_dataset_config(self):
@@ -64,9 +64,9 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         profile_config   = self._profile_dataset_config()
         dataset_pipeline = ProfileDatasetPipeline(profile_config, run_meta.run_directory, logger=logger, seed=self.entry.seed)
 
-        (train_loader, val_loader, test_loader), _datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
+        (train_loader, val_loader, test_loader), datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
 
-        return train_loader, val_loader, test_loader, x_axis, x_len, (profile_config, x_len)
+        return train_loader, val_loader, test_loader, x_axis, x_len, datasets, (profile_config, x_len)
 
     def _save_metadata(self, run_meta, profile_config: ProfileDatasetConfig, x_len: int) -> None:
         run_meta.save_trainer_config()
@@ -91,7 +91,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
         (_loaders, datasets, x_axis, x_len, _normalizer) = dataset_pipeline.run()
 
-        model   = pipeline._build_model(x_len)
+        model   = pipeline._build_model(x_len, pipeline.autoencoder_cfg)
         trainer = Trainer(model, pipeline.autoencoder_cfg, x_axis, pipeline.trainer_config, work_dir, logger)
 
         return trainer, datasets["train"], model

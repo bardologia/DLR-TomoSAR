@@ -9,7 +9,7 @@ from configuration.dataset                          import AugmentationConfig
 from configuration.normalization.general            import NormalizationConfig
 from configuration.sar.geometry_config              import GeometryConfig
 from configuration.training.general.optimization    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime         import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.runtime         import IOConfig, MemoryConfig, OverfitCheckConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
 from configuration.training.general.pretraining     import PretrainConfig
 from configuration.training.general.trainer         import SharedSubConfigInheritance
 
@@ -57,3 +57,4 @@ class ImageAeEntryConfig:
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)

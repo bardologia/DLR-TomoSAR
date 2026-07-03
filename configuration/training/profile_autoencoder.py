@@ -8,7 +8,7 @@ from configuration.training.general.run              import RunPathsConfig, Trai
 from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config               import GeometryConfig
 from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitCheckConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
 from configuration.training.general.pretraining      import PretrainConfig
 from configuration.training.general.trainer          import SharedSubConfigInheritance
 
@@ -56,6 +56,7 @@ class ProfileAeEntryConfig:
     ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     geometry        : GeometryConfig      = field(default_factory=GeometryConfig)
 
-    paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
-    training : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))
-    pretrain : PretrainConfig      = field(default_factory=PretrainConfig)
+    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))
+    pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
+    overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)
