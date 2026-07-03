@@ -72,6 +72,7 @@ class DatasetPipeline:
             raise FileNotFoundError(f"A per-pixel physics-geometry loss term is active but {path} is missing; this dataset predates automatic geometry-field generation, re-run preprocessing for it.")
 
         field = GeometryField.load(path).subset(self.config.secondary_labels)
+        field.validate_extent(self.layout.global_crop)
 
         self.logger.section("[Per-Pixel Geometry Field Loaded]")
         self.logger.kv_table(field.describe(), title="Geometry Field")

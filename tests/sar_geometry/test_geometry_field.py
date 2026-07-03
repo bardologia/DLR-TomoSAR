@@ -199,3 +199,15 @@ def test_real_geometry_field_reference_kz_zero_and_mean_baseline(meta_dir, basel
 
     assert np.abs(gf.kz("height")[0]).max() == 0.0
     assert np.allclose(bperp_mean, expected, atol=0.1)
+
+
+def test_validate_extent_accepts_matching_crop():
+    gf = _field()
+    gf.validate_extent(CropRegion(gf.azimuth_start, gf.azimuth_start + gf.n_azimuth, gf.range_start, gf.range_start + gf.n_range))
+
+
+def test_validate_extent_rejects_foreign_crop():
+    gf = _field()
+
+    with pytest.raises(ValueError, match="different crop"):
+        gf.validate_extent(CropRegion(gf.azimuth_start + 1, gf.azimuth_start + 1 + gf.n_azimuth, gf.range_start, gf.range_start + gf.n_range))

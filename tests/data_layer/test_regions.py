@@ -218,3 +218,44 @@ def test_validate_disjoint_rejects_overlap_within_split():
 
     with pytest.raises(ValueError, match="train\\[0\\]"):
         splits.validate_disjoint()
+
+def test_contains_true_for_inner_and_equal_regions():
+    outer = CropRegion(100, 200, 50, 150)
+
+    assert outer.contains(CropRegion(120, 180, 60, 140))
+    assert outer.contains(outer)
+
+
+def test_contains_false_when_any_edge_escapes():
+    outer = CropRegion(100, 200, 50, 150)
+
+    assert not outer.contains(CropRegion(90, 180, 60, 140))
+    assert not outer.contains(CropRegion(120, 210, 60, 140))
+    assert not outer.contains(CropRegion(120, 180, 40, 140))
+    assert not outer.contains(CropRegion(120, 180, 60, 160))
+
+
+def test_validate_within_accepts_contained_splits():
+    glob   = CropRegion(0, 1000, 0, 500)
+    splits = SplitRegions.from_ratios(glob)
+
+    splits.validate_within(glob)
+
+
+def test_validate_within_rejects_region_outside_crop():
+    glob   = CropRegion(100, 1000, 0, 500)
+    stale  = CropRegion(70, 90, 0, 500)
+    splits = SplitRegions(train=stale, val=CropRegion(100, 200, 0, 500), test=CropRegion(200, 300, 0, 500))
+
+    with pytest.raises(ValueError, match="'train'.*not contained"):
+        splits.validate_within(glob)
+
+
+def test_validate_within_names_indexed_region_in_lists():
+    glob   = CropRegion(0, 1000, 0, 500)
+    good   = CropRegion(0, 100, 0, 500)
+    bad    = CropRegion(900, 1100, 0, 500)
+    splits = SplitRegions(train=[good, bad], val=CropRegion(100, 200, 0, 500), test=CropRegion(200, 300, 0, 500))
+
+    with pytest.raises(ValueError, match=r"'train\[1\]'"):
+        splits.validate_within(glob)

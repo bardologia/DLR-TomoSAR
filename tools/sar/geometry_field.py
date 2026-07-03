@@ -60,6 +60,13 @@ class GeometryField:
 
         return scale * self.perpendicular_baseline() / denominator
 
+    def validate_extent(self, crop) -> None:
+        actual   = (self.azimuth_start, self.azimuth_start + self.n_azimuth, self.range_start, self.range_start + self.n_range)
+        expected = crop.as_tuple()
+
+        if actual != expected:
+            raise ValueError(f"Geometry field extent az[{actual[0]}, {actual[1]}) rg[{actual[2]}, {actual[3]}) does not match the preprocessing global crop az[{expected[0]}, {expected[1]}) rg[{expected[2]}, {expected[3]}); the stored geometry_field.npz belongs to a different crop, re-run preprocessing to regenerate it.")
+
     def subset(self, secondary_labels) -> "GeometryField":
         if secondary_labels is None:
             return self
