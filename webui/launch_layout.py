@@ -565,6 +565,7 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                     {"kind": "fields", "title": "Max-batch probe", "groups": [
                         {"title": None, "fields": ["max_batch.vram_budget_gb", {"path": "max_batch.max_batch", "widget": NUM_BATCH}, "max_batch.measure_steps", {"path": "max_batch.seed", "widget": NUM_SEED}]},
                     ]},
@@ -625,6 +626,7 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},

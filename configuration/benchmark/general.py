@@ -10,6 +10,7 @@ from configuration.training.backbone            import default_curriculum
 from configuration.training.general.loss        import LossConfig
 from configuration.training.general.pretraining import PretrainConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.runtime     import OverfitCheckConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
 
@@ -87,6 +88,7 @@ class BenchmarkConfig:
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
     loss          : LossConfig          = field(default_factory=_default_base_loss)
+    overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)
     jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)

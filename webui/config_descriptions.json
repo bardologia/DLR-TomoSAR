@@ -767,7 +767,8 @@
       "seed": "Base random seed for the benchmark",
       "seeds": "Explicit seed list for multi-seed repeated runs",
       "poll_interval_s": "Seconds between polls of queued job status",
-      "sweep_loss_components": "Loss terms varied across the benchmark sweep"
+      "sweep_loss_components": "Loss terms varied across the benchmark sweep",
+      "overfit_check": "Overfit sanity-check gate run before each benchmarked model's training"
     }
   },
   "benchmark/jepa::JepaBenchConfig": {
@@ -847,7 +848,8 @@
       "resume": "Whether to resume interrupted folds instead of restarting",
       "seed": "Base random seed for reproducibility",
       "seeds": "Multiple seeds for repeated seed-varied runs",
-      "poll_interval_s": "Seconds between queue polls for job completion"
+      "poll_interval_s": "Seconds between queue polls for job completion",
+      "overfit_check": "Overfit sanity-check gate run before each fold's training"
     }
   },
   "cross_validation/jepa::JepaCvConfig": {

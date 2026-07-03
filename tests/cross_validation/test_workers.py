@@ -246,9 +246,10 @@ def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypa
     captured = {}
 
     class _FakePipeline:
-        def __init__(self, trainer_config, dataset_config, backbone_name, model_config, seed, run_name):
+        def __init__(self, trainer_config, dataset_config, backbone_name, model_config, seed, run_name, overfit_check):
             captured["trainer_config"] = trainer_config
             captured["run_name"]       = run_name
+            captured["overfit_check"]  = overfit_check
 
         def run(self, probe_config=None):
             pass
@@ -263,3 +264,18 @@ def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypa
     assert trainer_config.curriculum.complete.use_covariance_match is True
     assert trainer_config.geometry.baselines_origin == str(config.geometry.baselines_file(test_data_dir))
     assert captured["run_name"] == "fold_1_seed7"
+    assert captured["overfit_check"] is config.overfit_check
+
+
+@pytest.mark.real_data
+def test_fold_entry_configs_carry_the_overfit_check(test_data_dir):
+    config = worker_config(test_data_dir, "jepa")
+    config.overfit_check.enabled = True
+    worker = FoldTrainingWorker(config, run_tag="rt")
+
+    jepa_entry = worker._jepa_entry_config("fold_0", seed=None)
+    ae_entry   = worker._ae_entry_config("fold_0", seed=None)
+
+    assert jepa_entry.overfit_check is config.overfit_check
+    assert ae_entry.overfit_check   is config.overfit_check
+    assert jepa_entry.overfit_check.enabled is True

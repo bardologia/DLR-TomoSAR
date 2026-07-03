@@ -65,6 +65,7 @@ class BenchmarkWorker(WorkerBase):
             ae_loss         = self.config.ae_loss,
             paths           = self.config.paths,
             training        = self.config.training,
+            overfit_check   = self.config.overfit_check,
         )
 
     def _jepa_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
@@ -84,6 +85,7 @@ class BenchmarkWorker(WorkerBase):
             embedding_loss             = jepa.embedding_loss,
             paths                      = self.config.paths,
             training                   = self.config.training,
+            overfit_check              = self.config.overfit_check,
         )
 
 
@@ -148,6 +150,7 @@ class TrainingWorker(BenchmarkWorker):
             model_config   = model_config,
             seed           = self.config.seed if seed is None else seed,
             run_name       = run_name,
+            overfit_check  = self.config.overfit_check,
         )
 
         pipeline.run(probe_config=self._probe_config())
