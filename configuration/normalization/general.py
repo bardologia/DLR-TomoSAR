@@ -23,6 +23,9 @@ class ChannelStrategy:
         if self.norm_method is NormMethod.FIXED_DIV_PI:
             return 0.0, float(np.pi)
 
+        if flat.size == 0:
+            raise ValueError(f"Cannot fit {self.norm_method.value} normalization on an empty sample pool; the collection mask left no pixels for this channel group.")
+
         data = (
             np.log1p(np.maximum(flat.astype(np.float64), 0.0))
             if self.apply_log1p

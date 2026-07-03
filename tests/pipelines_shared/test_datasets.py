@@ -4,10 +4,22 @@ import numpy as np
 import pytest
 
 from configuration.dataset                       import InputConfig, OutputConfig, Representation
+from configuration.normalization                 import ChannelStats, ChannelStrategy, NormMethod
 from pipelines.backbone.dataset.datasets         import MultiRegionDataset, PatchDataset
+from pipelines.backbone.dataset.normalizer       import Normalizer
 from pipelines.backbone.dataset.spatial          import Patcher
+from pipelines.backbone.dataset.stats            import Stats
 from pipelines.profile_autoencoder.dataset.datasets import ProfileDataset
 from tools.monitoring.logger                     import Logger
+
+
+def _identity_channel_stats(n: int) -> ChannelStats:
+    strategy = ChannelStrategy(NormMethod.ZSCORE)
+    return ChannelStats(loc=[0.0] * n, scale=[1.0] * n, names=[f"c{i}" for i in range(n)], strategies=[strategy] * n)
+
+
+def _identity_normalizer(n_inputs: int, n_outputs: int) -> Normalizer:
+    return Normalizer(Stats(input_stats=_identity_channel_stats(n_inputs), output_stats=_identity_channel_stats(n_outputs)))
 
 
 def _backbone_dataset(interferograms, parameters, split_name="train", n_ifg=3):
@@ -21,11 +33,14 @@ def _backbone_dataset(interferograms, parameters, split_name="train", n_ifg=3):
                           use_secondaries=False,
                           use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY)
 
-    return PatchDataset(
+    ds = PatchDataset(
         inputs=inputs, gt_parameters=params, grid=patcher,
         input_config=ic, output_config=OutputConfig(), split_name=split_name,
         n_secondaries=0, n_interferograms=n_ifg, n_gaussians=5,
-    ), patcher
+    )
+    ds.normalizer = _identity_normalizer(ds.input_channels, ds.gt_channels)
+
+    return ds, patcher
 
 
 @pytest.mark.real_data
@@ -142,6 +157,7 @@ def test_patchdataset_dem_fills_last_channel(interferograms, parameters):
         input_config=ic, output_config=OutputConfig(), split_name="val",
         n_secondaries=0, n_interferograms=3, n_gaussians=5, dem=dem,
     )
+    ds.normalizer = _identity_normalizer(ds.input_channels, ds.gt_channels)
 
     x, _ = ds[0]
 

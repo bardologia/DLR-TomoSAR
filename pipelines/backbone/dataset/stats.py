@@ -35,6 +35,10 @@ class Stats:
 
         payload = FileIO.load_json(path)
 
+        if payload["input_stats"] is None or payload["output_stats"] is None:
+            missing = [key for key in ("input_stats", "output_stats") if payload[key] is None]
+            raise ValueError(f"Normalization stats at '{path}' lack {missing}; the file holds only a partial half and cannot drive training or inference.")
+
         input_stats  = ChannelStats.from_dict(payload["input_stats"])
         output_stats = ChannelStats.from_dict(payload["output_stats"])
         clamp        = OutputClampConfig.from_dict(payload["clamp"])

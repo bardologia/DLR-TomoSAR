@@ -122,10 +122,12 @@ def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, pa
     assert np.all(np.isfinite(stats.output_stats.loc))
     assert np.all(np.isfinite(stats.output_stats.scale))
 
-    norm   = Normalizer(stats)
-    sample = ds[0][0]
-    out    = norm.normalize_input(sample)
-    back   = norm.denormalize_input(out)
+    norm          = Normalizer(stats)
+    ds.normalizer = norm
+
+    out   = ds[0][0]
+    back  = norm.denormalize_input(out)
+    again = norm.normalize_input(back)
 
     assert np.all(np.isfinite(out))
-    np.testing.assert_allclose(back, sample, atol=1e-2)
+    np.testing.assert_allclose(again, out, atol=1e-2)

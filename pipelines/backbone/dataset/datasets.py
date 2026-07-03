@@ -107,13 +107,13 @@ class PatchDataset(Dataset):
 
     def _normalize_input_tensor(self, input_tensor: np.ndarray) -> np.ndarray:
         if self.normalizer is None:
-            return input_tensor
+            raise RuntimeError(f"PatchDataset '{self.split_name}' was indexed before a normalizer was assigned; training on raw physical values would be silently wrong.")
 
         return self.normalizer.normalize_input(input_tensor)
 
     def _normalize_gt_params(self, gt_params: np.ndarray) -> np.ndarray:
-        if self.normalizer is None or self.normalizer.stats.output_stats is None:
-            return gt_params
+        if self.normalizer.stats.output_stats is None:
+            raise RuntimeError(f"PatchDataset '{self.split_name}' has a normalizer without output stats; ground-truth parameters cannot be normalized.")
 
         return self.normalizer.normalize_output(gt_params)
 

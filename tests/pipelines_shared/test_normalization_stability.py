@@ -163,3 +163,18 @@ def test_robust_iqr_scale_is_more_outlier_stable_than_zscore():
 
     assert r_drift < z_drift
     assert r_drift < 0.05
+
+
+def test_strategy_fit_rejects_empty_pool():
+    import numpy as np
+    import pytest as _pytest
+
+    from configuration.normalization import NormMethod
+    from configuration.normalization.general import ChannelStrategy
+
+    for method in (NormMethod.ZSCORE, NormMethod.ROBUST_IQR, NormMethod.MIN_MAX_P999):
+        with _pytest.raises(ValueError, match="empty sample pool"):
+            ChannelStrategy(method).fit(np.array([]))
+
+    loc, scale = ChannelStrategy(NormMethod.FIXED_DIV_PI).fit(np.array([]))
+    assert scale == _pytest.approx(np.pi)

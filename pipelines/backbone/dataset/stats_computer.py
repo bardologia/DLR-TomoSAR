@@ -95,14 +95,18 @@ class StatsComputer:
                 dem_flat = np.asarray(part.dem, dtype=np.float64).ravel()
                 collected["dem/elevation"].append(StatsComputer._sample_flat(dem_flat, budget["dem/elevation"], rng))
 
-        return {g: np.concatenate(v) for g, v in collected.items() if v}
+        empty = [g for g, v in collected.items() if not v]
+        if empty:
+            raise ValueError(f"No samples collected for channel groups {empty}; the input stack does not provide data for these groups, so their normalization cannot be fit.")
+
+        return {g: np.concatenate(v) for g, v in collected.items()}
 
     @staticmethod
     def _fit_input(logger : Logger, group_keys : list[str], strategies : dict[str, ChannelStrategy], collected : dict[str, np.ndarray]) -> ChannelStats:
         unique_groups    = list(dict.fromkeys(group_keys))
         group_strategies = strategies
 
-        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected.get(g, np.array([]))) for g in unique_groups}
+        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected[g] if group_strategies[g].norm_method is not NormMethod.FIXED_DIV_PI else np.array([])) for g in unique_groups}
 
         n          = len(group_keys)
         locs       = [group_mean_std[group_keys[i]][0] for i in range(n)]
@@ -122,6 +126,10 @@ class StatsComputer:
                 "scale":    f"{scales[c]:.6f}",
             })
         logger.metrics_table(rows, ["Ch", "Slot", "Method", "log1p", "loc", "scale"])
+
+        degenerate = [group for group, (_loc, scale) in group_mean_std.items() if scale <= 1e-8]
+        if degenerate:
+            logger.warning(f"Channel groups {degenerate} fit a degenerate scale (<= 1e-8); the channel is near-constant in the train regions and any deviation will be amplified by ~1e8 after normalization.")
 
         return ChannelStats(
             loc        = locs,
@@ -222,6 +230,10 @@ class StatsComputer:
                     "log1p":    str(strat.apply_log1p),
                 })
             logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
+
+            degenerate = [key for key, (_m, s) in role_fit.items() if s <= 1e-8]
+            if degenerate:
+                logger.warning(f"Output roles {degenerate} fit a degenerate scale (<= 1e-8); the parameter is near-constant over active pixels and any deviation will be amplified by ~1e8 after normalization.")
 
         return ChannelStats(
             loc        = locs,
