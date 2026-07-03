@@ -261,13 +261,52 @@ def test_ablation_planner_rejects_feature_without_degrade():
         AblationTrialPlanner("resunet", [{"label": "x"}], include_full=True)
 
 
+def test_ablation_planner_rejects_feature_without_enable():
+    with pytest.raises(ValueError, match="enable"):
+        AblationTrialPlanner("resunet", [{"label": "x", "degrade": {"curriculum.enabled": False}}], include_full=True)
+
+
+def test_ablation_planner_rejects_duplicate_labels():
+    features = [
+        {"label": "same", "enable": {"curriculum.warmup.use_cosine_curve": True},         "degrade": {"curriculum.warmup.use_cosine_curve": False}},
+        {"label": "same", "enable": {"curriculum.warmup.use_active_normalization": True}, "degrade": {"curriculum.warmup.use_active_normalization": False}},
+    ]
+
+    with pytest.raises(ValueError, match="unique"):
+        AblationTrialPlanner("resunet", features, include_full=True)
+
+
+def test_ablation_planner_rejects_orphaned_complete_terms():
+    features = [
+        {"label": "curriculum", "enable": {"curriculum.enabled": True},                          "degrade": {"curriculum.enabled": False}},
+        {"label": "covariance", "enable": {"curriculum.complete.use_covariance_match": True},    "degrade": {"curriculum.complete.use_covariance_match": False}},
+    ]
+
+    planner = AblationTrialPlanner("resunet", features, include_full=True)
+
+    with pytest.raises(ValueError, match="use_covariance_match"):
+        planner.plan()
+
+
+def test_ablation_planner_accepts_complete_terms_mirrored_into_warmup():
+    features = [
+        {"label": "curriculum", "enable": {"curriculum.enabled": True},                       "degrade": {"curriculum.enabled": False, "curriculum.warmup.use_coherence_resyn": True}},
+        {"label": "coherence",  "enable": {"curriculum.complete.use_coherence_resyn": True},  "degrade": {"curriculum.complete.use_coherence_resyn": False, "curriculum.warmup.use_coherence_resyn": False}},
+    ]
+
+    planner = AblationTrialPlanner("resunet", features, include_full=True)
+
+    names = [name for name, _ in planner.plan()]
+    assert names == ["resunet_abl-0-full", "resunet_abl-1-no_curriculum", "resunet_abl-2-baseline"]
+
+
 def test_ablation_catalog_default_is_the_standard_set():
     features = AblationCatalog.default_features()
     labels   = [feature["label"] for feature in features]
 
     assert labels == [
         "covariance_match", "physics_curriculum", "coherence_resyn",
-        "cosine_curve", "architecture", "augmentation",
+        "cosine_curve", "architecture_param_loss", "augmentation",
         "active_norm", "lr_per_group", "lr_warmup",
         "out_sigma", "out_amp", "ifg_phase", "pass_mag",
         "output_clamp",
@@ -311,14 +350,10 @@ def test_ablation_catalog_standard_categories_present():
     assert cosine["degrade"]["curriculum.warmup.use_cosine_curve"]   is False
     assert cosine["degrade"]["curriculum.complete.use_cosine_curve"] is False
 
-    imbalance = catalog["class_imbalance"]
-    assert imbalance["enable"]["curriculum.warmup.use_active_normalization"]  is True
-    assert imbalance["degrade"]["curriculum.warmup.use_active_normalization"] is False
-    assert "curriculum.warmup.presence_balance" not in imbalance["enable"]
-
+    assert "class_imbalance"  not in catalog
     assert "predict_presence" not in catalog
 
-    architecture = catalog["architecture"]
+    architecture = catalog["architecture_param_loss"]
     assert architecture["enable"]["backbone_name"]                       == "resunet"
     assert architecture["enable"]["curriculum.warmup.use_param_l1"]      is True
     assert architecture["enable"]["curriculum.warmup.use_param_mse"]     is False
@@ -348,12 +383,10 @@ def test_ablation_catalog_standard_categories_present():
 def test_ablation_catalog_as_dict_covers_loss_terms():
     catalog = AblationCatalog.as_dict()
 
-    assert "curve_loss_mse_to_l1" in catalog
+    assert "curve_loss_mse_to_l1" not in catalog
     assert "spectral_coherence"   in catalog
-
-    swap = catalog["curve_loss_mse_to_l1"]
-    assert swap["enable"]["curriculum.warmup.use_mse_curve"]  is True
-    assert swap["degrade"]["curriculum.warmup.use_l1_curve"]  is True
+    assert "ssim"                 in catalog
+    assert "smoothness_tv"        in catalog
 
 
 def test_ablation_catalog_covers_normalization_and_clamp():

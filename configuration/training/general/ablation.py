@@ -146,19 +146,6 @@ class AblationCatalog:
         ]
 
     @classmethod
-    def _imbalance_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
-
-        return [
-            {
-                "label"   : "class_imbalance",
-                "group"   : "class imbalance",
-                "enable"  : {f"{prefix}use_active_normalization": True,  f"{prefix}amp_focal_gamma": 2.0},
-                "degrade" : {f"{prefix}use_active_normalization": False, f"{prefix}amp_focal_gamma": 0.0},
-            },
-        ]
-
-    @classmethod
     def _slot_features(cls) -> list[dict]:
         prefix = cls.WARMUP_PREFIX
 
@@ -184,25 +171,12 @@ class AblationCatalog:
         ]
 
     @classmethod
-    def _structural_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
-
-        return [
-            {
-                "label"   : "curve_loss_mse_to_l1",
-                "group"   : "loss swap",
-                "enable"  : {f"{prefix}use_mse_curve": True,  f"{prefix}weight_mse_curve": 1.0, f"{prefix}use_l1_curve": False, f"{prefix}weight_l1_curve": 0.0},
-                "degrade" : {f"{prefix}use_mse_curve": False, f"{prefix}weight_mse_curve": 0.0, f"{prefix}use_l1_curve": True,  f"{prefix}weight_l1_curve": 1.0},
-            },
-        ]
-
-    @classmethod
     def _architecture_features(cls) -> list[dict]:
         warmup = cls.WARMUP_PREFIX
 
         return [
             {
-                "label"   : "architecture",
+                "label"   : "architecture_param_loss",
                 "group"   : "architecture",
                 "enable"  : {
                     "backbone_name"              : cls.FULL_ARCHITECTURE,
@@ -243,9 +217,7 @@ class AblationCatalog:
             + cls._schedule_features()
             + cls._physics_features()
             + cls._loss_component_features()
-            + cls._imbalance_features()
             + cls._slot_features()
-            + cls._structural_features()
             + cls._architecture_features()
             + loss_terms
         )
@@ -256,7 +228,7 @@ class AblationCatalog:
 
     DEFAULT_ORDER = (
         "covariance_match", "physics_curriculum", "coherence_resyn",
-        "cosine_curve", "architecture", "augmentation",
+        "cosine_curve", "architecture_param_loss", "augmentation",
         "active_norm", "lr_per_group", "lr_warmup",
         "out_sigma", "out_amp", "ifg_phase", "pass_mag",
         "output_clamp",

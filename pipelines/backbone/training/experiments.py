@@ -99,8 +99,14 @@ class AblationTrialPlanner:
             raise ValueError("ablation_features must list at least one feature to ablate")
 
         for index, feature in enumerate(self.features):
-            if "label" not in feature or "degrade" not in feature:
-                raise ValueError(f"Ablation feature #{index} must define 'label' and 'degrade', got {feature}")
+            missing = [key for key in ("label", "enable", "degrade") if key not in feature]
+            if missing:
+                raise ValueError(f"Ablation feature #{index} must define {missing}, got {feature}")
+
+        labels     = [feature["label"] for feature in self.features]
+        duplicates = sorted({label for label in labels if labels.count(label) > 1})
+        if duplicates:
+            raise ValueError(f"Ablation feature labels must be unique, duplicated: {duplicates}; duplicate labels collapse distinct trials onto one run directory")
 
     def summary(self) -> dict:
         return {
@@ -112,7 +118,7 @@ class AblationTrialPlanner:
     def _enabled_overrides(self) -> dict:
         merged = {}
         for feature in self.features:
-            merged.update(feature.get("enable", {}))
+            merged.update(feature["enable"])
         return merged
 
     def _degraded_prefix(self, count: int) -> dict:
@@ -128,6 +134,19 @@ class AblationTrialPlanner:
             return f"{self.model_name}_abl-{step}-baseline"
         return f"{self.model_name}_abl-{step}-no_{self.features[step - 1]['label']}"
 
+    @staticmethod
+    def _check_complete_terms(run_name: str, overrides: dict) -> None:
+        if overrides.get("curriculum.enabled") is not False:
+            return
+
+        for key, value in overrides.items():
+            if not key.startswith("curriculum.complete.use_") or value is not True:
+                continue
+
+            term = key.split("curriculum.complete.", 1)[1]
+            if overrides.get(f"curriculum.warmup.{term}") is not True:
+                raise ValueError(f"{run_name} disables the curriculum while {key}=True has no active curriculum.warmup.{term} mirror, so the term would be silently dropped; degrade that feature before the curriculum feature or mirror the term into the warmup config")
+
     def plan(self) -> list[tuple[str, dict]]:
         enabled = self._enabled_overrides()
         plans   = []
@@ -138,6 +157,9 @@ class AblationTrialPlanner:
         for step in range(1, len(self.features) + 1):
             overrides = {**enabled, **self._degraded_prefix(step)}
             plans.append((self._run_name(step), overrides))
+
+        for run_name, overrides in plans:
+            self._check_complete_terms(run_name, overrides)
 
         return plans
 
