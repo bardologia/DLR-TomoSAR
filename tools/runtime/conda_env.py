@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +44,17 @@ class CondaJobDispatcher:
         self.logger    = logger
         self.repo_root = repo_root if repo_root is not None else Path(__file__).resolve().parents[2]
 
+    @staticmethod
+    def _runtime_env(interpreter: Path) -> dict:
+        env          = dict(os.environ)
+        library_dir  = str(interpreter.parent.parent / "lib")
+        library_path = env.get("LD_LIBRARY_PATH", "")
+
+        if library_dir not in library_path.split(":"):
+            env["LD_LIBRARY_PATH"] = library_dir + (":" + library_path if library_path else "")
+
+        return env
+
     def dispatch(self, entry_relative_path: str, spec_payload: dict, spec_path: Path) -> None:
         FileIO.save_json(spec_payload, spec_path)
 
@@ -51,4 +63,4 @@ class CondaJobDispatcher:
         command     = [str(interpreter), str(entry), "--spec", str(spec_path)]
 
         self.logger.subsection(f"Dispatching '{entry_relative_path}' in env '{self.env_name}': {' '.join(command)}")
-        subprocess.run(command, check=True, cwd=str(self.repo_root))
+        subprocess.run(command, check=True, cwd=str(self.repo_root), env=self._runtime_env(interpreter))
