@@ -191,6 +191,26 @@ def test_report_is_reduced_key():
     assert Report._is_reduced_key("curve_mse_gt")    is False
 
 
+def test_report_figure_sections_absent_without_figures(tmp_path):
+    report = Report(
+        output_dir       = tmp_path,
+        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
+        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
+        checkpoint_meta  = {"epoch": 0, "best_epoch": 0, "best_val_loss": 1.0},
+        global_metrics   = _global_metrics(),
+        figure_paths     = {},
+        gif_paths        = {},
+        report_path      = tmp_path / "report.md",
+    )
+
+    text = report.assemble().read_text(encoding="utf-8")
+
+    assert "## 4. Profile reconstructions"     not in text
+    assert "## 5. Per-pixel metric maps"       not in text
+    assert "## 6. Gaussian parameter analysis" not in text
+    assert "## 8. SSIM curves"                 not in text
+
+
 def test_report_full_metrics_excludes_per_slice(tmp_path):
     gm = _global_metrics()
 

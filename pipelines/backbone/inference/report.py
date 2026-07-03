@@ -668,42 +668,48 @@ class Report:
             )
             self._numbered_section(out, "3b.", track_groups)
 
-        out.append("\n## 4. Profile reconstructions\n")
-        out.append(
-            "Each panel overlays the GT profile (black solid), "
-            "prediction (red dashed) and individual Gaussian components. "
-            "The shaded area shows the signed residual (pred \u2212 gt). "
-            "The raw full-stack tomogram that the GT Gaussians are fit to is drawn as a grey reference. "
-            "When a reduced baseline is available, its classical-Capon profile is overlaid "
-            "(green dotted, rescaled to the GT peak) so the network's gain in elevation shape is visible.\n"
-        )
-        self._section(out, (
+        profile_groups = (
             ("profiles_best",   "4.1 Best-fit profiles (lowest MSE)"),
             ("profiles_worst",  "4.2 Worst-fit profiles (highest MSE)"),
             ("profiles_random", "4.3 Random profiles"),
-        ))
+        )
+        if any(fp.get(key) for key, _title in profile_groups):
+            out.append("\n## 4. Profile reconstructions\n")
+            out.append(
+                "Each panel overlays the GT profile (black solid), "
+                "prediction (red dashed) and individual Gaussian components. "
+                "The shaded area shows the signed residual (pred \u2212 gt). "
+                "The raw full-stack tomogram that the GT Gaussians are fit to is drawn as a grey reference. "
+                "When a reduced baseline is available, its classical-Capon profile is overlaid "
+                "(green dotted, rescaled to the GT peak) so the network's gain in elevation shape is visible.\n"
+            )
+            self._section(out, profile_groups)
 
-        out.append("\n## 5. Per-pixel metric maps\n")
-        self._section(out, (
+        pixel_groups = (
             ("pixel_mse_map",       "5.1 MSE map (log scale, pred vs GT)"),
             ("pixel_r2_map",        "5.2 R\u00b2 map (pred vs GT)"),
             ("pixel_peak_map",      "5.3 Peak-location error map (|\u0394 peak index|)"),
             ("metric_histograms",   "5.4 Metric distributions"),
-        ))
-
-        out.append("\n## 6. Gaussian parameter analysis\n")
-        out.append(
-            "All parameter figures are permutation-invariant: the distributions (6.1), scatter (6.2) and "
-            "error maps (6.3) Hungarian-match predicted Gaussians to GT Gaussians per pixel before scoring, "
-            "and the active-count map (6.4) compares counts only. For aggregate ordering-independent accuracy "
-            "see §2.5.\n"
         )
-        self._section(out, (
+        if any(fp.get(key) for key, _title in pixel_groups):
+            out.append("\n## 5. Per-pixel metric maps\n")
+            self._section(out, pixel_groups)
+
+        param_groups = (
             ("param_distributions",    "6.1 Parameter distributions (GT vs Pred)"),
             ("param_scatter",          "6.2 Parameter scatter plots (GT vs Pred, with R²)"),
             ("param_error_maps",       "6.3 Parameter absolute-error maps |Pred − GT|"),
             ("active_count_map",       "6.4 Active Gaussian count map"),
-        ))
+        )
+        if any(fp.get(key) for key, _title in param_groups):
+            out.append("\n## 6. Gaussian parameter analysis\n")
+            out.append(
+                "All parameter figures are permutation-invariant: the distributions (6.1), scatter (6.2) and "
+                "error maps (6.3) Hungarian-match predicted Gaussians to GT Gaussians per pixel before scoring, "
+                "and the active-count map (6.4) compares counts only. For aggregate ordering-independent accuracy "
+                "see §2.5.\n"
+            )
+            self._section(out, param_groups)
 
         org_groups = [(key, title) for key, title in (
             ("slot_usage",      "Per-slot activation frequency"),
@@ -744,16 +750,18 @@ class Report:
             )
             self._numbered_section(out, "7.", slice_groups)
 
-        out.append("\n## 8. SSIM curves\n")
-        out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT, both denormalised and unit-area-normalised.\n")
-        self._section(out, (
+        ssim_groups = (
             ("ssim_range",        "8.1 SSIM along range axis (denorm)"),
             ("ssim_azimuth",      "8.2 SSIM along azimuth axis (denorm)"),
             ("ssim_elev",         "8.3 SSIM along elevation axis (denorm)"),
             ("ssim_range_norm",   "8.4 SSIM along range axis (unit-area)"),
             ("ssim_azimuth_norm", "8.5 SSIM along azimuth axis (unit-area)"),
             ("ssim_elev_norm",    "8.6 SSIM along elevation axis (unit-area)"),
-        ))
+        )
+        if any(fp.get(key) for key, _title in ssim_groups) or fp.get("elev_metric_curves"):
+            out.append("\n## 8. SSIM curves\n")
+            out.append("SSIM plotted for every slice along each axis \u2014 pred vs GT, both denormalised and unit-area-normalised.\n")
+            self._section(out, ssim_groups)
 
         if fp.get("elev_metric_curves"):
             out.append("\n### 8.7 Per-elevation-bin metrics (MAE, RMSE, R\u00b2, cross-entropy)\n")
