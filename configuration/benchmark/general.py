@@ -8,16 +8,17 @@ from configuration.normalization.general        import NormalizationConfig
 from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.backbone            import default_curriculum
 from configuration.training.general.loss        import LossCurriculumConfig
+from configuration.training.general.pretraining import PretrainConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
 
 @dataclass
 class MaxBatchConfig:
-    vram_budget_gb : float = 40.0
-    max_batch      : int   = 512
-    measure_steps  : int   = 3
-    seed           : int   = 42
+    vram_budget_gb : float = PretrainConfig.vram_budget_gb
+    max_batch      : int   = PretrainConfig.max_batch
+    measure_steps  : int   = PretrainConfig.measure_steps
+    seed           : int   = PretrainConfig.seed
 
 
 @dataclass
