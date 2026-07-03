@@ -83,11 +83,16 @@ class DatasetPicker {
     this.el.appendChild(this.note);
 
     if (this.spec.baseFrom) {
-      this.view._onDependency(this.spec.baseFrom, () => this._loadSingle());
+      this.view._onDependency(this.spec.baseFrom, () => this._scheduleSingleReload());
     }
 
     this._renderSingleOptions([]);
     this._loadSingle();
+  }
+
+  _scheduleSingleReload() {
+    clearTimeout(this.singleReloadTimer);
+    this.singleReloadTimer = setTimeout(() => this._loadSingle(), 350);
   }
 
   _base() {
@@ -105,19 +110,25 @@ class DatasetPicker {
   }
 
   async _loadSingle() {
+    const seq = (this.singleLoadSeq = (this.singleLoadSeq || 0) + 1);
+
     if (this.spec.mode === "params") {
       const dataset = this.view._effective(this.view._leafByPath(this.spec.datasetFrom));
-      await this._fetchParams(dataset);
+      await this._fetchParams(dataset, seq);
       return;
     }
     if (this.spec.mode === "runs") {
-      await this._fetchRuns(this._base());
+      await this._fetchRuns(this._base(), seq);
       return;
     }
-    await this._fetchDatasets(this._base());
+    await this._fetchDatasets(this._base(), seq);
   }
 
-  async _fetchRuns(base) {
+  _singleStale(seq) {
+    return seq !== this.singleLoadSeq;
+  }
+
+  async _fetchRuns(base, seq) {
     if (!base) {
       this.note.textContent = "set a runs directory first";
       this._renderSingleOptions([]);
@@ -125,6 +136,7 @@ class DatasetPicker {
     }
     this.note.textContent = "listing...";
     const res = await window.apiGet(`/api/fs/runs?base=${encodeURIComponent(base)}`);
+    if (this._singleStale(seq)) return;
     if (!res.ok) {
       this.note.textContent = res.error || "could not list runs";
       this._renderSingleOptions([]);
@@ -136,9 +148,10 @@ class DatasetPicker {
     this._renderSingleOptions(items.map((r) => ({ value: r.name, label: r.name + (r.has_checkpoint ? "" : "  (no checkpoint)") })));
   }
 
-  async _fetchDatasets(base) {
+  async _fetchDatasets(base, seq) {
     this.note.textContent = "listing...";
     const res = await window.apiGet(`/api/fs/datasets?base=${encodeURIComponent(base || "")}`);
+    if (this._singleStale(seq)) return;
     if (!res.ok) {
       this.note.textContent = res.error || "could not list datasets";
       this._renderSingleOptions([]);
@@ -149,7 +162,7 @@ class DatasetPicker {
     this._renderSingleOptions(items.map((d) => ({ value: d.path, label: d.name + (d.has_params ? "" : "  (no params)") })));
   }
 
-  async _fetchParams(dataset) {
+  async _fetchParams(dataset, seq) {
     if (!dataset) {
       this.note.textContent = "select a dataset first";
       this._renderSingleOptions([]);
@@ -157,6 +170,7 @@ class DatasetPicker {
     }
     this.note.textContent = "listing...";
     const res = await window.apiGet(`/api/fs/params?dataset=${encodeURIComponent(dataset)}`);
+    if (this._singleStale(seq)) return;
     if (!res.ok) {
       this.note.textContent = res.error || "could not list params";
       this._renderSingleOptions([]);
@@ -353,7 +367,9 @@ class DatasetPicker {
   }
 
   _commitMulti() {
-    const names = this.items.map((d) => d.name).filter((n) => this.selected.has(n));
+    const listed = new Set(this.items.map((d) => d.name));
+    const kept   = this._selectedNames().filter((n) => !listed.has(n));
+    const names  = [...kept, ...this.items.map((d) => d.name).filter((n) => this.selected.has(n))];
     this.view._setValue(this.leaf, window.PythonLiteral.render(names));
     this._paintSummary();
   }
