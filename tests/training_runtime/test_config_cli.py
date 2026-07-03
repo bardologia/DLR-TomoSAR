@@ -205,10 +205,9 @@ def test_load_resolved_restores_path_and_tuple_types(tmp_path):
     assert fresh.betas == (0.5, 0.6)
 
 
-def test_load_resolved_missing_file_returns_config():
-    cfg    = _config()
-    result = ConfigCli.load_resolved(cfg, Path("/nonexistent/path.json"))
-    assert result is cfg
+def test_load_resolved_missing_file_raises():
+    with pytest.raises(FileNotFoundError):
+        ConfigCli.load_resolved(_config(), Path("/nonexistent/path.json"))
 
 
 def test_load_resolved_unknown_key_raises(tmp_path):

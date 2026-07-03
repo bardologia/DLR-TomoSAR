@@ -189,7 +189,7 @@ class ConfigCli:
     @classmethod
     def load_resolved(cls, config, path: Path):
         if not Path(path).exists():
-            return config
+            raise FileNotFoundError(f"Resolved config not found at {path} for {type(config).__name__}")
 
         with open(path, "r", encoding="utf-8") as f:
             mapping = json.load(f)
