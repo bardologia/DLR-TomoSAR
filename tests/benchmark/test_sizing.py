@@ -90,7 +90,7 @@ def test_width_scaler_scaled_config_applies_overrides(scaler):
 def _config(dataset_path) -> BenchmarkConfig:
     config                        = BenchmarkConfig()
     config.paths.dataset_path     = dataset_path
-    config.paths.parameters_path  = dataset_path / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
+    config.paths.parameters_path  = dataset_path / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
     return config
 
 

@@ -70,17 +70,6 @@ def test_free_parameters_mean_only():
     assert cfg.fitting_method  == "mu_sigma_adam"
 
 
-def test_suffix_encodes_free_flags():
-    base = ExtractionConfig(processed_data_path=Path("/tmp/run"))
-    full = ExtractionConfig(
-        processed_data_path = Path("/tmp/run"),
-        fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True, fit_mean=True)),
-    )
-    assert "fitamp" not in base.output_suffix_value
-    assert "fitmu"  not in base.output_suffix_value
-    assert full.output_suffix_value.endswith("_fitamp_fitmu")
-
-
 def test_entry_config_fit_modes_default_sweep():
     cfg = ExtractParamsEntryConfig()
     assert cfg.fit_modes == ["sigma", "sigma_amp", "sigma_amp_mu"]
@@ -113,12 +102,19 @@ def test_extraction_config_paths_derived():
 
 
 def test_extraction_config_default_suffix_encodes_fit():
-    cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"))
+    cfg    = ExtractionConfig(processed_data_path=Path("/tmp/run"))
     suffix = cfg.output_suffix_value
-    assert suffix.startswith("sigmaonly_k")
-    assert f"k{cfg.fit_settings.fit_config.k_max}" in suffix
-    assert "sig" in suffix
-    assert "lam" in suffix
+    assert suffix.startswith(f"k{cfg.fit_settings.fit_config.k_max}_lam")
+    assert "_sig" in suffix
+    assert suffix.endswith("_sigma")
+
+
+def test_extraction_config_suffix_encodes_free_parameters():
+    sigma_amp    = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitMode.SigmaOnly(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True)))
+    sigma_amp_mu = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitMode.SigmaOnly(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True, fit_mean=True)))
+
+    assert sigma_amp.output_subdir_name    == "params_k2_lam0.01_sig4_sigma_amp"
+    assert sigma_amp_mu.output_subdir_name == "params_k2_lam0.01_sig4_sigma_mu_amp"
 
 
 def test_extraction_config_explicit_suffix_used():
@@ -138,7 +134,7 @@ def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction
         processed_data_path = Path("/tmp/run"),
         fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(k_max=5, sigma_init_divisor=4.0, lambda_k=1e-2)),
     )
-    assert cfg.output_subdir_name == "params_sigmaonly_k5_sig4_lam0p01"
+    assert cfg.output_subdir_name == "params_k5_lam0.01_sig4_sigma"
 
 
 def test_extraction_discover_height_range_from_state(tmp_path):

@@ -15,7 +15,7 @@ from tools.monitoring.logger import Logger
 def trainer_config(test_data_dir, tmp_path):
     config                       = BenchmarkConfig()
     config.paths.dataset_path    = str(test_data_dir)
-    config.paths.parameters_path = test_data_dir / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
+    config.paths.parameters_path = test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
     return ConfigFactory(config).training_trainer_config(tmp_path / "seed_logdir")
 
 

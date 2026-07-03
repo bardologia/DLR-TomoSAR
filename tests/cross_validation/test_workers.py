@@ -27,7 +27,7 @@ def make_logger(tmp_path: Path) -> Logger:
 def worker_config(test_data_dir: Path, training_type: str = "backbone") -> CrossValidationConfig:
     config                       = CrossValidationConfig(training_type=training_type)
     config.paths.dataset_path    = test_data_dir
-    config.paths.parameters_path = test_data_dir / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
+    config.paths.parameters_path = test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
     config.folds              = FoldConfig(n_folds=5, azimuth_start=1000, azimuth_end=2000)
     return config
 

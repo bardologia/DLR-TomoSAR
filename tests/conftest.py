@@ -14,7 +14,7 @@ if str(_REPO_ROOT) not in sys.path:
 _TEST_DATA = _REPO_ROOT / "test_data"
 _DATA      = _TEST_DATA / "data"
 _META      = _TEST_DATA / "meta"
-_PARAMS    = _TEST_DATA / "params" / "params_sigmaonly_k5_sig4_lam0p01"
+_PARAMS    = _TEST_DATA / "params" / "params_k5_lam0.01_sig4_sigma"
 
 _HAS_DATA = _TEST_DATA.is_dir() and (_DATA / "dataset.json").is_file()
 

@@ -34,7 +34,7 @@ class ParamTrial:
 
     @property
     def label(self) -> str:
-        base = Path(self.name).name.replace("params_sigmaonly_", "")
+        base = Path(self.name).name.removeprefix("params_")
         return f"{self.dataset} · {base}" if self.dataset else base
 
 
@@ -66,7 +66,6 @@ class ParamTrialCollector:
     def _build_trial(self, tag: str) -> ParamTrial:
         run_dir = self.params_dir / tag
         meta    = FileIO.load_json(run_dir / self.MARKER)
-        base    = Path(tag).name
 
         return ParamTrial(
             name               = tag,
@@ -74,8 +73,8 @@ class ParamTrialCollector:
             k_max              = int(meta["k_max"]),
             lambda_k           = float(meta["lambda_k"]),
             sigma_init_divisor = float(meta["sigma_init_divisor"]),
-            fit_amplitude      = "fitamp" in base,
-            fit_mean           = "fitmu"  in base,
+            fit_amplitude      = bool(meta["fit_amplitude"]),
+            fit_mean           = bool(meta["fit_mean"]),
             dataset            = self._dataset_of(tag),
         )
 

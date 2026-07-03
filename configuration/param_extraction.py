@@ -100,19 +100,16 @@ class ExtractionConfig:
             return self.output_suffix
 
         cfg     = self.fit_settings.fit_config
-        k_max   = cfg.k_max
-        divisor = cfg.sigma_init_divisor
-        lambda_k = cfg.lambda_k
-        div_tag = f"{divisor:g}".replace(".", "p")
-        lam_tag = f"{lambda_k:g}".replace(".", "p").replace("-", "m")
+        lam_tag = f"{cfg.lambda_k:g}"
+        div_tag = f"{cfg.sigma_init_divisor:g}"
 
-        free_tag = ""
-        if cfg.fit_amplitude:
-            free_tag += "_fitamp"
+        free = ["sigma"]
         if cfg.fit_mean:
-            free_tag += "_fitmu"
+            free.append("mu")
+        if cfg.fit_amplitude:
+            free.append("amp")
 
-        return f"sigmaonly_k{k_max}_sig{div_tag}_lam{lam_tag}{free_tag}"
+        return f"k{cfg.k_max}_lam{lam_tag}_sig{div_tag}_{'_'.join(free)}"
 
     @property
     def output_subdir_name(self) -> str:
