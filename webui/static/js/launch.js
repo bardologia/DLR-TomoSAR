@@ -259,9 +259,11 @@ class LaunchView extends ConfigForm {
 
     const dirty         = this.dirty;
     const activeSection = this.activeSection;
+    const detach        = this.detach;
     this._resetState();
     this.dirty         = dirty;
     this.activeSection = activeSection;
+    this.detach        = detach;
     this._renderConfig(this.config);
     this._refresh();
   }
@@ -348,6 +350,12 @@ class LaunchView extends ConfigForm {
     });
 
     paint();
+
+    return () => {
+      paint();
+      this._paintTypeCard(this._effective(leaf));
+      this._reloadModelsForType();
+    };
   }
 
   _buildModelCard(meaning) {
@@ -732,8 +740,8 @@ class LaunchView extends ConfigForm {
     host.appendChild(this._buildToolbar(cfg));
 
     if (typeLeaf) {
-      this._renderTypeTab(typeTab, typeLeaf);
-      this.controls[typeLeaf.path] = { leaf: typeLeaf, reset: () => {} };
+      const repaint = this._renderTypeTab(typeTab, typeLeaf);
+      this.controls[typeLeaf.path] = { leaf: typeLeaf, reset: repaint };
     }
 
     this._renderLayout(host, cfg);
@@ -804,12 +812,20 @@ class LaunchView extends ConfigForm {
     });
   }
 
-  _launch() {
-    if (!this.detail) return;
+  async _launch() {
+    if (!this.detail || this.launching) return;
     const interp = document.getElementById("launch-interpreter").value;
     const followEl = document.getElementById("launch-follow");
     const follow = this.detach ? "" : (followEl ? followEl.value : "");
-    this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, follow, this.detach);
+
+    this.launching = true;
+    if (this.launchBtn) this.launchBtn.disabled = true;
+    try {
+      await this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, follow, this.detach);
+    } finally {
+      this.launching = false;
+      if (this.launchBtn) this.launchBtn.disabled = false;
+    }
   }
 
   _renderSource(d) {
