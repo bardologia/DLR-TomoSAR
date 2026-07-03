@@ -15,7 +15,6 @@ _SUPPORTED_TYPES = (bool, int, float, str, Path, list, tuple, dict)
 class ConfigCli:
 
     BOOTSTRAP_FLAGS = (
-        "-h", "--help",
         "--help-config",
         "--detach", "--nohup",
         "--gpu",
@@ -31,6 +30,7 @@ class ConfigCli:
         self.overrides : dict = {}
         self.parser    = argparse.ArgumentParser(description=description, add_help=False, allow_abbrev=False)
 
+        self.parser.add_argument("-h", "--help", action="store_true", dest="_help")
         self.parser.add_argument("--help-config", action="store_true", dest="_help_config")
         self.parser.add_argument("--detach", "--nohup", action="store_true", dest="_detach")
 
@@ -50,7 +50,7 @@ class ConfigCli:
 
         self._reject_unknown_options(leftover)
 
-        if getattr(args, "_help_config", False):
+        if getattr(args, "_help", False) or getattr(args, "_help_config", False):
             self._print_config_help()
             raise SystemExit(0)
 
