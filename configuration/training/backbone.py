@@ -187,7 +187,6 @@ class BackboneEntryConfig:
     input_trials     : dict                  = field(default_factory=_default_input_trials)
 
     ablation_features     : list = field(default_factory=AblationCatalog.default_features)
-    ablation_catalog      : dict = field(default_factory=AblationCatalog.as_dict)
     ablation_include_full : bool = True
 
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])

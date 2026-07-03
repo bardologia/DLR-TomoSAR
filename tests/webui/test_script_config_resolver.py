@@ -36,14 +36,10 @@ def test_container_leaves_render_as_python_literals(backbone_leaves):
         ast.literal_eval(leaf["value"])
 
 
-def test_ablation_leaves_expose_the_catalog(backbone_leaves):
+def test_ablation_leaves_expose_the_feature_plan(backbone_leaves):
     by_path  = {leaf["path"]: leaf for leaf in backbone_leaves}
     features = ast.literal_eval(by_path["ablation_features"]["value"])
-    catalog  = ast.literal_eval(by_path["ablation_catalog"]["value"])
 
     assert [feature["label"] for feature in features] == list(AblationCatalog.DEFAULT_ORDER)
-    assert set(catalog) == set(AblationCatalog.as_dict())
     assert by_path["ablation_include_full"]["value"] == "True"
-
-    physics_curriculum = catalog["physics_curriculum"]
-    assert physics_curriculum["enable"]["curriculum.enabled"] is True
+    assert "ablation_catalog" not in by_path
