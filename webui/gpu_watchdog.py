@@ -14,10 +14,11 @@ from web_logger     import WebLogger
 
 class GpuWatchdog:
 
-    INTERVAL    = 4.0
-    GRACE_S     = 30.0
-    EVENT_LIMIT = 50
-    LOG_NAME    = "intrusions.jsonl"
+    INTERVAL          = 4.0
+    GRACE_S           = 30.0
+    CRITICAL_WINDOW_S = 300.0
+    EVENT_LIMIT       = 50
+    LOG_NAME          = "intrusions.jsonl"
 
     def __init__(self, system: SystemMonitor, paths: ProjectPaths, logger: WebLogger) -> None:
         self.system    = system
@@ -42,7 +43,7 @@ class GpuWatchdog:
 
     def state(self) -> dict:
         with self.lock:
-            active = [incident["record"] for incident in self.incidents.values() if incident["status"] != "survived"]
+            active = [incident["record"] for incident in self.incidents.values() if incident["status"] in ("active", "critical")]
             return {
                 "armed"    : self.armed,
                 "active"   : active,
@@ -137,46 +138,62 @@ class GpuWatchdog:
         }
 
     def _register(self, intruders: dict, server_gpus: list[dict]) -> None:
-        now = time.monotonic()
+        now   = time.monotonic()
+        fresh = []
 
-        for key, record in intruders.items():
-            incident = self.incidents.get(key)
-            if incident is None:
-                self.incidents[key] = {"record": record, "mine_pids": list(record["mine_pids"]), "status": "active", "last_seen": now}
-                self._persist(record, server_gpus, "intrusion")
-                self._raise(record, "intrusion")
-            else:
-                incident["last_seen"] = now
+        with self.lock:
+            for key, record in intruders.items():
+                incident = self.incidents.get(key)
+                if incident is None:
+                    self.incidents[key] = {"record": record, "mine_pids": list(record["mine_pids"]), "status": "active", "started": now, "last_seen": now}
+                    fresh.append(record)
+                else:
+                    incident["last_seen"] = now
+
+        for record in fresh:
+            self._persist(record, server_gpus, "intrusion")
+            self._raise(record, "intrusion")
 
     def _escalate(self, intruders: dict, server_gpus: list[dict]) -> None:
         now = time.monotonic()
 
-        for key, incident in self.incidents.items():
-            if incident["status"] != "active":
-                continue
+        with self.lock:
+            snapshot = [(key, incident) for key, incident in self.incidents.items() if incident["status"] == "active"]
 
+        for key, incident in snapshot:
             dead = [pid for pid in incident["mine_pids"] if self.system.pid_owner(pid) != self.system.user]
 
-            if dead:
+            if dead and now - incident["started"] <= self.CRITICAL_WINDOW_S:
                 self._flag_critical(incident, dead, server_gpus)
+            elif dead:
+                self._retire(incident, dead)
             elif key not in intruders and now - incident["last_seen"] > self.GRACE_S:
-                incident["status"]           = "survived"
-                incident["record"]["status"] = "survived"
+                with self.lock:
+                    incident["status"]           = "survived"
+                    incident["record"]["status"] = "survived"
+
+    def _retire(self, incident: dict, dead: list[int]) -> None:
+        with self.lock:
+            incident["mine_pids"] = [pid for pid in incident["mine_pids"] if pid not in dead]
+            if not incident["mine_pids"]:
+                incident["status"]           = "ended"
+                incident["record"]["status"] = "ended"
+
+        if incident["status"] == "ended":
+            self.logger.muted(f"gpu incident on gpu {incident['record']['gpu_index']} ended, own pid(s) {dead} exited outside the critical window")
 
     def _flag_critical(self, incident: dict, dead: list[int], server_gpus: list[dict]) -> None:
-        record                = incident["record"]
-        incident["status"]    = "critical"
-        record["status"]      = "critical"
-        record["dead_pids"]   = dead
-        record["critical_at"] = datetime.now().isoformat(timespec="seconds")
-
-        self._persist(record, server_gpus, "critical")
-
         with self.lock:
-            self.critical += 1
+            record                = incident["record"]
+            incident["status"]    = "critical"
+            record["status"]      = "critical"
+            record["dead_pids"]   = dead
+            record["critical_at"] = datetime.now().isoformat(timespec="seconds")
+            self.critical        += 1
             self.events.append(dict(record))
 
-        self.logger.error(f"CRITICAL: your pid(s) {dead} on gpu {record['gpu_index']} [{record['gpu_name']}] DIED after {record['user']} (pid {record['pid']}) invaded it")
+        self._persist(record, server_gpus, "critical")
+        self.logger.error(f"CRITICAL: your pid(s) {dead} on gpu {record['gpu_index']} [{record['gpu_name']}] DIED within {self.CRITICAL_WINDOW_S:.0f}s of {record['user']} (pid {record['pid']}) invading it")
 
     def _persist(self, record: dict, server_gpus: list[dict], kind: str) -> None:
         entry = {
