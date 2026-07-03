@@ -10,6 +10,8 @@ class ModelBuilder:
         config   = registry[model_name]()
 
         for attribute, value in model_overrides.items():
+            if not hasattr(config, attribute):
+                raise AttributeError(f"Unknown model override '{attribute}' for {type(config).__name__}")
             setattr(config, attribute, value)
 
         return config
