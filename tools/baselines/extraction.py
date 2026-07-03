@@ -28,10 +28,10 @@ class BaselineExtractor:
             return slice(0, n_samples)
 
         start, end = int(self.azimuth_window[0]), int(self.azimuth_window[1])
-        if start >= n_samples:
-            raise ValueError(f"Azimuth window start {start} exceeds track length {n_samples}")
+        if start < 0 or end > n_samples:
+            raise ValueError(f"Azimuth window [{start}, {end}) is not covered by the track file ({n_samples} samples); the requested crop exceeds this track's extent.")
 
-        return slice(max(0, start), min(n_samples, end))
+        return slice(start, end)
 
     def _windowed_components(self, raw: np.ndarray) -> tuple:
         window     = self._window_slice(raw.shape[1])

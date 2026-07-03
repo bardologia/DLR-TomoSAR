@@ -151,3 +151,19 @@ def test_extractor_window_start_beyond_length_raises():
 
     with pytest.raises(ValueError):
         BaselineExtractor(paths, azimuth_window=(40, 60), reader=lambda p: tracks[Path(p).name]).extract()
+
+
+def test_extractor_window_end_beyond_length_raises():
+    paths  = {"FL01_PS02": Path("a.rat")}
+    tracks = {"a.rat": _fake_track(n_azimuth=50)}
+
+    with pytest.raises(ValueError, match="not covered"):
+        BaselineExtractor(paths, azimuth_window=(20, 60), reader=lambda p: tracks[Path(p).name]).extract()
+
+
+def test_extractor_short_secondary_track_raises():
+    paths  = {"FL01_PS02": Path("a.rat"), "FL01_PS04": Path("b.rat")}
+    tracks = {"a.rat": _fake_track(n_azimuth=100), "b.rat": _fake_track(n_azimuth=50)}
+
+    with pytest.raises(ValueError, match="not covered"):
+        BaselineExtractor(paths, azimuth_window=(20, 60), reader=lambda p: tracks[Path(p).name]).extract_with_profiles()
