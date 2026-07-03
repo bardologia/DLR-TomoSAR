@@ -34,12 +34,17 @@ class PreprocessingComparisonConfig:
 
 
 @dataclass
+class ComparisonPathsConfig:
+    log_base_dir : Path = RunPathsConfig.log_base_dir
+
+
+@dataclass
 class ComparisonEntryConfig:
     run_tag         : Optional[str] = None
     reference_model : str           = SizeMatchConfig.reference_model
     embed_images    : bool          = ComparisonReportConfig.embed_images
 
-    paths : RunPathsConfig = field(default_factory=RunPathsConfig)
+    paths : ComparisonPathsConfig = field(default_factory=ComparisonPathsConfig)
 
 
 @dataclass
