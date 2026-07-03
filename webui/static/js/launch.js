@@ -2,7 +2,11 @@
 
 class LaunchView extends ConfigForm {
 
-  static FOLLOW_INFER = new Set(["train_backbone", "train_jepa"]);
+  static FOLLOW_INFER = {
+    train_backbone:             "infer_backbone",
+    train_profile_autoencoder:  "infer_profile_autoencoder",
+    train_image_autoencoder:    "infer_image_autoencoder",
+  };
 
   static MODEL_KEY_TYPE = {
     train_backbone:             "backbone",
@@ -586,14 +590,14 @@ class LaunchView extends ConfigForm {
 
     let follow = null;
     let followSelect = null;
-    if (this.detail && LaunchView.FOLLOW_INFER.has(this.detail.key)) {
+    if (this.detail && LaunchView.FOLLOW_INFER[this.detail.key]) {
       follow = document.createElement("div");
       follow.className = "rail-block";
       follow.innerHTML = `<span class="rail-block__label">After run</span>`;
       const fsel = document.createElement("select");
       fsel.className = "run-select";
       fsel.id = "launch-follow";
-      [["", "nothing"], ["infer", "Inference"]].forEach(([value, label]) => {
+      [["", "nothing"], [LaunchView.FOLLOW_INFER[this.detail.key], "Inference"]].forEach(([value, label]) => {
         const opt = document.createElement("option");
         opt.value = value;
         opt.textContent = label;

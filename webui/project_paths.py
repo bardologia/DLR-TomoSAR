@@ -83,6 +83,9 @@ class ProjectPaths:
         "xray_weights"              : "analysis",
     }
 
+    def has_script(self, key: str) -> bool:
+        return key in self.SCRIPT_DIRS
+
     def script_entry(self, key: str) -> dict:
         override  = self.ENTRY_OVERRIDES.get(key, {})
         file_stem = override.get("file", key)

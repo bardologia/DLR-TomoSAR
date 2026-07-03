@@ -64,6 +64,12 @@ class ProcessManager:
         if not script.exists():
             return {"ok": False, "error": "script not found"}
 
+        if follow_up and not detach:
+            if not self.paths.has_script(follow_up):
+                return {"ok": False, "error": f"unknown follow-up script '{follow_up}'"}
+            if not self.paths.script_entry(follow_up)["path"].exists():
+                return {"ok": False, "error": f"follow-up script '{follow_up}' not found"}
+
         record = self._make_record(key, interpreter, self._clean_overrides(overrides), detach)
         stream = JobStream()
 
@@ -151,11 +157,6 @@ class ProcessManager:
         return None
 
     def _schedule(self, parent: dict, key: str) -> None:
-        script = self.paths.script_entry(key)["path"]
-        if not script.exists():
-            self.logger.warning(f"follow-up {key} skipped, script not found")
-            return
-
         record              = self._make_record(key, parent["interpreter"], {})
         record["status"]    = "scheduled"
         record["follow_of"] = parent["job_id"]
