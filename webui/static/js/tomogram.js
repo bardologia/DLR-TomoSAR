@@ -300,9 +300,19 @@ class TomogramView {
   }
 
   async enter() {
-    if (this.entered) return;
+    if (this.entered) {
+      await this._refreshStrip();
+      return;
+    }
     this.entered = true;
     await this.refresh();
+  }
+
+  async _refreshStrip() {
+    const data = await window.apiGet(`/api/cubes?base=${encodeURIComponent(this._runsBase())}`);
+    if (!data || data.error) return;
+    this.cubes = data.cubes || [];
+    this._renderStrip();
   }
 
   async refresh() {

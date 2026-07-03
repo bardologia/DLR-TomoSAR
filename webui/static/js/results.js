@@ -55,7 +55,10 @@ class ResultsView {
   }
 
   enter() {
-    if (this.loaded) return;
+    if (this.loaded) {
+      this.loadCatalog();
+      return;
+    }
     this.loaded = true;
 
     this._renderSidebar();
