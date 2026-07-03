@@ -117,7 +117,7 @@ class Tuner:
         pipeline = TrialPipeline(
             trainer_config = trainer_cfg,
             dataset_config = dataset_cfg,
-            model_name     = self.model_name,
+            backbone_name  = self.model_name,
             model_config   = model_config,
             seed           = self.tune_cfg.base_seed + trial.number,
             run_name       = f"trial_{trial.number:04d}",

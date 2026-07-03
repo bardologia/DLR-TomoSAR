@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 
 import optuna
@@ -7,6 +8,7 @@ import optuna
 import pipelines.tuning.trial as trial_mod
 
 from pipelines.tuning.tuners               import ParamSampler, BestConfigWriter, Tuner
+from pipelines.backbone.training.pipeline  import TrainingPipeline
 from configuration.architectures.backbone  import UNetConfig
 
 
@@ -253,11 +255,15 @@ def test_tuner_objective_materializes_trial_config(fake_logger, tune_cfg, tmp_pa
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
     study.optimize(tuner._objective, n_trials=1)
 
-    assert captured["model_name"]  == "unet"
-    assert captured["seed"]        == tune_cfg.base_seed + 0
-    assert captured["run_name"]    == "trial_0000"
-    assert captured["emit_docs"]   is True
-    assert captured["trial"].number == 0
+    assert captured["backbone_name"] == "unet"
+    assert captured["seed"]          == tune_cfg.base_seed + 0
+    assert captured["run_name"]      == "trial_0000"
+    assert captured["emit_docs"]     is True
+    assert captured["trial"].number  == 0
+
+    forwarded = set(captured) - {"trial", "emit_docs"}
+    accepted  = set(inspect.signature(TrainingPipeline.__init__).parameters) - {"self"}
+    assert forwarded <= accepted
 
     tcfg = captured["trainer_config"]
     assert tcfg.training.epochs         == tune_cfg.n_epochs
