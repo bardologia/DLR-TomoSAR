@@ -50,10 +50,6 @@ class MemoryConfig:
     reserve_vram      : bool  = False
     vram_keep_free_gb : float = 1.0
 
-    def adopt_reservation(self, pretrain) -> None:
-        self.reserve_vram      = pretrain.reserve_vram
-        self.vram_keep_free_gb = pretrain.vram_keep_free_gb
-
 
 @dataclass
 class ResourceConfig:

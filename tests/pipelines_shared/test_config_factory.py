@@ -105,3 +105,15 @@ def test_inference_config_propagates_queue_settings(test_data_dir, params_dir):
     assert cfg.split           == "test"
     assert cfg.checkpoint_name == "best_model.pt"
     assert cfg.gif_axes        == list(factory.config.inference.gif_axes)
+
+
+@pytest.mark.real_data
+def test_training_trainer_config_adopts_vram_reservation(test_data_dir, params_dir):
+    factory = _factory(test_data_dir, params_dir)
+    factory.config.training.reserve_vram      = True
+    factory.config.training.vram_keep_free_gb = 2.5
+
+    cfg = factory.training_trainer_config(logdir=Path("/tmp/some_run"))
+
+    assert cfg.memory.reserve_vram      is True
+    assert cfg.memory.vram_keep_free_gb == 2.5

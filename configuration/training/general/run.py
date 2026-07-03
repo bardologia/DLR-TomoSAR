@@ -35,6 +35,9 @@ class TrainingQueueConfig:
     ema_decay                   : float = 0.999
     resume                      : bool  = False
 
+    reserve_vram      : bool  = False
+    vram_keep_free_gb : float = 1.0
+
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256
 

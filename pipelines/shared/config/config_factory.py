@@ -5,7 +5,7 @@ from pathlib import Path
 from configuration.benchmark import BenchmarkConfig
 from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from configuration.inference import InferenceConfig
-from configuration.training import default_curriculum, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
+from configuration.training import default_curriculum, EarlyStoppingConfig, GradientClipperConfig, MemoryConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion
 
@@ -86,6 +86,7 @@ class ConfigFactory:
             warmup         = WarmupConfig(warmup_steps=training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=training.warmup_enabled, warmup_mode=training.warmup_mode.value, warmup_poly_power=training.warmup_poly_power),
             scheduler      = SchedulerConfig(type=training.scheduler_type.value, epochs=scheduler_epochs, eta_min=training.eta_min, step_size=training.scheduler_step_size, gamma=training.scheduler_gamma, power=training.scheduler_power),
             optimizer      = OptimizerConfig(betas=(0.9, 0.999), eps=1e-8, lr_scale=lr_scale),
+            memory         = MemoryConfig(reserve_vram=training.reserve_vram, vram_keep_free_gb=training.vram_keep_free_gb),
 
             training = TrainingLoopConfig(
                 epochs                      = training.epochs,

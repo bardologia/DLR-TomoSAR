@@ -2,7 +2,7 @@ from __future__ import annotations
 
 _SHARED_SUBCONFIGS = (
     "geometry", "early_stopping", "warmup", "scheduler", "io", "optimizer",
-    "training", "resources", "gradient_clipper",
+    "training", "resources", "gradient_clipper", "memory",
 )
 
 

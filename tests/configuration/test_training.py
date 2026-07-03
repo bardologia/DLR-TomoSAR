@@ -185,13 +185,14 @@ def test_shared_subconfig_inheritance_copies_fields():
 
     base = Base()
     for name in ("geometry", "early_stopping", "warmup", "scheduler", "io",
-                 "optimizer", "training", "resources", "gradient_clipper"):
+                 "optimizer", "training", "resources", "gradient_clipper", "memory"):
         setattr(base, name, object())
 
     target = JepaTrainerConfig(gaussian=make_gaussian())
     target.inherit_shared_from(base)
     assert target.optimizer is base.optimizer
     assert target.scheduler is base.scheduler
+    assert target.memory    is base.memory
 
 
 def test_shared_subconfig_class_is_mixin():

@@ -18,7 +18,4 @@ class PretrainConfig:
     timed_batches    : int             = 60
     data_wait_target : float           = 0.05
 
-    reserve_vram      : bool  = False
-    vram_keep_free_gb : float = 1.0
-
     seed : int = 42

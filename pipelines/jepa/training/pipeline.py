@@ -70,7 +70,6 @@ class TrainingPipeline:
         )
         self.trainer_config.inherit_shared_from(base)
         self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-        self.trainer_config.memory.adopt_reservation(entry_config.pretrain)
 
         self.dataset_config = self.factory.training_dataset_config()
         if split_regions is not None:

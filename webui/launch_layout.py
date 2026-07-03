@@ -144,6 +144,9 @@ class LaunchLayout:
                 "clip_adaptive_percentile",
                 "clip_adaptive_mean_std_k",
             ]},
+            {"title": "VRAM reservation", "fields": [
+                {"gate": "reserve_vram", "fields": ["vram_keep_free_gb"]},
+            ]},
             {"title": "Patches and splits", "fields": [
                 "patch_size",
                 "patch_stride",
@@ -196,7 +199,6 @@ class LaunchLayout:
             {"title": "Auto-tuning", "fields": ["find_batch_size", "tune_loader", {"path": "seed", "widget": NUM_SEED}]},
             {"title": "Batch probe", "fields": ["vram_budget_gb", {"path": "max_batch", "widget": NUM_BATCH}, "measure_steps"]},
             {"title": "Loader sweep", "fields": ["worker_counts", "prefetch_factors", "warmup_batches", "timed_batches", "data_wait_target"]},
-            {"title": "VRAM reservation", "fields": [{"gate": "reserve_vram", "fields": ["vram_keep_free_gb"]}]},
         ],
         "inference_full": [
             {"title": "Run", "fields": ["run_directory", "output_subdir", "device", "log_level", {"path": "seed", "widget": NUM_SEED}]},

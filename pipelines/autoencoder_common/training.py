@@ -27,7 +27,6 @@ class AutoencoderTrainingPipeline:
 
         self.trainer_config          = self._build_trainer_config(base, entry_config)
         self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-        self.trainer_config.memory.adopt_reservation(entry_config.pretrain)
 
         self.split_regions  = split_regions if split_regions is not None else self.factory.split_regions()
         self.dataset_config = self._build_dataset_config()

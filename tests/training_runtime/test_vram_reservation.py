@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 import torch
 
-from configuration.training.general.pretraining import PretrainConfig
-from configuration.training.general.runtime     import MemoryConfig
-from tools.training.vram_reservation            import VramReservation
+from configuration.benchmark.general             import BenchmarkConfig
+from configuration.cross_validation.general      import CrossValidationConfig
+from configuration.training                      import BackboneEntryConfig, ImageAeEntryConfig, JepaEntryConfig, ProfileAeEntryConfig
+from configuration.training.general.trainer      import _SHARED_SUBCONFIGS, SharedSubConfigInheritance
+from configuration.tuning.general                import TuningEntryConfig
+from tools.runtime.config_cli                    import ConfigCli
+from tools.training.vram_reservation             import VramReservation
 
 GB = 1024 ** 3
 MB = 1024 ** 2
 
 cuda_only = pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+
+_FLOW_CONFIGS = [BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, BenchmarkConfig, CrossValidationConfig, TuningEntryConfig]
 
 
 def _free_bytes() -> int:
@@ -22,14 +30,26 @@ def _reservation(keep_free_gb: float, logger, enabled: bool = True) -> VramReser
     return VramReservation(enabled=enabled, keep_free_gb=keep_free_gb, device=torch.device("cuda"), logger=logger)
 
 
-def test_memory_config_adopts_pretrain_values():
-    pretrain = PretrainConfig(reserve_vram=True, vram_keep_free_gb=2.5)
-    memory   = MemoryConfig()
+@pytest.mark.parametrize("flow_config", _FLOW_CONFIGS)
+def test_reservation_exposed_and_disabled_on_every_training_flow(flow_config):
+    config = flow_config()
+    paths  = dict(ConfigCli._leaves(config))
 
-    memory.adopt_reservation(pretrain)
+    assert "training.reserve_vram"      in paths
+    assert "training.vram_keep_free_gb" in paths
+    assert config.training.reserve_vram is False
 
-    assert memory.reserve_vram      is True
-    assert memory.vram_keep_free_gb == 2.5
+
+def test_memory_is_shared_into_type_trainer_configs():
+    class Carrier(SharedSubConfigInheritance):
+        pass
+
+    base    = SimpleNamespace(**{name: object() for name in _SHARED_SUBCONFIGS})
+    carrier = Carrier()
+
+    carrier.inherit_shared_from(base)
+
+    assert carrier.memory is base.memory
 
 
 def test_disabled_flag_is_inert(logger):

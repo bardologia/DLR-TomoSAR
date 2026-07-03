@@ -1564,7 +1564,7 @@
     }
   },
   "training/general/pretraining::PretrainConfig": {
-    "summary": "Controls pre-training probes that auto-size batch, tune the data loader, and reserve GPU memory",
+    "summary": "Controls pre-training probes that auto-size batch and tune the data loader",
     "fields": {
       "find_batch_size": "Run the VRAM batch-size search probe before training",
       "tune_loader": "Run the data-loader worker/prefetch tuning sweep",
@@ -1576,8 +1576,6 @@
       "warmup_batches": "Untimed batches consumed before measurement to warm caches",
       "timed_batches": "Number of batches timed per loader configuration for throughput",
       "data_wait_target": "Acceptable fraction of step time spent waiting on data",
-      "reserve_vram": "Fill spare GPU memory into this process's allocator cache right before the first batch so concurrent jobs cannot claim the device",
-      "vram_keep_free_gb": "Gigabytes of GPU memory the reservation leaves unclaimed on the device",
       "seed": "Random seed for reproducible probe runs"
     }
   },
@@ -1628,7 +1626,9 @@
       "early_stop_min_delta": "Minimum validation-loss improvement required to reset early-stopping patience",
       "use_ema": "Whether to maintain an exponential moving average of model weights for evaluation",
       "ema_decay": "Decay rate of the weight EMA; closer to 1 averages over more steps",
-      "resume": "Whether to resume training from the latest checkpoint in the run directory"
+      "resume": "Whether to resume training from the latest checkpoint in the run directory",
+      "reserve_vram": "Fill spare GPU memory into this process's allocator cache right before the first batch so concurrent jobs cannot claim the device",
+      "vram_keep_free_gb": "Gigabytes of GPU memory the reservation leaves unclaimed on the device"
     }
   },
   "training/general/runtime::IOConfig": {
@@ -1678,8 +1678,8 @@
       "clear_cache_every_n_steps": "Empty CUDA cache at this step interval; 0 disables",
       "clear_cache_after_eval": "Free CUDA cache after each validation pass",
       "clear_cache_after_epoch": "Free CUDA cache at the end of each epoch",
-      "reserve_vram": "Trainer-side switch adopted from pretrain.reserve_vram; parks spare VRAM before the first batch",
-      "vram_keep_free_gb": "Trainer-side value adopted from pretrain.vram_keep_free_gb; gigabytes left free on the device"
+      "reserve_vram": "Trainer-side switch adopted from training.reserve_vram; parks spare VRAM before the first batch",
+      "vram_keep_free_gb": "Trainer-side value adopted from training.vram_keep_free_gb; gigabytes left free on the device"
     }
   },
   "training/general/runtime::ResourceConfig": {
