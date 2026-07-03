@@ -513,7 +513,19 @@ class FeedTuner {
   _connect() {
     this.source = new EventSource(`/api/jobs/${this.jobId}/stream`);
     this.source.onmessage = (ev) => this._onEvent(ev);
-    this.source.onerror = () => this._disconnect();
+    this.source.onerror = () => this._reconnect();
+  }
+
+  _reconnect() {
+    if (!this.jobId) return;
+    if (!this.source || this.source.readyState !== EventSource.CLOSED) return;
+
+    this.source.close();
+    this.source = null;
+    this._appendLog("stream dropped, reconnecting");
+    setTimeout(() => {
+      if (this.jobId && !this.source) this._connect();
+    }, 2000);
   }
 
   _disconnect() {
