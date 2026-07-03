@@ -23,7 +23,7 @@ class BestKSelector:
         amps_norm, mus, final_sigs = gpu_results[K]
         pred       = GaussianMixture.evaluate_batch(height_axis, amps_norm, mus, final_sigs)
         mse        = ((pred - prof_norm_all) ** 2).mean(axis=1)
-        complexity = self.lambda_k * K * amps_norm.mean(axis=1)
+        complexity = self.lambda_k * K
 
         return K, mse, mse + complexity
 

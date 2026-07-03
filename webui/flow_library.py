@@ -235,11 +235,11 @@ class FlowLibrary:
             },
             {
                 "id": "scoreK", "title": "Per-order penalised score", "phase": "3 - Best-K",
-                "note": "Every order K is scored on the normalised profile with a complexity penalty lambda_K K a-bar_K, where a-bar_K is the mean normalised amplitude, so the budget is spent only when peaks are genuinely present.",
+                "note": "Every order K is scored on the normalised profile with a flat complexity penalty lambda_K per component, so an extra Gaussian is kept only when it buys at least that much normalised MSE.",
                 "inputs": ["gtilde", "sigstar", "a0"], "outputs": ["mseK", "penK"],
                 "lines": [
                     [{"id": "mseK", "tex": r"\mathrm{MSE}_K", "role": "intermediate"}, {"tex": "="}, {"tex": r"\tfrac{1}{H}\sum_h\big(\hat\gamma_K(x_h) -"}, {"id": "gtilde", "tex": r"\tilde{\gamma}_h", "role": "intermediate"}, {"tex": r"\big)^2"}],
-                    [{"id": "penK", "tex": r"\mathcal{L}_K", "role": "intermediate"}, {"tex": "="}, {"id": "mseK", "tex": r"\mathrm{MSE}_K", "role": "intermediate"}, {"tex": r"+\ \lambda_K\,K\,\bar{a}_K,\qquad \bar a_K = \tfrac{1}{K}\sum_{k\le K} a_k"}],
+                    [{"id": "penK", "tex": r"\mathcal{L}_K", "role": "intermediate"}, {"tex": "="}, {"id": "mseK", "tex": r"\mathrm{MSE}_K", "role": "intermediate"}, {"tex": r"+\ \lambda_K\,K"}],
                 ],
             },
             {

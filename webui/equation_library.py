@@ -308,16 +308,15 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Phase 3 — penalised score per K",
-                    "tex"   : r"\mathrm{MSE}_K = \frac{1}{H}\sum_{h}\left(\hat{\gamma}_K(x_h) - \tilde{\gamma}(x_h)\right)^2, \qquad \mathrm{pen}_K = \mathrm{MSE}_K + \lambda_K \cdot K \cdot \bar{a}_K, \qquad \bar{a}_K = \frac{1}{K}\sum_{k=1}^{K} a^{\mathrm{norm}}_k",
-                    "note"  : "The K·mean-amplitude penalty spends the full component budget only when the profile is genuinely multi-layered (sigma.py BestKSelector).",
+                    "tex"   : r"\mathrm{MSE}_K = \frac{1}{H}\sum_{h}\left(\hat{\gamma}_K(x_h) - \tilde{\gamma}(x_h)\right)^2, \qquad \mathrm{pen}_K = \mathrm{MSE}_K + \lambda_K \cdot K",
+                    "note"  : "Each extra component must buy at least lambda_k of normalised MSE, so the budget is spent only when the profile is genuinely multi-layered (sigma.py BestKSelector).",
                     "vars"  : [
                         {"sym": r"\mathrm{MSE}_K",      "desc": "fit error of the K-component model"},
                         {"sym": r"\hat{\gamma}_K(x_h)", "desc": "K-component reconstruction at sample x_h"},
                         {"sym": r"\tilde{\gamma}(x_h)", "desc": "normalised measured profile"},
                         {"sym": r"H",                   "desc": "number of elevation samples"},
                         {"sym": r"\mathrm{pen}_K",      "desc": "penalised score of model order K"},
-                        {"sym": r"\lambda_K",           "desc": "complexity penalty, lambda_k = 1e-2"},
-                        {"sym": r"\bar{a}_K",           "desc": "mean of the K normalised amplitudes"},
+                        {"sym": r"\lambda_K",           "desc": "per-component complexity penalty, lambda_k = 1e-2"},
                     ],
                 },
                 {
