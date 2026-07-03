@@ -240,11 +240,15 @@ class TrainingPipeline:
 
         loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
 
-        self._run_overfit_check(run_meta, logger, datasets, x_len, x_axis)
-
         model, backbone_cfg = self._build_module(datasets, x_len, logger)
 
         self._save_metadata(run_meta, backbone_cfg, datasets, x_len)
+
+        try:
+            self._run_overfit_check(run_meta, logger, datasets, x_len, x_axis)
+        except BaseException:
+            run_meta.close()
+            raise
 
         profile_normalizer = self._profile_normalizer(run_meta, logger)
 

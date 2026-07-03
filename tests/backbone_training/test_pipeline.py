@@ -180,3 +180,33 @@ def test_training_pipeline_overfit_check_gates_and_reports(test_data_dir, params
 
     assert (run_directory / "best_model.pt").exists()
     assert len(train_losses) == 1
+
+
+@pytest.mark.real_data
+def test_training_pipeline_overfit_check_abort_leaves_configs(test_data_dir, params_dir, tmp_path):
+    from configuration.training import OverfitCheckConfig
+
+    dataset_config = _dataset_config(test_data_dir, params_dir)
+    trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
+
+    overfit_check = OverfitCheckConfig(enabled=True, n_examples=2, max_steps=2, steps_per_epoch=2, pass_loss_ratio=0.0, stop_threshold=0.0)
+
+    pipeline = TrainingPipeline(
+        trainer_config = trainer_config,
+        dataset_config = dataset_config,
+        backbone_name  = "resunet",
+        model_config   = None,
+        seed           = 0,
+        run_name       = "pipeline_overfit_abort",
+        overfit_check  = overfit_check,
+    )
+
+    with pytest.raises(RuntimeError, match="Overfit check failed"):
+        pipeline.run(probe_config=None)
+
+    run_directory = pipeline.run_metadata.run_directory
+
+    assert (run_directory / "meta" / "overfit_report.json").is_file()
+    assert (run_directory / "docs" / "trainer_config.json").is_file()
+    assert (run_directory / "meta" / "run_summary.json").is_file()
+    assert not (run_directory / "best_model.pt").exists()

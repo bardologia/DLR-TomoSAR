@@ -147,8 +147,6 @@ class TrainingPipeline:
         out_channels  = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, n_gaussians)
         x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
 
-        self._run_overfit_check(train_dataset, in_channels, out_channels, x_axis)
-
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
@@ -163,9 +161,11 @@ class TrainingPipeline:
             seed             = self.seed,
         )
 
-        trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)
-
         try:
+            self._run_overfit_check(train_dataset, in_channels, out_channels, x_axis)
+
+            trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)
+
             trainer.maybe_run_loss_probe(train_loader, probe_config)
             results = trainer.train(train_loader, val_loader, test_loader)
             self.run_metadata.save_test_metrics(trainer.test_metrics)

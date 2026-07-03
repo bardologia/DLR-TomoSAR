@@ -75,7 +75,7 @@ class OverfitCheck:
         cfg = copy.deepcopy(model_config)
 
         for field_spec in fields(cfg):
-            if field_spec.name.endswith("dropout") or field_spec.name.endswith("_wd"):
+            if field_spec.name.endswith("dropout") or field_spec.name.endswith("_wd") or field_spec.name.endswith("stochastic_depth_rate"):
                 setattr(cfg, field_spec.name, 0.0)
                 self.record(f"model.{field_spec.name}", 0.0)
 
@@ -159,6 +159,10 @@ class OverfitCheck:
     def run(self, trainer, train_dataset) -> dict:
         self.work_directory.mkdir(parents=True, exist_ok=True)
 
+        start          = time.perf_counter()
+        batch, indices = self._gate_batch(train_dataset)
+        loader         = [batch] * self.epoch_steps
+
         self.logger.section("[Overfit Check]")
         self.logger.kv_table({
             "Examples"        : self.config.n_examples,
@@ -169,10 +173,6 @@ class OverfitCheck:
             "Work Directory"  : str(self.work_directory),
             "Sanitized"       : ", ".join(sorted(self.overrides)),
         })
-
-        start          = time.perf_counter()
-        batch, indices = self._gate_batch(train_dataset)
-        loader         = [batch] * self.epoch_steps
 
         try:
             train_losses, _, _ = trainer.train(loader, loader, loader)

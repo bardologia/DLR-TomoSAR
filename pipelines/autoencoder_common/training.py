@@ -92,11 +92,15 @@ class AutoencoderTrainingPipeline:
 
         train_loader, val_loader, test_loader, x_axis, model_dim, datasets, metadata_args = self._prepare_data(run_meta, logger)
 
-        self._run_overfit_check(run_meta, logger, model_dim, x_axis, datasets)
-
         model = self._build_model(model_dim, self.autoencoder_cfg)
         self._log_model(logger, model, model_dim)
 
         self._save_metadata(run_meta, *metadata_args)
+
+        try:
+            self._run_overfit_check(run_meta, logger, model_dim, x_axis, datasets)
+        except BaseException:
+            run_meta.close()
+            raise
 
         return self._train(run_meta, logger, model, x_axis, train_loader, val_loader, test_loader)
