@@ -236,7 +236,10 @@ class RequestRouter:
             self._send_json(handler, {"scripts": self.catalog.list_scripts()})
             return
         if path.startswith("/api/scripts/") and path.endswith("/config"):
-            key    = path[len("/api/scripts/"):-len("/config")]
+            key = path[len("/api/scripts/"):-len("/config")]
+            if not self.paths.has_script(key):
+                self._send_json(handler, {"error": f"unknown script '{key}'"}, 404)
+                return
             result = self.resolver.resolve(key, self._preferred_interpreter(key))
             if result.get("ok"):
                 try:
@@ -246,7 +249,10 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path.startswith("/api/scripts/"):
-            key    = path[len("/api/scripts/"):]
+            key = path[len("/api/scripts/"):]
+            if not self.paths.has_script(key):
+                self._send_json(handler, {"error": f"unknown script '{key}'"}, 404)
+                return
             detail = self.catalog.get_script(key)
             if detail is None:
                 self._send_json(handler, {"error": "not found"}, 404)
@@ -294,7 +300,10 @@ class RequestRouter:
         body = self._read_json(handler)
 
         if path == "/api/run":
-            key         = body.get("script_key", "")
+            key = body.get("script_key", "")
+            if not self.paths.has_script(key):
+                self._send_json(handler, {"error": f"unknown script '{key}'"}, 404)
+                return
             interpreter = body.get("interpreter") or self._preferred_interpreter(key)
             overrides   = body.get("overrides", {})
             follow_up   = body.get("follow_up") or None
@@ -523,7 +532,7 @@ class RequestRouter:
 
     def _serve_static(self, handler, relative: str) -> None:
         target = (self.paths.static_dir / relative).resolve()
-        if not str(target).startswith(str(self.paths.static_dir.resolve())):
+        if not target.is_relative_to(self.paths.static_dir.resolve()):
             self._send_json(handler, {"error": "forbidden"}, 403)
             return
         if not target.is_file():
