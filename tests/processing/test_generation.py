@@ -202,7 +202,7 @@ def test_stack_inference_pipeline_smoke(tmp_path, primary, secondaries, interfer
     }
     (data_dir / "dataset.json").write_text(json.dumps(layout))
 
-    outputs = StackInferencePipeline(run_dir, CLIP, logger).run()
+    outputs = StackInferencePipeline(run_dir, logger).run()
 
     assert (run_dir / "images").is_dir()
     assert outputs["figures"] > 0

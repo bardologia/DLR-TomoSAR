@@ -710,7 +710,6 @@ class LaunchLayout:
                             "runs_dir",
                             {"path": "run_tags", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
                         ]},
-                        {"title": "Rendering", "fields": ["max_amplitude_clip"]},
                     ]},
                 ]},
             ],

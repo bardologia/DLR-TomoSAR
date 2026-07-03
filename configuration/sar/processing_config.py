@@ -177,5 +177,3 @@ class PreProcessEntryConfig:
 class PreprocessInferenceConfig:
     runs_dir : Path = Path("/ste/rnd/User/vice_vi/Dataset")
     run_tags : list = field(default_factory=list)
-
-    max_amplitude_clip : float = 1.25
