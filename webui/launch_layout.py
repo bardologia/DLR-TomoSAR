@@ -292,20 +292,34 @@ class LaunchLayout:
         "seeds",
     ]
 
-    INFER_LAYOUT = {
-        "essentials": [
-            "logs_dirs",
-            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "logs_dirs", "multiBase": True}},
-            {"path": "gpus", "widget": GPU_MANY},
-            "poll_interval_s",
-        ],
+    INFER_ESSENTIALS = [
+        "logs_dirs",
+        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "logs_dirs", "multiBase": True}},
+        {"path": "gpus", "widget": GPU_MANY},
+        "poll_interval_s",
+    ]
+
+    INFER_BACKBONE_LAYOUT = {
+        "essentials": INFER_ESSENTIALS,
         "sections": [
             {"key": "backbone", "title": "Backbone", "panels": [
                 {"kind": "fields", "title": "Backbone inference", "template": "inference_full", "at": "inference"},
             ]},
+        ],
+    }
+
+    INFER_PROFILE_AE_LAYOUT = {
+        "essentials": INFER_ESSENTIALS,
+        "sections": [
             {"key": "profile-ae", "title": "Profile AE", "panels": [
                 {"kind": "fields", "title": "Profile autoencoder inference", "template": "profile_inference", "at": "profile_inference"},
             ]},
+        ],
+    }
+
+    INFER_IMAGE_AE_LAYOUT = {
+        "essentials": INFER_ESSENTIALS,
+        "sections": [
             {"key": "image-ae", "title": "Image AE", "panels": [
                 {"kind": "fields", "title": "Image autoencoder inference", "template": "image_inference", "at": "image_inference"},
             ]},
@@ -500,9 +514,9 @@ class LaunchLayout:
                 ]},
             ],
         },
-        "infer_backbone":            INFER_LAYOUT,
-        "infer_profile_autoencoder": INFER_LAYOUT,
-        "infer_image_autoencoder":   INFER_LAYOUT,
+        "infer_backbone":            INFER_BACKBONE_LAYOUT,
+        "infer_profile_autoencoder": INFER_PROFILE_AE_LAYOUT,
+        "infer_image_autoencoder":   INFER_IMAGE_AE_LAYOUT,
         "benchmark": {
             "type_tab": {"field": "training_type", "options": [["backbone", "Backbone"], ["profile_autoencoder", "Profile AE"], ["jepa", "JEPA"]]},
             "essentials": [

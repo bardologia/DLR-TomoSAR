@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 from configuration.inference.general             import InferencePaths, InferenceConfig
-from configuration.inference.backbone            import InferenceEntryConfig
+from configuration.inference.backbone            import BackboneInferenceEntryConfig
+from configuration.inference.image_autoencoder   import ImageAeInferenceEntryConfig
+from configuration.inference.profile_autoencoder import ProfileAeInferenceEntryConfig
 from configuration.inference.image_autoencoder   import ImageAeInferenceConfig
 from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
 
@@ -36,7 +38,9 @@ from configuration.sar.geometry_config   import GeometryConfig
 
 DEFAULT_CONFIGS = [
     InferencePaths,
-    InferenceEntryConfig,
+    BackboneInferenceEntryConfig,
+    ProfileAeInferenceEntryConfig,
+    ImageAeInferenceEntryConfig,
     TuningConfig,
     TuningEntryConfig,
     JepaTuneConfig,
@@ -82,20 +86,23 @@ def test_inference_config_profile_counts_positive():
     assert cfg.n_random_profiles > 0
 
 
-def test_inference_entry_config_holds_inference():
-    cfg = InferenceEntryConfig()
+def test_backbone_inference_entry_config_holds_inference():
+    cfg = BackboneInferenceEntryConfig()
     assert isinstance(cfg.inference, InferenceConfig)
     assert cfg.inference.gif_axes == ["elevation", "range", "azimuth"]
     assert isinstance(cfg.run_filter, list)
+    assert len(cfg.logs_dirs) == 2
 
 
-def test_inference_entry_config_holds_every_family():
-    cfg = InferenceEntryConfig()
+def test_ae_inference_entry_configs_expose_only_their_tree():
+    profile = ProfileAeInferenceEntryConfig()
+    image   = ImageAeInferenceEntryConfig()
 
-    assert isinstance(cfg.logs_dirs, list) and len(cfg.logs_dirs) == 4
-    assert all(isinstance(root, str) for root in cfg.logs_dirs)
-    assert isinstance(cfg.profile_inference, ProfileAeInferenceConfig)
-    assert isinstance(cfg.image_inference, ImageAeInferenceConfig)
+    assert isinstance(profile.profile_inference, ProfileAeInferenceConfig)
+    assert isinstance(image.image_inference, ImageAeInferenceConfig)
+    assert not hasattr(profile, "inference")
+    assert not hasattr(image, "inference")
+    assert not hasattr(BackboneInferenceEntryConfig(), "profile_inference")
 
 
 def test_tuning_config_positive_trials():

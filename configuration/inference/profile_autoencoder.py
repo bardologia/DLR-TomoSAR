@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib     import Path
-from typing      import Optional
+from typing      import List, Optional
+
+_RUNS_ROOT = "/ste/rnd/User/vice_vi/DLR-TomoSAR/runs"
 
 
 @dataclass
@@ -40,3 +42,15 @@ class ProfileAeInferenceConfig:
     save_dpi: int = 300
 
     paths : ProfileAeInferencePaths = field(default_factory=ProfileAeInferencePaths)
+
+
+@dataclass
+class ProfileAeInferenceEntryConfig:
+    logs_dirs : List[str] = field(default_factory=lambda: [
+        f"{_RUNS_ROOT}/profile_autoencoder",
+    ])
+    run_filter      : List[str] = field(default_factory=list)
+    gpus            : List[int] = field(default_factory=lambda: [0])
+    poll_interval_s : float     = 5.0
+
+    profile_inference : ProfileAeInferenceConfig = field(default_factory=lambda: ProfileAeInferenceConfig(run_directory=Path(".")))

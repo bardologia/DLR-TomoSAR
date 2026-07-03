@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from pathlib  import Path
 
-from configuration.inference                   import InferenceEntryConfig
 from pipelines.shared.inference.run_classifier import RunClassifier
 from tools.monitoring.logger                   import Logger
 from tools.orchestration.gpu_queue             import GpuJob, GpuJobResult, GpuQueue
@@ -12,7 +11,7 @@ from tools.runtime.run_tag                     import RunTag
 
 
 class InferenceScheduler:
-    def __init__(self, config: InferenceEntryConfig, entry_script: Path, run_type: str) -> None:
+    def __init__(self, config, entry_script: Path, run_type: str) -> None:
         self.config       = config
         self.entry_script = entry_script
         self.run_type     = run_type

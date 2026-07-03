@@ -31,15 +31,15 @@ class ProjectPaths:
         },
         "infer_backbone": {
             "config_module" : "configuration.inference",
-            "config_class"  : "InferenceEntryConfig",
+            "config_class"  : "BackboneInferenceEntryConfig",
         },
         "infer_profile_autoencoder": {
             "config_module" : "configuration.inference",
-            "config_class"  : "InferenceEntryConfig",
+            "config_class"  : "ProfileAeInferenceEntryConfig",
         },
         "infer_image_autoencoder": {
             "config_module" : "configuration.inference",
-            "config_class"  : "InferenceEntryConfig",
+            "config_class"  : "ImageAeInferenceEntryConfig",
         },
         "cross_validate": {
             "file"          : "cross_validate",

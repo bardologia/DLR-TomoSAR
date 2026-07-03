@@ -16,6 +16,12 @@ class InferenceEntry:
         RunType.IMAGE_AE   : "ImageAeInferenceRunner",
     }
 
+    CONFIGS = {
+        RunType.BACKBONE   : "BackboneInferenceEntryConfig",
+        RunType.PROFILE_AE : "ProfileAeInferenceEntryConfig",
+        RunType.IMAGE_AE   : "ImageAeInferenceEntryConfig",
+    }
+
     DESCRIPTIONS = {
         RunType.BACKBONE   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports over every backbone/JEPA run under the selected roots.",
         RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run under the selected roots.",
@@ -26,10 +32,14 @@ class InferenceEntry:
         self.entry_script = Path(entry_script)
         self.run_type     = run_type
 
+    def _entry_config(self):
+        import configuration.inference as inference_configs
+
+        return getattr(inference_configs, self.CONFIGS[self.run_type])()
+
     def _worker(self, run_dir: str, config_path: str, gpu_id: int) -> None:
         EnvironmentPinner.gpu(gpu_id)
 
-        from configuration.inference            import InferenceEntryConfig
         from pipelines.shared.inference.inference_dispatch import BackboneInferenceRunner, ImageAeInferenceRunner, ProfileAeInferenceRunner
         from tools.runtime.config_cli           import ConfigCli
 
@@ -39,18 +49,17 @@ class InferenceEntry:
             "ImageAeInferenceRunner"   : ImageAeInferenceRunner,
         }
 
-        config = ConfigCli.load_resolved(InferenceEntryConfig(), Path(config_path))
+        config = ConfigCli.load_resolved(self._entry_config(), Path(config_path))
 
         runners[self.RUNNERS[self.run_type]](config).run(Path(run_dir))
 
     def _scheduler(self) -> None:
         EnvironmentPinner.threads()
 
-        from configuration.inference             import InferenceEntryConfig
         from pipelines.shared.inference.inference_scheduler import InferenceScheduler
         from tools.runtime.config_cli            import ConfigCli
 
-        config = ConfigCli(InferenceEntryConfig(), description=self.DESCRIPTIONS[self.run_type]).apply()
+        config = ConfigCli(self._entry_config(), description=self.DESCRIPTIONS[self.run_type]).apply()
 
         results = InferenceScheduler(config=config, entry_script=self.entry_script, run_type=self.run_type).run()
 

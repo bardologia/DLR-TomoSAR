@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.inference import InferenceEntryConfig
+from configuration.inference import BackboneInferenceEntryConfig
 from tools.runtime.config_cli import ConfigCli
 
 
@@ -60,9 +60,9 @@ CLI_MODULES = (
 )
 
 ENTRY_CONFIGS = {
-    "infer_backbone"            : ("configuration.inference",          "InferenceEntryConfig"),
-    "infer_profile_autoencoder" : ("configuration.inference",          "InferenceEntryConfig"),
-    "infer_image_autoencoder"   : ("configuration.inference",          "InferenceEntryConfig"),
+    "infer_backbone"            : ("configuration.inference",          "BackboneInferenceEntryConfig"),
+    "infer_profile_autoencoder" : ("configuration.inference",          "ProfileAeInferenceEntryConfig"),
+    "infer_image_autoencoder"   : ("configuration.inference",          "ImageAeInferenceEntryConfig"),
     "pre_process"               : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
     "extract_params"            : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
     "analyze_preprocessing"     : ("configuration.sar.processing_config", "PreprocessInferenceConfig"),
@@ -71,7 +71,7 @@ ENTRY_CONFIGS = {
     "tune_dataloader"           : ("configuration.benchmark.dataloader_tuning",  "DataLoaderTuningEntryConfig"),
     "benchmark"                 : ("configuration.benchmark",                    "BenchmarkConfig"),
     "cross_validate"            : ("configuration.cross_validation",             "CrossValidationConfig"),
-    "compare_runs"              : ("configuration.benchmark",                    "BenchmarkConfig"),
+    "compare_runs"              : ("configuration.comparison",                   "ComparisonEntryConfig"),
 }
 
 
@@ -210,7 +210,7 @@ def test_config_cli_apply_no_args_returns_unmodified_config(name):
 
 
 def test_config_cli_rejects_unknown_override():
-    cli = ConfigCli(InferenceEntryConfig())
+    cli = ConfigCli(BackboneInferenceEntryConfig())
 
     with pytest.raises(ValueError):
         cli.apply(["--not-a-real-flag", "1"])
