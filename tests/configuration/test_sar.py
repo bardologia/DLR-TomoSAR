@@ -36,7 +36,7 @@ def test_geometry_config_defaults():
     assert cfg.slant_range > 0
     assert 0 < cfg.look_angle_deg < 90
     assert isinstance(cfg.baselines, tuple)
-    assert cfg.baselines_source == "auto"
+    assert cfg.baselines_source == "dataset"
     assert cfg.baseline_component == "perpendicular"
 
 
@@ -54,12 +54,6 @@ def test_geometry_resolved_manual_returns_self(tmp_path):
 
 def test_geometry_resolved_with_kz_returns_self(tmp_path):
     cfg      = GeometryConfig(kz_values=(0.1, 0.2))
-    resolved = cfg.resolved(tmp_path)
-    assert resolved is cfg
-
-
-def test_geometry_resolved_auto_missing_file_returns_self(tmp_path):
-    cfg      = GeometryConfig(baselines_source="auto")
     resolved = cfg.resolved(tmp_path)
     assert resolved is cfg
 

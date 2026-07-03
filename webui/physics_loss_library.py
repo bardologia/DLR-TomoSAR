@@ -346,7 +346,7 @@ class PhysicsLossLibrary:
                         {"field": "look_angle_deg",      "default": "45.0",          "meaning": "projects baselines to the perpendicular component"},
                         {"field": "baselines",          "default": "9 values, 0-90", "meaning": "synthetic baselines (m); replaced per dataset"},
                         {"field": "baseline_component",  "default": "perpendicular", "meaning": "baseline component the dataset table resolves to"},
-                        {"field": "baselines_source",    "default": "auto",          "meaning": "auto / dataset / manual table resolution"},
+                        {"field": "baselines_source",    "default": "dataset",       "meaning": "dataset (require meta/baselines.json) / manual (use config values)"},
                         {"field": "kz_values",           "default": "()",            "meaning": "explicit kz override; bypasses the baselines"},
                     ],
                 },

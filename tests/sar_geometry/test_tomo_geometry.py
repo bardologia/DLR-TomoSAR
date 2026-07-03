@@ -16,20 +16,47 @@ def _cfg(**kwargs) -> GeometryConfig:
 
 
 def test_kz_from_baselines_matches_hand_computation():
-    cfg   = _cfg(wavelength=0.23, slant_range=5000.0, baselines=(0.0, 10.0, 20.0))
+    cfg   = _cfg(wavelength=0.23, slant_range=5000.0, look_angle_deg=30.0, baselines=(0.0, 10.0, 20.0))
     geom  = TomoGeometry(cfg, torch.linspace(-20.0, 80.0, 150))
 
-    scale    = 4.0 * math.pi / (0.23 * 5000.0)
+    scale    = 4.0 * math.pi / (0.23 * 5000.0 * math.sin(math.radians(30.0)))
     expected = [0.0, scale * 10.0, scale * 20.0]
 
     assert geom.kz.tolist() == pytest.approx(expected, rel=1e-6)
 
 
-def test_kz_scale_is_four_pi_over_lambda_r0():
-    cfg   = _cfg(wavelength=0.1, slant_range=2000.0, baselines=(0.0, 1.0))
+def test_slant_kz_scale_is_four_pi_over_lambda_r0():
+    cfg   = _cfg(wavelength=0.1, slant_range=2000.0, baselines=(0.0, 1.0), height_axis_convention="slant")
     geom  = TomoGeometry(cfg, torch.linspace(0.0, 1.0, 4))
 
     assert float(geom.kz[1]) == pytest.approx(4.0 * math.pi / (0.1 * 2000.0), rel=1e-6)
+
+
+def test_height_kz_is_slant_kz_divided_by_sin_look():
+    slant_cfg  = _cfg(wavelength=0.1, slant_range=2000.0, look_angle_deg=35.0, baselines=(0.0, 1.0), height_axis_convention="slant")
+    height_cfg = _cfg(wavelength=0.1, slant_range=2000.0, look_angle_deg=35.0, baselines=(0.0, 1.0), height_axis_convention="height")
+
+    x      = torch.linspace(0.0, 1.0, 4)
+    slant  = TomoGeometry(slant_cfg,  x)
+    height = TomoGeometry(height_cfg, x)
+
+    assert float(height.kz[1]) == pytest.approx(float(slant.kz[1]) / math.sin(math.radians(35.0)), rel=1e-6)
+
+
+def test_unknown_convention_raises():
+    cfg = _cfg(height_axis_convention="bogus")
+
+    with pytest.raises(ValueError, match="height_axis_convention"):
+        TomoGeometry(cfg, torch.linspace(0.0, 1.0, 4))
+
+
+def test_explicit_kz_values_ignore_convention_scaling():
+    slant_cfg  = _cfg(kz_values=(0.05, 0.10), height_axis_convention="slant")
+    height_cfg = _cfg(kz_values=(0.05, 0.10), height_axis_convention="height")
+
+    x = torch.linspace(0.0, 1.0, 4)
+
+    assert TomoGeometry(slant_cfg, x).kz.tolist() == TomoGeometry(height_cfg, x).kz.tolist()
 
 
 def test_explicit_kz_values_override_baselines():

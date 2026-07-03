@@ -1275,7 +1275,7 @@
       "look_angle_deg": "Radar look/incidence angle in degrees, used for perpendicular projection",
       "baselines": "Per-track baseline offsets in metres relative to the primary acquisition",
       "kz_values": "Explicit vertical wavenumbers per track; non-empty overrides baseline computation",
-      "baselines_source": "Resolution mode: auto, dataset (require file), or manual (use config values)",
+      "baselines_source": "Resolution mode: dataset (require meta/baselines.json) or manual (use config values)",
       "baseline_component": "Projection used: perpendicular, vertical, horizontal, or magnitude",
       "baselines_origin": "Provenance tag of active baselines: config default or loaded file path",
       "height_axis_convention": "Orientation of the vertical reconstruction axis, e.g. height versus elevation"

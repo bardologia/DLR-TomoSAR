@@ -103,10 +103,10 @@ def test_real_kz_from_perpendicular_baselines_sign(baselines_json):
     table = TrackBaselines.from_payload(baselines_json)
     perp  = table.baselines("perpendicular", look_angle_deg=45.0)
 
-    cfg   = GeometryConfig(wavelength=0.23, slant_range=5000.0, baselines=tuple(perp))
+    cfg   = GeometryConfig(wavelength=0.23, slant_range=5000.0, look_angle_deg=45.0, baselines=tuple(perp))
     geom  = TomoGeometry(cfg, torch.linspace(-20.0, 80.0, 150))
 
-    scale = 4.0 * math.pi / (0.23 * 5000.0)
+    scale = 4.0 * math.pi / (0.23 * 5000.0 * math.sin(math.radians(45.0)))
 
     assert geom.n_tracks == 29
     assert float(geom.kz[0]) == 0.0
