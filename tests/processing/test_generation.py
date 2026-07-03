@@ -206,3 +206,40 @@ def test_stack_inference_pipeline_smoke(tmp_path, primary, secondaries, interfer
 
     assert (run_dir / "images").is_dir()
     assert outputs["figures"] > 0
+
+
+def _write_tomo_partial(directory, suffix: str, dem_chunk: np.ndarray, tomogram_chunk: np.ndarray) -> None:
+    import h5py
+
+    directory.mkdir(parents=True, exist_ok=True)
+
+    with h5py.File(str(directory / f"partial_{suffix}.h5"), "w") as handle:
+        handle.create_dataset("DEM",      data=dem_chunk)
+        handle.create_dataset("tomogram", data=tomogram_chunk)
+
+
+def test_tomogram_concatenate_roundtrip(tmp_path, logger):
+    from pipelines.processing.generation.tomogram import TomogramProcessor
+
+    rng      = np.random.default_rng(0)
+    dem      = rng.normal(size=(30, 8)).astype(np.float32)
+    tomogram = (rng.normal(size=(5, 30, 8)) + 1j * rng.normal(size=(5, 30, 8))).astype(np.complex64)
+
+    crop      = CropRegion(0, 30, 0, 8)
+    config    = ProcessingConfig(crop=crop, paths=PathConfig(main_directory=tmp_path, run_subdirectory="run"))
+    processor = TomogramProcessor(config, logger)
+
+    config.tomogram_config.max_crop_azimuth_width = 12
+    subsections = processor._divide_crop(config.tomogram_config)
+
+    assert [s[:2] for s in subsections] == [(0, 12), (12, 24), (24, 30)]
+
+    partials_dir = tmp_path / "tomo_tmp" / "TOMO" / "TOMO-SR"
+
+    for index, (azimuth_start, azimuth_end, _, _) in enumerate(subsections):
+        _write_tomo_partial(partials_dir, f"{index:04d}", dem[azimuth_start:azimuth_end], tomogram[:, azimuth_start:azimuth_end])
+
+    combined_dem, combined_tomogram = processor._concatenate(tmp_path / "tomo_tmp")
+
+    np.testing.assert_array_equal(combined_dem,      dem)
+    np.testing.assert_array_equal(combined_tomogram, tomogram)
