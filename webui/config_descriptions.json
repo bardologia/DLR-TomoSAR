@@ -821,7 +821,8 @@
     "fields": {
       "n_folds": "Number of cross-validation folds to split the data into",
       "azimuth_start": "First azimuth line index of the usable range",
-      "azimuth_end": "Last azimuth line index of the usable range"
+      "azimuth_end": "Last azimuth line index of the usable range",
+      "guard": "Azimuth lines excluded around every boundary between different splits, half taken from each side; matches the manual split guard band"
     }
   },
   "cross_validation/general::CrossValidationConfig": {

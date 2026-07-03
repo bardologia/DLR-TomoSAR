@@ -9,14 +9,14 @@ from pipelines.cross_validation.folds import FoldConfigFactory, FoldNaming, Fold
 from tools.data.regions               import CropRegion, SplitRegions
 
 
-def make_config(n_folds: int, azimuth_start: int = 1000, azimuth_end: int = 2000) -> CrossValidationConfig:
+def make_config(n_folds: int, azimuth_start: int = 1000, azimuth_end: int = 2000, guard: int = 0) -> CrossValidationConfig:
     config       = CrossValidationConfig()
-    config.folds = FoldConfig(n_folds=n_folds, azimuth_start=azimuth_start, azimuth_end=azimuth_end)
+    config.folds = FoldConfig(n_folds=n_folds, azimuth_start=azimuth_start, azimuth_end=azimuth_end, guard=guard)
     return config
 
 
-def make_planner(n_folds: int, azimuth_start: int = 1000, azimuth_end: int = 2000, range_start: int = 500, range_end: int = 1000) -> FoldPlanner:
-    config = make_config(n_folds, azimuth_start, azimuth_end)
+def make_planner(n_folds: int, azimuth_start: int = 1000, azimuth_end: int = 2000, range_start: int = 500, range_end: int = 1000, guard: int = 0) -> FoldPlanner:
+    config = make_config(n_folds, azimuth_start, azimuth_end, guard=guard)
     return FoldPlanner(config, range_start=range_start, range_end=range_end)
 
 
@@ -181,6 +181,59 @@ def test_test_blocks_across_folds_tile_the_extent():
         covered.extend(range(start, end))
 
     assert covered == list(range(1000, 2000))
+
+
+def test_guard_trims_internal_boundaries_only():
+    planner = make_planner(5, guard=64)
+    plan    = planner.plan(0)
+
+    assert az_intervals(plan.split_regions.regions("test"))  == [(1000, 1168)]
+    assert az_intervals(plan.split_regions.regions("val"))   == [(1232, 1368)]
+    assert az_intervals(plan.split_regions.regions("train")) == [(1432, 2000)]
+
+
+def test_guard_gap_separates_every_split_pair():
+    planner = make_planner(5, guard=64)
+
+    for plan in planner.plans():
+        intervals = []
+        for name in ("train", "val", "test"):
+            intervals.extend(az_intervals(plan.split_regions.regions(name)))
+
+        for (_, left_end), (right_start, _) in zip(sorted(intervals), sorted(intervals)[1:]):
+            assert right_start - left_end == 64
+
+
+def test_guard_keeps_split_train_runs_trimmed():
+    planner = make_planner(5, guard=64)
+    plan    = planner.plan(2)
+
+    assert az_intervals(plan.split_regions.regions("train")) == [(1000, 1368), (1832, 2000)]
+
+
+def test_zero_guard_reproduces_block_aligned_regions():
+    planner = make_planner(5, guard=0)
+    plan    = planner.plan(0)
+
+    test_region = plan.split_regions.regions("test")[0]
+    assert (test_region.azimuth_start, test_region.azimuth_end) == planner.blocks[0]
+
+
+def test_default_guard_is_64():
+    assert FoldConfig().guard == 64
+
+
+def test_rejects_odd_or_negative_guard():
+    with pytest.raises(ValueError, match="non-negative even"):
+        make_planner(5, guard=63)
+
+    with pytest.raises(ValueError, match="non-negative even"):
+        make_planner(5, guard=-2)
+
+
+def test_rejects_guard_consuming_smallest_block():
+    with pytest.raises(ValueError, match="consumes the smallest fold block"):
+        make_planner(5, azimuth_start=1000, azimuth_end=1300, guard=64)
 
 
 def test_rejects_fewer_than_three_folds():

@@ -602,7 +602,7 @@ class LaunchLayout:
                 ]},
                 {"key": "folds", "title": "Folds", "panels": [
                     {"kind": "fields", "groups": [
-                        {"title": "Fold layout", "fields": ["folds.n_folds", "folds.azimuth_start", "folds.azimuth_end"]},
+                        {"title": "Fold layout", "fields": ["folds.n_folds", "folds.azimuth_start", "folds.azimuth_end", "folds.guard"]},
                     ]},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit", "at": "overfit"},
                 ]},

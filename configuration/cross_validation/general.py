@@ -23,6 +23,7 @@ class FoldConfig:
     n_folds       : int = 10
     azimuth_start : int = 1000
     azimuth_end   : int = 16000
+    guard         : int = 64
 
 
 @dataclass

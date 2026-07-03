@@ -180,8 +180,8 @@ def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch
     worker.run(2)
 
     train = sorted((r.azimuth_start, r.azimuth_end) for r in captured["sr"].regions("train"))
-    assert train                                        == [(1000, 1400), (1800, 2000)]
-    assert worker.factory.planner().plan(2).split_regions.regions("test")[0].azimuth_start == 1400
+    assert train                                        == [(1000, 1368), (1832, 2000)]
+    assert worker.factory.planner().plan(2).split_regions.regions("test")[0].azimuth_start == 1432
 
 
 @pytest.mark.real_data

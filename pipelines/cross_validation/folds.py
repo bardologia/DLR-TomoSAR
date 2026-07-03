@@ -26,10 +26,20 @@ class FoldPlanner:
         if folds.n_folds < 3:
             raise ValueError(f"n_folds must be >= 3 so that train, val, and test stay disjoint; got {folds.n_folds}")
 
-        self.n_folds     = folds.n_folds
-        self.range_start = range_start
-        self.range_end   = range_end
-        self.blocks      = self._partition(folds.azimuth_start, folds.azimuth_end, folds.n_folds)
+        if folds.guard < 0 or folds.guard % 2 != 0:
+            raise ValueError(f"folds.guard={folds.guard} must be a non-negative even number of azimuth lines")
+
+        self.n_folds       = folds.n_folds
+        self.guard         = folds.guard
+        self.azimuth_start = folds.azimuth_start
+        self.azimuth_end   = folds.azimuth_end
+        self.range_start   = range_start
+        self.range_end     = range_end
+        self.blocks        = self._partition(folds.azimuth_start, folds.azimuth_end, folds.n_folds)
+
+        smallest_block = min(end - start for start, end in self.blocks)
+        if smallest_block <= self.guard:
+            raise ValueError(f"folds.guard={self.guard} consumes the smallest fold block ({smallest_block} azimuth lines); reduce guard or n_folds")
 
     def _partition(self, azimuth_start: int, azimuth_end: int, n_folds: int) -> list[tuple[int, int]]:
         total = azimuth_end - azimuth_start
@@ -59,11 +69,18 @@ class FoldPlanner:
 
     def _run_region(self, run: tuple[int, int]) -> CropRegion:
         first_block, last_block = run
-        return CropRegion(self.blocks[first_block][0], self.blocks[last_block][1], self.range_start, self.range_end)
+        azimuth_start, azimuth_end = self._trim(self.blocks[first_block][0], self.blocks[last_block][1])
+        return CropRegion(azimuth_start, azimuth_end, self.range_start, self.range_end)
 
     def _block_region(self, block_index: int) -> CropRegion:
-        azimuth_start, azimuth_end = self.blocks[block_index]
+        azimuth_start, azimuth_end = self._trim(*self.blocks[block_index])
         return CropRegion(azimuth_start, azimuth_end, self.range_start, self.range_end)
+
+    def _trim(self, azimuth_start: int, azimuth_end: int) -> tuple[int, int]:
+        margin        = self.guard // 2
+        azimuth_start = azimuth_start + margin if azimuth_start > self.azimuth_start else azimuth_start
+        azimuth_end   = azimuth_end - margin   if azimuth_end   < self.azimuth_end   else azimuth_end
+        return azimuth_start, azimuth_end
 
     def plan(self, fold_index: int) -> FoldPlan:
         if not 0 <= fold_index < self.n_folds:
