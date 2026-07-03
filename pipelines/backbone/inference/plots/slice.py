@@ -198,7 +198,12 @@ class SlicePlotter(PlotTools):
         err_gt_slice = self._rescale(err_gt_slice, scale)
 
         vmin, vmax = self._shared_clim(gt_slice, pred_slice)
-        emax_gt  = float(np.percentile(err_gt_slice, 99.0))
+
+        err_finite = err_gt_slice[np.isfinite(err_gt_slice)]
+        if err_finite.size == 0:
+            raise ValueError(f"Slice '{stem}' has no finite error values; the prediction slice is entirely NaN against the reference.")
+
+        emax_gt  = float(np.percentile(err_finite, 99.0))
         ssim_str = f"   SSIM = {ssim_value:.4f}" if ssim_value is not None and np.isfinite(ssim_value) else ""
 
         panels = [
