@@ -6,6 +6,7 @@ from typing  import List, Optional
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.colors    as mcolors
 import matplotlib.pyplot    as plt
 import numpy                as np
 
@@ -103,22 +104,38 @@ class ParamPlotter(PlotTools):
         return paths
 
     @staticmethod
+    def _bin_edges(values: np.ndarray, bins: int, q: float = 0.5) -> np.ndarray:
+        lo = float(np.percentile(values, q))
+        hi = float(np.percentile(values, 100.0 - q))
+
+        if hi - lo < 1e-12:
+            lo, hi = float(values.min()), float(values.max())
+        if hi - lo < 1e-12:
+            hi = lo + 1.0
+
+        return np.linspace(lo, hi, bins + 1)
+
+    @staticmethod
     def _point_density(gt: np.ndarray, pred: np.ndarray) -> np.ndarray:
         bins = int(np.clip(np.sqrt(gt.size / 2.0), 16, 128))
 
-        counts, gt_edges, pred_edges = np.histogram2d(gt, pred, bins=bins)
-        gt_bin   = np.clip(np.digitize(gt,   gt_edges)   - 1, 0, bins - 1)
-        pred_bin = np.clip(np.digitize(pred, pred_edges) - 1, 0, bins - 1)
+        gt_edges   = ParamPlotter._bin_edges(gt,   bins)
+        pred_edges = ParamPlotter._bin_edges(pred, bins)
 
-        return counts[gt_bin, pred_bin]
+        counts, _, _ = np.histogram2d(gt, pred, bins=[gt_edges, pred_edges])
+        gt_bin       = np.clip(np.digitize(gt,   gt_edges)   - 1, 0, bins - 1)
+        pred_bin     = np.clip(np.digitize(pred, pred_edges) - 1, 0, bins - 1)
+
+        return np.maximum(counts[gt_bin, pred_bin], 1.0)
 
     def _scatter_panel(self, ax, gt: np.ndarray, pred: np.ndarray, label: str):
         r2      = self._r2_value(gt, pred)
         density = self._point_density(gt, pred)
         order   = np.argsort(density)
+        norm    = mcolors.LogNorm(vmin=1.0, vmax=max(float(density.max()), 2.0))
 
         return ax.scatter(
-            gt[order], pred[order], c=density[order], s=4, alpha=0.7,
+            gt[order], pred[order], c=density[order], s=4, alpha=0.7, norm=norm,
             cmap="viridis", edgecolors="none", rasterized=True, label=f"{label}  R²={r2:.3f}",
         )
 
@@ -176,7 +193,7 @@ class ParamPlotter(PlotTools):
                 ax.set_ylim(lo, hi)
                 ax.set_aspect("equal", adjustable="box")
 
-                fig.colorbar(sc, ax=ax, fraction=0.045, pad=0.02).set_label("point density (count per 2-D bin)")
+                fig.colorbar(sc, ax=ax, fraction=0.045, pad=0.02).set_label("point density (count per 2-D bin, log scale)")
 
                 r2_str = self._r2_value(gt, pred)
                 ax.set_title(f"GT g{k + 1} — {lbl}  (matched, R²={r2_str:.3f})", fontsize=10)
