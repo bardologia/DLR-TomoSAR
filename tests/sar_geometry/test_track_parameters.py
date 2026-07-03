@@ -127,6 +127,15 @@ def test_collector_builds_parameters_over_passes(tmp_path):
     assert all(path.endswith("INF/INF-RDP/pp_17sartom0102_Lhv_t01L.xml") for path in parameters.track_files)
 
 
+def test_collector_rejects_duplicate_labels(tmp_path):
+    _write_sample(tmp_path / "FL01" / "PS02" / "T01L", pols=("hv",))
+
+    directories = [tmp_path / "FL01" / "PS02" / "T01L", tmp_path / "FL01" / "PS02" / "T01L"]
+
+    with pytest.raises(ValueError, match="duplicate labels"):
+        TrackParameterCollector.from_pass_directories(directories, "hv")
+
+
 def test_derived_geometry_matches_acquisition(tmp_path):
     path = tmp_path / "pp.xml"
     path.write_text(SAMPLE_XML, encoding="utf-8")

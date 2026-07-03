@@ -89,6 +89,15 @@ def test_resolve_passes_builds_label_mapping(tmp_path):
     assert set(mapping.keys()) == {"FL01_PS02", "FL01_PS04"}
 
 
+def test_resolve_passes_rejects_duplicate_labels(tmp_path):
+    d = tmp_path / "FL01" / "PS02" / "INF" / "INF-TRACK"
+    d.mkdir(parents=True)
+    (d / "track_sar_resa_z.rat").write_text("stub")
+
+    with pytest.raises(ValueError, match="unique label"):
+        TrackFileResolver().resolve_passes([tmp_path / "FL01" / "PS02", tmp_path / "FL01" / "PS02"])
+
+
 def test_extractor_reference_baselines_are_zero():
     paths = {
         "FL01_PS02": Path("a.rat"),

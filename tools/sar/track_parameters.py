@@ -225,8 +225,14 @@ class TrackParameterCollector:
 
     @classmethod
     def from_pass_directories(cls, pass_directories: list, polarisation: str) -> "TrackParameterCollector":
-        resolver    = StepParameterResolver()
-        track_paths = {resolver.label(str(directory)): resolver.resolve_for_polarisation(directory, polarisation) for directory in pass_directories}
+        resolver = StepParameterResolver()
+        labels   = [resolver.label(str(directory)) for directory in pass_directories]
+
+        duplicates = sorted({label for label in labels if labels.count(label) > 1})
+        if duplicates:
+            raise ValueError(f"Pass directories resolve to duplicate labels {duplicates}; every pass must map to a unique label or tracks would be silently dropped.")
+
+        track_paths = {label: resolver.resolve_for_polarisation(directory, polarisation) for label, directory in zip(labels, pass_directories)}
 
         return cls(track_paths)
 

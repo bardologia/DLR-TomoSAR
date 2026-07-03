@@ -57,8 +57,10 @@ class PassProductResolver:
 
         for directory in pass_directories:
             label = self.label(directory)
-            path  = self.resolve(directory)
-            mapping[label] = path
+            if label in mapping:
+                raise ValueError(f"Pass directory {directory} resolves to label '{label}' which is already taken; every pass must map to a unique label or tracks would be silently dropped.")
+
+            mapping[label] = self.resolve(directory)
 
         return mapping
 
