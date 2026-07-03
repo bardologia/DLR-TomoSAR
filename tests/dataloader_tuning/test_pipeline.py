@@ -129,6 +129,42 @@ def test_final_config_overrides_from_refine_report(tmp_path):
 
 
 @pytest.mark.slow
+def test_run_exits_with_reason_when_no_configuration_succeeds(tmp_path, monkeypatch):
+    config   = _config(tmp_path, batch_sizes=[256], worker_counts=[2], refine=False, save_figures=False)
+    pipeline = DataLoaderTuningPipeline(config)
+
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.os.cpu_count", lambda: 8)
+
+    class FakeTarget:
+        dataset        = [torch.zeros(2)]
+        model          = torch.nn.Linear(2, 2)
+        to_model_input = staticmethod(lambda batch, device: batch)
+        forward_loss   = staticmethod(lambda model, x: model(x).mean())
+        model_name     = "mlp_ae"
+        sample_text    = "synthetic"
+        item_source    = "synthetic"
+        config_hint    = "synthetic"
+
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.build_feed_target", lambda *a, **k: FakeTarget())
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.GpuFeedBenchmark", lambda **kwargs: object())
+
+    oom_records = [{"status": "oom", "batch_size": 256, "num_workers": 2, "prefetch_factor": 4, "pin_memory": True, "persistent_workers": True}]
+
+    class FakeSweep:
+        def __init__(self, benchmark, specs, on_result):
+            self.on_result = on_result
+        def run(self):
+            for record in oom_records:
+                self.on_result(dict(record))
+            return oom_records
+
+    monkeypatch.setattr("pipelines.dataloader_tuning.pipeline.DataLoaderSweep", FakeSweep)
+
+    with pytest.raises(SystemExit, match="no working configuration"):
+        pipeline.run()
+
+
+@pytest.mark.slow
 def test_run_selects_highest_throughput_config(tmp_path, monkeypatch):
     config   = _config(tmp_path, batch_sizes=[256, 512], worker_counts=[2], refine=False, save_figures=False)
     pipeline = DataLoaderTuningPipeline(config)

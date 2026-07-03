@@ -164,6 +164,12 @@ class DataLoaderTuningPipeline:
         report         = SweepReport(main_results, wait_threshold=self.config.data_wait_target)
         recommendation = report.recommendation
 
+        if not recommendation["found"]:
+            self.events.emit("recommendation", {"recommendation": recommendation, "final": None})
+            self.logger.error(f"No configuration succeeded: {recommendation['reason']}")
+            self.logger.close()
+            raise SystemExit(f"dataloader tuning found no working configuration: {recommendation['reason']}")
+
         refine_results = []
         refine_report  = None
         if self.config.refine and recommendation.get("found"):
