@@ -145,17 +145,17 @@ class SigmaFittingExtractor:
         self.logger.section("[Kernel Compilation]")
         self.logger.subsection(f"Compiling JAX kernel (free: {free}) for K={self.k_max}")
 
-        N_warm = self._n_devices * max(1, 4 // self._n_devices)
-        K      = self.k_max
+        B = self.gpu_pixel_batch_size
+        K = self.k_max
 
-        dummy_s = jnp.ones((N_warm, K),  dtype=jnp.float32) * 5.0
-        dummy_p = jnp.ones((N_warm, H),  dtype=jnp.float32)
-        dummy_a = jnp.ones((N_warm, K),  dtype=jnp.float32) * 0.5
-        dummy_m = jnp.zeros((N_warm, K), dtype=jnp.float32)
+        dummy_s = jnp.ones((B, K),  dtype=jnp.float32) * 5.0
+        dummy_p = jnp.ones((B, H),  dtype=jnp.float32)
+        dummy_a = jnp.ones((B, K),  dtype=jnp.float32) * 0.5
+        dummy_m = jnp.zeros((B, K), dtype=jnp.float32)
 
-        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, self.amp_mask, self.mu_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, 2, self.adam_lr, self.adam_b1, self.adam_b2)
+        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, self.amp_mask, self.mu_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, self.adam_steps, self.adam_lr, self.adam_b1, self.adam_b2)
 
-        self.logger.subsection(f"Kernel compiled (K={K})")
+        self.logger.subsection(f"Kernel compiled (K={K}, batch={B}, n_steps={self.adam_steps})")
 
     def _load_batch(
         self,
