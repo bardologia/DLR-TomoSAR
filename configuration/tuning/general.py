@@ -45,7 +45,6 @@ class TuningEntryConfig:
     skip_models  : list[str]  = field(default_factory=list)
     run_tag      : str | None = None
 
-    n_gaussians     : int                 = 5
     training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
     overfit         : OverfitConfig       = field(default_factory=OverfitConfig)
     ae_loss         : object              = field(default_factory=_default_ae_loss)

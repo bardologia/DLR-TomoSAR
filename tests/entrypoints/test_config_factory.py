@@ -14,8 +14,9 @@ from tools.data.regions import CropRegion
 
 @pytest.fixture
 def factory(test_data_dir):
-    config = BenchmarkConfig()
-    config.paths.dataset_path = str(test_data_dir)
+    config                       = BenchmarkConfig()
+    config.paths.dataset_path    = str(test_data_dir)
+    config.paths.parameters_path = test_data_dir / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
     return ConfigFactory(config)
 
 

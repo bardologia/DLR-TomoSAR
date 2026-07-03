@@ -672,7 +672,6 @@
       "model_name": "Identifier of the trained run whose data pipeline is benchmarked",
       "gpu": "CUDA device index to run the benchmark on",
       "seed": "Random seed for reproducible sampling and shuffling",
-      "n_gaussians": "Number of Gaussian mixture components per elevation profile",
       "use_amp": "Enable automatic mixed precision during timing runs",
       "pixel_subsample": "Fraction of pixels retained when subsampling the dataset",
       "keep_empty_frac": "Fraction of empty/background pixels kept in samples",
@@ -767,7 +766,6 @@
       "resume": "Whether to continue from existing partial results",
       "seed": "Base random seed for the benchmark",
       "seeds": "Explicit seed list for multi-seed repeated runs",
-      "n_gaussians": "Number of Gaussian mixture components per elevation profile",
       "poll_interval_s": "Seconds between polls of queued job status",
       "sweep_loss_components": "Loss terms varied across the benchmark sweep"
     }
@@ -848,7 +846,6 @@
       "resume": "Whether to resume interrupted folds instead of restarting",
       "seed": "Base random seed for reproducibility",
       "seeds": "Multiple seeds for repeated seed-varied runs",
-      "n_gaussians": "Number of Gaussian mixture components predicted per profile",
       "poll_interval_s": "Seconds between queue polls for job completion"
     }
   },
@@ -1412,7 +1409,6 @@
       "gpu": "Primary GPU device index for a single run",
       "seed": "Base random seed for reproducibility",
       "seeds": "Multiple seeds to launch repeated runs; empty uses seed",
-      "n_gaussians": "Number of Gaussian components predicted per elevation profile",
       "logdir": "Root directory where run outputs and checkpoints are written",
       "model_overrides": "Ad-hoc key-value overrides applied to backbone hyperparameters",
       "paths": "Filesystem paths for data, runs, and outputs",
@@ -1717,7 +1713,6 @@
       "gpu": "CUDA device index for training",
       "seed": "Random seed for a single-run reproducibility",
       "seeds": "List of seeds to sweep across multiple runs",
-      "n_gaussians": "Number of Gaussian components along the elevation axis",
       "logdir": "Filesystem root where run outputs and checkpoints are written",
       "ae_model_name": "Registry key selecting the autoencoder architecture",
       "model_overrides": "Ad-hoc key-value overrides applied to the model config",
@@ -1784,7 +1779,6 @@
       "gpu": "GPU device index to train on",
       "seed": "Random seed for a single run",
       "seeds": "List of seeds for launching multiple repeated runs",
-      "n_gaussians": "Number of Gaussian components in the profile mixture",
       "logdir": "Root directory for JEPA run outputs and checkpoints",
       "model_overrides": "Dictionary of backbone hyperparameter overrides",
       "profile_autoencoder_logdir": "Directory holding pretrained profile autoencoder runs",
@@ -1838,7 +1832,6 @@
       "gpu": "CUDA device index to train on",
       "seed": "Random seed for a single run",
       "seeds": "Seed list for launching multiple repeated runs",
-      "n_gaussians": "Number of Gaussian components per elevation profile",
       "logdir": "Base directory for run outputs and checkpoints",
       "pixel_subsample": "Fraction of pixels sampled for training; 1.0 keeps all",
       "keep_empty_frac": "Fraction of empty/background profiles retained when subsampling",
@@ -1874,7 +1867,6 @@
       "gpus": "GPU device IDs available for parallel trials",
       "skip_models": "Model names to exclude from the sweep",
       "run_tag": "Optional label identifying this tuning run",
-      "n_gaussians": "Number of Gaussian mixture components along elevation",
       "training": "Training queue configuration shared across trials",
       "overfit": "Overfit-check settings for sanity validation",
       "ae_loss": "Profile autoencoder loss configuration",

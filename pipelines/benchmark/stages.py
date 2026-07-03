@@ -192,12 +192,12 @@ class SizeMatchStage(ExperimentStage):
             iterations    = 0,
         ))
 
-    def _write_report(self, records: dict, target: int) -> None:
+    def _write_report(self, records: dict, target: int, out_channels: int) -> None:
         lines = [
             "# Capacity Matching Report",
             f"\n_Generated {RunTag.timestamp()}  —  run tag `{self.run_tag}`_\n",
             f"Reference model `{self.config.size_match.reference_model}` at **{target:,}** parameters.",
-            f"Counting performed with {self.config.size_match.in_channels} input channels, {self.config.n_gaussians * 3} output channels, image size {self.config.training.patch_size[0]}.\n",
+            f"Counting performed with {self.config.size_match.in_channels} input channels, {out_channels} output channels, image size {self.config.training.patch_size[0]}.\n",
             "## Matched Widths\n",
             "| Model | Scale | Scaled attributes | Parameters | Δ vs reference | Iterations | Flags |",
             "| --- | --- | --- | --- | --- | --- | --- |",
@@ -215,13 +215,15 @@ class SizeMatchStage(ExperimentStage):
         self.logger.info(f"Report written to: {self.report_path}")
 
     def run(self) -> dict:
+        matcher = SizeMatcher(config=self.config, logger=self.logger)
+
         self.logger.section("Capacity matching")
         self.logger.kv_table({
             "Reference model" : self.config.size_match.reference_model,
             "Tolerance"       : f"{100.0 * self.config.size_match.tolerance:.2f} %",
             "Max iterations"  : self.config.size_match.max_iterations,
             "In channels"     : self.config.size_match.in_channels,
-            "Out channels"    : self.config.n_gaussians * 3,
+            "Out channels"    : matcher.out_channels,
         }, title="Configuration")
 
         cached = self._load_cached()
@@ -229,7 +231,6 @@ class SizeMatchStage(ExperimentStage):
             self.logger.info(f"Cached size match reused from: {self.records_path}")
             return cached
 
-        matcher   = SizeMatcher(config=self.config, logger=self.logger)
         reference = self.config.size_match.reference_model
         target    = matcher.reference_count()
 
@@ -250,7 +251,7 @@ class SizeMatchStage(ExperimentStage):
                 self.logger.warning(f"{model_name}: {flag}")
 
         self._write_results(records, self.records_path)
-        self._write_report(records, target)
+        self._write_report(records, target, matcher.out_channels)
 
         return records
 

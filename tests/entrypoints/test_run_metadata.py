@@ -13,8 +13,9 @@ from tools.monitoring.logger import Logger
 
 @pytest.fixture
 def trainer_config(test_data_dir, tmp_path):
-    config = BenchmarkConfig()
-    config.paths.dataset_path = str(test_data_dir)
+    config                       = BenchmarkConfig()
+    config.paths.dataset_path    = str(test_data_dir)
+    config.paths.parameters_path = test_data_dir / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
     return ConfigFactory(config).training_trainer_config(tmp_path / "seed_logdir")
 
 

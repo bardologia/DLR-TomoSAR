@@ -220,7 +220,7 @@ class RunLoader:
 
         model.eval()
         norm_stats = Stats.load(self.run_directory / "meta", self.logger)
-        gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, n_gaussians)
+        gauss_cfg  = GaussianConfig.from_dataset(dataset_config.preprocessing_run_directory, dataset_config.parameters_path)
         model      = self._wrap_model(model, device, norm_stats, x_axis, gauss_cfg.amp_max)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(

@@ -43,7 +43,7 @@ def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
 @pytest.mark.slow
 def test_backbone_preparation_returns_loaders_axis_and_datasets(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
-    gaussian       = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+    gaussian       = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     trainer_config = SimpleNamespace(gaussian=gaussian)
     run_meta       = SimpleNamespace(run_directory=tmp_path)
     logger         = Logger(log_dir=str(tmp_path / "logs"), name="prep", level="ERROR")
@@ -68,7 +68,7 @@ def test_backbone_preparation_returns_loaders_axis_and_datasets(test_data_dir, p
 @pytest.mark.slow
 def test_backbone_preparation_loader_batches_consistent(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
-    gaussian       = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+    gaussian       = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     trainer_config = SimpleNamespace(gaussian=gaussian)
     run_meta       = SimpleNamespace(run_directory=tmp_path)
     logger         = Logger(log_dir=str(tmp_path / "logs"), name="prep2", level="ERROR")

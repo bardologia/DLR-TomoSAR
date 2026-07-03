@@ -109,8 +109,8 @@ def test_config_state_crop_round_trips_through_processing(config_state_json):
 
 
 @pytest.mark.real_data
-def test_gaussian_from_dataset_matches_state(meta_dir, config_state_json):
-    gaussian     = GaussianConfig.from_dataset(meta_dir.parent, n_gaussians=5)
+def test_gaussian_from_dataset_matches_state(meta_dir, params_dir, config_state_json):
+    gaussian     = GaussianConfig.from_dataset(meta_dir.parent, params_dir / "parameters.npy")
     height_range = config_state_json["tomogram_config"]["height_range"]
 
     assert gaussian.x_min == float(height_range[0])

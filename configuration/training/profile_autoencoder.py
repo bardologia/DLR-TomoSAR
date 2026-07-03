@@ -44,7 +44,6 @@ class ProfileAeEntryConfig:
     gpu         : int        = 0
     seed        : int        = 0
     seeds       : list[int]  = field(default_factory=list)
-    n_gaussians : int        = 5
     logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
 
     pixel_subsample : float = 1.0

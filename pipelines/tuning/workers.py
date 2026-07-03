@@ -25,7 +25,6 @@ class TuningWorker:
     def _ae_entry_template(self):
         return ProfileAeEntryConfig(
             seed            = self.config.tuning.base_seed,
-            n_gaussians     = self.config.n_gaussians,
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
             ae_loss         = self.config.ae_loss,
@@ -36,7 +35,6 @@ class TuningWorker:
     def _image_ae_entry_template(self):
         return ImageAeEntryConfig(
             seed        = self.config.tuning.base_seed,
-            n_gaussians = self.config.n_gaussians,
             ae_loss     = self.config.image_ae_loss,
             paths       = self.config.paths,
             training    = self.config.training,
@@ -47,7 +45,6 @@ class TuningWorker:
 
         return JepaEntryConfig(
             seed                       = self.config.tuning.base_seed,
-            n_gaussians                = self.config.n_gaussians,
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
             profile_autoencoder_run    = jepa.profile_autoencoder_run,
             profile_autoencoder_mode   = jepa.profile_autoencoder_mode,

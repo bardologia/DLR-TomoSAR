@@ -12,7 +12,6 @@ class DataLoaderTuningEntryConfig:
     model_name  : str  = ""
     gpu         : int  = 0
     seed        : int  = 0
-    n_gaussians : int  = 5
     use_amp     : bool = False
 
     pixel_subsample : float = 0.2

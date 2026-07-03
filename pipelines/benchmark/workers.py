@@ -58,7 +58,6 @@ class BenchmarkWorker(WorkerBase):
         return ProfileAeEntryConfig(
             run_name        = run_name or model_name,
             seed            = self.config.seed if seed is None else seed,
-            n_gaussians     = self.config.n_gaussians,
             logdir          = logdir,
             pixel_subsample = self.config.pixel_subsample,
             keep_empty_frac = self.config.keep_empty_frac,
@@ -77,7 +76,6 @@ class BenchmarkWorker(WorkerBase):
             run_name                   = run_name or model_name,
             backbone_name              = model_name,
             seed                       = self.config.seed if seed is None else seed,
-            n_gaussians                = self.config.n_gaussians,
             logdir                     = logdir,
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
             profile_autoencoder_run    = jepa.profile_autoencoder_run,

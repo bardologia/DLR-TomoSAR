@@ -15,7 +15,6 @@ def _factory(test_data_dir, params_dir, **overrides) -> ConfigFactory:
     cfg.paths.dataset_path     = test_data_dir
     cfg.paths.parameters_path  = params_dir / "parameters.npy"
     cfg.paths.secondary_labels = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
-    cfg.n_gaussians            = 5
 
     cfg.training.train_azimuth = (1000, 1400)
     cfg.training.val_azimuth   = (1400, 1700)

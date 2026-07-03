@@ -44,8 +44,8 @@ def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
     )
 
 
-def _trainer_config(test_data_dir, tmp_path) -> BackboneTrainerConfig:
-    gaussian = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+def _trainer_config(test_data_dir, params_dir, tmp_path) -> BackboneTrainerConfig:
+    gaussian = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     config   = BackboneTrainerConfig(gaussian=gaussian)
 
     config.io.logdir                  = str(tmp_path)
@@ -65,7 +65,7 @@ def _trainer_config(test_data_dir, tmp_path) -> BackboneTrainerConfig:
 @pytest.mark.slow
 def test_training_pipeline_end_to_end_produces_checkpoint(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
-    trainer_config = _trainer_config(test_data_dir, tmp_path)
+    trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
 
     pipeline = TrainingPipeline(
         trainer_config = trainer_config,
@@ -90,7 +90,7 @@ def test_training_pipeline_end_to_end_produces_checkpoint(test_data_dir, params_
 @pytest.mark.slow
 def test_training_pipeline_runs_per_pixel_physics_geometry(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
-    trainer_config = _trainer_config(test_data_dir, tmp_path)
+    trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
 
     trainer_config.curriculum.warmup.use_covariance_match    = True
     trainer_config.curriculum.warmup.weight_covariance_match = 1.0
@@ -117,7 +117,7 @@ def test_training_pipeline_runs_per_pixel_physics_geometry(test_data_dir, params
 @pytest.mark.slow
 def test_training_pipeline_saves_configs(test_data_dir, params_dir, tmp_path):
     dataset_config = _dataset_config(test_data_dir, params_dir)
-    trainer_config = _trainer_config(test_data_dir, tmp_path)
+    trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
 
     pipeline = TrainingPipeline(
         trainer_config = trainer_config,

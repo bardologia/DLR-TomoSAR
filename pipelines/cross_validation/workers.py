@@ -152,7 +152,6 @@ class FoldTrainingWorker(CrossValidationWorker):
             run_name                   = run_name,
             backbone_name              = cv.backbone_name,
             seed                       = cv.seed if seed is None else seed,
-            n_gaussians                = cv.n_gaussians,
             logdir                     = self.run_dir / "folds",
             model_overrides            = cv.model_overrides,
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
@@ -179,7 +178,6 @@ class FoldTrainingWorker(CrossValidationWorker):
         return ProfileAeEntryConfig(
             run_name        = run_name,
             seed            = cv.seed if seed is None else seed,
-            n_gaussians     = cv.n_gaussians,
             logdir          = self.run_dir / "folds",
             pixel_subsample = ae.pixel_subsample,
             keep_empty_frac = ae.keep_empty_frac,

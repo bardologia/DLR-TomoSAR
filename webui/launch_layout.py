@@ -22,7 +22,6 @@ class LaunchLayout:
     NUM_ACCUM    = {"kind": "number", "int": True, "min": 1, "max": 64, "presets": [1, 2, 4, 8, 16]}
     NUM_PATIENCE = {"kind": "number", "int": True, "min": 1, "max": 200, "presets": [5, 10, 20, 30, 50, 100]}
     NUM_SEED     = {"kind": "number", "int": True, "min": 0, "max": 9999, "presets": [0, 1, 42, 123, 2024]}
-    NUM_GAUSS    = {"kind": "number", "int": True, "min": 1, "max": 20, "presets": [3, 5, 10, 15, 20]}
     NUM_FREQ     = {"kind": "number", "int": True, "min": 1, "max": 50, "presets": [1, 2, 5, 10]}
     NUM_ETA_MIN  = {"kind": "number", "log": True, "min": 1e-9, "max": 1e-2, "presets": [0, 1e-7, 1e-6, 1e-5]}
     NUM_WEIGHT   = {"kind": "number", "min": 0, "max": 10, "step": 0.05, "presets": [0, 0.05, 0.1, 0.5, 1, 2]}
@@ -291,7 +290,6 @@ class LaunchLayout:
         {"path": "paths.parameters_path", "widget": PICK_PARAMS},
         {"path": "seed", "widget": NUM_SEED},
         "seeds",
-        {"path": "n_gaussians", "widget": NUM_GAUSS},
     ]
 
     INFER_LAYOUT = {
@@ -437,7 +435,6 @@ class LaunchLayout:
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
                 "seeds",
-                {"path": "n_gaussians", "widget": NUM_GAUSS},
             ],
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
@@ -511,7 +508,6 @@ class LaunchLayout:
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
                 "seeds",
-                {"path": "n_gaussians", "widget": NUM_GAUSS},
                 "resume",
                 "poll_interval_s",
             ],
@@ -578,7 +574,6 @@ class LaunchLayout:
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
                 "seeds",
-                {"path": "n_gaussians", "widget": NUM_GAUSS},
                 "resume",
                 "poll_interval_s",
             ],
@@ -638,7 +633,6 @@ class LaunchLayout:
                 {"path": "gpus", "widget": GPU_MANY},
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
-                {"path": "n_gaussians", "widget": NUM_GAUSS},
             ],
             "sections": [
                 {"key": "search", "title": "Search", "panels": [
@@ -688,7 +682,7 @@ class LaunchLayout:
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [
                     {"kind": "fields", "groups": [
-                        {"title": "Run", "fields": ["mode", "model_name", {"path": "gpu", "widget": GPU_ONE}, {"path": "seed", "widget": NUM_SEED}, {"path": "n_gaussians", "widget": NUM_GAUSS}, "use_amp"]},
+                        {"title": "Run", "fields": ["mode", "model_name", {"path": "gpu", "widget": GPU_ONE}, {"path": "seed", "widget": NUM_SEED}, "use_amp"]},
                         {"title": "Sampling", "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
                         {"title": "Sweep grid", "fields": [
                             {"path": "batch_sizes", "widget": MULTI_INT},

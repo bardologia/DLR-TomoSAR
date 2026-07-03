@@ -43,7 +43,6 @@ class ImageAeEntryConfig:
     gpu         : int        = 0
     seed        : int        = 0
     seeds       : list[int]  = field(default_factory=list)
-    n_gaussians : int        = 5
     logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/image_autoencoder")
 
     ae_model_name   : str               = "conv2d_ae"

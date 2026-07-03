@@ -94,7 +94,6 @@ class BenchmarkConfig:
     resume          : bool       = True
     seed            : int        = 0
     seeds           : list[int]  = field(default_factory=list)
-    n_gaussians     : int        = 5
     poll_interval_s : float      = 5.0
 
     sweep_loss_components : list[str] = field(default_factory=lambda: ["param_l1"])

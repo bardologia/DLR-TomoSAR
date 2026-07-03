@@ -147,7 +147,6 @@ def test_loss_curriculum_holds_two_loss_configs():
 def test_backbone_entry_default_subconfigs():
     cfg = BackboneEntryConfig()
     assert cfg.backbone_name == "resunet"
-    assert cfg.n_gaussians > 0
     assert isinstance(cfg.curriculum, LossCurriculumConfig)
     assert isinstance(cfg.inference, InferenceConfig)
     assert isinstance(cfg.warmup_losses, dict)

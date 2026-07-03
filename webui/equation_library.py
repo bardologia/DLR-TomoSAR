@@ -500,7 +500,7 @@ class EquationLibrary:
                         {"sym": r"\theta_{c_i}",     "desc": "i-th selected parameter channel"},
                         {"sym": r"\{c_i\}",          "desc": "indices chosen from the interleaved layout"},
                         {"sym": r"C_{\mathrm{out}}", "desc": "selected output channel count"},
-                        {"sym": r"n_g",              "desc": "n_gaussians, default 1"},
+                        {"sym": r"n_g",              "desc": "n_gaussians, the k_max of the parameter extraction"},
                         {"sym": r"p_g",              "desc": "params per Gaussian, default 3"},
                     ],
                 },

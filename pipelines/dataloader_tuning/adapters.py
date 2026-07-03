@@ -83,7 +83,7 @@ class ProfileFeedAdapter:
         from configuration.training import ProfileAeEntryConfig
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-        entry = ProfileAeEntryConfig(n_gaussians=self.config.n_gaussians, ae_model_name=self.model_name, seed=self.config.seed)
+        entry = ProfileAeEntryConfig(ae_model_name=self.model_name, seed=self.config.seed)
         entry.paths.dataset_path    = self.config.paths.dataset_path
         entry.paths.parameters_path = self.config.paths.parameters_path
         entry.pixel_subsample       = self.config.pixel_subsample
@@ -139,7 +139,7 @@ class ImageFeedAdapter:
         from configuration.training.image_autoencoder import ImageAeEntryConfig
         from pipelines.image_autoencoder.training.pipeline import TrainingPipeline
 
-        entry = ImageAeEntryConfig(n_gaussians=self.config.n_gaussians, ae_model_name=self.model_name, seed=self.config.seed)
+        entry = ImageAeEntryConfig(ae_model_name=self.model_name, seed=self.config.seed)
         entry.paths.dataset_path    = self.config.paths.dataset_path
         entry.paths.parameters_path = self.config.paths.parameters_path
 
@@ -231,7 +231,7 @@ class BackboneFeedAdapter:
         from configuration.training          import BackboneEntryConfig
         from pipelines.shared.config.config_factory import ConfigFactory
 
-        entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed, n_gaussians=self.config.n_gaussians)
+        entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed)
         entry.paths = self.config.paths
 
         return ConfigFactory(entry)

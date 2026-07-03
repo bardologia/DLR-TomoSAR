@@ -91,8 +91,9 @@ def test_sizematch_reference_record_is_zero_deviation(config, logger_stub):
 @pytest.mark.slow
 def test_sizematch_run_emits_reference_and_matched(monkeypatch, logger_stub, test_data_dir, tmp_path):
     config                    = BenchmarkConfig()
-    config.paths.log_base_dir = tmp_path
-    config.paths.dataset_path = test_data_dir
+    config.paths.log_base_dir    = tmp_path
+    config.paths.dataset_path    = test_data_dir
+    config.paths.parameters_path = test_data_dir / "params" / "params_sigmaonly_k5_sig4_lam0p01" / "parameters.npy"
     config.resume             = False
     config.skip_models        = []
 

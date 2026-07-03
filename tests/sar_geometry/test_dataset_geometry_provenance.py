@@ -11,8 +11,8 @@ from tools.sar.track_parameters          import TrackParameters
 
 
 @pytest.mark.real_data
-def test_elevation_axis_spans_config_height_range_at_tomogram_resolution(test_data_dir, config_state_json, tomogram_full):
-    gaussian       = GaussianConfig.from_dataset(test_data_dir, n_gaussians=5)
+def test_elevation_axis_spans_config_height_range_at_tomogram_resolution(test_data_dir, params_dir, config_state_json, tomogram_full):
+    gaussian       = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     height_range   = config_state_json["tomogram_config"]["height_range"]
     profile_length = int(tomogram_full.shape[0])
 
