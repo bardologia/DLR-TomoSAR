@@ -463,7 +463,7 @@ class ContentionMonitor:
             self.logger.muted(f"contention cleared: {kind}")
 
     def _resolve_device(self):
-        target = str(self.paths.repo_root.resolve())
+        target = self.paths.repo_root.resolve()
         best   = ("", None)
         try:
             for line in open("/proc/mounts").read().splitlines():
@@ -471,8 +471,8 @@ class ContentionMonitor:
                 if len(parts) < 2:
                     continue
                 source, mount = parts[0], parts[1]
-                if target.startswith(mount) and len(mount) >= len(best[0]) and source.startswith("/dev/"):
-                    best = (mount, source.rsplit("/", 1)[-1])
+                if target.is_relative_to(mount) and len(mount) >= len(best[0]) and source.startswith("/dev/"):
+                    best = (mount, os.path.realpath(source).rsplit("/", 1)[-1])
         except OSError:
             return None
         return best[1]
