@@ -52,7 +52,7 @@ class DatasetPicker {
     else this._buildSingle();
 
     if (this.spec.datasetFrom) {
-      this.view._onDependency(this.spec.datasetFrom, (value) => this._reloadSingle(value));
+      this.view._onDependency(this.spec.datasetFrom, () => this._scheduleSingleReload());
     }
 
     return { el: this.el, input: this.select, reset: () => this._reset() };
@@ -214,11 +214,6 @@ class DatasetPicker {
     this.select.classList.toggle("is-dirty", this.select.value !== this.leaf.value);
     this.view._setValue(this.leaf, this.select.value);
     this.view._fireDependents(this.leaf.path, this.select.value);
-  }
-
-  async _reloadSingle(datasetPath) {
-    if (this.spec.mode !== "params") return;
-    await this._fetchParams(datasetPath);
   }
 
   _buildMulti() {
