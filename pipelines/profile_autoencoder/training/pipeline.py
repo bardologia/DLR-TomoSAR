@@ -64,9 +64,9 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         profile_config   = self._profile_dataset_config()
         dataset_pipeline = ProfileDatasetPipeline(profile_config, run_meta.run_directory, logger=logger, seed=self.entry.seed)
 
-        (train_loader, val_loader, _test_loader), _datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
+        (train_loader, val_loader, test_loader), _datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
 
-        return train_loader, val_loader, x_axis, x_len, (profile_config, x_len)
+        return train_loader, val_loader, test_loader, x_axis, x_len, (profile_config, x_len)
 
     def _save_metadata(self, run_meta, profile_config: ProfileDatasetConfig, x_len: int) -> None:
         run_meta.save_trainer_config()

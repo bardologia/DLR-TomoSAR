@@ -89,7 +89,7 @@ def test_orchestration_produces_checkpoint_and_metadata(tmp_path):
     pipe._save_metadata(run_meta, _profile_config(tmp_path), PROFILE_LENGTH)
 
     loader            = _loader()
-    results, run_dir  = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader)
+    results, run_dir  = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader, loader)
 
     train_losses, val_losses, best = results
 
@@ -112,7 +112,7 @@ def test_saved_checkpoint_is_loadable(tmp_path):
     x_axis   = np.linspace(0.0, 1.0, PROFILE_LENGTH, dtype=np.float32)
 
     loader            = _loader()
-    _results, run_dir = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader)
+    _results, run_dir = pipe._train(run_meta, run_meta.logger, model, x_axis, loader, loader, loader)
 
     ckpt = torch.load(Path(run_dir) / "best_model.pt", map_location="cpu", weights_only=False)
 

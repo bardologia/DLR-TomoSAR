@@ -38,12 +38,12 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         return model
 
     def _prepare_data(self, run_meta, logger):
-        loaders, datasets, x_axis, x_len       = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
-        train_loader, val_loader, _test_loader = loaders
+        loaders, datasets, x_axis, x_len      = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
+        train_loader, val_loader, test_loader = loaders
 
         in_channels = datasets["train"].input_channels
 
-        return train_loader, val_loader, x_axis, in_channels, (in_channels, x_len)
+        return train_loader, val_loader, test_loader, x_axis, in_channels, (in_channels, x_len)
 
     def _save_metadata(self, run_meta, in_channels: int, x_len: int) -> None:
         run_meta.save_trainer_config()
