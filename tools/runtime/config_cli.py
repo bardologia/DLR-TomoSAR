@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import types
+import typing
 from dataclasses import fields, is_dataclass
 from enum        import Enum
 from pathlib     import Path
@@ -62,7 +64,7 @@ class ConfigCli:
             if raw is None:
                 continue
 
-            value = self._coerce(raw, current)
+            value = self._coerce(raw, current, self._annotation(self.config, path))
             self.set_path(self.config, path, value)
             self.overrides[path] = value
 
@@ -96,17 +98,12 @@ class ConfigCli:
             else:
                 yield path, value
 
-    def _coerce(self, raw: str, current):
+    def _coerce(self, raw: str, current, annotation=None):
         if isinstance(current, Enum):
             return type(current)(raw.strip())
 
         if isinstance(current, bool):
-            lowered = raw.strip().lower()
-            if lowered in ("true", "1", "yes", "on"):
-                return True
-            if lowered in ("false", "0", "no", "off"):
-                return False
-            raise ValueError(f"Cannot parse boolean from '{raw}'")
+            return self._parse_bool(raw)
 
         if isinstance(current, int):
             return int(raw)
@@ -129,12 +126,59 @@ class ConfigCli:
             return tuple(parsed) if isinstance(parsed, (list, tuple)) else (parsed,)
 
         if current is None:
-            try:
-                return ast.literal_eval(raw)
-            except (ValueError, SyntaxError):
-                return raw
+            return self._coerce_by_annotation(raw, annotation)
 
         return raw
+
+    @staticmethod
+    def _parse_bool(raw: str) -> bool:
+        lowered = raw.strip().lower()
+        if lowered in ("true", "1", "yes", "on"):
+            return True
+        if lowered in ("false", "0", "no", "off"):
+            return False
+        raise ValueError(f"Cannot parse boolean from '{raw}'")
+
+    @classmethod
+    def _coerce_by_annotation(cls, raw: str, annotation):
+        target = cls._unwrap_optional(annotation)
+
+        if target is bool:
+            return cls._parse_bool(raw)
+        if target is int:
+            return int(raw)
+        if target is float:
+            return float(raw)
+        if target is str:
+            return raw
+        if target is Path:
+            return Path(raw)
+        if isinstance(target, type) and issubclass(target, Enum):
+            return target(raw.strip())
+
+        try:
+            return ast.literal_eval(raw)
+        except (ValueError, SyntaxError):
+            return raw
+
+    @staticmethod
+    def _annotation(config, path: str):
+        parts  = path.split(".")
+        target = config
+        for part in parts[:-1]:
+            target = getattr(target, part)
+        return typing.get_type_hints(type(target)).get(parts[-1])
+
+    @staticmethod
+    def _unwrap_optional(annotation):
+        if annotation is None:
+            return None
+
+        if typing.get_origin(annotation) in (typing.Union, types.UnionType):
+            concrete = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+            return concrete[0] if len(concrete) == 1 else None
+
+        return annotation
 
     def _print_config_help(self) -> None:
         rows  = [(path, type(value).__name__ if value is not None else "any", repr(value)) for path, value in self._leaves(self.config)]
@@ -210,6 +254,8 @@ class ConfigCli:
                 value = type(current)(value)
             elif isinstance(current, tuple) and isinstance(value, list):
                 value = tuple(value)
+            elif current is None and isinstance(value, str) and cls._unwrap_optional(cls._annotation(config, leaf)) is Path:
+                value = Path(value)
 
             cls.set_path(config, leaf, value)
 
