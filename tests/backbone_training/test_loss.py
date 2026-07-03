@@ -113,8 +113,8 @@ def test_forward_output_dict_keys_for_active_term():
     out  = loss(pred, gt)
 
     assert "param_l1"     in out["components"]
-    assert "param_l1/amp" in out["components"]
-    assert "param_l1/mu"  in out["components"]
+    assert "param_l1/amp" in out["monitor"]
+    assert "param_l1/mu"  in out["monitor"]
 
 
 def test_gradient_flows_to_predictions():
@@ -201,7 +201,7 @@ def test_log_all_losses_populates_monitor():
 
     assert "mse_curve"   in monitor_terms
     assert "param_huber" in monitor_terms
-    assert not any(key.startswith("param_l1") for key in out["monitor"])
+    assert "param_l1/amp" in out["monitor"]
     assert len(out["monitor"]) > len(out["components"])
 
 
@@ -322,15 +322,14 @@ def test_total_loss_is_weighted_normalised_mean():
     assert out["total_loss"].item() == pytest.approx(expected, rel=1e-4)
 
 
-def test_param_count_mismatch_pads_param_weights():
+def test_param_weights_length_mismatch_raises():
     cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_weights=(1.0,))
     loss = build_loss(n_gaussians=3, loss_cfg=cfg)
     pred = param_tensor(2, 3, 5, 5, seed=23)
     gt   = param_tensor(2, 3, 5, 5, seed=24)
 
-    out  = loss(pred, gt)
-
-    assert torch.isfinite(out["total_loss"]).item()
+    with pytest.raises(ValueError, match="param_weights"):
+        loss(pred, gt)
 
 
 @pytest.mark.real_data
@@ -358,3 +357,15 @@ def test_loss_on_real_tomogram_param_target(parameters):
     assert torch.isfinite(noisy["total_loss"]).item()
     assert torch.isfinite(clean["total_loss"]).item()
     assert noisy["total_loss"].item() > clean["total_loss"].item()
+
+
+def test_gradient_flows_with_log_all_losses_and_shared_matching():
+    loss = build_loss(n_gaussians=2, log_all_losses=True)
+    pred = param_tensor(2, 2, 6, 6, seed=31).requires_grad_(True)
+    gt   = param_tensor(2, 2, 6, 6, seed=32)
+
+    loss(pred, gt)["total_loss"].backward()
+
+    assert pred.grad is not None
+    assert torch.isfinite(pred.grad).all().item()
+    assert pred.grad.abs().sum().item() > 0.0

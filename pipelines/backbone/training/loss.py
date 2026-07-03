@@ -76,15 +76,14 @@ class Loss:
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         return GaussianCurve.reconstruct(params, self.x_axis, self.gaussian_cfg.params_per_gaussian)
 
-    def _param_term(self, pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss, kind):
-        pred, pred_phys, gt, gt_phys = self._match_params(pred_gauss, gt_gauss, gt_phys_gauss, pred_phys_gauss)
+    def _param_term(self, matched, kind):
+        pred, pred_phys, gt, gt_phys = matched
         cfg = self.loss_cfg
         w   = torch.tensor(cfg.param_weights, dtype=pred.dtype, device=pred.device)
 
-        if w.numel() < pred.shape[2]:
-            w = torch.cat([w, torch.ones(pred.shape[2] - w.numel(), dtype=w.dtype, device=w.device)])
+        if w.numel() != pred.shape[2]:
+            raise ValueError(f"param_weights has {w.numel()} entries but each Gaussian has {pred.shape[2]} parameters; configure exactly one weight per parameter.")
 
-        w       = w[:pred.shape[2]]
         weights = w.reshape(1, 1, -1, 1, 1)
 
         active     = (gt_phys[:, :, 0:1] > cfg.amp_zero_thr).to(pred.dtype)
@@ -176,7 +175,7 @@ class Loss:
         _, _, _, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
         return pred_curves, exp_curves
 
-    def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map) -> dict:
+    def _term_computes(self, cfg, diff, pred_curves, exp_curves, pred_params_norm, matched, kz_map) -> dict:
         lc = CurveLoss
         pc = PhysicalLoss
 
@@ -200,8 +199,8 @@ class Loss:
             "coherence_resyn":    coherence_resyn,
             "covariance_match":   covariance_match,
             "capon_cycle":        capon_cycle,
-            "param_huber":        lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "huber")[0],
-            "param_mse":          lambda: self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "mse")[0],
+            "param_huber":        lambda: self._param_term(matched, "huber")[0],
+            "param_mse":          lambda: self._param_term(matched, "mse")[0],
             "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
         }
 
@@ -251,6 +250,9 @@ class Loss:
 
         pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
 
+        needs_params = self.log_all_losses or cfg.use_param_l1 or cfg.use_param_huber or cfg.use_param_mse
+        matched      = self._match_params(pred_params_norm, gt_params, gt_phys, pred_params_phys) if needs_params else None
+
         if self.sampler is not None and self.sampler.active:
             self.sampler.observe(pred_params_phys)
 
@@ -260,7 +262,7 @@ class Loss:
         needs_diff = self.log_all_losses or cfg.use_mse_curve or cfg.use_l1_curve or cfg.use_huber_curve or cfg.use_charbonnier_curve
         diff       = (pred_curves - exp_curves) if needs_diff else None
 
-        computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, gt_params, gt_phys, pred_params_phys, kz_map)
+        computes = self._term_computes(cfg, diff, pred_curves, exp_curves, pred_params_norm, matched, kz_map)
 
         components : dict = {}
         monitor    : dict = {}
@@ -276,10 +278,10 @@ class Loss:
 
             if term.name == "param_l1":
                 if is_used:
-                    val, per_param_l1, physical = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                    val, per_param_l1, physical = self._param_term(matched, "l1")
                 elif self.log_all_losses:
                     with torch.no_grad():
-                        val, per_param_l1, physical = self._param_term(pred_params_norm, gt_params, gt_phys, pred_params_phys, "l1")
+                        val, per_param_l1, physical = self._param_term(matched, "l1")
                 else:
                     continue
             else:
@@ -302,9 +304,8 @@ class Loss:
             else:
                 monitor[f"{term.name}_{term.space}"] = val
 
-        per_param_target = components if cfg.use_param_l1 else monitor
         for pname, pval in per_param_l1.items():
-            per_param_target[f"param_l1/{pname}"] = pval
+            monitor[f"param_l1/{pname}"] = pval
 
         if self.slot_presence_active:
             occupancy = self._occupancy(pred_params_phys, gt_phys)

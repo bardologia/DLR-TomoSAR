@@ -33,12 +33,17 @@ class LossScaleProbe:
         self.logger       = logger
         self.loss_cfg     = copy.deepcopy(loss_cfg)
 
+        known   = {term.use_flag for term in LOSS_TERMS}
+        unknown = sorted(set(probe_cfg.enabled_losses) - known)
+        if unknown:
+            raise ValueError(f"Unknown probe enabled_losses keys {unknown}; valid flags: {sorted(known)}")
+
         for term in LOSS_TERMS:
             override = probe_cfg.enabled_losses.get(term.use_flag)
             setattr(self.loss_cfg, term.use_flag, override if override is not None else True)
 
         for term in LOSS_TERMS:
-            if getattr(self.loss_cfg, term.use_flag, False):
+            if getattr(self.loss_cfg, term.use_flag):
                 setattr(self.loss_cfg, term.weight_key, 1.0)
 
     def _build_criterion(self, x_axis: torch.Tensor):

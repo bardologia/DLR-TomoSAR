@@ -68,7 +68,7 @@ class TrainingPipeline:
         loss_cfgs  = [curriculum.warmup] + ([curriculum.complete] if curriculum.enabled else [])
         flags      = ("use_coherence_resyn", "use_covariance_match", "use_capon_cycle")
 
-        return any(getattr(cfg, flag, False) for cfg in loss_cfgs for flag in flags)
+        return any(getattr(cfg, flag) for cfg in loss_cfgs for flag in flags)
 
     def _run_overfit_check(self, train_dataset, in_channels: int, out_channels: int, x_axis) -> None:
         check = OverfitCheck(self.overfit_check, self.run_metadata.run_directory, self.logger)

@@ -18,7 +18,7 @@ class ParamMatcher:
         gt_mu       = gt[:, :, 1]
         is_active   = gt_phys_amp > active_thr
         sort_key    = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float("inf")))
-        gt_index    = torch.argsort(sort_key, dim=1)
+        gt_index    = torch.argsort(sort_key, dim=1, stable=True)
         gt_idx_b    = gt_index[:, :, None, :, :].expand_as(gt)
 
         return torch.gather(gt, dim=1, index=gt_idx_b), torch.gather(gt_phys, dim=1, index=gt_idx_b)
