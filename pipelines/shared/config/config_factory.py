@@ -74,7 +74,7 @@ class ConfigFactory:
             "io"               : IOConfig(logdir=str(logdir)),
         }
 
-    def training_trainer_config(self, logdir: Path) -> BackboneTrainerConfig:
+    def training_trainer_config(self, logdir: Path, overfit: OverfitConfig | None = None) -> BackboneTrainerConfig:
         training         = self.config.training
         scheduler_epochs = training.scheduler_epochs if training.scheduler_epochs is not None else training.epochs
         lr_scale         = training.batch_size / training.lr_reference_batch_size if training.scale_lr_with_batch else 1.0
@@ -101,7 +101,7 @@ class ConfigFactory:
                 resume                      = training.resume,
             ),
 
-            overfit = OverfitConfig(enabled=False),
+            overfit = overfit if overfit is not None else OverfitConfig(enabled=False),
 
             curriculum = default_curriculum(),
         )

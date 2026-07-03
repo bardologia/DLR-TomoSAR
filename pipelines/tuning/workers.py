@@ -61,7 +61,7 @@ class TuningWorker:
     def _build_base_configs(self):
         factory = ConfigFactory(self.config)
 
-        trainer_config            = factory.training_trainer_config(logdir=Path(self.config.paths.log_base_dir))
+        trainer_config            = factory.training_trainer_config(logdir=Path(self.config.paths.log_base_dir), overfit=self.config.overfit)
         trainer_config.curriculum = self.config.curriculum
         dataset_config            = factory.training_dataset_config()
 
