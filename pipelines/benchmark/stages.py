@@ -283,8 +283,10 @@ class InferenceStage(SeedExpandedStage, QueuedInferenceStage):
 
 
 class ComparisonStage(ExperimentStage):
-    def __init__(self, config: BenchmarkConfig, run_tag: str, logger: Logger) -> None:
+    def __init__(self, config, run_tag: str, logger: Logger, reference_model: str, embed_images: bool) -> None:
         super().__init__(config=config, run_tag=run_tag, logger=logger)
+        self.reference_model = reference_model
+        self.embed_images    = embed_images
 
     def run(self) -> Path:
         self.logger.section("Comparison reports")
@@ -297,8 +299,8 @@ class ComparisonStage(ExperimentStage):
         report = ComparisonReport(
             records         = records,
             out_dir         = out_dir,
-            reference_model = self.config.size_match.reference_model,
-            embed_images    = self.config.comparison.embed_images,
+            reference_model = self.reference_model,
+            embed_images    = self.embed_images,
             logger          = self.logger,
             seed_dispersion = collector.seed_dispersion,
         )

@@ -50,7 +50,7 @@ class BenchmarkPipeline(StagedPipeline):
         return results
 
     def _run_comparison(self) -> Path:
-        stage   = ComparisonStage(config=self.config, run_tag=self.run_tag, logger=self.logger)
+        stage   = ComparisonStage(config=self.config, run_tag=self.run_tag, logger=self.logger, reference_model=self.config.size_match.reference_model, embed_images=self.config.comparison.embed_images)
         out_dir = stage.run()
 
         self._mark_stage("comparison", "completed")

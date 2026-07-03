@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 from typing      import List, Optional
 
+from configuration.benchmark.general    import ComparisonReportConfig, SizeMatchConfig
+from configuration.training.general.run import RunPathsConfig
+
 
 @dataclass
 class TrialComparisonConfig:
@@ -28,6 +31,15 @@ class PreprocessingComparisonConfig:
 
     make_plots : bool          = True
     output_dir : Optional[Path] = None
+
+
+@dataclass
+class ComparisonEntryConfig:
+    run_tag         : Optional[str] = None
+    reference_model : str           = SizeMatchConfig.reference_model
+    embed_images    : bool          = ComparisonReportConfig.embed_images
+
+    paths : RunPathsConfig = field(default_factory=RunPathsConfig)
 
 
 @dataclass

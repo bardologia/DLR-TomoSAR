@@ -137,7 +137,7 @@ def test_training_and_inference_stages_subclass_queued_bases(config, logger_stub
 
 
 def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, monkeypatch):
-    stage = ComparisonStage(config=config, run_tag="t", logger=logger_stub)
+    stage = ComparisonStage(config=config, run_tag="t", logger=logger_stub, reference_model=config.size_match.reference_model, embed_images=config.comparison.embed_images)
 
     collected = {}
 

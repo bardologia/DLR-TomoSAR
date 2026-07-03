@@ -24,17 +24,17 @@ def _resolve_run_tag(config) -> str:
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.benchmark import BenchmarkConfig
-    from pipelines.benchmark.stages                 import ComparisonStage
-    from tools.runtime.config_cli                   import ConfigCli
-    from tools.monitoring.logger                    import Logger
+    from configuration.comparison   import ComparisonEntryConfig
+    from pipelines.benchmark.stages import ComparisonStage
+    from tools.runtime.config_cli   import ConfigCli
+    from tools.monitoring.logger    import Logger
 
-    config = ConfigCli(BenchmarkConfig(), description="Standalone benchmark comparison").apply()
+    config = ConfigCli(ComparisonEntryConfig(), description="Standalone benchmark comparison").apply()
     tag    = _resolve_run_tag(config)
 
     logger = Logger(log_dir=str(Path(config.paths.log_base_dir) / tag / "pipeline"), name="compare_runs")
 
-    stage   = ComparisonStage(config=config, run_tag=tag, logger=logger)
+    stage   = ComparisonStage(config=config, run_tag=tag, logger=logger, reference_model=config.reference_model, embed_images=config.embed_images)
     out_dir = stage.run()
 
     logger.info(f"Comparison written to: {out_dir}")
