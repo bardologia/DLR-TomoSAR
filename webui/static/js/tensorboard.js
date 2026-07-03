@@ -73,7 +73,7 @@ class TensorboardView {
     }
     if (!this.active || !data || data.error) return;
 
-    this.instances = (data.instances || []).filter((i) => i.status === "starting" || i.status === "running");
+    this.instances = (data.instances || []).filter((i) => i.status === "starting" || i.status === "running" || i.status === "failed");
 
     if (!this.instances.some((i) => i.id === this.selectedId)) this.selectedId = null;
     if (!this.selectedId && this.instances.length) this.selectedId = this.instances[0].id;
@@ -95,7 +95,7 @@ class TensorboardView {
     this.instances.forEach((inst) => {
       const pill = document.createElement("button");
       pill.type = "button";
-      pill.className = "tb-pill" + (inst.id === this.selectedId ? " is-active" : "") + (inst.status === "running" ? " is-running" : " is-starting");
+      pill.className = "tb-pill" + (inst.id === this.selectedId ? " is-active" : "") + (inst.status === "running" ? " is-running" : inst.status === "failed" ? " is-failed" : " is-starting");
       pill.title = inst.logdir;
       pill.innerHTML =
         `<span class="tb-pill__dot" aria-hidden="true"></span>` +
@@ -131,7 +131,11 @@ class TensorboardView {
     }
 
     this.empty.hidden = false;
-    if (inst) {
+    if (inst && inst.status === "failed") {
+      this.emptyTitle.textContent = "TensorBoard failed to start";
+      this.emptyHint.textContent = `The instance for ${inst.logdir} exited during startup; see the console server log for its stderr tail.`;
+      this.startBtn.hidden = false;
+    } else if (inst) {
       this.emptyTitle.textContent = "TensorBoard is starting";
       this.emptyHint.textContent = `Indexing ${inst.logdir} — the dashboard appears here as soon as it responds.`;
       this.startBtn.hidden = true;
