@@ -19,7 +19,15 @@ class ConfigBrowser {
   }
 
   async load() {
-    const data  = await window.apiGet("/api/configs");
+    const data = await window.apiGet("/api/configs");
+
+    if (data.error) {
+      this.groups = [];
+      this.flat   = [];
+      this.listEl.innerHTML = `<div class="clist__empty">Could not load configurations: ${this._esc(String(data.error))}</div>`;
+      return;
+    }
+
     this.groups = data.groups || [];
     this.flat   = [];
 

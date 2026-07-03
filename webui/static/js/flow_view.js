@@ -37,6 +37,10 @@ class FlowView {
     if (this.loaded) return;
     this.loaded = true;
     const data = await window.apiGet("/api/flows");
+    if (!data || data.error) {
+      this.loaded = false;
+      return;
+    }
     this.flows = data.flows || [];
     this._buildShell();
     if (this.flows.length) this._selectFlow(this.flows[0].key);

@@ -10,6 +10,12 @@ class ScriptPanel {
 
   async load() {
     const data = await window.apiGet("/api/scripts");
+
+    if (data.error) {
+      this.gridEl.textContent = `Could not load scripts: ${data.error}`;
+      return;
+    }
+
     this.scripts = data.scripts || [];
     this._renderFilters();
     this._renderGrid();

@@ -1,18 +1,26 @@
 "use strict";
 
 window.apiGet = async function (url) {
-  const res = await fetch(url);
-  if (!res.ok && res.status >= 500) return { error: `server ${res.status}` };
-  return res.json();
+  try {
+    const res = await fetch(url);
+    if (!res.ok && res.status >= 500) return { error: `server ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { error: "backend unreachable" };
+  }
 };
 
 window.apiPost = async function (url, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {}),
-  });
-  return res.json();
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    return await res.json();
+  } catch (e) {
+    return { ok: false, error: "backend unreachable" };
+  }
 };
 
 let _toastTimer = null;
@@ -77,15 +85,34 @@ class App {
   }
 
   async _loadProject() {
-    try {
-      this.project = await window.apiGet("/api/project");
-      this._setStatus(true);
-    } catch (e) {
+    const project = await window.apiGet("/api/project");
+
+    if (project.error) {
       this.project = { interpreters: [], counts: {} };
       this._setStatus(false);
+      this._retryProject();
       return;
     }
+
+    this.project = project;
+    this._setStatus(true);
     this._initStatus();
+  }
+
+  _retryProject() {
+    setTimeout(async () => {
+      const project = await window.apiGet("/api/project");
+      if (project.error) {
+        this._retryProject();
+        return;
+      }
+
+      this.project = project;
+      if (this.launchView) this.launchView.project = project;
+      if (this.ablationView) this.ablationView.project = project;
+      this._setStatus(true);
+      this._initStatus();
+    }, 3000);
   }
 
   _setStatus(ok) {
