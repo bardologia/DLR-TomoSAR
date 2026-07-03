@@ -186,6 +186,8 @@ def test_report_is_reduced_key():
     assert Report._is_reduced_key("curve_mse_red")  is True
     assert Report._is_reduced_key("ssim_red_elev_3") is True
     assert Report._is_reduced_key("pixel_mse_predn") is True
+    assert Report._is_reduced_key("reduced_orientation_corr_aligned") is True
+    assert Report._is_reduced_key("reduced_orientation_corr_flipped") is True
     assert Report._is_reduced_key("curve_mse_gt")    is False
 
 

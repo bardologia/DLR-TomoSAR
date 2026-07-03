@@ -560,7 +560,7 @@ class Report:
 
     @staticmethod
     def _is_reduced_key(k: str) -> bool:
-        return ("_red" in k) or k.startswith("ssim_red") or ("predn" in k)
+        return ("_red" in k) or k.startswith("reduced_") or k.startswith("ssim_red") or ("predn" in k)
 
     @staticmethod
     def _is_physics_key(k: str) -> bool:
