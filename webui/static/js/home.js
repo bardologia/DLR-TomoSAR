@@ -68,13 +68,13 @@ class StatusBoard {
           `<header class="gcard__head"><span class="gcard__idx">gpu ${g.index != null ? g.index : i}</span><span class="gcard__name">${this._esc(g.name || "unknown")}</span><span class="gcard__who"></span></header>` +
           `<div class="gcard__cluster">` +
           `<canvas class="gdial gdial--big gdial--util"></canvas>` +
+          `<canvas class="gcard__graph"></canvas>` +
+          `</div>` +
           `<div class="gcard__meters">` +
           `<canvas class="gmeter gmeter--temp"></canvas>` +
           `<canvas class="gmeter gmeter--power"></canvas>` +
           `</div>` +
-          `</div>` +
           `<div class="gcard__vramrow"><span class="gcard__vlabel">vram</span><canvas class="gseg"></canvas><span class="gcard__vram">--</span></div>` +
-          `<canvas class="gcard__graph"></canvas>` +
           `<footer class="gcard__foot"><span class="gcard__temp">--</span><span class="gcard__power">--</span><span class="gcard__legend"><i class="lg lg--util"></i>util<i class="lg lg--vram"></i>vram</span></footer>` +
           `</article>`
         ).join("")
@@ -115,9 +115,11 @@ class StatusBoard {
       `</section>` +
 
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
+      `<div class="sboard__gputop">` +
+      `<div class="gpudeck">` +
       `<header class="sboard__cap"><span>cuda devices</span><span class="sboard__n">${gpus.length}</span></header>` +
       `<div class="sboard__gpugrid">${gpuCards}</div>` +
-      `</section>` +
+      `</div>` +
 
       `<section class="sboard sboard--cpu" aria-label="Processor">` +
       `<header class="sboard__cap"><span>processor</span><span class="sboard__n">${sys.cpu ? sys.cpu.count : 0} cores</span></header>` +
@@ -133,6 +135,9 @@ class StatusBoard {
       `</div>` +
       `<canvas class="sboard__graph" id="sb-cpu-graph"></canvas>` +
       `<div class="cpu__grid" id="sb-cores">${coreCells}</div>` +
+      `</section>` +
+
+      `</div>` +
       `</section>` +
 
       `<section class="sboard sboard--mem" aria-label="Memory">` +
