@@ -99,6 +99,7 @@ def _build_run_directory(tmp_path, test_data_dir, params_dir):
 
     MetadataWriter(run_dir, logger=_SilentLogger()).save_dataset_configuration(dataset_config)
     FileIO.save_json({"model_name": "unet", "in_channels": in_channels, "out_channels": 3 * N_GAUSSIANS}, meta_dir / "run_summary.json")
+    FileIO.save_json({"geometry": {"height_axis_convention": "height"}}, run_dir / "docs" / "trainer_config.json")
 
     _persist_stats(meta_dir, in_channels)
     _persist_model(run_dir, meta_dir, in_channels)

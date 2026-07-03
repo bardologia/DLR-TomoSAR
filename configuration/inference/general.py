@@ -43,7 +43,6 @@ class InferenceConfig:
     reduced_pyrat_dir    : Optional[Path] = None
 
     compute_data_consistency : bool  = True
-    height_axis_convention   : str   = "height"
     physics_floor            : float = 1e-3
     phase_multilook          : int   = 9
 

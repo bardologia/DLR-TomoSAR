@@ -1088,7 +1088,6 @@
       "save_dpi": "Saved figure resolution in dots per inch",
       "paths": "Nested output directory and filename configuration",
       "compute_data_consistency": "Whether to evaluate predicted profiles against the measured stack via coherence and covariance error maps; requires the per-pixel geometry field",
-      "height_axis_convention": "Axis convention used to derive per-pixel kz for data consistency: height or elevation",
       "physics_floor": "Numerical floor applied inside the physical re-synthesis to avoid division blow-ups",
       "phase_multilook": "Uniform multilook window size applied to interferometric phase before coherence comparison"
     }

@@ -10,6 +10,7 @@ from scipy.ndimage import uniform_filter
 
 from configuration.inference import InferenceConfig
 from pipelines.backbone.inference.loader import Run
+from tools.data.io            import FileIO
 from tools.loss.physical_loss import PhysicalLoss
 from tools.monitoring.logger  import Logger
 from tools.sar                import GeometryField
@@ -31,6 +32,16 @@ class DataConsistencyEvaluator:
         self.logger = logger
         self.device = torch.device(cfg.device)
 
+    def _height_axis_convention(self) -> str:
+        path = Path(self.cfg.run_directory) / "docs" / "trainer_config.json"
+        if not path.is_file():
+            raise FileNotFoundError(f"Data-consistency evaluation derives the height-axis convention from the training run, but {path} is missing; the run predates saved trainer configs, restore its docs/trainer_config.json or re-train.")
+
+        convention = str(FileIO.load_json(path)["geometry"]["height_axis_convention"])
+        self.logger.subsection(f"Height-axis convention from training run : {convention}")
+
+        return convention
+
     def _load_kz(self) -> Tuple[np.ndarray, List[str]]:
         path = Path(self._run.dataset_config.preprocessing_run_directory) / "meta" / GeometryField.FILENAME
         if not path.is_file():
@@ -38,7 +49,7 @@ class DataConsistencyEvaluator:
 
         field  = GeometryField.load(path).subset(self._run.dataset_config.secondary_labels)
         sliced = field.slice(*self._run.split_region.local_slices(self._run.global_crop))
-        kz     = sliced.kz(self.cfg.height_axis_convention).astype(np.float32)
+        kz     = sliced.kz(self._height_axis_convention()).astype(np.float32)
 
         H = self._run.split_region.azimuth_size
         W = self._run.split_region.range_size

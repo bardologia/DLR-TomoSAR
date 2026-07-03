@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import types
 
 import numpy as np
@@ -53,15 +54,22 @@ def _synth_gamma(curves: np.ndarray, kz_track: np.ndarray, x_axis: np.ndarray) -
     return (np.exp(1j * phase) * curves).sum(axis=0) * dx
 
 
-def _build_case(tmp_path, sign: float = 1.0):
+def _write_trainer_config(run_dir, convention: str) -> None:
+    docs = run_dir / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    (docs / "trainer_config.json").write_text(json.dumps({"geometry": {"height_axis_convention": convention}}))
+
+
+def _build_case(tmp_path, sign: float = 1.0, convention: str = "height"):
     n_tracks, H, W = 3, 6, 5
     x_axis         = np.linspace(-20.0, 80.0, 24, dtype=np.float32)
 
     field = _geometry_field(n_tracks, H, W)
     (tmp_path / "meta").mkdir(parents=True, exist_ok=True)
     field.save(tmp_path / "meta" / GeometryField.FILENAME)
+    _write_trainer_config(tmp_path, convention)
 
-    kz     = field.kz("height").astype(np.float32)
+    kz     = field.kz(convention).astype(np.float32)
     curves = _gt_curves(x_axis, H, W)
 
     inputs = np.zeros((1 + 2 * (n_tracks - 1), H, W), dtype=np.complex64)
@@ -135,6 +143,23 @@ def test_missing_geometry_field_raises(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="geometry field"):
         DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+
+
+def test_missing_trainer_config_raises(tmp_path):
+    run, cfg, curves, x_axis = _build_case(tmp_path)
+    (tmp_path / "docs" / "trainer_config.json").unlink()
+
+    with pytest.raises(FileNotFoundError, match="trainer_config"):
+        DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+
+
+def test_height_convention_read_from_training_run(tmp_path):
+    run, cfg, curves, x_axis = _build_case(tmp_path, convention="slant")
+
+    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+
+    assert consistency.metrics["physics_coherence_error_mean"] == pytest.approx(0.0, abs=1e-9)
+    assert consistency.metrics["phase_agreement_gt_mean"]      == pytest.approx(1.0, abs=1e-4)
 
 
 def test_per_track_metrics_present_and_labelled(tmp_path):
