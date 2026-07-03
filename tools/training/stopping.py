@@ -81,12 +81,18 @@ class OverfitManager:
             "Batch Size":  self.batch_size,
         })
 
+    def _slice_batch(self, batch):
+        if isinstance(batch, torch.Tensor):
+            return batch[:self.batch_size]
+
+        return tuple(t[:self.batch_size] if isinstance(t, torch.Tensor) else t for t in batch)
+
     def setup_loaders(self, train_loader, val_loader, test_loader):
         if not self.enabled:
             return train_loader, val_loader, test_loader
 
         raw_batch    = next(iter(train_loader))
-        single_batch = tuple(t[:self.batch_size] if isinstance(t, torch.Tensor) else t for t in raw_batch)
+        single_batch = self._slice_batch(raw_batch)
 
         epoch_steps       = min(len(train_loader), self.max_steps)
         self._epoch_steps = epoch_steps

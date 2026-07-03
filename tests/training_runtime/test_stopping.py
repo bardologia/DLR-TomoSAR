@@ -120,6 +120,19 @@ def test_overfit_setup_loaders_replicates_single_batch(logger):
     assert mgr._epoch_steps            == 3
 
 
+def test_overfit_setup_loaders_slices_bare_tensor_batches(logger):
+    mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=6, batch_size=2), logger)
+    batch  = torch.arange(12.0).reshape(4, 3)
+    loader = [batch, batch, batch]
+
+    data_loader, val_loader, test_loader = mgr.setup_loaders(loader, loader, loader)
+
+    assert isinstance(data_loader[0], torch.Tensor)
+    assert data_loader[0].shape == (2, 3)
+    assert torch.equal(data_loader[0], batch[:2])
+    assert val_loader[0].shape  == (2, 3)
+
+
 def test_overfit_planned_epochs(logger):
     mgr    = OverfitManager(_overfit_config(enabled=True, max_steps=10, batch_size=1), logger)
     batch  = (torch.zeros(4, 1),)
