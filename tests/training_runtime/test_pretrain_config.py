@@ -13,6 +13,8 @@ _EXPECTED_FLAGS = (
     "pretrain.tune_loader",
     "pretrain.vram_budget_gb",
     "pretrain.max_batch",
+    "pretrain.reserve_vram",
+    "pretrain.vram_keep_free_gb",
 )
 
 
@@ -30,3 +32,4 @@ def test_pretrain_defaults_are_disabled(entry_config):
 
     assert config.pretrain.find_batch_size is False
     assert config.pretrain.tune_loader     is False
+    assert config.pretrain.reserve_vram    is False

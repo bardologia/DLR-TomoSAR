@@ -11,11 +11,12 @@ from torch.utils.data import DataLoader
 from tools.monitoring.tracker          import Tracker
 from tools.monitoring.resource_monitor import ResourceMonitor
 
-from tools.training.aggregation import MetricAggregator
-from tools.training.scheduling  import Scheduler, Warmup
-from tools.training.stopping    import EarlyStopping, OverfitManager
-from tools.training.gradients   import GradientClipper
-from tools.training.checkpoint  import Checkpoint, TrainerState, WeightEma
+from tools.training.aggregation      import MetricAggregator
+from tools.training.scheduling       import Scheduler, Warmup
+from tools.training.stopping         import EarlyStopping, OverfitManager
+from tools.training.gradients        import GradientClipper
+from tools.training.checkpoint       import Checkpoint, TrainerState, WeightEma
+from tools.training.vram_reservation import VramReservation
 
 
 class BaseTrainer:
@@ -66,6 +67,7 @@ class BaseTrainer:
         self.ema              = WeightEma(self.model, config.training.ema_decay, config.training.use_ema)
         self.overfitter       = OverfitManager(config, self.logger)
         self.resource_monitor = ResourceMonitor(config=config.resources, logger=self.logger, tracker=self.tracker, step_getter=lambda: self.global_step)
+        self.vram_reservation = VramReservation(enabled=config.memory.reserve_vram, keep_free_gb=config.memory.vram_keep_free_gb, device=self.device, logger=self.logger)
 
         self.criterion = self._build_criterion()
 
@@ -149,6 +151,7 @@ class BaseTrainer:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        self.vram_reservation.refill()
 
     def capture_state(self, epoch: int) -> dict:
         return {
@@ -346,6 +349,7 @@ class BaseTrainer:
             last_epoch       = max(start_epoch - 1, 0)
 
             self._before_training(data_loader)
+            self.vram_reservation.fill()
 
             with self.logger.live_monitor("Training Progress") as live_mon:
                 with self.logger.track(transient=False) as _prog_epochs:

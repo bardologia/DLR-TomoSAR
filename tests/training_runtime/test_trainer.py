@@ -6,7 +6,8 @@ import pytest
 import torch
 import torch.optim as optim
 
-from tools.training.trainer import BaseTrainer
+from tools.training.trainer          import BaseTrainer
+from tools.training.vram_reservation import VramReservation
 
 
 class TrainerShim:
@@ -75,7 +76,18 @@ def test_capture_state_contains_model_and_axis():
 
 def test_clear_cuda_cache_runs_on_cpu():
     shim = TrainerShim()
+    shim.vram_reservation = VramReservation(enabled=False, keep_free_gb=1.0, device=torch.device("cpu"), logger=None)
     BaseTrainer._clear_cuda_cache(shim)
+
+
+def test_clear_cuda_cache_refills_reservation():
+    calls = []
+    shim  = TrainerShim()
+    shim.vram_reservation = SimpleNamespace(refill=lambda: calls.append("refill"))
+
+    BaseTrainer._clear_cuda_cache(shim)
+
+    assert calls == ["refill"]
 
 
 def test_eval_step_delegates_to_compute_loss():

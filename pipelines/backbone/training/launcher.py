@@ -95,6 +95,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
+        trainer_config.memory.adopt_reservation(self.config.pretrain)
 
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
