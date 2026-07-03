@@ -16,6 +16,7 @@ from configuration.training.general import (
     PretrainConfig,
 )
 from configuration.training.backbone import (
+    default_curriculum,
     PatchTrialsConfig,
     SecondaryTrialsConfig,
     BackboneTrainerConfig,

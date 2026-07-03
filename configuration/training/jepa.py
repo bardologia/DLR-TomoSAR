@@ -5,6 +5,8 @@ from pathlib     import Path
 
 from configuration.training.general.run               import RunPathsConfig, TrainingQueueConfig
 from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.dataset                            import AugmentationConfig
+from configuration.normalization.general              import NormalizationConfig
 from configuration.architectures.image_autoencoder    import ImageAutoencoderBaseConfig
 from configuration.inference.general                  import InferenceConfig
 from configuration.sar.geometry_config                import GeometryConfig
@@ -114,9 +116,11 @@ class JepaEntryConfig:
     param_loss     : LossConfig          = field(default_factory=default_param_loss)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
-    paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
-    training : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
-    pretrain : PretrainConfig      = field(default_factory=PretrainConfig)
+    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    training      : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
+    pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
+    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
 
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=JepaDefaults.inference)

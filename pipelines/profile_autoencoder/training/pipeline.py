@@ -36,24 +36,27 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         model, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
         return model
 
+    def _build_dataset_config(self):
+        return None
+
     def _profile_dataset_config(self) -> ProfileDatasetConfig:
         gaussian_cfg = self.trainer_config.gaussian
-        ds           = self.dataset_config
+        training     = self.entry.training
 
         return ProfileDatasetConfig(
-            preprocessing_run_directory = ds.preprocessing_run_directory,
-            split_regions               = ds.split_regions,
-            parameters_path             = ds.parameters_path,
+            preprocessing_run_directory = self.entry.paths.dataset_path,
+            split_regions               = self.split_regions,
+            parameters_path             = self.entry.paths.parameters_path,
             n_gaussians                 = gaussian_cfg.n_default_gaussians,
             x_min                       = gaussian_cfg.x_min,
             x_max                       = gaussian_cfg.x_max,
             pixel_subsample             = self.entry.pixel_subsample,
             keep_empty_frac             = self.entry.keep_empty_frac,
-            batch_size                  = ds.batch_size,
-            num_workers                 = ds.num_workers,
-            prefetch_factor             = ds.prefetch_factor,
-            pin_memory                  = ds.pin_memory,
-            shuffle_train               = ds.shuffle_train,
+            batch_size                  = training.batch_size,
+            num_workers                 = training.num_workers,
+            prefetch_factor             = training.prefetch_factor,
+            pin_memory                  = True,
+            shuffle_train               = True,
             augmentation                = self.entry.profile_augmentation,
         )
 

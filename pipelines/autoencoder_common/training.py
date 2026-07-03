@@ -27,9 +27,13 @@ class AutoencoderTrainingPipeline:
         self.trainer_config          = self._build_trainer_config(base, entry_config)
         self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
-        self.dataset_config = self.factory.training_dataset_config()
-        if split_regions is not None:
-            self.dataset_config.split_regions = split_regions
+        self.split_regions  = split_regions if split_regions is not None else self.factory.split_regions()
+        self.dataset_config = self._build_dataset_config()
+
+    def _build_dataset_config(self):
+        config               = self.factory.training_dataset_config()
+        config.split_regions = self.split_regions
+        return config
 
     def _autoencoder_config(self, entry_config):
         raise NotImplementedError

@@ -5,6 +5,8 @@ from pathlib     import Path
 
 from configuration.training.general.run             import RunPathsConfig, TrainingQueueConfig
 from configuration.architectures.image_autoencoder  import Conv2dImageAutoencoderConfig, ImageAutoencoderBaseConfig
+from configuration.dataset                          import AugmentationConfig
+from configuration.normalization.general            import NormalizationConfig
 from configuration.sar.geometry_config              import GeometryConfig
 from configuration.training.general.optimization    import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
 from configuration.training.general.runtime         import IOConfig, MemoryConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
@@ -50,6 +52,8 @@ class ImageAeEntryConfig:
     ae_loss         : ImageAeLossConfig = field(default_factory=ImageAeLossConfig)
     geometry        : GeometryConfig    = field(default_factory=GeometryConfig)
 
-    paths    : RunPathsConfig      = field(default_factory=RunPathsConfig)
-    training : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
-    pretrain : PretrainConfig      = field(default_factory=PretrainConfig)
+    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
+    pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
+    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)

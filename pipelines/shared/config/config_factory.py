@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from configuration.dataset import AugmentationConfig, DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.normalization import NormalizationConfig
+from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from configuration.inference import InferenceConfig
-from configuration.training import LossConfig, LossCurriculumConfig, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
+from configuration.training import default_curriculum, EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, OverfitConfig, TrainingLoopConfig, BackboneTrainerConfig
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion
 
@@ -32,33 +31,33 @@ class ConfigFactory:
     def benchmark_input_config(self) -> InputConfig:
         return InputConfig.full_stack()
 
-    def _normalization(self) -> NormalizationConfig:
-        return getattr(self.config, "normalization", NormalizationConfig())
-
     def _output_config(self) -> OutputConfig:
-        norm = self._normalization()
+        norm = self.config.normalization
         return OutputConfig(output_strategies={key: norm.strategy("output", key) for key in ("out/amp", "out/mu", "out/sigma")})
 
-    def training_dataset_config(self) -> DatasetConfig:
+    def split_regions(self) -> SplitRegions:
         crop     = self.global_crop()
         training = self.config.training
 
-        split_regions = SplitRegions(
+        return SplitRegions(
             train = CropRegion(training.train_azimuth[0], training.train_azimuth[1], crop.range_start, crop.range_end),
             val   = CropRegion(training.val_azimuth[0],   training.val_azimuth[1],   crop.range_start, crop.range_end),
             test  = CropRegion(training.test_azimuth[0],  training.test_azimuth[1],  crop.range_start, crop.range_end),
         )
 
+    def training_dataset_config(self) -> DatasetConfig:
+        training = self.config.training
+
         return DatasetConfig(
             preprocessing_run_directory = self.config.paths.dataset_path,
             parameters_path             = self.config.paths.parameters_path,
-            split_regions               = split_regions,
+            split_regions               = self.split_regions(),
             secondary_labels            = self._secondary_labels(),
             patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=True),
             input_config    = self.benchmark_input_config(),
             output_config   = self._output_config(),
-            normalization   = self._normalization(),
-            augmentation    = getattr(self.config, "augmentation", AugmentationConfig()),
+            normalization   = self.config.normalization,
+            augmentation    = self.config.augmentation,
             batch_size      = training.batch_size,
             num_workers     = training.num_workers,
             prefetch_factor = training.prefetch_factor,
@@ -102,11 +101,7 @@ class ConfigFactory:
 
             overfit = OverfitConfig(enabled=False),
 
-            curriculum = LossCurriculumConfig(
-                enabled  = False,
-                warmup   = LossConfig(use_param_l1=True, weight_param_l1=1.0, param_weights=(1.0, 1.0, 1.0)),
-                complete = LossConfig(use_param_l1=True, weight_param_l1=1.0),
-            ),
+            curriculum = default_curriculum(),
         )
 
     def inference_config(self, run_directory: Path) -> InferenceConfig:

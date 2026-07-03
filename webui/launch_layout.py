@@ -443,6 +443,8 @@ class LaunchLayout:
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
@@ -478,6 +480,8 @@ class LaunchLayout:
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
@@ -590,6 +594,8 @@ class LaunchLayout:
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
@@ -645,6 +651,8 @@ class LaunchLayout:
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                     {"kind": "fields", "title": "Sampling", "groups": [
                         {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
                     ]},
@@ -652,6 +660,10 @@ class LaunchLayout:
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit", "at": "overfit"},
+                ]},
+                {"key": "loss", "title": "Loss", "when": {"field": "training_type", "in": ["backbone"]}, "panels": [
+                    {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
+                    {"kind": "pair", "title": "Loss stages", "template": "loss", "base": "curriculum.complete", "override": "curriculum.warmup"},
                 ]},
                 {"key": "ae-loss", "title": "Autoencoder loss", "when": {"field": "training_type", "in": ["profile_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},

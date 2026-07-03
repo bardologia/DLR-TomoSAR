@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
+from configuration.dataset                      import AugmentationConfig
+from configuration.normalization.general        import NormalizationConfig
+from configuration.training.backbone            import default_curriculum
+from configuration.training.general.loss        import LossCurriculumConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
 from configuration.training.general.runtime     import OverfitConfig
 from configuration.training.image_autoencoder   import ImageAeLossConfig
@@ -45,10 +49,13 @@ class TuningEntryConfig:
     skip_models  : list[str]  = field(default_factory=list)
     run_tag      : str | None = None
 
-    training        : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
-    overfit         : OverfitConfig       = field(default_factory=OverfitConfig)
-    ae_loss         : object              = field(default_factory=_default_ae_loss)
-    image_ae_loss   : object              = field(default_factory=_default_image_ae_loss)
+    training        : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
+    overfit         : OverfitConfig        = field(default_factory=OverfitConfig)
+    curriculum      : LossCurriculumConfig = field(default_factory=default_curriculum)
+    normalization   : NormalizationConfig  = field(default_factory=NormalizationConfig)
+    augmentation    : AugmentationConfig   = field(default_factory=AugmentationConfig)
+    ae_loss         : object               = field(default_factory=_default_ae_loss)
+    image_ae_loss   : object               = field(default_factory=_default_image_ae_loss)
     jepa            : JepaTuneConfig       = field(default_factory=JepaTuneConfig)
-    pixel_subsample : float               = 1.0
-    keep_empty_frac : float               = 0.05
+    pixel_subsample : float                = 1.0
+    keep_empty_frac : float                = 0.05
