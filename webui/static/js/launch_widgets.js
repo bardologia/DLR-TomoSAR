@@ -1182,7 +1182,10 @@ class ExperimentBuilder {
     label.spellcheck = false;
     label.title      = "variant label, used in the run name";
     label.addEventListener("change", () => {
-      variant.label = label.value.trim() || variant.label;
+      const wanted = label.value.trim() || variant.label;
+      const taken  = new Set(this.variants[which].filter((other) => other !== variant).map((other) => other.label));
+      variant.label = taken.has(wanted) ? this._uniqueLabel(which, wanted) : wanted;
+      label.value   = variant.label;
       this._emit(which);
     });
 
@@ -1382,7 +1385,10 @@ class ExperimentBuilder {
     label.spellcheck   = false;
     label.title        = "variant label, used in the run name";
     label.addEventListener("change", () => {
-      variant.label = label.value.trim() || variant.label;
+      const wanted = label.value.trim() || variant.label;
+      const taken  = new Set(this.variants.warmup.filter((other) => other !== variant).map((other) => other.label));
+      variant.label = taken.has(wanted) ? this._uniqueLabel("warmup", wanted) : wanted;
+      label.value   = variant.label;
       this._emit("warmup");
     });
     labelRow.appendChild(label);
@@ -2192,7 +2198,21 @@ class AblationBuilder {
       input.type        = "text";
       input.value       = value === undefined || value === null ? "" : (structured ? PythonLiteral.render(value) : String(value));
       input.placeholder = value === undefined ? "unset" : "";
-      input.addEventListener("change", () => onCommit(structured ? PythonLiteral.parse(input.value) : input.value));
+      input.addEventListener("change", () => {
+        if (!structured) {
+          onCommit(input.value);
+          return;
+        }
+        try {
+          const parsed = PythonLiteral.parse(input.value);
+          input.classList.remove("is-invalid");
+          input.title = "";
+          onCommit(parsed);
+        } catch (e) {
+          input.classList.add("is-invalid");
+          input.title = `not a valid Python literal: ${e.message || e}`;
+        }
+      });
     }
     return input;
   }
@@ -3220,15 +3240,17 @@ class ConfigForm {
     const select = document.createElement("select");
     select.className = "cfg-edit__input picker__select";
 
-    const current = String(leaf.value);
-    const options = choices.includes(current) ? choices : [current, ...choices];
+    const current   = String(leaf.value);
+    const effective = String(this._effective(leaf));
+    const options   = [...new Set([current, effective, ...choices].filter((value) => choices.includes(value) || value === current || value === effective))];
     options.forEach((value) => {
       const opt = document.createElement("option");
       opt.value = value;
       opt.textContent = value === "default" && defaultLabel ? defaultLabel : value;
       select.appendChild(opt);
     });
-    select.value = current;
+    select.value = effective;
+    select.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
 
     select.addEventListener("change", () => {
       select.classList.toggle("is-dirty", select.value !== leaf.value);
@@ -3252,17 +3274,23 @@ class ConfigForm {
   }
 
   _setValue(leaf, value) {
-    const changed = value !== leaf.value && value !== "";
+    const changed = value !== leaf.value;
     if (changed) this.dirty[leaf.path] = value;
     else delete this.dirty[leaf.path];
+    this._refresh();
+  }
+
+  _unsetValue(leaf) {
+    delete this.dirty[leaf.path];
     this._refresh();
   }
 
   _textControl(leaf) {
     const input = document.createElement("input");
     input.className = "cfg-edit__input";
-    input.value = leaf.value;
+    input.value = this._effective(leaf);
     input.spellcheck = false;
+    input.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
     input.addEventListener("input", () => {
       input.classList.toggle("is-dirty", input.value !== leaf.value);
       this._setValue(leaf, input.value);
@@ -3280,15 +3308,24 @@ class ConfigForm {
     input.className = "cfg-edit__input";
     input.type = "number";
     input.step = leaf.type === "int" ? "1" : "any";
-    input.value = leaf.value;
+    input.value = this._effective(leaf);
     input.spellcheck = false;
+    input.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
     input.addEventListener("input", () => {
-      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
-      this._setValue(leaf, input.value);
+      const empty   = input.value === "";
+      const invalid = !empty && leaf.type === "int" && !/^-?\d+$/.test(input.value);
+
+      input.classList.toggle("is-dirty", !empty && input.value !== leaf.value);
+      input.classList.toggle("is-invalid", invalid);
+      input.title = invalid ? "not a whole number; this field takes an integer" : "";
+
+      if (empty || invalid) this._unsetValue(leaf);
+      else this._setValue(leaf, input.value);
     });
     const reset = () => {
       input.value = leaf.value;
       input.classList.remove("is-dirty");
+      input.classList.remove("is-invalid");
     };
     return { el: input, input, reset };
   }

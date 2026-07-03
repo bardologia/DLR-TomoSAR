@@ -1171,6 +1171,8 @@ main { margin-left: var(--navw); }
 .tb-pill.is-active { color: var(--ink); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .tb-pill__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex: none; }
 .tb-pill.is-running .tb-pill__dot { background: var(--accent-2); }
+.tb-pill.is-failed .tb-pill__dot { background: #c0392b; }
+.tb-pill.is-failed .tb-pill__state { color: #c0392b; }
 .tb-pill.is-starting .tb-pill__dot { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
 .tb-pill__name { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tb-pill__state { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
@@ -1412,6 +1414,7 @@ main { margin-left: var(--navw); }
 .cfg-edit__input { font-family: var(--mono); font-size: 13px; padding: 6px 9px; background: #fdfdfb; border: 1px solid var(--line); border-radius: var(--r-input); color: var(--ink); transition: border-color 0.2s var(--ease); min-width: 0; }
 .cfg-edit__input:focus { outline: none; border-color: var(--accent); }
 .cfg-edit__input.is-dirty { border-color: var(--warn); }
+.cfg-edit__input.is-invalid { border-color: var(--bad, #c0392b); }
 .cfg-edit__input.is-locked { opacity: 0.5; cursor: not-allowed; }
 .cfg-note { font-size: 13.5px; color: var(--ink-dim); margin: 0 0 14px; font-family: var(--mono); }
 .launch-nomatch { margin-top: 6px; }
