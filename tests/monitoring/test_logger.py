@@ -122,8 +122,12 @@ def test_section_writes_banner_rules(tmp_path):
 
     contents = _read_log(tmp_path, "exp_sec_bar")
     bar      = "=" * Logger.FILE_RULE_WIDTH
+    lines    = contents.splitlines()
+    index    = next(i for i, line in enumerate(lines) if ">>> DATA LOADING" in line)
 
-    assert f"{bar}\n>>> DATA LOADING\n{bar}" in contents
+    assert lines[index - 1] == bar
+    assert lines[index + 1] == bar
+    assert "[INFO]" in lines[index]
 
 
 def test_second_section_includes_elapsed(tmp_path):
@@ -160,8 +164,9 @@ def test_subsection_writes_marker(tmp_path):
     logger.close()
 
     contents = _read_log(tmp_path, "exp_sub")
+    line     = next(line for line in contents.splitlines() if "> step one" in line)
 
-    assert "> step one" in contents
+    assert "[INFO]" in line
 
 
 def test_ok_writes_plus_marker(tmp_path):

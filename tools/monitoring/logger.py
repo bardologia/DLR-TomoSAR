@@ -174,9 +174,18 @@ class Logger:
             return
         self._file_handler.handle(self.logger.makeRecord(self.name, level, "", 0, message, None, None))
 
+    def _file_raw(self, text: str = "") -> None:
+        if self._file_handler is None:
+            return
+        self._file_handler.stream.write(text + "\n")
+        self._file_handler.flush()
+
     def _file_banner(self, line: str) -> None:
         bar = "=" * self.FILE_RULE_WIDTH
-        self._to_file(f"\n{bar}\n{line}\n{bar}")
+        self._file_raw()
+        self._file_raw(bar)
+        self._to_file(line)
+        self._file_raw(bar)
 
     def _header(self, log_level: int) -> None:
         started = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -218,7 +227,8 @@ class Logger:
     def subsection(self, title: str) -> None:
         line = f"  [cyan]>[/cyan] {title}"
         self.console.print(line, style="bold white")
-        self._to_file(f"\n  > {title}")
+        self._file_raw()
+        self._to_file(f"  > {title}")
 
     def debug(self, message: str) -> None:    
         self.logger.debug(message)
@@ -267,7 +277,9 @@ class Logger:
         if not data:
             return
 
-        self._to_file(f"\n  > {title}" if title else "")
+        self._file_raw()
+        if title:
+            self._to_file(f"  > {title}")
 
         key_width = max(len(str(k)) for k in data)
         for k, v in data.items():
@@ -285,7 +297,9 @@ class Logger:
 
         self.console.print(tbl)
 
-        self._to_file(f"\n  > {title}" if title else "")
+        self._file_raw()
+        if title:
+            self._to_file(f"  > {title}")
 
         cells  = [[self._fmt(row.get(column, "")) for column in columns] for row in rows]
         widths = [max(len(str(columns[index])), *(len(row[index]) for row in cells)) if cells else len(str(columns[index])) for index in range(len(columns))]
