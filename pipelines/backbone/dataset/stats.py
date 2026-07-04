@@ -50,6 +50,7 @@ class Stats:
             "Output channels": output_stats.n_channels,
             "Output clamp":    f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
             "Clamp leak":      clamp.leaky_slope,
+            "Param leak":      clamp.param_leaky_slope,
             "Amp max":         clamp.amp_max,
         })
 

@@ -214,13 +214,29 @@ def test_prepare_reads_clamp_knobs_from_stats():
     cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
     loss = build_loss(n_gaussians=1, loss_cfg=cfg)
 
-    loss.norm_stats.stats.clamp.amp_max     = 2.0
-    loss.norm_stats.stats.clamp.leaky_slope = 0.0
+    loss.norm_stats.stats.clamp.amp_max           = 2.0
+    loss.norm_stats.stats.clamp.leaky_slope       = 0.0
+    loss.norm_stats.stats.clamp.param_leaky_slope = 0.0
 
     huge = torch.full((1, 3, 2, 2), 50.0)
     _, pred_phys, _, _, _ = loss._prepare(huge, torch.zeros_like(huge))
 
     assert pred_phys[:, 0].max().item() <= 2.0
+
+
+def test_prepare_param_clamp_slope_acts_independently():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    loss = build_loss(n_gaussians=1, loss_cfg=cfg)
+
+    loss.norm_stats.stats.clamp.amp_max           = 2.0
+    loss.norm_stats.stats.clamp.leaky_slope       = 0.0
+    loss.norm_stats.stats.clamp.param_leaky_slope = 0.5
+
+    raw = torch.zeros((1, 3, 2, 2))
+    raw[:, 0] = 50.0
+    _, pred_phys, _, _, _ = loss._prepare(raw, torch.zeros_like(raw))
+
+    assert pred_phys[0, 0, 0, 0].item() == pytest.approx(2.0 + 0.5 * (50.0 - 2.0), abs=1e-4)
 
 
 def test_single_term_total_equals_component_after_normalisation():

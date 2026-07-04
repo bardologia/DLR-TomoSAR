@@ -156,7 +156,7 @@ class Loss:
             x_axis      = self.x_axis,
             amp_max     = clamp_cfg.amp_max,
             ppg         = self.gaussian_cfg.params_per_gaussian,
-            leaky_slope = leaky_slope,
+            leaky_slope = clamp_cfg.param_leaky_slope,
         )
 
         pred_params_norm = self.norm_stats.normalize_output(pred_params_phys, leaky_slope=leaky_slope)
