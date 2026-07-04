@@ -26,7 +26,7 @@ class AblationCatalog:
         ("out_amp",   "out_amp",   "robust_iqr_log1p", "zscore"),
         ("out_sigma", "out_sigma", "robust_iqr_log1p", "zscore"),
         ("pass_mag",  "pass_mag",  "robust_iqr_log1p", "zscore_log1p"),
-        ("ifg_phase", "ifg_phase", "zscore",           "fixed_div_pi"),
+        ("ifg_phase", "ifg_phase", "fixed_div_pi",     "zscore"),
         ("ifg_mag",   "ifg_mag",   "robust_iqr_log1p", "zscore"),
         ("dem",       "dem",       "robust_iqr_log1p", "zscore"),
     )

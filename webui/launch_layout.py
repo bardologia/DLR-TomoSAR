@@ -177,7 +177,7 @@ class LaunchLayout:
                 {"path": "pass_mag",   "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p, per-slot"}},
                 {"path": "pass_phase", "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore, per-slot"}},
                 {"path": "ifg_mag",    "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p, per-slot"}},
-                {"path": "ifg_phase",  "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore, per-slot"}},
+                {"path": "ifg_phase",  "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "fixed_div_pi, per-slot"}},
                 {"path": "out_amp",    "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p, per-slot"}},
                 {"path": "out_mu",     "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore, per-slot"}},
                 {"path": "out_sigma",  "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p, per-slot"}},

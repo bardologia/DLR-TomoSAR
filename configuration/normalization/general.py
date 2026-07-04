@@ -105,7 +105,7 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
     "ifg/mag"         : Presets.ROBUST_IQR_LOG1P,
     "ifg/raw_re_im"   : Presets.ZSCORE,
     "ifg/norm_re_im"  : Presets.ZSCORE,
-    "ifg/phase"       : Presets.ZSCORE,
+    "ifg/phase"       : Presets.FIXED_DIV_PI,
 
     "out/amp"         : Presets.ROBUST_IQR_LOG1P,
     "out/mu"          : Presets.ZSCORE,

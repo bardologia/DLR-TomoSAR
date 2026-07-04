@@ -9,7 +9,7 @@ from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.stats         import Stats
 
 ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma"]
-ZSCORE_SLOTS       = ["out/mu", "pass/phase", "ifg/phase", "pass/raw_re_im", "ifg/raw_re_im", "dem/elevation"]
+ZSCORE_SLOTS       = ["out/mu", "pass/phase", "pass/raw_re_im", "ifg/raw_re_im", "dem/elevation"]
 
 AMP_THR        = 1e-2
 SCALE_FLOOR    = 1e-8
@@ -58,6 +58,12 @@ def test_mu_and_signed_channels_stay_zscore():
 
     for slot in ZSCORE_SLOTS:
         assert ChannelStrategy.from_slot(slot).norm_method is NormMethod.ZSCORE
+
+
+def test_ifg_phase_uses_fixed_div_pi():
+    strat = ChannelStrategy.from_slot("ifg/phase")
+    assert strat.norm_method is NormMethod.FIXED_DIV_PI
+    assert strat.apply_log1p is False
 
 
 @pytest.mark.real_data

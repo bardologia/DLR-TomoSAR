@@ -313,7 +313,7 @@ def test_ablation_catalog_standard_categories_present():
 
     assert catalog["out_amp"]["degrade"]["normalization.out_amp"]      == "zscore"
     assert catalog["pass_mag"]["degrade"]["normalization.pass_mag"]    == "zscore_log1p"
-    assert catalog["ifg_phase"]["degrade"]["normalization.ifg_phase"]  == "fixed_div_pi"
+    assert catalog["ifg_phase"]["degrade"]["normalization.ifg_phase"]  == "zscore"
     assert catalog["augmentation"]["degrade"]["augmentation.p_flip_h"] == 0.0
     assert "augmentation.p_noise"     not in catalog["augmentation"]["enable"]
     assert "out_mu"      not in catalog
@@ -465,4 +465,4 @@ def test_ablation_default_plan_round_trips_through_config_cli():
     assert baseline.training.warmup_enabled                is False
     assert baseline.normalization.clamp_output           is False
     assert baseline.normalization.out_amp                == "zscore"
-    assert baseline.normalization.ifg_phase              == "fixed_div_pi"
+    assert baseline.normalization.ifg_phase              == "zscore"
