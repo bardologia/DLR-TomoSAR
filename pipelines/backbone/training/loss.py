@@ -148,12 +148,13 @@ class Loss:
         return pred, pred_phys, gt, gt_phys
 
     def _prepare(self, pred_params, gt_params):
-        leaky_slope = self.gaussian_cfg.clamp_leaky_slope
+        clamp_cfg   = self.norm_stats.stats.clamp
+        leaky_slope = clamp_cfg.leaky_slope
 
         pred_params_phys = GaussianClamp.apply(
             self.norm_stats.denormalize_output(pred_params.float(), leaky_slope=leaky_slope),
             x_axis      = self.x_axis,
-            amp_max     = self.gaussian_cfg.amp_max,
+            amp_max     = clamp_cfg.amp_max,
             ppg         = self.gaussian_cfg.params_per_gaussian,
             leaky_slope = leaky_slope,
         )

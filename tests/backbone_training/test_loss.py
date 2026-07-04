@@ -210,6 +210,19 @@ def test_prepare_clamps_prediction_so_invalid_identical_params_are_nonzero():
     assert out["total_loss"].item() > 0.0
 
 
+def test_prepare_reads_clamp_knobs_from_stats():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    loss = build_loss(n_gaussians=1, loss_cfg=cfg)
+
+    loss.norm_stats.stats.clamp.amp_max     = 2.0
+    loss.norm_stats.stats.clamp.leaky_slope = 0.0
+
+    huge = torch.full((1, 3, 2, 2), 50.0)
+    _, pred_phys, _, _, _ = loss._prepare(huge, torch.zeros_like(huge))
+
+    assert pred_phys[:, 0].max().item() <= 2.0
+
+
 def test_single_term_total_equals_component_after_normalisation():
     cfg  = LossConfig(use_param_l1=True, weight_param_l1=2.0)
     loss = build_loss(n_gaussians=2, loss_cfg=cfg)

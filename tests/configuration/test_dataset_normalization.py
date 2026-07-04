@@ -110,15 +110,24 @@ def test_normalization_config_per_channel_override_wins_over_global():
 
 
 def test_normalization_clamp_round_trips_through_dict():
-    cfg   = NormalizationConfig(clamp_output=False, clamp_floor=0.0, clamp_ceil=50.0)
+    cfg   = NormalizationConfig(clamp_output=False, clamp_floor=0.0, clamp_ceil=50.0, clamp_leaky_slope=0.2, amp_max=500.0)
     clamp = cfg.clamp()
 
     assert isinstance(clamp, OutputClampConfig)
-    assert clamp.enabled is False
-    assert clamp.ceil    == 50.0
+    assert clamp.enabled     is False
+    assert clamp.ceil        == 50.0
+    assert clamp.leaky_slope == 0.2
+    assert clamp.amp_max     == 500.0
 
     rebuilt = OutputClampConfig.from_dict(clamp.as_dict())
     assert rebuilt == clamp
+
+
+def test_clamp_payload_missing_knobs_breaks_loudly():
+    payload = {"enabled": True, "floor": 0.0, "ceil": 1000.0}
+
+    with pytest.raises(KeyError):
+        OutputClampConfig.from_dict(payload)
 
 
 def test_patch_config_defaults():

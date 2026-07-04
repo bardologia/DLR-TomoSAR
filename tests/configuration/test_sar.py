@@ -21,7 +21,6 @@ def test_gaussian_config_instantiates():
     cfg = GaussianConfig(n_default_gaussians=5, x_min=-20.0, x_max=80.0)
     assert cfg.params_per_gaussian == 3
     assert cfg.x_max > cfg.x_min
-    assert cfg.amp_max > 0
 
 
 def test_gaussian_config_asdict_round_trips():

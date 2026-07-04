@@ -49,6 +49,8 @@ class Stats:
             "Input channels":  input_stats.n_channels,
             "Output channels": output_stats.n_channels,
             "Output clamp":    f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
+            "Clamp leak":      clamp.leaky_slope,
+            "Amp max":         clamp.amp_max,
         })
 
         return cls(input_stats = input_stats, output_stats = output_stats, clamp = clamp)
