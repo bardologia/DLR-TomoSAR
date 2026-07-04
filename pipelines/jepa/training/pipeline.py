@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 
-from configuration.training                              import JepaTrainerConfig, OverfitConfig
+from configuration.training                              import JepaTrainerConfig
 from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from models.profile_autoencoder                          import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
@@ -23,9 +23,8 @@ from tools.runtime.reproducibility                       import Reproducibility
 
 
 class TrainingPipeline:
-    def __init__(self, entry_config, split_regions=None, overfit=None) -> None:
+    def __init__(self, entry_config, split_regions=None) -> None:
         self.entry   = entry_config
-        self.overfit = overfit if overfit is not None else OverfitConfig(enabled=False)
         self.factory = ConfigFactory(entry_config)
         Reproducibility.seed_everything(entry_config.seed)
 
@@ -66,7 +65,6 @@ class TrainingPipeline:
             image_autoencoder_mode         = entry_config.image_autoencoder_mode,
             image_autoencoder_checkpoint   = image_checkpoint,
             param_loss                     = entry_config.param_loss,
-            overfit                        = self.overfit,
         )
         self.trainer_config.inherit_shared_from(base)
         self.trainer_config.geometry = entry_config.geometry.resolved(entry_config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())

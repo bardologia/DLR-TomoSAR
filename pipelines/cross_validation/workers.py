@@ -119,7 +119,7 @@ class FoldTrainingWorker(CrossValidationWorker):
 
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
-        trainer_config            = self.factory.training_trainer_config(logdir=self.run_dir / "folds", overfit=self.config.overfit)
+        trainer_config            = self.factory.training_trainer_config(logdir=self.run_dir / "folds")
         trainer_config.curriculum = self.config.curriculum
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
@@ -140,7 +140,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_jepa(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.jepa.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
+        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
 
     def _jepa_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import JepaEntryConfig
@@ -167,7 +167,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions, overfit=self.config.overfit).run()
+        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
 
     def _ae_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import ProfileAeEntryConfig

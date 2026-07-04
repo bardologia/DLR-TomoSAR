@@ -96,11 +96,6 @@ def test_sanitized_trainer_config_disables_regularization(tmp_path):
 
     cfg = check.sanitized_trainer_config(original)
 
-    assert cfg.overfit.enabled        is True
-    assert cfg.overfit.max_steps      == 100
-    assert cfg.overfit.batch_size     == 4
-    assert cfg.overfit.stop_threshold == 1e-5
-
     assert cfg.training.epochs               == 5
     assert cfg.training.validation_frequency == 5
     assert cfg.training.use_ema              is False
@@ -115,7 +110,6 @@ def test_sanitized_trainer_config_disables_regularization(tmp_path):
 
     assert original.optimizer.weight_decay == 0.1
     assert original.training.use_ema       is True
-    assert original.overfit.enabled        is False
 
     assert check.overrides["optimizer.weight_decay"] == 0.0
     assert check.overrides["training.use_ema"]       is False

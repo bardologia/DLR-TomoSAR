@@ -8,7 +8,7 @@ from configuration.training.general.run              import TrainingPathsConfig,
 from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config               import GeometryConfig
 from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitCheckConfig, OverfitConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.runtime          import IOConfig, MemoryConfig, OverfitCheckConfig, ResourceConfig, TrainingLoopConfig
 from configuration.training.general.pretraining      import PretrainConfig
 from configuration.training.general.trainer          import SharedSubConfigInheritance
 
@@ -32,7 +32,6 @@ class ProfileAeTrainerConfig(SharedSubConfigInheritance):
     io               : IOConfig                     = field(default_factory=IOConfig)
     optimizer        : OptimizerConfig              = field(default_factory=OptimizerConfig)
     training         : TrainingLoopConfig           = field(default_factory=TrainingLoopConfig)
-    overfit          : OverfitConfig                = field(default_factory=OverfitConfig)
     resources        : ResourceConfig               = field(default_factory=ResourceConfig)
     memory           : MemoryConfig                 = field(default_factory=MemoryConfig)
     gradient_clipper : GradientClipperConfig        = field(default_factory=GradientClipperConfig)

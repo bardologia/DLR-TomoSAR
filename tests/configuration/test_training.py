@@ -13,7 +13,6 @@ from configuration.training.general.optimization import (
 )
 from configuration.training.general.runtime import (
     IOConfig,
-    OverfitConfig,
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
@@ -60,7 +59,6 @@ SIMPLE_DEFAULT_CONFIGS = [
     EarlyStoppingConfig,
     GradientClipperConfig,
     IOConfig,
-    OverfitConfig,
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,

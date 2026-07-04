@@ -102,26 +102,14 @@ class Scheduler:
         self.scheduler_type = self.config.scheduler.type
 
         self._epoch_offset  = 0
-        self._t_max_override = None
 
         self._log_scheduler_info()
-
-    def set_total_epochs(self, epochs: int) -> None:
-        resolved = max(1, int(epochs))
-        if resolved == self._resolved_t_max():
-            return
-
-        self._t_max_override = resolved
-        self._log_scheduler_info()
-
-    def _resolved_t_max(self) -> int:
-        return self._t_max_override if self._t_max_override is not None else self.config.scheduler.epochs
 
     def _eta_min_ratio(self) -> float:
         return float(self.config.scheduler.eta_min) / max(self.base_lrs[0], 1e-12)
 
     def _progress(self, epoch: int) -> float:
-        return min(1.0, epoch / max(1, self._resolved_t_max()))
+        return min(1.0, epoch / max(1, self.config.scheduler.epochs))
 
     def _cosine_annealing(self, epoch: int) -> float:
         ratio    = self._eta_min_ratio()
@@ -192,15 +180,13 @@ class Scheduler:
 
     def state_dict(self) -> dict:
         return {
-            "current_lrs"    : list(self.current_lrs),
-            "epoch_offset"   : self._epoch_offset,
-            "t_max_override" : self._t_max_override,
+            "current_lrs"  : list(self.current_lrs),
+            "epoch_offset" : self._epoch_offset,
         }
 
     def load_state_dict(self, state: dict) -> None:
-        self.current_lrs     = list(state["current_lrs"])
-        self._epoch_offset   = int(state["epoch_offset"])
-        self._t_max_override = state["t_max_override"]
+        self.current_lrs   = list(state["current_lrs"])
+        self._epoch_offset = int(state["epoch_offset"])
 
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")
@@ -210,7 +196,7 @@ class Scheduler:
         }
 
         if self.scheduler_type in ("cosine_annealing", "linear", "polynomial", "exponential"):
-            info["T_max"]   = self._resolved_t_max()
+            info["T_max"]   = self.config.scheduler.epochs
             info["Eta Min"] = self.config.scheduler.eta_min
 
         if self.scheduler_type == "polynomial":

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from torch.utils.data import default_collate
 
-from configuration.training.general.runtime import IOConfig, OverfitConfig
+from configuration.training.general.runtime import IOConfig
 from tools.data.io                 import FileIO
 from tools.runtime.reproducibility import RngSnapshot
 
@@ -49,8 +49,7 @@ class OverfitCheck:
         finally:
             trainer_config.io.writer = writer
 
-        cfg.overfit = OverfitConfig(enabled=True, max_steps=self.config.max_steps, stop_threshold=self.config.stop_threshold, batch_size=self.config.n_examples)
-        cfg.io      = IOConfig(logdir=str(self.work_directory))
+        cfg.io = IOConfig(logdir=str(self.work_directory))
 
         cfg.training.epochs               = self.planned_epochs
         cfg.training.validation_frequency = self.planned_epochs

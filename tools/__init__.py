@@ -3,7 +3,7 @@ from .reporting     import MarkdownDoc, MarkdownTable, MetricSectionGrouper, Plo
 from .metrics       import FiniteScalar, MetricOrientation, R2, RelativeImprovement
 from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, ProfileNormalizer, ProfilePreprocessor, SplitRegions
 from .diagnostics   import IssueDetector, LayerReport, StateDictResolver, WeightAnalyzer, WeightXray, XraySummarizer
-from .training      import BaseTrainer, Checkpoint, EarlyStopping, GradientClipper, MetricAggregator, OverfitManager, Scheduler, Warmup
+from .training      import BaseTrainer, Checkpoint, EarlyStopping, GradientClipper, MetricAggregator, Scheduler, Warmup
 from .orchestration import ExperimentStage, GpuJob, GpuJobResult, GpuQueue, ProcessPoolRunner, QueuedInferenceStage, QueuedTrainingStage
 from .runtime       import CondaEnv, CondaJobDispatcher, Reproducibility, WorkerInitializer
 from .sar           import InterferogramLauncher, TomogramLauncher
@@ -55,7 +55,6 @@ __all__ = [
     "EarlyStopping",
     "GradientClipper",
     "MetricAggregator",
-    "OverfitManager",
     "Scheduler",
     "Warmup",
 ]

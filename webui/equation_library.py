@@ -1036,17 +1036,6 @@ class EquationLibrary:
                         {"sym": r"P",                       "desc": "patience = 15"},
                     ],
                 },
-                {
-                    "title" : "Overfit mode stop",
-                    "tex"   : r"\text{stop} \iff \ell_{\mathrm{train}} < \tau_{\mathrm{stop}} \ \ \text{or} \ \ \mathrm{steps} \geq S_{\max}",
-                    "note"  : "Debug mode repeating one batch for the whole epoch; stops once the loss collapses, verifying model capacity (overfit.py).",
-                    "vars"  : [
-                        {"sym": r"\ell_{\mathrm{train}}", "desc": "training loss on the repeated batch"},
-                        {"sym": r"\tau_{\mathrm{stop}}",  "desc": "overfit stop_threshold"},
-                        {"sym": r"\mathrm{steps}",        "desc": "optimiser steps consumed"},
-                        {"sym": r"S_{\max}",              "desc": "overfit max_steps budget"},
-                    ],
-                },
             ],
         }
 

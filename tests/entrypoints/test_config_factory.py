@@ -131,7 +131,6 @@ def test_training_trainer_config_epochs_propagate(factory, tmp_path):
     trainer_config = factory.training_trainer_config(tmp_path / "logdir")
 
     assert trainer_config.training.epochs == training.epochs
-    assert trainer_config.overfit.enabled is False
 
 
 @pytest.mark.real_data

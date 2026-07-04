@@ -280,11 +280,6 @@ class LaunchLayout:
                 {"gate": "enabled", "fields": ["swap_epoch", "reset_lr", "reset_warmup", "reset_optimizer"]},
             ]},
         ],
-        "overfit": [
-            {"title": "Overfit mode", "fields": [
-                {"gate": "enabled", "fields": ["max_steps", "stop_threshold", "batch_size"]},
-            ]},
-        ],
         "overfit_check": [
             {"title": "Overfit check", "fields": [
                 {"gate": "enabled", "fields": ["n_examples", "max_steps", "steps_per_epoch", "pass_loss_ratio", "stop_threshold"]},
@@ -618,7 +613,6 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Fold layout", "fields": ["folds.n_folds", "folds.azimuth_start", "folds.azimuth_end", "folds.guard"]},
                     ]},
-                    {"kind": "fields", "title": "Overfit mode", "template": "overfit", "at": "overfit"},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
@@ -684,7 +678,6 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
-                    {"kind": "fields", "title": "Overfit mode", "template": "overfit", "at": "overfit"},
                 ]},
                 {"key": "loss", "title": "Loss", "when": {"field": "training_type", "in": ["backbone"]}, "panels": [
                     {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},

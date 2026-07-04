@@ -853,7 +853,6 @@
       "comparison": "Settings for the cross-fold comparison report",
       "geometry": "SAR acquisition geometry parameters for the stack",
       "curriculum": "Loss curriculum schedule across training phases",
-      "overfit": "Overfit-on-subset debugging mode settings",
       "jepa": "Cross-validation settings specific to JEPA training",
       "autoencoder": "Cross-validation settings specific to profile-autoencoder training",
       "inference_splits": "Dataset splits to run inference on, e.g. val and test",
@@ -1409,7 +1408,6 @@
       "io": "Checkpoint, logging, and artifact input/output settings",
       "optimizer": "Optimizer choice, learning rate, and weight decay",
       "training": "Core training loop settings: epochs, batch size, iteration control",
-      "overfit": "Single-batch overfit sanity-check mode settings",
       "curriculum": "Two-phase loss curriculum with warmup and complete stages",
       "resources": "Compute resource allocation such as device and worker counts",
       "memory": "Memory-management settings like pinning and cache limits",
@@ -1647,15 +1645,6 @@
       "logdir": "Filesystem directory where run logs and TensorBoard events are written"
     }
   },
-  "training/general/runtime::OverfitConfig": {
-    "summary": "Deliberate single-batch overfit sanity check for the backbone",
-    "fields": {
-      "enabled": "Whether to run the overfit-on-one-batch diagnostic instead of normal training",
-      "max_steps": "Maximum optimizer steps before stopping the overfit run",
-      "stop_threshold": "Loss value below which the overfit run halts early",
-      "batch_size": "Samples per step during overfit; typically 1"
-    }
-  },
   "training/general/runtime::OverfitCheckConfig": {
     "summary": "Pre-training overfit sanity gate: memorize a few examples with regularization disabled before normal training starts",
     "fields": {
@@ -1726,7 +1715,6 @@
       "io": "Checkpointing, logging, and output-writing behaviour",
       "optimizer": "Optimizer choice, learning rate, and weight decay",
       "training": "Epoch count, batch size, and core training-loop settings",
-      "overfit": "Single-batch overfit mode for debugging the pipeline",
       "resources": "Device, worker, and compute-resource allocation",
       "memory": "GPU memory management and precision settings",
       "gradient_clipper": "Gradient-norm or value clipping to stabilize updates"
@@ -1792,7 +1780,6 @@
       "io": "Checkpointing, logging, and output IO settings",
       "optimizer": "Optimizer type and hyperparameters",
       "training": "Training loop parameters such as epochs and batch size",
-      "overfit": "Single-batch overfit debugging settings",
       "resources": "Compute resource allocation such as devices and workers",
       "memory": "Memory-management and caching settings",
       "gradient_clipper": "Gradient-clipping norm or value thresholds"
@@ -1847,7 +1834,6 @@
       "io": "Checkpointing, logging, and output writing settings",
       "optimizer": "Optimizer type, learning rate, and weight decay",
       "training": "Core training loop settings such as epoch count",
-      "overfit": "Small-batch overfit sanity-check settings",
       "resources": "Device and compute-resource allocation settings",
       "memory": "Memory-management and caching settings",
       "gradient_clipper": "Gradient-norm clipping threshold and mode"
@@ -1897,7 +1883,6 @@
       "skip_models": "Model names to exclude from the sweep",
       "run_tag": "Optional label identifying this tuning run",
       "training": "Training queue configuration shared across trials",
-      "overfit": "Overfit-check settings for sanity validation",
       "ae_loss": "Profile autoencoder loss configuration",
       "image_ae_loss": "Image autoencoder loss configuration",
       "jepa": "JEPA-specific tuning configuration",

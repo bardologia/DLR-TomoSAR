@@ -61,7 +61,7 @@ class TuningWorker:
     def _build_base_configs(self):
         factory = ConfigFactory(self.config)
 
-        trainer_config            = factory.training_trainer_config(logdir=Path(self.config.paths.log_base_dir), overfit=self.config.overfit)
+        trainer_config            = factory.training_trainer_config(logdir=Path(self.config.paths.log_base_dir))
         trainer_config.curriculum = self.config.curriculum
         dataset_config            = factory.training_dataset_config()
 
@@ -77,7 +77,6 @@ class TuningWorker:
                 tune_cfg           = tune_cfg,
                 log_dir            = str(self.run_dir / model_name),
                 logger             = logger,
-                overfit            = self.config.overfit,
             )
 
         if self.config.training_type == "image_autoencoder":
@@ -89,7 +88,6 @@ class TuningWorker:
                 tune_cfg           = tune_cfg,
                 log_dir            = str(self.run_dir / model_name),
                 logger             = logger,
-                overfit            = self.config.overfit,
             )
 
         if self.config.training_type == "jepa":
@@ -100,7 +98,6 @@ class TuningWorker:
                 tune_cfg         = tune_cfg,
                 log_dir          = str(self.run_dir / model_name),
                 logger           = logger,
-                overfit          = self.config.overfit,
             )
 
         trainer_cfg, dataset_cfg = self._build_base_configs()

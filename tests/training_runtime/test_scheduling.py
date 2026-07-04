@@ -203,17 +203,6 @@ def test_scheduler_unknown_type_raises(logger):
         sched.step(0)
 
 
-def test_scheduler_set_total_epochs_changes_tmax(logger):
-    config = _scheduler_config("cosine_annealing", epochs=10, eta_min=0.0)
-    sched  = Scheduler([0.01], warmup=None, config=config, logger=logger)
-
-    sched.set_total_epochs(20)
-    assert sched._resolved_t_max() == 20
-
-    mid = sched.step(10)
-    assert mid[0] == pytest.approx(0.005)
-
-
 def test_scheduler_reset_applies_epoch_offset(logger):
     config = _scheduler_config("cosine_annealing", epochs=10, eta_min=0.0)
     sched  = Scheduler([0.02], warmup=None, config=config, logger=logger)

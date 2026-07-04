@@ -8,7 +8,6 @@ from configuration.normalization.general        import NormalizationConfig
 from configuration.training.backbone            import default_curriculum
 from configuration.training.general.loss        import LossCurriculumConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
-from configuration.training.general.runtime     import OverfitConfig
 from configuration.training.image_autoencoder   import ImageAeLossConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
 from configuration.tuning.jepa                  import JepaTuneConfig
@@ -50,7 +49,6 @@ class TuningEntryConfig:
     run_tag      : str | None = None
 
     training        : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
-    overfit         : OverfitConfig        = field(default_factory=OverfitConfig)
     curriculum      : LossCurriculumConfig = field(default_factory=default_curriculum)
     normalization   : NormalizationConfig  = field(default_factory=NormalizationConfig)
     augmentation    : AugmentationConfig   = field(default_factory=AugmentationConfig)

@@ -6,7 +6,6 @@ import pytest
 
 from configuration.benchmark.general import BenchmarkConfig
 from configuration.dataset           import Representation
-from configuration.training          import OverfitConfig
 from pipelines.shared.config.config_factory import ConfigFactory
 from tools.data.regions              import CropRegion
 
@@ -118,24 +117,3 @@ def test_training_trainer_config_adopts_vram_reservation(test_data_dir, params_d
 
     assert cfg.memory.reserve_vram      is True
     assert cfg.memory.vram_keep_free_gb == 2.5
-
-
-@pytest.mark.real_data
-def test_training_trainer_config_defaults_overfit_disabled(test_data_dir, params_dir):
-    factory = _factory(test_data_dir, params_dir)
-
-    cfg = factory.training_trainer_config(logdir=Path("/tmp/some_run"))
-
-    assert cfg.overfit.enabled is False
-
-
-@pytest.mark.real_data
-def test_training_trainer_config_forwards_overfit(test_data_dir, params_dir):
-    factory = _factory(test_data_dir, params_dir)
-    overfit = OverfitConfig(enabled=True, max_steps=17, batch_size=3)
-
-    cfg = factory.training_trainer_config(logdir=Path("/tmp/some_run"), overfit=overfit)
-
-    assert cfg.overfit is overfit
-    assert cfg.overfit.enabled   is True
-    assert cfg.overfit.max_steps == 17

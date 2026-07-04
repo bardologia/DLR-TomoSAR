@@ -10,14 +10,6 @@ class IOConfig:
 
 
 @dataclass
-class OverfitConfig:
-    enabled        : bool  = False
-    max_steps      : int   = 50
-    stop_threshold : float = 1e-6
-    batch_size     : int   = 1
-
-
-@dataclass
 class OverfitCheckConfig:
     enabled         : bool  = False
     n_examples      : int   = 2

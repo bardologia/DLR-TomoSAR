@@ -153,7 +153,6 @@ class AeTuner:
         tune_cfg,
         log_dir           : str,
         logger,
-        overfit,
     ) -> None:
         self.model_name         = model_name
         self.config_cls         = config_cls
@@ -162,7 +161,6 @@ class AeTuner:
         self.tune_cfg           = tune_cfg
         self.log_dir            = log_dir
         self.logger             = logger
-        self.overfit            = overfit
 
         self.sampler     = ParamSampler()
         self.space       = {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
@@ -182,7 +180,7 @@ class AeTuner:
         entry.training.scheduler_epochs    = self.tune_cfg.n_epochs
         entry.training.early_stop_patience = self.tune_cfg.early_stop_patience
 
-        pipeline                 = self.trial_pipeline_cls(entry, trial=trial, overfit=self.overfit)
+        pipeline                 = self.trial_pipeline_cls(entry, trial=trial)
         (_, _, best_val_loss), _ = pipeline.run()
 
         return best_val_loss
@@ -210,7 +208,6 @@ class JepaTuner:
         tune_cfg,
         log_dir        : str,
         logger,
-        overfit,
     ) -> None:
         self.model_name       = model_name
         self.model_config_cls = model_config_cls
@@ -218,7 +215,6 @@ class JepaTuner:
         self.tune_cfg         = tune_cfg
         self.log_dir          = log_dir
         self.logger           = logger
-        self.overfit          = overfit
 
         self.sampler     = ParamSampler()
         self.space       = model_config_cls.tunable_arch_params()
@@ -240,7 +236,7 @@ class JepaTuner:
         entry.training.scheduler_epochs    = self.tune_cfg.n_epochs
         entry.training.early_stop_patience = self.tune_cfg.early_stop_patience
 
-        pipeline                 = TrialJepaPipeline(entry, trial=trial, overfit=self.overfit)
+        pipeline                 = TrialJepaPipeline(entry, trial=trial)
         (_, _, best_val_loss), _ = pipeline.run()
 
         return best_val_loss

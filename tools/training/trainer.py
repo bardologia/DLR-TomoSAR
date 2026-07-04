@@ -13,7 +13,7 @@ from tools.monitoring.resource_monitor import ResourceMonitor
 
 from tools.training.aggregation      import MetricAggregator
 from tools.training.scheduling       import Scheduler, Warmup
-from tools.training.stopping         import EarlyStopping, OverfitManager
+from tools.training.stopping         import EarlyStopping
 from tools.training.gradients        import GradientClipper
 from tools.training.checkpoint       import Checkpoint, TrainerState, WeightEma
 from tools.training.vram_reservation import VramReservation
@@ -65,7 +65,6 @@ class BaseTrainer:
         self.grad_clipper     = GradientClipper(config=config, logger=self.logger, tracker=self.tracker, param_groups=self.optimizer.param_groups)
         self.checkpoint       = Checkpoint(self.logger, self.tracker, str(self.checkpoint_path))
         self.ema              = WeightEma(self.model, config.training.ema_decay, config.training.use_ema)
-        self.overfitter       = OverfitManager(config, self.logger)
         self.resource_monitor = ResourceMonitor(config=config.resources, logger=self.logger, tracker=self.tracker, step_getter=lambda: self.global_step)
         self.vram_reservation = VramReservation(enabled=config.memory.reserve_vram, keep_free_gb=config.memory.vram_keep_free_gb, device=self.device, logger=self.logger)
 
@@ -342,16 +341,11 @@ class BaseTrainer:
         if self.resource_monitor is not None:
             self.resource_monitor.start()
         try:
-            data_loader, val_loader, test_loader = self.overfitter.setup_loaders(train_loader, val_loader, test_loader)
-
-            if self.overfitter.enabled:
-                self.lr_scheduler.set_total_epochs(self.overfitter.planned_epochs())
-
-            loader_generator = getattr(data_loader, "generator", None)
+            loader_generator = getattr(train_loader, "generator", None)
             start_epoch      = self._maybe_resume(loader_generator)
             last_epoch       = max(start_epoch - 1, 0)
 
-            self._before_training(data_loader)
+            self._before_training(train_loader)
             self.vram_reservation.fill()
 
             with self.logger.live_monitor("Training Progress") as live_mon:
@@ -365,7 +359,7 @@ class BaseTrainer:
                         self.logger.section(f"[Epoch {epoch_num}/{self.epochs}]")
                         self._before_epoch(epoch)
 
-                        train_loss = self.train_epoch(data_loader, epoch)
+                        train_loss = self.train_epoch(train_loader, epoch)
                         self.logger.subsection(f"Train  : loss={train_loss:.4f}")
 
                         do_eval = (epoch_num % self.validation_frequency == 0) or (epoch_num == self.epochs)
@@ -407,7 +401,7 @@ class BaseTrainer:
                         )
                         _prog_epochs.update(_task_epochs, advance=1, description=f"[section]Training[/section]  best_val={self.checkpoint.best_val_loss:.4f} @ ep {self.checkpoint.best_epoch + 1}")
 
-                        if stop or self.overfitter.check_stop(train_loss):
+                        if stop:
                             break
 
             if self.restore_best:
