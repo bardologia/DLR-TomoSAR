@@ -13,8 +13,8 @@ class TrialPlanner:
         self.warmup_losses = warmup_losses
 
     @staticmethod
-    def _warmup_overrides(loss: dict) -> dict:
-        return {f"curriculum.warmup.{key}": value for key, value in loss.items()}
+    def _stage_overrides(stage: str, loss: dict) -> dict:
+        return {f"curriculum.{stage}.{key}": value for key, value in loss.items()}
 
 
 class CurriculumTrialPlanner(TrialPlanner):
@@ -31,9 +31,9 @@ class CurriculumTrialPlanner(TrialPlanner):
         for warmup_label, warmup_loss in self.warmup_losses.items():
             for complete_label, complete_loss in self.complete_losses.items():
                 run_name  = f"{self.model_name}_w-{warmup_label}_c-{complete_label}"
-                overrides = {"curriculum.enabled": True}
-                overrides.update(self._warmup_overrides(warmup_loss))
-                overrides.update({f"curriculum.complete.{key}": value for key, value in complete_loss.items()})
+                overrides = {"curriculum.enabled": True, "curriculum.inherit": False}
+                overrides.update(self._stage_overrides("warmup",   warmup_loss))
+                overrides.update(self._stage_overrides("complete", complete_loss))
                 plans.append((run_name, overrides))
 
         return plans
@@ -49,7 +49,7 @@ class WarmupTrialPlanner(TrialPlanner):
         for label, loss in self.warmup_losses.items():
             run_name  = f"{self.model_name}_nc-{label}"
             overrides = {"curriculum.enabled": False}
-            overrides.update(self._warmup_overrides(loss))
+            overrides.update(self._stage_overrides("complete", loss))
             plans.append((run_name, overrides))
 
         return plans
@@ -71,7 +71,7 @@ class SlotPresenceTrialPlanner:
         overrides = {"curriculum.enabled": False}
 
         for key, value in spec.items():
-            overrides[f"curriculum.warmup.{key}"] = value
+            overrides[f"curriculum.complete.{key}"] = value
 
         return overrides
 
@@ -134,19 +134,6 @@ class AblationTrialPlanner:
             return f"{self.model_name}_abl-{step}-baseline"
         return f"{self.model_name}_abl-{step}-no_{self.features[step - 1]['label']}"
 
-    @staticmethod
-    def _check_complete_terms(run_name: str, overrides: dict) -> None:
-        if overrides.get("curriculum.enabled") is not False:
-            return
-
-        for key, value in overrides.items():
-            if not key.startswith("curriculum.complete.use_") or value is not True:
-                continue
-
-            term = key.split("curriculum.complete.", 1)[1]
-            if overrides.get(f"curriculum.warmup.{term}") is not True:
-                raise ValueError(f"{run_name} disables the curriculum while {key}=True has no active curriculum.warmup.{term} mirror, so the term would be silently dropped; degrade that feature before the curriculum feature or mirror the term into the warmup config")
-
     def plan(self) -> list[tuple[str, dict]]:
         enabled = self._enabled_overrides()
         plans   = []
@@ -157,9 +144,6 @@ class AblationTrialPlanner:
         for step in range(1, len(self.features) + 1):
             overrides = {**enabled, **self._degraded_prefix(step)}
             plans.append((self._run_name(step), overrides))
-
-        for run_name, overrides in plans:
-            self._check_complete_terms(run_name, overrides)
 
         return plans
 

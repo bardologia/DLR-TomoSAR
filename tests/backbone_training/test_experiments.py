@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
-from configuration.training import BackboneEntryConfig
+from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
 from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
@@ -48,7 +48,7 @@ def test_warmup_planner_disables_curriculum():
     assert len(plans) == 2
     assert all(overrides["curriculum.enabled"] is False for _, overrides in plans)
     assert plans[0][0] == "unet_nc-a"
-    assert plans[0][1]["curriculum.warmup.use_param_l1"] is True
+    assert plans[0][1]["curriculum.complete.use_param_l1"] is True
 
 
 def test_presence_planner_disables_curriculum():
@@ -66,9 +66,9 @@ def test_presence_planner_disables_curriculum():
     ov = dict(plans)["resunet_pr-AB"]
 
     assert ov["curriculum.enabled"] is False
-    assert "curriculum.warmup.param_match" not in ov
-    assert ov["curriculum.warmup.use_active_normalization"]  is True
-    assert ov["curriculum.warmup.presence_balance"]          is True
+    assert "curriculum.complete.param_match" not in ov
+    assert ov["curriculum.complete.use_active_normalization"]  is True
+    assert ov["curriculum.complete.presence_balance"]          is True
 
 
 def test_presence_planner_default_matrix():
@@ -276,7 +276,7 @@ def test_ablation_planner_rejects_duplicate_labels():
         AblationTrialPlanner("resunet", features, include_full=True)
 
 
-def test_ablation_planner_rejects_orphaned_complete_terms():
+def test_ablation_planner_allows_complete_terms_with_disabled_curriculum():
     features = [
         {"label": "curriculum", "enable": {"curriculum.enabled": True},                          "degrade": {"curriculum.enabled": False}},
         {"label": "covariance", "enable": {"curriculum.complete.use_covariance_match": True},    "degrade": {"curriculum.complete.use_covariance_match": False}},
@@ -284,20 +284,12 @@ def test_ablation_planner_rejects_orphaned_complete_terms():
 
     planner = AblationTrialPlanner("resunet", features, include_full=True)
 
-    with pytest.raises(ValueError, match="use_covariance_match"):
-        planner.plan()
-
-
-def test_ablation_planner_accepts_complete_terms_mirrored_into_warmup():
-    features = [
-        {"label": "curriculum", "enable": {"curriculum.enabled": True},                       "degrade": {"curriculum.enabled": False, "curriculum.warmup.use_coherence_resyn": True}},
-        {"label": "coherence",  "enable": {"curriculum.complete.use_coherence_resyn": True},  "degrade": {"curriculum.complete.use_coherence_resyn": False, "curriculum.warmup.use_coherence_resyn": False}},
-    ]
-
-    planner = AblationTrialPlanner("resunet", features, include_full=True)
-
     names = [name for name, _ in planner.plan()]
     assert names == ["resunet_abl-0-full", "resunet_abl-1-no_curriculum", "resunet_abl-2-baseline"]
+
+    no_curriculum = dict(planner.plan())["resunet_abl-1-no_curriculum"]
+    assert no_curriculum["curriculum.enabled"]                       is False
+    assert no_curriculum["curriculum.complete.use_covariance_match"] is True
 
 
 def test_ablation_catalog_default_is_the_standard_set():
@@ -336,35 +328,32 @@ def test_ablation_catalog_standard_categories_present():
     coherence = catalog["coherence_resyn"]
     assert coherence["enable"]["curriculum.complete.use_coherence_resyn"]     is True
     assert coherence["degrade"]["curriculum.complete.weight_coherence_resyn"] == 0.0
-    assert coherence["degrade"]["curriculum.warmup.use_coherence_resyn"]      is False
+    assert "curriculum.warmup.use_coherence_resyn" not in coherence["degrade"]
 
     physics_curriculum = catalog["physics_curriculum"]
-    assert physics_curriculum["enable"]["curriculum.enabled"]                        is True
-    assert physics_curriculum["degrade"]["curriculum.enabled"]                       is False
-    assert physics_curriculum["degrade"]["curriculum.warmup.use_coherence_resyn"]    is True
-    assert physics_curriculum["degrade"]["curriculum.warmup.weight_coherence_resyn"] == 0.05
+    assert physics_curriculum["enable"]["curriculum.enabled"]  is True
+    assert physics_curriculum["degrade"]                       == {"curriculum.enabled": False}
 
     cosine = catalog["cosine_curve"]
-    assert cosine["enable"]["curriculum.warmup.use_cosine_curve"]    is True
     assert cosine["enable"]["curriculum.complete.use_cosine_curve"]  is True
-    assert cosine["degrade"]["curriculum.warmup.use_cosine_curve"]   is False
     assert cosine["degrade"]["curriculum.complete.use_cosine_curve"] is False
+    assert "curriculum.warmup.use_cosine_curve" not in cosine["enable"]
 
     assert "class_imbalance"  not in catalog
     assert "predict_presence" not in catalog
 
     architecture = catalog["architecture_param_loss"]
-    assert architecture["enable"]["backbone_name"]                       == "resunet"
-    assert architecture["enable"]["curriculum.warmup.use_param_l1"]      is True
-    assert architecture["enable"]["curriculum.warmup.use_param_mse"]     is False
-    assert architecture["degrade"]["backbone_name"]                      == "unet"
-    assert architecture["degrade"]["curriculum.warmup.use_param_l1"]     is False
-    assert architecture["degrade"]["curriculum.warmup.use_param_mse"]    is True
-    assert architecture["degrade"]["curriculum.warmup.weight_param_mse"] == 1.0
+    assert architecture["enable"]["backbone_name"]                         == "resunet"
+    assert architecture["enable"]["curriculum.complete.use_param_l1"]      is True
+    assert architecture["enable"]["curriculum.complete.use_param_mse"]     is False
+    assert architecture["degrade"]["backbone_name"]                        == "unet"
+    assert architecture["degrade"]["curriculum.complete.use_param_l1"]     is False
+    assert architecture["degrade"]["curriculum.complete.use_param_mse"]    is True
+    assert architecture["degrade"]["curriculum.complete.weight_param_mse"] == 1.0
 
     active_norm = catalog["active_norm"]
-    assert active_norm["enable"]["curriculum.warmup.use_active_normalization"]  is True
-    assert active_norm["degrade"]["curriculum.warmup.use_active_normalization"] is False
+    assert active_norm["enable"]["curriculum.complete.use_active_normalization"]  is True
+    assert active_norm["degrade"]["curriculum.complete.use_active_normalization"] is False
 
     assert "warmup_loss" not in catalog
     assert "curriculum"  not in catalog
@@ -446,25 +435,34 @@ def test_ablation_default_plan_round_trips_through_config_cli():
     plans = planner.plan()
     assert len(plans) == len(config.ablation_features) + 1
 
+    def _apply(overrides: dict):
+        cli   = ConfigCli(BackboneEntryConfig())
+        trial = cli.apply(ConfigCli.to_argv(overrides) + ["--trial"])
+        CurriculumInheritance(trial.curriculum, default_curriculum(), cli.overrides).apply()
+        return trial
+
     for run_name, overrides in plans:
-        argv  = ConfigCli.to_argv({**overrides, "run_name": run_name, "logdir": "/tmp/abl"})
-        trial = ConfigCli(BackboneEntryConfig()).apply(argv + ["--trial"])
+        trial = _apply({**overrides, "run_name": run_name, "logdir": "/tmp/abl"})
         assert trial.run_name == run_name
 
-    full     = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-0-full"]) + ["--trial"])
-    baseline = ConfigCli(BackboneEntryConfig()).apply(ConfigCli.to_argv(dict(plans)[f"{config.backbone_name}_abl-{len(config.ablation_features)}-baseline"]) + ["--trial"])
-    assert full.curriculum.enabled                       is True
-    assert full.backbone_name                            == "resunet"
-    assert full.curriculum.warmup.use_param_l1           is True
-    assert full.curriculum.warmup.use_cosine_curve       is True
-    assert full.training.warmup_enabled                  is True
-    assert baseline.curriculum.enabled                   is False
-    assert baseline.backbone_name                        == "unet"
-    assert baseline.curriculum.warmup.use_param_mse      is True
-    assert baseline.curriculum.warmup.use_param_l1       is False
-    assert baseline.curriculum.warmup.use_active_normalization is False
-    assert set(baseline.model_overrides.values())        == {3e-4}
-    assert baseline.training.warmup_enabled              is False
+    full     = _apply(dict(plans)[f"{config.backbone_name}_abl-0-full"])
+    baseline = _apply(dict(plans)[f"{config.backbone_name}_abl-{len(config.ablation_features)}-baseline"])
+    assert full.curriculum.enabled                         is True
+    assert full.backbone_name                              == "resunet"
+    assert full.curriculum.complete.use_param_l1           is True
+    assert full.curriculum.complete.use_cosine_curve       is True
+    assert full.curriculum.warmup.use_param_l1             is True
+    assert full.curriculum.warmup.use_cosine_curve         is True
+    assert full.curriculum.warmup.use_coherence_resyn      is False
+    assert full.training.warmup_enabled                    is True
+    assert baseline.curriculum.enabled                     is False
+    assert baseline.backbone_name                          == "unet"
+    assert baseline.curriculum.complete.use_param_mse      is True
+    assert baseline.curriculum.complete.use_param_l1       is False
+    assert baseline.curriculum.complete.use_active_normalization is False
+    assert baseline.curriculum.warmup.use_param_mse        is True
+    assert set(baseline.model_overrides.values())          == {3e-4}
+    assert baseline.training.warmup_enabled                is False
     assert baseline.normalization.clamp_output           is False
     assert baseline.normalization.out_amp                == "zscore"
     assert baseline.normalization.ifg_phase              == "fixed_div_pi"

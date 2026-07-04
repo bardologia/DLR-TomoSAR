@@ -5,7 +5,6 @@ from configuration.training.general.loss import ParamMatching
 
 class AblationCatalog:
 
-    WARMUP_PREFIX   = "curriculum.warmup."
     COMPLETE_PREFIX = "curriculum.complete."
 
     CURRICULUM_SWAP_EPOCH = 15
@@ -86,14 +85,12 @@ class AblationCatalog:
 
     @classmethod
     def _schedule_features(cls) -> list[dict]:
-        warmup = cls.WARMUP_PREFIX
-
         return [
             {
                 "label"   : "physics_curriculum",
                 "group"   : "schedule",
                 "enable"  : {"curriculum.enabled": True, "curriculum.swap_epoch": cls.CURRICULUM_SWAP_EPOCH},
-                "degrade" : {"curriculum.enabled": False, f"{warmup}use_coherence_resyn": True, f"{warmup}weight_coherence_resyn": cls.PHYSICS_WEIGHT},
+                "degrade" : {"curriculum.enabled": False},
             },
             {
                 "label"   : "lr_warmup",
@@ -111,7 +108,6 @@ class AblationCatalog:
 
     @classmethod
     def _physics_features(cls) -> list[dict]:
-        warmup   = cls.WARMUP_PREFIX
         complete = cls.COMPLETE_PREFIX
 
         return [
@@ -119,7 +115,7 @@ class AblationCatalog:
                 "label"   : "coherence_resyn",
                 "group"   : "physics",
                 "enable"  : {f"{complete}use_coherence_resyn": True,  f"{complete}weight_coherence_resyn": cls.PHYSICS_WEIGHT},
-                "degrade" : {f"{complete}use_coherence_resyn": False, f"{complete}weight_coherence_resyn": 0.0, f"{warmup}use_coherence_resyn": False, f"{warmup}weight_coherence_resyn": 0.0},
+                "degrade" : {f"{complete}use_coherence_resyn": False, f"{complete}weight_coherence_resyn": 0.0},
             },
             {
                 "label"   : "covariance_match",
@@ -131,21 +127,20 @@ class AblationCatalog:
 
     @classmethod
     def _loss_component_features(cls) -> list[dict]:
-        warmup   = cls.WARMUP_PREFIX
         complete = cls.COMPLETE_PREFIX
 
         return [
             {
                 "label"   : "cosine_curve",
                 "group"   : "loss components",
-                "enable"  : {f"{warmup}use_cosine_curve": True,  f"{warmup}weight_cosine_curve": cls.COSINE_WEIGHT, f"{complete}use_cosine_curve": True,  f"{complete}weight_cosine_curve": cls.COSINE_WEIGHT},
-                "degrade" : {f"{warmup}use_cosine_curve": False, f"{warmup}weight_cosine_curve": 0.0,               f"{complete}use_cosine_curve": False, f"{complete}weight_cosine_curve": 0.0},
+                "enable"  : {f"{complete}use_cosine_curve": True,  f"{complete}weight_cosine_curve": cls.COSINE_WEIGHT},
+                "degrade" : {f"{complete}use_cosine_curve": False, f"{complete}weight_cosine_curve": 0.0},
             },
         ]
 
     @classmethod
     def _slot_features(cls) -> list[dict]:
-        prefix = cls.WARMUP_PREFIX
+        prefix = cls.COMPLETE_PREFIX
 
         return [
             {
@@ -170,32 +165,32 @@ class AblationCatalog:
 
     @classmethod
     def _architecture_features(cls) -> list[dict]:
-        warmup = cls.WARMUP_PREFIX
+        complete = cls.COMPLETE_PREFIX
 
         return [
             {
                 "label"   : "architecture_param_loss",
                 "group"   : "architecture",
                 "enable"  : {
-                    "backbone_name"              : cls.FULL_ARCHITECTURE,
-                    f"{warmup}use_param_l1"      : True,
-                    f"{warmup}weight_param_l1"   : 1.0,
-                    f"{warmup}use_param_mse"     : False,
-                    f"{warmup}weight_param_mse"  : 0.0,
+                    "backbone_name"                : cls.FULL_ARCHITECTURE,
+                    f"{complete}use_param_l1"      : True,
+                    f"{complete}weight_param_l1"   : 1.0,
+                    f"{complete}use_param_mse"     : False,
+                    f"{complete}weight_param_mse"  : 0.0,
                 },
                 "degrade" : {
-                    "backbone_name"              : cls.BASELINE_ARCHITECTURE,
-                    f"{warmup}use_param_l1"      : False,
-                    f"{warmup}weight_param_l1"   : 0.0,
-                    f"{warmup}use_param_mse"     : True,
-                    f"{warmup}weight_param_mse"  : 1.0,
+                    "backbone_name"                : cls.BASELINE_ARCHITECTURE,
+                    f"{complete}use_param_l1"      : False,
+                    f"{complete}weight_param_l1"   : 0.0,
+                    f"{complete}use_param_mse"     : True,
+                    f"{complete}weight_param_mse"  : 1.0,
                 },
             },
         ]
 
     @classmethod
     def _loss_toggle(cls, label: str, use_key: str, weight_key: str, weight: float) -> dict:
-        prefix = cls.WARMUP_PREFIX
+        prefix = cls.COMPLETE_PREFIX
 
         return {
             "label"   : label,
