@@ -168,6 +168,8 @@ class App {
     this.pipelineFlow = new window.PipelineFlow(document.getElementById("flow"));
     this.pipelineFlow.load();
 
+    this.repoMap = new window.RepoMapView(document.getElementById("repomap"));
+
     this.modelGallery = new window.ModelGallery(
       document.getElementById("model-list"),
       document.getElementById("model-detail")
@@ -296,6 +298,7 @@ class App {
     }
     if (route === "ablation") this.ablationView.enter();
     if (route === "physics") this.physicsLossView.load();
+    if (route === "repomap") this.repoMap.enter();
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
     if (route === "results") this.resultsView.enter();
