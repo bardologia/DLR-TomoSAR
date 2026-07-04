@@ -111,6 +111,8 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             overfit_check  = self.config.overfit_check,
         )
 
+        ConfigCli.save_resolved(self.config, pipeline.run_metadata.run_directory / "docs" / "resolved_entry_config.json")
+
         results = pipeline.run(probe_config=self._probe_config())
 
         if self.config.infer_after:
@@ -137,21 +139,20 @@ class TrainScheduler:
         self.config       = config
         self.entry_script = Path(entry_script)
 
-        base_logdir       = Path(config.logdir)
-        subdir            = self.MODE_SUBDIRS.get(config.trials_mode)
-        self.runs_root    = base_logdir / subdir if subdir else base_logdir
+        if config.trials_mode not in self.MODE_SUBDIRS:
+            raise ValueError(f"Unknown trials_mode '{config.trials_mode}', expected one of {sorted(self.MODE_SUBDIRS)}")
 
+        self.runs_root    = Path(config.logdir) / self.MODE_SUBDIRS[config.trials_mode]
         self.log_dir      = self.runs_root / "batch_train_logs"
         self.results_path = self.log_dir / "train_scheduler_results.json"
 
         self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
 
         self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
-        self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script)
+        self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root)
 
     def planner(self):
         mode = self.config.trials_mode
-
         if mode == "curriculum":
             return CurriculumTrialPlanner(self.config.backbone_name, self.config.warmup_losses, self.config.complete_losses)
         if mode == "warmup":
@@ -208,6 +209,9 @@ class TrainScheduler:
         self.stage._log_failures(failed)
 
         self.logger.close()
+
+        if failed:
+            raise SystemExit(f"{len(failed)} of {len(results)} training trials failed; see {self.results_path}")
 
 
 class BackboneTrainingLauncher:

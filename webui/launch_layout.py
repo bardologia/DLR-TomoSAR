@@ -154,6 +154,10 @@ class LaunchLayout:
         "paths_rest": [
             {"title": "Run paths", "fields": ["log_base_dir", "secondary_labels"]},
         ],
+
+        "paths_train": [
+            {"title": "Run paths", "fields": ["secondary_labels"]},
+        ],
         "geometry": [
             {"title": "Acquisition", "fields": ["wavelength", "slant_range", "look_angle_deg"]},
             {"title": "Baselines", "fields": ["baselines", "kz_values", "baselines_source", "baseline_component", "baselines_origin", "height_axis_convention"]},
@@ -378,7 +382,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
-                    {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
                     {"kind": "fields", "title": "Input channels", "template": "input", "at": "input"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
@@ -424,7 +428,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
-                    {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
                     {"kind": "fields", "title": "Sampling", "groups": [
                         {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
                     ]},
@@ -463,7 +467,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
-                    {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                 ]},
@@ -501,7 +505,7 @@ class LaunchLayout:
                     ]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
-                    {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
                 ]},

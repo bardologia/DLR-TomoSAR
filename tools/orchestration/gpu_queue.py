@@ -29,6 +29,9 @@ class GpuJobResult:
 
 class GpuQueue:
     def __init__(self, gpus: list[int], logger: Logger, poll_interval_s: float = 5.0, handle_signals: bool = True, terminate_deadline_s: float = 30.0) -> None:
+        if not gpus:
+            raise ValueError("GpuQueue requires at least one GPU id; an empty gpus list would poll forever without launching any job.")
+
         self.gpus                 = list(gpus)
         self.logger               = logger
         self.poll_interval_s      = poll_interval_s

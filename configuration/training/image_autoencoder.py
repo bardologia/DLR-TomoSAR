@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run             import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run             import TrainingPathsConfig, TrainingQueueConfig
 from configuration.architectures.image_autoencoder  import Conv2dImageAutoencoderConfig, ImageAutoencoderBaseConfig
 from configuration.dataset                          import AugmentationConfig
 from configuration.normalization.general            import NormalizationConfig
@@ -52,7 +52,7 @@ class ImageAeEntryConfig:
     ae_loss         : ImageAeLossConfig = field(default_factory=ImageAeLossConfig)
     geometry        : GeometryConfig    = field(default_factory=GeometryConfig)
 
-    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=512, num_workers=16, prefetch_factor=2))
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)

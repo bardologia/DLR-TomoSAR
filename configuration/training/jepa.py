@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run               import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run               import TrainingPathsConfig, TrainingQueueConfig
 from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.dataset                            import AugmentationConfig
 from configuration.normalization.general              import NormalizationConfig
@@ -117,7 +117,7 @@ class JepaEntryConfig:
     param_loss     : LossConfig          = field(default_factory=default_param_loss)
     geometry       : GeometryConfig      = field(default_factory=GeometryConfig)
 
-    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
     normalization : NormalizationConfig = field(default_factory=NormalizationConfig)

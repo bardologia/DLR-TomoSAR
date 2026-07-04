@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.dataset.profile_autoencoder       import ProfileAugmentationConfig
-from configuration.training.general.run              import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run              import TrainingPathsConfig, TrainingQueueConfig
 from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config               import GeometryConfig
 from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
@@ -56,7 +56,7 @@ class ProfileAeEntryConfig:
     ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     geometry        : GeometryConfig      = field(default_factory=GeometryConfig)
 
-    paths         : RunPathsConfig      = field(default_factory=RunPathsConfig)
+    paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
     overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)

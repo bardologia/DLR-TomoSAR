@@ -1594,13 +1594,18 @@
       "seed": "Random seed for reproducible probe runs"
     }
   },
-  "training/general/run::RunPathsConfig": {
+  "training/general/run::TrainingPathsConfig": {
     "summary": "Filesystem locations and secondary tracks for a training run",
     "fields": {
       "dataset_path": "Root directory of the preprocessed SAR stack dataset",
       "parameters_path": "Path to the .npy Gaussian-fit ground-truth parameters",
-      "log_base_dir": "Base directory where run logs and checkpoints are written",
       "secondary_labels": "Secondary acquisition tracks paired with the primary for tomography"
+    }
+  },
+  "training/general/run::RunPathsConfig": {
+    "summary": "Training-run paths extended with the batch-run root used by benchmark, cross-validation, and tuning",
+    "fields": {
+      "log_base_dir": "Base directory where batch run directories are written"
     }
   },
   "training/general/run::TrainingQueueConfig": {

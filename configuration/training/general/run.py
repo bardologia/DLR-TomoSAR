@@ -7,11 +7,15 @@ from configuration.training.general.optimization import ClipMode, SchedulerType,
 
 
 @dataclass
-class RunPathsConfig:
+class TrainingPathsConfig:
     dataset_path     : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")
     parameters_path  : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10/params/params_Ng3_sigonly_k5/parameters_Ng3_sigonly_k5.npy")
-    log_base_dir     : Path  = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/benchmark_extended")
     secondary_labels : tuple = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
+
+
+@dataclass
+class RunPathsConfig(TrainingPathsConfig):
+    log_base_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/benchmark_extended")
 
 
 @dataclass

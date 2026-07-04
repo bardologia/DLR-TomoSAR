@@ -11,12 +11,12 @@ from tools.orchestration.gpu_queue import GpuJob, GpuQueue
 
 
 class ExperimentStage:
-    def __init__(self, config, run_tag: str, logger: Logger, entry_script: Path | None = None) -> None:
+    def __init__(self, config, run_tag: str, logger: Logger, entry_script: Path | None = None, run_dir: Path | None = None) -> None:
         self.config       = config
         self.entry_script = entry_script
         self.run_tag      = run_tag
         self.logger       = logger
-        self.run_dir      = Path(config.paths.log_base_dir) / run_tag
+        self.run_dir      = Path(run_dir) if run_dir is not None else Path(config.paths.log_base_dir) / run_tag
 
     def _run_queue(self, jobs: list[GpuJob]) -> list[dict]:
         queue = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s)
@@ -31,7 +31,7 @@ class ExperimentStage:
 
     def _log_failures(self, failed: list[dict], name_key: str = "name") -> None:
         for result in failed:
-            log_hint = f"  (see {result['log_file']})" if result.get("log_file") else ""
+            log_hint = f"  (see {result['log_file']})" if result["log_file"] else ""
             self.logger.error(f"FAILED  {result[name_key]}{log_hint}")
 
 
