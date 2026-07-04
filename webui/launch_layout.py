@@ -276,6 +276,7 @@ class LaunchLayout:
         ],
         "curriculum_head": [
             {"title": "Curriculum", "fields": [
+                "inherit",
                 {"gate": "enabled", "fields": ["swap_epoch", "reset_lr", "reset_warmup", "reset_optimizer"]},
             ]},
         ],

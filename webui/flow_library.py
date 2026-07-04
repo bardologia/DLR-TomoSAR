@@ -623,7 +623,7 @@ class FlowLibrary:
             },
             {
                 "id": "schedule", "title": "Warmup, cosine schedule, curriculum", "phase": "Schedule & curriculum",
-                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor times the per-step warmup factor; at the swap epoch the loss curriculum moves from the warmup objective to the complete objective.",
+                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor times the per-step warmup factor; at the swap epoch the loss curriculum moves from the warmup objective to the complete objective, and with the curriculum disabled the complete objective is used from the first epoch.",
                 "inputs": [], "outputs": ["eta"],
                 "lines": [
                     [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big)"}],

@@ -1509,8 +1509,9 @@
     "fields": {
       "enabled": "Turn on two-phase loss curriculum scheduling",
       "swap_epoch": "Epoch at which warmup loss switches to complete loss",
-      "warmup": "Loss configuration used before the swap epoch",
-      "complete": "Loss configuration used from the swap epoch onward",
+      "inherit": "Copy complete-stage edits into warmup fields not explicitly overridden at launch",
+      "warmup": "Loss configuration used before the swap epoch; the single stage is complete when the curriculum is off",
+      "complete": "Loss configuration used from the swap epoch onward, or for the whole run when the curriculum is off",
       "reset_lr": "Reset learning rate at the curriculum swap",
       "reset_warmup": "Restart scheduler warmup after the swap",
       "reset_optimizer": "Reinitialize optimizer state at the swap"

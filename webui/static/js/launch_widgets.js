@@ -314,7 +314,7 @@ class ExperimentBuilder {
 
   static MODES = [
     { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
-    { key: "warmup",     label: "warmup only", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
+    { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
@@ -2833,6 +2833,7 @@ class ConfigForm {
     this.gates         = [];
     this.sections      = [];
     this.pairs         = [];
+    this.pairBase      = new Map();
     this.byPath        = new Map();
     this.activeSection = null;
     this.query         = "";
@@ -3116,7 +3117,7 @@ class ConfigForm {
 
     const note = document.createElement("p");
     note.className = "pair-override__note";
-    note.textContent = `Inherits ${panel.base}; fields edited here override its values for the ${panel.override} stage.`;
+    note.textContent = `Fields where both stages share a default inherit ${panel.base} edits; editing here pins the ${panel.override} value.`;
 
     const startAt = this.states.length;
     const body = this._buildGroups(panel.groups, { base: panel.base, override: panel.override });
@@ -3124,6 +3125,11 @@ class ConfigForm {
     body.hidden = true;
 
     const record = { base: panel.base, override: panel.override, badge, body, toggle, open: false, states: this.states.slice(startAt) };
+
+    const inheritPath = panel.base.split(".").slice(0, -1).concat("inherit").join(".");
+    record.states.forEach(({ leaf }) => {
+      this.pairBase.set(leaf.path, { base: panel.base + leaf.path.slice(panel.override.length), inherit: inheritPath });
+    });
     toggle.addEventListener("click", () => {
       record.open = !record.open;
       this._applyVisibility();
@@ -3182,7 +3188,7 @@ class ConfigForm {
     }
 
     row.appendChild(control.el);
-    this.controls[leaf.path] = { leaf, reset: control.reset };
+    this.controls[leaf.path] = { leaf, reset: control.reset, input: control.input };
     this.states.push({ leaf, row, sectionKey: sectionKey !== undefined ? sectionKey : this._section, pinned });
     return row;
   }
@@ -3199,7 +3205,7 @@ class ConfigForm {
 
     const toggle = this._switchControl(lead);
     row.appendChild(toggle.el);
-    this.controls[lead.path] = { leaf: lead, reset: toggle.reset };
+    this.controls[lead.path] = { leaf: lead, reset: toggle.reset, input: toggle.input };
     this.states.push({ leaf: lead, row, sectionKey: this._section });
     return row;
   }
@@ -3218,7 +3224,7 @@ class ConfigForm {
     control.input.title = `--${weight.path}`;
     row.appendChild(control.input);
 
-    this.controls[weight.path] = { leaf: weight, reset: control.reset };
+    this.controls[weight.path] = { leaf: weight, reset: control.reset, input: control.input };
     this.states.push({ leaf: weight, row, sectionKey: this._section });
     return row;
   }
@@ -3229,7 +3235,24 @@ class ConfigForm {
   }
 
   _effective(leaf) {
-    return this.dirty[leaf.path] !== undefined ? this.dirty[leaf.path] : leaf.value;
+    if (this.dirty[leaf.path] !== undefined) return this.dirty[leaf.path];
+    const inherited = this._inherited(leaf);
+    return inherited !== undefined ? inherited : leaf.value;
+  }
+
+  _inherited(leaf) {
+    if (!this.pairBase || this.dirty[leaf.path] !== undefined) return undefined;
+
+    const link = this.pairBase.get(leaf.path);
+    if (!link) return undefined;
+
+    const inheritLeaf = this.byPath.get(link.inherit);
+    if (inheritLeaf && (this.dirty[link.inherit] !== undefined ? this.dirty[link.inherit] : inheritLeaf.value) !== "True") return undefined;
+
+    const base = this.byPath.get(link.base);
+    if (!base || leaf.value !== base.value) return undefined;
+
+    return this.dirty[link.base];
   }
 
   _leafByPath(path) {
@@ -3259,8 +3282,8 @@ class ConfigForm {
     });
 
     const reset = () => {
-      select.value = leaf.value;
-      select.classList.remove("is-dirty");
+      select.value = String(this._effective(leaf));
+      select.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
     };
     return { el: select, input: select, reset };
   }
@@ -3274,7 +3297,7 @@ class ConfigForm {
   }
 
   _setValue(leaf, value) {
-    const changed = value !== leaf.value;
+    const changed = value !== leaf.value || this._inherited(leaf) !== undefined;
     if (changed) this.dirty[leaf.path] = value;
     else delete this.dirty[leaf.path];
     this._refresh();
@@ -3297,8 +3320,8 @@ class ConfigForm {
       this._fireDependents(leaf.path, input.value);
     });
     const reset = () => {
-      input.value = leaf.value;
-      input.classList.remove("is-dirty");
+      input.value = this._effective(leaf);
+      input.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
     };
     return { el: input, input, reset };
   }
@@ -3323,8 +3346,8 @@ class ConfigForm {
       else this._setValue(leaf, input.value);
     });
     const reset = () => {
-      input.value = leaf.value;
-      input.classList.remove("is-dirty");
+      input.value = this._effective(leaf);
+      input.classList.toggle("is-dirty", this.dirty[leaf.path] !== undefined);
       input.classList.remove("is-invalid");
     };
     return { el: input, input, reset };
@@ -3442,6 +3465,13 @@ class ConfigForm {
 
   _refreshPairs() {
     this.pairs.forEach((pair) => {
+      pair.states.forEach(({ leaf, row }) => {
+        row.classList.toggle("is-inherited", this._inherited(leaf) !== undefined);
+
+        const control = this.controls[leaf.path];
+        if (control && this.dirty[leaf.path] === undefined && document.activeElement !== control.input) control.reset();
+      });
+
       const differ = pair.states.filter(({ leaf }) => {
         const base = this.byPath.get(pair.base + leaf.path.slice(pair.override.length));
         return base && this._effective(leaf) !== this._effective(base);

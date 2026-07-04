@@ -156,6 +156,7 @@ class LaunchView extends ConfigForm {
     this.gates         = [];
     this.sections      = [];
     this.pairs         = [];
+    this.pairBase      = new Map();
     this.byPath        = new Map();
     this.activeSection = null;
     this.query         = "";

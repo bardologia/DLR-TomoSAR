@@ -1372,6 +1372,10 @@ main { margin-left: var(--navw); }
 .pair-override__note { margin: 0; padding: 0 14px 8px; font-size: 11.5px; color: var(--ink-faint); }
 .pair-override__body { padding: 11px 13px; border-top: 1px solid var(--line); }
 .pair-override__body[hidden] { display: none; }
+.cfg-edit__row.is-inherited .cfg-edit__name { color: var(--accent); }
+.cfg-edit__row.is-inherited .cfg-edit__name::after { content: "inherited"; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-left: 6px; }
+.cfg-edit__row.is-inherited .cfg-edit__input { border-color: var(--accent); }
+.cfg-edit__row.is-inherited .switch { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .pair-override__chev { transition: none; }
 }
