@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures
+from pipelines.backbone.training.diagnostics import ExampleSelector, ParamSampler, ReconstructionFigures
 
 from tests.backbone_training._helpers import build_loss, valid_param_tensor
 
@@ -118,24 +118,80 @@ def test_loss_feeds_active_sampler():
     assert set(sampler.histograms().keys()) == {"amp", "mu_m", "sigma_m"}
 
 
-def _loader(batch=3, n_gaussians=2, hw=8):
+def _set_gaussian(tgt, sample, h, w, slot, amp, mu, sigma):
+    tgt[sample, 3 * slot + 0, h, w] = amp
+    tgt[sample, 3 * slot + 1, h, w] = mu
+    tgt[sample, 3 * slot + 2, h, w] = sigma
+
+
+def _category_loader(hw=8):
     gen  = torch.Generator().manual_seed(0)
-    imgs = torch.randn(batch, 2, hw, hw, generator=gen)
-    tgt  = valid_param_tensor(batch, n_gaussians, hw, hw, seed=3)
+    imgs = torch.randn(4, 2, hw, hw, generator=gen)
+    tgt  = torch.zeros(4, 6, hw, hw)
+
+    _set_gaussian(tgt, 0, 1, 1, 0, 1.0,  30.0, 5.0)
+    _set_gaussian(tgt, 0, 2, 2, 0, 5.0,  30.0, 5.0)
+    _set_gaussian(tgt, 0, 3, 3, 0, 10.0, 30.0, 5.0)
+
+    _set_gaussian(tgt, 1, 4, 4, 0, 3.0, 20.0, 4.0)
+    _set_gaussian(tgt, 1, 4, 4, 1, 3.0, 26.0, 4.0)
+    _set_gaussian(tgt, 1, 5, 5, 0, 3.0, 20.0, 4.0)
+    _set_gaussian(tgt, 1, 5, 5, 1, 3.0, 28.0, 4.0)
+    _set_gaussian(tgt, 1, 6, 6, 0, 3.0, 18.0, 4.0)
+    _set_gaussian(tgt, 1, 6, 6, 1, 3.0, 29.0, 4.0)
+
+    _set_gaussian(tgt, 2, 1, 1, 0, 2.0, 0.0,  3.0)
+    _set_gaussian(tgt, 2, 1, 1, 1, 5.0, 60.0, 3.0)
+    _set_gaussian(tgt, 2, 2, 2, 0, 2.0, 0.0,  3.0)
+    _set_gaussian(tgt, 2, 2, 2, 1, 8.0, 60.0, 3.0)
+    _set_gaussian(tgt, 2, 3, 3, 0, 1.0, 0.0,  3.0)
+    _set_gaussian(tgt, 2, 3, 3, 1, 9.0, 60.0, 3.0)
+
+    _set_gaussian(tgt, 3, 1, 1, 0, 3.0, 10.0, 3.0)
+    _set_gaussian(tgt, 3, 1, 1, 1, 3.0, 22.0, 3.0)
+    _set_gaussian(tgt, 3, 2, 2, 0, 3.0, 10.0, 3.0)
+    _set_gaussian(tgt, 3, 2, 2, 1, 3.0, 34.0, 3.0)
+    _set_gaussian(tgt, 3, 3, 3, 0, 3.0, 5.0,  3.0)
+    _set_gaussian(tgt, 3, 3, 3, 1, 3.0, 53.0, 3.0)
+
+    return [(imgs[:2], tgt[:2]), (imgs[2:], tgt[2:])]
+
+
+def _single_only_loader(hw=8):
+    gen  = torch.Generator().manual_seed(1)
+    imgs = torch.randn(1, 2, hw, hw, generator=gen)
+    tgt  = torch.zeros(1, 6, hw, hw)
+
+    _set_gaussian(tgt, 0, 1, 1, 0, 1.0, 30.0, 5.0)
+    _set_gaussian(tgt, 0, 2, 2, 0, 4.0, 30.0, 5.0)
+    _set_gaussian(tgt, 0, 3, 3, 0, 9.0, 30.0, 5.0)
+
     return [(imgs, tgt)]
 
 
-def test_figures_capture_reference_once():
-    figs = ReconstructionFigures(FigureTracker(), torch.device("cpu"))
+def test_selector_finds_all_categories():
+    criterion = build_loss(n_gaussians=2)
+    selector  = ExampleSelector(params_per_gaussian=3, amp_zero_thr=1e-3)
+    selected  = selector.select(_category_loader(), criterion.norm_stats.denormalize_output)
 
-    loader = _loader()
-    figs.capture_reference(loader)
+    assert selected["single_gaussian"]  == [(0, 1, 1), (0, 2, 2), (0, 3, 3)]
+    assert selected["two_overlapping"]  == [(1, 4, 4), (1, 5, 5), (1, 6, 6)]
+    assert selected["two_separated"]    == [(3, 1, 1), (3, 2, 2), (3, 3, 3)]
+    assert selected["two_distant"]      == [(2, 1, 1), (2, 2, 2), (2, 3, 3)]
+
+
+def test_figures_capture_reference_once():
+    figs      = ReconstructionFigures(FigureTracker(), torch.device("cpu"))
+    criterion = build_loss(n_gaussians=2)
+
+    loader = _category_loader()
+    figs.capture_reference(loader, criterion)
     first = figs._images
 
-    figs.capture_reference(_loader(batch=1))
+    figs.capture_reference(_single_only_loader(), criterion)
 
     assert figs._images is first
-    assert len(figs._pixels) == ReconstructionFigures.NUM_PIXELS
+    assert len(figs._pixels) == 12
 
 
 def test_figures_log_noop_without_reference():
@@ -147,16 +203,64 @@ def test_figures_log_noop_without_reference():
     assert tracker.figures == []
 
 
-def test_figures_log_emits_one_figure_per_pixel():
-    tracker = FigureTracker()
-    figs    = ReconstructionFigures(tracker, torch.device("cpu"))
-    figs.capture_reference(_loader())
-
+def test_figures_log_emits_one_figure_per_example():
+    tracker   = FigureTracker()
+    figs      = ReconstructionFigures(tracker, torch.device("cpu"))
     criterion = build_loss(n_gaussians=2)
-    model     = lambda images: valid_param_tensor(images.shape[0], 2, images.shape[2], images.shape[3], seed=4)
+    figs.capture_reference(_category_loader(), criterion)
+
+    model = lambda images: valid_param_tensor(images.shape[0], 2, images.shape[2], images.shape[3], seed=4)
 
     figs.log(model, criterion, epoch=5)
 
-    assert len(tracker.figures) == ReconstructionFigures.NUM_PIXELS
+    expected_tags = [f"reconstruction/{name}_{rank}/val" for name in ExampleSelector.CATEGORIES for rank in (1, 2, 3)]
+
+    assert [tag for tag, _, _ in tracker.figures] == expected_tags
     assert all(step == 5 for _, _, step in tracker.figures)
-    assert all(tag.startswith("reconstruction/") and tag.endswith("/val") for tag, _, _ in tracker.figures)
+
+
+def test_figures_ylim_fixed_across_epochs():
+    tracker   = FigureTracker()
+    figs      = ReconstructionFigures(tracker, torch.device("cpu"))
+    criterion = build_loss(n_gaussians=2)
+    figs.capture_reference(_category_loader(), criterion)
+
+    small = lambda images: valid_param_tensor(images.shape[0], 2, images.shape[2], images.shape[3], seed=4)
+    large = lambda images: 20.0 * valid_param_tensor(images.shape[0], 2, images.shape[2], images.shape[3], seed=4)
+
+    figs.log(small, criterion, epoch=0)
+    figs.log(large, criterion, epoch=1)
+
+    first  = [fig.axes[0].get_ylim() for _, fig, step in tracker.figures if step == 0]
+    second = [fig.axes[0].get_ylim() for _, fig, step in tracker.figures if step == 1]
+
+    assert first == second
+    assert all(lo == 0.0 for lo, _ in first)
+
+
+def test_figures_partial_categories_keep_available_examples():
+    tracker   = FigureTracker()
+    figs      = ReconstructionFigures(tracker, torch.device("cpu"))
+    criterion = build_loss(n_gaussians=2)
+    figs.capture_reference(_single_only_loader(), criterion)
+
+    model = lambda images: valid_param_tensor(images.shape[0], 2, images.shape[2], images.shape[3], seed=4)
+    figs.log(model, criterion, epoch=0)
+
+    assert len(tracker.figures) == 3
+    assert all(tag.startswith("reconstruction/single_gaussian_") for tag, _, _ in tracker.figures)
+
+
+def test_figures_disable_when_no_category_matches():
+    tracker   = FigureTracker()
+    figs      = ReconstructionFigures(tracker, torch.device("cpu"))
+    criterion = build_loss(n_gaussians=2)
+
+    gen    = torch.Generator().manual_seed(2)
+    loader = [(torch.randn(2, 2, 8, 8, generator=gen), torch.zeros(2, 6, 8, 8))]
+
+    figs.capture_reference(loader, criterion)
+    figs.log(model=None, criterion=criterion, epoch=0)
+
+    assert figs._disabled is True
+    assert tracker.figures == []

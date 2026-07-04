@@ -22,6 +22,23 @@ def _loader(in_channels: int = 2, n_gaussians: int = 2, n: int = 6, hw: int = 16
     gen  = torch.Generator().manual_seed(0)
     imgs = torch.randn(n, in_channels, hw, hw, generator=gen)
     tgt  = torch.randn(n, n_gaussians * 3, hw, hw, generator=gen)
+
+    for i, amp in enumerate((1.0, 5.0, 10.0)):
+        tgt[0, :, i + 1, i + 1]   = 0.0
+        tgt[0, 0:3, i + 1, i + 1] = torch.tensor([amp, 30.0, 5.0])
+
+    for i, mu2 in enumerate((26.0, 28.0, 29.0)):
+        tgt[1, 0:3, i + 1, i + 1] = torch.tensor([3.0, 20.0, 4.0])
+        tgt[1, 3:6, i + 1, i + 1] = torch.tensor([3.0, mu2, 4.0])
+
+    for i, amp2 in enumerate((5.0, 8.0, 9.0)):
+        tgt[2, 0:3, i + 1, i + 1] = torch.tensor([2.0, 0.0, 3.0])
+        tgt[2, 3:6, i + 1, i + 1] = torch.tensor([amp2, 60.0, 3.0])
+
+    for i, mu2 in enumerate((22.0, 34.0, 53.0)):
+        tgt[3, 0:3, i + 1, i + 1] = torch.tensor([3.0, 5.0, 3.0])
+        tgt[3, 3:6, i + 1, i + 1] = torch.tensor([3.0, mu2, 3.0])
+
     return DataLoader(TensorDataset(imgs, tgt), batch_size=2)
 
 
@@ -145,7 +162,7 @@ def test_train_logs_throughput_and_diagnostics(tmp_path):
     nonfinite = [value for tag, value, _ in writer.scalars if tag == "controls/nonfinite_batches"]
     assert nonfinite == [0.0]
 
-    assert len(writer.figures) == 4
+    assert len(writer.figures) == 12
     assert all(tag.startswith("reconstruction/") and tag.endswith("/val") for tag, _, _ in writer.figures)
 
 

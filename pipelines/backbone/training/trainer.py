@@ -151,7 +151,7 @@ class Trainer(BaseTrainer):
             return
 
         self.param_sampler.begin()
-        self.recon_figures.capture_reference(val_loader)
+        self.recon_figures.capture_reference(val_loader, self.criterion)
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
         self._log_val_diagnostics(epoch)
