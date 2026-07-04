@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from configuration.training.backbone     import default_curriculum
 from configuration.training.general.loss import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
@@ -73,6 +74,31 @@ def test_catalog_combined_enables_the_union_of_terms():
 
     other_flags_off = [not getattr(cfg, term.use_flag) for term in LOSS_TERMS if term.name not in ("param_l1", "covariance_match", "l1_curve")]
     assert all(other_flags_off)
+
+
+def test_probe_union_merges_stages_when_curriculum_enabled():
+    curriculum = default_curriculum()
+    curriculum.warmup.use_smoothness_tv    = True
+    curriculum.warmup.weight_smoothness_tv = 0.7
+
+    union = LossComponentCatalog.probe_union(curriculum)
+
+    assert union.use_coherence_resyn    is True
+    assert union.use_covariance_match   is True
+    assert union.use_smoothness_tv      is True
+    assert union.weight_smoothness_tv   == pytest.approx(0.7)
+    assert union.use_param_l1           is True
+
+
+def test_probe_union_is_the_single_stage_when_curriculum_disabled():
+    curriculum         = default_curriculum()
+    curriculum.enabled = False
+    curriculum.warmup.use_smoothness_tv = True
+
+    union = LossComponentCatalog.probe_union(curriculum)
+
+    assert union.use_smoothness_tv    is False
+    assert union.use_coherence_resyn  is True
 
 
 def test_catalog_combined_rejects_empty_and_unknown():

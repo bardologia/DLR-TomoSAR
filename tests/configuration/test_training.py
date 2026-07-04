@@ -19,12 +19,14 @@ from configuration.training.general.runtime import (
     ResourceConfig,
 )
 from configuration.training.general.loss import (
+    CurriculumInheritance,
     LossConfig,
     LossCurriculumConfig,
 )
 from configuration.training.general.trainer import SharedSubConfigInheritance
 
 from configuration.training.backbone import (
+    default_curriculum,
     PatchTrialsConfig,
     SecondaryTrialsConfig,
     BackboneTrainerConfig,
@@ -142,6 +144,67 @@ def test_loss_curriculum_holds_two_loss_configs():
     assert isinstance(cfg.warmup, LossConfig)
     assert isinstance(cfg.complete, LossConfig)
     assert cfg.warmup is not cfg.complete
+
+
+def test_loss_curriculum_initial_stage_follows_enabled():
+    cfg = LossCurriculumConfig()
+
+    cfg.enabled = True
+    assert cfg.initial_stage is cfg.warmup
+    assert cfg.active_stages() == [cfg.warmup, cfg.complete]
+
+    cfg.enabled = False
+    assert cfg.initial_stage is cfg.complete
+    assert cfg.active_stages() == [cfg.complete]
+
+
+def test_curriculum_inheritance_copies_explicit_complete_edits_into_warmup():
+    cfg       = default_curriculum()
+    overrides = {"curriculum.complete.use_l1_curve": True, "curriculum.complete.weight_l1_curve": 0.3}
+
+    cfg.complete.use_l1_curve    = True
+    cfg.complete.weight_l1_curve = 0.3
+
+    inherited = CurriculumInheritance(cfg, default_curriculum(), overrides).apply()
+
+    assert set(inherited) == {"use_l1_curve", "weight_l1_curve"}
+    assert cfg.warmup.use_l1_curve    is True
+    assert cfg.warmup.weight_l1_curve == pytest.approx(0.3)
+
+
+def test_curriculum_inheritance_respects_explicit_warmup_overrides():
+    cfg       = default_curriculum()
+    overrides = {"curriculum.complete.use_cosine_curve": False, "curriculum.warmup.use_cosine_curve": True}
+
+    cfg.complete.use_cosine_curve = False
+
+    inherited = CurriculumInheritance(cfg, default_curriculum(), overrides).apply()
+
+    assert inherited == {}
+    assert cfg.warmup.use_cosine_curve is True
+
+
+def test_curriculum_inheritance_skips_fields_with_divergent_stage_defaults():
+    cfg       = default_curriculum()
+    overrides = {"curriculum.complete.use_coherence_resyn": True, "curriculum.complete.weight_coherence_resyn": 0.2}
+
+    cfg.complete.weight_coherence_resyn = 0.2
+
+    inherited = CurriculumInheritance(cfg, default_curriculum(), overrides).apply()
+
+    assert inherited == {}
+    assert cfg.warmup.use_coherence_resyn is False
+
+
+def test_curriculum_inheritance_disabled_by_inherit_flag():
+    cfg       = default_curriculum()
+    overrides = {"curriculum.complete.use_l1_curve": True}
+
+    cfg.inherit               = False
+    cfg.complete.use_l1_curve = True
+
+    assert CurriculumInheritance(cfg, default_curriculum(), overrides).apply() == {}
+    assert cfg.warmup.use_l1_curve is False
 
 
 def test_backbone_entry_default_subconfigs():

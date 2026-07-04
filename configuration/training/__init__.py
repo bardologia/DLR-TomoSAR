@@ -10,6 +10,7 @@ from configuration.training.general import (
     TrainingLoopConfig,
     MemoryConfig,
     ResourceConfig,
+    CurriculumInheritance,
     LossConfig,
     LossCurriculumConfig,
     ParamMatching,

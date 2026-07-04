@@ -64,13 +64,13 @@ class Trainer(BaseTrainer):
     section_title = "[PyTorch Training Loop]"
 
     def __init__(self, model, model_cfg, x_axis, config, run_dir, logger, norm_stats=None, emit_docs=True):
-        self.model_cfg       = model_cfg
-        self.gaussian_cfg    = config.gaussian
-        self.curriculum      = config.curriculum
-        self.warmup_loss_cfg = config.curriculum.warmup
-        self.norm_stats      = norm_stats
-        self.emit_docs       = emit_docs
-        self.param_sampler   = ParamSampler(config.gaussian.params_per_gaussian, self.warmup_loss_cfg.amp_zero_thr)
+        self.model_cfg        = model_cfg
+        self.gaussian_cfg     = config.gaussian
+        self.curriculum       = config.curriculum
+        self.initial_loss_cfg = config.curriculum.initial_stage
+        self.norm_stats       = norm_stats
+        self.emit_docs        = emit_docs
+        self.param_sampler    = ParamSampler(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
@@ -104,7 +104,10 @@ class Trainer(BaseTrainer):
         return self.model_cfg.get_param_groups(self.model)
 
     def _build_criterion(self):
-        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.warmup_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses, sampler=self.param_sampler)
+        stage = "curriculum.warmup" if self.curriculum.enabled else "curriculum.complete (curriculum disabled)"
+        self.logger.subsection(f"Loss built from {stage}")
+
+        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.initial_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses, sampler=self.param_sampler)
 
     def _warn_nonfinite(self, tensor: torch.Tensor, name: str) -> None:
         if torch.isnan(tensor).any() or torch.isinf(tensor).any():
@@ -184,7 +187,7 @@ class Trainer(BaseTrainer):
 
         probe = LossScaleProbe(
             probe_cfg    = probe_config,
-            loss_cfg     = self.warmup_loss_cfg,
+            loss_cfg     = self.initial_loss_cfg,
             gaussian_cfg = self.gaussian_cfg,
             geometry_cfg = self.config.geometry,
             norm_stats   = self.norm_stats,

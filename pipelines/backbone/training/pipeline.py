@@ -64,26 +64,27 @@ class TrainingPipeline:
 
     @staticmethod
     def physics_geometry_active(trainer_config) -> bool:
-        curriculum = trainer_config.curriculum
-        loss_cfgs  = [curriculum.warmup] + ([curriculum.complete] if curriculum.enabled else [])
-        flags      = ("use_coherence_resyn", "use_covariance_match", "use_capon_cycle")
+        flags = ("use_coherence_resyn", "use_covariance_match", "use_capon_cycle")
 
-        return any(getattr(cfg, flag) for cfg in loss_cfgs for flag in flags)
+        return any(getattr(cfg, flag) for cfg in trainer_config.curriculum.active_stages() for flag in flags)
 
     def _run_overfit_check(self, train_dataset, in_channels: int, out_channels: int, x_axis) -> None:
         check = OverfitCheck(self.overfit_check, self.run_metadata.run_directory, self.logger)
         if not check.enabled:
             return
 
-        gate_trainer_config                    = check.sanitized_trainer_config(self.trainer_config)
-        gate_trainer_config.curriculum.enabled = False
+        gate_trainer_config = check.sanitized_trainer_config(self.trainer_config)
 
-        for loss_cfg in (gate_trainer_config.curriculum.warmup, gate_trainer_config.curriculum.complete):
-            loss_cfg.use_active_normalization = False
+        gate_stage                          = gate_trainer_config.curriculum.initial_stage
+        gate_stage.use_active_normalization = False
+
+        gate_trainer_config.curriculum.enabled  = False
+        gate_trainer_config.curriculum.warmup   = gate_stage
+        gate_trainer_config.curriculum.complete = gate_stage
 
         check.record("curriculum.enabled", False)
-        check.record("curriculum.warmup.use_active_normalization",   False)
-        check.record("curriculum.complete.use_active_normalization", False)
+        check.record("gate_loss_stage", "warmup" if self.trainer_config.curriculum.enabled else "complete")
+        check.record("gate_stage.use_active_normalization", False)
 
         base_config       = self.model_config if self.model_config is not None else ModelBuilder.config_from_registry(self.backbone_name, {})
         gate_model_config = check.sanitized_model_config(base_config)

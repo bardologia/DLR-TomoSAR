@@ -8,12 +8,13 @@ from pathlib     import Path
 
 import torch
 
-from configuration.training import BackboneEntryConfig
+from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
 from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
+from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.config.config_factory  import ConfigFactory
@@ -67,7 +68,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         model, model_cfg = get_backbone(self.config.backbone_name, config=model_config, **overrides)
 
         trainer = Trainer(model=model, model_cfg=model_cfg, x_axis=dataset_config.x_axis, config=trainer_config, run_dir=work_dir, logger=logger, norm_stats=dataset.normalizer, emit_docs=False)
-        trainer.criterion.set_curriculum(trainer_config.curriculum.complete)
+        trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(trainer_config.curriculum))
 
         return trainer, dataset, model
 
@@ -224,6 +225,8 @@ class BackboneTrainingLauncher:
 
         cli    = ConfigCli(BackboneEntryConfig(), description="Train one backbone end to end, or fan out curriculum/warmup/secondary trials across GPUs")
         config = cli.apply(argv)
+
+        CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()
 
         trial_parser = argparse.ArgumentParser(add_help=False)
         trial_parser.add_argument("--trial", action="store_true")

@@ -29,7 +29,8 @@ def main() -> None:
     else:
         EnvironmentPinner.threads()
 
-    from configuration.tuning import TuningEntryConfig
+    from configuration.training import CurriculumInheritance, default_curriculum
+    from configuration.tuning   import TuningEntryConfig
     from pipelines.tuning.pipeline               import TuningScheduler
     from pipelines.tuning.workers                import TuningWorker
     from tools.runtime.config_cli                import ConfigCli
@@ -71,6 +72,8 @@ def main() -> None:
 
             config = ConfigCli.load_resolved(TuningEntryConfig(), resolved_path)
             config = ConfigCli.apply_overrides(config, cli.overrides)
+
+        CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()
 
         scheduler = TuningScheduler(tag=tag, config=config, entry_script=entry_script)
         scheduler.schedule(target_model=args.model, resume=args.resume)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import copy
+
+from dataclasses import dataclass, field, fields
 from enum        import Enum
 
 
@@ -78,6 +80,7 @@ class LossConfig:
 class LossCurriculumConfig:
     enabled    : bool = False
     swap_epoch : int  = 0
+    inherit    : bool = True
 
     warmup   : LossConfig = field(default_factory=LossConfig)
     complete : LossConfig = field(default_factory=LossConfig)
@@ -85,3 +88,42 @@ class LossCurriculumConfig:
     reset_lr             : bool = False
     reset_warmup         : bool = False
     reset_optimizer      : bool = False
+
+    @property
+    def initial_stage(self) -> LossConfig:
+        return self.warmup if self.enabled else self.complete
+
+    def active_stages(self) -> list[LossConfig]:
+        return [self.warmup, self.complete] if self.enabled else [self.complete]
+
+
+class CurriculumInheritance:
+    def __init__(self, curriculum: LossCurriculumConfig, defaults: LossCurriculumConfig, overrides: dict, prefix: str = "curriculum") -> None:
+        self.curriculum = curriculum
+        self.defaults   = defaults
+        self.overrides  = overrides
+        self.prefix     = prefix
+
+    def _inheritable(self, name: str) -> bool:
+        if f"{self.prefix}.warmup.{name}" in self.overrides:
+            return False
+
+        if f"{self.prefix}.complete.{name}" not in self.overrides:
+            return False
+
+        return getattr(self.defaults.warmup, name) == getattr(self.defaults.complete, name)
+
+    def apply(self) -> dict:
+        if not self.curriculum.inherit:
+            return {}
+
+        inherited = {}
+        for spec in fields(LossConfig):
+            if not self._inheritable(spec.name):
+                continue
+
+            value = copy.deepcopy(getattr(self.curriculum.complete, spec.name))
+            setattr(self.curriculum.warmup, spec.name, value)
+            inherited[spec.name] = value
+
+        return inherited

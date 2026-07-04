@@ -14,6 +14,7 @@ from configuration.training.general.runtime import (
     ResourceConfig,
 )
 from configuration.training.general.loss import (
+    CurriculumInheritance,
     LossConfig,
     LossCurriculumConfig,
     ParamMatching,

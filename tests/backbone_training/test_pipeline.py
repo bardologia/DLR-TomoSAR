@@ -55,8 +55,8 @@ def _trainer_config(test_data_dir, params_dir, tmp_path) -> BackboneTrainerConfi
     config.resources.enabled          = False
     config.geometry                   = geometry_config()
 
-    config.curriculum.warmup.use_param_l1    = True
-    config.curriculum.warmup.weight_param_l1 = 1.0
+    config.curriculum.complete.use_param_l1    = True
+    config.curriculum.complete.weight_param_l1 = 1.0
 
     return config
 
@@ -92,8 +92,8 @@ def test_training_pipeline_runs_per_pixel_physics_geometry(test_data_dir, params
     dataset_config = _dataset_config(test_data_dir, params_dir)
     trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path)
 
-    trainer_config.curriculum.warmup.use_covariance_match    = True
-    trainer_config.curriculum.warmup.weight_covariance_match = 1.0
+    trainer_config.curriculum.complete.use_covariance_match    = True
+    trainer_config.curriculum.complete.weight_covariance_match = 1.0
     trainer_config.geometry.height_axis_convention           = "height"
 
     pipeline = TrainingPipeline(
@@ -171,7 +171,8 @@ def test_training_pipeline_overfit_check_gates_and_reports(test_data_dir, params
     assert report["passed"] is True
     assert report["n_examples"] == 2
     assert report["sanitized_overrides"]["optimizer.weight_decay"] == 0.0
-    assert report["sanitized_overrides"]["curriculum.warmup.use_active_normalization"] is False
+    assert report["sanitized_overrides"]["gate_loss_stage"] == "complete"
+    assert report["sanitized_overrides"]["gate_stage.use_active_normalization"] is False
     assert report["sanitized_overrides"]["model.dropout"] == 0.0
     assert report["sanitized_overrides"]["augmentation"] == "disabled"
 

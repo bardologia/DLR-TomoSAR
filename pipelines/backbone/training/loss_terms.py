@@ -67,3 +67,16 @@ class LossComponentCatalog:
     def combined_curriculum(cls, names, base: LossConfig | None = None) -> LossCurriculumConfig:
         cfg = cls.combined(names, base=base)
         return LossCurriculumConfig(enabled=False, warmup=cfg, complete=cfg)
+
+    @classmethod
+    def probe_union(cls, curriculum: LossCurriculumConfig) -> LossConfig:
+        stages = curriculum.active_stages()
+        union  = copy.deepcopy(stages[-1])
+
+        for stage in stages[:-1]:
+            for term in LOSS_TERMS:
+                if getattr(stage, term.use_flag) and not getattr(union, term.use_flag):
+                    setattr(union, term.use_flag,   True)
+                    setattr(union, term.weight_key, getattr(stage, term.weight_key))
+
+        return union

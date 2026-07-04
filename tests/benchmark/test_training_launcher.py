@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pipelines.backbone.training.launcher as backbone_pipeline
-from configuration.training import BackboneEntryConfig
+from configuration.training import BackboneEntryConfig, default_curriculum
 from pipelines.shared.training import training_launcher as mod
 
 
@@ -84,6 +84,7 @@ def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):
 
     class FakeConfig:
         trials_enabled = True
+        curriculum     = default_curriculum()
 
     class FakeCli:
         def __init__(self, config, description):

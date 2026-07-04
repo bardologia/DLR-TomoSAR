@@ -12,11 +12,15 @@ from _bootstrap import EnvironmentPinner
 def _scheduler() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.cross_validation import CrossValidationConfig
-    from pipelines.cross_validation.pipeline               import CrossValidationPipeline
-    from tools.runtime.config_cli                          import ConfigCli
+    from configuration.cross_validation      import CrossValidationConfig
+    from configuration.training              import CurriculumInheritance, default_curriculum
+    from pipelines.cross_validation.pipeline import CrossValidationPipeline
+    from tools.runtime.config_cli            import ConfigCli
 
-    config = ConfigCli(CrossValidationConfig(), description="K-fold cross-validation").apply()
+    cli    = ConfigCli(CrossValidationConfig(), description="K-fold cross-validation")
+    config = cli.apply()
+
+    CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()
 
     pipeline = CrossValidationPipeline(config=config, entry_script=Path(__file__).resolve())
     pipeline.run()

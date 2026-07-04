@@ -119,8 +119,8 @@ def tiny_trainer_config(n_gaussians: int = 2, epochs: int = 1) -> BackboneTraine
     cfg.resources.enabled            = False
     cfg.geometry                     = geometry_config()
 
-    cfg.curriculum.warmup.use_param_l1    = True
-    cfg.curriculum.warmup.weight_param_l1 = 1.0
+    cfg.curriculum.complete.use_param_l1    = True
+    cfg.curriculum.complete.weight_param_l1 = 1.0
 
     return cfg
 
