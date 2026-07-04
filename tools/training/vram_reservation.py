@@ -7,7 +7,7 @@ from tools.monitoring.logger import Logger
 
 class VramReservation:
 
-    CHUNK_START_BYTES = 512 * 1024 ** 2
+    GRANULARITY_BYTES = 2 * 1024 ** 2
     CHUNK_FLOOR_BYTES = 16 * 1024 ** 2
 
     def __init__(self, enabled: bool, keep_free_gb: float, device: torch.device, logger: Logger) -> None:
@@ -24,20 +24,23 @@ class VramReservation:
     def _claim(self) -> int:
         chunks  = []
         claimed = 0
-        chunk   = self.CHUNK_START_BYTES
+        shrink  = 1
 
         while True:
             spare = self._free_bytes() - self.keep_free_bytes
             if spare < self.CHUNK_FLOOR_BYTES:
                 break
 
+            chunk = (spare // shrink // self.GRANULARITY_BYTES) * self.GRANULARITY_BYTES
+            if chunk < self.CHUNK_FLOOR_BYTES:
+                break
+
             try:
-                chunks.append(torch.empty(min(chunk, spare), dtype=torch.uint8, device=self.device))
-                claimed += chunks[-1].numel()
+                chunks.append(torch.empty(chunk, dtype=torch.uint8, device=self.device))
+                claimed += chunk
+                shrink   = 1
             except torch.cuda.OutOfMemoryError:
-                chunk //= 2
-                if chunk < self.CHUNK_FLOOR_BYTES:
-                    break
+                shrink *= 2
 
         del chunks
         return claimed

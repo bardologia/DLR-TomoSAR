@@ -100,6 +100,28 @@ def test_fill_parks_memory_and_training_allocations_reuse_it(logger):
 
 
 @cuda_only
+def test_big_allocations_split_the_reservation_instead_of_dropping_it(logger):
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+
+    free_before = _free_bytes()
+    if free_before < 2 * GB:
+        pytest.skip("not enough free VRAM for a big-allocation reservation test")
+
+    reservation = _reservation(256 * MB / GB, logger)
+    reservation.fill()
+
+    reserved_after_fill = torch.cuda.memory_reserved()
+    tensor              = torch.empty(768 * MB, dtype=torch.uint8, device="cuda")
+
+    assert _free_bytes() <= 256 * MB + 64 * MB
+    assert torch.cuda.memory_reserved() >= reserved_after_fill - 64 * MB
+
+    del tensor
+    torch.cuda.empty_cache()
+
+
+@cuda_only
 def test_refill_reparks_after_cache_clear(logger):
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
