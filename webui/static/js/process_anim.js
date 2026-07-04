@@ -5006,7 +5006,7 @@ class ProcessAnimator {
       const terms = [
         { name: "param_l1",         w: "1.0", p1: true,  p2: true },
         { name: "mse_curve",        w: "1.0", p1: false, p2: true },
-        { name: "ssim_curve",       w: "0.5", p1: false, p2: true },
+        { name: "cosine_curve",     w: "0.5", p1: false, p2: true },
         { name: "covariance_match", w: "0.0", p1: false, p2: false },
         { name: "moments",          w: "0.0", p1: false, p2: false },
       ];
@@ -5171,7 +5171,7 @@ class ProcessAnimator {
 
     if (ts < 3.8) this._cap("Loss curriculum  ·  phase 1: param_l1 on matched [a, mu, sigma] sets  ·  direct parameter supervision");
     else if (ts < 6.6) this._cap("epoch == swap_epoch  ->  CurriculumController.maybe_swap() fires");
-    else if (ts < 9.4) this._cap("criterion.set_curriculum(complete)  ·  param_l1 stays in the formula  ·  mse_curve and ssim_curve join it");
+    else if (ts < 9.4) this._cap("criterion.set_curriculum(complete)  ·  param_l1 stays in the formula  ·  mse_curve and cosine_curve join it");
     else if (ts < 10.8) this._cap("Resets cascade  ·  early stopping, lr scheduler, warmup, optimizer moments, checkpoint baseline (new loss scale)");
     else if (ts < 12.6) this._cap("Zooming into the learning-rate schedule around the swap epoch");
     else if (ts < 15.2) this._cap("The cosine glides down toward epoch 50  ·  by the swap it sits at 0.5 x base");

@@ -670,18 +670,14 @@ window.FLOW_SKETCHES = {
   },
 
   curveshape: {
-    tip: "Three magnitude-free shape terms: cosine angle, windowed spectral coherence, and per-slice SSIM.",
+    tip: "Magnitude-free shape term: cosine angle between predicted and target elevation profiles over valid pixels.",
     build(svg) { svg.innerHTML = `
-      <line class="skl-axis" x1="62" y1="116" x2="62" y2="32"/>
-      <line class="skl-axis" x1="40" y1="96" x2="86" y2="96"/>
-      <line class="skl-draw c-cal" x1="62" y1="96" x2="84" y2="44"/>
-      <line class="skl-draw c-meas" x1="62" y1="96" x2="78" y2="58"/>
-      <text x="50" y="40" style="fill:#7e8aa0;font-size:7px">cos</text>
-      <rect x="108" y="40" width="40" height="40" class="skl-pop f-faint" style="opacity:.2"/>
-      <path class="skl-draw c-cal" d="M110 72 Q118 42 128 58 Q138 44 146 66" style="fill:none"/>
-      <text x="110" y="92" style="fill:#7e8aa0;font-size:7px">coh</text>
-      <rect x="168" y="40" width="44" height="40" class="skl-draw c-cal" style="fill:rgba(79,214,196,0.1)"/>
-      <text x="172" y="92" style="fill:#7e8aa0;font-size:7px">SSIM</text>`; },
+      <line class="skl-axis" x1="102" y1="116" x2="102" y2="32"/>
+      <line class="skl-axis" x1="80" y1="96" x2="176" y2="96"/>
+      <line class="skl-draw c-cal" x1="102" y1="96" x2="164" y2="42"/>
+      <line class="skl-draw c-meas" x1="102" y1="96" x2="148" y2="56"/>
+      <path class="skl-dash c-faint" d="M132 70 A 34 34 0 0 1 138 78" style="fill:none"/>
+      <text x="140" y="66" style="fill:#7e8aa0;font-size:7px">cos</text>`; },
     anim: null,
   },
 

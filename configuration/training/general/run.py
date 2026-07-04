@@ -15,7 +15,7 @@ class TrainingPathsConfig:
 
 @dataclass
 class RunPathsConfig(TrainingPathsConfig):
-    log_base_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/benchmark_extended")
+    log_base_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/benchmark")
 
 
 @dataclass
