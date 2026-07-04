@@ -185,6 +185,8 @@ class LaunchLayout:
             ]},
             {"title": "Clamp", "fields": [
                 {"gate": "clamp_output", "fields": ["clamp_floor", "clamp_ceil"]},
+                "clamp_leaky_slope",
+                "amp_max",
             ]},
         ],
         "augmentation": [

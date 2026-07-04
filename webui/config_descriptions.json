@@ -1203,7 +1203,9 @@
       "dem": "Override preset for DEM elevation channel; 'default' keeps slot choice",
       "clamp_output": "Whether to clamp final outputs to the floor-ceil range",
       "clamp_floor": "Lower clamp bound applied to outputs; default 0.0",
-      "clamp_ceil": "Upper clamp bound applied to outputs; default 80.0"
+      "clamp_ceil": "Upper clamp bound applied to outputs; default 1000.0",
+      "clamp_leaky_slope": "Leak slope of the loss-path clamps (denormalize, parameter bounds, renormalize) so gradients survive saturation; inference always hard-clamps; default 0.1",
+      "amp_max": "Physical amplitude ceiling of the Gaussian parameter clamp, applied in the loss and at inference; default 1000.0"
     }
   },
   "normalization/general::ChannelStats": {
