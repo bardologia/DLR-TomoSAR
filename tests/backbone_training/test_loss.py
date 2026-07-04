@@ -131,6 +131,23 @@ def test_forward_returns_finite_scalar_total():
     assert torch.isfinite(out["total_loss"]).item()
 
 
+def test_physical_errors_logged_without_active_param_term():
+    cfg  = LossConfig(use_mse_curve=True, weight_mse_curve=1.0)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg)
+    pred = param_tensor(2, 2, 6, 6, seed=0).requires_grad_(True)
+
+    out  = loss(pred, param_tensor(2, 2, 6, 6, seed=1))
+
+    assert set(out["components"].keys())  == {"mse_curve"}
+    assert set(out["physical"].keys())    == {"amp_mae", "mu_mae_m", "sigma_mae_m"}
+    assert all(torch.isfinite(v).item() for v in out["physical"].values())
+
+    out["total_loss"].backward()
+
+    assert pred.grad is not None
+    assert torch.isfinite(pred.grad).all().item()
+
+
 def test_forward_output_dict_keys_for_active_term():
     loss = build_loss(n_gaussians=2)
     pred = param_tensor(2, 2, 5, 5, seed=2)

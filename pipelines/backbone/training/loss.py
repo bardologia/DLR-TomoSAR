@@ -96,25 +96,24 @@ class Loss:
         elem_w               = weights * param_mask * presence
         elem_w[:, :, 0:1]    = elem_w[:, :, 0:1] * focal
 
-        physical = self._physical_errors(pred_phys, gt_phys, active)
-
         if kind == "l1":
-            total, per_param = ParamLoss.l1(pred, gt, elem_w, ["amp", "mu", "sigma"], cfg.use_active_normalization)
-            return total, per_param, physical
+            return ParamLoss.l1(pred, gt, elem_w, ["amp", "mu", "sigma"], cfg.use_active_normalization)
 
         if kind == "huber":
-            return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}, physical
+            return ParamLoss.huber(pred, gt, elem_w, cfg.param_huber_delta, cfg.use_active_normalization), {}
 
         if kind == "mse":
-            return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}, physical
+            return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}
 
         raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1', 'huber', or 'mse'.")
 
     @torch.no_grad()
-    def _physical_errors(self, pred_phys, gt_phys, active) -> dict:
+    def _physical_errors(self, matched) -> dict:
+        _, pred_phys, _, gt_phys = matched
+
         diff = (pred_phys - gt_phys).abs()
 
-        active_mask = active[:, :, 0]
+        active_mask = (gt_phys[:, :, 0] > self.loss_cfg.amp_zero_thr).to(pred_phys.dtype)
         n_active    = active_mask.sum().clamp(min=1.0)
 
         return {
@@ -250,8 +249,8 @@ class Loss:
 
         pred_params_norm, pred_params_phys, gt_phys, pred_curves, exp_curves = self._prepare(pred_output, gt_params)
 
-        needs_params = self.log_all_losses or cfg.use_param_l1 or cfg.use_param_huber or cfg.use_param_mse
-        matched      = self._match_params(pred_params_norm, gt_params, gt_phys, pred_params_phys) if needs_params else None
+        matched  = self._match_params(pred_params_norm, gt_params, gt_phys, pred_params_phys)
+        physical = self._physical_errors(matched)
 
         if self.sampler is not None and self.sampler.active:
             self.sampler.observe(pred_params_phys)
@@ -267,7 +266,6 @@ class Loss:
         components : dict = {}
         monitor    : dict = {}
         occupancy  : dict = {}
-        physical   : dict = {}
         total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
         weight_sum:    float  = 0.0
 
@@ -278,10 +276,10 @@ class Loss:
 
             if term.name == "param_l1":
                 if is_used:
-                    val, per_param_l1, physical = self._param_term(matched, "l1")
+                    val, per_param_l1 = self._param_term(matched, "l1")
                 elif self.log_all_losses:
                     with torch.no_grad():
-                        val, per_param_l1, physical = self._param_term(matched, "l1")
+                        val, per_param_l1 = self._param_term(matched, "l1")
                 else:
                     continue
             else:
