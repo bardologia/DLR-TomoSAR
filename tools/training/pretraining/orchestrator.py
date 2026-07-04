@@ -43,8 +43,6 @@ class PretrainOrchestrator:
             torch.cuda.empty_cache()
 
     def _find_batch_size(self, context: PretrainContext) -> None:
-        self.logger.section("[Pretrain] Max batch-size finder")
-
         ceiling = min(self.pretrain.max_batch, len(context.dataset))
         if ceiling < self.pretrain.max_batch:
             self.logger.subsection(f"Ceiling lowered from {self.pretrain.max_batch} to {ceiling}: the dataset holds {len(context.dataset)} samples")
@@ -69,8 +67,6 @@ class PretrainOrchestrator:
         self.logger.subsection(f"Resolved batch size: {self.training.batch_size} (peak {result['peak_gb']:.2f} GB, scale_lr_with_batch={self.training.scale_lr_with_batch})")
 
     def _tune_loader(self, context: PretrainContext) -> None:
-        self.logger.section("[Pretrain] DataLoader tuner")
-
         tuner = LoaderTuner(
             dataset          = context.dataset,
             model            = context.model,
@@ -101,9 +97,13 @@ class PretrainOrchestrator:
             return
 
         if self.pretrain.find_batch_size:
+            self.logger.section("[Pretrain] Max batch-size finder")
+            self.logger.subsection("Probe run: the dataset and model below belong to the batch-size probe, not the training run.")
             self._find_batch_size(self.build())
             self._release_cache()
 
         if self.pretrain.tune_loader:
+            self.logger.section("[Pretrain] DataLoader tuner")
+            self.logger.subsection("Probe run: the dataset and model below belong to the loader-timing probe, not the training run.")
             self._tune_loader(self.build())
             self._release_cache()
