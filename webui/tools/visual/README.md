@@ -32,6 +32,28 @@ It loads the SPA once, then per route sets the hash, waits for network idle,
 `document.fonts.ready`, and a settle delay (for GSAP entrances and KaTeX typesetting),
 and takes a `fullPage` screenshot.
 
+## Repo-map diagram harness
+
+`render_diagram.js` renders a single repo-map schema (one folder/diagram from
+`webui/repomap_data.json`, or a bare diagram object) headlessly through the real
+`repomap.js` and `styles.css` via `repomap_harness.html`, so a diagram's layout can be
+audited or hand-tuned in isolation without the live server. Render at `--width 1520` to
+match the real panel width (the point at which cards start clipping off the right edge).
+
+```
+node render_diagram.js --json ../../repomap_data.json --folder benchmarking --dkey benchmark-pipeline --out /tmp/rm.png --width 1520 [--labels]
+```
+
+`snap_repomap.js` drives the live server instead, selecting the folder tab and diagram
+sub-tab before screenshotting the panel:
+
+```
+node snap_repomap.js --port 8765 --out /tmp/tomosar-repomap [--labels] backbone:backbone-inference tune:tune-search
+```
+
+Targets are `folder:dkey` pairs. `RepoMapLibrary` loads the JSON once at startup, so
+restart the server after editing `repomap_data.json` before snapping the live view.
+
 ## Animation frame dumper
 
 Renders the pipeline process animations (`webui/static/js/process_anim.js`) headlessly with MathJax loaded and dumps per-timestep PNG frames of the canvas. Used to audit equation placement, text overlap, sizing, and scene pacing without driving the full web UI.
