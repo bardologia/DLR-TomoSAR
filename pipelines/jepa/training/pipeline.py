@@ -131,9 +131,11 @@ class TrainingPipeline:
 
         profile_autoencoder = None
         if self.autoencoder_cfg is not None:
-            self.autoencoder_cfg.profile_length = x_len
-            backbone_out                        = self.autoencoder_cfg.embedding_dim
-            profile_autoencoder                 = self._load_profile_autoencoder()
+            if self.autoencoder_cfg.profile_length != x_len:
+                raise ValueError(f"Profile autoencoder was trained with profile_length={self.autoencoder_cfg.profile_length} but the JEPA dataset produces curves of length {x_len}; retrain the profile autoencoder on this dataset's elevation axis before coupling it.")
+
+            backbone_out        = self.autoencoder_cfg.embedding_dim
+            profile_autoencoder = self._load_profile_autoencoder()
         else:
             backbone_out = self._gaussian_out_channels()
 
