@@ -361,11 +361,17 @@ class RepoMapView {
     };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
-    // Faces are directional: inputs enter LEFT/TOP, outputs leave RIGHT/BOTTOM. Adjacent cards are
-    // joined by a straight line between their closest face centres; diagonals use a single elbow
-    // (one horizontal + one vertical face); backward/blocked edges take a side route.
+    // Adjacent cards are joined by a straight line between their closest face centres. Anything
+    // diagonal takes a SINGLE elbow (one side face + one top/bottom face) so a wire never runs two
+    // side faces with a jog through the narrow column gap, nor two top/bottom faces through the row
+    // gap. Straight lines and blocked side routes claim their faces first; each diagonal then picks
+    // the elbow whose faces are still free of the opposite direction, keeping every side one-way.
     const AV = 22;
     const nodeBoxes = this.diagram.nodes.map((n) => box(n.id)).filter(Boolean);
+    const usage = {};
+    const bump = (id, f, dir) => { const k = id + "|" + f; (usage[k] = usage[k] || { out: 0, in: 0 })[dir]++; };
+    const clearOpp = (id, f, dir) => { const u = usage[id + "|" + f]; return !u || u[dir === "out" ? "in" : "out"] === 0; };
+
     const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
@@ -373,8 +379,6 @@ class RepoMapView {
       const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
       const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
       const dx  = bcx - acx, dy = bcy - acy;
-
-      // A straight line is only safe if no other card sits on it.
       const between = (vertical) => nodeBoxes.some((o) => {
         const ocx = o.x + o.w / 2, ocy = o.y + o.h / 2;
         return vertical
@@ -382,14 +386,25 @@ class RepoMapView {
           : (Math.abs(ocy - acy) <= o.h / 2 && ocx > Math.min(acx, bcx) + 1 && ocx < Math.max(acx, bcx) - 1);
       });
       const sameRow = Math.abs(dy) <= AV, sameCol = Math.abs(dx) <= AV;
+      const r = { e, a, b, acx, acy, bcx, bcy, dx, dy, bend: 0, aligned: false, cat: "diag", fa: null, fb: null };
+      if      (sameRow && !between(false)) { r.aligned = true; r.cat = "line"; r.fa = dx >= 0 ? "R" : "L"; r.fb = dx >= 0 ? "L" : "R"; }
+      else if (sameCol && !between(true))  { r.aligned = true; r.cat = "line"; r.fa = dy >= 0 ? "B" : "T"; r.fb = dy >= 0 ? "T" : "B"; }
+      else if (sameRow)                    { r.cat = "side"; r.fa = dx >= 0 ? "R" : "L"; r.fb = dx >= 0 ? "L" : "R"; }
+      else if (sameCol)                    { r.cat = "side"; r.fa = dy >= 0 ? "B" : "T"; r.fb = dy >= 0 ? "T" : "B"; }
+      recs.push(r);
+    });
 
-      let fa, fb, aligned = false;
-      if (sameRow && !between(false)) { aligned = true; if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; } }
-      else if (sameCol && !between(true)) { aligned = true; if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; } }
-      else if (dx >= 0 && dy > 0 && !sameCol) { if (dx >= dy) { fa = "R"; fb = "T"; } else { fa = "B"; fb = "L"; } }
-      else if (dx >= 0) { fa = "R"; fb = "L"; }
-      else { fa = "L"; fb = "R"; }
-      recs.push({ e, a, b, fa, fb, aligned, acx, acy, bcx, bcy, bend: 0 });
+    recs.forEach((r) => { if (r.cat !== "diag") { bump(r.e.from, r.fa, "out"); bump(r.e.to, r.fb, "in"); } });
+    recs.forEach((r) => {
+      if (r.cat !== "diag") return;
+      const fx = r.dx >= 0 ? "R" : "L", tx = r.dx >= 0 ? "L" : "R";
+      const fy = r.dy >= 0 ? "B" : "T", ty = r.dy >= 0 ? "T" : "B";
+      const opts = Math.abs(r.dx) >= Math.abs(r.dy) ? [[fx, ty], [fy, tx]] : [[fy, tx], [fx, ty]];
+      let pick = null;
+      for (const [fa, fb] of opts) { if (clearOpp(r.e.from, fa, "out") && clearOpp(r.e.to, fb, "in")) { pick = [fa, fb]; break; } }
+      if (!pick) pick = r.dx >= 0 ? ["R", "L"] : ["L", "R"];
+      r.fa = pick[0]; r.fb = pick[1];
+      bump(r.e.from, r.fa, "out"); bump(r.e.to, r.fb, "in");
     });
 
     // Keep each face one-directional: if a face carries both entering and leaving wires, move the
