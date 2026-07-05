@@ -194,5 +194,12 @@
       "num_keys": 114,
       "num_parameters": 3598105
     }
+  },
+  "unrolled": {
+    "gamma_net": {
+      "signature": "961654c6e800bd7052d4464db60b93828238161d13e095fb0130e5883587e551",
+      "num_keys": 34,
+      "num_parameters": 1432
+    }
   }
 }
