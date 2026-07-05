@@ -3087,7 +3087,7 @@ main { margin-left: var(--navw); }
 .picker__hint { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
 .picker__filter { font-family: var(--mono); font-size: 12.5px; padding: 6px 10px; margin-left: auto; flex: 0 1 220px; min-width: 120px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-input); color: var(--ink); transition: border-color 0.2s var(--ease); }
 .picker__filter:focus { outline: none; border-color: var(--accent); }
-.picker__items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 2px 12px; padding: 8px 10px; max-height: 340px; overflow: auto; }
+.picker__items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(560px, 100%), 1fr)); gap: 2px 12px; padding: 8px 10px; max-height: 340px; overflow: auto; }
 .picker__item { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border: 1px solid transparent; border-radius: var(--r-input); cursor: pointer; min-width: 0; transition: background 0.15s var(--ease), border-color 0.15s var(--ease); }
 .picker__item:hover { background: var(--bg-1); }
 .picker__item.is-selected { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
