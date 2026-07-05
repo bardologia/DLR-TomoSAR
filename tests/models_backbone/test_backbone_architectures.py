@@ -37,6 +37,7 @@ SMALL_OVERRIDES = {
     "u2net"               : {"features": [16, 32, 64, 128], "rsu_heights": (4, 3, 2)},
     "pixel_mlp"           : {"features": [32, 32]},
     "local_cnn"           : {"features": [8, 16]},
+    "nafnet"              : {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]},
 }
 
 

@@ -35,6 +35,7 @@ class BackboneModelLibrary:
         "u2net"              : "U2NetLiteConfig",
         "pixel_mlp"          : "PixelMLPNetConfig",
         "local_cnn"          : "LocalCNNConfig",
+        "nafnet"             : "NAFNetConfig",
     }
 
     NOTE_FILES = {
@@ -61,6 +62,7 @@ class BackboneModelLibrary:
         "u2net"              : "U2-Net.md",
         "pixel_mlp"          : "PixelMLP.md",
         "local_cnn"          : "Local CNN.md",
+        "nafnet"             : "NAFNet.md",
     }
 
     FALLBACK_ACTIVATION    = "gelu"

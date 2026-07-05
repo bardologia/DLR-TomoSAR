@@ -882,6 +882,31 @@
         "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
       }
     },
+    "architectures/backbone::NAFNetConfig": {
+      "summary": "NAFNet restoration backbone (Chen et al., 2022): a nonlinearity-free encoder-decoder of gated blocks with simplified channel attention, additive skips, and PixelShuffle upsampling; the zoo's representative of the image-restoration family built for high-fidelity dense per-pixel output",
+      "fields": {
+        "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
+        "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
+        "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
+        "width": "Base channel width after the intro convolution; doubles at every encoder stage (width x 2^i) and is the single knob capacity matching scales",
+        "enc_blocks": "NAFBlocks per encoder stage, one entry per stage; each stage ends in a stride-2 2x2 convolution that halves resolution and doubles channels; default [2, 2, 4, 8]",
+        "middle_blocks": "NAFBlocks in the bottleneck stage at the coarsest resolution (width x 2^n_stages channels); default 12",
+        "dec_blocks": "NAFBlocks per decoder stage, one entry per stage, must have the same length as enc_blocks; each stage starts with a 1x1 conv + PixelShuffle upsample and an additive skip from the matching encoder stage",
+        "dw_expand": "Channel expansion factor of the depthwise-conv branch inside each NAFBlock before SimpleGate halves it",
+        "ffn_expand": "Channel expansion factor of the FFN branch inside each NAFBlock before SimpleGate halves it",
+        "dropout": "Elementwise dropout probability applied after each NAFBlock branch, matching the official implementation; 0 disables dropout",
+        "init_mode": "Weight initialization scheme (default = PyTorch native, kaiming, xavier); default keeps the official zero-initialized beta/gamma residual scales",
+        "encoder_lr": "AdamW learning rate for intro conv, encoder stages, and downsample convolutions",
+        "bottleneck_lr": "AdamW learning rate for the middle (bottleneck) stage",
+        "decoder_lr": "AdamW learning rate for upsample layers and decoder stages",
+        "output_head_lr": "AdamW learning rate for the final 3x3 output convolution",
+        "encoder_wd": "Weight decay for intro conv, encoder stages, and downsample convolutions",
+        "bottleneck_wd": "Weight decay for the middle (bottleneck) stage",
+        "decoder_wd": "Weight decay for upsample layers and decoder stages",
+        "output_head_wd": "Weight decay for the final 3x3 output convolution",
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
+      }
+    },
     "architectures/image_autoencoder::ImageAutoencoderBaseConfig": {
       "summary": "Shared architecture and optimizer settings for the 2D image-space autoencoder family reconstructing the multi-channel input stack",
       "fields": {

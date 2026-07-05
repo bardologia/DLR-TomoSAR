@@ -22,6 +22,7 @@ from configuration.architectures.backbone import (
     U2NetLiteConfig,
     PixelMLPNetConfig,
     LocalCNNConfig,
+    NAFNetConfig,
 )
 from configuration.architectures.image_autoencoder import (
     ImageAutoencoderBaseConfig,

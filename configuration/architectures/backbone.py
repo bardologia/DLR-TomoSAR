@@ -1528,3 +1528,67 @@ class LocalCNNConfig:
             {'params': list(model.trunk.parameters()),       'lr': self.trunk_lr,       'weight_decay': self.trunk_wd,       'name': 'trunk'},
             {'params': list(model.output_head.parameters()), 'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
+
+
+@dataclass
+class NAFNetConfig:
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    width               : int       = 32
+    enc_blocks          : list[int] = field(default_factory=lambda: [2, 2, 4, 8])
+    middle_blocks       : int       = 12
+    dec_blocks          : list[int] = field(default_factory=lambda: [2, 2, 2, 2])
+    dw_expand           : int       = 2
+    ffn_expand          : int       = 2
+    dropout             : float     = 0.0
+    init_mode           : str       = "default"
+
+    encoder_lr     : float = 3e-4
+    bottleneck_lr  : float = 3e-4
+    decoder_lr     : float = 3e-4
+    output_head_lr : float = 1e-3
+
+    encoder_wd     : float = 1e-4
+    bottleneck_wd  : float = 1e-4
+    decoder_wd     : float = 1e-4
+    output_head_wd : float = 1e-4
+
+    shape_logger_types  : tuple           = field(default_factory=lambda: (
+        nn.Conv2d, nn.PixelShuffle, nn.AdaptiveAvgPool2d,
+        nn.LayerNorm, nn.Dropout,
+    ))
+
+    @classmethod
+    def tunable_lr_params(cls) -> dict:
+        return {
+            "encoder_lr"     : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "bottleneck_lr"  : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "decoder_lr"     : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "output_head_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "encoder_wd"     : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "bottleneck_wd"  : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "decoder_wd"     : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "output_head_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "dropout"        : {"type": "float", "low": 0.0, "high": 0.3},
+        }
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "width"         : {"type": "categorical",         "choices": [16, 24, 32, 48]},
+            "enc_blocks"    : {"type": "indexed_categorical", "choices": [[2, 2, 4, 8], [1, 1, 1, 28], [2, 2, 2, 2]]},
+            "middle_blocks" : {"type": "categorical",         "choices": [1, 6, 12]},
+            "dw_expand"     : {"type": "categorical",         "choices": [1, 2]},
+            "ffn_expand"    : {"type": "categorical",         "choices": [1, 2]},
+        }
+
+    def get_param_groups(self, model: nn.Module) -> list[dict]:
+        encoder_params = list(model.intro.parameters()) + list(model.encoder_stages.parameters()) + list(model.downsample_layers.parameters())
+        decoder_params = list(model.upsample_layers.parameters()) + list(model.decoder_stages.parameters())
+        return [g for g in [
+            {'params': encoder_params,                          'lr': self.encoder_lr,     'weight_decay': self.encoder_wd,     'name': 'encoder'},
+            {'params': list(model.middle_stage.parameters()),   'lr': self.bottleneck_lr,  'weight_decay': self.bottleneck_wd,  'name': 'middle'},
+            {'params': decoder_params,                          'lr': self.decoder_lr,     'weight_decay': self.decoder_wd,     'name': 'decoder'},
+            {'params': list(model.output_head.parameters()),    'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
+        ] if len(g['params']) > 0]
