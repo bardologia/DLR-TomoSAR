@@ -84,6 +84,16 @@ class TrainingPipeline:
             raise FileNotFoundError(f"{label} autoencoder run '{run}' not found under {logdir}")
         return directory
 
+    def _physics_geometry_active(self) -> bool:
+        if self.autoencoder_cfg is not None:
+            return False
+
+        cfg = self.trainer_config.param_loss
+        return cfg.use_coherence_resyn or cfg.use_covariance_match or cfg.use_capon_cycle
+
+    def _prepare_datasets(self, run_meta, logger, seed):
+        return BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, seed, build_geometry_field=self._physics_geometry_active(), height_axis_convention=self.trainer_config.geometry.height_axis_convention).run()
+
     def _gaussian_out_channels(self) -> int:
         g = self.trainer_config.gaussian
         return g.params_per_gaussian * g.n_default_gaussians
@@ -236,7 +246,7 @@ class TrainingPipeline:
         run_meta = TrainingRunMetadata(self.trainer_config, self.backbone_name, Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
-        loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
+        loaders, datasets, x_axis, x_len = self._prepare_datasets(run_meta, logger, self.entry.seed)
 
         model, backbone_cfg = self._build_module(datasets, x_len, logger)
 
@@ -265,7 +275,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         pipeline = TrainingPipeline(self.config)
         run_meta = TrainingRunMetadata(pipeline.trainer_config, pipeline.backbone_name, work_dir, "pretrain_context")
 
-        loaders, datasets, x_axis, x_len = BackboneDatasetPreparation(pipeline.dataset_config, pipeline.trainer_config, run_meta, logger, self.config.seed).run()
+        loaders, datasets, x_axis, x_len = pipeline._prepare_datasets(run_meta, logger, self.config.seed)
 
         model, backbone_cfg = pipeline._build_module(datasets, x_len, logger)
         norm_stats          = datasets["train"].normalizer
