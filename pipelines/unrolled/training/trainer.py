@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib     import Path
 
 import torch
 
-from models.unrolled          import TomoOperator
-from tools.data.gaussians     import GaussianCurve
-from tools.data.io            import FileIO
+from configuration.training           import SchedulerConfig, WarmupConfig
+from models.unrolled                  import TomoOperator
+from tools.data.gaussians             import GaussianCurve
+from tools.data.io                    import FileIO
+from tools.training                   import WeightEma
+from tools.training.scheduling        import Scheduler, Warmup
+from tools.training.vram_reservation  import VramReservation
+
+
+@dataclass
+class ScheduleSettings:
+    warmup    : WarmupConfig
+    scheduler : SchedulerConfig
 
 
 class UnrolledTrainer:
@@ -29,7 +40,17 @@ class UnrolledTrainer:
         self.dx     = float(self.x_axis[1] - self.x_axis[0])
 
         self.optimizer = torch.optim.AdamW(model_cfg.get_param_groups(self.model), betas=(0.9, 0.999), eps=1e-8)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.training.scheduler_epochs or self.training.epochs, eta_min=self.training.eta_min)
+        self.base_lrs  = [float(group["lr"]) for group in self.optimizer.param_groups]
+
+        schedules = ScheduleSettings(
+            warmup    = WarmupConfig(warmup_steps=self.training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=self.training.warmup_enabled, warmup_mode="linear"),
+            scheduler = SchedulerConfig(type="cosine_annealing", epochs=self.training.scheduler_epochs or self.training.epochs, eta_min=self.training.eta_min),
+        )
+
+        self.warmup           = Warmup(schedules, logger)
+        self.lr_scheduler     = Scheduler(self.base_lrs, self.warmup, schedules, logger)
+        self.ema              = WeightEma(self.model, self.training.ema_decay, self.training.use_ema)
+        self.vram_reservation = VramReservation(enabled=self.training.reserve_vram, keep_free_gb=self.training.vram_keep_free_gb, device=self.device, logger=logger)
 
         self.checkpoint_dir = self.run_dir / "checkpoints"
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -44,6 +65,9 @@ class UnrolledTrainer:
             "Curve loss"      : entry_config.curve_loss,
             "Noise std"       : entry_config.measurement_noise_std,
             "Power floor"     : entry_config.power_floor,
+            "Warmup"          : f"{self.training.warmup_enabled} ({self.training.warmup_steps} steps)",
+            "EMA"             : f"{self.training.use_ema} (decay {self.training.ema_decay})",
+            "VRAM reservation": f"{self.training.reserve_vram} (keep free {self.training.vram_keep_free_gb} GB)",
             "Sample points"   : int(self.x_axis.shape[0]),
             "Parameters"      : sum(p.numel() for p in self.model.parameters()),
         })
@@ -90,6 +114,10 @@ class UnrolledTrainer:
 
         return gt_params, kz_map
 
+    def _apply_lrs(self, lrs: list[float]) -> None:
+        for group, lr in zip(self.optimizer.param_groups, lrs):
+            group["lr"] = lr
+
     def _run_epoch(self, loader, train: bool) -> dict:
         self.model.train(train)
 
@@ -110,6 +138,9 @@ class UnrolledTrainer:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.training.max_grad_norm)
                 self.optimizer.step()
+                self.ema.update(self.model)
+                self.warmup.step()
+                self._apply_lrs(self.lr_scheduler.effective_lrs())
 
             total_loss += float(loss.detach())
             total_peak += float(self._peak_error_m(pred.detach(), target, mask))
@@ -122,31 +153,39 @@ class UnrolledTrainer:
         torch.save(self.model.state_dict(), self.checkpoint_dir / f"{name}.pt")
 
     def train(self, train_loader, val_loader, test_loader) -> dict:
+        self.vram_reservation.fill()
+
         epochs_without_improvement = 0
         history : list[dict] = []
 
         for epoch in range(1, self.training.epochs + 1):
+            self.lr_scheduler.step(epoch - 1)
+            self._apply_lrs(self.lr_scheduler.effective_lrs())
+
             train_metrics = self._run_epoch(train_loader, train=True)
-            with torch.no_grad():
+            with torch.no_grad(), self.ema.applied(self.model):
                 val_metrics = self._run_epoch(val_loader, train=False)
 
-            self.scheduler.step()
+                improved = val_metrics["loss"] < self.best_val_loss - self.training.early_stop_min_delta
+                if improved:
+                    self.best_val_loss         = val_metrics["loss"]
+                    epochs_without_improvement = 0
+                    self._save_checkpoint("best")
+
+            self.vram_reservation.refill()
 
             history.append({"epoch": epoch, "train": train_metrics, "val": val_metrics})
             self.logger.info(f"epoch {epoch:>4} | train loss {train_metrics['loss']:.6f} | val loss {val_metrics['loss']:.6f} | val peak MAE {val_metrics['peak_mae_m']:.3f} m")
 
-            if val_metrics["loss"] < self.best_val_loss - self.training.early_stop_min_delta:
-                self.best_val_loss         = val_metrics["loss"]
-                epochs_without_improvement = 0
-                self._save_checkpoint("best")
-            else:
+            if not improved:
                 epochs_without_improvement += 1
 
             if epochs_without_improvement > self.training.early_stop_patience:
                 self.logger.subsection(f"Early stopping at epoch {epoch}: no val improvement for {epochs_without_improvement} epochs")
                 break
 
-        self._save_checkpoint("last")
+        with self.ema.applied(self.model):
+            self._save_checkpoint("last")
 
         best_path = self.checkpoint_dir / "best.pt"
         if best_path.is_file():

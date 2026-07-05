@@ -18,6 +18,15 @@ class UnrolledTrainingConfig:
     early_stop_min_delta : float      = 0.0
     max_grad_norm        : float      = 1.0
 
+    warmup_enabled : bool = True
+    warmup_steps   : int  = 200
+
+    use_ema   : bool  = False
+    ema_decay : float = 0.999
+
+    reserve_vram      : bool  = False
+    vram_keep_free_gb : float = 1.0
+
     batch_size      : int = 256
     num_workers     : int = 4
     prefetch_factor : int = 2

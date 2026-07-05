@@ -159,6 +159,15 @@ class LaunchLayout:
                 {"path": "early_stop_patience", "widget": NUM_PATIENCE},
                 "early_stop_min_delta",
             ]},
+            {"title": "LR warmup", "fields": [
+                {"gate": "warmup_enabled", "fields": [{"path": "warmup_steps", "widget": NUM_STEPS}]},
+            ]},
+            {"title": "Weight averaging", "fields": [
+                {"gate": "use_ema", "fields": ["ema_decay"]},
+            ]},
+            {"title": "VRAM reservation", "fields": [
+                {"gate": "reserve_vram", "fields": ["vram_keep_free_gb"]},
+            ]},
             {"title": "Batch and loader", "fields": [
                 {"path": "batch_size", "widget": NUM_BATCH},
                 {"path": "num_workers", "widget": NUM_WORKERS},

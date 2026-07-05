@@ -2109,7 +2109,7 @@
         "logdir": "Base directory that receives one subdirectory per training run",
         "model_overrides": "Field overrides applied to the model config from the registry (e.g. n_iterations)",
         "paths": "Dataset locations: preprocessing run directory, extracted-parameters file, and secondary track labels",
-        "training": "Training-loop knobs (epochs, schedule, early stopping, batch/loader settings, patch tiling, azimuth splits); a slim UnrolledTrainingConfig containing exactly the fields the lean trainer reads",
+        "training": "Training-loop knobs (epochs, cosine schedule, LR warmup, EMA weight averaging, VRAM reservation, early stopping, batch/loader settings, patch tiling, azimuth splits); a slim UnrolledTrainingConfig containing exactly the fields the trainer reads",
         "geometry": "Tomographic geometry configuration resolved against the dataset; supplies the height-axis convention and enables the per-pixel kz field the operator requires",
         "normalization": "Per-channel normalization recipes used by the dataset pipeline; output denormalization recovers physical Gaussian parameters before profile rendering",
         "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches",
@@ -2119,7 +2119,7 @@
       }
     },
     "training/unrolled::UnrolledTrainingConfig": {
-      "summary": "Training-loop knobs for the unrolled physics pipeline; deliberately slimmer than the shared TrainingQueueConfig because the lean unrolled trainer supports exactly these fields",
+      "summary": "Training-loop knobs for the unrolled physics pipeline; slimmer than the shared TrainingQueueConfig, containing exactly the fields the unrolled trainer supports (schedule, warmup, EMA, VRAM reservation, clipping, batching, splits)",
       "fields": {
         "epochs": "Number of training epochs",
         "scheduler_epochs": "Cosine schedule horizon in epochs; null uses the full epoch count",
@@ -2127,6 +2127,12 @@
         "early_stop_patience": "Epochs without validation improvement before training stops",
         "early_stop_min_delta": "Minimum validation-loss decrease that counts as an improvement",
         "max_grad_norm": "Fixed gradient-norm clipping threshold",
+        "warmup_enabled": "Whether linear LR warmup runs at the start of training, scaling all group learning rates up from 10% of base over warmup_steps optimizer steps",
+        "warmup_steps": "Number of optimizer steps the linear warmup spans",
+        "use_ema": "Whether an exponential moving average of the weights is maintained; validation, checkpointing, and the final test run use the averaged weights",
+        "ema_decay": "EMA decay factor per optimizer step; closer to 1 averages over a longer history",
+        "reserve_vram": "Whether the pre-training guard parks spare GPU memory in the allocator cache so concurrent jobs cannot squeeze this run out",
+        "vram_keep_free_gb": "GPU memory left unreserved for other processes when the VRAM reservation fills",
         "batch_size": "Patches per training batch",
         "num_workers": "Dataloader worker processes",
         "prefetch_factor": "Batches prefetched per dataloader worker",
