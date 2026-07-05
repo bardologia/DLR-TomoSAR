@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-
 import pytest
 import torch
 import torch.nn as nn
@@ -180,7 +178,6 @@ def test_optimizer_step_updates_online_branch():
 def test_checkpoint_state_dict_round_trip(tmp_path):
     module = build_module()
     images = torch.randn(2, 2, SPATIAL, SPATIAL)
-    gt     = torch.rand(2, N_GAUSSIANS * 3, SPATIAL, SPATIAL)
 
     state = {"epoch": 1, "params": module.state_dict(), "x_axis": torch.linspace(-4, 4, 8).numpy()}
     path  = tmp_path / "best_model.pt"
