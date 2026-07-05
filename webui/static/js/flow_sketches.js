@@ -506,7 +506,7 @@ window.FLOW_SKETCHES = {
   },
 
   represent: {
-    tip: "An SLC pass keeps |p|, an interferogram keeps its phase; normalised channels divide by m = max(|p|, 1).",
+    tip: "An SLC pass keeps |p|, an interferogram keeps its phase; normalised re/im divide by m=|p| (1 if |p|=0).",
     build(svg) { svg.innerHTML = `
       <circle cx="64" cy="70" r="32" class="skl-axis" style="fill:none;opacity:.5"/>
       <line class="skl-axis" x1="26" y1="70" x2="102" y2="70"/>
@@ -1174,7 +1174,7 @@ window.FLOW_SKETCHES = {
   },
 
   prune: {
-    tip: "A trial whose loss stays above the running median m at step t is pruned, once 8 trials are done and t >= 8.",
+    tip: "A trial whose loss stays above the running median m at step t is pruned, once 8 trials complete and t >= 8.",
     build(svg) { svg.innerHTML = `
       <line class="skl-axis" x1="30" y1="120" x2="210" y2="120"/>
       <line class="skl-dash c-cal" x1="30" y1="72" x2="210" y2="72"/>

@@ -19,12 +19,12 @@ class FlowLibrary:
             {"id": "cross",  "tex": r"c_i",                    "role": "intermediate", "kind": "tensor", "shape": "N_s x A_z x R_g", "desc": "raw master-secondary cross-product",                                "sample": [["0.45+0.30j", "0.41-0.12j"], ["0.55+0.18j", "0.48-0.05j"]]},
             {"id": "pi",     "tex": r"p_i",                    "role": "intermediate", "kind": "tensor", "shape": "N_s x A_z x R_g", "desc": "unit-magnitude interferometric phasor",                             "sample": [["0.83+0.55j", "0.96-0.28j"], ["0.95+0.31j", "0.99-0.10j"]]},
             {"id": "Ai",     "tex": r"A_i",                    "role": "intermediate", "kind": "tensor", "shape": "N_s x A_z x R_g", "desc": "clipped secondary amplitude weight",                                "sample": [["0.71", "0.93"], ["1.25", "0.58"]]},
-            {"id": "phii",   "tex": r"\tilde{\phi}_i",         "role": "calculated",   "kind": "tensor", "shape": "N_s x A_z x R_g", "desc": "amplitude-weighted complex interferogram (network input)",          "sample": [["0.51+0.20j", "0.44-0.12j"], ["0.63+0.18j", "0.55-0.05j"]]},
+            {"id": "phii",   "tex": r"\tilde{\phi}_i",         "role": "final",        "kind": "tensor", "shape": "N_s x A_z x R_g", "desc": "amplitude-weighted complex interferogram (network input)",          "sample": [["0.51+0.20j", "0.44-0.12j"], ["0.63+0.18j", "0.55-0.05j"]]},
             {"id": "bv",     "tex": r"b^{\mathrm{v}}_i",       "role": "calculated",   "kind": "vector", "shape": "N_p",             "desc": "vertical baseline relative to reference pass (m)",                  "sample": ["0.00", "12.4", "-8.1", "20.7"]},
             {"id": "bh",     "tex": r"b^{\mathrm{h}}_i",       "role": "calculated",   "kind": "vector", "shape": "N_p",             "desc": "horizontal baseline relative to reference pass (m)",                "sample": ["0.00", "5.2", "-3.4", "9.8"]},
-            {"id": "prof",   "tex": r"\mathbf{\tau}_i",    "role": "calculated",   "kind": "tensor", "shape": "N_p x A_z",       "desc": "per-azimuth horizontal/vertical track position profiles (m)",       "sample": [["112.3", "112.5"], ["101.7", "101.9"]]},
+            {"id": "prof",   "tex": r"\mathbf{\tau}_i",        "role": "calculated",   "kind": "tensor", "shape": "N_p x A_z",       "desc": "per-azimuth horizontal/vertical track position profiles (m)",       "sample": [["112.3", "112.5"], ["101.7", "101.9"]]},
             {"id": "look",   "tex": r"\theta",                 "role": "calculated",   "kind": "vector", "shape": "R_g",             "desc": "per-range look angle theta (rad)",                                  "sample": ["0.79", "0.80", "...", "1.02"]},
-            {"id": "brel",   "tex": r"\mathbf{\beta}_i",   "role": "calculated",   "kind": "tensor", "shape": "N_p x A_z",       "desc": "reference-relative baseline profiles, horizontal & vertical (m)",   "sample": [["0.00", "0.00"], ["5.2", "4.9"]]},
+            {"id": "brel",   "tex": r"\mathbf{\beta}_i",       "role": "calculated",   "kind": "tensor", "shape": "N_p x A_z",       "desc": "reference-relative baseline profiles, horizontal & vertical (m)",   "sample": [["0.00", "0.00"], ["5.2", "4.9"]]},
             {"id": "geom",   "tex": r"k_z",                    "role": "final",        "kind": "tensor", "shape": "N_p x A_z x R_g", "desc": "per-pixel interferometric wavenumber k_z (rad/m) for the physics loss", "sample": [["0.00", "0.00"], ["0.11", "0.12"]]},
         ]
         steps = [
@@ -118,12 +118,12 @@ class FlowLibrary:
                 "note": "Re-attaching the clipped amplitude as the phasor's modulus gives an interferogram whose phase is the residual (sub-DEM) elevation phase and whose magnitude is a bounded signal-strength proxy; this stack is the network input.",
                 "inputs": ["Ai", "pi"], "outputs": ["phii"],
                 "lines": [
-                    [{"id": "phii", "tex": r"\tilde{\phi}_i", "role": "calculated"}, {"tex": "="}, {"id": "Ai", "tex": r"A_i", "role": "intermediate"}, {"tex": r"\cdot"}, {"id": "pi", "tex": r"p_i", "role": "intermediate"}, {"tex": "="}, {"id": "Ai", "tex": r"A_i", "role": "intermediate"}, {"tex": r"\dfrac{s_0\,\overline{\tilde{s}_i}}{\left|s_0\,\overline{\tilde{s}_i}\right| + \epsilon}"}],
+                    [{"id": "phii", "tex": r"\tilde{\phi}_i", "role": "final"}, {"tex": "="}, {"id": "Ai", "tex": r"A_i", "role": "intermediate"}, {"tex": r"\cdot"}, {"id": "pi", "tex": r"p_i", "role": "intermediate"}, {"tex": "="}, {"id": "Ai", "tex": r"A_i", "role": "intermediate"}, {"tex": r"\dfrac{s_0\,\overline{\tilde{s}_i}}{\left|s_0\,\overline{\tilde{s}_i}\right| + \epsilon}"}],
                 ],
             },
             {
                 "id": "trackgeo", "title": "Look angle and relative baselines", "phase": "C - Geometry field",
-                "note": "The look angle is recovered per range bin from the reference-pass geometry, arccos of sensor-height-above-terrain over slant range (clamped so a corrupt h0/terrain cannot yield a zero angle); the per-azimuth position profiles become baselines relative to the reference pass. A left-looking stack (antdir <= 0) aborts, since the kz formula assumes a right-looking geometry.",
+                "note": "The look angle is recovered per range bin from the reference-pass geometry, arccos of sensor-height-above-terrain over slant range; the build aborts when that height is non-positive or reaches the nearest slant range, because clamping the ratio into [-1, 1] would otherwise silently yield a zero look angle and an infinite kz. The per-azimuth position profiles become baselines relative to the reference pass. A left-looking stack (antdir <= 0) aborts, since the kz formula assumes a right-looking geometry.",
                 "inputs": ["par", "prof"], "outputs": ["look", "brel"],
                 "lines": [
                     [{"id": "look", "tex": r"\theta(r)", "role": "calculated"}, {"tex": "="}, {"tex": r"\arccos\!\Big(\mathrm{clip}\big(\tfrac{h_0 - \mathrm{terrain}}{r},\,-1,\,1\big)\Big),\quad r = "}, {"id": "par", "tex": r"\rho_0.r", "role": "measured"}, {"tex": r"[\mathtt{rg}_0{:}\mathtt{rg}_1]"}],
@@ -236,9 +236,9 @@ class FlowLibrary:
             {
                 "id": "objective", "title": "Mixture-fit objective", "phase": "2 - Fit (GPU)",
                 "note": "The loss is the per-profile MSE between the K-Gaussian sum and the normalised profile, with amplitude entering normalised as a/s so the seed peak maps near unity. sigma is floored at 1e-6 and the exponent clipped to [-100, 0] before summing; vmap over pixels, value_and_grad over (a, mu, sigma).",
-                "inputs": ["gtilde", "mu0", "a0", "sig0"], "outputs": ["loss"],
+                "inputs": ["gtilde", "mu0", "a0", "scale", "sig0"], "outputs": ["loss"],
                 "lines": [
-                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{1}{H}\sum_{h}\Big(\sum_{k}"}, {"id": "a0", "tex": r"a_k", "role": "intermediate"}, {"tex": r"\,e^{-\frac{(x_h-"}, {"id": "mu0", "tex": r"\mu_k", "role": "intermediate"}, {"tex": r")^2}{2\max(\sigma_k,\,10^{-6})^2}} -"}, {"id": "gtilde", "tex": r"\tilde{\gamma}_h", "role": "intermediate"}, {"tex": r"\Big)^{2}"}],
+                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{1}{H}\sum_{h}\Big(\sum_{k}\dfrac{"}, {"id": "a0", "tex": r"a_k", "role": "intermediate"}, {"tex": r"}{"}, {"id": "scale", "tex": r"s", "role": "intermediate"}, {"tex": r"}\,e^{-\frac{(x_h-"}, {"id": "mu0", "tex": r"\mu_k", "role": "intermediate"}, {"tex": r")^2}{2\max(\sigma_k,\,10^{-6})^2}} -"}, {"id": "gtilde", "tex": r"\tilde{\gamma}_h", "role": "intermediate"}, {"tex": r"\Big)^{2}"}],
                 ],
             },
             {
@@ -322,7 +322,7 @@ class FlowLibrary:
             {"id": "Imat",   "tex": r"I",                 "role": "measured",     "kind": "tensor", "shape": "N_i x Az x Rg",      "desc": "selected interferogram passes",                              "sample": [["0.9+0.4j"]]},
             {"id": "X",      "tex": r"\mathbf{X}",        "role": "measured",     "kind": "tensor", "shape": "(1+N_s+N_i) x Az x Rg", "desc": "stacked complex buffer: primary, secondaries, ifgs",       "sample": [["0.8+0.2j", "0.6-0.4j"], ["0.5+0.5j", "0.9-0.1j"]]},
             {"id": "dem",    "tex": r"\mathbf{D}",        "role": "measured",     "kind": "matrix", "shape": "Az x Rg",            "desc": "DEM elevation channel, real (optional)",                     "sample": [["112.4", "113.1"], ["110.8", "111.9"]]},
-            {"id": "grid",   "tex": r"\mathcal{G}",       "role": "calculated",   "kind": "set",    "shape": "n_v x n_h",          "desc": "patch grid counts and padding",                              "sample": "n_v=89, n_h=92"},
+            {"id": "grid",   "tex": r"\mathcal{G}",       "role": "calculated",   "kind": "set",    "shape": "n_v x n_h",          "desc": "patch grid counts and padding",                              "sample": "n_v=89, n_h=93"},
             {"id": "cpatch", "tex": r"\mathbf{p}",        "role": "intermediate", "kind": "tensor", "shape": "C x P x P",          "desc": "one extracted complex patch (padded copy)",                  "sample": [["0.8+0.2j", "0.6-0.4j", "1.1+0.0j"], ["0.5+0.5j", "0.9-0.1j", "0.7+0.3j"], ["1.0+0.2j", "0.4-0.6j", "0.8+0.1j"]]},
             {"id": "rep",    "tex": r"\mathbf{r}",        "role": "intermediate", "kind": "tensor", "shape": "c x P x P",          "desc": "real channels of one complex pass",                          "sample": ["|s|", "ang", "re", "im"]},
             {"id": "x",      "tex": r"\mathbf{x}",        "role": "calculated",   "kind": "tensor", "shape": "C_in x P x P",       "desc": "assembled real-valued input tensor",                         "sample": [["0.91", "0.62", "1.10"], ["0.55", "0.88", "0.71"]]},
@@ -608,7 +608,7 @@ class FlowLibrary:
                 "note": "The default sorted-GT matching orders GT slots by mu among active components (inactive amplitudes < 1e-3 pushed to the end); inactive slots mask their mu and sigma to zero so empty slots contribute amplitude only. Param-L1 (the default supervised term) is active-normalised in normalised space; TV is an optional roughness penalty.",
                 "inputs": ["thrn", "gtp"], "outputs": ["lj"],
                 "lines": [
-                    [{"id": "lj", "tex": r"\ell_{\mathrm{p\text{-}L1}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum w_p\,m\,|\,\tilde{\theta}_{\mathrm{n}} - \theta^{\mathrm{GT}}\,|}{\sum w_p\,m},\quad m = \mathbb{1}[a^{\mathrm{GT}}\ge 10^{-3}]\ (\mu,\sigma)"}],
+                    [{"id": "lj", "tex": r"\ell_{\mathrm{p\text{-}L1}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum w_p\,m\,|\,\tilde{\theta}_{\mathrm{n}} - \theta^{\mathrm{GT}}\,|}{\sum w_p\,m},\quad m = \mathbb{1}[a^{\mathrm{GT}} > 10^{-3}]\ (\mu,\sigma)"}],
                     [{"tex": r"\ell_{\mathrm{TV}} = \overline{|\tilde\theta_{h}-\tilde\theta_{h-1}|} + \overline{|\tilde\theta_{w}-\tilde\theta_{w-1}|}"}],
                 ],
             },
@@ -666,7 +666,7 @@ class FlowLibrary:
 
     def _inference(self) -> dict:
         nodes = [
-            {"id": "ckpt",     "tex": r"\theta^{\star}",           "role": "measured",     "kind": "vector", "shape": "|theta|",        "desc": "best-epoch checkpoint weights (params), with bundled x-axis and norm stats", "sample": ["0.31", "-0.08", "..."]},
+            {"id": "ckpt",     "tex": r"\theta^{\star}",           "role": "measured",     "kind": "vector", "shape": "|theta|",        "desc": "best-epoch checkpoint weights (params) with bundled x-axis; per-slot norm stats load from the run meta", "sample": ["0.31", "-0.08", "..."]},
             {"id": "xaxis",    "tex": r"\mathbf{x}",               "role": "measured",     "kind": "vector", "shape": "N",              "desc": "elevation axis (m) restored from the checkpoint",       "sample": ["-20", "-19.6", "...", "20"]},
             {"id": "xhat",     "tex": r"\hat{\mathbf{x}}",         "role": "measured",     "kind": "tensor", "shape": "B x C_in x P x P","desc": "normalised input patch batch from the loader",          "sample": [["0.41", "-0.20"], ["-0.33", "0.27"]]},
             {"id": "znorm",    "tex": r"\hat{\mathbf{z}}",         "role": "intermediate", "kind": "tensor", "shape": "B x 3K x P x P", "desc": "raw normalised network output",                         "sample": ["0.22", "-1.1", "0.7", "..."]},
@@ -698,7 +698,7 @@ class FlowLibrary:
         steps = [
             {
                 "id": "load", "title": "Strict run reconstruction", "phase": "Load run",
-                "note": "The trained architecture is rebuilt verbatim from run_summary.json and the saved model config, the best-epoch weights (params), x-axis and per-slot norm stats are restored, and the predictor is wrapped with the checkpoint amplitude ceiling; inference requires a single contiguous split region or stitching aborts loudly.",
+                "note": "The trained architecture is rebuilt verbatim from run_summary.json and the saved model config, the best-epoch weights (params), x-axis and per-slot norm stats are restored, and the predictor is wrapped with the norm-stats amplitude ceiling (amp_max); inference requires a single contiguous split region or stitching aborts loudly.",
                 "inputs": ["ckpt"], "outputs": ["xaxis"],
                 "lines": [
                     [{"id": "ckpt", "tex": r"\theta^{\star}", "role": "measured"}, {"tex": "="}, {"tex": r"\mathrm{ckpt[params]}\ @\ \mathrm{best\ epoch},\qquad"}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"= \{x_n\}_{n=1}^{N}"}],
@@ -724,7 +724,7 @@ class FlowLibrary:
             },
             {
                 "id": "align", "title": "GT denormalise and mu-sort", "phase": "Windowed predict",
-                "note": "GT params are denormalised by the dataset output stats (no clamp), then per pixel the slots are stably argsorted by mean with inactive slots (amplitude at or below 1e-3) pushed to the tail, giving GT a canonical mu-ordered storage order for downstream matching.",
+                "note": "GT params are denormalised by the dataset output stats (no clamp), then per pixel the slots are argsorted by mean with inactive slots (amplitude at or below 1e-3) pushed to the tail, giving GT a canonical mu-ordered storage order for downstream matching.",
                 "inputs": ["thgt"], "outputs": ["thgts"],
                 "lines": [
                     [{"id": "thgts", "tex": r"\theta^{\mathrm{GT}}_{\pi}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{take}\big("}, {"id": "thgt", "tex": r"\theta^{\mathrm{GT}}", "role": "measured"}, {"tex": r",\ \pi^{\star}\big),\quad \pi^{\star} = \operatorname{argsort}_k\,\kappa_k"}],
@@ -793,7 +793,7 @@ class FlowLibrary:
             },
             {
                 "id": "elevssim", "title": "Per-elevation metrics and SSIM", "phase": "Curve metrics",
-                "note": "Per elevation bin (all pixels as samples): MAE, RMSE, R-squared and a cross-entropy between column-normalised distributions; plus mean SSIM over the sampled slices along each axis, on both denorm and unit-area cubes at each slice's GT data range.",
+                "note": "Per elevation bin (all pixels as samples): MAE, RMSE, R-squared and a cross-entropy between column-normalised distributions; plus mean SSIM over all slices along each axis, on both denorm and unit-area cubes at each slice's GT data range.",
                 "inputs": ["cube", "cubegt"], "outputs": ["elevr2"],
                 "lines": [
                     [{"id": "elevr2", "tex": r"R^2_{\mathrm{elev}}(n)", "role": "calculated"}, {"tex": "="}, {"tex": r"1 - \dfrac{\sum_{a,r}(\hat C_{n,a,r}-C_{n,a,r})^2}{\sum_{a,r}(C_{n,a,r}-\bar C_n)^2 + 10^{-12}}"}],
@@ -929,7 +929,7 @@ class FlowLibrary:
                 "inputs": ["fobj"], "outputs": ["med"],
                 "lines": [
                     [{"id": "med", "tex": r"m^{(t)}", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname{median}\big\{\,"}, {"id": "fobj", "tex": r"f^{(t)}_j", "role": "calculated"}, {"tex": r": j \in \mathrm{COMPLETE}\,\big\}"}],
-                    [{"tex": r"\mathrm{prune} \iff \mathcal{L}^{(t)}_{\mathrm{val}} > "}, {"id": "med", "tex": r"m^{(t)}", "role": "calculated"}, {"tex": r"\ \wedge\ n_{\mathrm{done}} \ge 8\ \wedge\ t \ge 8"}],
+                    [{"tex": r"\mathrm{prune} \iff \mathcal{L}^{(t)}_{\mathrm{val}} > "}, {"id": "med", "tex": r"m^{(t)}", "role": "calculated"}, {"tex": r"\ \wedge\ n_{\mathrm{complete}} \ge 8\ \wedge\ t \ge 8"}],
                 ],
             },
             {
