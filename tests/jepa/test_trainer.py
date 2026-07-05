@@ -4,7 +4,9 @@ import pytest
 import torch
 import torch.nn as nn
 
+from configuration.architectures      import Conv2dImageAutoencoderConfig
 from configuration.training.jepa      import EmbeddingLossConfig
+from models.image_autoencoder         import get_image_autoencoder
 from pipelines.jepa.training.coupling import CouplingMode, TargetProvider
 from pipelines.jepa.training.loss     import Loss as EmbeddingLoss
 from pipelines.jepa.training.trainer  import JepaModule, Trainer
@@ -33,6 +35,21 @@ def test_jepa_module_image_autoencoder_disabled_by_default():
 
     assert module.image_autoencoder   is None
     assert module.profile_autoencoder is not None
+
+
+def test_jepa_module_forward_routes_through_image_autoencoder():
+    image_cfg    = Conv2dImageAutoencoderConfig(in_channels=2, embedding_dim=4, base_channels=4, depth=1, downsample_factor=2)
+    image_ae, _  = get_image_autoencoder("conv2d_ae", image_cfg)
+    backbone     = nn.Conv2d(4, EMBEDDING_DIM, kernel_size=1)
+    module       = JepaModule(backbone, profile_autoencoder=make_autoencoder("none"), image_autoencoder=image_ae)
+    module.eval()
+
+    images = torch.randn(2, 2, 8, 8)
+
+    with torch.no_grad():
+        out = module(images)
+
+    assert out.shape == (2, EMBEDDING_DIM, 8, 8)
 
 
 def test_validate_coupling_live_requires_finetune():

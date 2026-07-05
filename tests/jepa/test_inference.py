@@ -11,7 +11,9 @@ import torch.nn as nn
 from pipelines.backbone.dataset.spatial    import GridInfo
 from pipelines.backbone.inference.loader    import RunLoader
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
-from pipelines.jepa.inference.loader         import JepaInferenceModel, JepaRunLoader
+from configuration.architectures             import Conv2dImageAutoencoderConfig, UNetConfig
+from pipelines.jepa.inference.loader         import JepaInferenceModel, JepaParamRunLoader, JepaRunLoader
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO
 from pipelines.jepa.inference.pipeline       import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
 from pipelines.jepa.inference.predictor      import JepaCurvePredictor
 from pipelines.jepa.training.trainer         import JepaModule
@@ -57,6 +59,30 @@ def test_jepa_inference_model_curve_is_nonnegative():
         out = adapter(images)
 
     assert (out >= 0.0).all()
+
+
+def test_jepa_param_run_loader_builds_image_frontend_module(tmp_path):
+    meta_dir = tmp_path / "meta"
+    meta_dir.mkdir()
+
+    image_cfg = Conv2dImageAutoencoderConfig(in_channels=2, embedding_dim=4, base_channels=4, depth=1, downsample_factor=2)
+    ImageAutoencoderConfigIO.save(image_cfg, "conv2d_ae", meta_dir)
+
+    backbone_cfg = UNetConfig(in_channels=4, out_channels=6, features=(8, 16))
+    BackboneModelConfigIO.save(backbone_cfg, "unet", meta_dir)
+
+    loader = JepaParamRunLoader(tmp_path, logger=FakeLogger())
+    module = loader._build_model("unet", in_channels=2, out_channels=6, image_size=8)
+    module.eval()
+
+    assert isinstance(module, JepaModule)
+    assert module.profile_autoencoder is None
+    assert module.image_autoencoder   is not None
+
+    with torch.no_grad():
+        out = module(torch.randn(2, 2, 8, 8))
+
+    assert out.shape == (2, 6, 8, 8)
 
 
 def test_wrap_model_returns_model_wrapper_with_curve_output():

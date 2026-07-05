@@ -130,6 +130,61 @@ def test_loss_total_scales_components_by_weight(x_axis, norm_stats, profile_norm
     assert out["total_loss"].item() == pytest.approx(3.0 * raw.item(), rel=1e-6)
 
 
+def test_loss_cosine_term_zero_on_matching_embeddings(x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_embedding_cosine=True, weight_embedding_cosine=1.0, use_curve_recon=False)
+    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+
+    gt = torch.rand(2, N_GAUSSIANS * 3, SPATIAL, SPATIAL)
+
+    with torch.no_grad():
+        gt_curve   = GaussianCurve.reconstruct(gt.float(), x_axis, 3)
+        gt_curve_n = profile_normalizer.normalize(gt_curve)
+        z_star     = autoencoder.encoder(gt_curve_n)
+
+    out = loss(z_star, gt)
+
+    assert "embedding_cosine" in out["components"]
+    assert out["total_loss"].item() == pytest.approx(0.0, abs=1e-6)
+    assert loss(-z_star, gt)["total_loss"].item() > 1.0
+
+
+def test_loss_smoothl1_term_zero_on_matching_embeddings(x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_embedding_smoothl1=True, weight_embedding_smoothl1=1.0, smoothl1_beta=1.0, use_curve_recon=False)
+    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+
+    gt = torch.rand(2, N_GAUSSIANS * 3, SPATIAL, SPATIAL)
+
+    with torch.no_grad():
+        gt_curve   = GaussianCurve.reconstruct(gt.float(), x_axis, 3)
+        gt_curve_n = profile_normalizer.normalize(gt_curve)
+        z_star     = autoencoder.encoder(gt_curve_n)
+
+    out = loss(z_star, gt)
+
+    assert "embedding_smoothl1" in out["components"]
+    assert out["total_loss"].item() == pytest.approx(0.0, abs=1e-10)
+    assert loss(z_star + 1.0, gt)["total_loss"].item() > 0.0
+
+
+@pytest.mark.parametrize("kind", ["l1", "huber", "charbonnier"])
+def test_loss_curve_recon_kinds_compute_finite_terms(kind, x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_curve_recon=True, weight_curve_recon=1.0, curve_kind=kind)
+    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+    z_hat, gt   = random_inputs()
+
+    out = loss(z_hat, gt)
+
+    assert "curve_recon" in out["components"]
+    assert torch.isfinite(out["total_loss"])
+
+    out["total_loss"].backward()
+    assert z_hat.grad is not None
+    assert torch.isfinite(z_hat.grad).all()
+
+
 def test_loss_unknown_curve_kind_raises(x_axis, norm_stats, profile_normalizer):
     autoencoder = make_autoencoder("none")
     emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_curve_recon=True, curve_kind="bogus")
