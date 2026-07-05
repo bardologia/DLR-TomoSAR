@@ -13,7 +13,7 @@ class ConfigRegistry:
 
     SECTION_TITLES = {
         "sar"              : "SAR Processing",
-        "param"            : "Parameter Extraction",
+        "param_extraction" : "Parameter Extraction",
         "normalization"    : "Normalization",
         "dataset"          : "Dataset",
         "architectures"    : "Model Architectures",
@@ -22,9 +22,11 @@ class ConfigRegistry:
         "benchmark"        : "Benchmark",
         "cross_validation" : "Cross-validation",
         "tuning"           : "Tuning",
+        "comparison"       : "Run Comparison",
+        "diagnostics"      : "Diagnostics",
     }
 
-    SECTION_ORDER = ["sar", "param", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "tuning"]
+    SECTION_ORDER = ["sar", "param_extraction", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "tuning", "comparison", "diagnostics"]
 
     def __init__(self, paths: ProjectPaths) -> None:
         self.paths        = paths
@@ -105,22 +107,26 @@ class ConfigRegistry:
             return ""
         return ast.unparse(node)
 
-    def _sections(self) -> list[str]:
+    def _section_units(self) -> list[tuple[str, list[Path]]]:
         root  = self.paths.config_dir
-        found = [p.name for p in sorted(root.iterdir()) if p.is_dir() and not p.name.startswith(("_", "."))]
-        known = [s for s in self.SECTION_ORDER if s in found]
-        extra = [s for s in found if s not in self.SECTION_ORDER]
-        return known + extra
+        dirs  = [p for p in sorted(root.iterdir()) if p.is_dir()  and not p.name.startswith(("_", "."))]
+        files = [p for p in sorted(root.iterdir()) if p.is_file() and p.suffix == ".py" and p.name != "__init__.py"]
 
-    def _section_files(self, section: str) -> list[Path]:
-        section_dir = self.paths.config_dir / section
-        return [p for p in sorted(section_dir.rglob("*.py")) if p.name != "__init__.py"]
+        units: dict[str, list[Path]] = {}
+        for d in dirs:
+            units[d.name] = [p for p in sorted(d.rglob("*.py")) if p.name != "__init__.py"]
+        for f in files:
+            units[f.stem] = [f]
+
+        known = [s for s in self.SECTION_ORDER if s in units]
+        extra = [s for s in units if s not in self.SECTION_ORDER]
+        return [(s, units[s]) for s in known + extra]
 
     def _rel_module(self, path: Path) -> str:
         return path.relative_to(self.paths.config_dir).with_suffix("").as_posix()
 
     def _attach_descriptions(self, cls: dict) -> None:
-        entry            = self.descriptions[f"{cls['module']}::{cls['name']}"]
+        entry            = self.descriptions["configs"][f"{cls['module']}::{cls['name']}"]
         cls["desc"]      = entry["summary"]
         field_descs      = entry["fields"]
         for field in cls["fields"]:
@@ -128,9 +134,9 @@ class ConfigRegistry:
 
     def collect(self) -> list[dict]:
         groups = []
-        for section in self._sections():
+        for section, files in self._section_units():
             classes = []
-            for path in self._section_files(section):
+            for path in files:
                 for cls in self._parse_module(path):
                     cls["module"] = self._rel_module(path)
                     self._attach_descriptions(cls)
@@ -140,6 +146,7 @@ class ConfigRegistry:
             groups.append({
                 "module" : section,
                 "title"  : self.SECTION_TITLES.get(section, section.replace("_", " ").title()),
+                "desc"   : self.descriptions["sections"][section],
                 "classes": classes,
             })
         return groups

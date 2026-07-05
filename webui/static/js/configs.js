@@ -179,6 +179,13 @@ class ConfigBrowser {
       const inner    = document.createElement("div");
       inner.className = "cgroup__inner";
 
+      if (g.desc && !this.query) {
+        const intro = document.createElement("p");
+        intro.className   = "cgroup__desc";
+        intro.textContent = g.desc;
+        inner.appendChild(intro);
+      }
+
       classes.forEach((c) => {
         const count = this._visibleFields(c).length;
         const item  = document.createElement("button");
