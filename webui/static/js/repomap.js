@@ -91,10 +91,7 @@ class RepoMapView {
         </div>
       </div>
       <div class="rm__title">
-        <div class="rm__titletext">
-          <h3 class="rm__stage-name"></h3>
-          <p class="rm__blurb"></p>
-        </div>
+        <h3 class="rm__stage-name"></h3>
         <a class="rm__entry" target="_blank" rel="noopener"></a>
       </div>
       <div class="rm__stage">
@@ -117,7 +114,6 @@ class RepoMapView {
     this.labelsBtn = this.panel.querySelector(".rm-tool--labels");
     this.traceBtn  = this.panel.querySelector(".rm-tool--trace");
     this.nameEl    = this.panel.querySelector(".rm__stage-name");
-    this.blurbEl   = this.panel.querySelector(".rm__blurb");
     this.entryEl   = this.panel.querySelector(".rm__entry");
     this.legendEl  = this.panel.querySelector(".rm__legend");
     this.graphEl   = this.panel.querySelector(".rm-graph");
@@ -168,7 +164,6 @@ class RepoMapView {
     [...this.subtabsEl.children].forEach((b) => b.classList.toggle("is-active", b.dataset.key === this.diagram.key));
 
     this.nameEl.textContent  = this.diagram.title;
-    this.blurbEl.textContent = this.diagram.blurb || "";
 
     if (this.diagram.entry) {
       this.entryEl.style.display = "";
@@ -366,6 +361,11 @@ class RepoMapView {
     };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
+    // One-way faces: a node takes inputs on its LEFT and TOP, emits outputs on its
+    // RIGHT and BOTTOM. Downward-flowing wires therefore leave the bottom and enter the
+    // top (using the vertical faces), while level/upward wires stay on left/right; no face
+    // ever mixes an entering and a leaving wire. The rare backward edge arcs under as feedback.
+    const K = 0.5;
     const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
@@ -374,8 +374,13 @@ class RepoMapView {
       const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
       const dx  = bcx - acx, dy = bcy - acy;
       let fa, fb, axis;
-      if (Math.abs(dx) >= Math.abs(dy)) { axis = "h"; if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; } }
-      else                              { axis = "v"; if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; } }
+      if (bcx < acx - 6) {                                        // rare backward/feedback edge
+        if      (Math.abs(dy) < 10) { fa = "L"; fb = "R"; axis = "h"; }  // ~level: short direct hop
+        else if (dy > 0)            { fa = "B"; fb = "T"; axis = "v"; }  // loops down through the gap
+        else                        { fa = "T"; fb = "B"; axis = "v"; }  // loops up through the gap
+      }
+      else if (dy > Math.abs(dx) * K)     { fa = "B"; fb = "T"; axis = "v"; }
+      else                                { fa = "R"; fb = "L"; axis = "h"; }
       recs.push({ e, a, b, fa, fb, axis, acx, acy, bcx, bcy, bend: 0 });
     });
 

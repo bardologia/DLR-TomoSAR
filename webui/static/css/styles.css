@@ -3440,10 +3440,9 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .rm-tool.is-on { color: #f7f9ff; background: var(--accent-2); border-color: var(--accent-2); }
 .rm-tool__ic { font-size: 0.6rem; line-height: 1; }
 
-/* ---- Title / blurb / entry ---- */
-.rm__title { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px 6px; }
-.rm__stage-name { margin: 0 0 6px; font: 600 1.2rem/1.1 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
-.rm__blurb { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--ink-dim); max-width: 78ch; }
+/* ---- Title / entry ---- */
+.rm__title { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 9px 20px; }
+.rm__stage-name { margin: 0; font: 600 0.96rem/1.2 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
 .rm__entry {
   flex: none; font: 500 0.72rem/1 var(--mono); color: var(--accent);
   padding: 7px 11px; border: 1px solid var(--line); border-radius: var(--r-pill);
