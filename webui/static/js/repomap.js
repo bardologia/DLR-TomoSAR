@@ -365,7 +365,7 @@ class RepoMapView {
     // RIGHT and BOTTOM. Downward-flowing wires therefore leave the bottom and enter the
     // top (using the vertical faces), while level/upward wires stay on left/right; no face
     // ever mixes an entering and a leaving wire. The rare backward edge arcs under as feedback.
-    const K = 0.5;
+    const AV = 22;
     const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
@@ -373,15 +373,21 @@ class RepoMapView {
       const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
       const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
       const dx  = bcx - acx, dy = bcy - acy;
-      let fa, fb, axis;
-      if (bcx < acx - 6) {                                        // rare backward/feedback edge
-        if      (Math.abs(dy) < 10) { fa = "L"; fb = "R"; axis = "h"; }  // ~level: short direct hop
-        else if (dy > 0)            { fa = "B"; fb = "T"; axis = "v"; }  // loops down through the gap
-        else                        { fa = "T"; fb = "B"; axis = "v"; }  // loops up through the gap
+      let fa, fb, shape;
+      if (bcx < acx - 6) {                                          // rare backward/feedback edge
+        if      (Math.abs(dy) < 12)  { fa = "L"; fb = "R"; shape = "hvh"; }
+        else if (dy > 0)             { fa = "B"; fb = "T"; shape = "vhv"; }
+        else                         { fa = "T"; fb = "B"; shape = "vhv"; }
+      } else if (Math.abs(dy) <= AV) {                              // same row: straight across
+        fa = "R"; fb = "L"; shape = "hvh";
+      } else if (dy > 0) {                                          // flowing down
+        if      (dx <= a.w * 0.5)    { fa = "B"; fb = "T"; shape = "vhv"; }   // ~same column: straight down
+        else if (dx >= dy)           { fa = "R"; fb = "T"; shape = "hv";  }   // right, then down (single elbow)
+        else                         { fa = "B"; fb = "L"; shape = "vh";  }   // down, then right (single elbow)
+      } else {                                                     // flowing up: balanced side route
+        fa = "R"; fb = "L"; shape = "hvh";
       }
-      else if (dy > Math.abs(dx) * K)     { fa = "B"; fb = "T"; axis = "v"; }
-      else                                { fa = "R"; fb = "L"; axis = "h"; }
-      recs.push({ e, a, b, fa, fb, axis, acx, acy, bcx, bcy, bend: 0 });
+      recs.push({ e, a, b, fa, fb, shape, acx, acy, bcx, bcy, bend: 0 });
     });
 
     // Spread the wires meeting each node across that face so multiple arrows never share a
@@ -414,7 +420,7 @@ class RepoMapView {
     });
 
     recs.forEach((r) => {
-      const geom  = this._orthPath(r.pa, r.pb, r.axis, r.bend);
+      const geom  = this._orthPath(r.pa, r.pb, r.shape, r.bend);
       const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
 
       const base = this._path(geom.d, "rm-wire", color);
@@ -446,17 +452,23 @@ class RepoMapView {
     return p;
   }
 
-  _orthPath(pa, pb, axis, bend) {
+  _orthPath(pa, pb, shape, bend) {
     const bnd = bend || 0;
 
-    if (axis === "h") {
+    if (shape === "hv") {                                        // single elbow: across, then down
+      return { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };
+    }
+    if (shape === "vh") {                                        // single elbow: down, then across
+      return { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
+    }
+    if (shape === "hvh") {                                       // facing L/R sides: balanced Z
       let mx = (pa.x + pb.x) / 2 + bnd;
       const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
       if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
       return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
     }
 
-    let my = (pa.y + pb.y) / 2 + bnd;
+    let my = (pa.y + pb.y) / 2 + bnd;                            // vhv: facing T/B sides
     const lo = Math.min(pa.y, pb.y) + 8, hi = Math.max(pa.y, pb.y) - 8;
     if (lo <= hi) my = Math.max(lo, Math.min(hi, my));
     return { d: `M ${pa.x} ${pa.y} V ${my} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my };
