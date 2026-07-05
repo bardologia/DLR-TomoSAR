@@ -134,7 +134,7 @@
               "writes": [
                 "geometry_field.npz"
               ],
-              "row": 2
+              "row": 3
             },
             {
               "id": "meta",
@@ -150,50 +150,50 @@
                 "meta_inputs.txt",
                 "dataset.json"
               ],
-              "row": 0
+              "row": 1
             }
           ],
           "edges": [
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "ProcessingConfig sessions (per win filter)",
+              "label": "sessions per win filter",
               "kind": "control"
             },
             {
               "from": "config",
               "to": "pipeline",
-              "label": "run config (crop, tracks, paths)",
+              "label": "crop, tracks, paths",
               "kind": "data"
             },
             {
               "from": "registry",
               "to": "pipeline",
-              "label": "resolved .npy output paths",
+              "label": "resolved .npy paths",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "tomo_launcher",
-              "label": "tomogram spec (crop, tracks, out paths)",
+              "label": "tomogram spec",
               "kind": "data"
             },
             {
               "from": "tomo_launcher",
               "to": "tomo_gen",
-              "label": "tomogram_spec.json via pyrat subprocess",
+              "label": "via pyrat subprocess",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "inf_launcher",
-              "label": "interferogram spec (crop, tracks, out paths)",
+              "label": "interferogram spec",
               "kind": "data"
             },
             {
               "from": "inf_launcher",
               "to": "inf_gen",
-              "label": "interferogram_spec.json via pyrat subprocess",
+              "label": "via pyrat subprocess",
               "kind": "control"
             },
             {
@@ -205,7 +205,7 @@
             {
               "from": "inf_gen",
               "to": "geom",
-              "label": "track_parameters + track_profiles",
+              "label": "track params + profiles",
               "kind": "data"
             },
             {
@@ -217,7 +217,7 @@
             {
               "from": "pipeline",
               "to": "meta",
-              "label": "stage metadata + pass_labels + config",
+              "label": "stage metadata + config",
               "kind": "data"
             }
           ],
@@ -300,7 +300,7 @@
             }
           ],
           "ncol": 5,
-          "nrow": 3
+          "nrow": 4
         },
         {
           "key": "preprocessing-analysis",
@@ -411,13 +411,13 @@
             {
               "from": "scheduler",
               "to": "stack_pipeline",
-              "label": "run_dir per trial session",
+              "label": "run_dir per trial",
               "kind": "control"
             },
             {
               "from": "stack_pipeline",
               "to": "plotter",
-              "label": "stack paths + max_amplitude_clip + pass_labels",
+              "label": "paths + clip + labels",
               "kind": "data"
             }
           ],
@@ -488,7 +488,7 @@
               "module": "main/processing/extract_params.py",
               "role": "entry",
               "fn": "Bootstraps the sweep: pins GPUs, resolves the dataset queue and per-permutation plans, then runs one ParamExtractionPipeline per plan with a shared PeakInitialiser.",
-              "col": 0,
+              "col": 1,
               "reads": [],
               "writes": [],
               "row": 0
@@ -510,7 +510,7 @@
               "module": "pipelines/tomogram",
               "role": "external",
               "fn": "Full tomogram cube (H x Az x R) produced by the tomogram-generation pipeline, discovered from each dataset's data/ directory.",
-              "col": 0,
+              "col": 1,
               "reads": [],
               "writes": [
                 "tomogram_full.npy"
@@ -591,7 +591,7 @@
               "module": "pipelines/processing/param_extraction/io.py",
               "role": "io",
               "fn": "Saves the mu-sorted parameters.npy, the fit_diagnostics.npz and the param_extraction_meta.json describing K, lambda, thresholds and the source tomogram.",
-              "col": 4,
+              "col": 2,
               "reads": [],
               "writes": [
                 "parameters.npy",
@@ -605,61 +605,61 @@
             {
               "from": "config",
               "to": "queue",
-              "label": "sweep config (paths, K/lambda/mode lists)",
+              "label": "paths + K/lambda/mode",
               "kind": "control"
             },
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "instantiates pipeline, injects shared PeakInitialiser",
+              "label": "new pipeline + PeakInit",
               "kind": "control"
             },
             {
               "from": "queue",
               "to": "pipeline",
-              "label": "ExtractionConfig plan (per permutation)",
+              "label": "ExtractionConfig plan",
               "kind": "control"
             },
             {
               "from": "tomo_in",
               "to": "pipeline",
-              "label": "tomogram_full.npy path (discover_tomogram_path)",
+              "label": "tomogram_full.npy path",
               "kind": "io"
             },
             {
               "from": "pipeline",
               "to": "sigma_fit",
-              "label": "tomogram_path + height_range",
+              "label": "path + height_range",
               "kind": "control"
             },
             {
               "from": "sigma_fit",
               "to": "init",
-              "label": "raw active profile batch + height axis",
+              "label": "profile batch + axis",
               "kind": "data"
             },
             {
               "from": "init",
               "to": "kernel",
-              "label": "peak-seeded (a, mu, sigma) inits per K",
+              "label": "peak-seeded inits per K",
               "kind": "data"
             },
             {
               "from": "kernel",
               "to": "selector",
-              "label": "Adam-fitted (a, mu, sigma) candidates per K",
+              "label": "fitted params per K",
               "kind": "data"
             },
             {
               "from": "selector",
               "to": "pipeline",
-              "label": "best-K params + mse/penalised/best_k maps",
+              "label": "best-K params + maps",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "io",
-              "label": "mu-sorted parameter stack + diagnostics + meta",
+              "label": "params + diag + meta",
               "kind": "io"
             }
           ],
@@ -745,7 +745,7 @@
               "module": "pipelines/processing/param_extraction",
               "role": "external",
               "fn": "An extraction run directory (parameters.npy, fit_diagnostics.npz, param_extraction_meta.json and the source tomogram) produced by the Extraction stage.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [
                 "parameters.npy",
@@ -753,7 +753,7 @@
                 "param_extraction_meta.json",
                 "tomogram_full.npy"
               ],
-              "row": 2
+              "row": 0
             },
             {
               "id": "scheduler",
@@ -794,7 +794,7 @@
                 "param_extraction_meta.json"
               ],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "metrics",
@@ -807,7 +807,7 @@
                 "tomogram_full.npy"
               ],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "plots",
@@ -820,68 +820,68 @@
               "writes": [
                 "result plots (PNG)"
               ],
-              "row": 1
+              "row": 0
             }
           ],
           "edges": [
             {
               "from": "config",
               "to": "scheduler",
-              "label": "params_dir, run_tags, make_plots",
+              "label": "params_dir, tags, plots",
               "kind": "control"
             },
             {
               "from": "entry",
               "to": "scheduler",
-              "label": "bootstraps inference scheduler",
+              "label": "bootstraps scheduler",
               "kind": "control"
             },
             {
               "from": "trial_in",
               "to": "scheduler",
-              "label": "rglob param_extraction_meta.json (trial discovery)",
+              "label": "rglob meta (discovery)",
               "kind": "io"
             },
             {
               "from": "scheduler",
               "to": "run_pipe",
-              "label": "run_dir per trial (ParamInferenceSession)",
+              "label": "run_dir per trial",
               "kind": "control"
             },
             {
               "from": "run_pipe",
               "to": "io",
-              "label": "run_dir + parameters/diagnostics/meta filenames",
+              "label": "run_dir + filenames",
               "kind": "control"
             },
             {
               "from": "trial_in",
               "to": "io",
-              "label": "parameters.npy + fit_diagnostics.npz + meta.json",
+              "label": "params/diag/meta files",
               "kind": "io"
             },
             {
               "from": "io",
               "to": "metrics",
-              "label": "parameters array + diagnostics + meta",
+              "label": "loaded arrays + meta",
               "kind": "data"
             },
             {
               "from": "trial_in",
               "to": "metrics",
-              "label": "source tomogram_full.npy (reloaded for R2/contrast)",
+              "label": "source tomogram",
               "kind": "io"
             },
             {
               "from": "metrics",
               "to": "plots",
-              "label": "metrics_dict (R2/activity/contrast/K-margin maps + summaries)",
+              "label": "metric maps + summaries",
               "kind": "data"
             },
             {
               "from": "run_pipe",
               "to": "plots",
-              "label": "make_plots gate + run_dir",
+              "label": "make_plots gate",
               "kind": "control"
             }
           ],
@@ -952,7 +952,7 @@
             }
           ],
           "ncol": 6,
-          "nrow": 3
+          "nrow": 2
         }
       ]
     },
@@ -977,7 +977,7 @@
               "col": 0,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "geom",
@@ -1016,7 +1016,7 @@
                 "preprocessing arrays (*.npy)"
               ],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "patcher",
@@ -1027,7 +1027,7 @@
               "col": 2,
               "reads": [],
               "writes": [],
-              "row": 2
+              "row": 0
             },
             {
               "id": "dataset",
@@ -1128,7 +1128,7 @@
             {
               "from": "cropper",
               "to": "dataset",
-              "label": "cropped input/param/DEM arrays",
+              "label": "cropped input/param/DEM",
               "kind": "data"
             },
             {
@@ -1303,13 +1303,13 @@
               "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "external",
               "fn": "Dataset-stage boundary that returns train/val/test loaders, the fitted normalizer and the datasets.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [
                 "train/val/test DataLoaders",
                 "normalization_stats.json"
               ],
-              "row": 0
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -1339,7 +1339,7 @@
               "module": "pipelines/backbone/training/trainer.py",
               "role": "orchestrator",
               "fn": "Runs the epoch loop with EMA, warmup/LR schedule, curriculum loss swap and checkpointing, saving the best model on validation.",
-              "col": 3,
+              "col": 4,
               "reads": [
                 "normalization_stats.json"
               ],
@@ -1355,7 +1355,7 @@
               "module": "pipelines/backbone/training/loss.py",
               "role": "transform",
               "fn": "Reconstructs Gaussian curves and computes the weighted sum of curve, parameter, TV and physics terms declared in loss_terms.py, plus occupancy diagnostics.",
-              "col": 3,
+              "col": 4,
               "reads": [],
               "writes": [],
               "row": 2
@@ -1366,12 +1366,12 @@
               "module": "pipelines/shared/training/overfit_check.py",
               "role": "transform",
               "fn": "Pre-training sanity gate that memorizes a few sanitized examples and aborts the run on failure.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "meta/overfit_report.json"
               ],
-              "row": 2
+              "row": 0
             },
             {
               "id": "loss_probe",
@@ -1379,7 +1379,7 @@
               "module": "pipelines/backbone/training/loss_probe.py",
               "role": "metric",
               "fn": "Optionally averages each loss term at weight 1 over a few batches to suggest comparable-magnitude weights, then may exit.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [],
               "row": 2
@@ -1390,7 +1390,7 @@
               "module": "pipelines/backbone/training/diagnostics.py",
               "role": "metric",
               "fn": "Selects representative validation pixels and logs predicted-vs-GT profile reconstructions and predicted-parameter histograms per epoch.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [],
               "row": 1
@@ -1401,7 +1401,7 @@
               "module": "pipelines/backbone/training/docs.py",
               "role": "io",
               "fn": "Runs a shape-hooked forward pass to render a layer-by-layer model documentation table to markdown.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [
                 "docs/model_doc.md"
@@ -1459,25 +1459,25 @@
             {
               "from": "pipeline",
               "to": "model_builder",
-              "label": "in/out channels, backbone name",
+              "label": "channels + backbone name",
               "kind": "control"
             },
             {
               "from": "model_builder",
               "to": "trainer",
-              "label": "backbone model + model_cfg",
+              "label": "model + model_cfg",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "trainer",
-              "label": "x_axis, config, normalizer",
+              "label": "x_axis, cfg, normalizer",
               "kind": "control"
             },
             {
               "from": "dataset_pipeline",
               "to": "trainer",
-              "label": "train loader + norm_stats",
+              "label": "loader + norm_stats",
               "kind": "data"
             },
             {
@@ -1489,7 +1489,7 @@
             {
               "from": "pipeline",
               "to": "overfit_check",
-              "label": "sanitized model + trainer",
+              "label": "sanitized model+trainer",
               "kind": "control"
             },
             {
@@ -1501,7 +1501,7 @@
             {
               "from": "trainer",
               "to": "diagnostics",
-              "label": "val batches + pred curves",
+              "label": "val batches + preds",
               "kind": "data"
             },
             {
@@ -1594,7 +1594,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 5,
+          "ncol": 6,
           "nrow": 3
         },
         {
@@ -1742,7 +1742,7 @@
                 "figures/*.png",
                 "animations/*.gif"
               ],
-              "row": 0
+              "row": 1
             },
             {
               "id": "report",
@@ -1755,7 +1755,7 @@
               "writes": [
                 "report.md"
               ],
-              "row": 1
+              "row": 0
             }
           ],
           "edges": [
@@ -1786,19 +1786,19 @@
             {
               "from": "loader",
               "to": "model_wrapper",
-              "label": "net + normalizer + amp_max",
+              "label": "net + norm + amp_max",
               "kind": "data"
             },
             {
               "from": "loader",
               "to": "predictor",
-              "label": "Run (loader, dataset, grid)",
+              "label": "Run (dataset, grid)",
               "kind": "data"
             },
             {
               "from": "model_wrapper",
               "to": "predictor",
-              "label": "denormalized clamped params",
+              "label": "denorm clamped params",
               "kind": "data"
             },
             {
@@ -1810,7 +1810,7 @@
             {
               "from": "predictor",
               "to": "metrics",
-              "label": "Result (pred/GT curves + params)",
+              "label": "pred/GT curves + params",
               "kind": "data"
             },
             {
@@ -2020,7 +2020,7 @@
               "col": 2,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "dataset",
@@ -2039,10 +2039,10 @@
               "module": "pipelines/profile_autoencoder/dataset/augmentation.py",
               "role": "transform",
               "fn": "Applies train-only amplitude scaling, circular shift, flip and post-normalization Gaussian noise to each curve.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "norm",
@@ -2079,55 +2079,55 @@
             {
               "from": "pipeline",
               "to": "layout",
-              "label": "preprocessing run dir + parameters_path",
+              "label": "run dir + params_path",
               "kind": "control"
             },
             {
               "from": "layout",
               "to": "cropper",
-              "label": "global_crop + memmapped parameters",
+              "label": "crop + memmap params",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "curve",
-              "label": "x_min/x_max + profile_length -> x_axis",
+              "label": "axis bounds -> x_axis",
               "kind": "control"
             },
             {
               "from": "cropper",
               "to": "dataset",
-              "label": "per-split param arrays (list[ndarray])",
+              "label": "per-split param arrays",
               "kind": "data"
             },
             {
               "from": "curve",
               "to": "dataset",
-              "label": "x_axis + GaussianMixture curve eval",
+              "label": "x_axis + curve eval",
               "kind": "data"
             },
             {
               "from": "augment",
               "to": "dataset",
-              "label": "train-only amp/shift/flip + noise",
+              "label": "amp/shift/flip + noise",
               "kind": "data"
             },
             {
               "from": "dataset",
               "to": "norm",
-              "label": "sampled train curves to fit stats",
+              "label": "sampled curves -> stats",
               "kind": "data"
             },
             {
               "from": "norm",
               "to": "loader",
-              "label": "log1p+standardize applied per curve",
+              "label": "log1p+standardize curves",
               "kind": "data"
             },
             {
               "from": "dataset",
               "to": "loader",
-              "label": "train/val/test ProfileDatasets",
+              "label": "train/val/test datasets",
               "kind": "data"
             }
           ],
@@ -2274,7 +2274,7 @@
               "module": "pipelines/autoencoder_common/trainer.py",
               "role": "orchestrator",
               "fn": "Shared AE trainer (extends tools BaseTrainer): builds model_cfg param groups, runs the epoch/validation loop and checkpoints best_model.pt.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [
                 "best_model.pt"
@@ -2292,55 +2292,55 @@
             {
               "from": "entry",
               "to": "runner",
-              "label": "SeedSweepLauncher runs SingleTrainRunner per seed",
+              "label": "runs per seed",
               "kind": "control"
             },
             {
               "from": "runner",
               "to": "pipeline",
-              "label": "builds and runs TrainingPipeline(config)",
+              "label": "builds TrainingPipeline",
               "kind": "control"
             },
             {
               "from": "datasetpipe",
               "to": "pipeline",
-              "label": "train/val/test loaders + x_axis + x_len",
+              "label": "loaders + x_axis + x_len",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "model",
-              "label": "x_len -> profile_length; get_profile_autoencoder(cfg)",
+              "label": "builds autoencoder",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "aetrainer",
-              "label": "loaders + trainer_config for the epoch loop",
+              "label": "loaders + trainer_config",
               "kind": "data"
             },
             {
               "from": "model",
               "to": "trainer",
-              "label": "reconstruct(curve) -> curve_hat, latent z",
+              "label": "reconstruct(curve)",
               "kind": "data"
             },
             {
               "from": "trainer",
               "to": "loss",
-              "label": "builds Loss(ae_loss) criterion",
+              "label": "builds Loss criterion",
               "kind": "data"
             },
             {
               "from": "loss",
               "to": "aetrainer",
-              "label": "per-batch reconstruction loss",
+              "label": "per-batch loss",
               "kind": "data"
             },
             {
               "from": "trainer",
               "to": "aetrainer",
-              "label": "_compute_loss / _build_criterion hooks; extends shared loop",
+              "label": "loss/criterion hooks",
               "kind": "control"
             }
           ],
@@ -2449,7 +2449,7 @@
                 "profile_ae config json"
               ],
               "writes": [],
-              "row": 1
+              "row": 2
             },
             {
               "id": "predictor",
@@ -2506,55 +2506,55 @@
             {
               "from": "cfg",
               "to": "pipeline",
-              "label": "ProfileAeInferenceConfig",
+              "label": "inference config",
               "kind": "control"
             },
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "InferenceEntry(RunType.PROFILE_AE) builds & runs pipeline",
+              "label": "builds & runs pipeline",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "metadata",
-              "label": "output/figures/logs dirs + metrics/report paths",
+              "label": "output dirs + paths",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "loader",
-              "label": "run_directory + split + device",
+              "label": "run dir + split + device",
               "kind": "control"
             },
             {
               "from": "loader",
               "to": "predictor",
-              "label": "ProfileAeRun (model, normalizer, DataLoader, x_axis)",
+              "label": "ProfileAeRun",
               "kind": "data"
             },
             {
               "from": "predictor",
               "to": "metrics",
-              "label": "AeResult (gt, pred, embeddings)",
+              "label": "AeResult (gt, pred, emb)",
               "kind": "data"
             },
             {
               "from": "predictor",
               "to": "plots",
-              "label": "AeResult curves + embeddings + per-curve MSE",
+              "label": "curves + emb + MSE",
               "kind": "data"
             },
             {
               "from": "predictor",
               "to": "pipeline",
-              "label": "embeddings -> embeddings.npy",
+              "label": "embeddings.npy",
               "kind": "data"
             },
             {
               "from": "metrics",
               "to": "report",
-              "label": "metrics dict (+ metrics.json)",
+              "label": "metrics dict",
               "kind": "data"
             },
             {
@@ -2672,7 +2672,7 @@
               "col": 2,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "consumer",
@@ -2683,26 +2683,26 @@
               "col": 3,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             }
           ],
           "edges": [
             {
               "from": "prep",
               "to": "dspipe",
-              "label": "DatasetConfig + GaussianAxis",
+              "label": "config + GaussianAxis",
               "kind": "control"
             },
             {
               "from": "dspipe",
               "to": "loaders",
-              "label": "train/val/test DataLoaders + PatchDatasets",
+              "label": "loaders + PatchDatasets",
               "kind": "data"
             },
             {
               "from": "loaders",
               "to": "consumer",
-              "label": "input-image patch batches (batch[0])",
+              "label": "input patches batch[0]",
               "kind": "data"
             }
           ],
@@ -2730,7 +2730,7 @@
             }
           ],
           "ncol": 4,
-          "nrow": 2
+          "nrow": 1
         },
         {
           "key": "imageae-training",
@@ -2851,31 +2851,31 @@
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "ImageAeEntryConfig via SeedSweepLauncher/SingleTrainRunner",
+              "label": "via SeedSweepLauncher",
               "kind": "control"
             },
             {
               "from": "cfg",
               "to": "pipeline",
-              "label": "ae_model_name, ae_loss, geometry, paths",
+              "label": "model, loss, geom, paths",
               "kind": "data"
             },
             {
               "from": "data",
               "to": "pipeline",
-              "label": "DataLoaders + in_channels",
+              "label": "loaders + in_channels",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "model",
-              "label": "in_channels + ImageAutoencoderConfig",
+              "label": "in_channels + ae config",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "trainer",
-              "label": "loaders + x_axis + run_dir",
+              "label": "loaders, x_axis, run_dir",
               "kind": "control"
             },
             {
@@ -2887,13 +2887,13 @@
             {
               "from": "loss",
               "to": "trainer",
-              "label": "ReconstructionLoss criterion",
+              "label": "ReconstructionLoss",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "configio",
-              "label": "arch config + run_summary fields",
+              "label": "config + run_summary",
               "kind": "control"
             },
             {
@@ -2905,7 +2905,7 @@
             {
               "from": "configio",
               "to": "jepa",
-              "label": "image_autoencoder config + embedding_dim",
+              "label": "config + embedding_dim",
               "kind": "data"
             }
           ],
@@ -2983,7 +2983,7 @@
               "module": "pipelines/autoencoder_common/inference/metadata.py",
               "role": "io",
               "fn": "Creates the output/figures/logs directories under run/inference/image_ae and holds the metrics and report paths.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [],
               "row": 0
@@ -3059,7 +3059,7 @@
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "ImageAeInferenceConfig + run_directory",
+              "label": "config + run_dir",
               "kind": "control"
             },
             {
@@ -3077,13 +3077,13 @@
             {
               "from": "loader",
               "to": "predictor",
-              "label": "ImageAeRun (model, DataLoader, normalizer)",
+              "label": "ImageAeRun bundle",
               "kind": "data"
             },
             {
               "from": "predictor",
               "to": "metrics",
-              "label": "AeResult (gt, pred, embeddings)",
+              "label": "AeResult (gt/pred/emb)",
               "kind": "data"
             },
             {
@@ -3095,7 +3095,7 @@
             {
               "from": "metrics",
               "to": "plots",
-              "label": "channel_mse + per_patch_mse",
+              "label": "channel + patch MSE",
               "kind": "data"
             },
             {
@@ -3199,10 +3199,10 @@
               "module": "configuration/training/jepa.py",
               "role": "config",
               "fn": "Dataclass carrying the backbone name, the profile/image autoencoder runs and freeze-or-finetune modes, target_provider, embedding_loss and param_loss knobs.",
-              "col": 1,
+              "col": 0,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -3210,7 +3210,7 @@
               "module": "pipelines/jepa/training/pipeline.py",
               "role": "orchestrator",
               "fn": "Resolves the autoencoder runs, assembles JepaTrainerConfig, builds the module, runs the overfit gate, and launches the trainer.",
-              "col": 2,
+              "col": 1,
               "reads": [
                 "profile_autoencoder best_model.pt",
                 "image_autoencoder best_model.pt"
@@ -3218,7 +3218,7 @@
               "writes": [
                 "JEPA run meta (configs + ProfileStats)"
               ],
-              "row": 0
+              "row": 1
             },
             {
               "id": "preproc",
@@ -3226,12 +3226,12 @@
               "module": "pipelines/preprocessing",
               "role": "external",
               "fn": "Preprocessing run supplying the input SLC stack and per-pixel Gaussian-parameter arrays consumed by the dataset preparation.",
-              "col": 0,
+              "col": 1,
               "reads": [],
               "writes": [
                 "preprocessing input + parameter arrays"
               ],
-              "row": 1
+              "row": 0
             },
             {
               "id": "prof_ckpt",
@@ -3239,7 +3239,7 @@
               "module": "pipelines/profile_autoencoder",
               "role": "external",
               "fn": "Pretrained profile-autoencoder best_model.pt plus its config and ProfileStats, owned by the profile-autoencoder pipeline.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [
                 "profile_autoencoder best_model.pt"
@@ -3252,7 +3252,7 @@
               "module": "pipelines/image_autoencoder",
               "role": "external",
               "fn": "Pretrained image-autoencoder best_model.pt plus its config, owned by the image-autoencoder pipeline, used as an optional spatial frontend.",
-              "col": 3,
+              "col": 2,
               "reads": [],
               "writes": [
                 "image_autoencoder best_model.pt"
@@ -3265,12 +3265,12 @@
               "module": "pipelines/shared/dataset/dataset_prep.py",
               "role": "data",
               "fn": "Shared preparation that crops patches and yields train/val/test DataLoaders of (input stack, GT params) plus the elevation x-axis.",
-              "col": 1,
+              "col": 2,
               "reads": [
                 "preprocessing input + parameter arrays"
               ],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "module",
@@ -3284,7 +3284,7 @@
                 "image_autoencoder best_model.pt"
               ],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "coupling",
@@ -3295,7 +3295,7 @@
               "col": 4,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "trainer",
@@ -3308,7 +3308,7 @@
               "writes": [
                 "JEPA predictor best_model.pt"
               ],
-              "row": 1
+              "row": 0
             },
             {
               "id": "loss",
@@ -3319,7 +3319,7 @@
               "col": 5,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "out_ckpt",
@@ -3332,7 +3332,7 @@
                 "JEPA predictor best_model.pt"
               ],
               "writes": [],
-              "row": 1
+              "row": 0
             }
           ],
           "edges": [
@@ -3345,19 +3345,19 @@
             {
               "from": "cfg",
               "to": "pipeline",
-              "label": "entry config -> JepaTrainerConfig + dataset config",
+              "label": "trainer + dataset config",
               "kind": "control"
             },
             {
               "from": "preproc",
               "to": "dataprep",
-              "label": "input stack + GT parameter arrays",
+              "label": "input stack + GT params",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "dataprep",
-              "label": "DatasetConfig + trainer_config",
+              "label": "dataset + trainer config",
               "kind": "control"
             },
             {
@@ -3369,19 +3369,19 @@
             {
               "from": "dataprep",
               "to": "trainer",
-              "label": "train/val/test DataLoaders (images, GT params)",
+              "label": "train/val/test loaders",
               "kind": "data"
             },
             {
               "from": "prof_ckpt",
               "to": "module",
-              "label": "profile AE weights + config",
+              "label": "profile AE weights",
               "kind": "io"
             },
             {
               "from": "img_ckpt",
               "to": "module",
-              "label": "image AE weights + config",
+              "label": "image AE weights",
               "kind": "io"
             },
             {
@@ -3405,13 +3405,13 @@
             {
               "from": "coupling",
               "to": "trainer",
-              "label": "CouplingMode applied (freeze / finetune)",
+              "label": "freeze / finetune",
               "kind": "control"
             },
             {
               "from": "coupling",
               "to": "loss",
-              "label": "TargetProvider -> target embedding z*",
+              "label": "target embedding z*",
               "kind": "data"
             },
             {
@@ -3423,7 +3423,7 @@
             {
               "from": "trainer",
               "to": "out_ckpt",
-              "label": "best_model.pt (predictor weights, x-axis)",
+              "label": "predictor best_model.pt",
               "kind": "io"
             }
           ],
@@ -3508,13 +3508,13 @@
               "module": "pipelines/jepa/training/trainer.py",
               "role": "external",
               "fn": "Trained JEPA predictor best_model.pt with meta configs and ProfileStats produced by JEPA training.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [
                 "JEPA predictor best_model.pt",
                 "JEPA run meta (configs + ProfileStats)"
               ],
-              "row": 2
+              "row": 1
             },
             {
               "id": "components",
@@ -3620,55 +3620,55 @@
             {
               "from": "resolver",
               "to": "components",
-              "label": "selects JEPA loader/predictor/evaluator",
+              "label": "selects JEPA components",
               "kind": "control"
             },
             {
               "from": "components",
               "to": "pipeline",
-              "label": "InferenceComponents (class bindings)",
+              "label": "class bindings",
               "kind": "control"
             },
             {
               "from": "in_ckpt",
               "to": "loader",
-              "label": "best_model.pt + meta configs + ProfileStats",
+              "label": "best_model.pt + meta",
               "kind": "io"
             },
             {
               "from": "pipeline",
               "to": "loader",
-              "label": "run_directory, split, checkpoint_name",
+              "label": "run dir, split, ckpt",
               "kind": "control"
             },
             {
               "from": "loader",
               "to": "adapter",
-              "label": "JepaModule + ProfileNormalizer",
+              "label": "JepaModule + normalizer",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "predictor",
-              "label": "Run + stitch/window config",
+              "label": "stitch/window config",
               "kind": "control"
             },
             {
               "from": "adapter",
               "to": "predictor",
-              "label": "run.model(images) -> predicted curves",
+              "label": "model(images) -> curves",
               "kind": "data"
             },
             {
               "from": "adapter",
               "to": "embed_eval",
-              "label": "JepaModule (z_hat, decode)",
+              "label": "z_hat + decode",
               "kind": "data"
             },
             {
               "from": "predictor",
               "to": "curve_cubes",
-              "label": "pred/gt cubes + pixel maps (.npy)",
+              "label": "cubes + maps (.npy)",
               "kind": "io"
             },
             {
@@ -3680,7 +3680,7 @@
             {
               "from": "embed_eval",
               "to": "metrics_json",
-              "label": "embedding MSE/cosine + chain MSE",
+              "label": "embed MSE/cosine + chain",
               "kind": "io"
             }
           ],
@@ -3754,7 +3754,7 @@
               "col": 0,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 1
             },
             {
               "id": "dataset_json",
@@ -3795,7 +3795,7 @@
                 "run_summary.json",
                 "test_metrics.json"
               ],
-              "row": 2
+              "row": 1
             },
             {
               "id": "config_io",
@@ -3814,7 +3814,7 @@
                 "image_autoencoder_config.json",
                 "profile_dataset_config.json"
               ],
-              "row": 2
+              "row": 1
             },
             {
               "id": "train_pipeline",
@@ -3838,7 +3838,7 @@
                 "model_config.json"
               ],
               "writes": [],
-              "row": 2
+              "row": 1
             }
           ],
           "edges": [
@@ -3851,31 +3851,31 @@
             {
               "from": "dataset_json",
               "to": "factory",
-              "label": "global_crop + GaussianConfig + GeometryConfig",
+              "label": "crop + Gaussian + geom",
               "kind": "io"
             },
             {
               "from": "factory",
               "to": "train_pipeline",
-              "label": "DatasetConfig + BackboneTrainerConfig + InferenceConfig",
+              "label": "dataset+trainer+infer",
               "kind": "data"
             },
             {
               "from": "factory",
               "to": "run_meta",
-              "label": "BackboneTrainerConfig + logdir",
+              "label": "trainer cfg + logdir",
               "kind": "data"
             },
             {
               "from": "run_meta",
               "to": "config_io",
-              "label": "model config to serialize",
+              "label": "model cfg to serialize",
               "kind": "control"
             },
             {
               "from": "config_io",
               "to": "inference",
-              "label": "persisted model/dataset config",
+              "label": "persisted model/data cfg",
               "kind": "io"
             }
           ],
@@ -4014,7 +4014,7 @@
               "col": 4,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             }
           ],
           "edges": [
@@ -4027,19 +4027,19 @@
             {
               "from": "ds_cfg",
               "to": "layout",
-              "label": "preprocessing_run_directory + parameters_path",
+              "label": "run dir + params path",
               "kind": "io"
             },
             {
               "from": "layout",
               "to": "ds_pipeline",
-              "label": "artifact paths + profile_length + secondary_indices",
+              "label": "paths, profile, sec idx",
               "kind": "data"
             },
             {
               "from": "ds_prep",
               "to": "ds_pipeline",
-              "label": "n_gaussians + GaussianAxis x_axis",
+              "label": "n_gaussians + x_axis",
               "kind": "data"
             },
             {
@@ -4051,13 +4051,13 @@
             {
               "from": "loader",
               "to": "trainer",
-              "label": "train/val/test DataLoader",
+              "label": "train/val/test loaders",
               "kind": "data"
             },
             {
               "from": "ds_prep",
               "to": "trainer",
-              "label": "x_axis + x_len + datasets",
+              "label": "x_axis, x_len, datasets",
               "kind": "data"
             }
           ],
@@ -4166,7 +4166,7 @@
             {
               "from": "m_cfg",
               "to": "builder",
-              "label": "backbone_name + model_overrides",
+              "label": "name + overrides",
               "kind": "data"
             },
             {
@@ -4178,7 +4178,7 @@
             {
               "from": "builder",
               "to": "model_cfg",
-              "label": "model config dataclass",
+              "label": "config dataclass",
               "kind": "data"
             },
             {
@@ -4320,13 +4320,13 @@
             {
               "from": "entry",
               "to": "seed_launcher",
-              "label": "EntryConfig + runner class + argv",
+              "label": "config + runner + argv",
               "kind": "control"
             },
             {
               "from": "seed_launcher",
               "to": "seed_runner",
-              "label": "resolved config + runner_class",
+              "label": "config + runner_class",
               "kind": "data"
             },
             {
@@ -4338,7 +4338,7 @@
             {
               "from": "train_runner",
               "to": "preflight",
-              "label": "PretrainContext builder + config",
+              "label": "context builder + config",
               "kind": "control"
             },
             {
@@ -4350,7 +4350,7 @@
             {
               "from": "worker_base",
               "to": "train_pipeline",
-              "label": "subprocess training unit (run_dir + trainer config)",
+              "label": "subprocess run unit",
               "kind": "data"
             },
             {
@@ -4509,25 +4509,25 @@
             {
               "from": "entry",
               "to": "scheduler",
-              "label": "scheduler mode: config + run_type",
+              "label": "scheduler mode, run_type",
               "kind": "control"
             },
             {
               "from": "scheduler",
               "to": "run_classifier",
-              "label": "run dir + run_type filter",
+              "label": "run dir + type filter",
               "kind": "control"
             },
             {
               "from": "scheduler",
               "to": "gpu_queue",
-              "label": "GpuJob list (entry --worker --run-dir --config)",
+              "label": "per-run GpuJob list",
               "kind": "control"
             },
             {
               "from": "gpu_queue",
               "to": "worker",
-              "label": "worker subprocess: run_dir + resolved config",
+              "label": "worker: run_dir + config",
               "kind": "control"
             },
             {
@@ -4539,7 +4539,7 @@
             {
               "from": "resolver",
               "to": "infer_pipeline",
-              "label": "InferenceComponents (backbone/JEPA)",
+              "label": "InferenceComponents",
               "kind": "data"
             },
             {
@@ -4615,7 +4615,7 @@
                 "state.json",
                 "resolved_config.json"
               ],
-              "row": 0
+              "row": 1
             },
             {
               "id": "session_scheduler",
@@ -4634,7 +4634,7 @@
               "module": "pipelines/benchmark/pipeline.py",
               "role": "external",
               "fn": "Concrete multi-stage sweeps that mark stages and spawn per-stage GPU jobs on the shared scaffolding.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [],
               "row": 0
@@ -4692,19 +4692,19 @@
             {
               "from": "staged_pipeline",
               "to": "staged_subclass",
-              "label": "run dir + _mark_stage scaffolding",
+              "label": "run dir + stage marks",
               "kind": "control"
             },
             {
               "from": "session_scheduler",
               "to": "session_subclass",
-              "label": "sequential run() scaffolding",
+              "label": "sequential run()",
               "kind": "control"
             },
             {
               "from": "session_subclass",
               "to": "process_pool",
-              "label": "sessions + session_runner",
+              "label": "sessions + runner",
               "kind": "control"
             },
             {
@@ -4716,7 +4716,7 @@
             {
               "from": "staged_pipeline",
               "to": "state_out",
-              "label": "state.json + resolved_config.json",
+              "label": "state + resolved config",
               "kind": "io"
             }
           ],
@@ -4802,7 +4802,7 @@
               "col": 1,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "factory",
@@ -4813,7 +4813,7 @@
               "col": 1,
               "reads": [],
               "writes": [],
-              "row": 2
+              "row": 1
             },
             {
               "id": "planner",
@@ -4821,7 +4821,7 @@
               "module": "pipelines/cross_validation/folds.py",
               "role": "transform",
               "fn": "Partitions the azimuth extent into n_folds guard-trimmed blocks and assigns disjoint train/val/test SplitRegions for each fold.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [],
               "row": 2
@@ -4859,7 +4859,7 @@
               "col": 2,
               "reads": [],
               "writes": [],
-              "row": 3
+              "row": 2
             },
             {
               "id": "train_worker",
@@ -4896,7 +4896,7 @@
                 "training_results.json"
               ],
               "writes": [],
-              "row": 3
+              "row": 2
             },
             {
               "id": "report",
@@ -4910,7 +4910,7 @@
                 "cv_aggregate_report.md",
                 "cv_summary.json"
               ],
-              "row": 3
+              "row": 2
             },
             {
               "id": "ext_train",
@@ -4945,7 +4945,7 @@
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "instantiates and runs CrossValidationPipeline",
+              "label": "runs CV pipeline",
               "kind": "control"
             },
             {
@@ -4957,13 +4957,13 @@
             {
               "from": "pipeline",
               "to": "factory",
-              "label": "constructs FoldConfigFactory(config)",
+              "label": "builds FoldConfigFactory",
               "kind": "control"
             },
             {
               "from": "factory",
               "to": "planner",
-              "label": "FoldPlanner (crop-validated)",
+              "label": "FoldPlanner (validated)",
               "kind": "data"
             },
             {
@@ -4975,19 +4975,19 @@
             {
               "from": "pipeline",
               "to": "infer_stage",
-              "label": "runs FoldInferenceStage(planner)",
+              "label": "runs FoldInferenceStage",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "report_stage",
-              "label": "runs CrossValidationReportStage(planner)",
+              "label": "runs CV ReportStage",
               "kind": "control"
             },
             {
               "from": "planner",
               "to": "infer_stage",
-              "label": "per-fold FoldPlan / split_regions",
+              "label": "per-fold split_regions",
               "kind": "data"
             },
             {
@@ -4999,37 +4999,37 @@
             {
               "from": "train_stage",
               "to": "train_worker",
-              "label": "GpuJob subprocess: --fold, --seed",
+              "label": "GpuJob: --fold --seed",
               "kind": "io"
             },
             {
               "from": "infer_stage",
               "to": "infer_worker",
-              "label": "GpuJob subprocess: --fold, --split, --seed",
+              "label": "GpuJob: --fold --split",
               "kind": "io"
             },
             {
               "from": "train_worker",
               "to": "ext_train",
-              "label": "TrainingPipeline(dataset_config w/ split_regions, model_config)",
+              "label": "TrainingPipeline(cfg)",
               "kind": "control"
             },
             {
               "from": "infer_worker",
               "to": "ext_infer",
-              "label": "InferencePipeline(fold_inference_config, components)",
+              "label": "InferencePipeline(cfg)",
               "kind": "control"
             },
             {
               "from": "report_stage",
               "to": "collector",
-              "label": "FoldCollector(run_dir, splits)",
+              "label": "FoldCollector(splits)",
               "kind": "data"
             },
             {
               "from": "collector",
               "to": "report",
-              "label": "base_records + records_by_split + seed_dispersion",
+              "label": "records + dispersion",
               "kind": "data"
             }
           ],
@@ -5083,7 +5083,7 @@
             }
           ],
           "ncol": 5,
-          "nrow": 4
+          "nrow": 3
         }
       ]
     },
@@ -5116,7 +5116,7 @@
               "module": "main/analysis/compare_runs.py",
               "role": "entry",
               "fn": "Standalone entry that resolves a benchmark run tag and re-runs ComparisonStage to rebuild the leaderboard from existing training and inference outputs.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "metrics.json"
               ],
@@ -5177,7 +5177,7 @@
               "module": "pipelines/benchmark/batch_probe.py",
               "role": "metric",
               "fn": "Runs the real Trainer training step under the swept loss union to find the largest power-of-two batch whose peak VRAM stays under budget (BatchSizeFinder + TrainStepMemoryProbe), writing max_batch.json.",
-              "col": 3,
+              "col": 4,
               "reads": [
                 "size_match.json",
                 "resolved_config.json"
@@ -5185,7 +5185,7 @@
               "writes": [
                 "max_batch.json"
               ],
-              "row": 1
+              "row": 0
             },
             {
               "id": "trainworker",
@@ -5226,7 +5226,7 @@
               "module": "pipelines/benchmark/results.py",
               "role": "metric",
               "fn": "Groups per-seed runs by model, aggregates metrics with dispersion, and hands the TrialRecords to the shared ComparisonReport that ranks every capacity-matched unit against the reference.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "best_model.pt",
                 "metrics.json",
@@ -5242,31 +5242,31 @@
             {
               "from": "cfg",
               "to": "entry",
-              "label": "BenchmarkConfig via ConfigCli",
+              "label": "BenchmarkConfig via CLI",
               "kind": "control"
             },
             {
               "from": "entry",
               "to": "pipeline",
-              "label": "resolved config + entry_script path",
+              "label": "resolved config + script",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "seedexpand",
-              "label": "models x sweep_loss_components x seeds",
+              "label": "models x losses x seeds",
               "kind": "control"
             },
             {
               "from": "pipeline",
               "to": "sizematch",
-              "label": "model list + reference_model",
+              "label": "models + reference",
               "kind": "control"
             },
             {
               "from": "sizematch",
               "to": "maxbatch",
-              "label": "size_match.json width overrides",
+              "label": "width overrides",
               "kind": "data"
             },
             {
@@ -5284,7 +5284,7 @@
             {
               "from": "seedexpand",
               "to": "trainworker",
-              "label": "run units + worker CLI command",
+              "label": "run units + CLI command",
               "kind": "control"
             },
             {
@@ -5296,13 +5296,13 @@
             {
               "from": "trainworker",
               "to": "inferworker",
-              "label": "trained run dir (best_model.pt)",
+              "label": "trained run dir",
               "kind": "data"
             },
             {
               "from": "trainworker",
               "to": "leaderboard",
-              "label": "training runs (checkpoints, run_summary)",
+              "label": "training runs",
               "kind": "data"
             },
             {
@@ -5314,7 +5314,7 @@
             {
               "from": "compare_entry",
               "to": "leaderboard",
-              "label": "run_tag + reference_model (standalone)",
+              "label": "run_tag + reference",
               "kind": "control"
             }
           ],
@@ -5386,7 +5386,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 7,
+          "ncol": 6,
           "nrow": 3
         },
         {
@@ -5448,7 +5448,7 @@
               "module": "tools/runtime/event_stream.py",
               "role": "io",
               "fn": "Streams meta, per-spec result, recommendation and done events over stdout for the web UI to render the sweep live.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [
                 "@TUNE event stream"
@@ -5464,7 +5464,7 @@
               "col": 3,
               "reads": [],
               "writes": [],
-              "row": 2
+              "row": 1
             },
             {
               "id": "benchmark",
@@ -5495,7 +5495,7 @@
             {
               "from": "cfg",
               "to": "entry",
-              "label": "DataLoaderTuningEntryConfig via ConfigCli",
+              "label": "config via ConfigCli",
               "kind": "control"
             },
             {
@@ -5507,7 +5507,7 @@
             {
               "from": "pipeline",
               "to": "adapters",
-              "label": "mode + dataset paths + model_name",
+              "label": "mode + paths + model",
               "kind": "control"
             },
             {
@@ -5519,13 +5519,13 @@
             {
               "from": "adapters",
               "to": "benchmark",
-              "label": "FeedTarget: dataset + model + loss fn",
+              "label": "FeedTarget: data+model+loss",
               "kind": "data"
             },
             {
               "from": "pipeline",
               "to": "sweep",
-              "label": "LoaderSpec grid (batch x workers; refine prefetch x pin)",
+              "label": "LoaderSpec grid",
               "kind": "data"
             },
             {
@@ -5537,7 +5537,7 @@
             {
               "from": "benchmark",
               "to": "report",
-              "label": "per-spec record: samples/s, data-wait %, GPU util, feed ratio",
+              "label": "per-spec throughput record",
               "kind": "data"
             },
             {
@@ -5667,7 +5667,7 @@
               "module": "pipelines/tuning/tuners.py",
               "role": "transform",
               "fn": "Assembles the search space from the config's tunable lr/arch params and drives study.optimize, running one training pipeline per trial (backbone / profile-AE / image-AE / JEPA variants).",
-              "col": 4,
+              "col": 3,
               "reads": [],
               "writes": [],
               "row": 0
@@ -5678,7 +5678,7 @@
               "module": "pipelines/tuning/tuners.py",
               "role": "transform",
               "fn": "Suggests concrete hyperparameters from the space spec through the Optuna trial (float / categorical / indexed_categorical) and decodes them back for reporting.",
-              "col": 3,
+              "col": 2,
               "reads": [],
               "writes": [],
               "row": 0
@@ -5689,7 +5689,7 @@
               "module": "pipelines/tuning/trial.py",
               "role": "transform",
               "fn": "Thin subclasses of the real training pipelines/trainers that train one short candidate and report val loss to the trial each epoch, raising TrialPruned when the median pruner says stop.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [],
               "row": 0
@@ -5700,7 +5700,7 @@
               "module": "pipelines/tuning/pipeline.py",
               "role": "io",
               "fn": "Shared Optuna study persisted in optuna.db that coordinates trial results and TPE suggestions across GPU workers, enabling resume-in-chunks.",
-              "col": 5,
+              "col": 4,
               "reads": [
                 "optuna.db"
               ],
@@ -5715,7 +5715,7 @@
               "module": "pipelines/tuning/tuners.py",
               "role": "io",
               "fn": "Reads the study's best trial, decodes its params, and writes best_config.json atomically, both as a scheduler step and as a per-trial optimize callback.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "optuna.db"
               ],
@@ -5730,7 +5730,7 @@
               "module": "pipelines/tuning/plots.py",
               "role": "io",
               "fn": "Renders the study to publication-style PNGs (optimization history, per-param slice/rank, contours, param/duration importances, EDF, timeline).",
-              "col": 5,
+              "col": 4,
               "reads": [
                 "optuna.db"
               ],
@@ -5744,73 +5744,73 @@
             {
               "from": "config",
               "to": "entry",
-              "label": "TuningEntryConfig defaults via ConfigCli",
+              "label": "defaults via ConfigCli",
               "kind": "data"
             },
             {
               "from": "entry",
               "to": "scheduler",
-              "label": "run tag + resolved config + entry_script path",
+              "label": "run tag + config path",
               "kind": "control"
             },
             {
               "from": "scheduler",
               "to": "gpuqueue",
-              "label": "list[GpuJob]: per-GPU worker commands",
+              "label": "per-GPU worker jobs",
               "kind": "control"
             },
             {
               "from": "gpuqueue",
               "to": "worker",
-              "label": "spawns tune.py --worker subprocess per GPU",
+              "label": "spawn --worker per GPU",
               "kind": "control"
             },
             {
               "from": "scheduler",
               "to": "study",
-              "label": "create/load sqlite study; fail stale RUNNING trials",
+              "label": "create/load; fail stale",
               "kind": "data"
             },
             {
               "from": "worker",
               "to": "study",
-              "label": "load_study + TPE sampler + median pruner",
+              "label": "load study + TPE/pruner",
               "kind": "data"
             },
             {
               "from": "worker",
               "to": "tuner",
-              "label": "builds tuner for training_type + shared study + n_trials",
+              "label": "build tuner (study, n)",
               "kind": "control"
             },
             {
               "from": "sampler",
               "to": "tuner",
-              "label": "sampled hyperparameters applied to model config",
+              "label": "sampled hyperparameters",
               "kind": "data"
             },
             {
               "from": "tuner",
               "to": "trial",
-              "label": "trial config (epochs/patience/seed) + model config + Optuna trial",
+              "label": "trial + model config",
               "kind": "control"
             },
             {
               "from": "tuner",
               "to": "study",
-              "label": "study.optimize appends completed/pruned trials",
+              "label": "optimize appends trials",
               "kind": "data"
             },
             {
               "from": "trial",
               "to": "study",
-              "label": "trial.report(val_loss, epoch) + final objective (pruning)",
+              "label": "report val_loss + prune",
               "kind": "data"
             },
             {
               "from": "study",
               "to": "bestwriter",
-              "label": "best_trial params + value",
+              "label": "best_trial params/value",
               "kind": "data"
             },
             {
@@ -5822,13 +5822,13 @@
             {
               "from": "scheduler",
               "to": "bestwriter",
-              "label": "write(study) -> best_config.json",
+              "label": "write best_config.json",
               "kind": "control"
             },
             {
               "from": "scheduler",
               "to": "plotter",
-              "label": "render(study) -> study_plots",
+              "label": "render study_plots",
               "kind": "control"
             }
           ],
@@ -5887,7 +5887,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 7,
+          "ncol": 6,
           "nrow": 3
         }
       ]
@@ -5913,7 +5913,7 @@
               "col": 0,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "config",
@@ -5921,7 +5921,7 @@
               "module": "configuration/comparison.py",
               "role": "config",
               "fn": "Supplies runs_dir, run_tags, pixel_sample, block_size, range_chunk, workers and make_plots for the window sweep.",
-              "col": 1,
+              "col": 0,
               "reads": [],
               "writes": [],
               "row": 1
@@ -5946,7 +5946,7 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "orchestrator",
               "fn": "Sequences collect, threaded measure, optional plot, and report over the window trials.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [],
               "row": 1
@@ -5957,7 +5957,7 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Discovers preprocessing runs and reads each config_state.json to recover the multilook window into a WindowTrial.",
-              "col": 3,
+              "col": 2,
               "reads": [
                 "config_state.json"
               ],
@@ -5970,7 +5970,7 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "metric",
               "fn": "Chunks each tomogram's amplitude to measure peak-to-floor contrast, spurious peaks, residual speckle and azimuth correlation length.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "tomogram_full.npy"
               ],
@@ -5983,7 +5983,7 @@
               "module": "pipelines/comparison/spatial_stats.py",
               "role": "transform",
               "fn": "Computes block coefficient-of-variation, block std and FFT autocorrelation length for the speckle and blurring metrics (shared with the param comparison).",
-              "col": 4,
+              "col": 3,
               "reads": [],
               "writes": [],
               "row": 2
@@ -5994,12 +5994,12 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Renders one bar chart per window-quality metric across the trials.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [
                 "window_metric_pngs"
               ],
-              "row": 2
+              "row": 0
             },
             {
               "id": "table",
@@ -6007,10 +6007,10 @@
               "module": "pipelines/comparison/metric_table.py",
               "role": "transform",
               "fn": "Builds the per-window markdown metric table, bolding the best value in each column (shared with the param comparison).",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [],
-              "row": 0
+              "row": 2
             },
             {
               "id": "report",
@@ -6018,7 +6018,7 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Assembles the markdown report from the metric table, bar plots and the bias-variance reading guide.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "window_metric_pngs"
               ],
@@ -6038,7 +6038,7 @@
             {
               "from": "config",
               "to": "pipeline",
-              "label": "runs_dir, block_size, workers",
+              "label": "runs_dir, block_size",
               "kind": "data"
             },
             {
@@ -6050,13 +6050,13 @@
             {
               "from": "runs",
               "to": "collector",
-              "label": "config_state.json (window)",
+              "label": "config_state.json",
               "kind": "io"
             },
             {
               "from": "collector",
               "to": "metrics",
-              "label": "WindowTrial list (window, tomogram_path)",
+              "label": "WindowTrial list",
               "kind": "data"
             },
             {
@@ -6086,7 +6086,7 @@
             {
               "from": "table",
               "to": "report",
-              "label": "bold-best metric table rows",
+              "label": "bold-best table rows",
               "kind": "data"
             },
             {
@@ -6139,7 +6139,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 7,
+          "ncol": 6,
           "nrow": 3
         },
         {
@@ -6158,7 +6158,7 @@
               "col": 0,
               "reads": [],
               "writes": [],
-              "row": 1
+              "row": 0
             },
             {
               "id": "config",
@@ -6166,7 +6166,7 @@
               "module": "configuration/comparison.py",
               "role": "config",
               "fn": "Supplies params_dir, run_tags, pixel_sample, block_size and make_plots for the fit comparison.",
-              "col": 1,
+              "col": 0,
               "reads": [],
               "writes": [],
               "row": 1
@@ -6177,7 +6177,7 @@
               "module": "pipelines/processing/param_extraction/",
               "role": "external",
               "fn": "Prior Gaussian-fit runs, each holding fitted parameters, meta, and fit diagnostics.",
-              "col": 3,
+              "col": 2,
               "reads": [],
               "writes": [
                 "parameters.npy",
@@ -6193,7 +6193,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "orchestrator",
               "fn": "Sequences collect, measure, optional plot and report over the K-family trials.",
-              "col": 2,
+              "col": 1,
               "reads": [],
               "writes": [],
               "row": 1
@@ -6204,7 +6204,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Discovers runs marked by param_extraction_meta.json and reads their fit config (k_max, lambda_k, fit flags) into ParamTrials sorted by K.",
-              "col": 3,
+              "col": 2,
               "reads": [
                 "param_extraction_meta.json"
               ],
@@ -6217,7 +6217,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "metric",
               "fn": "Loads each trial's parameters, summary and diagnostics to compute R2, BIC, coverage, active/collapsed slots, mu separation and dominant-height coherence.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "parameters.npy",
                 "param_extraction_meta.json",
@@ -6234,7 +6234,7 @@
               "module": "pipelines/comparison/spatial_stats.py",
               "role": "transform",
               "fn": "Returns the block std of the dominant-scatterer height map used for the spatial-coherence metric (shared with the preprocessing comparison).",
-              "col": 4,
+              "col": 3,
               "reads": [],
               "writes": [],
               "row": 2
@@ -6245,7 +6245,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Renders K-colour-coded bar charts of BIC, R2, slot collapse, coherence and slot usage.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [
                 "param_metric_pngs"
@@ -6258,7 +6258,7 @@
               "module": "pipelines/shared/comparison/comparison_report.py",
               "role": "metric",
               "fn": "ComparisonReportBase / RankingComputer build the within-K composite score, mean rank and wins from each family's per-trial metrics.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [],
               "row": 1
@@ -6269,7 +6269,7 @@
               "module": "pipelines/comparison/metric_table.py",
               "role": "transform",
               "fn": "Builds the per-trial metric table, bolding the best value within each K family (shared with the preprocessing comparison).",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [],
               "row": 2
@@ -6280,7 +6280,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Writes the overview (config table plus within-K leaderboards) and the metrics markdown embedding the comparison plots.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "param_metric_pngs"
               ],
@@ -6301,7 +6301,7 @@
             {
               "from": "config",
               "to": "pipeline",
-              "label": "params_dir, pixel_sample, block_size",
+              "label": "params_dir, sampling",
               "kind": "data"
             },
             {
@@ -6313,19 +6313,19 @@
             {
               "from": "runs",
               "to": "collector",
-              "label": "param_extraction_meta.json (fit config)",
+              "label": "meta.json (fit config)",
               "kind": "io"
             },
             {
               "from": "collector",
               "to": "metrics",
-              "label": "ParamTrial list (run_dir, k_max, fit flags)",
+              "label": "ParamTrial list",
               "kind": "data"
             },
             {
               "from": "runs",
               "to": "metrics",
-              "label": "parameters.npy, summary, diagnostics",
+              "label": "params + diagnostics",
               "kind": "io"
             },
             {
@@ -6343,7 +6343,7 @@
             {
               "from": "metrics",
               "to": "ranking",
-              "label": "per-trial metric dicts (per K)",
+              "label": "metric dicts (per K)",
               "kind": "data"
             },
             {
@@ -6455,7 +6455,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 7,
+          "ncol": 6,
           "nrow": 3
         },
         {
@@ -6545,7 +6545,7 @@
               "module": "pipelines/comparison/comparison_report.py",
               "role": "io",
               "fn": "Writes the overview with leaderboards, the grouped metrics comparison, and the per-figure and per-gif side-by-side galleries.",
-              "col": 4,
+              "col": 5,
               "reads": [
                 "inference_media"
               ],
@@ -6573,7 +6573,7 @@
             {
               "from": "runs",
               "to": "collector",
-              "label": "best_model.pt, metrics.json, figures/gifs",
+              "label": "ckpt, metrics, media",
               "kind": "io"
             },
             {
@@ -6591,19 +6591,19 @@
             {
               "from": "records",
               "to": "report",
-              "label": "records (metrics, media, checkpoints)",
+              "label": "trial records + media",
               "kind": "data"
             },
             {
               "from": "ranking",
               "to": "report",
-              "label": "composite scores + ranks (RankingResult)",
+              "label": "composite scores + ranks",
               "kind": "data"
             },
             {
               "from": "config",
               "to": "report",
-              "label": "compare_images/gifs, embed_images",
+              "label": "compare/embed flags",
               "kind": "data"
             }
           ],
@@ -6670,7 +6670,7 @@
               "scope": "within"
             }
           ],
-          "ncol": 5,
+          "ncol": 6,
           "nrow": 3
         }
       ]
@@ -6750,12 +6750,12 @@
               "module": "tools/diagnostics/weight_xray.py",
               "role": "io",
               "fn": "Loads the checkpoint with torch.load and locates the parameter tensor mapping inside it (top level or a configured key).",
-              "col": 3,
+              "col": 2,
               "reads": [
                 "best_model.pt"
               ],
               "writes": [],
-              "row": 0
+              "row": 2
             },
             {
               "id": "analyzer",
@@ -6788,7 +6788,7 @@
               "col": 5,
               "reads": [],
               "writes": [],
-              "row": 2
+              "row": 0
             },
             {
               "id": "plots",
@@ -6801,7 +6801,7 @@
               "writes": [
                 "plots/*.png"
               ],
-              "row": 0
+              "row": 2
             },
             {
               "id": "report",
@@ -6824,79 +6824,79 @@
             {
               "from": "entry",
               "to": "batch",
-              "label": "parsed entry_config + Logger",
+              "label": "entry_config + Logger",
               "kind": "control"
             },
             {
               "from": "config",
               "to": "batch",
-              "label": "thresholds, output_subdir, plotting flags",
+              "label": "thresholds + flags",
               "kind": "data"
             },
             {
               "from": "config",
               "to": "selector",
-              "label": "runs_dir + checkpoint_filename",
+              "label": "runs_dir + ckpt name",
               "kind": "data"
             },
             {
               "from": "selector",
               "to": "batch",
-              "label": "selected run directories",
+              "label": "selected run dirs",
               "kind": "data"
             },
             {
               "from": "batch",
               "to": "xray",
-              "label": "per-run WeightXrayConfig + Logger",
+              "label": "per-run config + Logger",
               "kind": "control"
             },
             {
               "from": "xray",
               "to": "resolver",
-              "label": "resolved checkpoint path",
+              "label": "checkpoint path",
               "kind": "control"
             },
             {
               "from": "resolver",
               "to": "analyzer",
-              "label": "state_dict (name -> tensor)",
+              "label": "state_dict",
               "kind": "data"
             },
             {
               "from": "analyzer",
               "to": "detector",
-              "label": "list[LayerReport] + state_dict",
+              "label": "LayerReports, state_dict",
               "kind": "data"
             },
             {
               "from": "detector",
               "to": "summarizer",
-              "label": "LayerReports with attached Issues",
+              "label": "LayerReports + Issues",
               "kind": "data"
             },
             {
               "from": "detector",
               "to": "plots",
-              "label": "LayerReports (severity) + state_dict",
+              "label": "LayerReports (severity)",
               "kind": "data"
             },
             {
               "from": "detector",
               "to": "report",
-              "label": "flagged LayerReports (per-tensor tables)",
+              "label": "flagged LayerReports",
               "kind": "data"
             },
             {
               "from": "summarizer",
               "to": "report",
-              "label": "summary dict (severity counts, verdict)",
+              "label": "summary + verdict",
               "kind": "data"
             },
             {
               "from": "plots",
               "to": "report",
-              "label": "diagnostic plot PNG paths",
+              "label": "plot PNG paths",
               "kind": "data"
             }
           ],
