@@ -1,4 +1,4 @@
-from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, MultiResUNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSkipConfig
+from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, LocalCNNConfig, MultiResUNetConfig, PixelMLPNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSkipConfig
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from ..registry     import RegistryFactory
 from .unet          import UNet, UNetMultiHead, UNetPerGaussian
@@ -17,6 +17,7 @@ from .hrnet_lite      import HRNetLite
 from .multires_unet   import MultiResUNet
 from .fpn_net         import FPNNet
 from .u2net_lite      import U2NetLite
+from .pixel_baselines import LocalCNN, PixelMLPNet
 
 BACKBONE_MODEL_REGISTRY: dict[str, type] = {
     "unet"                : UNet,
@@ -40,6 +41,8 @@ BACKBONE_MODEL_REGISTRY: dict[str, type] = {
     "multires_unet"       : MultiResUNet,
     "fpn"                 : FPNNet,
     "u2net"               : U2NetLite,
+    "pixel_mlp"           : PixelMLPNet,
+    "local_cnn"           : LocalCNN,
 }
 
 BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
@@ -64,6 +67,8 @@ BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
     "multires_unet"       : MultiResUNetConfig,
     "fpn"                 : FPNNetConfig,
     "u2net"               : U2NetLiteConfig,
+    "pixel_mlp"           : PixelMLPNetConfig,
+    "local_cnn"           : LocalCNNConfig,
 }
 
 
@@ -95,6 +100,8 @@ __all__ = [
     "MultiResUNet",
     "FPNNet",
     "U2NetLite",
+    "PixelMLPNet",
+    "LocalCNN",
     "UNetConfig",
     "UNetMultiHeadConfig",
     "UNetPerGaussianConfig",
@@ -116,6 +123,8 @@ __all__ = [
     "MultiResUNetConfig",
     "FPNNetConfig",
     "U2NetLiteConfig",
+    "PixelMLPNetConfig",
+    "LocalCNNConfig",
     "get_backbone",
     "BACKBONE_MODEL_REGISTRY",
     "BACKBONE_CONFIG_REGISTRY",

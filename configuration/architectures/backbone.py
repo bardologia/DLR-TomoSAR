@@ -1430,3 +1430,101 @@ class U2NetLiteConfig:
             {'params': list(model.output_head.parameters()),    'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
         ] if len(g['params']) > 0]
 
+
+
+@dataclass
+class PixelMLPNetConfig:
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [1024, 1024, 1024, 1024])
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
+
+    trunk_lr       : float = 3e-4
+    output_head_lr : float = 1e-3
+
+    trunk_wd       : float = 1e-4
+    output_head_wd : float = 1e-4
+
+    shape_logger_types  : tuple           = field(default_factory=lambda: (
+        nn.Conv2d, nn.Dropout2d,
+        nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
+        nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
+    ))
+
+    @classmethod
+    def tunable_lr_params(cls) -> dict:
+        return {
+            "trunk_lr"       : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "output_head_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "trunk_wd"       : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "output_head_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "dropout"        : {"type": "float", "low": 0.0, "high": 0.5},
+        }
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "features"      : {"type": "indexed_categorical", "choices": [[512, 512, 512, 512], [1024, 1024, 1024, 1024], [768, 768, 768, 768, 768, 768]]},
+            "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
+            "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
+        }
+
+    def get_param_groups(self, model: nn.Module) -> list[dict]:
+        return [g for g in [
+            {'params': list(model.trunk.parameters()),       'lr': self.trunk_lr,       'weight_decay': self.trunk_wd,       'name': 'trunk'},
+            {'params': list(model.output_head.parameters()), 'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
+        ] if len(g['params']) > 0]
+
+
+@dataclass
+class LocalCNNConfig:
+    in_channels         : int       = 1
+    out_channels        : int       = 6
+    params_per_gaussian : int       = 3
+    features            : list[int] = field(default_factory=lambda: [256, 256, 256])
+    dropout             : float     = 0.15
+    activation          : str       = "relu"
+    normalization       : str       = "batch"
+    conv_bias           : bool      = False
+    init_mode           : str       = "default"
+
+    trunk_lr       : float = 3e-4
+    output_head_lr : float = 1e-3
+
+    trunk_wd       : float = 1e-4
+    output_head_wd : float = 1e-4
+
+    shape_logger_types  : tuple           = field(default_factory=lambda: (
+        nn.Conv2d, nn.Dropout2d,
+        nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
+        nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
+    ))
+
+    @classmethod
+    def tunable_lr_params(cls) -> dict:
+        return {
+            "trunk_lr"       : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "output_head_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "trunk_wd"       : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "output_head_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "dropout"        : {"type": "float", "low": 0.0, "high": 0.5},
+        }
+
+    @classmethod
+    def tunable_arch_params(cls) -> dict:
+        return {
+            "features"      : {"type": "indexed_categorical", "choices": [[128, 128, 128], [256, 256, 256], [192, 192, 192, 192, 192]]},
+            "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
+            "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
+        }
+
+    def get_param_groups(self, model: nn.Module) -> list[dict]:
+        return [g for g in [
+            {'params': list(model.trunk.parameters()),       'lr': self.trunk_lr,       'weight_decay': self.trunk_wd,       'name': 'trunk'},
+            {'params': list(model.output_head.parameters()), 'lr': self.output_head_lr, 'weight_decay': self.output_head_wd, 'name': 'output_head'},
+        ] if len(g['params']) > 0]

@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import torch
+import torch.nn as nn
+
+from configuration.architectures import LocalCNNConfig, PixelMLPNetConfig
+from ..blocks                    import ConvBlock, build_activation, build_norm2d, initialize_weights
+
+
+class PixelMLPNet(nn.Module):
+    def __init__(self, config: PixelMLPNetConfig | None = None):
+        super().__init__()
+        self.config = config if config is not None else PixelMLPNetConfig()
+
+        if len(self.config.features) == 0:
+            raise ValueError("features must contain at least one channel size")
+
+        layers   = []
+        channels = self.config.in_channels
+        for feature_size in self.config.features:
+            layers.append(nn.Conv2d(channels, feature_size, kernel_size=1, bias=self.config.conv_bias))
+            layers.append(build_norm2d(self.config.normalization, feature_size))
+            layers.append(build_activation(self.config.activation))
+            if self.config.dropout > 0:
+                layers.append(nn.Dropout2d(self.config.dropout))
+            channels = feature_size
+
+        self.trunk       = nn.Sequential(*layers)
+        self.output_head = nn.Conv2d(channels, self.config.out_channels, kernel_size=1)
+
+        initialize_weights(module=self, mode=self.config.init_mode)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.output_head(self.trunk(x))
+
+
+class LocalCNN(nn.Module):
+    def __init__(self, config: LocalCNNConfig | None = None):
+        super().__init__()
+        self.config = config if config is not None else LocalCNNConfig()
+
+        if len(self.config.features) == 0:
+            raise ValueError("features must contain at least one channel size")
+
+        blocks   = []
+        channels = self.config.in_channels
+        for feature_size in self.config.features:
+            blocks.append(
+                ConvBlock(
+                    input_channels  = channels,
+                    output_channels = feature_size,
+                    dropout         = self.config.dropout,
+                    activation      = self.config.activation,
+                    normalization   = self.config.normalization,
+                    bias            = self.config.conv_bias,
+                )
+            )
+            channels = feature_size
+
+        self.trunk       = nn.Sequential(*blocks)
+        self.output_head = nn.Conv2d(channels, self.config.out_channels, kernel_size=1)
+
+        initialize_weights(module=self, mode=self.config.init_mode)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.output_head(self.trunk(x))

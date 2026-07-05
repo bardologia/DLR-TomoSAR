@@ -20,6 +20,8 @@ from configuration.architectures.backbone import (
     MultiResUNetConfig,
     FPNNetConfig,
     U2NetLiteConfig,
+    PixelMLPNetConfig,
+    LocalCNNConfig,
 )
 from configuration.architectures.image_autoencoder import (
     ImageAutoencoderBaseConfig,

@@ -35,6 +35,8 @@ SMALL_OVERRIDES = {
     "multires_unet"       : {"features": [16, 32, 64, 128], "bottleneck_factor": 1},
     "fpn"                 : {"features": [16, 32, 64, 128], "pyramid_channels": 32, "segmentation_convs": 1},
     "u2net"               : {"features": [16, 32, 64, 128], "rsu_heights": (4, 3, 2)},
+    "pixel_mlp"           : {"features": [32, 32]},
+    "local_cnn"           : {"features": [8, 16]},
 }
 
 

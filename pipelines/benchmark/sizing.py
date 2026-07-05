@@ -46,6 +46,8 @@ class WidthScaler:
             "multires_unet"       : feature_rules,
             "fpn"                 : feature_rules + [WidthRule(attribute="pyramid_channels", divisor=8)],
             "u2net"               : feature_rules,
+            "pixel_mlp"           : feature_rules,
+            "local_cnn"           : feature_rules,
         }
 
         self._enforce_locked()
