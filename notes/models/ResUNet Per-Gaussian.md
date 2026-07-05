@@ -1,3 +1,17 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - ResUNetPerGaussian
+family: head-variant
+registry_key: resunet_pergaussian
+summary: ResUNet backbone combined with the per-slot PixelMLP heads of UNet Per-Gaussian.
+---
+
 # ResUNet Per-Gaussian
 
 `ResUNetPerGaussian` (`models/backbone/resunet.py`) combines the [[ResUNet]] backbone with the per-slot output heads of [[UNet Per-Gaussian]]: one `PixelMLP` head per Gaussian component, each predicting that slot's $(a, \mu, \sigma)$ triple.

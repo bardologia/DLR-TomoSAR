@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - Transformer1dAutoencoder
+  - transformer1d_ae
+family: profile-autoencoder
+registry_key: transformer1d_ae
+summary: Self-attention profile autoencoder capturing long-range dependencies; highest-capacity profile model in the zoo.
+---
+
 # Transformer1D Autoencoder
 
-`Transformer1dAutoencoder` (`models/autoencoder/transformer1d.py`) is a [[Model Zoo|profile autoencoder]] that models the elevation profile with self-attention, capturing long-range dependencies between distant range bins. As with the other profile autoencoders, its encoder defines the output latent space targeted by [[JEPA]].
+`Transformer1dAutoencoder` (`models/autoencoder/transformer1d.py`) is a [[Model Zoo|profile autoencoder]] that models the elevation profile with self-attention, capturing long-range dependencies between distant range bins. As with the other profile autoencoders, its encoder defines the output latent space targeted by [[JEPA Profile-Embedding|JEPA]].
 
 ---
 

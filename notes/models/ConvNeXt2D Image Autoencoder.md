@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - ConvNeXt2dImageAutoencoder
+  - convnext2d_ae
+family: image-autoencoder
+registry_key: convnext2d_ae
+summary: ConvNeXt-block image autoencoder for the SAR stack, sharing design with the ConvNeXt UNet backbone.
+---
+
 # ConvNeXt2D Image Autoencoder
 
-`ConvNeXt2dImageAutoencoder` (`models/image_autoencoder/convnext2d.py`) is a [[Model Zoo|image autoencoder]] built from ConvNeXt blocks — the modern convolution design also used by the [[ConvNeXt UNet]] backbone. It encodes the SAR image stack into a 2D spatial embedding and reconstructs it; the trained encoder is reused as the pretrained image front-end of the [[JEPA]] predictor.
+`ConvNeXt2dImageAutoencoder` (`models/image_autoencoder/convnext2d.py`) is a [[Model Zoo|image autoencoder]] built from ConvNeXt blocks — the modern convolution design also used by the [[ConvNeXt UNet]] backbone. It encodes the SAR image stack into a 2D spatial embedding and reconstructs it; the trained encoder is reused as the pretrained image front-end of the [[JEPA Profile-Embedding|JEPA]] predictor.
 
 ---
 

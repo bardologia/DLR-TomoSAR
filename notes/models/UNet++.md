@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - UNetPlusPlus
+  - Nested UNet
+family: unet
+registry_key: unetplusplus
+summary: UNet with nested, densely connected skip pathways that reduce the encoder-decoder semantic gap.
+---
+
 # UNet++
 
-`UNetPlusPlus` (`models/backbone/UNetPlusPlus.py`) extends the [[UNet]] skip connections to a nested, dense structure ([[UNetPlusPlus_Zhou2018_1807.10165.pdf|Zhou et al., 2018]]). Intermediate nodes between encoder and decoder re-aggregate features from multiple encoder levels, reducing the semantic gap between the contracting and expanding paths.
+`UNetPlusPlus` (`models/backbone/unet_plus_plus.py`) extends the [[UNet]] skip connections to a nested, dense structure ([[UNetPlusPlus_Zhou2018_1807.10165.pdf|Zhou et al., 2018]]). Intermediate nodes between encoder and decoder re-aggregate features from multiple encoder levels, reducing the semantic gap between the contracting and expanding paths.
 
 ---
 
@@ -94,7 +109,7 @@ See [[Configuration Layer]] → `UNetPlusPlusConfig`. Parameters shared with [[U
 **Review date:** 2026-06-04
 **Citation:** Z. Zhou, M. M. R. Siddiquee, N. Tajbakhsh, J. Liang. *UNet++: A Nested U-Net Architecture for Medical Image Segmentation.* arXiv:1807.10165, 2018. [[UNetPlusPlus_Zhou2018_1807.10165.pdf|PDF]]
 
-Ground-truth reference is the paper PDF. The verification compares the implementation in `models/backbone/UNetPlusPlus.py` and `configuration/model/models_config.py` against Eq. 1 and Fig. 1 of the paper, node by node.
+Ground-truth reference is the paper PDF. The verification compares the implementation in `models/backbone/unet_plus_plus.py` and `configuration/architectures/backbone.py` against Eq. 1 and Fig. 1 of the paper, node by node.
 
 ### Verdict table
 

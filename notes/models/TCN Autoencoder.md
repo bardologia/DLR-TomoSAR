@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - TcnAutoencoder
+  - tcn_ae
+family: profile-autoencoder
+registry_key: tcn_ae
+summary: Dilated-residual temporal convolutional network profile autoencoder with exponentially growing receptive field.
+---
+
 # TCN Autoencoder
 
-`TcnAutoencoder` (`models/profile_autoencoder/tcn.py`) is a [[Model Zoo|profile autoencoder]] built from a temporal convolutional network: stacked dilated residual convolutions along the range axis whose receptive field grows exponentially with depth. It captures both narrow and broad elevation features without the cost of attention. Like the other profile autoencoders it defines the output latent space later targeted by [[JEPA]].
+`TcnAutoencoder` (`models/profile_autoencoder/tcn.py`) is a [[Model Zoo|profile autoencoder]] built from a temporal convolutional network: stacked dilated residual convolutions along the range axis whose receptive field grows exponentially with depth. It captures both narrow and broad elevation features without the cost of attention. Like the other profile autoencoders it defines the output latent space later targeted by [[JEPA Profile-Embedding|JEPA]].
 
 ---
 

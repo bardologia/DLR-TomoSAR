@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - Conv1dAutoencoder
+  - conv1d_ae
+family: profile-autoencoder
+registry_key: conv1d_ae
+summary: 1D convolutional profile autoencoder exploiting local smoothness along the range axis.
+---
+
 # Conv1D Autoencoder
 
-`Conv1dAutoencoder` (`models/autoencoder/conv1d.py`) is a [[Model Zoo|profile autoencoder]] that treats the elevation profile as a 1D signal and applies convolutions along the range axis, exploiting the local smoothness of the fitted profile. Like the other profile autoencoders it defines the output latent space later targeted by [[JEPA]].
+`Conv1dAutoencoder` (`models/autoencoder/conv1d.py`) is a [[Model Zoo|profile autoencoder]] that treats the elevation profile as a 1D signal and applies convolutions along the range axis, exploiting the local smoothness of the fitted profile. Like the other profile autoencoders it defines the output latent space later targeted by [[JEPA Profile-Embedding|JEPA]].
 
 ---
 

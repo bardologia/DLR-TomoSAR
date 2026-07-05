@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - MlpAutoencoder
+  - mlp_ae
+family: profile-autoencoder
+registry_key: mlp_ae
+summary: Default, cheapest profile autoencoder; fully-convolutional symmetric MLP baseline supplying the JEPA target latent.
+---
+
 # MLP Autoencoder
 
-`MlpAutoencoder` (`models/autoencoder/mlp.py`) is the default [[Model Zoo|profile autoencoder]]. It learns the latent space of the *output* domain: it encodes a fitted, normalized elevation profile into a low-dimensional embedding and reconstructs it. The encoder later supplies the target latent that the [[JEPA]] predictor regresses towards.
+`MlpAutoencoder` (`models/autoencoder/mlp.py`) is the default [[Model Zoo|profile autoencoder]]. It learns the latent space of the *output* domain: it encodes a fitted, normalized elevation profile into a low-dimensional embedding and reconstructs it. The encoder later supplies the target latent that the [[JEPA Profile-Embedding|JEPA]] predictor regresses towards.
 
 ---
 

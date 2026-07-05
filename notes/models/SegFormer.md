@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - SegFormer
+  - SegFormerLite
+family: segformer
+registry_key: segformer
+summary: Hierarchical transformer encoder with efficient attention and an all-MLP multi-scale decoder.
+---
+
 # SegFormer
 
-`SegFormerLite` (`models/backbone/SegFormerLite.py`, registry name `"segformer"`) is a hierarchical transformer encoder with an all-MLP decoder ([[SegFormer_Xie2021_2105.15203.pdf|Xie et al., 2021]]): four stages of overlapping patch embeddings and efficient self-attention produce a feature pyramid, and a lightweight decoder projects, upsamples, and fuses all four scales before the output head.
+`SegFormerLite` (`models/backbone/segformer_lite.py`, registry name `"segformer"`) is a hierarchical transformer encoder with an all-MLP decoder ([[SegFormer_Xie2021_2105.15203.pdf|Xie et al., 2021]]): four stages of overlapping patch embeddings and efficient self-attention produce a feature pyramid, and a lightweight decoder projects, upsamples, and fuses all four scales before the output head.
 
 The model is a dense per-pixel regressor for the TomoSAR Gaussian-mixture target. It ingests `in_channels` (default $1$) co-registered SLC channels and the `output_head` 1×1 convolution emits `out_channels` (default $6$) maps, which decode as $3K$ Gaussian-mixture parameters with $K = $ `out_channels` $/3$ Gaussians at $3$ parameters each (`params_per_gaussian = 3`); the default $6$ channels are $K = 2$ Gaussians.
 

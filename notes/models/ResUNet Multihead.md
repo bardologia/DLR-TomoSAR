@@ -1,3 +1,17 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - ResUNetMultiHead
+family: head-variant
+registry_key: resunet_multihead
+summary: ResUNet backbone combined with the three parameter-type-specific PixelMLP heads of UNet Multihead.
+---
+
 # ResUNet Multihead
 
 `ResUNetMultiHead` (`models/backbone/resunet.py`) combines the [[ResUNet]] backbone with the parameter-type-specific output heads of [[UNet Multihead]]: three independent `PixelMLP` heads — amplitude, mean elevation, sigma — in place of the single shared 1×1 convolution of `ResUNet`.

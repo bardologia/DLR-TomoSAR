@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - ConvNeXtUNet
+  - ConvNeXt U-Net
+family: convnext
+registry_key: convnext_unet
+summary: U-Net topology with ConvNeXt inverted-bottleneck blocks (depthwise-7x7, LayerNorm, GELU) at every stage.
+---
+
 # ConvNeXt UNet
 
-`ConvNeXtUNet` (`models/backbone/ConvNeXtUNet.py`) places ConvNeXt blocks ([[ConvNeXt_Liu2022_2201.03545.pdf|Liu et al., 2022]]) inside the U-Net topology: each encoder/decoder stage is a stack of depthwise-7×7 inverted-bottleneck blocks with LayerNorm and GELU, connected by strided-conv downsampling, transposed-conv upsampling, and skip concatenation.
+`ConvNeXtUNet` (`models/backbone/convnext_unet.py`) places ConvNeXt blocks ([[ConvNeXt_Liu2022_2201.03545.pdf|Liu et al., 2022]]) inside the U-Net topology: each encoder/decoder stage is a stack of depthwise-7×7 inverted-bottleneck blocks with LayerNorm and GELU, connected by strided-conv downsampling, transposed-conv upsampling, and skip concatenation.
 
 ---
 
@@ -72,26 +87,26 @@ This model is a deliberate hybrid: the **encoder** is judged strictly against th
 
 | Dimension | Paper ref | Code | Classification |
 |---|---|---|---|
-| Block op order (DWConv$_{7\times7}\to$LN$\to$FC$\to$GELU$\to$FC$\to\gamma\to$residual) | Fig. 4 | `ConvNeXtUNet.py:36-49` | MATCH |
-| Pointwise layers channels-last as Linears | Fig. 4 (note "$1\times1$ convs $\equiv$ Linear") | `ConvNeXtUNet.py:29-31,42-44` | MATCH |
-| Inverted-bottleneck ratio 4 | Sec. 2.4 | `models_config.py:1058` (`ffn_ratio=4.0`) | MATCH |
-| LayerNorm over $C$ only (channels-last) | Sec. 2.6 "BN$\to$LN" | `ConvNeXtUNet.py:11-19,28,41` | MATCH |
-| Layer Scale $\gamma$ (init $10^{-6}$, per-channel, before drop path) | Sec. 3.1 | `ConvNeXtUNet.py:34,45-46`; `models_config.py:1060` (`layer_scale_init=1e-6`) | MATCH |
-| Stochastic depth linearly increasing across blocks | Sec. 2.1; Sec. 3.1 | `ConvNeXtUNet.py:79-86` | MATCH |
-| Patchify stem ($4\times4$ conv stride 4 + LN) | Sec. 2.2 | `ConvNeXtUNet.py:90-93` ($3\times3$ stride 1) | ACCEPTED ADAPTATION |
-| Separate downsampling (LN + $2\times2$ conv stride 2) | Sec. 2.6 page-6 | `ConvNeXtUNet.py:100-103` | MATCH |
-| Channel change location (official folds into downsample conv) | Sec. 2.6 / official impl | `ConvNeXtUNet.py:55` (per-stage $1\times1$ projection) | ACCEPTED ADAPTATION |
+| Block op order (DWConv$_{7\times7}\to$LN$\to$FC$\to$GELU$\to$FC$\to\gamma\to$residual) | Fig. 4 | `convnext_unet.py:36-49` | MATCH |
+| Pointwise layers channels-last as Linears | Fig. 4 (note "$1\times1$ convs $\equiv$ Linear") | `convnext_unet.py:29-31,42-44` | MATCH |
+| Inverted-bottleneck ratio 4 | Sec. 2.4 | `configuration/architectures/backbone.py` (`ffn_ratio=4.0`) | MATCH |
+| LayerNorm over $C$ only (channels-last) | Sec. 2.6 "BN$\to$LN" | `convnext_unet.py:11-19,28,41` | MATCH |
+| Layer Scale $\gamma$ (init $10^{-6}$, per-channel, before drop path) | Sec. 3.1 | `convnext_unet.py:34,45-46`; `configuration/architectures/backbone.py` (`layer_scale_init=1e-6`) | MATCH |
+| Stochastic depth linearly increasing across blocks | Sec. 2.1; Sec. 3.1 | `convnext_unet.py:79-86` | MATCH |
+| Patchify stem ($4\times4$ conv stride 4 + LN) | Sec. 2.2 | `convnext_unet.py:90-93` ($3\times3$ stride 1) | ACCEPTED ADAPTATION |
+| Separate downsampling (LN + $2\times2$ conv stride 2) | Sec. 2.6 page-6 | `convnext_unet.py:100-103` | MATCH |
+| Channel change location (official folds into downsample conv) | Sec. 2.6 / official impl | `convnext_unet.py:55` (per-stage $1\times1$ projection) | ACCEPTED ADAPTATION |
 | Stage compute ratio $(3,3,9,3)$ | Sec. 2.2 | uniform `blocks_per_stage` | out of scope (hyperparameter) |
-| Decoder: transposed conv $\to$ concat skip $\to$ ConvNeXt stage | — (UNet) | `ConvNeXtUNet.py:108-136` | MATCH (coherent) |
-| Output head | — (dense prediction) | `ConvNeXtUNet.py:115` ($1\times1$ conv) | ACCEPTED ADAPTATION |
+| Decoder: transposed conv $\to$ concat skip $\to$ ConvNeXt stage | — (UNet) | `convnext_unet.py:108-136` | MATCH (coherent) |
+| Output head | — (dense prediction) | `convnext_unet.py:115` ($1\times1$ conv) | ACCEPTED ADAPTATION |
 
-**Encoder fidelity (strict).** The block in `ConvNeXtUNet.py:36-49` reproduces Fig. 4's ConvNeXt column exactly: a $7\times7$ depthwise convolution (`dwconv`, `groups=channels`, $\text{pad}=3$) for spatial mixing, a single LayerNorm over the channel dimension via a channels-last permutation, a $C\to4C$ pointwise expansion (`fc1`), one GELU, a $4C\to C$ pointwise reduction (`fc2`), Layer Scale ($\gamma$), and an additive residual. Realising the pointwise layers as `nn.Linear` in channels-last layout is exactly the official implementation's choice and is mathematically identical to $1\times1$ convolutions, so the *fewer activations / fewer norms* micro-design (Sec. 2.6 — one LN, one GELU per block) is honoured. Inter-stage downsampling (`ConvNeXtUNet.py:100-103`) is a `ChannelLayerNorm` followed by a $2\times2$ stride-2 convolution, matching the "separate downsampling layers" with a normalisation before each spatial-resolution change (Sec. 2, page 6). Stochastic depth (`ConvNeXtUNet.py:79-86`) is a single linearly increasing schedule consumed monotonically across all $2N+1$ stages (encoder, bottleneck, decoder), consistent with the linear drop-path rule.
+**Encoder fidelity (strict).** The block in `convnext_unet.py:36-49` reproduces Fig. 4's ConvNeXt column exactly: a $7\times7$ depthwise convolution (`dwconv`, `groups=channels`, $\text{pad}=3$) for spatial mixing, a single LayerNorm over the channel dimension via a channels-last permutation, a $C\to4C$ pointwise expansion (`fc1`), one GELU, a $4C\to C$ pointwise reduction (`fc2`), Layer Scale ($\gamma$), and an additive residual. Realising the pointwise layers as `nn.Linear` in channels-last layout is exactly the official implementation's choice and is mathematically identical to $1\times1$ convolutions, so the *fewer activations / fewer norms* micro-design (Sec. 2.6 — one LN, one GELU per block) is honoured. Inter-stage downsampling (`convnext_unet.py:100-103`) is a `ChannelLayerNorm` followed by a $2\times2$ stride-2 convolution, matching the "separate downsampling layers" with a normalisation before each spatial-resolution change (Sec. 2, page 6). Stochastic depth (`convnext_unet.py:79-86`) is a single linearly increasing schedule consumed monotonically across all $2N+1$ stages (encoder, bottleneck, decoder), consistent with the linear drop-path rule.
 
-**Layer Scale.** The paper (Sec. 3.1) states "Layer Scale of initial value $10^{-6}$ is applied", i.e. a learnable per-channel vector $\gamma$ initialised to $10^{-6}$ multiplies the block's residual branch immediately before drop path: $\mathbf{y}=\mathbf{x}+\text{DropPath}(\gamma\odot f(\mathbf{x}))$. `ConvNeXtBlock` registers `self.gamma = nn.Parameter(layer_scale_init * torch.ones(channels))` (`ConvNeXtUNet.py:34`) and applies `x = self.gamma * x` after `fc2` while the tensor is still channels-last, before the permute-back and `self.drop_path` (`ConvNeXtUNet.py:45-47`), matching the official `facebookresearch/ConvNeXt` block. The initial value is threaded as `layer_scale_init` ($10^{-6}$ by default) through `ConvNeXtUNetConfig` (`models_config.py:1060`) $\to$ `ConvNeXtUNet` $\to$ `ConvNeXtStage` $\to$ `ConvNeXtBlock`, alongside the `ffn_ratio`/`drop_path` threading. When `layer_scale_init` $\le 0$ the parameter is `None` and the branch is added unscaled. The $\gamma$ parameters live inside the encoder/bottleneck/decoder submodules, so `get_param_groups` covers them automatically.
+**Layer Scale.** The paper (Sec. 3.1) states "Layer Scale of initial value $10^{-6}$ is applied", i.e. a learnable per-channel vector $\gamma$ initialised to $10^{-6}$ multiplies the block's residual branch immediately before drop path: $\mathbf{y}=\mathbf{x}+\text{DropPath}(\gamma\odot f(\mathbf{x}))$. `ConvNeXtBlock` registers `self.gamma = nn.Parameter(layer_scale_init * torch.ones(channels))` (`convnext_unet.py:34`) and applies `x = self.gamma * x` after `fc2` while the tensor is still channels-last, before the permute-back and `self.drop_path` (`convnext_unet.py:45-47`), matching the official `facebookresearch/ConvNeXt` block. The initial value is threaded as `layer_scale_init` ($10^{-6}$ by default) through `ConvNeXtUNetConfig` (`configuration/architectures/backbone.py`) $\to$ `ConvNeXtUNet` $\to$ `ConvNeXtStage` $\to$ `ConvNeXtBlock`, alongside the `ffn_ratio`/`drop_path` threading. When `layer_scale_init` $\le 0$ the parameter is `None` and the branch is added unscaled. The $\gamma$ parameters live inside the encoder/bottleneck/decoder submodules, so `get_param_groups` covers them automatically.
 
-**Accepted adaptations.** (i) *Stem* — the paper's patchify stem is a $4\times4$ stride-4 non-overlapping convolution that downsamples $4\times$ at entry (Sec. 2.2); the code uses a $3\times3$ stride-1 convolution plus LN (`ConvNeXtUNet.py:90-93`), preserving full input resolution. This is the standard dense-prediction adaptation: a U-Net needs a full-resolution feature map for the first skip connection, and all spatial reduction is deferred to the separate downsampling layers. Justified, non-structural. (ii) *Per-stage $1\times1$ projection* (`ConvNeXtUNet.py:55`) — the official implementation folds the channel change into the $2\times2$ downsample convolution, whereas here the downsample keeps channels constant ($C\to C$) and a $1\times1$ convolution at the head of each stage performs the channel change. The two placements are functionally equivalent (a linear channel remap adjacent to the resolution change); the code's choice is what lets the decoder feed concatenated $2C$ skips into a stage cleanly. Justified. (iii) *Output head* — a $1\times1$ convolution to `out_channels` (`ConvNeXtUNet.py:115`) replaces the classification head (final LN + global average pool + linear); this is the canonical dense-prediction head and the correct choice for a U-Net.
+**Accepted adaptations.** (i) *Stem* — the paper's patchify stem is a $4\times4$ stride-4 non-overlapping convolution that downsamples $4\times$ at entry (Sec. 2.2); the code uses a $3\times3$ stride-1 convolution plus LN (`convnext_unet.py:90-93`), preserving full input resolution. This is the standard dense-prediction adaptation: a U-Net needs a full-resolution feature map for the first skip connection, and all spatial reduction is deferred to the separate downsampling layers. Justified, non-structural. (ii) *Per-stage $1\times1$ projection* (`convnext_unet.py:55`) — the official implementation folds the channel change into the $2\times2$ downsample convolution, whereas here the downsample keeps channels constant ($C\to C$) and a $1\times1$ convolution at the head of each stage performs the channel change. The two placements are functionally equivalent (a linear channel remap adjacent to the resolution change); the code's choice is what lets the decoder feed concatenated $2C$ skips into a stage cleanly. Justified. (iii) *Output head* — a $1\times1$ convolution to `out_channels` (`convnext_unet.py:115`) replaces the classification head (final LN + global average pool + linear); this is the canonical dense-prediction head and the correct choice for a U-Net.
 
-**Decoder (coherence check only).** Wiring is correct (`ConvNeXtUNet.py:108-136`): `reversed_features = [bottleneck_channels] + features[::-1]`; each step upsamples with a $2\times2$ stride-2 transposed convolution from `reversed_features[i]` to `reversed_features[i+1]`, aligns to the skip via `match_spatial_size`, concatenates the encoder skip (channels `reversed_features[i+1]`) to give $2\times$ channels, and runs a `ConvNeXtStage` whose $1\times1$ projection maps $2C\to C$. Skips are captured pre-downsample (`ConvNeXtUNet.py:125`), so spatial sizes and channel counts match at each concat. Bottleneck channel count is `features[-1] * bottleneck_factor` (`ConvNeXtUNet.py:77`). No channel-bookkeeping errors found.
+**Decoder (coherence check only).** Wiring is correct (`convnext_unet.py:108-136`): `reversed_features = [bottleneck_channels] + features[::-1]`; each step upsamples with a $2\times2$ stride-2 transposed convolution from `reversed_features[i]` to `reversed_features[i+1]`, aligns to the skip via `match_spatial_size`, concatenates the encoder skip (channels `reversed_features[i+1]`) to give $2\times$ channels, and runs a `ConvNeXtStage` whose $1\times1$ projection maps $2C\to C$. Skips are captured pre-downsample (`convnext_unet.py:125`), so spatial sizes and channel counts match at each concat. Bottleneck channel count is `features[-1] * bottleneck_factor` (`convnext_unet.py:77`). No channel-bookkeeping errors found.
 
 ---
 

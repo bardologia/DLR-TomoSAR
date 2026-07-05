@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - CnnAttnAutoencoder
+  - cnn_attn_ae
+family: profile-autoencoder
+registry_key: cnn_attn_ae
+summary: Convolutional tokeniser plus multi-token self-attention; most expressive profile autoencoder.
+---
+
 # Conv-Attention Autoencoder
 
-`CnnAttnAutoencoder` (`models/profile_autoencoder/cnn_attn.py`) is a [[Model Zoo|profile autoencoder]] that combines a convolutional tokeniser with genuine multi-token self-attention. Unlike the [[Transformer1D Autoencoder]], which embeds the whole profile as a single token, this model splits the profile into patches and lets attention relate the patches to one another — local convolution plus global attention. It is the most expressive profile model. Like the others it defines the output latent space later targeted by [[JEPA]].
+`CnnAttnAutoencoder` (`models/profile_autoencoder/cnn_attn.py`) is a [[Model Zoo|profile autoencoder]] that combines a convolutional tokeniser with genuine multi-token self-attention. Unlike the [[Transformer1D Autoencoder]], which embeds the whole profile as a single token, this model splits the profile into patches and lets attention relate the patches to one another — local convolution plus global attention. It is the most expressive profile model. Like the others it defines the output latent space later targeted by [[JEPA Profile-Embedding|JEPA]].
 
 ---
 

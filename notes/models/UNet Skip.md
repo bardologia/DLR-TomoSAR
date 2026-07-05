@@ -1,3 +1,17 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - UNetSkip
+family: resunet
+registry_key: unet_skip
+summary: Residual U-Net variant using MaxPool2d downsampling instead of ResUNet's stride-2 convolutions.
+---
+
 # UNet Skip
 
 `UNetSkip` (`models/backbone/resunet.py`, registry key `"unet_skip"`) is a U-Net with residual conv blocks and `MaxPool2d` downsampling. It subclasses `ResUNetBackbone` and is instantiated with `downsample="maxpool"`, so every residual unit runs at stride 1 and all spatial reduction is performed by separate `MaxPool2d(2)` layers.

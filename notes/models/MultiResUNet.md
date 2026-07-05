@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - MultiResUNet
+  - MultiRes block U-Net
+family: multires
+registry_key: multires_unet
+summary: U-Net with MultiRes blocks (chained 3x3 convs approximating inception branches) and residual ResPath skips.
+---
+
 # MultiResUNet
 
-`MultiResUNet` (`models/backbone/MultiResUNet.py`) replaces the U-Net's double-conv blocks with MultiRes blocks — chained 3×3 convolutions whose intermediate outputs are concatenated, approximating parallel 3×3/5×5/7×7 inception branches at a fraction of the cost — and filters each skip connection through a residual "ResPath" ([[MultiResUNet_Ibtehaz2020_1902.04049.pdf|Ibtehaz & Rahman, 2020]]).
+`MultiResUNet` (`models/backbone/multires_unet.py`) replaces the U-Net's double-conv blocks with MultiRes blocks — chained 3×3 convolutions whose intermediate outputs are concatenated, approximating parallel 3×3/5×5/7×7 inception branches at a fraction of the cost — and filters each skip connection through a residual "ResPath" ([[MultiResUNet_Ibtehaz2020_1902.04049.pdf|Ibtehaz & Rahman, 2020]]).
 
 ---
 
@@ -74,7 +89,7 @@ See [[Configuration Layer]] → `MultiResUNetConfig`. All base UNet-style parame
 **Review date:** 2026-06-04
 **Reference:** Ibtehaz, N. & Rahman, M. S. (2020). *MultiResUNet: Rethinking the U-Net Architecture for Multimodal Biomedical Image Segmentation.* Neural Networks, 121, 74–87. arXiv:1902.04049. Ground truth: Section 3 (Proposed Methodology), Section 4 (Proposed Architecture, Eq. 1), Fig. 3–5, Table 1. [[MultiResUNet_Ibtehaz2020_1902.04049.pdf|PDF]]
 
-Equation-by-equation, figure-by-figure verification of `models/backbone/MultiResUNet.py` and the `MultiResUNetConfig` builder (`configuration/models_config.py:1244`) against the paper. Hyperparameters (filter counts, $\alpha$, dropout, learning rates) are out of scope; the channel-allocation *ratio scheme* is treated as a paper design point.
+Equation-by-equation, figure-by-figure verification of `models/backbone/multires_unet.py` and the `MultiResUNetConfig` builder (`configuration/architectures/backbone.py`) against the paper. Hyperparameters (filter counts, $\alpha$, dropout, learning rates) are out of scope; the channel-allocation *ratio scheme* is treated as a paper design point.
 
 ### Verdict table
 

@@ -1,3 +1,15 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - Architecture Summary
+  - Model Registry
+---
+
 # Model Zoo
 
 This note summarises all model architectures available in DLR-TomoSAR, their key properties, and guidance on when to prefer each.
@@ -116,15 +128,15 @@ The recurring sub-modules live in a single `models/blocks.py` and are imported b
 | `PatchEmbedding` / `tokens_to_feature_map` | Strided-conv patch tokeniser and the inverse token $\to$ feature-map reshape | `transunet`, `unetr`; `tokens_to_feature_map` also used by `swin_unet` |
 | `build_activation` / `build_norm2d` / `build_upsample` / `initialize_weights` / `match_spatial_size` / `DropPath` | Factory and utility helpers | all architectures |
 
-The `unet` and `resunet` families share a thin backbone (`UNetBackbone`, `ResUNetBackbone`) that holds the encode-decode path; the single-head, triple-head (`*MultiHead`), and per-Gaussian (`*PerGaussian`) classes differ only in the output head they attach via `GaussianHeadsMixin`. The plain single-head models map the backbone embedding straight to `out_channels` with one `nn.Conv2d(embedding_channels, out_channels, kernel_size=1)` and emit those channels directly, with no Gaussian-layout resolution. Only the head variants call `GaussianHeadsMixin._resolve_gaussian_layout`, which sets $K = \texttt{out\_channels} / \texttt{params\_per\_gaussian}$ and raises `ValueError` when `out_channels` is not divisible by `params_per_gaussian`; `_build_triple_heads` then builds three `PixelMLP` heads each emitting $K$ channels (interleaved to $3K$ via `torch.stack(..., dim=2)`), while `_build_per_gaussian_heads` builds $K$ `PixelMLP` heads each emitting `params_per_gaussian` channels. Swin-specific window attention (`WindowAttention`, `SwinTransformerBlock`, `PatchMerging`, `PatchExpanding`, `SwinStage`) remains local to `models/backbone/SwinUNet.py` because it is not reused elsewhere.
+The `unet` and `resunet` families share a thin backbone (`UNetBackbone`, `ResUNetBackbone`) that holds the encode-decode path; the single-head, triple-head (`*MultiHead`), and per-Gaussian (`*PerGaussian`) classes differ only in the output head they attach via `GaussianHeadsMixin`. The plain single-head models map the backbone embedding straight to `out_channels` with one `nn.Conv2d(embedding_channels, out_channels, kernel_size=1)` and emit those channels directly, with no Gaussian-layout resolution. Only the head variants call `GaussianHeadsMixin._resolve_gaussian_layout`, which sets $K = \texttt{out\_channels} / \texttt{params\_per\_gaussian}$ and raises `ValueError` when `out_channels` is not divisible by `params_per_gaussian`; `_build_triple_heads` then builds three `PixelMLP` heads each emitting $K$ channels (interleaved to $3K$ via `torch.stack(..., dim=2)`), while `_build_per_gaussian_heads` builds $K$ `PixelMLP` heads each emitting `params_per_gaussian` channels. Swin-specific window attention (`WindowAttention`, `SwinTransformerBlock`, `PatchMerging`, `PatchExpanding`, `SwinStage`) remains local to `models/backbone/swin_unet.py` because it is not reused elsewhere.
 
 ---
 
-## Configuration Persistence (ModelConfigIO)
+## Configuration Persistence (BackboneModelConfigIO)
 
-Each training run persists the full architecture configuration so a checkpoint can be reloaded into a structurally identical model at inference time. `ModelConfigIO` (`tools/data/io.py`) serialises every dataclass field of the model config except `shape_logger_types` (the `EXCLUDED` set) to `model_config.json` in the run's metadata directory, recording `model_name`, `config_type` (the config class name), and the field/value map under `config`.
+Each training run persists the full architecture configuration so a checkpoint can be reloaded into a structurally identical model at inference time. `BackboneModelConfigIO` (`pipelines/shared/config/config_persistence.py`, a subclass of the shared `ConfigIO` base) serialises every dataclass field of the model config except `shape_logger_types` (its `EXCLUDED` set) to `model_config.json` (the `RunArtifacts.BACKBONE_CONFIG` filename) in the run's metadata directory, recording `model_name`, `config_type` (the config class name), and the field/value map under `config`.
 
-`ModelConfigIO.load` reconstructs the config strictly: it normalises `model_name` (lowercase, `-`/space to `_`), instantiates the dataclass from `CONFIG_REGISTRY[model_name]`, then overwrites each persisted field, raising loudly if the file is missing, the `model_name` is unknown, or a persisted field is not an attribute of the dataclass. Tuple-typed fields (e.g. `atrous_rates`, `rsu_heights`, `num_heads`, `sr_ratios`) are coerced back from their JSON list form when the live default is a tuple. There is no tolerant fallback: an absent `model_config.json` raises `FileNotFoundError` and forces a retrain rather than a best-effort reconstruction. This makes the hyperparameters in each model note (channel widths, depths, head counts, dilation rates) the exact quantities captured per run.
+`ConfigIO.load` reconstructs the config strictly: it normalises `model_name` (lowercase, `-`/space to `_`), instantiates the dataclass from `BACKBONE_CONFIG_REGISTRY[model_name]` (returned by `BackboneModelConfigIO._registry`), then overwrites each persisted field, raising loudly if the file is missing, the `model_name` is unknown, or a persisted field is not an attribute of the dataclass. It returns the reconstructed `config` together with the raw persisted `model_name`. Tuple-typed fields (e.g. `atrous_rates`, `rsu_heights`, `num_heads`, `sr_ratios`) are coerced back from their JSON list form when the live default is a tuple. There is no tolerant fallback: an absent `model_config.json` raises `FileNotFoundError` and forces a retrain rather than a best-effort reconstruction. The sibling classes `ProfileAutoencoderConfigIO` and `ImageAutoencoderConfigIO` in the same module persist the autoencoder architectures the same way. This makes the hyperparameters in each model note (channel widths, depths, head counts, dilation rates) the exact quantities captured per run.
 
 ---
 

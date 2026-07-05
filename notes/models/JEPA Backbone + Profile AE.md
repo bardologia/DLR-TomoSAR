@@ -1,6 +1,23 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - JEPA Profile AE coupling
+family: jepa
+registry_key: resunet
+summary: JEPA backbone regresses a pretrained profile-autoencoder embedding instead of Gaussian params directly.
+group: jepa-ae
+---
+
 # JEPA Backbone + Profile AE
 
 A joint-embedding predictive variant in which the supervised backbone stops regressing Gaussian parameters directly and instead predicts the latent embedding of a pretrained profile autoencoder. The autoencoder is imported from a finished profile-autoencoder run; it is never trained from scratch here.
+
+This is one configuration of the unified JEPA pipeline (`python -m main.training.train_jepa`): it is selected by pointing `JepaEntryConfig.profile_autoencoder_run` at a profile-autoencoder run and leaving `image_autoencoder_run` empty. The full mechanics live in [[JEPA Profile-Embedding]].
 
 ## Data flow
 

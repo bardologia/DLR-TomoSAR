@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - LinkNet
+  - additive-skip encoder-decoder
+family: linknet
+registry_key: linknet
+summary: Compact encoder-decoder with additive (not concatenative) skip connections and a ResNet-style encoder.
+---
+
 # LinkNet
 
-`LinkNet` (`models/backbone/LinkNet.py`) implements a compact encoder-decoder architecture where skip connections are additive rather than concatenative ([[LinkNet_Chaurasia2017_1707.03718.pdf|Chaurasia & Culurciello, 2017]]). The decoder adds a transformed version of the encoder skip back to the decoder feature map rather than doubling the channel count via concatenation.
+`LinkNet` (`models/backbone/link_net.py`) implements a compact encoder-decoder architecture where skip connections are additive rather than concatenative ([[LinkNet_Chaurasia2017_1707.03718.pdf|Chaurasia & Culurciello, 2017]]). The decoder adds a transformed version of the encoder skip back to the decoder feature map rather than doubling the channel count via concatenation.
 
 ---
 
@@ -88,7 +103,7 @@ See [[Configuration Layer]] → `LinkNetConfig`.
 ## Relation to the LinkNet paper
 
 **Reference:** Chaurasia, A. & Culurciello, E. (2017). *LinkNet: Exploiting Encoder Representations for Efficient Semantic Segmentation.* arXiv:1707.03718. (Fig. 1 network, Fig. 2 encoder module, Fig. 3 decoder module, Tables I–II block specs.) [[LinkNet_Chaurasia2017_1707.03718.pdf|PDF]]
-**Code:** `models/backbone/LinkNet.py`, `models/blocks.py` (`build_activation`, `build_norm2d`, `match_spatial_size`), `configuration/model/models_config.py` (`LinkNetConfig`).
+**Code:** `models/backbone/link_net.py`, `models/blocks.py` (`build_activation`, `build_norm2d`, `match_spatial_size`), `configuration/architectures/backbone.py` (`LinkNetConfig`).
 
 The signature LinkNet idea — additive (not concatenative) skips, added before each decoder block input exactly as in Fig. 1 — is the contribution the architecture is named for and is reproduced here. The stem ($k\times k$ stride-1, no max-pool), the single-residual-block encoder depth, and the generic-decoder-block-plus-$1\times1$-head final stage differ from the paper's ResNet-18 encoder, fitting the single-channel dense-regression task that has no ImageNet-pretrained-weight pathway.
 

@@ -1,6 +1,22 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - U2-Net
+  - U2NetLite
+  - nested U-structure
+family: u2net
+registry_key: u2net
+summary: Two-level nested U-structure using Residual U-blocks (RSU) as the outer U-Net's stage blocks.
+---
+
 # U2-Net
 
-`U2NetLite` (`models/backbone/U2NetLite.py`) is a two-level nested U-structure ([[U2Net_Qin2020_2005.09007.pdf|Qin et al., 2020]]): the outer network is a U-Net whose blocks are themselves small U-Nets — Residual U-blocks (RSU) — so every stage mixes local and multi-scale context internally before the outer topology downsamples.
+`U2NetLite` (`models/backbone/u2net_lite.py`) is a two-level nested U-structure ([[U2Net_Qin2020_2005.09007.pdf|Qin et al., 2020]]): the outer network is a U-Net whose blocks are themselves small U-Nets — Residual U-blocks (RSU) — so every stage mixes local and multi-scale context internally before the outer topology downsamples.
 
 ---
 
@@ -60,7 +76,7 @@ See [[Configuration Layer]] → `U2NetLiteConfig`: `in_channels` (default $1$), 
 
 ## Paper fidelity
 
-*Review date: 2026-06-04. Ground truth: Qin et al., "U$^2$-Net: Going Deeper with Nested U-Structure for Salient Object Detection," Pattern Recognition 106 (2020), arXiv:2005.09007 ([[U2Net_Qin2020_2005.09007.pdf|PDF]]). Scope: architecture fidelity of `models/backbone/U2NetLite.py` and its `U2NetLiteConfig` builder against Section 3.1 (RSU, Fig. 2e), Section 3.2 (nested-U, Fig. 5, Table 1) and Section 3.3 (supervision, Eq. 1, Fig. 5). Hyperparameters out of scope.*
+*Review date: 2026-06-04. Ground truth: Qin et al., "U$^2$-Net: Going Deeper with Nested U-Structure for Salient Object Detection," Pattern Recognition 106 (2020), arXiv:2005.09007 ([[U2Net_Qin2020_2005.09007.pdf|PDF]]). Scope: architecture fidelity of `models/backbone/u2net_lite.py` and its `U2NetLiteConfig` builder against Section 3.1 (RSU, Fig. 2e), Section 3.2 (nested-U, Fig. 5, Table 1) and Section 3.3 (supervision, Eq. 1, Fig. 5). Hyperparameters out of scope.*
 
 **Verdict: faithful Lite implementation.** The non-negotiable structural primitives — the RSU residual-U-block mechanism, its dilated RSU-4F variant, and the two-level nested-U topology — are reproduced exactly. All divergences from the full $176.3$ MB U$^2$-Net are either accepted Lite scalings (fewer stages, smaller heights, narrower mid-channels) or one justified task-driven adaptation (removal of deep supervision for a regression head).
 
@@ -78,7 +94,7 @@ See [[Configuration Layer]] → `U2NetLiteConfig`: `in_channels` (default $1$), 
 | 10 | Nested-U decoder (RSU + concat skips + up) | §3.2(ii), Fig. 5 | `U2NetLite.py:127-131,147-149` | MATCH |
 | 11 | Intermediate mid-channels $M$ | Table 1 (per-stage $M$) | `U2NetLite.py:116-117` | ACCEPTED ADAPTATION |
 | 12 | Stage count / RSU heights | §3.2, Table 1 (6 enc / RSU-7..4) | `U2NetLite.py:119-131`; cfg `rsu_heights=(5,4,3)` | ACCEPTED ADAPTATION |
-| 13 | Channel progression between stages | Table 1 | `models_config.py:1378` `features=[64,128,256,512]` | ACCEPTED ADAPTATION |
+| 13 | Channel progression between stages | Table 1 | `configuration/architectures/backbone.py` `features=[64,128,256,512]` | ACCEPTED ADAPTATION |
 | 14 | Resolution bookkeeping (ceil pool + interpolate-to-skip) | Fig. 5 | `U2NetLite.py:53,59-60,148` | MATCH (robust to odd sizes) |
 | 15 | Side outputs + deep supervision (6 maps, fuse) | §3.3, Eq. 1, Fig. 5 | absent; `U2NetLite.py:134,151-152` | ACCEPTED ADAPTATION |
 | 16 | Output activation (sigmoid per side output) | §3.3, Fig. 5 legend | `U2NetLite.py:152` (linear $1\times1$) | ACCEPTED ADAPTATION |

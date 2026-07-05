@@ -1,6 +1,24 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - image-frontend JEPA
+  - JEPA param backbone
+family: jepa
+registry_key: resunet
+summary: Pretrained image autoencoder feeds the backbone, which still regresses Gaussian params directly (no embedding target).
+group: jepa-ae
+---
+
 # JEPA Image AE + Backbone
 
 A variant that places a pretrained image autoencoder in front of the backbone as a learned encoder of the SAR stack. There is no embedding target here: the backbone still regresses the Gaussian parameters and is trained with the ordinary supervised parameter loss.
+
+This is one configuration of the unified JEPA pipeline (`python -m main.training.train_jepa`): it is selected by pointing `JepaEntryConfig.image_autoencoder_run` at an image-autoencoder run and leaving `profile_autoencoder_run` empty. With no profile autoencoder, the run is scored at inference via `JEPA_PARAM_INFERENCE_COMPONENTS` (backbone predicts parameters through the front-end); see [[JEPA Profile-Embedding]].
 
 ## Data flow
 

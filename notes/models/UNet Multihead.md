@@ -1,3 +1,18 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - UNetMultiHead
+  - UNetMultiHeadConfig
+family: head-variant
+registry_key: unet_multihead
+summary: UNet backbone with three parameter-type-specific PixelMLP heads (amplitude, mean, sigma) instead of one shared conv.
+---
+
 # UNet Multihead
 
 `UNetMultiHead` (`models/backbone/unet.py`, registry name `unet_multihead`, config `UNetMultiHeadConfig`) extends the shared `UNetBackbone` with three independent pixel-wise MLP output heads — one for amplitude, one for mean elevation, and one for sigma — rather than a single shared 1×1 convolution.

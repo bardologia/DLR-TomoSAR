@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - TransUNet
+  - ViT-CNN hybrid U-Net
+family: transformer
+registry_key: transunet
+summary: CNN encoder feeds a ViT bottleneck, decoded by a CNN U-Net decoder with encoder skip connections.
+---
+
 # TransUNet
 
-`TransUNet` (`models/backbone/TransUNet.py`) fuses a Vision Transformer (ViT) patch encoder with a CNN U-Net decoder ([[TransUNet_Chen2021_2102.04306.pdf|Chen et al., 2021]]). The CNN backbone first extracts feature maps; the ViT processes flattened patch tokens from the deepest CNN feature map; the decoder recovers spatial resolution.
+`TransUNet` (`models/backbone/trans_unet.py`) fuses a Vision Transformer (ViT) patch encoder with a CNN U-Net decoder ([[TransUNet_Chen2021_2102.04306.pdf|Chen et al., 2021]]). The CNN backbone first extracts feature maps; the ViT processes flattened patch tokens from the deepest CNN feature map; the decoder recovers spatial resolution.
 
 ---
 
@@ -104,33 +119,33 @@ With the defaults, $d = C_b = 272 \cdot 2 = 544$, and `transformer_heads = 4` di
 
 | # | Component | Paper ref | Code | Verdict |
 |---|---|---|---|---|
-| 1 | Hybrid order (CNN then transformer) | §3.2 "CNN-Transformer Hybrid as Encoder" | `TransUNet.py:111-139` | MATCH |
-| 1b | CNN backbone type | §3.2, §4.2 (ResNet-50) | `TransUNet.py:26-41` (double-conv stack, `ConvBlock` from `blocks.py`) | ACCEPTED ADAPTATION (backbone is hyperparameter) |
-| 1c | Patch embedding on CNN feature map, $1\times1$ patches | §3.2 "$1\times1$ patches extracted from the CNN feature map" | `TransUNet.py:52-56`, `patch_size=1` default `models_config.py:624` | MATCH |
+| 1 | Hybrid order (CNN then transformer) | §3.2 "CNN-Transformer Hybrid as Encoder" | `trans_unet.py:111-139` | MATCH |
+| 1b | CNN backbone type | §3.2, §4.2 (ResNet-50) | `trans_unet.py:26-41` (double-conv stack, `ConvBlock` from `blocks.py`) | ACCEPTED ADAPTATION (backbone is hyperparameter) |
+| 1c | Patch embedding on CNN feature map, $1\times1$ patches | §3.2 "$1\times1$ patches extracted from the CNN feature map" | `trans_unet.py:52-56`, `patch_size=1` default `configuration/architectures/backbone.py` | MATCH |
 | 2 | Trainable linear projection (Eq. 1) | Eq. 1, $E \in \mathbb{R}^{(P^2\cdot C)\times D}$ | `PatchEmbedding` Conv2d k=s=p `blocks.py:419-441` | MATCH (strided conv = patch linear projection) |
-| 2b | Learned positional embedding added, no class token | Eq. 1, $E_{pos}\in\mathbb{R}^{N\times D}$ | `TransUNet.py:76-79,134` | MATCH |
+| 2b | Learned positional embedding added, no class token | Eq. 1, $E_{pos}\in\mathbb{R}^{N\times D}$ | `trans_unet.py:76-79,134` | MATCH |
 | 2c | Extra $\text{LN}$ inside patch embedding | not in Eq. 1 | `PatchEmbedding` `blocks.py:434,440` | DEVIATION (minor) |
 | 3 | Pre-norm MSA + residual (Eq. 2) | Eq. 2 | `TransformerBlock` `blocks.py:412-413` | MATCH |
 | 3b | Pre-norm MLP + residual (Eq. 3) | Eq. 3 | `TransformerBlock` `blocks.py:414-415` | MATCH |
-| 3c | Final $\text{LN}$ after layer $L$ | $\mathbf{z}_L$ encoded representation | `TransUNet.py:71,138` | MATCH |
+| 3c | Final $\text{LN}$ after layer $L$ | $\mathbf{z}_L$ encoded representation | `trans_unet.py:71,138` | MATCH |
 | 4 | MLP with GELU, ratio 4 | Eq. 3, ViT MLP | `TransformerBlock` `blocks.py:402-409`, `ffn_activation="gelu"` | MATCH |
-| 5 | Reshape tokens $HW/P^2 \to H/P\times W/P$ | §3.2 | `tokens_to_feature_map` `blocks.py:444-446` (`TransUNet.py:139`) | MATCH |
-| 6a | Initial $3\times3$ conv reshaping $D\to512$ before cascade | Fig. 1(b), §3.2 | channel reduction folded into the first upsampling operator `TransUNet.py:81-91` | MATCH (paper block order preserved) |
-| 6b | CUP block op order: 2x upsample -> $3\times3$ conv -> ReLU | §3.2 "Cascaded Upsampler" | upsample then ConvBlock `TransUNet.py:144-150` | MATCH (order preserved) |
+| 5 | Reshape tokens $HW/P^2 \to H/P\times W/P$ | §3.2 | `tokens_to_feature_map` `blocks.py:444-446` (`trans_unet.py:139`) | MATCH |
+| 6a | Initial $3\times3$ conv reshaping $D\to512$ before cascade | Fig. 1(b), §3.2 | channel reduction folded into the first upsampling operator `trans_unet.py:81-91` | MATCH (paper block order preserved) |
+| 6b | CUP block op order: 2x upsample -> $3\times3$ conv -> ReLU | §3.2 "Cascaded Upsampler" | upsample then ConvBlock `trans_unet.py:144-150` | MATCH (order preserved) |
 | 6c | CUP block internal composition | §3.2 (single conv + ReLU) | double-conv + norm `ConvBlock` from `blocks.py:113-149` | ACCEPTED ADAPTATION (U-Net-style block) |
-| 7 | Skip connections from CNN at $1/2,1/4,1/8$, none from transformer | Fig. 1(b) | 4 skips (incl. full-res), all from CNN `TransUNet.py:112-116,144-149` | ACCEPTED ADAPTATION (benign stem consequence) |
-| 8 | Segmentation head | Fig. 1(b) | $1\times1$ conv `TransUNet.py:103-107` | MATCH |
-| 9 | Patch grid $H/16$ | §3.2, §4.2 ($P=16$ via ResNet $1/16$) | `cnn_downsample=2^4=16`, grid $H/16$ `TransUNet.py:73-74` | MATCH |
-| 10 | Penultimate $(16,H,W)$ stage then head | Fig. 1(b) | last decoder level `cnn_features[0]` channels at full res `TransUNet.py:103-104` | MATCH |
-| -- | Upsample operator type | Fig. 1 (bilinear 2x) | `convtranspose` default, `bilinear` available `models_config.py:628`, `blocks.py:52-74` | ACCEPTED ADAPTATION (hyperparameter) |
+| 7 | Skip connections from CNN at $1/2,1/4,1/8$, none from transformer | Fig. 1(b) | 4 skips (incl. full-res), all from CNN `trans_unet.py:112-116,144-149` | ACCEPTED ADAPTATION (benign stem consequence) |
+| 8 | Segmentation head | Fig. 1(b) | $1\times1$ conv `trans_unet.py:103-107` | MATCH |
+| 9 | Patch grid $H/16$ | §3.2, §4.2 ($P=16$ via ResNet $1/16$) | `cnn_downsample=2^4=16`, grid $H/16$ `trans_unet.py:73-74` | MATCH |
+| 10 | Penultimate $(16,H,W)$ stage then head | Fig. 1(b) | last decoder level `cnn_features[0]` channels at full res `trans_unet.py:103-104` | MATCH |
+| -- | Upsample operator type | Fig. 1 (bilinear 2x) | `convtranspose` default, `bilinear` available `configuration/architectures/backbone.py`, `blocks.py:52-74` | ACCEPTED ADAPTATION (hyperparameter) |
 
 The transformer core (Eq. 1-3, pre-norm, final $\text{LN}$, GELU MLP, learned position embedding without class token) is an exact match to the paper. The hybrid ordering and the defining $1\times1$-patch-on-CNN-feature design (§3.2) are honoured, and skip connections originate solely from the CNN encoder with no transformer-sourced skip, as the paper requires.
 
 The remaining deviations live in the embedding plumbing rather than the conceptual architecture:
 
-1. **Initial channel-reduction conv (Fig. 1(b), §3.2; `TransUNet.py:81-91`).** The paper reshapes $\mathbf{z}_L$ to $(D, H/16, W/16)$ then applies a $3\times3$-conv + ReLU to $512$ channels before the first upsampling step. The channel reduction is folded into the first upsampling operator (`build_upsample(reversed_features[0] -> reversed_features[1])`), which reduces $D$ to the first decoder width as it upsamples, matching the paper's block order (reshape -> reduce -> upsample-then-conv cascade). Item 6a: MATCH.
+1. **Initial channel-reduction conv (Fig. 1(b), §3.2; `trans_unet.py:81-91`).** The paper reshapes $\mathbf{z}_L$ to $(D, H/16, W/16)$ then applies a $3\times3$-conv + ReLU to $512$ channels before the first upsampling step. The channel reduction is folded into the first upsampling operator (`build_upsample(reversed_features[0] -> reversed_features[1])`), which reduces $D$ to the first decoder width as it upsamples, matching the paper's block order (reshape -> reduce -> upsample-then-conv cascade). Item 6a: MATCH.
 
-2. **Extra full-resolution skip (Fig. 1(b); `TransUNet.py:112-116,144-149`).** Skips are appended for every CNN level before pooling, yielding 4 skips with the finest at full input resolution ($1/1$) against the paper's 3 at $1/2,1/4,1/8$. This is a benign consequence of the generic, depth-configurable CNN stem (structurally still all-CNN, none from the transformer). Item 7: accepted adaptation.
+2. **Extra full-resolution skip (Fig. 1(b); `trans_unet.py:112-116,144-149`).** Skips are appended for every CNN level before pooling, yielding 4 skips with the finest at full input resolution ($1/1$) against the paper's 3 at $1/2,1/4,1/8$. This is a benign consequence of the generic, depth-configurable CNN stem (structurally still all-CNN, none from the transformer). Item 7: accepted adaptation.
 
 3. **Extra $\text{LN}$ in patch embedding (`PatchEmbedding`, `blocks.py:434,440`).** Eq. 1 maps patches by linear projection and immediately adds $E_{pos}$ with no normalisation; the shared `PatchEmbedding` applies a `LayerNorm` to the projected tokens before the positional embedding is added. This is the sole genuine deviation. `PatchEmbedding` is the shared block in `models/blocks.py`, used by both `TransUNet` and [[UNETR]].
 

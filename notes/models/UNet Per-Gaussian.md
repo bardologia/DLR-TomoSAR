@@ -1,3 +1,18 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - UNetPerGaussian
+  - GaussianHeadsMixin
+family: head-variant
+registry_key: unet_pergaussian
+summary: UNet backbone with one independent PixelMLP head per Gaussian slot, predicting all its parameters jointly.
+---
+
 # UNet Per-Gaussian
 
 `UNetPerGaussian` (`models/backbone/unet.py`, registry key `"unet_pergaussian"`) extends the shared `UNetBackbone` with one independent pixel-wise MLP output head per Gaussian component, each predicting all parameters $(a_k, \mu_k, \sigma_k)$ for its assigned slot.

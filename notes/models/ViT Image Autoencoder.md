@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - ViTImageAutoencoder
+  - vit_ae
+family: image-autoencoder
+registry_key: vit_ae
+summary: Patch-based masked-autoencoder-style ViT image autoencoder modelling global structure across the SAR stack.
+---
+
 # ViT Image Autoencoder
 
-`ViTImageAutoencoder` (`models/image_autoencoder/vit.py`) is a [[Model Zoo|image autoencoder]] in the masked-autoencoder mould: it tokenises the SAR image stack into patches and relates them with a transformer encoder and decoder, modelling global structure across the stack. The trained encoder is reused as the pretrained image front-end of the [[JEPA]] predictor.
+`ViTImageAutoencoder` (`models/image_autoencoder/vit.py`) is a [[Model Zoo|image autoencoder]] in the masked-autoencoder mould: it tokenises the SAR image stack into patches and relates them with a transformer encoder and decoder, modelling global structure across the stack. The trained encoder is reused as the pretrained image front-end of the [[JEPA Profile-Embedding|JEPA]] predictor.
 
 ---
 

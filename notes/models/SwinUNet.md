@@ -1,6 +1,22 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - SwinUNet
+  - Swin Transformer U-Net
+  - Swin-UNet
+family: transformer
+registry_key: swin_unet
+summary: Hierarchical Swin Transformer encoder with symmetric Swin-based decoder for dense regression on SAR patches.
+---
+
 # SwinUNet
 
-`SwinUNet` (`models/backbone/SwinUNet.py`) uses a hierarchical Swin Transformer ([[SwinTransformer_Liu2021_2103.14030.pdf|Liu et al., 2021]]) as the encoder and a symmetric Swin-based decoder with patch merging/expanding, adapted for dense regression on SAR patches ([[SwinUNet_Cao2021_2105.05537.pdf|Cao et al., 2022]]).
+`SwinUNet` (`models/backbone/swin_unet.py`) uses a hierarchical Swin Transformer ([[SwinTransformer_Liu2021_2103.14030.pdf|Liu et al., 2021]]) as the encoder and a symmetric Swin-based decoder with patch merging/expanding, adapted for dense regression on SAR patches ([[SwinUNet_Cao2021_2105.05537.pdf|Cao et al., 2022]]).
 
 ---
 

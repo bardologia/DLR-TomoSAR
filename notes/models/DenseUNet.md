@@ -1,6 +1,22 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - DenseUNet
+  - FC-DenseNet
+  - Tiramisu
+family: densenet
+registry_key: dense_unet
+summary: Fully-convolutional DenseNet (Tiramisu) with dense blocks in a U-shaped down/up path and skip concatenation.
+---
+
 # DenseUNet
 
-`DenseUNet` (`models/backbone/DenseUNet.py`) is a fully-convolutional DenseNet (FC-DenseNet / "Tiramisu", [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|Jégou et al., 2017]]): dense blocks in which every layer receives the concatenation of all preceding feature maps, arranged in a U-shaped down/up path with skip concatenation.
+`DenseUNet` (`models/backbone/dense_unet.py`) is a fully-convolutional DenseNet (FC-DenseNet / "Tiramisu", [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|Jégou et al., 2017]]): dense blocks in which every layer receives the concatenation of all preceding feature maps, arranged in a U-shaped down/up path with skip concatenation.
 
 ---
 
@@ -64,7 +80,7 @@ See [[Configuration Layer]] → `DenseUNetConfig` (`growth_rate`, `block_layers`
 
 ## Paper fidelity
 
-*Review date: 2026-06-04.* Ground truth: Huang et al., *Densely Connected Convolutional Networks*, CVPR 2017 (arXiv:1608.06993) [[DenseNet_Huang2017_1608.06993.pdf|PDF]] — hereafter [[DenseNet_Huang2017_1608.06993.pdf|DenseNet]]; and Jégou et al., *The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation*, CVPRW 2017 (arXiv:1611.09326) [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|PDF]] — hereafter [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|FC-DenseNet]]. Code reviewed: `models/backbone/DenseUNet.py` and `configuration/model/models_config.py` (`DenseUNetConfig`; shared builders).
+*Review date: 2026-06-04.* Ground truth: Huang et al., *Densely Connected Convolutional Networks*, CVPR 2017 (arXiv:1608.06993) [[DenseNet_Huang2017_1608.06993.pdf|PDF]] — hereafter [[DenseNet_Huang2017_1608.06993.pdf|DenseNet]]; and Jégou et al., *The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation*, CVPRW 2017 (arXiv:1611.09326) [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|PDF]] — hereafter [[FCDenseNet_Tiramisu_Jegou2017_1611.09326.pdf|FC-DenseNet]]. Code reviewed: `models/backbone/dense_unet.py` and `configuration/architectures/backbone.py` (`DenseUNetConfig`; shared builders).
 
 The implementation is a faithful **FC-DenseNet (Tiramisu)** with one deliberate, paper-conformant choice (no bottleneck $1\times1$ inside dense layers) and one minor numerical robustness addition (spatial-size matching on the skip). No structural deviations were found. The single subtle point on which Tiramisu implementations usually fail — propagating *only the last dense block's new features* through the upsampling path rather than the full concatenation — is handled correctly.
 

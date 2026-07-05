@@ -1,6 +1,21 @@
+---
+type: model
+domain: model
+status: current
+tags:
+  - tomosar
+  - tomosar/model
+aliases:
+  - UNETR
+  - UNet Transformer
+family: transformer
+registry_key: unetr
+summary: Pure ViT encoder with a CNN decoder receiving skips from four evenly-spaced ViT layer outputs.
+---
+
 # UNETR
 
-`UNETR` (`models/backbone/UNETR.py`) uses a pure Vision Transformer (ViT) encoder with a CNN decoder that receives skip connections from intermediate ViT layer outputs ([[UNETR_Hatamizadeh2021_2103.10504.pdf|Hatamizadeh et al., 2022]]).
+`UNETR` (`models/backbone/unetr.py`) uses a pure Vision Transformer (ViT) encoder with a CNN decoder that receives skip connections from intermediate ViT layer outputs ([[UNETR_Hatamizadeh2021_2103.10504.pdf|Hatamizadeh et al., 2022]]).
 
 ---
 
@@ -123,9 +138,9 @@ The default `embedding_dim = 544` is divisible by `transformer_heads = 8`. Every
 
 ## Paper fidelity
 
-*Review date: 2026-06-04. Ground truth: Hatamizadeh et al., "UNETR: Transformers for 3D Medical Image Segmentation", arXiv:2103.10504 (Sec. 3.1 Architecture, Fig. 2, Eq. 1-6; [[UNETR_Hatamizadeh2021_2103.10504.pdf|PDF]]). Code under review: `models/backbone/UNETR.py`, `configuration/model/models_config.py` (`UNETRConfig`). The original is 3D ($H\times W\times D$, $P^3$ patches, $3\times3\times3$ convs, Deconv $2\times2\times2$); our implementation is the 2D analog ($H\times W$, $p^2$ patches, $3\times3$ convs, Deconv $2\times2$) and is judged on the 2D analog of each structure.*
+*Review date: 2026-06-04. Ground truth: Hatamizadeh et al., "UNETR: Transformers for 3D Medical Image Segmentation", arXiv:2103.10504 (Sec. 3.1 Architecture, Fig. 2, Eq. 1-6; [[UNETR_Hatamizadeh2021_2103.10504.pdf|PDF]]). Code under review: `models/backbone/unetr.py`, `configuration/architectures/backbone.py` (`UNETRConfig`). The original is 3D ($H\times W\times D$, $P^3$ patches, $3\times3\times3$ convs, Deconv $2\times2\times2$); our implementation is the 2D analog ($H\times W$, $p^2$ patches, $3\times3$ convs, Deconv $2\times2$) and is judged on the 2D analog of each structure.*
 
-**Overall verdict: faithful 2D adaptation.** Patch-direct embedding (no CNN encoder), the pre-norm ViT encoder (Eq. 1-3), the $\{z_3,z_6,z_9,z_{12}\}$ even-spacing skip rule, the per-skip deconv-step counts (3/2/1), the bottleneck-deconv-then-merge wiring, the multi-scale concat-then-conv decoder, the full-resolution input-stem skip, and the $1\times1$ output head all reproduce Fig. 2. Each deconv is followed by a $3\times3$ conv + norm + act and the front projection is a $3\times3$ conv, matching the Fig. 2 legend. The patch embedding, transformer block, and attention are the shared `PatchEmbedding`, `TransformerBlock`, and `MultiHeadSelfAttention` from `models/blocks.py`, the same modules used by [[TransUNet]]; only `ProgressiveProjectionHead` and the `UNETR` shell are local to `models/backbone/UNETR.py`. One minor deviation: the patch embedding adds a `LayerNorm` not present in Eq. 1.
+**Overall verdict: faithful 2D adaptation.** Patch-direct embedding (no CNN encoder), the pre-norm ViT encoder (Eq. 1-3), the $\{z_3,z_6,z_9,z_{12}\}$ even-spacing skip rule, the per-skip deconv-step counts (3/2/1), the bottleneck-deconv-then-merge wiring, the multi-scale concat-then-conv decoder, the full-resolution input-stem skip, and the $1\times1$ output head all reproduce Fig. 2. Each deconv is followed by a $3\times3$ conv + norm + act and the front projection is a $3\times3$ conv, matching the Fig. 2 legend. The patch embedding, transformer block, and attention are the shared `PatchEmbedding`, `TransformerBlock`, and `MultiHeadSelfAttention` from `models/blocks.py`, the same modules used by [[TransUNet]]; only `ProgressiveProjectionHead` and the `UNETR` shell are local to `models/backbone/unetr.py`. One minor deviation: the patch embedding adds a `LayerNorm` not present in Eq. 1.
 
 | # | Component (paper ref) | Code site | Verdict |
 |---|---|---|---|
