@@ -664,6 +664,396 @@ class FlowLibrary:
             "nodes": nodes, "steps": steps,
         }
 
+    def _profile_ae_train(self) -> dict:
+        nodes = [
+            {"id": "params", "tex": r"\Theta",                         "role": "measured",     "kind": "tensor", "shape": "3K x Az x Rg", "desc": "per-pixel Gaussian mixture parameters (a, mu, sigma) from extraction", "sample": [["0.81", "12.4", "1.9"], ["0.55", "31.8", "2.6"]]},
+            {"id": "gp",     "tex": r"(a,\mu,\sigma)",                 "role": "intermediate", "kind": "tensor", "shape": "3 x N_p x K",  "desc": "de-interleaved per-pixel amplitudes, means and widths",                "sample": [["0.81", "0.55"], ["12.4", "31.8"], ["1.9", "2.6"]]},
+            {"id": "active", "tex": r"\mathbb{1}_{\mathrm{act}}",      "role": "intermediate", "kind": "vector", "shape": "N_p",          "desc": "active-pixel mask: any component amplitude above threshold",           "sample": ["1", "0", "1", "1"]},
+            {"id": "idx",    "tex": r"\mathcal{I}",                    "role": "calculated",   "kind": "vector", "shape": "N_keep",       "desc": "kept, shuffled pixel indices (subsampled active + empty frac)",         "sample": ["4", "1", "9", "2"]},
+            {"id": "curve",  "tex": r"\mathbf{c}",                     "role": "calculated",   "kind": "vector", "shape": "L",            "desc": "synthesised elevation profile, the autoencoder sample",                "sample": ["0.00", "0.62", "0.31", "0.88", "0.00"]},
+            {"id": "caug",   "tex": r"\mathbf{c}'",                    "role": "intermediate", "kind": "vector", "shape": "L",            "desc": "geometrically augmented profile (scale, shift, flip)",                 "sample": ["0.00", "0.68", "0.34", "0.80", "0.00"]},
+            {"id": "stats",  "tex": r"(\ell, s)",                      "role": "calculated",   "kind": "vector", "shape": "2",            "desc": "log1p-standardize location and scale, fitted on the train split",      "sample": ["0.32", "0.51"]},
+            {"id": "cn",     "tex": r"\hat{\mathbf{c}}",               "role": "calculated",   "kind": "vector", "shape": "L",            "desc": "normalised profile: network input and reconstruction target",          "sample": ["-0.63", "0.58", "-0.10", "1.20", "-0.63"]},
+            {"id": "z",      "tex": r"\mathbf{z}",                     "role": "intermediate", "kind": "vector", "shape": "d",            "desc": "raw encoder bottleneck embedding",                                     "sample": ["0.22", "-1.10", "0.70", "..."]},
+            {"id": "zn",     "tex": r"\hat{\mathbf{z}}",               "role": "calculated",   "kind": "vector", "shape": "d",            "desc": "normalised bottleneck embedding",                                      "sample": ["0.18", "-0.94", "0.61", "..."]},
+            {"id": "crec",   "tex": r"\tilde{\mathbf{c}}",             "role": "calculated",   "kind": "vector", "shape": "L",            "desc": "decoder-reconstructed profile",                                        "sample": ["-0.60", "0.55", "-0.08", "1.17", "-0.61"]},
+            {"id": "err",    "tex": r"e",                              "role": "intermediate", "kind": "vector", "shape": "L",            "desc": "reconstruction residual c-rec minus c-hat",                            "sample": ["0.03", "-0.03", "0.02", "-0.03", "0.02"]},
+            {"id": "loss",   "tex": r"\mathcal{L}",                    "role": "calculated",   "kind": "scalar", "shape": "1",            "desc": "single-term reconstruction loss",                                      "sample": "3.1e-2"},
+            {"id": "groups", "tex": r"\{g_e, g_d\}",                   "role": "intermediate", "kind": "set",    "shape": "2",            "desc": "encoder and decoder AdamW parameter groups",                           "sample": ["ae_encoder", "ae_decoder"]},
+            {"id": "eta",    "tex": r"\eta_{\mathrm{eff}}",            "role": "intermediate", "kind": "vector", "shape": "2",            "desc": "per-group effective LR (base x cosine x warmup)",                      "sample": ["2.7e-4", "2.7e-4"]},
+            {"id": "gnorm",  "tex": r"\lVert\mathbf{g}\rVert_2",       "role": "intermediate", "kind": "scalar", "shape": "1",            "desc": "global gradient L2 norm",                                              "sample": "1.4"},
+            {"id": "w",      "tex": r"\theta_t",                       "role": "intermediate", "kind": "vector", "shape": "|theta|",      "desc": "model weights at optimiser step t",                                    "sample": ["0.31", "-0.08", "..."]},
+            {"id": "wbest",  "tex": r"\theta^{\star}",                 "role": "final",        "kind": "vector", "shape": "|theta|",      "desc": "best-epoch checkpointed autoencoder weights",                          "sample": ["0.30", "-0.09", "..."]},
+        ]
+        steps = [
+            {
+                "id": "pae_stack", "title": "Parameter load and de-interleave", "phase": "A - Curve genesis",
+                "note": "The extraction parameter artifact is memory-mapped and cropped to each split's zero-based local slices; the 3K interleaved channels are de-interleaved by stride-3 into per-pixel amplitude, mean and width matrices.",
+                "inputs": ["params"], "outputs": ["gp"],
+                "lines": [
+                    [{"id": "gp", "tex": r"(a,\mu,\sigma)_p", "role": "intermediate"}, {"tex": "="}, {"tex": r"\big("}, {"id": "params", "tex": r"\Theta", "role": "measured"}, {"tex": r"[0{::}3],\ \Theta[1{::}3],\ \Theta[2{::}3]\big)^{\top},\qquad K = C/3"}],
+                ],
+            },
+            {
+                "id": "pae_select", "title": "Active-pixel gate and subsample", "phase": "A - Curve genesis",
+                "note": "A pixel is active when any component amplitude exceeds amp_zero_thr = 1e-3; active pixels are kept at fraction pixel_subsample (default 1.0) and empty pixels at keep_empty_frac = 0.05, then the union is seed-shuffled.",
+                "inputs": ["gp"], "outputs": ["active", "idx"],
+                "lines": [
+                    [{"id": "active", "tex": r"\mathbb{1}_{\mathrm{act},p}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\bigvee_{k}\big["}, {"id": "gp", "tex": r"a_{p,k}", "role": "intermediate"}, {"tex": r" > \tau_a\big],\qquad \tau_a = 10^{-3}"}],
+                    [{"id": "idx", "tex": r"\mathcal{I}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{shuffle}\big(\mathcal{A}_{\rho}\,\cup\,\mathcal{E}_{\phi}\big),\quad |\mathcal{A}_\rho| = \rho\,|\mathcal{A}|,\ \ |\mathcal{E}_\phi| = 0.05\,|\mathcal{E}|"}],
+                ],
+            },
+            {
+                "id": "pae_genesis", "title": "Gaussian curve genesis", "phase": "A - Curve genesis",
+                "note": "For each kept pixel the elevation profile is synthesised on the fly by summing the K Gaussians over the axis; the width is floored at 1e-6 and the exponent clipped to [-100, 0] before exponentiation. This curve is both the autoencoder input and its reconstruction target.",
+                "inputs": ["gp", "idx"], "outputs": ["curve"],
+                "lines": [
+                    [{"id": "curve", "tex": r"c_h", "role": "calculated"}, {"tex": "="}, {"tex": r"\sum_{k}"}, {"id": "gp", "tex": r"a_k", "role": "intermediate"}, {"tex": r"\exp\!\Big(\mathrm{clip}\big(-\tfrac{(x_h-\mu_k)^2}{2\max(\sigma_k,10^{-6})^2},\ -100,\ 0\big)\Big)"}],
+                ],
+            },
+            {
+                "id": "pae_augment", "title": "Curve augmentation", "phase": "B - Normalization",
+                "note": "Train split only. With per-operation probabilities the profile is amplitude-scaled, circularly shifted by up to max_shift bins (np.roll) and axis-flipped; only the flip is on by default (p_flip = 0.5, p_amp_scale = p_shift = 0).",
+                "inputs": ["curve"], "outputs": ["caug"],
+                "lines": [
+                    [{"id": "caug", "tex": r"\mathbf{c}'", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{flip}_{p_f}\!\circ\,\mathrm{roll}_{k,\,p_s}\!\circ\,\mathrm{scale}_{s,\,p_a}\big("}, {"id": "curve", "tex": r"\mathbf{c}", "role": "calculated"}, {"tex": r"\big)"}],
+                    [{"tex": r"s\sim\mathcal{U}(0.9, 1.1),\quad k\sim\mathcal{U}\{-4,\dots,4\},\quad p_f = 0.5"}],
+                ],
+            },
+            {
+                "id": "pae_fitstats", "title": "Fit log1p-standardize statistics", "phase": "B - Normalization",
+                "note": "On the train split only and in float64, the location and scale are the mean and standard deviation of log1p(max(c,0)) over up to 100000 deterministically sampled genesis profiles (seed 42); the scale is floored at 1e-6.",
+                "inputs": ["curve"], "outputs": ["stats"],
+                "lines": [
+                    [{"tex": r"f(\mathbf{c}) = \log\!\big(1 + \max(\mathbf{c},0)\big)"}],
+                    [{"id": "stats", "tex": r"(\ell, s)", "role": "calculated"}, {"tex": "="}, {"tex": r"\big(\operatorname{mean} f(\mathbf{c}),\ \max(\operatorname{std} f(\mathbf{c}),\ 10^{-6})\big),\qquad N_{\mathrm{fit}} \le 10^{5}"}],
+                ],
+            },
+            {
+                "id": "pae_normalise", "title": "Normalise and jitter", "phase": "B - Normalization",
+                "note": "The fitted statistics standardise every split identically; on the train split only, Gaussian noise of std noise_std (default 0.01, in normalised units) is added after normalisation with probability p_noise. Input and target are this same normalised curve.",
+                "inputs": ["caug", "stats"], "outputs": ["cn"],
+                "lines": [
+                    [{"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{f("}, {"id": "caug", "tex": r"\mathbf{c}'", "role": "intermediate"}, {"tex": r") - "}, {"id": "stats", "tex": r"\ell", "role": "calculated"}, {"tex": r"}{"}, {"id": "stats", "tex": r"s", "role": "calculated"}, {"tex": r"}"}],
+                    [{"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}, {"tex": r"\leftarrow \hat{\mathbf{c}} + \varepsilon,\quad \varepsilon\sim\mathcal{N}(0,\sigma_N^2),\ \ \sigma_N = 0.01\ \ (\text{train},\ p_N)"}],
+                ],
+            },
+            {
+                "id": "pae_encode", "title": "Encode to bottleneck", "phase": "C - Autoencode",
+                "note": "The profile vector is mapped by the encoder (default: a 4-layer 1x1-conv MLP, hidden 512, GELU) to a low-dimensional embedding; the bottleneck width is embedding_dim = 24.",
+                "inputs": ["cn"], "outputs": ["z"],
+                "lines": [
+                    [{"id": "z", "tex": r"\mathbf{z}", "role": "intermediate"}, {"tex": "="}, {"tex": r"E_{\phi}\!\big("}, {"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}, {"tex": r"\big),\qquad \mathbf{z}\in\mathbb{R}^{d},\ \ d = 24"}],
+                ],
+            },
+            {
+                "id": "pae_embednorm", "title": "Normalise the embedding", "phase": "C - Autoencode",
+                "note": "The bottleneck is normalised by the embedding_norm mode; the default layernorm standardises across the d channels with learnable affine (nn.LayerNorm, eps 1e-5), while l2 projects to the unit sphere (eps 1e-6) and none passes through.",
+                "inputs": ["z"], "outputs": ["zn"],
+                "lines": [
+                    [{"id": "zn", "tex": r"\hat{\mathbf{z}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\gamma\odot\dfrac{"}, {"id": "z", "tex": r"\mathbf{z} - \overline{\mathbf{z}}", "role": "intermediate"}, {"tex": r"}{\sqrt{\operatorname{Var}(\mathbf{z}) + 10^{-5}}} + \beta\quad(\texttt{layernorm})"}],
+                    [{"tex": r"\texttt{l2}:\ \hat{\mathbf{z}} = \mathbf{z}/\max(\lVert\mathbf{z}\rVert_2,\,10^{-6}),\qquad \texttt{none}:\ \hat{\mathbf{z}} = \mathbf{z}"}],
+                ],
+            },
+            {
+                "id": "pae_decode", "title": "Decode to profile", "phase": "C - Autoencode",
+                "note": "The decoder mirrors the encoder, projecting the normalised embedding back to a full-length profile; the output has no final activation, so the reconstruction lives in the same normalised space as the target.",
+                "inputs": ["zn"], "outputs": ["crec"],
+                "lines": [
+                    [{"id": "crec", "tex": r"\tilde{\mathbf{c}}", "role": "calculated"}, {"tex": "="}, {"tex": r"D_{\psi}\!\big("}, {"id": "zn", "tex": r"\hat{\mathbf{z}}", "role": "calculated"}, {"tex": r"\big),\qquad \tilde{\mathbf{c}}\in\mathbb{R}^{L}"}],
+                ],
+            },
+            {
+                "id": "pae_recon", "title": "Reconstruction loss", "phase": "D - Loss",
+                "note": "The residual is reduced by the configured curve_kind (default MSE): MSE squares it, L1 takes magnitude, Huber bends at delta = 1.0, Charbonnier smooths with eps = 1e-3. It is the sole loss term of this single-objective autoencoder.",
+                "inputs": ["crec", "cn"], "outputs": ["err", "loss"],
+                "lines": [
+                    [{"id": "err", "tex": r"e", "role": "intermediate"}, {"tex": "="}, {"id": "crec", "tex": r"\tilde{\mathbf{c}}", "role": "calculated"}, {"tex": r"\ -\ "}, {"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}],
+                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big\langle e^2\big\rangle\ (\texttt{mse}),\ \ \big\langle|e|\big\rangle\ (\texttt{l1}),\ \ \mathrm{Huber}_{\delta=1},\ \ \big\langle\sqrt{e^2+\epsilon^2}\big\rangle_{\epsilon=10^{-3}}"}],
+                ],
+            },
+            {
+                "id": "pae_paramgroups", "title": "Encoder and decoder groups", "phase": "E - Optimiser step",
+                "note": "AdamW holds two parameter groups, encoder and decoder, each with its own learning rate and weight decay (defaults 3e-4 and 1e-4); shared betas (0.9, 0.999) and eps 1e-8. Empty groups are dropped.",
+                "inputs": [], "outputs": ["groups"],
+                "lines": [
+                    [{"id": "groups", "tex": r"g_{\mathrm{enc}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\{E_\phi;\ \eta_e,\ \lambda_e\},\qquad"}, {"id": "groups", "tex": r"g_{\mathrm{dec}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\{D_\psi;\ \eta_d,\ \lambda_d\}"}],
+                    [{"tex": r"\eta_e = \eta_d = 3\times10^{-4},\quad \lambda_e = \lambda_d = 10^{-4},\quad (\beta_1,\beta_2) = (0.9, 0.999),\ \epsilon = 10^{-8}"}],
+                ],
+            },
+            {
+                "id": "pae_schedule", "title": "Warmup and cosine schedule", "phase": "E - Optimiser step",
+                "note": "Each group's effective LR is its base rate times the cosine-annealing factor toward eta_min = 1e-6 over the epoch horizon T = 100, times a linear warmup ramping from warmup_start_factor = 0.1 over warmup_steps = 200 optimiser steps.",
+                "inputs": ["groups"], "outputs": ["eta"],
+                "lines": [
+                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad \eta_{\min} = 10^{-6},\ T = 100"}],
+                    [{"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\eta_0\,F(t)\,f_{\mathrm{w}}(s),\qquad f_{\mathrm{w}}(s) = \alpha_0 + (1-\alpha_0)\tfrac{s}{S},\ \ \alpha_0 = 0.1,\ S = 200"}],
+                ],
+            },
+            {
+                "id": "pae_gradstep", "title": "Grad clip and AdamW update", "phase": "E - Optimiser step",
+                "note": "After a finiteness guard the global gradient norm is clipped to max_grad_norm = 1.0 (fixed mode), then AdamW applies bias-corrected moments with decoupled weight decay; the epoch loop drives the reconstruction loss down.",
+                "inputs": ["loss", "eta"], "outputs": ["gnorm", "w"],
+                "iterative": {"var": "loss", "steps": 100, "unit": "epoch", "symbol": "L",
+                              "trace": ["6.4e-2", "4.0e-2", "2.9e-2", "2.1e-2", "1.6e-2", "1.3e-2"]},
+                "lines": [
+                    [{"id": "gnorm", "tex": r"\lVert\mathbf{g}\rVert_2", "role": "intermediate"}, {"tex": "="}, {"tex": r"\Big(\textstyle\sum_i\lVert\nabla_{\theta^{(i)}}"}, {"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": r"\rVert_2^2\Big)^{1/2},\quad \mathbf{g}\leftarrow\mathbf{g}\,\min\!\big(1,\ \tfrac{\tau}{\lVert\mathbf{g}\rVert_2 + \epsilon}\big),\ \tau = 1"}],
+                    [{"id": "w", "tex": r"\theta_{t+1}", "role": "intermediate"}, {"tex": "="}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\ -\ "}, {"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": r"\Big(\tfrac{\hat m_t}{\sqrt{\hat v_t}+\epsilon} + \lambda\,\theta_t\Big)"}],
+                ],
+            },
+            {
+                "id": "pae_checkpoint", "title": "Validation and checkpoint", "phase": "E - Optimiser step",
+                "note": "Every validation_frequency epochs the model (under EMA when enabled) is evaluated; the best epoch is checkpointed on strict improvement and early stopping restores it after patience = 15 evaluations without a new minimum.",
+                "inputs": ["w"], "outputs": ["wbest"],
+                "lines": [
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \mathrm{patience} = 15\ \text{evals}"}],
+                ],
+            },
+        ]
+        return {
+            "key": "profile_ae_train", "name": "Profile AE (Train)",
+            "blurb": "A profile autoencoder trained to reconstruct elevation curves. Synthesise each pixel's curve from its Gaussian mixture parameters, augment and log1p-standardise it, compress to a normalised bottleneck embedding and decode it back, then minimise a single reconstruction loss with AdamW, warmup, cosine annealing and early stopping.",
+            "nodes": nodes, "steps": steps,
+        }
+
+    def _image_ae_train(self) -> dict:
+        nodes = [
+            {"id": "x",     "tex": r"\mathbf{x}",              "role": "measured",     "kind": "tensor", "shape": "B x C_in x P x P",  "desc": "normalised input patch batch; also the reconstruction target", "sample": [["0.41", "-0.20"], ["-0.33", "0.27"]]},
+            {"id": "zpre",  "tex": r"\mathbf{z}_0",            "role": "intermediate", "kind": "tensor", "shape": "B x C_e x P' x P'", "desc": "raw encoder embedding before latent normalisation",           "sample": [["0.82", "-1.20"], ["0.31", "0.54"]]},
+            {"id": "z",     "tex": r"\mathbf{z}",              "role": "calculated",   "kind": "tensor", "shape": "B x C_e x P' x P'", "desc": "normalised latent code (bottleneck)",                         "sample": [["0.44", "-0.64"], ["0.17", "0.29"]]},
+            {"id": "xhat",  "tex": r"\hat{\mathbf{x}}",        "role": "calculated",   "kind": "tensor", "shape": "B x C_in x P x P",  "desc": "decoder reconstruction of the input patch",                   "sample": [["0.39", "-0.18"], ["-0.30", "0.29"]]},
+            {"id": "e",     "tex": r"\mathbf{e}",              "role": "intermediate", "kind": "tensor", "shape": "B x C_in x P x P",  "desc": "reconstruction residual x-hat minus x",                       "sample": ["-0.02", "0.02", "0.03", "..."]},
+            {"id": "lrec",  "tex": r"\ell",                    "role": "calculated",   "kind": "scalar", "shape": "1",                 "desc": "reconstruction loss (single component image_recon)",          "sample": "1.8e-2"},
+            {"id": "gnorm", "tex": r"\lVert\mathbf{g}\rVert_2","role": "intermediate", "kind": "scalar", "shape": "1",                 "desc": "global gradient L2 norm",                                     "sample": "0.83"},
+            {"id": "grad",  "tex": r"\mathbf{g}",              "role": "intermediate", "kind": "vector", "shape": "|theta|",           "desc": "clipped parameter gradient",                                  "sample": ["1.2e-2", "-4e-3", "..."]},
+            {"id": "eta",   "tex": r"\eta_{\mathrm{eff}}",     "role": "intermediate", "kind": "scalar", "shape": "1",                 "desc": "effective LR (base x cosine x warmup)",                       "sample": "2.9e-4"},
+            {"id": "w",     "tex": r"\theta_t",                "role": "intermediate", "kind": "vector", "shape": "|theta|",           "desc": "encoder/decoder weights at optimiser step t",                 "sample": ["0.31", "-0.08", "..."]},
+            {"id": "wbest", "tex": r"\theta^{\star}",          "role": "final",        "kind": "vector", "shape": "|theta|",           "desc": "best-epoch checkpointed weights",                             "sample": ["0.30", "-0.09", "..."]},
+        ]
+        steps = [
+            {
+                "id": "iae_encode", "title": "Encoder downsampling", "phase": "A - Encode",
+                "note": "The stem lifts the C_in-channel patch to base_channels (32); n = log2(downsample_factor) strided stages each halve resolution and double width; a 1x1 head projects to the embedding_dim (24) latent map.",
+                "inputs": ["x"], "outputs": ["zpre"],
+                "lines": [
+                    [{"id": "zpre", "tex": r"\mathbf{z}_0", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{emb}_{1\times1}\!\big(\mathrm{down}^{(n)}\!\big(\mathrm{stem}\big("}, {"id": "x", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"\big)\big)\big)"}],
+                    [{"tex": r"n = \log_2 s_{\mathrm{ds}},\qquad C_e = d_{\mathrm{emb}} = 24,\qquad P' = P / s_{\mathrm{ds}}\ \ (s_{\mathrm{ds}} = 1\ \text{for conv2d})"}],
+                ],
+            },
+            {
+                "id": "iae_embednorm", "title": "Embedding normalisation", "phase": "A - Encode",
+                "note": "The latent map is normalised by the configured mode (default none): l2 rescales each pixel's channel vector to unit length with a 1e-6 floor, layernorm standardises across channels per pixel with a 1e-6 variance floor.",
+                "inputs": ["zpre"], "outputs": ["z"],
+                "lines": [
+                    [{"id": "z", "tex": r"\mathbf{z}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{"}, {"id": "zpre", "tex": r"\mathbf{z}_0", "role": "intermediate"}, {"tex": r"}{\max\!\big(\lVert\mathbf{z}_0\rVert_2,\ \epsilon\big)}\ \ (\texttt{l2}),\qquad \epsilon = 10^{-6},\ \ \lVert\cdot\rVert_2\ \text{over channels}"}],
+                    [{"tex": r"\mathbf{z} = \dfrac{\mathbf{z}_0 - \mu_c}{\sqrt{\sigma_c^2 + 10^{-6}}}\ \ (\texttt{layernorm}),\qquad \mathbf{z} = \mathbf{z}_0\ \ (\texttt{none})"}],
+                ],
+            },
+            {
+                "id": "iae_decode", "title": "Decoder reconstruction", "phase": "B - Decode",
+                "note": "A 1x1 layer lifts the latent back to the bottleneck width; n upsampling stages each double resolution and halve width (convtranspose by default); depth-1 refinement blocks follow, and a 1x1 head returns the C_in-channel patch.",
+                "inputs": ["z"], "outputs": ["xhat"],
+                "lines": [
+                    [{"id": "xhat", "tex": r"\hat{\mathbf{x}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{head}_{1\times1}\!\big(\mathrm{refine}\big(\mathrm{up}^{(n)}\!\big(\mathrm{emb}^{-1}_{1\times1}\big("}, {"id": "z", "tex": r"\mathbf{z}", "role": "calculated"}, {"tex": r"\big)\big)\big)\big)\ \in\ \mathbb{R}^{C_{\mathrm{in}}\times P\times P}"}],
+                ],
+            },
+            {
+                "id": "iae_residual", "title": "Reconstruction residual", "phase": "Reconstruction loss",
+                "note": "The autoencoder is self-supervised: the target is the input patch itself, so the residual is the reconstruction minus the input, shared by all four reconstruction kinds.",
+                "inputs": ["xhat", "x"], "outputs": ["e"],
+                "lines": [
+                    [{"id": "e", "tex": r"\mathbf{e}", "role": "intermediate"}, {"tex": "="}, {"id": "xhat", "tex": r"\hat{\mathbf{x}}", "role": "calculated"}, {"tex": r"\ -\ "}, {"id": "x", "tex": r"\mathbf{x}", "role": "measured"}],
+                ],
+            },
+            {
+                "id": "iae_reconterm", "title": "Reconstruction loss term", "phase": "Reconstruction loss",
+                "note": "The single loss component image_recon reduces the residual by the configured recon_kind (default mse); Huber bends at delta = 1.0 and Charbonnier smooths the L1 with eps = 1e-3, floored at eps squared.",
+                "inputs": ["e"], "outputs": ["lrec"],
+                "lines": [
+                    [{"tex": r"\ell_{\mathrm{MSE}} = \big\langle \mathbf{e}^2\big\rangle,\qquad \ell_{L1} = \big\langle |\mathbf{e}| \big\rangle"}],
+                    [{"id": "lrec", "tex": r"\ell_{\mathrm{Hub}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big\langle \tfrac12 \mathbf{e}^2\,[|\mathbf{e}|\le\delta] + \delta\big(|\mathbf{e}|-\tfrac{\delta}{2}\big)\,[|\mathbf{e}|>\delta]\big\rangle,\quad \delta = 1"}],
+                    [{"tex": r"\ell_{\mathrm{Charb}} = \big\langle \sqrt{\mathbf{e}^2 + \varepsilon^2}\big\rangle,\quad \varepsilon = 10^{-3}"}],
+                ],
+            },
+            {
+                "id": "iae_gradclip", "title": "Backprop and gradient clipping", "phase": "Optimiser step",
+                "note": "After a per-batch finiteness guard, the global gradient L2 norm is formed and all gradients are rescaled by a common factor so the norm never exceeds the fixed threshold tau = 1.0; the floor epsilon = 1e-6 keeps the scale finite.",
+                "inputs": ["lrec"], "outputs": ["gnorm", "grad"],
+                "lines": [
+                    [{"id": "gnorm", "tex": r"\lVert\mathbf{g}\rVert_2", "role": "intermediate"}, {"tex": "="}, {"tex": r"\Big(\textstyle\sum_i \big\lVert\nabla_{\theta^{(i)}}"}, {"id": "lrec", "tex": r"\ell", "role": "calculated"}, {"tex": r"\big\rVert_2^2\Big)^{1/2}"}],
+                    [{"id": "grad", "tex": r"\mathbf{g}", "role": "intermediate"}, {"tex": r"\leftarrow \mathbf{g}\cdot\min\!\Big(1,\ \tfrac{\tau}{\lVert\mathbf{g}\rVert_2 + \varepsilon}\Big),\quad \tau = 1,\ \ \varepsilon = 10^{-6}"}],
+                ],
+            },
+            {
+                "id": "iae_adamw", "title": "AdamW update", "phase": "Optimiser step",
+                "note": "Two parameter groups, encoder and decoder, each at lr = 3e-4 with decoupled weight decay 1e-4; bias-corrected adaptive moments use betas (0.9, 0.999) and eps 1e-8. The epoch loop drives the reconstruction loss down.",
+                "inputs": ["grad", "eta"], "outputs": ["w"],
+                "iterative": {"var": "lrec", "steps": 100, "unit": "epoch", "symbol": "L",
+                              "trace": ["4.8e-2", "3.1e-2", "2.4e-2", "2.0e-2", "1.8e-2"]},
+                "lines": [
+                    [{"tex": r"\hat m_t = \tfrac{m_t}{1-\beta_1^t},\quad \hat v_t = \tfrac{v_t}{1-\beta_2^t},\quad (\beta_1,\beta_2) = (0.9,\,0.999)"}],
+                    [{"id": "w", "tex": r"\theta_{t+1}", "role": "intermediate"}, {"tex": "="}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\ -\ "}, {"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": r"\Big(\tfrac{\hat m_t}{\sqrt{\hat v_t}+\epsilon} + \lambda\theta_t\Big),\quad \lambda = 10^{-4},\ \epsilon = 10^{-8}"}],
+                ],
+            },
+            {
+                "id": "iae_schedule", "title": "Warmup and cosine schedule", "phase": "Schedule & checkpoint",
+                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor (T = scheduler.epochs = 100, eta_min = 1e-6) times the per-step linear warmup factor (200 steps, start factor 0.1).",
+                "inputs": [], "outputs": ["eta"],
+                "lines": [
+                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad T = 100,\ \eta_{\min} = 10^{-6}"}],
+                    [{"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\eta_0\cdot F(t)\cdot f_{\mathrm{w}}(s),\qquad f_{\mathrm{w}}(s) = \alpha_0 + (1-\alpha_0)\tfrac{s}{S},\ \ \alpha_0 = 0.1,\ S = 200"}],
+                ],
+            },
+            {
+                "id": "iae_checkpoint", "title": "Validation and checkpoint", "phase": "Schedule & checkpoint",
+                "note": "Evaluation runs every 5 epochs; the best epoch is checkpointed on strict improvement of the validation reconstruction loss, and after 15 evaluations without a new minimum early stopping restores the best weights.",
+                "inputs": ["w"], "outputs": ["wbest"],
+                "lines": [
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \text{eval every } 5,\ \ \mathrm{patience} = 15"}],
+                ],
+            },
+        ]
+        return {
+            "key": "image_ae_train", "name": "Image AE (Train)",
+            "blurb": "A 2D convolutional (or ConvNeXt / ViT) autoencoder reconstructs its own normalised input patch: the encoder downsamples to a normalised latent code, the decoder rebuilds the patch, and a single reconstruction loss is backpropagated through two-group AdamW with gradient clipping, warmup, cosine annealing, and best-val checkpointing.",
+            "nodes": nodes, "steps": steps,
+        }
+
+    def _jepa_train(self) -> dict:
+        nodes = [
+            {"id": "img",     "tex": r"\mathbf{x}",               "role": "measured",     "kind": "tensor", "shape": "B x C_in x P x P", "desc": "normalised input patch batch from the loader",      "sample": [["0.41", "-0.20"], ["-0.33", "0.27"]]},
+            {"id": "gtp",     "tex": r"\theta^{\mathrm{GT}}_{n}", "role": "measured",     "kind": "tensor", "shape": "B x 3K x P x P",   "desc": "loader-normalised GT Gaussian parameters",          "sample": ["0.55", "0.47", "0.34", "..."]},
+            {"id": "zhat",    "tex": r"\hat{\mathbf{z}}",         "role": "calculated",   "kind": "tensor", "shape": "B x E x P x P",    "desc": "predicted per-pixel embedding, E = embedding_dim",  "sample": ["0.18", "-0.44", "0.29", "..."]},
+            {"id": "gtphys",  "tex": r"\theta^{\mathrm{GT}}",     "role": "intermediate", "kind": "tensor", "shape": "B x 3K x P x P",   "desc": "denormalised physical GT parameters (no_grad)",     "sample": ["12.4", "8.1", "1.9", "..."]},
+            {"id": "gtcurve", "tex": r"\gamma",                   "role": "intermediate", "kind": "tensor", "shape": "B x L x P x P",    "desc": "reconstructed GT elevation curve (mixture)",        "sample": [["0.06", "0.70"], ["0.35", "0.86"]]},
+            {"id": "gtcn",    "tex": r"\bar{\gamma}",             "role": "intermediate", "kind": "tensor", "shape": "B x L x P x P",    "desc": "profile-normalised GT curve (log1p, standardise)",  "sample": [["-0.9", "0.4"], ["-0.2", "0.8"]]},
+            {"id": "zstar",   "tex": r"\mathbf{z}^{\star}",       "role": "calculated",   "kind": "tensor", "shape": "B x E x P x P",    "desc": "target embedding from the profile encoder",         "sample": ["0.20", "-0.41", "0.27", "..."]},
+            {"id": "zhn",     "tex": r"\hat{\mathbf{z}}_{n}",     "role": "intermediate", "kind": "tensor", "shape": "B x E x P x P",    "desc": "embedding-normalised prediction",                   "sample": ["0.31", "-0.52", "0.10", "..."]},
+            {"id": "zsn",     "tex": r"\mathbf{z}^{\star}_{n}",   "role": "intermediate", "kind": "tensor", "shape": "B x E x P x P",    "desc": "embedding-normalised target",                       "sample": ["0.33", "-0.49", "0.12", "..."]},
+            {"id": "chat",    "tex": r"\hat{\gamma}",             "role": "intermediate", "kind": "tensor", "shape": "B x L x P x P",    "desc": "curve decoded from the normalised prediction",      "sample": [["0.05", "0.69"], ["0.34", "0.85"]]},
+            {"id": "Lemb",    "tex": r"\ell_{\mathrm{emb}}",      "role": "calculated",   "kind": "scalar", "shape": "1",                "desc": "embedding-match loss (weighted enabled terms)",     "sample": "3.2e-2"},
+            {"id": "Lrec",    "tex": r"\ell_{\mathrm{rec}}",      "role": "calculated",   "kind": "scalar", "shape": "1",                "desc": "curve-reconstruction anchor loss",                  "sample": "1.7e-2"},
+            {"id": "Ltot",    "tex": r"\mathcal{L}",              "role": "final",        "kind": "scalar", "shape": "1",                "desc": "total JEPA loss (plain weighted sum)",              "sample": "4.9e-2"},
+            {"id": "w",       "tex": r"\theta_t",                 "role": "intermediate", "kind": "vector", "shape": "|theta|",          "desc": "trainable weights: backbone + finetuned AE groups", "sample": ["0.31", "-0.08", "..."]},
+            {"id": "phi",     "tex": r"\phi^{\mathrm{ema}}",      "role": "intermediate", "kind": "vector", "shape": "|enc|",            "desc": "EMA target-encoder weights (ema provider only)",    "sample": ["0.30", "-0.09", "..."]},
+            {"id": "wbest",   "tex": r"\theta^{\star}",           "role": "final",        "kind": "vector", "shape": "|theta|",          "desc": "best-epoch checkpointed weights",                   "sample": ["0.30", "-0.09", "..."]},
+            {"id": "diag",    "tex": r"\mathcal{D}",              "role": "final",        "kind": "set",    "shape": "4",                "desc": "inference embedding diagnostics (4 scalars)",       "sample": "MSE=6e-3, cos=0.98"},
+        ]
+        steps = [
+            {
+                "id": "jep_couple", "title": "Couple pretrained autoencoder", "phase": "A - Couple",
+                "note": "The profile autoencoder is imported from a pretrained run and coupled to the backbone; frozen mode disables its gradients and sets eval, finetune opens a separate optimiser group. Joint training from scratch is rejected, and live/ema targets require a trainable profile AE (live additionally requires the curve anchor).",
+                "inputs": [], "outputs": ["w"],
+                "lines": [
+                    [{"tex": r"(E_\phi, D_\phi) \leftarrow \text{pretrained profile AE},\qquad \mathrm{grad}(\phi) = \big[\texttt{mode}=\texttt{finetune}\big]"}],
+                    [{"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": "="}, {"tex": r"\theta_{\mathrm{bb}}\ \cup\ \theta^{\mathrm{ft}}_{\mathrm{AE}},\qquad \texttt{mode}\in\{\texttt{frozen},\ \texttt{finetune}\}"}],
+                ],
+            },
+            {
+                "id": "jep_predict", "title": "Predict latent embedding", "phase": "A - Couple",
+                "note": "One forward pass maps the normalised input patch to a per-pixel latent embedding of width E = embedding_dim (24 by default). When an image autoencoder is coupled it first encodes the input to latent features the backbone consumes; otherwise the backbone reads the dataset channels directly.",
+                "inputs": ["img"], "outputs": ["zhat"],
+                "lines": [
+                    [{"id": "zhat", "tex": r"\hat{\mathbf{z}}", "role": "calculated"}, {"tex": "="}, {"tex": r"f_\theta(\mathbf{u}),\qquad \mathbf{u} = E^{\mathrm{img}}_\psi\big("}, {"id": "img", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"\big)\ \text{or}\ "}, {"id": "img", "tex": r"\mathbf{x}", "role": "measured"}],
+                    [{"tex": r"\dim_c \hat{\mathbf{z}} = E = \dim_{\mathrm{emb}}\quad (\text{default } 24)"}],
+                ],
+            },
+            {
+                "id": "jep_gtcurve", "title": "Reconstruct and normalise the GT curve", "phase": "B - Target",
+                "note": "Under no_grad the GT parameters are denormalised to physical units and evaluated on the elevation axis as an additive Gaussian mixture (sigma floored at 1e-6, exponent clamped to [-100, 0]); the curve is then mapped to the autoencoder's own space by log1p compression and standardisation with the pretrained profile stats (scale floored at 1e-6).",
+                "inputs": ["gtp"], "outputs": ["gtphys", "gtcurve", "gtcn"],
+                "lines": [
+                    [{"id": "gtphys", "tex": r"\theta^{\mathrm{GT}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{denorm}\big("}, {"id": "gtp", "tex": r"\theta^{\mathrm{GT}}_{n}", "role": "measured"}, {"tex": r"\big),\qquad "}, {"id": "gtcurve", "tex": r"\gamma", "role": "intermediate"}, {"tex": r"(\xi_n) = \sum_k a_k \exp\!\Big(-\tfrac{(\xi_n-\mu_k)^2}{2\sigma_k^2}\Big)"}],
+                    [{"id": "gtcn", "tex": r"\bar{\gamma}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{\log(1+\max("}, {"id": "gtcurve", "tex": r"\gamma", "role": "intermediate"}, {"tex": r",0)) - \ell_\gamma}{s_\gamma},\qquad s_\gamma \ge 10^{-6}"}],
+                ],
+            },
+            {
+                "id": "jep_target", "title": "Target embedding", "phase": "B - Target",
+                "note": "The target embedding is the profile encoder applied to the normalised GT curve. The default stopgrad detaches it (no_grad); live keeps it differentiable through the encoder (requires finetune and the curve anchor to avoid a collapsed constant embedding); ema reads a separate exponential-moving-average copy of the encoder.",
+                "inputs": ["gtcn"], "outputs": ["zstar"],
+                "lines": [
+                    [{"id": "zstar", "tex": r"\mathbf{z}^{\star}", "role": "calculated"}, {"tex": "="}, {"tex": r"E_\phi\big("}, {"id": "gtcn", "tex": r"\bar{\gamma}", "role": "intermediate"}, {"tex": r"\big)\ \ [\texttt{stopgrad},\texttt{live}],\qquad E^{\mathrm{ema}}_\phi\big(\bar{\gamma}\big)\ \ [\texttt{ema}]"}],
+                    [{"tex": r"\texttt{stopgrad}:\ \mathrm{sg}[\mathbf{z}^{\star}];\quad \texttt{live}:\ \partial\mathbf{z}^{\star}/\partial\phi\ \text{kept}"}],
+                ],
+            },
+            {
+                "id": "jep_embednorm", "title": "Embedding normalisation", "phase": "B - Target",
+                "note": "Predicted and target embeddings pass through the autoencoder's embedding normalisation before matching. The default layernorm centres each pixel's E-vector, scales it to unit variance (eps 1e-5) and applies a learnable per-channel affine; l2 projects it to the unit sphere (norm floored at 1e-6); none is the identity. Both branches use the identical map so the loss compares them on the same footing.",
+                "inputs": ["zhat", "zstar"], "outputs": ["zhn", "zsn"],
+                "lines": [
+                    [{"id": "zhn", "tex": r"\hat{\mathbf{z}}_{n}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{EN}\big("}, {"id": "zhat", "tex": r"\hat{\mathbf{z}}", "role": "calculated"}, {"tex": r"\big),\qquad "}, {"id": "zsn", "tex": r"\mathbf{z}^{\star}_{n}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{EN}\big("}, {"id": "zstar", "tex": r"\mathbf{z}^{\star}", "role": "calculated"}, {"tex": r"\big)"}],
+                    [{"tex": r"\mathrm{EN}(\mathbf{z}) = \gamma\,\tfrac{\mathbf{z}-\mu_z}{\sqrt{\sigma_z^2+10^{-5}}}+\beta\,[\texttt{layernorm}],\ \ \tfrac{\mathbf{z}}{\max(\lVert\mathbf{z}\rVert_2,\,10^{-6})}\,[\texttt{l2}],\ \ \mathbf{z}\,[\texttt{none}]"}],
+                ],
+            },
+            {
+                "id": "jep_embloss", "title": "Embedding-match term", "phase": "C - Match",
+                "note": "The match term is a mean-squared error between the normalised embeddings by default (weight 1). Optional cosine distance (averaged over pixels whose target norm exceeds 1e-3, similarity clamped to [-1,1]) and smooth-L1 (beta 1) terms are off by default; the enabled terms are weighted and summed.",
+                "inputs": ["zhn", "zsn"], "outputs": ["Lemb"],
+                "lines": [
+                    [{"id": "Lemb", "tex": r"\ell_{\mathrm{emb}}", "role": "calculated"}, {"tex": "="}, {"tex": r"w_{\mathrm{mse}}\big\langle("}, {"id": "zhn", "tex": r"\hat{\mathbf{z}}_{n}", "role": "intermediate"}, {"tex": "-"}, {"id": "zsn", "tex": r"\mathbf{z}^{\star}_{n}", "role": "intermediate"}, {"tex": r")^2\big\rangle + w_{\cos}\ell_{\cos} + w_{\mathrm{sL1}}\ell_{\mathrm{sL1}}"}],
+                    [{"tex": r"\ell_{\cos} = \big\langle 1 - \tfrac{\langle\hat{\mathbf{z}}_{n},\mathbf{z}^{\star}_{n}\rangle}{\lVert\hat{\mathbf{z}}_{n}\rVert\,\lVert\mathbf{z}^{\star}_{n}\rVert}\big\rangle_{\lVert\mathbf{z}^{\star}_{n}\rVert>10^{-3}},\qquad (w_{\mathrm{mse}},w_{\cos},w_{\mathrm{sL1}})=(1,0,0)"}],
+                ],
+            },
+            {
+                "id": "jep_recon", "title": "Curve-reconstruction anchor", "phase": "C - Match",
+                "note": "The anchor decodes the normalised prediction and compares it to the normalised GT curve, keeping the embedding grounded in real profile shape and preventing collapse (mandatory when the target is live). The default reduction is MSE; l1, Huber (delta 1) and Charbonnier (eps 1e-3) are alternatives; weight 1.",
+                "inputs": ["zhn", "gtcn"], "outputs": ["chat", "Lrec"],
+                "lines": [
+                    [{"id": "chat", "tex": r"\hat{\gamma}", "role": "intermediate"}, {"tex": "="}, {"tex": r"D_\phi\big("}, {"id": "zhn", "tex": r"\hat{\mathbf{z}}_{n}", "role": "intermediate"}, {"tex": r"\big)"}],
+                    [{"id": "Lrec", "tex": r"\ell_{\mathrm{rec}}", "role": "calculated"}, {"tex": "="}, {"tex": r"w_{\mathrm{rec}}\big\langle("}, {"id": "chat", "tex": r"\hat{\gamma}", "role": "intermediate"}, {"tex": "-"}, {"id": "gtcn", "tex": r"\bar{\gamma}", "role": "intermediate"}, {"tex": r")^2\big\rangle,\qquad w_{\mathrm{rec}}=1"}],
+                ],
+            },
+            {
+                "id": "jep_total", "title": "Total JEPA loss", "phase": "C - Match",
+                "note": "The total loss is the plain sum of the enabled weighted terms (no weight normalisation, unlike the backbone composite): the embedding-match contribution plus the curve-reconstruction anchor. The defaults make it a unit-weighted MSE embedding loss plus a unit-weighted MSE curve loss.",
+                "inputs": ["Lemb", "Lrec"], "outputs": ["Ltot"],
+                "lines": [
+                    [{"id": "Ltot", "tex": r"\mathcal{L}", "role": "final"}, {"tex": "="}, {"id": "Lemb", "tex": r"\ell_{\mathrm{emb}}", "role": "calculated"}, {"tex": r"\ +\ "}, {"id": "Lrec", "tex": r"\ell_{\mathrm{rec}}", "role": "calculated"}],
+                ],
+            },
+            {
+                "id": "jep_step", "title": "AdamW update", "phase": "D - Optimise",
+                "note": "The loss backpropagates into the backbone and, in finetune mode, the coupled autoencoder; AdamW steps all groups with linear warmup, cosine annealing and gradient clipping shared from the base trainer. The autoencoder finetune group carries its own learning rate 3e-5 and weight decay 1e-4; a frozen AE contributes no group.",
+                "inputs": ["Ltot"], "outputs": ["w"],
+                "iterative": {"var": "loss", "steps": 100, "unit": "epoch", "symbol": "L",
+                              "trace": ["4.9e-2", "3.1e-2", "2.2e-2", "1.6e-2", "1.2e-2", "9.4e-3"]},
+                "lines": [
+                    [{"id": "w", "tex": r"\theta_{t+1}", "role": "intermediate"}, {"tex": "="}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\ -\ \eta_{\mathrm{eff}}\,\mathrm{AdamW}\big(\nabla_\theta"}, {"id": "Ltot", "tex": r"\mathcal{L}", "role": "final"}, {"tex": r"\big)"}],
+                    [{"tex": r"\theta = \theta_{\mathrm{bb}} \cup \theta^{\mathrm{ft}}_{\mathrm{AE}},\qquad (\eta_{\mathrm{AE}},\lambda_{\mathrm{AE}}) = (3\times10^{-5},\ 10^{-4})"}],
+                ],
+            },
+            {
+                "id": "jep_ema", "title": "EMA target update", "phase": "D - Optimise",
+                "note": "After each optimiser step, when the target provider is ema (which requires a finetuned profile AE), the target encoder is an exponential moving average of the online encoder with decay 0.996; buffers are copied directly. Stopgrad and frozen skip this update, so the target simply tracks the current encoder.",
+                "inputs": ["w"], "outputs": ["phi"],
+                "lines": [
+                    [{"id": "phi", "tex": r"\phi^{\mathrm{ema}}", "role": "intermediate"}, {"tex": r"\leftarrow"}, {"tex": r"\tau\,"}, {"id": "phi", "tex": r"\phi^{\mathrm{ema}}", "role": "intermediate"}, {"tex": r"\ +\ (1-\tau)\,\phi^{\mathrm{on}},\qquad \tau = 0.996"}],
+                ],
+            },
+            {
+                "id": "jep_checkpoint", "title": "Validation and checkpoint", "phase": "E - Eval",
+                "note": "Validation drives best-epoch checkpointing on strict improvement and early stopping reverts to the best weights after the patience window; the checkpoint stores the backbone and any finetuned autoencoder together so inference can rebuild the coupled predictor.",
+                "inputs": ["w"], "outputs": ["wbest"],
+                "lines": [
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_t\ \mathcal{L}_{\mathrm{val}}\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big)"}],
+                ],
+            },
+            {
+                "id": "jep_diag", "title": "Embedding diagnostics", "phase": "E - Eval",
+                "note": "At inference the embedding evaluator accumulates four diagnostics over the scene: embedding MSE and mean cosine between predicted and target embeddings, plus two normalised-curve MSEs, the decoder-only (target embedding through the decoder) and full-chain (predicted embedding through the decoder) errors, isolating autoencoder from predictor quality.",
+                "inputs": ["zhn", "zsn"], "outputs": ["diag"],
+                "lines": [
+                    [{"id": "diag", "tex": r"\mathcal{D}", "role": "final"}, {"tex": r"\supset\ \Big\{\ \mathrm{MSE}_{\mathrm{emb}} = \tfrac{\sum\lVert"}, {"id": "zhn", "tex": r"\hat{\mathbf{z}}_{n}", "role": "intermediate"}, {"tex": "-"}, {"id": "zsn", "tex": r"\mathbf{z}^{\star}_{n}", "role": "intermediate"}, {"tex": r"\rVert^2}{N_z},\quad \overline{\cos}\big(\hat{\mathbf{z}}_{n},\mathbf{z}^{\star}_{n}\big)\ \Big\}"}],
+                    [{"tex": r"\mathrm{MSE}_{\mathrm{dec}} = \big\langle (D_\phi(\mathbf{z}^{\star}_{n}) - \bar{\gamma})^2\big\rangle,\qquad \mathrm{MSE}_{\mathrm{chain}} = \big\langle (D_\phi(\hat{\mathbf{z}}_{n}) - \bar{\gamma})^2\big\rangle"}],
+                ],
+            },
+        ]
+        return {
+            "key": "jepa_train", "name": "JEPA (Latent train)",
+            "blurb": "Couple a pretrained profile autoencoder (frozen or fine-tuned) to the backbone, predict a per-pixel latent embedding, and match it to the encoder's embedding of the reconstructed ground-truth curve; an MSE embedding term plus a decoder curve-reconstruction anchor are summed and optimised with AdamW, with an optional EMA target and inference-time embedding diagnostics.",
+            "nodes": nodes, "steps": steps,
+        }
+
     def _inference(self) -> dict:
         nodes = [
             {"id": "ckpt",     "tex": r"\theta^{\star}",           "role": "measured",     "kind": "vector", "shape": "|theta|",        "desc": "best-epoch checkpoint weights (params) with bundled x-axis; per-slot norm stats load from the run meta", "sample": ["0.31", "-0.08", "..."]},
@@ -834,6 +1224,525 @@ class FlowLibrary:
             "nodes": nodes, "steps": steps,
         }
 
+    def _profile_ae_infer(self) -> dict:
+        nodes = [
+            {"id": "gparams", "tex": r"\theta^{\mathrm{GT}}",                 "role": "measured",     "kind": "tensor", "shape": "3K x Az x Rg",  "desc": "stored per-pixel Gaussian parameters (a, mu, sigma per slot)",            "sample": ["a_1", "mu_1", "sig_1", "..."]},
+            {"id": "xaxis",   "tex": r"\mathbf{x}",                           "role": "measured",     "kind": "vector", "shape": "L",             "desc": "elevation axis (m), linspace(x_min, x_max, L)",                           "sample": ["-20", "-19.6", "...", "80"]},
+            {"id": "ckpt",    "tex": r"\theta^{\star}",                       "role": "measured",     "kind": "vector", "shape": "|theta|",       "desc": "best-epoch AE weights (encoder + decoder); elevation x-axis bundled",     "sample": ["0.31", "-0.08", "..."]},
+            {"id": "norm",    "tex": r"(\ell,\,s)",                           "role": "measured",     "kind": "vector", "shape": "2",             "desc": "log1p location and scale fitted on the train split (scale floored 1e-6)", "sample": ["0.12", "0.94"]},
+            {"id": "sel",     "tex": r"\mathcal{S}",                          "role": "intermediate", "kind": "set",    "shape": "N",             "desc": "kept pixel indices: all active plus a fraction of empties, shuffled",     "sample": ["37", "5", "210", "..."]},
+            {"id": "curve",   "tex": r"c",                                    "role": "intermediate", "kind": "tensor", "shape": "B x L",         "desc": "mixture-built GT elevation profile, the AE input and reference",          "sample": [["0.00", "0.62"], ["0.31", "0.88"]]},
+            {"id": "cn",      "tex": r"c_{\mathrm{n}}",                       "role": "intermediate", "kind": "tensor", "shape": "B x L",         "desc": "log1p-standardised profile fed to the network",                           "sample": [["-0.13", "0.51"], ["0.09", "0.74"]]},
+            {"id": "X",       "tex": r"\mathbf{X}",                           "role": "intermediate", "kind": "tensor", "shape": "B x L x 1 x 1", "desc": "profile cast to an L-channel 1x1 spatial map",                            "sample": [["-0.13"], ["0.51"]]},
+            {"id": "z",       "tex": r"\mathbf{z}",                           "role": "intermediate", "kind": "tensor", "shape": "B x d",         "desc": "per-profile latent embedding after embedding-norm (d = 24 default)",      "sample": ["0.22", "-1.1", "0.70", "..."]},
+            {"id": "chatn",   "tex": r"\hat{c}_{\mathrm{n}}",                 "role": "intermediate", "kind": "tensor", "shape": "B x L",         "desc": "decoded reconstruction in normalised space",                              "sample": [["-0.12", "0.50"], ["0.10", "0.72"]]},
+            {"id": "pred",    "tex": r"\hat{c}",                              "role": "calculated",   "kind": "tensor", "shape": "B x L",         "desc": "denormalised reconstruction, physical units",                             "sample": [["0.01", "0.60"], ["0.30", "0.86"]]},
+            {"id": "gt",      "tex": r"c^{\mathrm{gt}}",                      "role": "calculated",   "kind": "tensor", "shape": "B x L",         "desc": "inverse-normalised reference profile (metric target)",                    "sample": [["0.00", "0.62"], ["0.31", "0.88"]]},
+            {"id": "emb",     "tex": r"\mathbf{Z}",                           "role": "final",        "kind": "matrix", "shape": "N x d",         "desc": "persisted embedding matrix, saved to embeddings.npy",                     "sample": [["0.22", "-1.1"], ["0.05", "0.70"]]},
+            {"id": "rec",     "tex": r"R^2",                                  "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "physical reconstruction scores: R2, MSE, RMSE, MAE",                      "sample": "0.94"},
+            {"id": "shp",     "tex": r"\rho",                                 "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "shape fidelity: mean Pearson and relative L2 over active curves",         "sample": "0.98"},
+            {"id": "pwr",     "tex": r"\delta_P",                             "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "integrated-power relative error and peak-location MAE (active curves)",   "sample": "0.04"},
+            {"id": "estat",   "tex": r"\langle\lVert\mathbf{z}\rVert\rangle", "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "embedding norm, per-dim spread and active-dim fraction",                  "sample": "1.00"},
+            {"id": "metrics", "tex": r"\mathcal{M}",                          "role": "final",        "kind": "set",    "shape": "-",             "desc": "metrics.json bundle (physical, normalised, shape, power, embedding)",     "sample": ["mse", "r2", "pearson", "..."]},
+            {"id": "report",  "tex": r"\mathcal{R}",                          "role": "final",        "kind": "set",    "shape": "-",             "desc": "report.md and rendered figure sets",                                      "sample": ["report.md", "figures/"]},
+        ]
+        steps = [
+            {
+                "id": "paei_restore", "title": "Strict run reconstruction", "phase": "A - Load run",
+                "note": "The run is rebuilt verbatim from run_summary.json and the saved autoencoder config; it aborts unless model_name is 'profile_ae' (backbone and JEPA runs must use 'infer'). The embedding width is out_channels, and the profile length L must agree across the dataset, the run summary and the checkpoint x-axis or loading fails loudly.",
+                "inputs": ["ckpt"], "outputs": ["xaxis"],
+                "lines": [
+                    [{"tex": r"\texttt{model\_name} = \texttt{profile\_ae},\quad d = C_{\mathrm{out}},\quad"}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"= \{x_n\}_{n=1}^{L}"}],
+                    [{"tex": r"L = |"}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"| = \texttt{x\_axis\_length} = |"}, {"id": "ckpt", "tex": r"\theta^{\star}", "role": "measured"}, {"tex": r".x_{\mathrm{axis}}|\quad(\text{else abort})"}],
+                ],
+            },
+            {
+                "id": "paei_select", "title": "Active-pixel selection", "phase": "A - Load run",
+                "note": "Only pixels whose largest slot amplitude clears the zero threshold are fitted; every active pixel is kept and a small fraction of empty pixels (keep_empty_frac) is sampled in, then the index is shuffled. Default inference keeps all active pixels (pixel_subsample = 1).",
+                "inputs": ["gparams"], "outputs": ["sel"],
+                "lines": [
+                    [{"id": "sel", "tex": r"\mathcal{S}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\big\{\,i : \max_k\,a_{i,k}\big("}, {"id": "gparams", "tex": r"\theta^{\mathrm{GT}}", "role": "measured"}, {"tex": r"\big) > \tau_a\big\}\ \cup\ \mathrm{Sample}(\mathcal{E},\,f_e),\quad \tau_a = 10^{-3},\ f_e = 0.05"}],
+                ],
+            },
+            {
+                "id": "paei_curves", "title": "Profile reconstruction from parameters", "phase": "A - Load run",
+                "note": "Each kept pixel's supervised profile is rebuilt from its Gaussian parameters as an additive mixture on the elevation axis; sigma is floored at 1e-6 and the exponent clipped to [-100, 0] before the sum. This mixture curve is exactly the AE input and the reconstruction reference.",
+                "inputs": ["gparams", "xaxis"], "outputs": ["curve"],
+                "lines": [
+                    [{"id": "curve", "tex": r"c(x_n)", "role": "intermediate"}, {"tex": "="}, {"tex": r"\sum_{k}"}, {"id": "gparams", "tex": r"a_k", "role": "measured"}, {"tex": r"\exp\!\Big(\mathrm{clip}\big(-\tfrac{(x_n-"}, {"id": "gparams", "tex": r"\mu_k", "role": "measured"}, {"tex": r")^2}{2\max("}, {"id": "gparams", "tex": r"\sigma_k", "role": "measured"}, {"tex": r",\,\sigma_{\mathrm{flr}})^2},\,-100,\,0\big)\Big),\ \ \sigma_{\mathrm{flr}}=10^{-6}"}],
+                ],
+            },
+            {
+                "id": "paei_normalise", "title": "Log1p standardisation", "phase": "A - Load run",
+                "note": "The dataset normaliser log1p-compresses the non-negative profile then standardises it by the train-split location and scale; the scale is floored at 1e-6. This is the dimensionless space the encoder consumes.",
+                "inputs": ["curve", "norm"], "outputs": ["cn"],
+                "lines": [
+                    [{"id": "cn", "tex": r"c_{\mathrm{n}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{\log\!\big(1+\max("}, {"id": "curve", "tex": r"c", "role": "intermediate"}, {"tex": r",0)\big) - "}, {"id": "norm", "tex": r"\ell", "role": "measured"}, {"tex": r"}{"}, {"id": "norm", "tex": r"s", "role": "measured"}, {"tex": r"},\qquad s = \max(\mathrm{scale},\,10^{-6})"}],
+                ],
+            },
+            {
+                "id": "paei_reshape", "title": "Cast profile to channel map", "phase": "B - Reconstruct",
+                "note": "Before the encoder each profile is cast to an L-channel tensor over a single 1x1 spatial cell, so the profile-length axis becomes the channel axis that the 1x1-convolution MLP mixes per pixel.",
+                "inputs": ["cn"], "outputs": ["X"],
+                "lines": [
+                    [{"id": "X", "tex": r"\mathbf{X}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{reshape}\big("}, {"id": "cn", "tex": r"c_{\mathrm{n}}", "role": "intermediate"}, {"tex": r"\big):\ (B, L)\ \mapsto\ (B, L, 1, 1)"}],
+                ],
+            },
+            {
+                "id": "paei_encode", "title": "Encode to latent embedding", "phase": "B - Reconstruct",
+                "note": "The encoder MLP (1x1 convolutions) contracts the L profile channels to a d-dimensional latent, which is then passed through the configured embedding normalisation. The default is a per-sample layernorm over the d channels (eps 1e-5, learnable affine); l2 divides by the norm floored at 1e-6, and none is the identity.",
+                "inputs": ["X", "ckpt"], "outputs": ["z"],
+                "lines": [
+                    [{"id": "z", "tex": r"\mathbf{z}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathcal{N}\!\big(f_{\mathrm{enc}}("}, {"id": "X", "tex": r"\mathbf{X}", "role": "intermediate"}, {"tex": r")\big),\qquad f_{\mathrm{enc}}:\ \mathbb{R}^{L}\!\to\mathbb{R}^{d},\ \ d = 24"}],
+                    [{"tex": r"\mathcal{N}_{\mathrm{LN}}(\mathbf{z}) = \gamma\odot\dfrac{\mathbf{z}-\mu_z}{\sqrt{\sigma_z^2 + 10^{-5}}} + \beta,\qquad \mathcal{N}_{\ell_2}(\mathbf{z}) = \dfrac{\mathbf{z}}{\max(\lVert\mathbf{z}\rVert_2,\,10^{-6})}"}],
+                ],
+            },
+            {
+                "id": "paei_decode", "title": "Decode reconstruction", "phase": "B - Reconstruct",
+                "note": "The decoder MLP expands the latent back to L channels, reconstructing the profile in the same normalised space; the whole model runs under no_grad in eval mode.",
+                "inputs": ["z"], "outputs": ["chatn"],
+                "lines": [
+                    [{"id": "chatn", "tex": r"\hat{c}_{\mathrm{n}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"f_{\mathrm{dec}}\!\big("}, {"id": "z", "tex": r"\mathbf{z}", "role": "intermediate"}, {"tex": r"\big),\qquad f_{\mathrm{dec}}:\ \mathbb{R}^{d}\!\to\mathbb{R}^{L}"}],
+                ],
+            },
+            {
+                "id": "paei_denorm", "title": "Inverse normalisation", "phase": "B - Reconstruct",
+                "note": "Both the reconstruction and the input are inverse-normalised to physical units: multiply by the scale, add the location, then clip the log-domain value to [0, log1p(1000)] before expm1, bounding the recovered profile to [0, 1000]. The inverse-normalised input is the metric reference.",
+                "inputs": ["chatn", "cn", "norm"], "outputs": ["gt", "pred"],
+                "lines": [
+                    [{"id": "pred", "tex": r"\hat{c}", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname{expm1}\!\Big(\operatorname{clip}\big("}, {"id": "chatn", "tex": r"\hat{c}_{\mathrm{n}}", "role": "intermediate"}, {"tex": r"\,s + "}, {"id": "norm", "tex": r"\ell", "role": "measured"}, {"tex": r",\ 0,\ \log(1{+}C)\big)\Big),\quad C = 1000"}],
+                    [{"id": "gt", "tex": r"c^{\mathrm{gt}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname{expm1}\!\Big(\operatorname{clip}\big("}, {"id": "cn", "tex": r"c_{\mathrm{n}}", "role": "intermediate"}, {"tex": r"\,s + "}, {"id": "norm", "tex": r"\ell", "role": "measured"}, {"tex": r",\ 0,\ \log(1{+}C)\big)\Big)"}],
+                ],
+            },
+            {
+                "id": "paei_embed", "title": "Persist embeddings", "phase": "C - Embeddings",
+                "note": "The per-profile latents are concatenated across all batches and saved to embeddings.npy as the split's embedding matrix, the primary artifact for downstream latent-space analysis.",
+                "inputs": ["z"], "outputs": ["emb"],
+                "lines": [
+                    [{"id": "emb", "tex": r"\mathbf{Z}", "role": "final"}, {"tex": "="}, {"tex": r"\big[\,"}, {"id": "z", "tex": r"\mathbf{z}_1;\ \dots;\ \mathbf{z}_N", "role": "intermediate"}, {"tex": r"\,\big]\ \in\ \mathbb{R}^{N\times d}\ \longrightarrow\ \texttt{embeddings.npy}"}],
+                ],
+            },
+            {
+                "id": "paei_physical", "title": "Physical reconstruction error", "phase": "D - Metrics",
+                "note": "Physical-scale reconstruction errors over all kept curves and bins: mean-squared and mean-absolute error, RMSE, and the coefficient of determination against the global GT mean with a 1e-8 stabiliser on the total sum of squares.",
+                "inputs": ["pred", "gt"], "outputs": ["rec"],
+                "lines": [
+                    [{"id": "rec", "tex": r"R^2", "role": "calculated"}, {"tex": "="}, {"tex": r"1 - \dfrac{\sum_{i,n}\big("}, {"id": "pred", "tex": r"\hat{c}", "role": "calculated"}, {"tex": r"-"}, {"id": "gt", "tex": r"c^{\mathrm{gt}}", "role": "calculated"}, {"tex": r"\big)^2}{\sum_{i,n}\big(c^{\mathrm{gt}} - \bar{c}^{\mathrm{gt}}\big)^2 + \varepsilon},\quad \varepsilon = 10^{-8}"}],
+                    [{"tex": r"\mathrm{MSE} = \big\langle(\hat{c}-c^{\mathrm{gt}})^2\big\rangle,\quad \mathrm{RMSE} = \sqrt{\mathrm{MSE}},\quad \mathrm{MAE} = \big\langle|\hat{c}-c^{\mathrm{gt}}|\big\rangle"}],
+                ],
+            },
+            {
+                "id": "paei_shape", "title": "Profile-shape fidelity", "phase": "D - Metrics",
+                "note": "On active curves only (GT peak above 1e-3): the magnitude-free shape agreement is the Pearson correlation of the mean-centred profiles and the relative L2 error, each averaged over active curves with a 1e-8 denominator floor.",
+                "inputs": ["pred", "gt"], "outputs": ["shp"],
+                "lines": [
+                    [{"id": "shp", "tex": r"\rho", "role": "calculated"}, {"tex": "="}, {"tex": r"\Big\langle\dfrac{\langle\tilde{c}^{\mathrm{gt}},\,\tilde{\hat{c}}\rangle}{\lVert\tilde{c}^{\mathrm{gt}}\rVert\,\lVert\tilde{\hat{c}}\rVert + \varepsilon}\Big\rangle_{a},\qquad \tilde{c} = c - \bar{c}"}],
+                    [{"tex": r"\mathrm{relL2} = \Big\langle\dfrac{\lVert\hat{c}-c^{\mathrm{gt}}\rVert_2}{\lVert c^{\mathrm{gt}}\rVert_2 + \varepsilon}\Big\rangle_{a}"}],
+                ],
+            },
+            {
+                "id": "paei_power", "title": "Power and peak-location error", "phase": "D - Metrics",
+                "note": "Also over active curves: the integrated profile power is the trapezoidal area under the curve, giving a relative power error, and the peak-location MAE is the distance between the argmax elevations of the reconstruction and the GT; the peak-amplitude relative error is reported alongside.",
+                "inputs": ["pred", "gt", "xaxis"], "outputs": ["pwr"],
+                "lines": [
+                    [{"id": "pwr", "tex": r"\delta_P", "role": "calculated"}, {"tex": "="}, {"tex": r"\Big\langle\dfrac{|P(\hat{c}) - P(c^{\mathrm{gt}})|}{|P(c^{\mathrm{gt}})| + \varepsilon}\Big\rangle_{a},\qquad P(c) = \mathrm{trapz}\big(c,\,"}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"\big)"}],
+                    [{"tex": r"\mathrm{MAE}_{\mathrm{peak}} = \Big\langle\big|"}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"[\arg\max\hat{c}] - "}, {"id": "xaxis", "tex": r"\mathbf{x}", "role": "measured"}, {"tex": r"[\arg\max c^{\mathrm{gt}}]\big|\Big\rangle_{a}"}],
+                ],
+            },
+            {
+                "id": "paei_embstat", "title": "Embedding statistics", "phase": "D - Metrics",
+                "note": "Latent-health diagnostics over the embedding matrix: the mean L2 norm of the embeddings, the mean per-dimension standard deviation across curves, and the fraction of latent dimensions whose spread exceeds 1e-4, a collapse guard.",
+                "inputs": ["emb"], "outputs": ["estat"],
+                "lines": [
+                    [{"id": "estat", "tex": r"\langle\lVert\mathbf{z}\rVert\rangle", "role": "calculated"}, {"tex": "="}, {"tex": r"\tfrac{1}{N}\textstyle\sum_i \big\lVert"}, {"id": "emb", "tex": r"\mathbf{Z}_i", "role": "final"}, {"tex": r"\big\rVert_2,\qquad f_{\mathrm{act}} = \tfrac{1}{d}\textstyle\sum_j\mathbb{1}\!\left[\operatorname{std}_i(\mathbf{Z}_{:,j}) > 10^{-4}\right]"}],
+                ],
+            },
+            {
+                "id": "paei_report", "title": "Metrics and figures", "phase": "E - Report",
+                "note": "The metric bundle is written to metrics.json (physical, normalised, shape, power and embedding blocks, tagged with the split region), and, unless plots are disabled, per-curve reconstructions ranked by MSE (best, worst, random), the mean profile, an error histogram, a power scatter and an embedding-norm histogram are rendered into the markdown report.",
+                "inputs": ["rec", "shp", "pwr", "estat"], "outputs": ["metrics", "report"],
+                "lines": [
+                    [{"id": "metrics", "tex": r"\mathcal{M}", "role": "final"}, {"tex": "="}, {"tex": r"\big\{"}, {"id": "rec", "tex": r"R^2", "role": "calculated"}, {"tex": ","}, {"id": "shp", "tex": r"\rho", "role": "calculated"}, {"tex": ","}, {"id": "pwr", "tex": r"\delta_P", "role": "calculated"}, {"tex": ","}, {"id": "estat", "tex": r"f_{\mathrm{act}}", "role": "calculated"}, {"tex": r",\ \dots\big\}\ \longrightarrow\ \texttt{metrics.json}"}],
+                    [{"id": "report", "tex": r"\mathcal{R}", "role": "final"}, {"tex": "="}, {"tex": r"\mathrm{best/worst/random},\ \bar{c},\ \mathrm{hist}(\mathrm{MSE}),\ \mathrm{power},\ \mathrm{hist}(\lVert\mathbf{z}\rVert)\ \longrightarrow\ \texttt{report.md}"}],
+                ],
+            },
+        ]
+        return {
+            "key"   : "profile_ae_infer",
+            "name"  : "Profile AE (Infer)",
+            "blurb" : "A trained profile autoencoder is rebuilt strictly from its saved config, the held-out split's supervised profiles are re-synthesised from their Gaussian parameters and log1p-standardised, then each profile is encoded to a low-dimensional latent and decoded back; reconstructions and inputs are inverse-normalised to physical units, the latents are persisted, and the split is scored by the full physical, shape, power and embedding-health metric suite.",
+            "nodes" : nodes,
+            "steps" : steps,
+        }
+
+    def _image_ae_infer(self) -> dict:
+        nodes = [
+            {"id": "wstar",  "tex": r"\theta^{\star}",      "role": "measured",     "kind": "vector", "shape": "|theta|",             "desc": "trained encoder-decoder weights from best_model.pt",     "sample": ["0.31", "-0.08", "0.12", "..."]},
+            {"id": "stats",  "tex": r"(\mu_c, s_c)",        "role": "measured",     "kind": "vector", "shape": "C_in x 2",            "desc": "per-input-channel loc and scale (output stats dropped)", "sample": ["0.12", "0.94", "..."]},
+            {"id": "xn",     "tex": r"\hat{\mathbf{x}}",    "role": "measured",     "kind": "tensor", "shape": "B x C_in x P x P",     "desc": "normalised input patch batch from the split loader",     "sample": [["0.41", "-0.20"], ["-0.33", "0.27"]]},
+            {"id": "z",      "tex": r"\mathbf{z}",          "role": "intermediate", "kind": "tensor", "shape": "B x D x h x w",        "desc": "embedding-normalised encoder latent feature map",        "sample": [["0.22", "-0.14"], ["0.31", "0.08"]]},
+            {"id": "xrecn",  "tex": r"\hat{\mathbf{x}}_n",  "role": "intermediate", "kind": "tensor", "shape": "B x C_in x P x P",     "desc": "decoded reconstruction, still in normalised space",      "sample": [["0.39", "-0.18"], ["-0.30", "0.24"]]},
+            {"id": "gt",     "tex": r"\mathbf{x}",          "role": "calculated",   "kind": "tensor", "shape": "N_p x C_in x P x P",   "desc": "denormalised physical input (round-trip of the patch)",  "sample": [["0.90", "0.61"], ["0.55", "0.88"]]},
+            {"id": "pred",   "tex": r"\tilde{\mathbf{x}}",  "role": "calculated",   "kind": "tensor", "shape": "N_p x C_in x P x P",   "desc": "denormalised physical reconstruction",                   "sample": [["0.88", "0.60"], ["0.57", "0.85"]]},
+            {"id": "emb",    "tex": r"\bar{\mathbf{z}}",    "role": "calculated",   "kind": "vector", "shape": "D",                   "desc": "per-patch embedding, latent pooled over space",          "sample": ["0.18", "-0.05", "0.42", "..."]},
+            {"id": "err",    "tex": r"e",                   "role": "intermediate", "kind": "tensor", "shape": "N_p x C_in x P x P",   "desc": "physical reconstruction residual pred minus gt",         "sample": ["-0.02", "0.01", "-0.03", "..."]},
+            {"id": "mse",    "tex": r"\mathrm{MSE}",        "role": "calculated",   "kind": "scalar", "shape": "1",                   "desc": "mean squared reconstruction error, physical units",      "sample": "3.1e-3"},
+            {"id": "r2",     "tex": r"R^2",                 "role": "calculated",   "kind": "scalar", "shape": "1",                   "desc": "coefficient of determination over all pixels",           "sample": "0.981"},
+            {"id": "psnr",   "tex": r"\mathrm{PSNR}",       "role": "calculated",   "kind": "scalar", "shape": "1",                   "desc": "peak SNR (dB) from the GT dynamic range",                "sample": "34.2"},
+            {"id": "nmse",   "tex": r"\mathrm{MSE}_n",      "role": "calculated",   "kind": "scalar", "shape": "1",                   "desc": "MSE after re-normalising both tensors (dimensionless)",  "sample": "4.0e-2"},
+            {"id": "cmse",   "tex": r"m_c",                 "role": "calculated",   "kind": "vector", "shape": "C_in",                "desc": "per-channel mean squared error",                         "sample": ["0.004", "0.002", "..."]},
+            {"id": "estat",  "tex": r"\mathbf{\delta}",     "role": "calculated",   "kind": "vector", "shape": "3",                   "desc": "embedding norm, mean per-dim std, active-dim fraction",  "sample": ["5.7", "0.21", "0.83"]},
+            {"id": "E",      "tex": r"E",                   "role": "final",        "kind": "matrix", "shape": "N_p x D",             "desc": "stacked patch embeddings written to embeddings.npy",     "sample": [["0.18", "-0.05"], ["0.22", "0.10"]]},
+            {"id": "report", "tex": r"\mathcal{M}",         "role": "final",        "kind": "set",    "shape": "3 files",             "desc": "metrics.json plus the assembled Markdown report",        "sample": "{MSE, R2, PSNR, ...}"},
+        ]
+        steps = [
+            {
+                "id": "iaei_loadrun", "title": "Model and checkpoint load", "phase": "A - Load run",
+                "note": "run_summary.json must declare model_name = image_ae or the load aborts; the architecture is rebuilt from the persisted AE config, the best_model.pt params are loaded, the embedding dimension is read as out_channels, and the model is set to eval.",
+                "inputs": [], "outputs": ["wstar"],
+                "lines": [
+                    [{"tex": r"\texttt{model\_name} = \texttt{image\_ae}\ \Rightarrow\ f_{\theta} = (\mathrm{Enc}_{\theta},\ \mathrm{Dec}_{\theta}),\quad D = C_{\mathrm{out}}"}],
+                    [{"id": "wstar", "tex": r"\theta^{\star}", "role": "measured"}, {"tex": r"\leftarrow \texttt{best\_model.pt}[\texttt{params}],\qquad f_{\theta}.\mathrm{eval}()"}],
+                ],
+            },
+            {
+                "id": "iaei_stats", "title": "Input normalization statistics", "phase": "A - Load run",
+                "note": "Stats.load reads the per-slot loc and scale fitted on the train split; the output-parameter stats are dropped because the autoencoder reconstructs its own input, not the Gaussian target, so only input stats are ever applied.",
+                "inputs": [], "outputs": ["stats"],
+                "lines": [
+                    [{"id": "stats", "tex": r"(\mu_c, s_c)", "role": "measured"}, {"tex": "="}, {"tex": r"\mathrm{Stats.load}(\texttt{meta}),\qquad \text{output stats} \to \varnothing"}],
+                ],
+            },
+            {
+                "id": "iaei_dataset", "title": "Rebuild split patches", "phase": "A - Load run",
+                "note": "The persisted dataset config is replayed for the split (default test), which must resolve to a single contiguous region or the run aborts; the loader tiles it into PxP patches with shuffle off and no drop-last, and the yielded channel count must equal the trained in_channels.",
+                "inputs": [], "outputs": ["xn"],
+                "lines": [
+                    [{"tex": r"\Omega_{\mathrm{test}}\ \text{single region},\qquad"}, {"id": "xn", "tex": r"\hat{\mathbf{x}}", "role": "measured"}, {"tex": r"\in \mathbb{R}^{B\times C_{\mathrm{in}}\times P\times P}"}],
+                    [{"tex": r"C_{\mathrm{in}}^{\mathrm{data}} = C_{\mathrm{in}}^{\mathrm{train}}\quad(\text{else abort})"}],
+                ],
+            },
+            {
+                "id": "iaei_encode", "title": "Encode to latent", "phase": "B - Reconstruct",
+                "note": "Under no_grad the encoder maps the normalised patch to a latent feature map, then the configured embedding norm is applied: none, L2 with eps 1e-6, or per-sample layernorm over the channel axis with var eps 1e-6.",
+                "inputs": ["xn", "wstar"], "outputs": ["z"],
+                "lines": [
+                    [{"id": "z", "tex": r"\mathbf{z}", "role": "intermediate"}, {"tex": "="}, {"tex": r"g_{\mathrm{norm}}\!\big(\mathrm{Enc}_{\theta}("}, {"id": "xn", "tex": r"\hat{\mathbf{x}}", "role": "measured"}, {"tex": r")\big)"}],
+                    [{"tex": r"g_{\ell_2}(\mathbf{z}) = \dfrac{\mathbf{z}}{\max(\lVert\mathbf{z}\rVert_2,\ 10^{-6})}\qquad\text{or}\qquad g_{\mathrm{LN}},\ g_{\mathrm{id}}"}],
+                ],
+            },
+            {
+                "id": "iaei_decode", "title": "Decode reconstruction", "phase": "B - Reconstruct",
+                "note": "The decoder maps the latent back to a normalised reconstruction with the same channel count and patch size as the input; this is the reconstruct() forward used at inference, returning both the reconstruction and the latent.",
+                "inputs": ["z", "wstar"], "outputs": ["xrecn"],
+                "lines": [
+                    [{"id": "xrecn", "tex": r"\hat{\mathbf{x}}_n", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{Dec}_{\theta}\!\big("}, {"id": "z", "tex": r"\mathbf{z}", "role": "intermediate"}, {"tex": r"\big) \in \mathbb{R}^{B\times C_{\mathrm{in}}\times P\times P}"}],
+                ],
+            },
+            {
+                "id": "iaei_denorm", "title": "Denormalise to physical units", "phase": "B - Reconstruct",
+                "note": "Input and reconstruction are inverted with the same input stats: scale, shift, and for log1p slots (SLC and ifg magnitudes) apply expm1 after clamping the argument to [log1p(floor), log1p(ceil)] with floor 0 and ceil 1000, so error is measured in physical backscatter units.",
+                "inputs": ["xn", "xrecn", "stats"], "outputs": ["gt", "pred"],
+                "lines": [
+                    [{"id": "gt", "tex": r"\mathbf{x}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{denorm}\!\big("}, {"id": "xn", "tex": r"\hat{\mathbf{x}}", "role": "measured"}, {"tex": r"\big),\quad \mathrm{denorm}(u)_c = \mathrm{expm1}\!\big(\operatorname{clip}(u_c s_c + \mu_c,\ 0,\ \log 1001)\big)\ \ (\mathrm{log1p})"}],
+                    [{"id": "pred", "tex": r"\tilde{\mathbf{x}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{denorm}\!\big("}, {"id": "xrecn", "tex": r"\hat{\mathbf{x}}_n", "role": "intermediate"}, {"tex": r"\big),\qquad \text{else } u_c s_c + \mu_c"}],
+                ],
+            },
+            {
+                "id": "iaei_embed", "title": "Pool latent to embedding", "phase": "B - Reconstruct",
+                "note": "Each patch embedding is the latent averaged over its spatial dimensions (a global mean pool); if the latent is already a vector it passes through, and embeddings are concatenated across every patch of the split.",
+                "inputs": ["z"], "outputs": ["emb"],
+                "lines": [
+                    [{"id": "emb", "tex": r"\bar{\mathbf{z}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{1}{h\,w}\sum_{u,v}"}, {"id": "z", "tex": r"\mathbf{z}_{:,\,:,\,u,v}", "role": "intermediate"}, {"tex": r"\ \in \mathbb{R}^{D}"}],
+                ],
+            },
+            {
+                "id": "iaei_residual", "title": "Reconstruction residual", "phase": "C - Metrics",
+                "note": "The residual is the elementwise difference between the physical reconstruction and the physical input in float64; every reconstruction metric below is a reduction of it.",
+                "inputs": ["pred", "gt"], "outputs": ["err"],
+                "lines": [
+                    [{"id": "err", "tex": r"e", "role": "intermediate"}, {"tex": "="}, {"id": "pred", "tex": r"\tilde{\mathbf{x}}", "role": "calculated"}, {"tex": "-"}, {"id": "gt", "tex": r"\mathbf{x}", "role": "calculated"}],
+                ],
+            },
+            {
+                "id": "iaei_physical", "title": "Physical error metrics", "phase": "C - Metrics",
+                "note": "MSE reduces the squared residual over all pixels; R^2 uses the total sum of squares about the global GT mean; PSNR uses the GT dynamic range as the peak. A 1e-8 stabiliser guards both denominators, and PSNR is NaN when the range is zero.",
+                "inputs": ["err", "gt"], "outputs": ["mse", "r2", "psnr"],
+                "lines": [
+                    [{"id": "mse", "tex": r"\mathrm{MSE}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big\langle e^2\big\rangle,\qquad"}, {"id": "r2", "tex": r"R^2", "role": "calculated"}, {"tex": "="}, {"tex": r"1 - \dfrac{\sum e^2}{\sum (\mathbf{x}-\bar{\mathbf{x}})^2 + \varepsilon}"}],
+                    [{"id": "psnr", "tex": r"\mathrm{PSNR}", "role": "calculated"}, {"tex": "="}, {"tex": r"10\log_{10}\dfrac{(\max\mathbf{x} - \min\mathbf{x})^2}{\mathrm{MSE} + \varepsilon},\qquad \varepsilon = 10^{-8}"}],
+                ],
+            },
+            {
+                "id": "iaei_normalized", "title": "Normalized-space error", "phase": "C - Metrics",
+                "note": "To report an error comparable across heavy-tailed channels, the physical GT and prediction are re-normalised with the input stats and their MSE and MAE recomputed in dimensionless units.",
+                "inputs": ["pred", "gt", "stats"], "outputs": ["nmse"],
+                "lines": [
+                    [{"id": "nmse", "tex": r"\mathrm{MSE}_n", "role": "calculated"}, {"tex": "="}, {"tex": r"\Big\langle\big(\mathrm{norm}("}, {"id": "pred", "tex": r"\tilde{\mathbf{x}}", "role": "calculated"}, {"tex": r") - \mathrm{norm}("}, {"id": "gt", "tex": r"\mathbf{x}", "role": "calculated"}, {"tex": r")\big)^2\Big\rangle"}],
+                ],
+            },
+            {
+                "id": "iaei_channel", "title": "Per-channel error", "phase": "C - Metrics",
+                "note": "Averaging the squared residual over patches and both spatial axes but not the channel axis gives a per-input-channel MSE, isolating which passes or interferograms reconstruct worst.",
+                "inputs": ["err"], "outputs": ["cmse"],
+                "lines": [
+                    [{"id": "cmse", "tex": r"m_c", "role": "calculated"}, {"tex": "="}, {"tex": r"\big\langle e_c^2 \big\rangle_{(p,\,i,\,j)},\qquad c = 1,\dots,C_{\mathrm{in}}"}],
+                ],
+            },
+            {
+                "id": "iaei_embstats", "title": "Embedding diagnostics", "phase": "C - Metrics",
+                "note": "Three latent-collapse diagnostics: the mean L2 norm of the patch embeddings, the mean per-dimension standard deviation across patches, and the fraction of dimensions whose std exceeds 1e-4 (the active-dimension fraction).",
+                "inputs": ["emb"], "outputs": ["estat"],
+                "lines": [
+                    [{"tex": r"\sigma_d = \operatorname*{std}_p\,"}, {"id": "emb", "tex": r"\bar{z}_{p,d}", "role": "calculated"}, {"tex": r",\qquad \rho_{\mathrm{act}} = \big\langle \mathbb{1}[\sigma_d > 10^{-4}]\big\rangle_d"}],
+                    [{"id": "estat", "tex": r"\mathbf{\delta}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big(\ \langle\lVert\bar{\mathbf{z}}_p\rVert_2\rangle_p,\ \ \langle\sigma_d\rangle_d,\ \ \rho_{\mathrm{act}}\ \big)"}],
+                ],
+            },
+            {
+                "id": "iaei_persist", "title": "Persist embeddings, metrics, report", "phase": "D - Persist",
+                "note": "The stacked embeddings are written to embeddings.npy, the metric dict (with the split name and region) to metrics.json, and a Markdown report is assembled; reconstruction figures (best, worst and random patches, error histogram, per-channel bars, embedding norm) are rendered when save_plots is on.",
+                "inputs": ["emb", "mse", "r2", "psnr", "nmse", "cmse", "estat"], "outputs": ["E", "report"],
+                "lines": [
+                    [{"id": "E", "tex": r"E", "role": "final"}, {"tex": "="}, {"tex": r"\big[\,"}, {"id": "emb", "tex": r"\bar{\mathbf{z}}_1, \dots, \bar{\mathbf{z}}_{N_p}", "role": "calculated"}, {"tex": r"\,\big] \to \texttt{embeddings.npy}"}],
+                    [{"id": "report", "tex": r"\mathcal{M}", "role": "final"}, {"tex": "="}, {"tex": r"\{\,\mathrm{MSE},\ R^2,\ \mathrm{PSNR},\ m_c,\ \dots\,\} \to \texttt{metrics.json},\ \texttt{report.md}"}],
+                ],
+            },
+        ]
+        return {
+            "key"   : "image_ae_infer",
+            "name"  : "Image AE (Infer)",
+            "blurb" : "Replay a trained image autoencoder over a split. Load the weights, stats and patch loader, encode each normalised patch to a latent and decode it back, denormalise to physical units, then score reconstruction error (MSE, R2, PSNR), latent diagnostics, and persist embeddings, metrics and a report.",
+            "nodes" : nodes,
+            "steps" : steps,
+        }
+
+    def _benchmark(self) -> dict:
+        nodes = [
+            {"id": "models",  "tex": r"\mathcal{M}",            "role": "measured",     "kind": "set",    "shape": "N_m",             "desc": "backbone architectures in the registry to benchmark (skip_models removed)", "sample": ["unet", "resunet", "swin_unet", "segformer"]},
+            {"id": "Nstar",   "tex": r"N^{*}",                  "role": "calculated",   "kind": "scalar", "shape": "1",               "desc": "reference-model trainable-parameter budget every model is matched to",       "sample": "7,142,912"},
+            {"id": "scale",   "tex": r"s",                      "role": "intermediate", "kind": "scalar", "shape": "1",               "desc": "width multiplier under the bracketed geometric bisection",                    "sample": "1.02"},
+            {"id": "Nk",      "tex": r"N(s)",                   "role": "intermediate", "kind": "scalar", "shape": "1",               "desc": "parameter count of the candidate model at scale s",                          "sample": "7,041,220"},
+            {"id": "dev",     "tex": r"\delta",                 "role": "intermediate", "kind": "scalar", "shape": "1",               "desc": "relative deviation of the candidate count from the budget",                   "sample": "-0.014"},
+            {"id": "smatch",  "tex": r"\omega",                 "role": "calculated",   "kind": "set",    "shape": "widths",          "desc": "capacity-matched width overrides, rounded to the divisor 8",                  "sample": "features=[48, 96, 192, 384]"},
+            {"id": "ctx",     "tex": r"C_{\mathrm{ctx}}",       "role": "measured",     "kind": "scalar", "shape": "GB",              "desc": "CUDA-context memory already resident on the target device",                   "sample": "0.42"},
+            {"id": "peak",    "tex": r"m_b",                    "role": "intermediate", "kind": "scalar", "shape": "GB",              "desc": "peak reserved VRAM of a real 3-step train loop at batch b, plus context",     "sample": "31.6"},
+            {"id": "bstar",   "tex": r"B^{*}",                  "role": "calculated",   "kind": "scalar", "shape": "1",               "desc": "largest power-of-two batch whose footprint stays under the budget",           "sample": "128"},
+            {"id": "units",   "tex": r"\mathcal{U}",            "role": "calculated",   "kind": "set",    "shape": "N_m x N_c x N_s", "desc": "(model, loss-component, seed) work units of the benchmark grid",              "sample": ["unet__param_l1_seed0", "resunet__param_l1_seed0"]},
+            {"id": "ckpt",    "tex": r"\theta^{\star}",         "role": "calculated",   "kind": "vector", "shape": "|theta|",         "desc": "best-epoch checkpoint per unit at matched width and measured batch",          "sample": ["0.30", "-0.09", "0.17"]},
+            {"id": "metrics", "tex": r"\mathbf{q}",             "role": "calculated",   "kind": "vector", "shape": "N_q",             "desc": "per-unit test-split metric vector (curve, parameter, physics)",               "sample": ["0.94", "1.72", "0.08"]},
+            {"id": "agg",     "tex": r"\bar{\mathbf{q}}",       "role": "calculated",   "kind": "vector", "shape": "N_q",             "desc": "per-model seed-aggregated metric mean (std kept alongside)",                  "sample": ["0.94", "1.70", "0.08"]},
+            {"id": "board",   "tex": r"\mathcal{S}",            "role": "final",        "kind": "vector", "shape": "N_m",             "desc": "magnitude-aware composite leaderboard score, ranked over models",             "sample": ["unet 0.88", "resunet 0.71"]},
+        ]
+        steps = [
+            {
+                "id": "bench_reference", "title": "Reference parameter budget", "phase": "A - Capacity match",
+                "note": "The reference model (unet by default) is instantiated at its default width with the fixed in_channels = 9 and the Gaussian-head out_channels, and its total trainable-parameter count becomes the budget every other architecture is scaled to hit.",
+                "inputs": ["models"], "outputs": ["Nstar"],
+                "lines": [
+                    [{"id": "Nstar", "tex": r"N^{*}", "role": "calculated"}, {"tex": "="}, {"tex": r"\sum_{p\,\in\,f_{\mathrm{ref}}} \lvert p\rvert,\qquad f_{\mathrm{ref}} = \mathtt{unet}\big(C_{\mathrm{in}}{=}9,\ C_{\mathrm{out}}\big)"}],
+                ],
+            },
+            {
+                "id": "bench_search", "title": "Bracketed bisection on width", "phase": "A - Capacity match",
+                "note": "The scale bracket starts at [0.05, 8.0]; the upper bound is doubled (capped at 64) until the widest candidate reaches the budget, then the multiplier is bisected by geometric mean for up to 100 iterations, each candidate instantiated and counted, halving the interval by the sign of the deviation until |delta| <= 5%.",
+                "inputs": ["Nstar"], "outputs": ["dev", "scale"],
+                "iterative": {"unit": "i", "steps": 100, "symbol": "s",
+                              "trace": ["0.63", "2.25", "1.19", "0.87", "1.02", "0.99", "1.00"]},
+                "lines": [
+                    [{"id": "scale", "tex": r"s", "role": "intermediate"}, {"tex": "="}, {"tex": r"\sqrt{\ell\,h}\,,\qquad"}, {"id": "Nk", "tex": r"N(s)", "role": "intermediate"}, {"tex": r"=\ \textstyle\sum_p \lvert p\rvert\quad\big(\ell,h\ \text{init}\ [0.05,\,8.0],\ \ h\!\leftarrow\!2h\ \text{to}\ 64\big)"}],
+                    [{"id": "dev", "tex": r"\delta", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{"}, {"id": "Nk", "tex": r"N(s)", "role": "intermediate"}, {"tex": r"-\ "}, {"id": "Nstar", "tex": r"N^{*}", "role": "calculated"}, {"tex": r"}{\max(N^{*},1)},\quad \ell\!\leftarrow\!s\ \text{if}\ \delta<0\ \text{else}\ h\!\leftarrow\!s,\ \ \text{stop}\ |\delta|\le 0.05"}],
+                ],
+            },
+            {
+                "id": "bench_widths", "title": "Rounded width overrides", "phase": "A - Capacity match",
+                "note": "The winning scale becomes concrete width overrides: each scalable attribute (e.g. the UNet features list, divisor 8) is scaled, rounded to its divisor and floored at it, while the locked embedding dims are never touched; a degeneracy audit flags a scale pinned at a search bound or a width clamped at the rounding minimum.",
+                "inputs": ["scale"], "outputs": ["smatch"],
+                "lines": [
+                    [{"id": "smatch", "tex": r"\omega_a", "role": "calculated"}, {"tex": "="}, {"tex": r"\max\!\big(d,\ \operatorname{round}(w_a\,"}, {"id": "scale", "tex": r"s", "role": "intermediate"}, {"tex": r"/d)\cdot d\big),\qquad d = 8\ \ (\mathtt{features})"}],
+                    [{"tex": r"a \notin \{\mathtt{embedding\_dim},\ \mathtt{embedding\_dims}\}\quad (\text{locked, unscaled})"}],
+                ],
+            },
+            {
+                "id": "bench_context", "title": "CUDA-context baseline", "phase": "B - Max batch",
+                "note": "On the target GPU, after clearing the cache, the already-resident memory (total minus free) is taken as the CUDA-context baseline and added to every later peak; above 1.5 GB it warns that another process is co-resident and shrinking the effective budget.",
+                "inputs": [], "outputs": ["ctx"],
+                "lines": [
+                    [{"id": "ctx", "tex": r"C_{\mathrm{ctx}}", "role": "measured"}, {"tex": "="}, {"tex": r"\dfrac{M_{\mathrm{total}} - M_{\mathrm{free}}}{2^{30}},\qquad \text{warn if}\ C_{\mathrm{ctx}} > 1.5\ \mathrm{GB}"}],
+                ],
+            },
+            {
+                "id": "bench_probe", "title": "Real-loss memory probe", "phase": "B - Max batch",
+                "note": "For each power-of-two batch b up to min(max_batch = 512, |train|), a real 3-step training loop runs at the matched width (bf16 autocast forward, the true composite loss, backward, optimiser step) and its peak reserved memory plus the context is the measured footprint; the surrogate never underestimates like an MSE probe would.",
+                "inputs": ["smatch", "ctx"], "outputs": ["peak"],
+                "lines": [
+                    [{"id": "peak", "tex": r"m_b", "role": "intermediate"}, {"tex": "="}, {"id": "ctx", "tex": r"C_{\mathrm{ctx}}", "role": "measured"}, {"tex": r"+\ \dfrac{1}{2^{30}}\,\operatorname{maxreserved}\!\big(f_{"}, {"id": "smatch", "tex": r"\omega", "role": "calculated"}, {"tex": r"},\,b\big),\quad b\in\{1,2,4,\dots,\min(512,\,|\mathrm{train}|)\}"}],
+                ],
+            },
+            {
+                "id": "bench_maxbatch", "title": "Largest batch under budget", "phase": "B - Max batch",
+                "note": "The largest batch whose footprint stays at or below the VRAM budget (40 GB) is kept; the scan halts at the first over-budget or OOM batch, and a model that cannot fit batch 1 fails loudly rather than training at an unfair size.",
+                "inputs": ["peak"], "outputs": ["bstar"],
+                "lines": [
+                    [{"id": "bstar", "tex": r"B^{*}", "role": "calculated"}, {"tex": "="}, {"tex": r"\max\big\{\,b :\ "}, {"id": "peak", "tex": r"m_b", "role": "intermediate"}, {"tex": r"\ \le\ V_{\mathrm{budget}}\,\big\},\qquad V_{\mathrm{budget}} = 40\ \mathrm{GB}"}],
+                    [{"tex": r"\text{halt at first OVER / OOM};\qquad"}, {"id": "peak", "tex": r"m_1", "role": "intermediate"}, {"tex": r"> V_{\mathrm{budget}} \Rightarrow \mathtt{FAIL}"}],
+                ],
+            },
+            {
+                "id": "bench_units", "title": "Benchmark grid expansion", "phase": "C - Sweep grid",
+                "note": "The grid is the Cartesian product of architectures, swept loss components (default {param_l1}) and seeds; with no seeds each (model, component) pair is a single unit, otherwise every pair is repeated per seed as model__component_seed{s}.",
+                "inputs": ["models"], "outputs": ["units"],
+                "lines": [
+                    [{"id": "units", "tex": r"\mathcal{U}", "role": "calculated"}, {"tex": "="}, {"id": "models", "tex": r"\mathcal{M}", "role": "measured"}, {"tex": r"\times\ \mathcal{C}\ \times\ \mathcal{S},\qquad \mathcal{C} = \{\mathtt{param\_l1}\}\ \ (\text{default})"}],
+                    [{"tex": r"\mathrm{name} = m \,\Vert\, c\ [\,\mathrm{seed}\,s\,],\qquad \mathcal{S} = \varnothing \Rightarrow N_s = 1"}],
+                ],
+            },
+            {
+                "id": "bench_train", "title": "Train each unit", "phase": "D - Train & infer",
+                "note": "Every unit is trained by the standard backbone pipeline at its matched width and measured max batch, with the loss curriculum pinned to that unit's single component; best-epoch weights are checkpointed. Architectures thus differ only in inductive bias, not in capacity or batch size.",
+                "inputs": ["units", "smatch", "bstar"], "outputs": ["ckpt"],
+                "lines": [
+                    [{"id": "ckpt", "tex": r"\theta^{\star}_u", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{\mathrm{epoch}}\ \mathcal{L}_{\mathrm{val}}\big(f_{"}, {"id": "smatch", "tex": r"\omega", "role": "calculated"}, {"tex": r",\,c};\ \mathrm{batch}{=}"}, {"id": "bstar", "tex": r"B^{*}", "role": "calculated"}, {"tex": r"\big),\quad u \in "}, {"id": "units", "tex": r"\mathcal{U}", "role": "calculated"}],
+                ],
+            },
+            {
+                "id": "bench_infer", "title": "Infer on the test split", "phase": "D - Train & infer",
+                "note": "Each trained unit runs the standard sliding-window inference on the held-out test split, producing the full scalar metric suite per unit: curve errors, parameter errors and physics-consistency measures.",
+                "inputs": ["ckpt"], "outputs": ["metrics"],
+                "lines": [
+                    [{"id": "metrics", "tex": r"\mathbf{q}_u", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{Metrics}\big(f_{"}, {"id": "ckpt", "tex": r"\theta^{\star}_u", "role": "calculated"}, {"tex": r"}(\mathbf{X}_{\mathrm{test}})\big)"}],
+                ],
+            },
+            {
+                "id": "bench_aggregate", "title": "Aggregate over seeds", "phase": "E - Compare",
+                "note": "Units sharing a model base are grouped and their per-seed metrics reduced to a mean and standard deviation (the checkpoint best-val-loss too), so seed noise is separated from genuine architecture differences.",
+                "inputs": ["metrics"], "outputs": ["agg"],
+                "lines": [
+                    [{"id": "agg", "tex": r"\bar{\mathbf{q}}_m", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname*{mean}_{s}\ "}, {"id": "metrics", "tex": r"\mathbf{q}_{m,s}", "role": "calculated"}, {"tex": r",\qquad \sigma_m = \operatorname*{std}_{s}\ "}, {"id": "metrics", "tex": r"\mathbf{q}_{m,s}", "role": "calculated"}],
+                ],
+            },
+            {
+                "id": "bench_leaderboard", "title": "Composite-score leaderboard", "phase": "E - Compare",
+                "note": "Each headline metric is min-max normalised across models to [0, 1] (1 = best by its own direction, missing metrics score 0) and averaged into a magnitude-aware composite Score; models are ranked by Score, with mean rank, wins and the gap Delta to the leader reported.",
+                "inputs": ["agg"], "outputs": ["board"],
+                "lines": [
+                    [{"id": "board", "tex": r"\mathrm{Score}_m", "role": "final"}, {"tex": "="}, {"tex": r"\dfrac{1}{|Q|}\sum_{q\in Q}\ \operatorname{minmax}_q\!\big("}, {"id": "agg", "tex": r"\bar{q}_{m,q}", "role": "calculated"}, {"tex": r"\big)\ \in [0,1]"}],
+                    [{"tex": r"\text{rank by Score},\qquad \Delta_m ="}, {"id": "board", "tex": r"\mathrm{Score}_m", "role": "final"}, {"tex": r"\ -\ \max_{m'}\mathrm{Score}_{m'}\ \le 0"}],
+                ],
+            },
+        ]
+        return {
+            "key"   : "benchmark",
+            "name"  : "Benchmark (Capacity-matched)",
+            "blurb" : "Fair architecture comparison at equal capacity. Every backbone is scaled to the reference model's parameter budget by bracketed bisection, given its own largest batch that fits the VRAM budget under a real 3-step training probe, then trained and inferred identically across a (model, loss-component, seed) grid; seeds are aggregated and models ranked by a magnitude-aware composite score.",
+            "nodes" : nodes,
+            "steps" : steps,
+        }
+
+    def _cross_validate(self) -> dict:
+        nodes = [
+            {"id": "cv_extent",     "tex": r"\Omega_{\mathrm{az}}",   "role": "measured",     "kind": "set",    "shape": "(az0, az1)", "desc": "fold azimuth window in absolute SLC lines",                 "sample": "(1000, 16000)"},
+            {"id": "cv_guard",      "tex": r"g",                      "role": "measured",     "kind": "scalar", "shape": "1",          "desc": "guard-band width between folds (azimuth lines, even)",      "sample": "64"},
+            {"id": "cv_blocks",     "tex": r"B_k",                    "role": "calculated",   "kind": "set",    "shape": "K x 2",      "desc": "K equal-width contiguous azimuth blocks",                   "sample": [["1000", "2500"], ["2500", "4000"]]},
+            {"id": "cv_region",     "tex": r"R_k",                    "role": "calculated",   "kind": "set",    "shape": "A_z x R_g",  "desc": "guard-trimmed block region (azimuth slice x full range)",   "sample": "[2532, 3968) x [0, 3000)"},
+            {"id": "cv_split",      "tex": r"\Omega^{(k)}",           "role": "calculated",   "kind": "set",    "shape": "3 regions",  "desc": "fold-k disjoint train / val / test split regions",          "sample": "test B0, val B1, train B2..9"},
+            {"id": "cv_units",      "tex": r"\mathcal{U}",            "role": "calculated",   "kind": "set",    "shape": "K x |S|",    "desc": "expanded (fold, seed) training run units",                 "sample": ["fold_0", "fold_1", "..."]},
+            {"id": "cv_model",      "tex": r"\theta_k^{\star}",       "role": "intermediate", "kind": "tensor", "shape": "|theta|",    "desc": "fold-k best-epoch weights and validation loss",             "sample": "0.041 (best val)"},
+            {"id": "cv_metrics",    "tex": r"m_k^{(s)}",              "role": "calculated",   "kind": "set",    "shape": "n_m",        "desc": "per-fold, per-split inference metric set",                  "sample": ["0.12", "0.19", "0.86"]},
+            {"id": "cv_foldmetric", "tex": r"\bar{m}_k^{(s)}",        "role": "calculated",   "kind": "vector", "shape": "n_m",        "desc": "per-fold seed-aggregated metric (seed mean, seed std)",     "sample": "0.12, sd 0.01"},
+            {"id": "cv_agg",        "tex": r"\bar{m}^{(s)}",          "role": "final",        "kind": "vector", "shape": "n_m",        "desc": "cross-fold aggregate: mean and sample std (ddof=1)",        "sample": "0.13, sd 0.02"},
+            {"id": "cv_report",     "tex": r"\mathcal{R}",           "role": "final",        "kind": "set",    "shape": "files",      "desc": "aggregate report, summary JSON, per-split comparisons",     "sample": "cv_aggregate_report.md, cv_summary.json"},
+        ]
+        steps = [
+            {
+                "id": "cv_partition", "title": "Azimuth block partition", "phase": "A - Fold plan",
+                "note": "The fold azimuth window [azimuth_start, azimuth_end) (default [1000, 16000)) is cut into K = n_folds contiguous equal-width blocks of size floor((az1-az0)/K); the final block absorbs the remainder. K must be at least 3 so that train, val and test stay mutually disjoint.",
+                "inputs": ["cv_extent"], "outputs": ["cv_blocks"],
+                "lines": [
+                    [{"tex": r"w = \big\lfloor (\mathtt{az}_1 - \mathtt{az}_0)/K \big\rfloor,\qquad K = n_{\mathrm{folds}} \ge 3"}],
+                    [{"id": "cv_blocks", "tex": r"B_k", "role": "calculated"}, {"tex": "="}, {"tex": r"\big[\,\mathtt{az}_0 + k\,w,\ \ \mathtt{az}_0 + (k{+}1)\,w\,\big),\qquad"}, {"id": "cv_extent", "tex": r"\Omega_{\mathrm{az}} = [\mathtt{az}_0, \mathtt{az}_1)", "role": "measured"}],
+                ],
+            },
+            {
+                "id": "cv_guard", "title": "Guard-band trimming", "phase": "A - Fold plan",
+                "note": "Interior block boundaries are eroded by margin = guard/2 lines on each side, while outer edges at the window boundary are left intact; this opens a guard-width gap between neighbouring splits so no patch straddles two folds. guard (default 64) must be even, non-negative and strictly smaller than the smallest block.",
+                "inputs": ["cv_blocks", "cv_guard"], "outputs": ["cv_region"],
+                "lines": [
+                    [{"id": "cv_region", "tex": r"R_k", "role": "calculated"}, {"tex": "="}, {"tex": r"\big[\,s_k + m\,\mathbb{1}_{s_k>\mathtt{az}_0},\ \ e_k - m\,\mathbb{1}_{e_k<\mathtt{az}_1}\,\big)\ \times\ [\mathtt{rg}_0, \mathtt{rg}_1)"}],
+                    [{"tex": r"m = "}, {"id": "cv_guard", "tex": r"g", "role": "measured"}, {"tex": r"/2,\qquad g\ \text{even},\quad 0 \le g < \min_k \big|"}, {"id": "cv_blocks", "tex": r"B_k", "role": "calculated"}, {"tex": r"\big|"}],
+                ],
+            },
+            {
+                "id": "cv_assign", "title": "Fold role assignment", "phase": "A - Fold plan",
+                "note": "For fold k the test band is block k and the validation band is the next block (k+1) mod K; the remaining K-2 blocks form the training set, with adjacent blocks merged into contiguous regions. Rotating k over 0..K-1 yields K disjoint train / val / test partitions of the same scene.",
+                "inputs": ["cv_region"], "outputs": ["cv_split"],
+                "lines": [
+                    [{"id": "cv_split", "tex": r"\Omega^{(k)}", "role": "calculated"}, {"tex": r":\quad \mathrm{test} = "}, {"id": "cv_region", "tex": r"R_k", "role": "calculated"}, {"tex": r",\quad \mathrm{val} = R_{(k+1)\bmod K}"}],
+                    [{"tex": r"\mathrm{train} = \mathrm{merge}\big\{\,R_j : j \notin \{\,k,\ (k{+}1)\bmod K\,\}\,\big\}"}],
+                ],
+            },
+            {
+                "id": "cv_units", "title": "Seed replication", "phase": "B - Fold training",
+                "note": "Each fold is one run; supplying a seed list replicates every fold once per seed (run name fold_k_seedS) so per-fold seed dispersion can be measured, otherwise a single unseeded run per fold. All fold x seed units are queued across the configured GPUs and resumed when a checkpoint already exists.",
+                "inputs": ["cv_split"], "outputs": ["cv_units"],
+                "lines": [
+                    [{"id": "cv_units", "tex": r"\mathcal{U}", "role": "calculated"}, {"tex": "="}, {"tex": r"\{\,\mathrm{fold}\_k : k < K\,\}\ \times\ \mathcal{S},\qquad |\mathcal{U}| = K\cdot\max(|\mathcal{S}|,\,1)"}],
+                    [{"tex": r"\mathcal{S} = \emptyset:\ \ \texttt{fold\_k}\ \ (\text{unseeded})\qquad \mathcal{S} \ne \emptyset:\ \ \texttt{fold\_k\_seed}s"}],
+                ],
+            },
+            {
+                "id": "cv_train", "title": "Per-fold training", "phase": "B - Fold training",
+                "note": "Every unit trains an independent backbone / JEPA / autoencoder pipeline on its fold's train and val regions as a GPU job, recording the best-epoch checkpoint and its validation loss; the guard band keeps each fold's training region disjoint from its held-out val and test bands, so the per-fold validation loss is a leakage-free generalisation estimate.",
+                "inputs": ["cv_units", "cv_split"], "outputs": ["cv_model"],
+                "iterative": {"var": "L*", "steps": 10, "unit": "fold", "symbol": r"L^{\star}",
+                              "trace": ["4.1e-2", "3.8e-2", "5.2e-2", "4.4e-2", "3.9e-2"]},
+                "lines": [
+                    [{"id": "cv_model", "tex": r"\theta_k^{\star}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\arg\min_{\theta}\ \mathcal{L}_{\mathrm{val}}\big(\theta;\ "}, {"id": "cv_split", "tex": r"\Omega^{(k)}", "role": "calculated"}, {"tex": r"\big)"}],
+                    [{"tex": r"L_k^{\star} = \mathcal{L}_{\mathrm{val}}(\theta_k^{\star}),\qquad k = 0,\dots,K-1"}],
+                ],
+            },
+            {
+                "id": "cv_infer", "title": "Per-fold-split inference", "phase": "C - Fold inference",
+                "note": "Unless the model is a profile autoencoder (those folds are scored by reconstruction loss alone), each trained fold is inferred on its held-out val and test bands into a per-fold, per-split metric set. A split is skipped when its region is disjoint, since cube stitching needs one contiguous band, or when its checkpoint is missing.",
+                "inputs": ["cv_model", "cv_split"], "outputs": ["cv_metrics"],
+                "lines": [
+                    [{"id": "cv_metrics", "tex": r"m_k^{(s)}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathcal{M}\big(f_{"}, {"id": "cv_model", "tex": r"\theta_k^{\star}", "role": "intermediate"}, {"tex": r"};\ \Omega^{(k)}_s\big),\qquad s \in \{\texttt{val},\ \texttt{test}\}"}],
+                    [{"tex": r"\text{skip if}\ \big|\mathrm{regions}(s)\big| \ne 1\ \ (\text{disjoint band})\ \ \text{or no checkpoint}"}],
+                ],
+            },
+            {
+                "id": "cv_collect", "title": "Seed aggregation per fold", "phase": "D - Aggregation",
+                "note": "Runs are regrouped by fold; a fold with several seed replicas is reduced to the across-seed mean and the within-fold seed standard deviation per metric, contributing one representative record. With no seed sweep this is a pass-through.",
+                "inputs": ["cv_metrics"], "outputs": ["cv_foldmetric"],
+                "lines": [
+                    [{"id": "cv_foldmetric", "tex": r"\bar{m}_k^{(s)}", "role": "calculated"}, {"tex": "="}, {"tex": r"\tfrac{1}{|\mathcal{S}_k|}\sum_{j}\,"}, {"id": "cv_metrics", "tex": r"m_{k,j}^{(s)}", "role": "calculated"}, {"tex": r",\qquad \sigma_k^{\mathrm{seed}} = \operatorname{std}_{j}\,m_{k,j}^{(s)}"}],
+                ],
+            },
+            {
+                "id": "cv_aggregate", "title": "Cross-fold mean and std", "phase": "D - Aggregation",
+                "note": "Each metric is averaged over the folds that produced a finite value, with the sample standard deviation (ddof = 1) reported only when at least 2 folds contributed; before aggregating, the report asserts all K folds trained (hold a checkpoint) and every fold has metrics on each split.",
+                "inputs": ["cv_foldmetric"], "outputs": ["cv_agg"],
+                "lines": [
+                    [{"id": "cv_agg", "tex": r"\bar{m}^{(s)}", "role": "final"}, {"tex": "="}, {"tex": r"\tfrac{1}{N}\sum_{k \in F}\,"}, {"id": "cv_foldmetric", "tex": r"\bar{m}_k^{(s)}", "role": "calculated"}, {"tex": r",\quad F = \{\,k : \bar{m}_k^{(s)}\ \text{finite}\,\}"}],
+                    [{"tex": r"\hat{\sigma}^{(s)} = \sqrt{\tfrac{1}{N-1}\sum_{k \in F}\big(\bar{m}_k^{(s)} - \bar{m}^{(s)}\big)^2}\,,\qquad N = |F| \ge 2"}],
+                ],
+            },
+            {
+                "id": "cv_report", "title": "Aggregate report and summary", "phase": "D - Aggregation",
+                "note": "The fold plan, an across-fold training summary (best epoch, best val loss, duration) and grouped metric aggregate tables are written to cv_aggregate_report.md; cv_summary.json carries every mean, std and per-fold value machine-readably; and per-split comparison reports are emitted with fold ranking disabled.",
+                "inputs": ["cv_agg"], "outputs": ["cv_report"],
+                "lines": [
+                    [{"id": "cv_report", "tex": r"\mathcal{R}", "role": "final"}, {"tex": "="}, {"tex": r"\big\{\ \texttt{cv\_aggregate\_report.md},\ \ \texttt{cv\_summary.json},\ \ \{\texttt{val},\texttt{test}\}/\ \big\}"}],
+                ],
+            },
+        ]
+        return {
+            "key"   : "cross_validate",
+            "name"  : "Cross-Validation (K-fold)",
+            "blurb" : "K-fold spatial cross-validation. Partition the scene azimuth into K equal blocks, erode a guard band so folds cannot leak, and rotate each block through test / val / train; train one model per fold (optionally per seed), infer on the held-out val and test bands, then aggregate every metric into a cross-fold mean and sample standard deviation with a machine-readable summary.",
+            "nodes" : nodes,
+            "steps" : steps,
+        }
+
     def _tuning(self) -> dict:
         nodes = [
             {"id": "space",     "tex": r"\Theta",                 "role": "measured",     "kind": "set",    "shape": "-", "desc": "joint learning, regularisation and architecture search space", "sample": ["lr", "wd", "features", "..."]},
@@ -948,12 +1857,154 @@ class FlowLibrary:
             "nodes": nodes, "steps": steps,
         }
 
+    def _feed_tuner(self) -> dict:
+        nodes = [
+            {"id": "dset",    "tex": r"\mathcal{D}",         "role": "measured",     "kind": "set",    "shape": "N",             "desc": "real training dataset from the mode's adapter (same items as training)", "sample": "profiles, len 96"},
+            {"id": "model",   "tex": r"f_\theta",            "role": "measured",     "kind": "tensor", "shape": "params",        "desc": "the mode's real model plus AdamW step; the GPU workload",                 "sample": "mlp_ae"},
+            {"id": "bset",    "tex": r"\mathcal{B}",         "role": "measured",     "kind": "vector", "shape": "n_b",           "desc": "batch-size sweep grid (samples)",                                         "sample": ["256", "512", "1024", "2048", "4096"]},
+            {"id": "wset",    "tex": r"\mathcal{W}",         "role": "measured",     "kind": "vector", "shape": "n_w",           "desc": "DataLoader worker-count sweep grid",                                      "sample": ["0", "2", "4", "6", "8"]},
+            {"id": "pset",    "tex": r"\mathcal{P}",         "role": "measured",     "kind": "vector", "shape": "n_p",           "desc": "prefetch-factor sweep grid",                                              "sample": ["2", "4", "8", "16"]},
+            {"id": "tau",     "tex": r"\tau_w",              "role": "measured",     "kind": "scalar", "shape": "1",             "desc": "data-wait target (GPU-idle fraction)",                                    "sample": "0.05"},
+            {"id": "spec",    "tex": r"\ell",                "role": "intermediate", "kind": "set",    "shape": "(b,w,p,pin)",   "desc": "one loader configuration (batch, workers, prefetch, pin)",                "sample": "(1024, 4, 4, pin)"},
+            {"id": "tload",   "tex": r"R_{\mathrm{load}}",   "role": "intermediate", "kind": "scalar", "shape": "1",             "desc": "loader-only throughput, GPU idle (samples/s)",                            "sample": "82000"},
+            {"id": "tgpu",    "tex": r"R_{\mathrm{gpu}}",    "role": "intermediate", "kind": "scalar", "shape": "1",             "desc": "GPU compute ceiling on one reused batch (samples/s)",                     "sample": "95000"},
+            {"id": "te2e",    "tex": r"R_{\mathrm{e2e}}",    "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "end-to-end training throughput (samples/s)",                              "sample": "78000"},
+            {"id": "wait",    "tex": r"w_{\mathrm{d}}",      "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "data-wait fraction, GPU-idle share of a step",                            "sample": "0.03"},
+            {"id": "util",    "tex": r"u_{\mathrm{gpu}}",    "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "mean GPU utilization over the run (%)",                                   "sample": "91"},
+            {"id": "fr",      "tex": r"\phi",                "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "feed ratio, loader over ceiling (dimensionless)",                         "sample": "0.86"},
+            {"id": "eff",     "tex": r"\eta",                "role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "compute efficiency, end-to-end over ceiling",                             "sample": "0.82"},
+            {"id": "rec",     "tex": r"\mathbf{r}",          "role": "calculated",   "kind": "set",    "shape": "per spec",      "desc": "per-spec result record",                                                  "sample": ["1024", "4", "78000", "0.03"]},
+            {"id": "sat",     "tex": r"\mathcal{S}",         "role": "calculated",   "kind": "set",    "shape": "subset",        "desc": "GPU-saturated configuration subset",                                      "sample": "{bs1024/w4, ...}"},
+            {"id": "cpub",    "tex": r"\beta_{\mathrm{cpu}}","role": "calculated",   "kind": "scalar", "shape": "1",             "desc": "CPU-bound flag (saturated set empty)",                                    "sample": "False"},
+            {"id": "reco",    "tex": r"\ell^\star",          "role": "final",        "kind": "set",    "shape": "(b,w,...)",     "desc": "recommended loader configuration",                                        "sample": "bs=1024, w=4"},
+            {"id": "refbest", "tex": r"\rho^\star",          "role": "calculated",   "kind": "set",    "shape": "(p,pin)",       "desc": "best prefetch and pin from the refine sweep",                             "sample": "(8, pin)"},
+            {"id": "final",   "tex": r"\ell^\dagger",        "role": "final",        "kind": "set",    "shape": "(b,w,p,pin,+)", "desc": "final DataLoader configuration written to results",                       "sample": "bs1024 w4 pf8 pin1"},
+            {"id": "results", "tex": r"\mathcal{J}",         "role": "final",        "kind": "set",    "shape": "json + figs",   "desc": "results.json plus four diagnostic figures",                               "sample": "results.json + 4 png"},
+        ]
+        steps = [
+            {
+                "id": "feed_target", "title": "Feed target assembly", "phase": "A - Target",
+                "note": "The adapter selected by mode (default profile_autoencoder) builds the actual training dataset and model plus a real forward/backward/AdamW step, so the measured CPU item cost and GPU compute match production; the loss is reconstruction MSE for the autoencoder modes and MSE against zero for the backbone.",
+                "inputs": [], "outputs": ["model", "dset"],
+                "lines": [
+                    [{"tex": r"\big("}, {"id": "dset", "tex": r"\mathcal{D}", "role": "measured"}, {"tex": r",\ "}, {"id": "model", "tex": r"f_\theta", "role": "measured"}, {"tex": r"\big) = \mathrm{Adapter}_{\texttt{mode}}()"}],
+                    [{"tex": r"\texttt{mode}\in\{\texttt{synthetic},\ \texttt{profile\_autoencoder},\ \texttt{image\_autoencoder},\ \texttt{backbone}\},\quad \mathcal{L} = \mathrm{MSE}(\mathrm{rec}_\theta(x),\,x)\ \ \text{or}\ \ \mathrm{MSE}(f_\theta(x),\,\mathbf{0})"}],
+                ],
+            },
+            {
+                "id": "feed_grid", "title": "Main sweep grid", "phase": "B - Sweep grid",
+                "note": "The main sweep enumerates every (batch, workers) pair with the reference prefetch factor 4, pin-memory on and persistent workers on; worker counts above the machine core count C are dropped. The default grid is 5 batch sizes times up to 5 worker counts, run one spec at a time.",
+                "inputs": ["bset", "wset"], "outputs": ["spec"],
+                "iterative": {"unit": "spec", "steps": 25, "symbol": r"\ell",
+                              "trace": ["31k", "58k", "74k", "78k", "61k"]},
+                "lines": [
+                    [{"id": "spec", "tex": r"\ell", "role": "intermediate"}, {"tex": r"\in \big\{(b,\,w,\,p_0,\,\text{pin}) :\ "}, {"id": "bset", "tex": r"b\in\mathcal{B}", "role": "measured"}, {"tex": r",\ "}, {"id": "wset", "tex": r"w\in\mathcal{W}", "role": "measured"}, {"tex": r",\ w\le C\big\}"}],
+                    [{"tex": r"\mathcal{B} = \{256,512,1024,2048,4096\},\quad \mathcal{W} = \{0,2,4,6,8\},\quad p_0 = 4"}],
+                ],
+            },
+            {
+                "id": "feed_loader", "title": "Loader-only throughput", "phase": "C - Per-spec probe",
+                "note": "With no GPU work the loader alone is iterated for 8 warm-up then 60 timed batches (shuffle and drop_last on, one thread per worker); the pure data-pipeline throughput is the samples produced over wall time.",
+                "inputs": ["dset", "spec"], "outputs": ["tload"],
+                "lines": [
+                    [{"id": "tload", "tex": r"R_{\mathrm{load}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{n_t\,b}{t_{\mathrm{load}}},\qquad n_{\mathrm{wu}} = 8,\ \ n_t = 60\ \ (\text{GPU idle})"}],
+                ],
+            },
+            {
+                "id": "feed_ceiling", "title": "GPU compute ceiling", "phase": "C - Per-spec probe",
+                "note": "One batch is moved to the GPU and pushed through the real train step 60 times (after 8 warm-up), CUDA-synchronised; reusing a single batch removes all data cost, so this is the pure GPU compute ceiling. AdamW lr is 1e-4 and AMP, when on, uses bf16 (off by default).",
+                "inputs": ["model", "spec"], "outputs": ["tgpu"],
+                "lines": [
+                    [{"id": "tgpu", "tex": r"R_{\mathrm{gpu}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\dfrac{n_t\,b}{t_{\mathrm{gpu}}},\qquad x_0\ \text{reused every step}"}],
+                    [{"tex": r"\theta \leftarrow \theta - \mathrm{AdamW}\!\big(\nabla_\theta\,"}, {"id": "model", "tex": r"\mathcal{L}(f_\theta, x_0)", "role": "measured"}, {"tex": r"\big),\quad \mathrm{lr} = 10^{-4}"}],
+                ],
+            },
+            {
+                "id": "feed_e2e", "title": "End-to-end split", "phase": "C - Per-spec probe",
+                "note": "The real loop times each batch's fetch-wait t_d and its compute t_c separately; the end-to-end rate divides by their sum and the data-wait fraction is the share the GPU idles waiting for data. A background nvml thread samples utilisation every 50 ms.",
+                "inputs": ["dset", "model", "spec"], "outputs": ["te2e", "util", "wait"],
+                "lines": [
+                    [{"id": "te2e", "tex": r"R_{\mathrm{e2e}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{n_t\,b}{t_d + t_c},\qquad"}, {"id": "wait", "tex": r"w_{\mathrm{d}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{t_d}{t_d + t_c}"}],
+                    [{"id": "util", "tex": r"u_{\mathrm{gpu}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big\langle \mathrm{util}_{\mathrm{nvml}}(t)\big\rangle,\qquad \Delta t_s = 50\,\mathrm{ms}"}],
+                ],
+            },
+            {
+                "id": "feed_ratios", "title": "Derived feed ratios", "phase": "C - Per-spec probe",
+                "note": "The record's feed ratio is loader capacity over the GPU ceiling (>= 1 means the CPU can outpace the GPU) and efficiency is the achieved rate over that ceiling; out-of-memory specs are caught and recorded as failed rather than aborting the sweep.",
+                "inputs": ["tload", "tgpu", "te2e"], "outputs": ["fr", "eff", "rec"],
+                "lines": [
+                    [{"id": "fr", "tex": r"\phi", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{"}, {"id": "tload", "tex": r"R_{\mathrm{load}}", "role": "intermediate"}, {"tex": r"}{"}, {"id": "tgpu", "tex": r"R_{\mathrm{gpu}}", "role": "intermediate"}, {"tex": r"},\qquad"}, {"id": "eff", "tex": r"\eta", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{"}, {"id": "te2e", "tex": r"R_{\mathrm{e2e}}", "role": "calculated"}, {"tex": r"}{"}, {"id": "tgpu", "tex": r"R_{\mathrm{gpu}}", "role": "intermediate"}, {"tex": r"}"}],
+                    [{"id": "rec", "tex": r"\mathbf{r}", "role": "calculated"}, {"tex": r"= \big(\ell,\ R_{\mathrm{load}},\ R_{\mathrm{gpu}},\ R_{\mathrm{e2e}},\ "}, {"id": "wait", "tex": r"w_{\mathrm{d}}", "role": "calculated"}, {"tex": r",\ u_{\mathrm{gpu}},\ \phi,\ \eta\big)"}],
+                ],
+            },
+            {
+                "id": "feed_saturate", "title": "GPU-saturated set", "phase": "D - Recommendation",
+                "note": "A config is GPU-saturated when its data-wait is at or below the target 0.05 or its feed ratio reaches 1; if none qualify the saturated set is empty and the run is flagged CPU-bound, and the full ok set is used for the pick instead.",
+                "inputs": ["rec", "tau"], "outputs": ["sat", "cpub"],
+                "lines": [
+                    [{"id": "sat", "tex": r"\mathcal{S}", "role": "calculated"}, {"tex": r"= \big\{\mathbf{r} :\ "}, {"id": "wait", "tex": r"w_{\mathrm{d}}", "role": "calculated"}, {"tex": r"\le"}, {"id": "tau", "tex": r"\tau_w", "role": "measured"}, {"tex": r"\ \ \lor\ \ "}, {"id": "fr", "tex": r"\phi", "role": "calculated"}, {"tex": r"\ge 1\big\},\qquad \tau_w = 0.05"}],
+                    [{"id": "cpub", "tex": r"\beta_{\mathrm{cpu}}", "role": "calculated"}, {"tex": r"= \big[\,"}, {"id": "sat", "tex": r"\mathcal{S}", "role": "calculated"}, {"tex": r"= \varnothing\,\big]"}],
+                ],
+            },
+            {
+                "id": "feed_recommend", "title": "Best configuration", "phase": "D - Recommendation",
+                "note": "Within the saturated pool (or the whole ok set when CPU-bound) the highest end-to-end throughput wins, ties breaking toward fewer workers then smaller batch; if no spec ran successfully the pipeline raises SystemExit.",
+                "inputs": ["sat"], "outputs": ["reco"],
+                "lines": [
+                    [{"id": "reco", "tex": r"\ell^\star", "role": "final"}, {"tex": r"= \arg\!\max_{\mathbf{r}\in "}, {"id": "sat", "tex": r"\mathcal{S}", "role": "calculated"}, {"tex": r"}\ \mathrm{lex}\big("}, {"id": "te2e", "tex": r"R_{\mathrm{e2e}}\!\downarrow", "role": "calculated"}, {"tex": r",\ w\!\uparrow,\ b\!\uparrow\big)"}],
+                    [{"tex": r"\text{pool} = "}, {"id": "sat", "tex": r"\mathcal{S}", "role": "calculated"}, {"tex": r"\ \text{if}\ \neg"}, {"id": "cpub", "tex": r"\beta_{\mathrm{cpu}}", "role": "calculated"}, {"tex": r"\ \text{else all ok};\quad \mathcal{S}_{\mathrm{ok}} = \varnothing \Rightarrow \texttt{SystemExit}"}],
+                ],
+            },
+            {
+                "id": "feed_refine", "title": "Prefetch and pin refine", "phase": "E - Refine",
+                "note": "Enabled by default: holding the recommended batch and at-least-one workers fixed, a second sweep varies prefetch over {2,4,8,16} and pin-memory on/off, and its highest-throughput row is kept.",
+                "inputs": ["reco", "pset"], "outputs": ["refbest"],
+                "lines": [
+                    [{"tex": r"\mathcal{G}_{\mathrm{ref}} = \big\{(b^\star,\ \max(1,w^\star),\ p,\ \mathrm{pin}) :\ "}, {"id": "pset", "tex": r"p\in\mathcal{P}", "role": "measured"}, {"tex": r",\ \mathrm{pin}\in\{0,1\}\big\}"}],
+                    [{"id": "refbest", "tex": r"\rho^\star", "role": "calculated"}, {"tex": r"= (p^\star,\mathrm{pin}^\star) = \arg\!\max_{\mathcal{G}_{\mathrm{ref}}}\ "}, {"id": "te2e", "tex": r"R_{\mathrm{e2e}}", "role": "calculated"}, {"tex": r",\qquad \mathcal{P} = \{2,4,8,16\}"}],
+                ],
+            },
+            {
+                "id": "feed_final", "title": "Final configuration", "phase": "E - Refine",
+                "note": "The final config takes batch and workers from the recommendation and, when the refine sweep produced results, overrides prefetch and pin-memory with its best row; otherwise they default to prefetch 4 and pin on. The cpu-bound flag is carried through.",
+                "inputs": ["reco", "refbest", "cpub"], "outputs": ["final"],
+                "lines": [
+                    [{"id": "final", "tex": r"\ell^\dagger", "role": "final"}, {"tex": r"= \big(b^\star,\ w^\star,\ "}, {"id": "refbest", "tex": r"\rho^\star", "role": "calculated"}, {"tex": r",\ \text{persist},\ "}, {"id": "cpub", "tex": r"\beta_{\mathrm{cpu}}", "role": "calculated"}, {"tex": r"\big)"}],
+                    [{"tex": r"\rho^\star \leftarrow (4,\ \text{pin on})\quad\text{if the refine sweep is empty}"}],
+                ],
+            },
+            {
+                "id": "feed_report", "title": "Results and figures", "phase": "F - Report",
+                "note": "The main and refine sweeps, the recommendation and the final config are written to results.json, and four diagnostic figures are saved when save_figures is on and the ok frame is non-empty.",
+                "inputs": ["rec", "reco", "final"], "outputs": ["results"],
+                "lines": [
+                    [{"id": "results", "tex": r"\mathcal{J}", "role": "final"}, {"tex": r"= \big\{\text{main},\ \text{refine},\ "}, {"id": "reco", "tex": r"\ell^\star", "role": "final"}, {"tex": r",\ "}, {"id": "final", "tex": r"\ell^\dagger", "role": "final"}, {"tex": r"\big\} \to \texttt{results.json}"}],
+                    [{"tex": r"\text{figures}:\ R_{\mathrm{e2e}}\text{-vs-}b,\ \ w_{\mathrm{d}}\text{-vs-}w,\ \ u_{\mathrm{gpu}}\text{-vs-}R_{\mathrm{e2e}},\ \ \phi\text{-vs-}w"}],
+                ],
+            },
+        ]
+        return {
+            "key"   : "feed_tuner",
+            "name"  : "Feed Tuner (DataLoader)",
+            "blurb" : "Sweep DataLoader settings against the real training workload. The mode's adapter wires the actual dataset and model plus a genuine forward/backward/AdamW step, then per (batch, workers) spec the benchmark measures loader-only throughput, the GPU compute ceiling on one reused batch, and the end-to-end rate with its data-wait fraction and GPU utilisation; the highest-throughput GPU-saturated config is picked (fewer workers, smaller batch as tie-breakers), a second sweep refines prefetch and pin-memory, and the final DataLoader configuration with four diagnostic figures is written.",
+            "nodes" : nodes,
+            "steps" : steps,
+        }
+
     def collect(self) -> list:
         return [
             self._processing(),
             self._param_extraction(),
             self._dataset(),
             self._training(),
+            self._profile_ae_train(),
+            self._image_ae_train(),
+            self._jepa_train(),
             self._inference(),
+            self._profile_ae_infer(),
+            self._image_ae_infer(),
+            self._benchmark(),
+            self._cross_validate(),
             self._tuning(),
+            self._feed_tuner(),
         ]
