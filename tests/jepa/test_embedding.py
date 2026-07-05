@@ -10,6 +10,8 @@ from pipelines.jepa.inference.embedding import JepaEmbeddingEvaluator
 from pipelines.jepa.inference.pipeline  import JEPA_INFERENCE_COMPONENTS
 from tools.data.gaussians               import GaussianReconstructor
 
+from tests.jepa.conftest import PROFILE_LENGTH, make_autoencoder
+
 
 class _SilentLogger:
     def section(self, *a, **k):    pass
@@ -89,6 +91,44 @@ def _build_case(z_offset: float = 0.0, flip: bool = False):
     return run, gt_curves, autoencoder
 
 
+def _build_layernorm_case():
+    torch.manual_seed(0)
+
+    n_gaussians, spatial = 2, 3
+    n_elev = PROFILE_LENGTH
+    x_axis = np.linspace(-4.0, 4.0, n_elev).astype(np.float32)
+    x      = x_axis.reshape(1, 1, -1, 1, 1)
+
+    gt_params           = torch.rand(2, n_gaussians * 3, spatial, spatial) + 0.1
+    gt_params[:, 1::3]  = torch.rand(2, n_gaussians, spatial, spatial) * 6.0 - 3.0
+    gt_params[:, 2::3] += 0.5
+
+    gt_gauss  = gt_params.numpy().astype(np.float32).reshape(2, n_gaussians, 3, spatial, spatial)
+    gt_curves = torch.from_numpy(GaussianReconstructor.reconstruct_batch(gt_gauss, x).astype(np.float32))
+
+    autoencoder = make_autoencoder("layernorm")
+    autoencoder.eval()
+    with torch.no_grad():
+        autoencoder.embedding_layernorm.norm.weight.mul_(2.0).add_(0.3)
+        autoencoder.embedding_layernorm.norm.bias.add_(0.5)
+        z_out = autoencoder.encoder(gt_curves)
+
+    adapter = types.SimpleNamespace(
+        jepa               = _FakeJepa(autoencoder, z_out),
+        profile_normalizer = _IdentityNormalizer(),
+    )
+
+    run = types.SimpleNamespace(
+        model       = types.SimpleNamespace(module=adapter, device="cpu"),
+        loader      = [(torch.rand(2, 2, spatial, spatial), gt_params)],
+        dataset     = types.SimpleNamespace(normalizer=_IdentityNormalizer()),
+        n_gaussians = n_gaussians,
+        x_axis      = x_axis,
+    )
+
+    return run
+
+
 def test_components_carry_embedding_evaluator():
     assert JEPA_INFERENCE_COMPONENTS.embedding_evaluator_cls is JepaEmbeddingEvaluator
 
@@ -131,6 +171,15 @@ def test_offset_prediction_separates_chain_from_decoder_error():
 
     assert metrics["jepa_embedding_mse"] == pytest.approx(0.25, rel=1e-5)
     assert metrics["jepa_chain_mse_norm"] > metrics["jepa_decode_mse_norm"]
+
+
+def test_layernorm_target_is_normalized_exactly_once():
+    run = _build_layernorm_case()
+
+    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+
+    assert metrics["jepa_embedding_mse"]    == pytest.approx(0.0, abs=1e-10)
+    assert metrics["jepa_embedding_cosine"] == pytest.approx(1.0, abs=1e-6)
 
 
 def test_empty_loader_raises():

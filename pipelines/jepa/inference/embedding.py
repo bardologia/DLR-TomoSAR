@@ -37,7 +37,7 @@ class JepaEmbeddingEvaluator:
 
         z_hat_n    = autoencoder.normalize_embedding(jepa(images))
         gt_curve_n = normalizer.normalize(gt_curves)
-        z_star_n   = autoencoder.normalize_embedding(autoencoder.encode(gt_curve_n))
+        z_star_n   = autoencoder.encode(gt_curve_n)
 
         decode_hat  = autoencoder.decode(z_hat_n)
         decode_star = autoencoder.decode(z_star_n)
