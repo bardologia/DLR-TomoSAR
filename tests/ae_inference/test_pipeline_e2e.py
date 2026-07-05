@@ -8,10 +8,14 @@ import pytest
 import torch
 
 from configuration.inference.image_autoencoder import ImageAeInferenceConfig
+from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
 from configuration.training import ImageAeEntryConfig
+from configuration.training.profile_autoencoder import ProfileAeEntryConfig
 from pipelines.backbone.inference.loader import RunLoader
 from pipelines.image_autoencoder.inference.pipeline import ImageAeInferencePipeline
 from pipelines.image_autoencoder.training.pipeline import TrainingPipeline
+from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferencePipeline
+from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as ProfileTrainingPipeline
 
 
 pytestmark = [pytest.mark.real_data, pytest.mark.slow]
@@ -110,3 +114,65 @@ def test_image_ae_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_pat
     embeddings = np.load(output_dir / "embeddings.npy")
     assert embeddings.shape[1] == 8
     assert np.isfinite(embeddings).all()
+
+
+def _profile_entry_config(test_data_dir, params_dir, tmp_path) -> ProfileAeEntryConfig:
+    entry = ProfileAeEntryConfig(run_name="e2e_profile_ae", logdir=tmp_path)
+
+    entry.paths.dataset_path    = test_data_dir
+    entry.paths.parameters_path = params_dir / "parameters.npy"
+
+    entry.training.epochs               = 1
+    entry.training.validation_frequency = 1
+    entry.training.batch_size           = 256
+    entry.training.num_workers          = 0
+    entry.training.scale_lr_with_batch  = False
+    entry.training.train_azimuth        = (1000, 1400)
+    entry.training.val_azimuth          = (1400, 1500)
+    entry.training.test_azimuth         = (1500, 1600)
+
+    entry.pixel_subsample = 0.005
+    entry.model_overrides = {"hidden_dim": 64, "depth": 2, "embedding_dim": 8}
+
+    return entry
+
+
+def test_profile_ae_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_path):
+    entry = _profile_entry_config(test_data_dir, params_dir, tmp_path)
+
+    (_train_losses, _val_losses, best_val_loss), run_directory = ProfileTrainingPipeline(entry).run()
+
+    assert np.isfinite(best_val_loss)
+    assert (run_directory / "best_model.pt").is_file()
+    assert (run_directory / "meta" / "profile_dataset_config.json").is_file()
+
+    config = ProfileAeInferenceConfig(
+        run_directory = run_directory,
+        output_subdir = "e2e",
+        device        = "cpu",
+        num_workers   = 0,
+        save_plots    = False,
+    )
+
+    report_path = ProfileAeInferencePipeline(config).run()
+    output_dir  = run_directory / "inference" / "profile_ae" / "e2e"
+
+    assert report_path.is_file()
+
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    assert metrics["split"] == "test"
+    assert metrics["split_regions"] == [[1500, 1600, 500, 1000]]
+    assert np.isfinite(metrics["mse_mean"])
+    assert np.isfinite(metrics["mse_mean_normalized"])
+
+    embeddings    = np.load(output_dir / "embeddings.npy")
+    pixel_indices = np.load(output_dir / "pixel_indices.npy")
+
+    assert embeddings.shape == (metrics["n_curves"], 8)
+    assert np.isfinite(embeddings).all()
+
+    assert pixel_indices.shape == (embeddings.shape[0],)
+    assert pixel_indices.dtype == np.int64
+    assert len(np.unique(pixel_indices)) == pixel_indices.shape[0]
+    assert pixel_indices.min() >= 0
+    assert pixel_indices.max() < 100 * 500

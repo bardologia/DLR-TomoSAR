@@ -33,7 +33,7 @@ class ProfileAeReport(AeReportBase):
             "x_axis_min"        : float(self.run.x_axis.min()),
             "x_axis_max"        : float(self.run.x_axis.max()),
             "split"             : self.run.split_name,
-            "split_region"      : str(self.run.split_region.as_tuple()),
+            "split_regions"     : ", ".join(str(region.as_tuple()) for region in self.run.split_regions),
             "best_epoch"        : self.run.checkpoint_meta["best_epoch"],
             "best_val_loss"     : self.run.checkpoint_meta["best_val_loss"],
             "preprocessing_dir" : str(self.run.preprocessing_run_directory),

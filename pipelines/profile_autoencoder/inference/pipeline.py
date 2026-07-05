@@ -44,18 +44,23 @@ class ProfileAeInferencePipeline:
     def _predict(self, run, logger: Logger):
         return ProfileAePredictor(run, device=self.config.device, logger=logger).run_inference()
 
-    def _persist_embeddings(self, result, meta: ProfileAeInferenceMetadata, logger: Logger) -> Path:
-        path = meta.output_dir / "embeddings.npy"
+    def _persist_embeddings(self, result, run, meta: ProfileAeInferenceMetadata, logger: Logger) -> Path:
+        path       = meta.output_dir / "embeddings.npy"
+        index_path = meta.output_dir / "pixel_indices.npy"
+
         np.save(path, result.embeddings)
-        logger.subsection(f"Embeddings saved : {path}  shape {result.embeddings.shape}")
+        np.save(index_path, run.dataset.index)
+
+        logger.subsection(f"Embeddings saved    : {path}  shape {result.embeddings.shape}")
+        logger.subsection(f"Pixel indices saved : {index_path}  shape {run.dataset.index.shape}")
         return path
 
     def _evaluate_metrics(self, result, run, meta: ProfileAeInferenceMetadata, logger: Logger):
         metrics_obj = ProfileAeMetrics(result, run.x_axis, run.normalizer, run.amp_zero_thr)
         metrics     = metrics_obj.compute()
 
-        metrics["split"]        = run.split_name
-        metrics["split_region"] = list(run.split_region.as_tuple())
+        metrics["split"]         = run.split_name
+        metrics["split_regions"] = [list(region.as_tuple()) for region in run.split_regions]
 
         ProfileAeMetrics.write_json(metrics, meta.metrics_path)
 
@@ -96,7 +101,7 @@ class ProfileAeInferencePipeline:
         run    = self._load_run(logger)
         result = self._predict(run, logger)
 
-        self._persist_embeddings(result, meta, logger)
+        self._persist_embeddings(result, run, meta, logger)
 
         metrics, metrics_obj = self._evaluate_metrics(result, run, meta, logger)
         figures              = self._compose_figures(result, run, metrics_obj, meta, logger)

@@ -33,7 +33,7 @@ class ProfileAeRun:
     n_curves                    : int
     checkpoint_meta             : dict
     preprocessing_run_directory : Path
-    split_region                : CropRegion
+    split_regions               : list[CropRegion]
     amp_zero_thr                : float
 
 
@@ -133,7 +133,7 @@ class ProfileAeRunLoader:
             drop_last   = False,
         )
 
-        region = dataset_config.split_regions.regions(config.split)[0]
+        regions = dataset_config.split_regions.regions(config.split)
 
         self.logger.section(f"[Profile AE Model]  : '{ae_name}'")
         self.logger.kv_table({
@@ -156,6 +156,6 @@ class ProfileAeRunLoader:
             n_curves                    = len(dataset),
             checkpoint_meta             = ckpt_meta,
             preprocessing_run_directory = Path(dataset_config.preprocessing_run_directory),
-            split_region                = region,
+            split_regions               = regions,
             amp_zero_thr                = dataset_config.amp_zero_thr,
         )
