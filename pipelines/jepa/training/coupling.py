@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-
 import torch
 import torch.nn as nn
 
@@ -36,38 +34,17 @@ class CouplingMode:
 
 
 class TargetProvider:
-    def __init__(self, kind: str, encoder: nn.Module, decay: float = 0.996) -> None:
-        self.kind  = kind
-        self.decay = float(decay)
+    VALID = ("stopgrad", "live")
 
-        self._ema = None
-        if kind == "ema":
-            self._ema = copy.deepcopy(encoder)
-            self._ema.requires_grad_(False)
-            self._ema.eval()
+    def __init__(self, kind: str) -> None:
+        if kind not in self.VALID:
+            raise ValueError(f"Unknown target_provider '{kind}'. Available: {list(self.VALID)}. 'stopgrad' detaches the encoder target; 'live' keeps it differentiable so the encoder trains through the embedding loss. The former 'ema' provider was removed: the encoder receives no gradient under a detached target, so its moving average never left the pretrained weights and behaved exactly like 'stopgrad'.")
 
-    def to(self, device) -> "TargetProvider":
-        if self._ema is not None:
-            self._ema.to(device)
-        return self
+        self.kind = kind
 
     def target(self, encoder: nn.Module, curve: torch.Tensor) -> torch.Tensor:
         if self.kind == "live":
             return encoder(curve)
 
-        if self.kind == "ema":
-            with torch.no_grad():
-                return self._ema(curve)
-
         with torch.no_grad():
             return encoder(curve)
-
-    @torch.no_grad()
-    def update(self, encoder: nn.Module) -> None:
-        if self._ema is None:
-            return
-
-        for ema_p, online_p in zip(self._ema.parameters(), encoder.parameters()):
-            ema_p.mul_(self.decay).add_(online_p.detach(), alpha=1.0 - self.decay)
-        for ema_b, online_b in zip(self._ema.buffers(), encoder.buffers()):
-            ema_b.copy_(online_b)

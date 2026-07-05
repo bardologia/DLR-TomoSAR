@@ -30,7 +30,7 @@ class LaunchLayout:
     NUM_DPI      = {"kind": "number", "int": True, "min": 72, "max": 600, "presets": [110, 150, 300, 600]}
 
     CH_AE_MODE      = {"kind": "choice", "options": ["frozen", "finetune"]}
-    CH_PROVIDER     = {"kind": "choice", "options": ["stopgrad", "ema", "live"]}
+    CH_PROVIDER     = {"kind": "choice", "options": ["stopgrad", "live"]}
     CH_NORM_GLOBAL  = {"kind": "choice", "options": ["per_slot"] + NORM_PRESETS}
     CH_NORM_CHANNEL = {"kind": "choice", "options": ["default"] + NORM_PRESETS}
 

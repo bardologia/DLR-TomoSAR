@@ -12,7 +12,7 @@ from tests.jepa.conftest import EMBEDDING_DIM, N_GAUSSIANS, SPATIAL, make_autoen
 
 
 def build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad"):
-    provider = TargetProvider(target_kind, autoencoder.encoder)
+    provider = TargetProvider(target_kind)
     return EmbeddingLoss(
         autoencoder        = autoencoder,
         target_provider    = provider,

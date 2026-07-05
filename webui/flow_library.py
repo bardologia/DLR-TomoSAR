@@ -935,14 +935,13 @@ class FlowLibrary:
             {"id": "Lrec",    "tex": r"\ell_{\mathrm{rec}}",      "role": "calculated",   "kind": "scalar", "shape": "1",                "desc": "curve-reconstruction anchor loss",                  "sample": "1.7e-2"},
             {"id": "Ltot",    "tex": r"\mathcal{L}",              "role": "final",        "kind": "scalar", "shape": "1",                "desc": "total JEPA loss (plain weighted sum)",              "sample": "4.9e-2"},
             {"id": "w",       "tex": r"\theta_t",                 "role": "intermediate", "kind": "vector", "shape": "|theta|",          "desc": "trainable weights: backbone + finetuned AE groups", "sample": ["0.31", "-0.08", "..."]},
-            {"id": "phi",     "tex": r"\phi^{\mathrm{ema}}",      "role": "intermediate", "kind": "vector", "shape": "|enc|",            "desc": "EMA target-encoder weights (ema provider only)",    "sample": ["0.30", "-0.09", "..."]},
             {"id": "wbest",   "tex": r"\theta^{\star}",           "role": "final",        "kind": "vector", "shape": "|theta|",          "desc": "best-epoch checkpointed weights",                   "sample": ["0.30", "-0.09", "..."]},
             {"id": "diag",    "tex": r"\mathcal{D}",              "role": "final",        "kind": "set",    "shape": "4",                "desc": "inference embedding diagnostics (4 scalars)",       "sample": "MSE=6e-3, cos=0.98"},
         ]
         steps = [
             {
                 "id": "jep_couple", "title": "Couple pretrained autoencoder", "phase": "A - Couple",
-                "note": "The profile autoencoder is imported from a pretrained run and coupled to the backbone; frozen mode disables its gradients and sets eval, finetune opens a separate optimiser group. Joint training from scratch is rejected, and live/ema targets require a trainable profile AE (live additionally requires the curve anchor).",
+                "note": "The profile autoencoder is imported from a pretrained run and coupled to the backbone; frozen mode disables its gradients and sets eval, finetune opens a separate optimiser group. Joint training from scratch is rejected, and a live target requires a trainable profile AE plus the curve anchor.",
                 "inputs": [], "outputs": ["w"],
                 "lines": [
                     [{"tex": r"(E_\phi, D_\phi) \leftarrow \text{pretrained profile AE},\qquad \mathrm{grad}(\phi) = \big[\texttt{mode}=\texttt{finetune}\big]"}],
@@ -969,10 +968,10 @@ class FlowLibrary:
             },
             {
                 "id": "jep_target", "title": "Target embedding", "phase": "B - Target",
-                "note": "The target embedding is the profile encoder applied to the normalised GT curve. The default stopgrad detaches it (no_grad); live keeps it differentiable through the encoder (requires finetune and the curve anchor to avoid a collapsed constant embedding); ema reads a separate exponential-moving-average copy of the encoder.",
+                "note": "The target embedding is the profile encoder applied to the normalised GT curve. The default stopgrad detaches it (no_grad); live keeps it differentiable through the encoder (requires finetune and the curve anchor to avoid a collapsed constant embedding).",
                 "inputs": ["gtcn"], "outputs": ["zstar"],
                 "lines": [
-                    [{"id": "zstar", "tex": r"\mathbf{z}^{\star}", "role": "calculated"}, {"tex": "="}, {"tex": r"E_\phi\big("}, {"id": "gtcn", "tex": r"\bar{\gamma}", "role": "intermediate"}, {"tex": r"\big)\ \ [\texttt{stopgrad},\texttt{live}],\qquad E^{\mathrm{ema}}_\phi\big(\bar{\gamma}\big)\ \ [\texttt{ema}]"}],
+                    [{"id": "zstar", "tex": r"\mathbf{z}^{\star}", "role": "calculated"}, {"tex": "="}, {"tex": r"E_\phi\big("}, {"id": "gtcn", "tex": r"\bar{\gamma}", "role": "intermediate"}, {"tex": r"\big)"}],
                     [{"tex": r"\texttt{stopgrad}:\ \mathrm{sg}[\mathbf{z}^{\star}];\quad \texttt{live}:\ \partial\mathbf{z}^{\star}/\partial\phi\ \text{kept}"}],
                 ],
             },
@@ -1023,14 +1022,6 @@ class FlowLibrary:
                 ],
             },
             {
-                "id": "jep_ema", "title": "EMA target update", "phase": "D - Optimise",
-                "note": "After each optimiser step, when the target provider is ema (which requires a finetuned profile AE), the target encoder is an exponential moving average of the online encoder with decay 0.996; buffers are copied directly. Stopgrad and frozen skip this update, so the target simply tracks the current encoder.",
-                "inputs": ["w"], "outputs": ["phi"],
-                "lines": [
-                    [{"id": "phi", "tex": r"\phi^{\mathrm{ema}}", "role": "intermediate"}, {"tex": r"\leftarrow"}, {"tex": r"\tau\,"}, {"id": "phi", "tex": r"\phi^{\mathrm{ema}}", "role": "intermediate"}, {"tex": r"\ +\ (1-\tau)\,\phi^{\mathrm{on}},\qquad \tau = 0.996"}],
-                ],
-            },
-            {
                 "id": "jep_checkpoint", "title": "Validation and checkpoint", "phase": "E - Eval",
                 "note": "Validation drives best-epoch checkpointing on strict improvement and early stopping reverts to the best weights after the patience window; the checkpoint stores the backbone and any finetuned autoencoder together so inference can rebuild the coupled predictor.",
                 "inputs": ["w"], "outputs": ["wbest"],
@@ -1050,7 +1041,7 @@ class FlowLibrary:
         ]
         return {
             "key": "jepa_train", "name": "JEPA (Latent train)",
-            "blurb": "Couple a pretrained profile autoencoder (frozen or fine-tuned) to the backbone, predict a per-pixel latent embedding, and match it to the encoder's embedding of the reconstructed ground-truth curve; an MSE embedding term plus a decoder curve-reconstruction anchor are summed and optimised with AdamW, with an optional EMA target and inference-time embedding diagnostics.",
+            "blurb": "Couple a pretrained profile autoencoder (frozen or fine-tuned) to the backbone, predict a per-pixel latent embedding, and match it to the encoder's embedding of the reconstructed ground-truth curve; an MSE embedding term plus a decoder curve-reconstruction anchor are summed and optimised with AdamW, with inference-time embedding diagnostics.",
             "nodes": nodes, "steps": steps,
         }
 

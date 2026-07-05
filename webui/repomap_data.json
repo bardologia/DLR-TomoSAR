@@ -3291,7 +3291,7 @@
               "label": "CouplingMode / TargetProvider",
               "module": "pipelines/jepa/training/coupling.py",
               "role": "transform",
-              "fn": "Freezes or fine-tunes each autoencoder and supplies the target embedding branch (live, stopgrad or EMA) that the backbone is trained to match.",
+              "fn": "Freezes or fine-tunes each autoencoder and supplies the target embedding branch (stopgrad or live) that the backbone is trained to match.",
               "col": 4,
               "reads": [],
               "writes": [],

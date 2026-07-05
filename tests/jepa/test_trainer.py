@@ -45,14 +45,6 @@ def test_validate_coupling_live_requires_finetune():
         Trainer.validate_coupling(frozen, "live", cfg)
 
 
-def test_validate_coupling_ema_requires_finetune():
-    frozen = CouplingMode("frozen", "profile autoencoder")
-    cfg    = EmbeddingLossConfig(use_curve_recon=True)
-
-    with pytest.raises(ValueError):
-        Trainer.validate_coupling(frozen, "ema", cfg)
-
-
 def test_validate_coupling_live_requires_curve_recon():
     finetune = CouplingMode("finetune", "profile autoencoder")
     cfg      = EmbeddingLossConfig(use_curve_recon=False)
@@ -79,7 +71,7 @@ def make_trainer_shim(target_kind="stopgrad", trainable=True):
     profile_normalizer = ProfileNormalizer(ProfileStats(loc=0.0, scale=1.0))
     emb_cfg            = EmbeddingLossConfig(use_embedding_mse=True, weight_embedding_mse=1.0, use_curve_recon=False)
 
-    provider  = TargetProvider(target_kind, module.profile_autoencoder.encoder, decay=0.5)
+    provider  = TargetProvider(target_kind)
     criterion = EmbeddingLoss(module.profile_autoencoder, provider, emb_cfg, x_axis, norm_stats, 3, profile_normalizer)
 
     trainer = Trainer.__new__(Trainer)
@@ -120,29 +112,6 @@ def test_optimizer_step_updates_online_branch():
     after   = list(trainer.model.backbone.parameters())
     changed = any(not torch.allclose(b, a) for b, a in zip(before, after))
     assert changed
-
-
-def test_on_optimizer_step_updates_ema_target():
-    trainer    = make_trainer_shim(target_kind="ema")
-    ema_before = [p.detach().clone() for p in trainer.criterion.target_provider._ema.parameters()]
-
-    with torch.no_grad():
-        for p in trainer.model.profile_autoencoder.encoder.parameters():
-            p.add_(1.0)
-
-    trainer._on_optimizer_step()
-
-    ema_after = list(trainer.criterion.target_provider._ema.parameters())
-    moved     = any(not torch.allclose(b, a) for b, a in zip(ema_before, ema_after))
-    assert moved
-
-
-def test_on_optimizer_step_noop_when_frozen():
-    trainer = make_trainer_shim(target_kind="stopgrad", trainable=False)
-
-    trainer._on_optimizer_step()
-
-    assert trainer.criterion.target_provider._ema is None
 
 
 def test_checkpoint_state_dict_round_trip(tmp_path):

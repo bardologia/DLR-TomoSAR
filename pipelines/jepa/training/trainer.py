@@ -47,11 +47,11 @@ class Trainer(BaseTrainer):
 
     @staticmethod
     def validate_coupling(profile_mode: CouplingMode, target_provider: str, embedding_cfg) -> None:
-        if target_provider in ("live", "ema") and not profile_mode.trainable:
-            raise ValueError(f"target_provider '{target_provider}' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_mode.kind}'.")
+        if target_provider == "live" and not profile_mode.trainable:
+            raise ValueError(f"target_provider 'live' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_mode.kind}'.")
 
         if target_provider == "live" and not embedding_cfg.use_curve_recon:
-            raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'/'ema'.")
+            raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'.")
 
     def _build_param_groups(self):
         param_groups = self.backbone_cfg.get_param_groups(self.model.backbone)
@@ -63,7 +63,7 @@ class Trainer(BaseTrainer):
 
     def _build_criterion(self):
         if self.has_profile:
-            target_provider = TargetProvider(self.config.target_provider, self.model.profile_autoencoder.encoder, self.config.ema_decay).to(self.device)
+            target_provider = TargetProvider(self.config.target_provider)
             return EmbeddingLoss(self.model.profile_autoencoder, target_provider, self.config.embedding_loss, self.x_axis, self.norm_stats, self.gaussian_cfg.params_per_gaussian, self.profile_normalizer)
 
         return ParameterLoss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.config.param_loss, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses)
@@ -74,10 +74,6 @@ class Trainer(BaseTrainer):
             self.model.profile_autoencoder.train()
         if self.has_image and self.image_mode.trainable:
             self.model.image_autoencoder.train()
-
-    def _on_optimizer_step(self):
-        if self.has_profile and self.profile_mode.trainable:
-            self.criterion.target_provider.update(self.model.profile_autoencoder.encoder)
 
     def _compute_loss(self, batch):
         images    = batch[0].to(self.device)

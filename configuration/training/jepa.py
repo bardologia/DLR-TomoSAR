@@ -54,7 +54,6 @@ class JepaTrainerConfig(SharedSubConfigInheritance):
 
     profile_autoencoder_mode       : str        = "frozen"
     target_provider                : str        = "stopgrad"
-    ema_decay                      : float      = 0.996
     profile_autoencoder_checkpoint : str | None = None
 
     ae_finetune_lr : float = 3e-5
