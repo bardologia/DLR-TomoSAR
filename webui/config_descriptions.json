@@ -999,6 +999,16 @@
         "seed": "Random seed for the uniform and gaussian sampling draws, making the trial set reproducible"
       }
     },
+    "training/backbone::LossScaleProbeConfig": {
+      "summary": "Controls the pre-training loss-scale probe that averages every loss term at weight 1.0 over a few batches to suggest balanced weight_* values",
+      "fields": {
+        "enabled": "Master switch for the loss-scale probe; when False the probe is skipped entirely",
+        "n_batches": "Number of training batches averaged per loss term before suggesting weights",
+        "reference": "Loss-term name whose raw mean anchors the suggested weights (suggested = raw(reference)/raw(term)); None normalises each term to 1.0 independently",
+        "exit_after": "Exit the process after emitting the probe report instead of continuing into training",
+        "enabled_losses": "Per-term use_* flag overrides applied during the probe; terms not listed are forced on"
+      }
+    },
     "training/backbone::BackboneTrainerConfig": {
       "summary": "Aggregates the resolved component configs the Trainer consumes for one backbone training run",
       "fields": {
@@ -1734,8 +1744,12 @@
         "profile_autoencoder_logdir": "root directory searched for the named profile_autoencoder_run subdirectory holding the pretrained profile-autoencoder checkpoint and config",
         "profile_autoencoder_run": "name of the pretrained profile-autoencoder run subdirectory to couple into JEPA; None disables the profile-autoencoder branch entirely (an image-autoencoder run must then be configured instead)",
         "profile_autoencoder_mode": "how the pretrained profile autoencoder is trained inside JEPA, frozen or finetune",
+        "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
+        "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
+        "image_autoencoder_mode": "coupling of the loaded image-autoencoder encoder, frozen or finetune; joint from-scratch training is not supported",
         "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
-        "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction"
+        "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
+        "param_loss": "LossConfig for direct Gaussian-parameter regression on the backbone output, used only when profile_autoencoder_run is unset (no embedding-matching branch); defaults to param_l1 with sorted-GT matching, active normalization on, presence_balance off"
       }
     },
     "cross_validation/general::FoldConfig": {
@@ -1779,8 +1793,12 @@
         "profile_autoencoder_logdir": "base directory of pretrained profile-autoencoder runs, joined with profile_autoencoder_run to load that run's best_model.pt as the JEPA profile autoencoder",
         "profile_autoencoder_run": "name of the pretrained profile-autoencoder run under profile_autoencoder_logdir to load; default None makes JEPA fold training raise ValueError since this config has no image-autoencoder alternative to fall back on",
         "profile_autoencoder_mode": "frozen (default) keeps the loaded profile autoencoder's weights fixed, finetune makes them trainable; target_provider live requires finetune, raising ValueError otherwise",
+        "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
+        "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
+        "image_autoencoder_mode": "coupling of the loaded image-autoencoder encoder, frozen or finetune; joint from-scratch training is not supported",
         "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
-        "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction"
+        "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
+        "param_loss": "LossConfig for direct Gaussian-parameter regression on the backbone output, used only when profile_autoencoder_run is unset (no embedding-matching branch); defaults to param_l1 with sorted-GT matching, active normalization on, presence_balance off"
       }
     },
     "cross_validation/profile_autoencoder::AeCvConfig": {
