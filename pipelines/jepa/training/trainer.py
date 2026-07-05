@@ -41,17 +41,20 @@ class Trainer(BaseTrainer):
         self.profile_mode = CouplingMode(config.profile_autoencoder_mode, "profile autoencoder") if self.has_profile else None
         if self.has_profile:
             self.profile_mode.apply(model.profile_autoencoder)
-            self.validate_coupling(self.profile_mode, config.target_provider, config.embedding_loss)
+            self.validate_coupling(self.profile_mode, config.target_provider, config.embedding_loss, model.profile_autoencoder)
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
     @staticmethod
-    def validate_coupling(profile_mode: CouplingMode, target_provider: str, embedding_cfg) -> None:
+    def validate_coupling(profile_mode: CouplingMode, target_provider: str, embedding_cfg, autoencoder) -> None:
         if target_provider == "live" and not profile_mode.trainable:
             raise ValueError(f"target_provider 'live' requires a trainable profile autoencoder (profile_autoencoder_mode 'finetune'), but profile_autoencoder_mode is '{profile_mode.kind}'.")
 
         if target_provider == "live" and not embedding_cfg.use_curve_recon:
             raise ValueError("target_provider 'live' keeps the target branch differentiable, so the embedding-match loss can collapse to a constant embedding; enable embedding_loss.use_curve_recon to anchor it, or use 'stopgrad'.")
+
+        if profile_mode.trainable and autoencoder.embedding_layernorm is not None and not embedding_cfg.use_curve_recon:
+            raise ValueError("profile_autoencoder_mode 'finetune' with embedding_norm 'layernorm' trains the embedding LayerNorm affine on both loss branches, so the embedding-match loss can collapse by driving the affine scale to zero; enable embedding_loss.use_curve_recon to anchor it, or freeze the profile autoencoder.")
 
     def _build_param_groups(self):
         param_groups = self.backbone_cfg.get_param_groups(self.model.backbone)

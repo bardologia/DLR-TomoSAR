@@ -42,7 +42,7 @@ def test_validate_coupling_live_requires_finetune():
     cfg    = EmbeddingLossConfig(use_curve_recon=True)
 
     with pytest.raises(ValueError):
-        Trainer.validate_coupling(frozen, "live", cfg)
+        Trainer.validate_coupling(frozen, "live", cfg, make_autoencoder("none"))
 
 
 def test_validate_coupling_live_requires_curve_recon():
@@ -50,14 +50,43 @@ def test_validate_coupling_live_requires_curve_recon():
     cfg      = EmbeddingLossConfig(use_curve_recon=False)
 
     with pytest.raises(ValueError):
-        Trainer.validate_coupling(finetune, "live", cfg)
+        Trainer.validate_coupling(finetune, "live", cfg, make_autoencoder("none"))
 
 
 def test_validate_coupling_stopgrad_frozen_is_valid():
     frozen = CouplingMode("frozen", "profile autoencoder")
     cfg    = EmbeddingLossConfig(use_curve_recon=True)
 
-    Trainer.validate_coupling(frozen, "stopgrad", cfg)
+    Trainer.validate_coupling(frozen, "stopgrad", cfg, make_autoencoder("none"))
+
+
+def test_validate_coupling_finetune_layernorm_requires_curve_recon():
+    finetune = CouplingMode("finetune", "profile autoencoder")
+    cfg      = EmbeddingLossConfig(use_curve_recon=False)
+
+    with pytest.raises(ValueError, match="LayerNorm"):
+        Trainer.validate_coupling(finetune, "stopgrad", cfg, make_autoencoder("layernorm"))
+
+
+def test_validate_coupling_finetune_layernorm_valid_with_curve_recon():
+    finetune = CouplingMode("finetune", "profile autoencoder")
+    cfg      = EmbeddingLossConfig(use_curve_recon=True)
+
+    Trainer.validate_coupling(finetune, "stopgrad", cfg, make_autoencoder("layernorm"))
+
+
+def test_validate_coupling_frozen_layernorm_valid_without_curve_recon():
+    frozen = CouplingMode("frozen", "profile autoencoder")
+    cfg    = EmbeddingLossConfig(use_curve_recon=False)
+
+    Trainer.validate_coupling(frozen, "stopgrad", cfg, make_autoencoder("layernorm"))
+
+
+def test_validate_coupling_finetune_parameterless_norm_valid_without_curve_recon():
+    finetune = CouplingMode("finetune", "profile autoencoder")
+    cfg      = EmbeddingLossConfig(use_curve_recon=False)
+
+    Trainer.validate_coupling(finetune, "stopgrad", cfg, make_autoencoder("l2"))
 
 
 def make_trainer_shim(target_kind="stopgrad", trainable=True):
