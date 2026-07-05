@@ -50,7 +50,7 @@ class WidthScaler:
             "u2net"               : feature_rules,
             "pixel_mlp"           : feature_rules,
             "local_cnn"           : feature_rules,
-            "nafnet"              : [WidthRule(attribute="width", divisor=8)],
+            "nafnet"              : [WidthRule(attribute="width", divisor=1)],
         }
 
         self._enforce_locked()
