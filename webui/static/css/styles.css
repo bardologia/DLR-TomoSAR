@@ -3463,17 +3463,17 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .rm__stage { border-top: 1px solid var(--line); display: flex; align-items: stretch; }
 .rm-graph {
   flex: 1; min-width: 0;
-  min-height: 56vh; max-height: 82vh; overflow: auto;
+  min-height: 64vh; max-height: 90vh; overflow: auto;
   background:
     radial-gradient(circle at 1px 1px, rgba(70,80,70,0.09) 1px, transparent 0) 0 0 / 24px 24px,
     #f7f8f5;
 }
 .rm-canvas { position: relative; width: 100%; }
 .rm-cols {
-  display: grid; width: 100%; min-height: 52vh; box-sizing: border-box;
-  grid-template-columns: repeat(var(--ncol, 4), minmax(166px, 1fr));
-  grid-template-rows: repeat(var(--nrow, 3), minmax(104px, 1fr));
-  gap: 16px 30px; padding: 24px 30px;
+  display: grid; width: 100%; min-height: 62vh; box-sizing: border-box;
+  grid-template-columns: repeat(var(--ncol, 4), minmax(210px, 1fr));
+  grid-template-rows: repeat(var(--nrow, 3), minmax(150px, 1fr));
+  gap: 46px 64px; padding: 40px 48px;
 }
 
 /* ---- Orthogonal wires ---- */
@@ -3568,6 +3568,6 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
   .rm__title { flex-direction: column; gap: 10px; }
   .rm__stage { flex-direction: column; }
   .rm__legend { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; align-self: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 12px 18px; }
-  .rm-cols { gap: 14px 20px; padding: 20px; }
+  .rm-cols { gap: 26px 30px; padding: 24px; }
   .rm-node { max-width: 190px; }
 }
