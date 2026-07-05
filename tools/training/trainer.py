@@ -180,7 +180,7 @@ class BaseTrainer:
             fetch_start = time.perf_counter()
             for batch_idx, batch in enumerate(loader):
                 data_wait    += time.perf_counter() - fetch_start
-                sample_count += len(batch[0])
+                sample_count += batch.shape[0] if isinstance(batch, torch.Tensor) else len(batch[0])
 
                 self._update_optimizer(self.lr_scheduler.effective_lrs())
 
