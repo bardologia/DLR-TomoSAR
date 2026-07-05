@@ -329,6 +329,24 @@ class GaussianHeadsMixin:
         out = torch.stack(head_outputs, dim=1)
         return out.view(B, self.n_gaussians * self.n_params, H, W)
 
+    def _build_set_prediction_heads(self) -> None:
+        self._build_per_gaussian_heads()
+        self.existence_head = PixelMLP(self.embedding_channels, self.hidden_channels, self.n_gaussians, self.config.activation)
+        self.amp_off        = nn.Parameter(torch.zeros(self.n_gaussians))
+
+    def _set_prediction_forward(self, embedding: torch.Tensor) -> torch.Tensor:
+        head_outputs = [head(embedding) for head in self.gaussian_heads]
+        gate         = torch.sigmoid(self.existence_head(embedding))
+
+        B, _, H, W = head_outputs[0].shape
+        out = torch.stack(head_outputs, dim=1)
+
+        off = self.amp_off.view(1, self.n_gaussians, 1, 1)
+        amp = gate * out[:, :, 0] + (1.0 - gate) * off
+        out = torch.cat([amp[:, :, None], out[:, :, 1:]], dim=2)
+
+        return out.reshape(B, self.n_gaussians * self.n_params, H, W)
+
 
 class Encoder(nn.Module):
     def __init__(

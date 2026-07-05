@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig
+from configuration.architectures import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetSetPredConfig
 from ..blocks                          import initialize_weights
 from ..blocks                          import ConvBlock, Decoder, Encoder, GaussianHeadsMixin
 
@@ -95,3 +95,15 @@ class UNetPerGaussian(UNetBackbone):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self._per_gaussian_forward(self.encode_decode(x))
+
+
+class UNetSetPred(UNetBackbone):
+    def __init__(self, config: UNetSetPredConfig | None = None):
+        super().__init__(config if config is not None else UNetSetPredConfig())
+        self._resolve_gaussian_layout()
+        self._build_set_prediction_heads()
+
+        initialize_weights(module=self, mode=self.config.init_mode)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._set_prediction_forward(self.encode_decode(x))

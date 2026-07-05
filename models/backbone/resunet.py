@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, UNetSkipConfig
+from configuration.architectures import ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, ResUNetSetPredConfig, UNetSkipConfig
 from ..blocks                          import build_upsample, initialize_weights
 from ..blocks                          import GaussianHeadsMixin, ResidualConvBlock, match_spatial_size
 
@@ -146,6 +146,18 @@ class ResUNetPerGaussian(ResUNetBackbone):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self._per_gaussian_forward(self.encode_decode(x))
+
+
+class ResUNetSetPred(ResUNetBackbone):
+    def __init__(self, config: ResUNetSetPredConfig | None = None):
+        super().__init__(config if config is not None else ResUNetSetPredConfig())
+        self._resolve_gaussian_layout()
+        self._build_set_prediction_heads()
+
+        initialize_weights(module=self, mode=self.config.init_mode)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._set_prediction_forward(self.encode_decode(x))
 
 
 class UNetSkip(ResUNetBackbone):

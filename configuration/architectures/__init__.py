@@ -23,6 +23,8 @@ from configuration.architectures.backbone import (
     PixelMLPNetConfig,
     LocalCNNConfig,
     NAFNetConfig,
+    UNetSetPredConfig,
+    ResUNetSetPredConfig,
 )
 from configuration.architectures.image_autoencoder import (
     ImageAutoencoderBaseConfig,

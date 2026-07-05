@@ -1,8 +1,8 @@
-from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, LocalCNNConfig, MultiResUNetConfig, NAFNetConfig, PixelMLPNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSkipConfig
+from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, LocalCNNConfig, MultiResUNetConfig, NAFNetConfig, PixelMLPNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, ResUNetSetPredConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSetPredConfig, UNetSkipConfig
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from ..registry     import RegistryFactory
-from .unet          import UNet, UNetMultiHead, UNetPerGaussian
-from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, UNetSkip
+from .unet          import UNet, UNetMultiHead, UNetPerGaussian, UNetSetPred
+from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, ResUNetSetPred, UNetSkip
 from .attention_unet import AttentionUNet
 from .unet_plus_plus  import UNetPlusPlus
 from .link_net        import LinkNet
@@ -24,10 +24,12 @@ BACKBONE_MODEL_REGISTRY: dict[str, type] = {
     "unet"                : UNet,
     "unet_multihead"      : UNetMultiHead,
     "unet_pergaussian"    : UNetPerGaussian,
+    "unet_setpred"        : UNetSetPred,
     "unet_skip"           : UNetSkip,
     "resunet"             : ResUNet,
     "resunet_multihead"   : ResUNetMultiHead,
     "resunet_pergaussian" : ResUNetPerGaussian,
+    "resunet_setpred"     : ResUNetSetPred,
     "attention_unet"      : AttentionUNet,
     "unetplusplus"        : UNetPlusPlus,
     "linknet"             : LinkNet,
@@ -51,10 +53,12 @@ BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
     "unet"                : UNetConfig,
     "unet_multihead"      : UNetMultiHeadConfig,
     "unet_pergaussian"    : UNetPerGaussianConfig,
+    "unet_setpred"        : UNetSetPredConfig,
     "unet_skip"           : UNetSkipConfig,
     "resunet"             : ResUNetConfig,
     "resunet_multihead"   : ResUNetMultiHeadConfig,
     "resunet_pergaussian" : ResUNetPerGaussianConfig,
+    "resunet_setpred"     : ResUNetSetPredConfig,
     "attention_unet"      : AttentionUNetConfig,
     "unetplusplus"        : UNetPlusPlusConfig,
     "linknet"             : LinkNetConfig,
@@ -85,10 +89,12 @@ __all__ = [
     "UNet",
     "UNetMultiHead",
     "UNetPerGaussian",
+    "UNetSetPred",
     "UNetSkip",
     "ResUNet",
     "ResUNetMultiHead",
     "ResUNetPerGaussian",
+    "ResUNetSetPred",
     "AttentionUNet",
     "UNetPlusPlus",
     "LinkNet",
@@ -109,10 +115,12 @@ __all__ = [
     "UNetConfig",
     "UNetMultiHeadConfig",
     "UNetPerGaussianConfig",
+    "UNetSetPredConfig",
     "UNetSkipConfig",
     "ResUNetConfig",
     "ResUNetMultiHeadConfig",
     "ResUNetPerGaussianConfig",
+    "ResUNetSetPredConfig",
     "AttentionUNetConfig",
     "UNetPlusPlusConfig",
     "LinkNetConfig",

@@ -388,6 +388,31 @@
         "shape_logger_types": "Tuple of nn.Module classes (conv, pool, norm, activation) whose per-layer output shapes are captured by the forward-hook model-documentation trace run once per training run on a real batch"
       }
     },
+    "architectures/backbone::UNetSetPredConfig": {
+      "summary": "UNet backbone with set-prediction heads: per-Gaussian PixelMLP heads plus an existence-logit head whose sigmoid gate blends each slot's amplitude toward a learned per-slot off level, giving the network an explicit slot on/off mechanism against Gaussian slot collapse; pairs with hungarian param_matching",
+      "fields": {
+        "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
+        "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
+        "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
+        "features": "Per-level encoder channel widths, one entry per resolution stage, ascending order by convention; default [64, 128, 256, 512]",
+        "bottleneck_factor": "Multiplier on the deepest feature width for the bottleneck stage",
+        "dropout": "Dropout2d probability inside each conv block; 0 disables dropout",
+        "activation": "Activation function used throughout the backbone and heads (relu, leaky_relu, gelu, elu, silu)",
+        "normalization": "Normalization layer inserted after every convolution (batch, instance, group, none)",
+        "upsample_mode": "Decoder upsampling operator: learned transposed convolution or bilinear interpolation + 1x1 conv",
+        "conv_bias": "Whether backbone convolutions carry a bias term; kept off by default because each convolution is followed by a normalization layer",
+        "init_mode": "Weight initialization scheme (default = PyTorch native, kaiming, xavier)",
+        "encoder_lr": "AdamW learning rate for the encoder parameter group",
+        "bottleneck_lr": "AdamW learning rate for the bottleneck parameter group",
+        "decoder_lr": "AdamW learning rate for the decoder parameter group",
+        "heads_lr": "AdamW learning rate for the per-Gaussian heads, the existence-logit head, and the learned per-slot off levels",
+        "encoder_wd": "Weight decay for the encoder parameter group",
+        "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+        "decoder_wd": "Weight decay for the decoder parameter group",
+        "heads_wd": "Weight decay for the heads parameter group",
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
+      }
+    },
     "architectures/backbone::ResUNetConfig": {
       "summary": "Residual-block U-Net backbone predicting per-pixel Gaussian mixture parameters over the elevation profile",
       "fields": {
@@ -646,6 +671,31 @@
         "decoder_wd": "weight decay for the decoder parameter group, tuned log-uniform over 1e-6..1e-1",
         "heads_wd": "weight decay for the per-Gaussian output-heads group",
         "shape_logger_types": "tuple of nn.Module classes whose forward output shapes are captured by the ModelInspector shape trace when training documentation is emitted"
+      }
+    },
+    "architectures/backbone::ResUNetSetPredConfig": {
+      "summary": "ResUNet (stride-2 residual) backbone with set-prediction heads: per-Gaussian PixelMLP heads plus an existence-logit head whose sigmoid gate blends each slot's amplitude toward a learned per-slot off level, giving the network an explicit slot on/off mechanism against Gaussian slot collapse; pairs with hungarian param_matching",
+      "fields": {
+        "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
+        "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
+        "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
+        "features": "Per-level encoder channel widths, one entry per resolution stage, ascending order by convention; default [64, 128, 256, 512]",
+        "bottleneck_factor": "Multiplier on the deepest feature width for the bottleneck stage",
+        "dropout": "Dropout2d probability inside each conv block; 0 disables dropout",
+        "activation": "Activation function used throughout the backbone and heads (relu, leaky_relu, gelu, elu, silu)",
+        "normalization": "Normalization layer inserted after every convolution (batch, instance, group, none)",
+        "upsample_mode": "Decoder upsampling operator: learned transposed convolution or bilinear interpolation + 1x1 conv",
+        "conv_bias": "Whether backbone convolutions carry a bias term; kept off by default because each convolution is followed by a normalization layer",
+        "init_mode": "Weight initialization scheme (default = PyTorch native, kaiming, xavier)",
+        "encoder_lr": "AdamW learning rate for the encoder parameter group",
+        "bottleneck_lr": "AdamW learning rate for the bottleneck parameter group",
+        "decoder_lr": "AdamW learning rate for the decoder parameter group",
+        "heads_lr": "AdamW learning rate for the per-Gaussian heads, the existence-logit head, and the learned per-slot off levels",
+        "encoder_wd": "Weight decay for the encoder parameter group",
+        "bottleneck_wd": "Weight decay for the bottleneck parameter group",
+        "decoder_wd": "Weight decay for the decoder parameter group",
+        "heads_wd": "Weight decay for the heads parameter group",
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
       }
     },
     "architectures/backbone::DeepLabV3PlusConfig": {
