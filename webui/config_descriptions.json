@@ -1774,7 +1774,7 @@
       "fields": {
         "profile_autoencoder_logdir": "base directory of pretrained profile-autoencoder runs, joined with profile_autoencoder_run to load that run's best_model.pt as the JEPA profile autoencoder",
         "profile_autoencoder_run": "name of the pretrained profile-autoencoder run under profile_autoencoder_logdir to load; default None makes JEPA fold training raise ValueError since this config has no image-autoencoder alternative to fall back on",
-        "profile_autoencoder_mode": "frozen (default) keeps the loaded profile autoencoder's weights fixed, finetune makes them trainable; target_provider live or ema requires finetune, raising ValueError otherwise",
+        "profile_autoencoder_mode": "frozen (default) keeps the loaded profile autoencoder's weights fixed, finetune makes them trainable; target_provider live requires finetune, raising ValueError otherwise",
         "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
         "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction"
       }

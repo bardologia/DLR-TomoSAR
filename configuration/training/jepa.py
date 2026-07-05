@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.training.general.run               import TrainingPathsConfig, TrainingQueueConfig
-from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
+from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig
 from configuration.dataset                            import AugmentationConfig
 from configuration.normalization.general              import NormalizationConfig
 from configuration.architectures.image_autoencoder    import ImageAutoencoderBaseConfig
