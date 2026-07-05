@@ -35,10 +35,20 @@
       "num_keys": 152,
       "num_parameters": 31013830
     },
+    "local_cnn": {
+      "signature": "7952dbb9c0fca31d482dce1efe3a560a1d16145a4a7a9b980b3dc70462c776b4",
+      "num_keys": 38,
+      "num_parameters": 2956038
+    },
     "multires_unet": {
       "signature": "8cec14f9728bc829dea3a3b96017ef185db0f0fb8a117668122c1a30c33a19a9",
       "num_keys": 391,
       "num_parameters": 14353291
+    },
+    "pixel_mlp": {
+      "signature": "b2e4541ba1faa3b53e81c25509e79cdb32f3afde619d584f487d800b34c3866a",
+      "num_keys": 26,
+      "num_parameters": 3161094
     },
     "resunet": {
       "signature": "35b6c81e5144a70347ebe98d2bdf3f11ddf1e861343bb1d1f77f1f06ed49ddfd",
