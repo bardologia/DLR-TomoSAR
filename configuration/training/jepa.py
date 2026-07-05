@@ -106,10 +106,14 @@ class JepaEntryConfig:
     profile_autoencoder_run    : str | None  = None
     profile_autoencoder_mode   : str         = "frozen"
     target_provider            : str         = "stopgrad"
+    ae_finetune_lr             : float       = 3e-5
+    ae_finetune_wd             : float       = 1e-4
 
     image_autoencoder_logdir : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/image_autoencoder")
     image_autoencoder_run    : str | None  = None
     image_autoencoder_mode   : str         = "frozen"
+    image_ae_finetune_lr     : float       = 3e-5
+    image_ae_finetune_wd     : float       = 1e-4
 
     embedding_loss : EmbeddingLossConfig = field(default_factory=EmbeddingLossConfig)
     param_loss     : LossConfig          = field(default_factory=default_param_loss)

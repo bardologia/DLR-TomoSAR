@@ -184,10 +184,10 @@
       "fields": {
         "enabled": "Gates only the floor/ceil clamp applied when decompressing log1p output channels (out/amp, out/sigma by default); the amp/mu/sigma physical-range clamp in GaussianClamp always applies regardless, default True",
         "floor": "Lower bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when enabled is True, default 0.0",
-        "ceil": "Upper bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when enabled is True, default 1000.0",
+        "ceil": "Upper bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when enabled is True, default 200.0",
         "leaky_slope": "Leak slope of the normalization decompress/compress clamps in the loss path so gradients survive saturation, default 0.1",
         "param_leaky_slope": "Leak slope of the GaussianClamp physical parameter-bounds clamp, kept separate from leaky_slope so the stacked below-floor gradient (leaky_slope squared times param_leaky_slope) stays controllable, default 0.1",
-        "amp_max": "Physical amplitude ceiling applied by GaussianClamp in the loss path and at inference, default 1000.0"
+        "amp_max": "Physical amplitude ceiling applied by GaussianClamp in the loss path and at inference, default 200.0"
       }
     },
     "normalization/general::NormalizationConfig": {
@@ -205,10 +205,10 @@
         "dem": "Override preset for the DEM elevation channel; default keeps the input_strategy/per_slot choice",
         "clamp_output": "Gates only the clamp_floor/clamp_ceil bound applied when decompressing log1p output channels (out/amp, out/sigma by default); the GaussianClamp amp/mu/sigma physical-range clamp always applies regardless, default True",
         "clamp_floor": "Lower bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when clamp_output is True, default 0.0",
-        "clamp_ceil": "Upper bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when clamp_output is True, default 1000.0",
+        "clamp_ceil": "Upper bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when clamp_output is True, default 200.0",
         "clamp_leaky_slope": "Leak slope of the normalization decompress/compress clamps in the loss path (denormalize floor/ceil, renormalize floor) so gradients survive saturation; inference always hard-clamps; default 0.1",
         "param_clamp_leaky_slope": "Leak slope of the Gaussian physical parameter-bounds clamp in the loss path, separate from clamp_leaky_slope so the stacked below-floor gradient (clamp_leaky_slope squared times param_clamp_leaky_slope) stays controllable, default 0.1",
-        "amp_max": "Physical amplitude ceiling of the Gaussian parameter clamp, applied in the loss and at inference, default 1000.0"
+        "amp_max": "Physical amplitude ceiling of the Gaussian parameter clamp, applied in the loss and at inference, default 200.0"
       }
     },
     "normalization/general::ChannelStats": {
@@ -1402,9 +1402,13 @@
         "profile_autoencoder_run": "Name of the specific pretrained profile-autoencoder run to load; None selects the latest",
         "profile_autoencoder_mode": "How the pretrained profile autoencoder is coupled into JEPA training: frozen or finetune",
         "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "ae_finetune_lr": "Learning rate of the profile-autoencoder optimiser group, applied only when profile_autoencoder_mode is finetune",
+        "ae_finetune_wd": "Weight decay of the profile-autoencoder optimiser group, applied only when profile_autoencoder_mode is finetune",
         "image_autoencoder_logdir": "Directory containing pretrained image-autoencoder runs from which the JEPA image encoder checkpoint is loaded",
         "image_autoencoder_run": "Name of the specific pretrained image-autoencoder run to load; None selects the latest",
         "image_autoencoder_mode": "How the pretrained image autoencoder is coupled into JEPA training: frozen or finetune",
+        "image_ae_finetune_lr": "Learning rate of the image-autoencoder optimiser group, applied only when image_autoencoder_mode is finetune",
+        "image_ae_finetune_wd": "Weight decay of the image-autoencoder optimiser group, applied only when image_autoencoder_mode is finetune",
         "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
         "param_loss": "LossConfig on predicted Gaussian parameters, defaulting to param_l1 weight 1.0 with sorted-GT matching and active normalization",
         "geometry": "GeometryConfig sub-config supplying SAR acquisition geometry (wavelength, slant range, look angle, baselines/kz) used to synthesize tomographic profiles for physics losses",

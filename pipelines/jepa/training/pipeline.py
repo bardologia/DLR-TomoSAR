@@ -61,9 +61,13 @@ class TrainingPipeline:
             profile_autoencoder_mode       = entry_config.profile_autoencoder_mode,
             target_provider                = entry_config.target_provider,
             profile_autoencoder_checkpoint = profile_checkpoint,
+            ae_finetune_lr                 = entry_config.ae_finetune_lr,
+            ae_finetune_wd                 = entry_config.ae_finetune_wd,
             image_autoencoder              = self.image_ae_cfg,
             image_autoencoder_mode         = entry_config.image_autoencoder_mode,
             image_autoencoder_checkpoint   = image_checkpoint,
+            image_ae_finetune_lr           = entry_config.image_ae_finetune_lr,
+            image_ae_finetune_wd           = entry_config.image_ae_finetune_wd,
             param_loss                     = entry_config.param_loss,
         )
         self.trainer_config.inherit_shared_from(base)
