@@ -367,9 +367,6 @@ class RepoMapView {
     // side faces with a jog through the narrow column gap, nor two top/bottom faces through the row
     // gap. Straight lines and blocked side routes claim their faces first; each diagonal then picks
     // the elbow whose faces are still free of the opposite direction, keeping every side one-way.
-    const AV = 22;
-    const nodeBoxes = this.diagram.nodes.map((n) => box(n.id)).filter(Boolean);
-
     // The grid leaves a card-free lane between every pair of adjacent columns and rows. A wire that
     // would otherwise run straight through an intervening card is re-routed as a "staple" that travels
     // those lanes only. Lane positions are derived from the actual card boxes so uneven card heights
@@ -414,52 +411,20 @@ class RepoMapView {
       }
       return false;
     };
-    const hgOf = (r) => (r.a.row !== r.b.row) ? (r.b.row > r.a.row ? hGutT(r.b.row) : hGutB(r.b.row))
-                                              : (rowHasBelow(r.a.row) ? hGutB(r.a.row) : hGutT(r.a.row));
-    const stapleH = (r) => {                                    // column-spanning bypass through a row lane
-      const right = r.b.col > r.a.col;
-      const ax = right ? r.a.x + r.a.w : r.a.x, bx = right ? r.b.x : r.b.x + r.b.w;
-      const gA = (right ? vGutR(r.a.col) : vGutL(r.a.col)) + r.lane * 8;
-      const gB = (right ? vGutL(r.b.col) : vGutR(r.b.col)) + r.lane * 8;
-      const ay = (r.fa === "L" || r.fa === "R") ? r.pa.y : r.acy;
-      const by = (r.fb === "L" || r.fb === "R") ? r.pb.y : r.bcy;
-      const hg = r.hg + r.lane * 11;
-      return { d: `M ${ax} ${ay} H ${gA} V ${hg} H ${gB} V ${by} H ${bx}`, mx: (gA + gB) / 2, my: hg };
-    };
-    const stapleV = (r) => {                                    // row-spanning bypass through a column lane
-      const down = r.b.row > r.a.row;
-      const ay = down ? r.a.y + r.a.h : r.a.y, by = down ? r.b.y : r.b.y + r.b.h;
-      const ax = (r.fa === "T" || r.fa === "B") ? r.pa.x : r.acx;
-      const bx = (r.fb === "T" || r.fb === "B") ? r.pb.x : r.bcx;
-      const gx = r.gx + r.lane * 11;
-      const gy1 = (down ? hGutB(r.a.row) : hGutT(r.a.row)) + r.lane * 8, gy2 = (down ? hGutT(r.b.row) : hGutB(r.b.row)) + r.lane * 8;
-      return { d: `M ${ax} ${ay} V ${gy1} H ${gx} V ${gy2} H ${bx} V ${by}`, mx: gx, my: (r.acy + r.bcy) / 2 };
-    };
-
-    const usage = {};
-    const bump = (id, f, dir) => { const k = id + "|" + f; (usage[k] = usage[k] || { out: 0, in: 0 })[dir]++; };
-    const clearOpp = (id, f, dir) => { const u = usage[id + "|" + f]; return !u || u[dir === "out" ? "in" : "out"] === 0; };
+    const fcx = (bx, f) => f === "R" ? bx.x + bx.w : f === "L" ? bx.x : bx.x + bx.w / 2;
+    const fcy = (bx, f) => f === "B" ? bx.y + bx.h : f === "T" ? bx.y : bx.y + bx.h / 2;
+    const manhattan = (pa, pb) => Math.abs(pa.x - pb.x) + Math.abs(pa.y - pb.y);
+    const pathFor = (type, fa, pa, pb) =>
+      type === "straight" ? `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`
+    : (fa === "L" || fa === "R") ? `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`
+    :                              `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`;
 
     const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
       if (!a || !b) return;
-      const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
-      const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
-      const dx  = bcx - acx, dy = bcy - acy;
-      const between = (vertical) => nodeBoxes.some((o) => {
-        const ocx = o.x + o.w / 2, ocy = o.y + o.h / 2;
-        return vertical
-          ? (Math.abs(ocx - acx) <= o.w / 2 && ocy > Math.min(acy, bcy) + 1 && ocy < Math.max(acy, bcy) - 1)
-          : (Math.abs(ocy - acy) <= o.h / 2 && ocx > Math.min(acx, bcx) + 1 && ocx < Math.max(acx, bcx) - 1);
-      });
-      const sameRow = Math.abs(dy) <= AV, sameCol = Math.abs(dx) <= AV;
-      const r = { e, a, b, acx, acy, bcx, bcy, dx, dy, bend: 0, aligned: false, cat: "diag", fa: null, fb: null };
-      if      (sameRow && !between(false)) { r.aligned = true; r.cat = "line"; r.fa = dx >= 0 ? "R" : "L"; r.fb = dx >= 0 ? "L" : "R"; }
-      else if (sameCol && !between(true))  { r.aligned = true; r.cat = "line"; r.fa = dy >= 0 ? "B" : "T"; r.fb = dy >= 0 ? "T" : "B"; }
-      else if (sameRow)                    { r.cat = "side"; r.fa = dx >= 0 ? "R" : "L"; r.fb = dx >= 0 ? "L" : "R"; }
-      else if (sameCol)                    { r.cat = "side"; r.fa = dy >= 0 ? "B" : "T"; r.fb = dy >= 0 ? "T" : "B"; }
-      recs.push(r);
+      const acx = a.x + a.w / 2, acy = a.y + a.h / 2, bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+      recs.push({ e, a, b, acx, acy, bcx, bcy, dCol: b.col - a.col, dRow: b.row - a.row, lane: 0 });
     });
 
     // A -> B and B -> A drawn between the same faces land on top of each other and read as one doubled
@@ -468,68 +433,45 @@ class RepoMapView {
     recs.forEach((r) => { havePair[r.e.from + " " + r.e.to] = true; });
     recs.forEach((r) => { if (havePair[r.e.to + " " + r.e.from]) r.recip = (String(r.e.from) < String(r.e.to)) ? -1 : 1; });
 
-    recs.forEach((r) => { if (r.cat !== "diag") { bump(r.e.from, r.fa, "out"); bump(r.e.to, r.fb, "in"); } });
+    // Choose the route with the fewest bends that clears every other card; among equals prefer the
+    // shortest arrow. A straight join (0 bends) or a single elbow covers everything except genuine skip
+    // links -- same row or column with a card between the ends -- which take one detour bend through a
+    // card-free gutter lane. Faces are fixed here; the exact attach slot is shared out below.
     recs.forEach((r) => {
-      if (r.cat !== "diag") return;
-      const fx = r.dx >= 0 ? "R" : "L", tx = r.dx >= 0 ? "L" : "R";
-      const fy = r.dy >= 0 ? "B" : "T", ty = r.dy >= 0 ? "T" : "B";
-      const opts = Math.abs(r.dx) >= Math.abs(r.dy) ? [[fx, ty], [fy, tx]] : [[fy, tx], [fx, ty]];
-      let pick = null;
-      for (const [fa, fb] of opts) { if (clearOpp(r.e.from, fa, "out") && clearOpp(r.e.to, fb, "in")) { pick = [fa, fb]; break; } }
-      if (!pick) pick = r.dx >= 0 ? ["R", "L"] : ["L", "R"];
-      r.fa = pick[0]; r.fb = pick[1];
-      bump(r.e.from, r.fa, "out"); bump(r.e.to, r.fb, "in");
+      const sameRow = r.dRow === 0, sameCol = r.dCol === 0, cands = [];
+      const add = (type, fa, fb) => {
+        const pa = { x: fcx(r.a, fa), y: fcy(r.a, fa) }, pb = { x: fcx(r.b, fb), y: fcy(r.b, fb) };
+        cands.push({ type, fa, fb, elbows: type === "straight" ? 0 : 1, len: manhattan(pa, pb), clear: !hitsCard(pathFor(type, fa, pa, pb), r.e.from, r.e.to) });
+      };
+      if (sameRow) add("straight", r.dCol >= 0 ? "R" : "L", r.dCol >= 0 ? "L" : "R");
+      if (sameCol) add("straight", r.dRow >= 0 ? "B" : "T", r.dRow >= 0 ? "T" : "B");
+      if (!sameRow && !sameCol) {
+        add("L", r.dCol >= 0 ? "R" : "L", r.dRow >= 0 ? "T" : "B");
+        add("L", r.dRow >= 0 ? "B" : "T", r.dCol >= 0 ? "L" : "R");
+      }
+      const clear = cands.filter((c) => c.clear).sort((p, q) => (p.elbows - q.elbows) || (p.len - q.len));
+      if (clear.length) { r.type = clear[0].type; r.fa = clear[0].fa; r.fb = clear[0].fb; r.aligned = r.type === "straight"; return; }
+
+      r.aligned = false;
+      if (Math.abs(r.dRow) >= Math.abs(r.dCol)) {                  // long run is vertical: use a column gutter
+        r.type = "Uv";
+        if (r.dCol === 0) { r.fa = "R"; r.fb = "R"; r.gut = vGutR(r.a.col); }
+        else { r.fa = r.dCol > 0 ? "R" : "L"; r.fb = r.dCol > 0 ? "L" : "R"; r.gut = r.dCol > 0 ? vGutR(r.a.col) : vGutL(r.a.col); }
+      } else {                                                     // long run is horizontal: use a row gutter
+        r.type = "U";
+        if (r.dRow === 0) { const below = rowHasBelow(r.a.row); r.fa = r.fb = below ? "B" : "T"; r.gut = below ? hGutB(r.a.row) : hGutT(r.a.row); }
+        else { r.fa = r.dRow > 0 ? "B" : "T"; r.fb = r.dRow > 0 ? "T" : "B"; r.gut = r.dRow > 0 ? hGutB(r.a.row) : hGutT(r.a.row); }
+      }
     });
 
-    // Keep each face one-directional: if a face carries both entering and leaving wires, move the
-    // movable (non-straight) minority onto an empty or same-direction face that points its way.
-    const NB = { R: [1, 0], L: [-1, 0], B: [0, 1], T: [0, -1] };
-    const faceDir = {};                    // "id|face" -> { out: [recs], in: [recs] }
-    const reg = (id, f, r, dir) => { const k = id + "|" + f; (faceDir[k] = faceDir[k] || { out: [], in: [] })[dir].push(r); };
-    recs.forEach((r) => { reg(r.e.from, r.fa, r, "out"); reg(r.e.to, r.fb, r, "in"); });
-    this.diagram.nodes.forEach((n) => {
-      const id = n.id;
-      ["R", "L", "T", "B"].forEach((f) => {
-        const dd = faceDir[id + "|" + f];
-        if (!dd || !dd.out.length || !dd.in.length) return;         // absent or not mixed
-        const outMovable = dd.out.every((r) => !r.aligned), inMovable = dd.in.every((r) => !r.aligned);
-        let dir = (outMovable && inMovable) ? (dd.out.length <= dd.in.length ? "out" : "in")
-                : outMovable ? "out" : inMovable ? "in" : null;
-        if (!dir) return;
-        const opp = dir === "out" ? "in" : "out";
-        dd[dir].slice().forEach((r) => {
-          const self = dir === "out" ? r.a : r.b, other = dir === "out" ? r.b : r.a;
-          const vx = (other.x + other.w / 2) - (self.x + self.w / 2), vy = (other.y + other.h / 2) - (self.y + self.h / 2);
-          let best = null, bestDot = 0.01;
-          ["R", "L", "T", "B"].forEach((cf) => {
-            if (cf === f) return;
-            const cd = faceDir[id + "|" + cf];
-            if (cd && (!cd[dir].length || cd[opp].length)) return;  // occupied by the opposite direction
-            const dot = NB[cf][0] * vx + NB[cf][1] * vy;
-            if (dot > bestDot) { bestDot = dot; best = cf; }
-          });
-          if (!best) return;
-          faceDir[id + "|" + f][dir] = faceDir[id + "|" + f][dir].filter((x) => x !== r);
-          reg(id, best, r, dir);
-          if (dir === "out") r.fa = best; else r.fb = best;
-        });
-      });
-    });
-
-    // Straight wires attach at the exact middle of their facing sides. Every other wire gets a
-    // distinct slot along its face, sorted by the opposite endpoint so the fan stays
-    // crossing-free; a face that carries a straight wire keeps its middle free for it.
-    const faceCenter = (bx, f) =>
-      f === "R" ? { x: bx.x + bx.w,     y: bx.y + bx.h / 2 } :
-      f === "L" ? { x: bx.x,            y: bx.y + bx.h / 2 } :
-      f === "B" ? { x: bx.x + bx.w / 2, y: bx.y + bx.h }     :
-                  { x: bx.x + bx.w / 2, y: bx.y };
+    // Give every wire on a card face its own attach point, ordered by the far end so the fan stays
+    // crossing-free and no two arrows ever share a point; a straight join keeps the exact face centre.
     const groups = {}, reserved = {};
     const push = (id, face, item) => { (groups[id + "|" + face] = groups[id + "|" + face] || []).push(item); };
     recs.forEach((r) => {
       if (r.aligned) {
-        r.pa = faceCenter(r.a, r.fa);
-        r.pb = faceCenter(r.b, r.fb);
+        r.pa = { x: fcx(r.a, r.fa), y: fcy(r.a, r.fa) };
+        r.pb = { x: fcx(r.b, r.fb), y: fcy(r.b, r.fb) };
         if (r.recip) {
           const off = 7 * r.recip;
           if (r.fa === "L" || r.fa === "R") { r.pa.y += off; r.pb.y += off; }
@@ -551,33 +493,34 @@ class RepoMapView {
         const r = item.r, bx = item.end === "a" ? r.a : r.b;
         const span = horiz ? bx.h : bx.w;
         const m    = Math.min(horiz ? 13 : 16, span / 2 - 2);
-        const frac = n === 1 ? (keepCenter ? 0.72 : 0.5) : i / (n - 1);
+        const frac = n === 1 ? (keepCenter ? 0.72 : 0.5) : (keepCenter ? 0.08 + 0.84 * (i / (n - 1)) : i / (n - 1));
         const along = m + (span - 2 * m) * frac;
         const pt = {};
         if      (face === "R") { pt.x = bx.x + bx.w; pt.y = bx.y + along; }
         else if (face === "L") { pt.x = bx.x;        pt.y = bx.y + along; }
         else if (face === "B") { pt.y = bx.y + bx.h; pt.x = bx.x + along; }
         else                   { pt.y = bx.y;        pt.x = bx.x + along; }
-        const zish = ((r.fa === "L" || r.fa === "R") === (r.fb === "L" || r.fb === "R"));
-        if (item.end === "a") r.pa = pt;
-        else { r.pb = pt; r.bend = (zish && n > 1) ? (i - (n - 1) / 2) * 9 : 0; }
+        if (item.end === "a") r.pa = pt; else r.pb = pt;
       });
     });
 
-    // Decide the route per wire: the plain elbow when it clears every card, else a gutter staple.
-    // Staples that share one gutter are then spread across parallel lanes so they never coincide.
+    // Final guard: no two arrows may share a point. Straight joins claim theirs first (so they stay
+    // straight); any bent wire landing on a taken point slides along its own face until it is clear.
+    const taken = {};
+    const key = (id, pt) => id + "|" + Math.round(pt.x) + "|" + Math.round(pt.y);
+    recs.forEach((r) => { if (r.type === "straight") { taken[key(r.e.from, r.pa)] = true; taken[key(r.e.to, r.pb)] = true; } });
     recs.forEach((r) => {
-      r.lane = 0;
-      r.simpleGeom = this._route(r.pa, r.fa, r.pb, r.fb, r.bend);
-      if (!hitsCard(r.simpleGeom.d, r.e.from, r.e.to)) { r.route = "simple"; return; }
-      if (r.a.col !== r.b.col) { r.route = "H"; r.hg = hgOf(r); } else { r.route = "V"; r.gx = vGutR(r.a.col); }
+      if (r.type === "straight") return;
+      [[r.e.from, r.pa, r.fa], [r.e.to, r.pb, r.fb]].forEach(([id, pt, f]) => {
+        let guard = 0;
+        while (taken[key(id, pt)] && guard < 24) { if (f === "L" || f === "R") pt.y += 6; else pt.x += 6; guard++; }
+        taken[key(id, pt)] = true;
+      });
     });
+
+    // Detour wires sharing one gutter get parallel lanes so their long runs never overlap.
     const laneG = {};
-    recs.forEach((r) => {
-      if (r.route === "simple") return;
-      const k = r.route === "H" ? "H" + Math.round(r.hg) : "V" + Math.round(r.gx);
-      (laneG[k] = laneG[k] || []).push(r);
-    });
+    recs.forEach((r) => { if (r.type === "U" || r.type === "Uv") { const k = r.type + Math.round(r.gut); (laneG[k] = laneG[k] || []).push(r); } });
     Object.values(laneG).forEach((list) => {
       if (list.length < 2) return;
       list.sort((p, q) => (p.acx + p.bcx + p.acy + p.bcy) - (q.acx + q.bcx + q.acy + q.bcy));
@@ -586,7 +529,23 @@ class RepoMapView {
     });
 
     recs.forEach((r) => {
-      let geom = r.route === "simple" ? r.simpleGeom : (r.route === "H" ? stapleH(r) : stapleV(r));
+      const pa = r.pa, pb = r.pb;
+      if      (r.type === "straight") r.geom = { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: (pa.y + pb.y) / 2 };
+      else if (r.type === "L") {
+        r.geom = (r.fa === "L" || r.fa === "R")
+          ? { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y }
+          : { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
+      } else if (r.type === "U") {
+        const g = r.gut + r.lane * 11;
+        r.geom = { d: `M ${pa.x} ${pa.y} V ${g} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: g };
+      } else {
+        const g = r.gut + r.lane * 11;
+        r.geom = { d: `M ${pa.x} ${pa.y} H ${g} V ${pb.y} H ${pb.x}`, mx: g, my: (pa.y + pb.y) / 2 };
+      }
+    });
+
+    recs.forEach((r) => {
+      const geom = r.geom;
       const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
 
       const base = this._path(geom.d, "rm-wire", color);
@@ -616,28 +575,6 @@ class RepoMapView {
     p.setAttribute("class", cls);
     p.setAttribute("stroke", color);
     return p;
-  }
-
-  _route(pa, fa, pb, fb, bend) {
-    const bnd = bend || 0;
-    const hA = fa === "L" || fa === "R", hB = fb === "L" || fb === "R";
-
-    if (hA && hB) {                                              // both side faces: straight or Z
-      if (Math.abs(pa.y - pb.y) < 1) return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };
-      let mx = (pa.x + pb.x) / 2 + bnd;
-      const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
-      if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
-      return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
-    }
-    if (!hA && !hB) {                                            // both top/bottom faces: straight or Z
-      if (Math.abs(pa.x - pb.x) < 1) return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
-      let my = (pa.y + pb.y) / 2 + bnd;
-      const lo = Math.min(pa.y, pb.y) + 8, hi = Math.max(pa.y, pb.y) - 8;
-      if (lo <= hi) my = Math.max(lo, Math.min(hi, my));
-      return { d: `M ${pa.x} ${pa.y} V ${my} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my };
-    }
-    if (hA) return { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };  // side -> top/bottom
-    return { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };          // top/bottom -> side
   }
 
   _toggleTrace() {
