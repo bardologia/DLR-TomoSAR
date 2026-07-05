@@ -97,8 +97,8 @@ class RepoMapView {
         </div>
         <a class="rm__entry" target="_blank" rel="noopener"></a>
       </div>
-      <div class="rm__legend"></div>
       <div class="rm__stage">
+        <div class="rm__legend"></div>
         <div class="rm-graph">
           <div class="rm-canvas">
             <svg class="rm-wires" aria-hidden="true"><defs>
@@ -222,7 +222,7 @@ class RepoMapView {
       el.innerHTML =
         `<div class="rm-node__top"><span class="rm-node__role">${this._esc(this.ROLE_LABELS[n.role] || n.role)}</span><span class="rm-node__io">${io.join("")}</span></div>` +
         `<h4 class="rm-node__name">${this._esc(n.label)}</h4>` +
-        `<p class="rm-node__fn">${this._esc(n.fn)}</p>` +
+        `<p class="rm-node__fn" title="${this._esc(n.fn)}">${this._esc(n.fn)}</p>` +
         `<code class="rm-node__mod">${this._esc(n.module)}</code>`;
 
       el.addEventListener("click", () => this._focusNode(n.id));
@@ -366,35 +366,67 @@ class RepoMapView {
     };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
-    const inCount = {};
-    (this.diagram.edges || []).forEach((e) => { inCount[e.to] = (inCount[e.to] || 0) + 1; });
-    const inSeen = {};
-
+    const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
       if (!a || !b) return;
+      const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+      const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+      const dx  = bcx - acx, dy = bcy - acy;
+      let fa, fb, axis;
+      if (Math.abs(dx) >= Math.abs(dy)) { axis = "h"; if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; } }
+      else                              { axis = "v"; if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; } }
+      recs.push({ e, a, b, fa, fb, axis, acx, acy, bcx, bcy, bend: 0 });
+    });
 
-      const idx    = (inSeen[e.to] = (inSeen[e.to] === undefined ? 0 : inSeen[e.to] + 1));
-      const offset = (idx - (inCount[e.to] - 1) / 2) * 16;
+    // Spread the wires meeting each node across that face so multiple arrows never share a
+    // point: entering and leaving wires get distinct attachment slots, sorted by the other
+    // endpoint's position to keep the fan crossing-free. Faces are chosen per wire direction,
+    // so a busy node naturally uses all four sides.
+    const groups = {};
+    const push = (id, face, item) => { (groups[id + "|" + face] = groups[id + "|" + face] || []).push(item); };
+    recs.forEach((r) => {
+      push(r.e.from, r.fa, { r, end: "a", perp: (r.fa === "L" || r.fa === "R") ? r.bcy : r.bcx });
+      push(r.e.to,   r.fb, { r, end: "b", perp: (r.fb === "L" || r.fb === "R") ? r.acy : r.acx });
+    });
+    Object.values(groups).forEach((list) => {
+      list.sort((p, q) => p.perp - q.perp);
+      const n = list.length;
+      list.forEach((item, i) => {
+        const r = item.r, face = item.end === "a" ? r.fa : r.fb, bx = item.end === "a" ? r.a : r.b;
+        const horiz = face === "L" || face === "R";
+        const span  = horiz ? bx.h : bx.w;
+        const m     = Math.min(horiz ? 13 : 16, span / 2 - 2);
+        const along = n === 1 ? span / 2 : m + (span - 2 * m) * (i / (n - 1));
+        const pt = {};
+        if      (face === "R") { pt.x = bx.x + bx.w; pt.y = bx.y + along; }
+        else if (face === "L") { pt.x = bx.x;        pt.y = bx.y + along; }
+        else if (face === "B") { pt.y = bx.y + bx.h; pt.x = bx.x + along; }
+        else                   { pt.y = bx.y;        pt.x = bx.x + along; }
+        if (item.end === "a") r.pa = pt;
+        else { r.pb = pt; r.bend = n === 1 ? 0 : (i - (n - 1) / 2) * 9; }
+      });
+    });
 
-      const geom  = this._orthGeom(a, b, offset);
-      const color = this.ROLE_COLORS[roleOf(e.from)] || this.ROLE_COLORS.external;
+    recs.forEach((r) => {
+      const geom  = this._orthPath(r.pa, r.pb, r.axis, r.bend);
+      const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
 
       const base = this._path(geom.d, "rm-wire", color);
       base.setAttribute("marker-end", "url(#rm-arrow)");
       const flow = this._path(geom.d, "rm-flow", color);
       this.wiresEl.appendChild(base);
       this.wiresEl.appendChild(flow);
-      this.wireEls.push({ base, flow, from: e.from, to: e.to, fcol: a.col, tcol: b.col });
+      this.wireEls.push({ base, flow, from: r.e.from, to: r.e.to, fcol: r.a.col, tcol: r.b.col });
 
-      if (e.label) {
+      if (r.e.label) {
         const lab = document.createElement("span");
-        lab.className   = "rm-elabel rm-elabel--" + (e.kind || "data");
+        lab.className   = "rm-elabel rm-elabel--" + (r.e.kind || "data");
         lab.style.left  = geom.mx + "px";
         lab.style.top   = geom.my + "px";
-        lab.textContent = e.label;
+        lab.textContent = r.e.label;
         this.labelsEl.appendChild(lab);
-        this.labelEls.push({ el: lab, from: e.from, to: e.to, tcol: b.col });
+        this.labelEls.push({ el: lab, from: r.e.from, to: r.e.to, tcol: r.b.col });
       }
     });
 
@@ -409,29 +441,20 @@ class RepoMapView {
     return p;
   }
 
-  _orthGeom(a, b, offset) {
-    const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
-    const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
-    const dx  = bcx - acx, dy = bcy - acy;
-    const off = offset || 0;
+  _orthPath(pa, pb, axis, bend) {
+    const bnd = bend || 0;
 
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      const right = dx >= 0;
-      const ax = right ? a.x + a.w : a.x;
-      const bx = right ? b.x : b.x + b.w;
-      const ay = acy, by = bcy;
-      let mx = (ax + bx) / 2 + off;
-      mx = right ? Math.max(ax + 14, Math.min(bx - 14, mx)) : Math.min(ax - 14, Math.max(bx + 14, mx));
-      return { d: `M ${ax} ${ay} H ${mx} V ${by} H ${bx}`, mx, my: (ay + by) / 2 };
+    if (axis === "h") {
+      let mx = (pa.x + pb.x) / 2 + bnd;
+      const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
+      if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
+      return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
     }
 
-    const down = dy >= 0;
-    const ay = down ? a.y + a.h : a.y;
-    const by = down ? b.y : b.y + b.h;
-    const ax = acx, bx = bcx;
-    let my = (ay + by) / 2 + off;
-    my = down ? Math.max(ay + 12, Math.min(by - 12, my)) : Math.min(ay - 12, Math.max(by + 12, my));
-    return { d: `M ${ax} ${ay} V ${my} H ${bx} V ${by}`, mx: (ax + bx) / 2, my };
+    let my = (pa.y + pb.y) / 2 + bnd;
+    const lo = Math.min(pa.y, pb.y) + 8, hi = Math.max(pa.y, pb.y) - 8;
+    if (lo <= hi) my = Math.max(lo, Math.min(hi, my));
+    return { d: `M ${pa.x} ${pa.y} V ${my} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my };
   }
 
   _toggleTrace() {
