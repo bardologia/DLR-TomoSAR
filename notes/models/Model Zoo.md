@@ -31,8 +31,10 @@ This note summarises all model architectures available in DLR-TomoSAR, their key
 | `unetr` | [[UNETR]] | Pure ViT | Transformer skip outputs | CNN decoder | ~34.4M |
 | `unet_multihead` | [[UNet Multihead]] | CNN encoder-decoder | Direct concatenation | 3 PixelMLP heads | ~31.0M |
 | `unet_pergaussian` | [[UNet Per-Gaussian]] | CNN encoder-decoder | Direct concatenation | $K$ PixelMLP heads | ~31.0M |
+| `unet_setpred` | [[UNet Set-Prediction]] | CNN encoder-decoder | Direct concatenation | $K$ PixelMLP heads + existence gate | ~31.0M |
 | `resunet_multihead` | [[ResUNet Multihead]] | Residual CNN encoder-decoder | Skip + residual | 3 PixelMLP heads | ~32.4M |
 | `resunet_pergaussian` | [[ResUNet Per-Gaussian]] | Residual CNN encoder-decoder | Skip + residual | $K$ PixelMLP heads | ~32.4M |
+| `resunet_setpred` | [[ResUNet Set-Prediction]] | Residual CNN encoder-decoder | Skip + residual | $K$ PixelMLP heads + existence gate | ~32.4M |
 | `deeplabv3plus` | [[DeepLabV3+]] | Residual CNN, output stride 8 | Low-level fusion in decoder | ASPP + light decoder | ~10.3M |
 | `segformer` | [[SegFormer]] | Hierarchical transformer (MiT-style) | Pyramid to all-MLP decoder | 1×1 conv | ~5.2M |
 | `convnext_unet` | [[ConvNeXt UNet]] | ConvNeXt blocks in U-Net | Direct concatenation | Single 1×1 conv | ~19.1M |
@@ -41,6 +43,9 @@ This note summarises all model architectures available in DLR-TomoSAR, their key
 | `multires_unet` | [[MultiResUNet]] | MultiRes blocks in U-Net | ResPath-filtered concat | Single 1×1 conv | ~14.4M |
 | `fpn` | [[FPN]] | Residual bottom-up + FPN top-down | Lateral 1×1 additions | Summed pyramid + 1×1 conv | ~7.8M |
 | `u2net` | [[U2-Net]] | Nested RSU mini-U-Nets | Direct concatenation | Single 1×1 conv | ~8.3M |
+| `pixel_mlp` | [[PixelMLP]] | 1×1 conv stack (no spatial context) | None (single stream) | Single 1×1 conv | ~3.2M |
+| `local_cnn` | [[Local CNN]] | Full-resolution 3×3 ConvBlock stack | None (single stream) | Single 1×1 conv | ~3.0M |
+| `nafnet` | [[NAFNet]] | Gated NAFBlock encoder-decoder (activation-free) | Additive skip | Single 3×3 conv | ~29.2M |
 
 Parameter counts are approximate for default configurations with $C_{\text{in}} = 1$ (`in_channels`) and $C_{\text{out}} = 6$ (`out_channels`), corresponding to $K = C_{\text{out}} / \text{params\_per\_gaussian} = 6/3 = 2$ Gaussian components. The [[Capacity Matching]] stage of the [[Benchmark Pipeline]] rescales all of them to the UNet reference budget before benchmarking.
 
@@ -75,6 +80,9 @@ The standard single-head UNet shows systematic bias across parameter types (mult
 ### Use ResUNet Multihead / ResUNet Per-Gaussian when
 Combining the stride-2 residual [[ResUNet]] backbone (`ResUNetBackbone` with the default `downsample="stride"`) with the specialised head designs. These isolate the head-structure question from the backbone question while holding the residual encode-decode path fixed.
 
+### Use UNet Set-Prediction / ResUNet Set-Prediction when
+Attacking Gaussian slot collapse head-on. Per-slot heads plus an existence-logit gate give each slot an explicit on/off mechanism decoupled from amplitude regression, and together with `param_matching: hungarian` realise DETR-style set prediction under the unchanged $3K$-channel output contract. Pair with the hungarian matcher; under `sorted_gt` the gate merely relabels slots.
+
 ### Use DeepLabV3+ when
 Multi-scale context at fixed dilation rates is suspected to matter (e.g., characteristic facade/layover scales). ASPP aggregates several receptive fields in parallel without extra downsampling.
 
@@ -99,6 +107,21 @@ Probing how much decoder capacity the task actually needs: the FPN decoder is de
 ### Use U2-Net when
 Intra-stage multi-scale mixing is desired: every stage is itself a small U-Net, so even full-resolution layers integrate wide context.
 
+### Use PixelMLP when
+Establishing the no-spatial-context control. Classical tomographic inversion (beamforming, Capon, CS) is strictly per-pixel; PixelMLP is its learned analogue, and the margin any spatial backbone holds over it is the measured value of spatial context. Every benchmark sweep should carry it.
+
+### Use Local CNN when
+Measuring how far local context alone goes. A fixed $(4B+1)\times(4B+1)$ receptive field with no downsampling completes the context ladder PixelMLP → Local CNN → encode-decode backbones, decomposing performance into per-pixel mapping, local smoothing, and long-range aggregation.
+
+### Use NAFNet when
+Testing the restoration hypothesis: the task is dense continuous regression, closer to image restoration than to the semantic segmentation the rest of the zoo descends from. NAFNet is the restoration family's strongest simple representative — gated blocks, channel attention, no conventional activations — and directly probes whether the segmentation prior (deep semantic bottleneck) is the wrong trade for per-pixel parameter fidelity.
+
+---
+
+## Beyond the Zoo
+
+[[GammaNet Unrolled]] is the physics-native counterpart to every model above: instead of learning a generic image-to-parameters mapping, it unrolls the exact tomographic forward operator into learned proximal-gradient iterations. It lives outside this registry — its own `unrolled` model family, training pipeline, and entry point — because its input contract (per-pixel coherence measurements plus kz, not the image channel stack) and output (reflectivity profiles, not Gaussian parameters) differ from the zoo's.
+
 ---
 
 ## Common Configuration
@@ -119,11 +142,11 @@ The recurring sub-modules live in a single `models/blocks.py` and are imported b
 
 | Block | Role | Consumers |
 |---|---|---|
-| `ConvBlock` | Double $3\times3$ conv $\to$ Norm $\to$ Act (optional `Dropout2d`) | `unet`, `attention_unet`, `unetplusplus`, `transunet`, `unetr`, `convnext_unet` (decoder), `multires_unet`, `u2net` |
+| `ConvBlock` | Double $3\times3$ conv $\to$ Norm $\to$ Act (optional `Dropout2d`) | `unet`, `attention_unet`, `unetplusplus`, `transunet`, `unetr`, `convnext_unet` (decoder), `multires_unet`, `u2net`, `local_cnn` |
 | `ResidualConvBlock` | Pre-activation residual unit with stride and `first_unit` controls | `resunet`, `unet_skip` and their head variants |
 | `Encoder` / `Decoder` | Symmetric `ConvBlock` stacks with `MaxPool2d` / `build_upsample` and concatenative skips | `unet` family (`UNetBackbone`) |
 | `PixelMLP` | $1\times1$ conv $\to$ Act $\to$ $1\times1$ conv pointwise head | multihead / per-Gaussian output heads |
-| `GaussianHeadsMixin` | Resolves the $K = C_{\text{out}}/\texttt{params\_per\_gaussian}$ layout and builds the triple-head or per-Gaussian heads | `unet_multihead`, `unet_pergaussian`, `resunet_multihead`, `resunet_pergaussian` |
+| `GaussianHeadsMixin` | Resolves the $K = C_{\text{out}}/\texttt{params\_per\_gaussian}$ layout and builds the triple-head, per-Gaussian, or gated set-prediction heads | `unet_multihead`, `unet_pergaussian`, `unet_setpred`, `resunet_multihead`, `resunet_pergaussian`, `resunet_setpred` |
 | `MultiHeadSelfAttention` / `TransformerBlock` | Pre-norm full self-attention and the transformer layer (LN $\to$ MSA $\to$ residual $\to$ LN $\to$ FFN $\to$ residual, with `DropPath`) | `transunet`, `unetr` |
 | `PatchEmbedding` / `tokens_to_feature_map` | Strided-conv patch tokeniser and the inverse token $\to$ feature-map reshape | `transunet`, `unetr`; `tokens_to_feature_map` also used by `swin_unet` |
 | `build_activation` / `build_norm2d` / `build_upsample` / `initialize_weights` / `match_spatial_size` / `DropPath` | Factory and utility helpers | all architectures |

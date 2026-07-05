@@ -40,7 +40,6 @@ class RequestRouter:
         "name"        : "DLR-TomoSAR",
         "tagline"     : "Neural SAR tomography control console",
         "description" : "Supervised deep learning that replaces per-pixel iterative optimisation in SAR tomographic parameter estimation, inferring all 3K Gaussian-mixture parameters of the elevation spectrum in one forward pass.",
-        "models"      : ["UNet", "ResUNet", "Attention UNet", "UNet++", "FCN", "LinkNet", "Swin-UNet", "TransUNet", "UNETR"],
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
@@ -438,14 +437,16 @@ class RequestRouter:
 
     def _project_payload(self) -> dict:
         interpreters = self.paths.discover_interpreters()
+        model_names  = [model["name"] for family in self.models.collect() for model in family["models"]]
         return {
             **self.PROJECT,
+            "models"       : model_names,
             "repo_root"    : str(self.paths.repo_root),
             "interpreters" : interpreters,
             "preferred"    : self.paths.preferred_interpreter(interpreters),
             "counts"       : {
                 "scripts"   : len(self.catalog.list_scripts()),
-                "models"    : len(self.PROJECT["models"]),
+                "models"    : len(model_names),
                 "pipelines" : len(self.PROJECT["pipelines"]),
             },
         }

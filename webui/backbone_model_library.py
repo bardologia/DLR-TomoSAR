@@ -72,6 +72,10 @@ class BackboneModelLibrary:
     FALLBACK_ACTIVATION    = "gelu"
     FALLBACK_NORMALIZATION = "layer"
 
+    DISPLAY_DEFAULTS = {
+        "nafnet" : ("simplegate", "layer"),
+    }
+
     def note(self, key: str) -> dict | None:
         filename = self.NOTE_FILES.get(key)
         if filename is None:
@@ -138,6 +142,10 @@ class BackboneModelLibrary:
         resolved = {}
 
         for key, class_name in self.CONFIG_CLASSES.items():
+            if key in self.DISPLAY_DEFAULTS:
+                resolved[key] = self.DISPLAY_DEFAULTS[key]
+                continue
+
             config        = getattr(module, class_name)()
             activation    = getattr(config, "activation", self.FALLBACK_ACTIVATION)
             normalization = getattr(config, "normalization", self.FALLBACK_NORMALIZATION)
@@ -255,6 +263,11 @@ class BackboneModelLibrary:
                         "when": "Systematic bias across Gaussian slots. One head per component imposes slot independence.",
                     },
                     {
+                        "key": "unet_setpred", "name": "UNet Set-Prediction", "skip": "Direct concatenation",
+                        "head": "K PixelMLP heads + existence gate", "params": "~31.0M", "recommended": False,
+                        "when": "Attacking Gaussian slot collapse. Per-slot heads plus an existence-logit gate decouple the slot on/off decision from amplitude regression; pair with hungarian param matching.",
+                    },
+                    {
                         "key": "resunet_multihead", "name": "ResUNet Multihead", "skip": "Skip + residual",
                         "head": "3 PixelMLP heads", "params": "~32.4M", "recommended": False,
                         "when": "Corrected stride-2 ResUNet backbone with parameter-type-specific heads. Isolates the head-structure question from the backbone.",
@@ -263,6 +276,11 @@ class BackboneModelLibrary:
                         "key": "resunet_pergaussian", "name": "ResUNet Per-Gaussian", "skip": "Skip + residual",
                         "head": "K PixelMLP heads", "params": "~32.4M", "recommended": False,
                         "when": "Corrected stride-2 ResUNet backbone with per-slot heads. Isolates the head-structure question from the backbone.",
+                    },
+                    {
+                        "key": "resunet_setpred", "name": "ResUNet Set-Prediction", "skip": "Skip + residual",
+                        "head": "K PixelMLP heads + existence gate", "params": "~32.4M", "recommended": False,
+                        "when": "The gated set-prediction heads on the stride-2 residual backbone. Completes the head-axis triple while holding the encode-decode path fixed.",
                     },
                 ],
             },
@@ -284,6 +302,33 @@ class BackboneModelLibrary:
                         "key": "fpn", "name": "FPN", "skip": "Lateral additions",
                         "head": "Pyramid sum + 1x1 conv", "params": "~7.8M", "recommended": False,
                         "when": "Probing how much decoder capacity the task needs. The minimal decoder concentrates parameters in the encoder.",
+                    },
+                ],
+            },
+            {
+                "family" : "Restoration",
+                "blurb"  : "Image-restoration designs built for high per-pixel fidelity rather than semantic abstraction.",
+                "models" : [
+                    {
+                        "key": "nafnet", "name": "NAFNet", "skip": "Additive skip",
+                        "head": "Single 3x3 conv", "params": "~29.2M", "recommended": False,
+                        "when": "Testing the restoration hypothesis: dense continuous regression is closer to restoration than segmentation. Gated blocks and channel attention with no conventional activations.",
+                    },
+                ],
+            },
+            {
+                "family" : "Controls",
+                "blurb"  : "Scientific control baselines that bound how much spatial context contributes at all.",
+                "models" : [
+                    {
+                        "key": "pixel_mlp", "name": "PixelMLP", "skip": "None (single stream)",
+                        "head": "Single 1x1 conv", "params": "~3.2M", "recommended": False,
+                        "when": "The no-spatial-context control. A per-pixel MLP of 1x1 convolutions; the margin any spatial backbone holds over it is the measured value of spatial context.",
+                    },
+                    {
+                        "key": "local_cnn", "name": "Local CNN", "skip": "None (single stream)",
+                        "head": "Single 1x1 conv", "params": "~3.0M", "recommended": False,
+                        "when": "The local-context-only control. Full-resolution 3x3 ConvBlocks with a fixed small receptive field, between PixelMLP and the encode-decode backbones.",
                     },
                 ],
             },
