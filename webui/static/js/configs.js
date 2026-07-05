@@ -33,7 +33,7 @@ class ConfigBrowser {
 
     this.groups.forEach((g) => {
       g.classes.forEach((c) => {
-        this.flat.push({ id: `${c.module || g.module}::${c.name}`, group: g.title, module: c.module || g.module, name: c.name, desc: c.desc, fields: c.fields });
+        this.flat.push({ id: `${c.module || g.module}::${c.name}`, group: g.title, groupDesc: g.desc, module: c.module || g.module, name: c.name, desc: c.desc, fields: c.fields });
       });
     });
 
@@ -179,13 +179,6 @@ class ConfigBrowser {
       const inner    = document.createElement("div");
       inner.className = "cgroup__inner";
 
-      if (g.desc && !this.query) {
-        const intro = document.createElement("p");
-        intro.className   = "cgroup__desc";
-        intro.textContent = g.desc;
-        inner.appendChild(intro);
-      }
-
       classes.forEach((c) => {
         const count = this._visibleFields(c).length;
         const item  = document.createElement("button");
@@ -323,6 +316,7 @@ class ConfigBrowser {
     this.detailEl.innerHTML =
       `<div class="cdetail__head">` +
       `<div><span class="cdetail__module">${this._esc(cls.group)}</span>` +
+      (cls.groupDesc ? `<p class="cdetail__sectiondesc">${this._esc(cls.groupDesc)}</p>` : "") +
       `<h3 class="cdetail__name">${this._esc(cls.name)}</h3>` +
       `<div class="cdetail__path">configuration/${this._esc(cls.module)}.py</div>` +
       (cls.desc ? `<p class="cdetail__desc">${this._mark(cls.desc)}</p>` : "") +
