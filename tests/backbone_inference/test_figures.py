@@ -190,7 +190,23 @@ def test_figure_composer_compose_with_reduced(tmp_path):
         result=res, run=run, global_metrics=gm, x_axis_np=x_axis, indices=indices, param_space=True,
     )
 
-    assert "improvement_map"      in figure_paths
+    assert "improvement_map"       in figure_paths
     assert "reduced_pixel_mse_map" in figure_paths
     for p in figure_paths["improvement_map"]:
+        assert p.is_file() and p.stat().st_size > 0
+
+    assert "slices_range_reduced"       in figure_paths
+    assert "slices_azimuth_reduced"     in figure_paths
+    assert "slices_elev_reduced"        in figure_paths
+    assert "ssim_range_reduced"         in figure_paths
+    assert "ssim_azimuth_reduced"       in figure_paths
+    assert "ssim_elev_reduced"          in figure_paths
+    assert "elev_metric_curves_reduced" in figure_paths
+
+    assert len(figure_paths["slices_range_reduced"]) > 0
+    for p in figure_paths["slices_range_reduced"]:
+        assert "reduced" in str(p)
+        assert p.is_file() and p.stat().st_size > 0
+
+    for p in figure_paths["ssim_range_reduced"]:
         assert p.is_file() and p.stat().st_size > 0

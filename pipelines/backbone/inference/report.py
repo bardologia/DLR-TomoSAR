@@ -130,22 +130,17 @@ class Report:
             raise ValueError(f"Track payload column '{key}' has {len(values)} entries but the run lists {n_tracks} tracks; the persisted track metadata is inconsistent.")
         return values
 
-    @staticmethod
-    def _is_per_slice_ssim(k: str) -> bool:
-        for prefix in (
-            "ssim_gt_elev_",   "ssim_gt_range_",   "ssim_gt_azimuth_",
-            "ssim_norm_elev_", "ssim_norm_range_", "ssim_norm_azimuth_",
-            "ssim_red_elev_",  "ssim_red_range_",  "ssim_red_azimuth_",
-        ):
-            if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
-                return True
-        for prefix in (
-            "elev_mae_gt_",  "elev_rmse_gt_",  "elev_r2_gt_",  "elev_ce_gt_",
-            "elev_mae_red_", "elev_rmse_red_", "elev_r2_red_", "elev_ce_red_",
-        ):
-            if k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit():
-                return True
-        return False
+    _PER_SLICE_PREFIXES = (
+        "ssim_gt_elev_",   "ssim_gt_range_",   "ssim_gt_azimuth_",
+        "ssim_norm_elev_", "ssim_norm_range_", "ssim_norm_azimuth_",
+        "ssim_red_elev_",  "ssim_red_range_",  "ssim_red_azimuth_",
+        "elev_mae_gt_",  "elev_rmse_gt_",  "elev_r2_gt_",  "elev_ce_gt_",
+        "elev_mae_red_", "elev_rmse_red_", "elev_r2_red_", "elev_ce_red_",
+    )
+
+    @classmethod
+    def _is_per_slice_ssim(cls, k: str) -> bool:
+        return any(k.startswith(prefix) and k[len(prefix):].lstrip("-").isdigit() for prefix in cls._PER_SLICE_PREFIXES)
 
     def _build_run_summary(self) -> List[str]:
         rs  = self.run_summary
@@ -554,80 +549,52 @@ class Report:
         "pred_pixel_mse_norm_mean", "reduced_pixel_mse_norm_mean",
     })
 
-    @classmethod
-    def _is_improvement_key(cls, k: str) -> bool:
-        return k in cls._IMPROVEMENT_KEYS
+    _METRIC_SKIP_KEYS = ("tracks", "track_positions", "split", "split_region")
 
     @staticmethod
     def _is_reduced_key(k: str) -> bool:
         return ("_red" in k) or k.startswith("reduced_") or k.startswith("ssim_red") or ("predn" in k)
 
-    @staticmethod
-    def _is_physics_key(k: str) -> bool:
-        return k.startswith("physics_") or k.startswith("phase_agreement_")
+    _METRIC_TAXONOMY = (
+        ("3.1 Dataset statistics",                               lambda k: k in Report._DATASET_KEYS or k.endswith("_status")),
+        ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
+        ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
+        ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
+        ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
+        ("3.8 NN improvement over baseline",                     lambda k: k in Report._IMPROVEMENT_KEYS),
+        ("3.7 SSIM summaries (reduced vs GT)",                   lambda k: k.startswith("ssim_red")),
+        ("3.6 Per-pixel (reduced vs GT)",                        lambda k: Report._is_reduced_key(k) and k.startswith("pixel_")),
+        ("3.5 Curve-level (reduced vs GT)",                      lambda k: Report._is_reduced_key(k)),
+        ("3.3 Per-pixel (GT)",                                   lambda k: k.startswith("pixel_")),
+        ("3.4b SSIM summaries (normalised)",                     lambda k: k.startswith("ssim_norm")),
+        ("3.4 SSIM summaries (denorm)",                          lambda k: k.startswith("ssim_")),
+        ("3.2 Curve-level (GT)",                                 lambda k: True),
+    )
 
     @staticmethod
-    def _is_occupancy_key(k: str) -> bool:
-        return k.startswith("active_frac") or k.startswith("active_count") or k.startswith("count_") or (k.startswith("slot_") and "_active_" in k)
+    def _section_order(title: str) -> tuple:
+        number = title.split()[0].split(".")[1]
+        digits = "".join(ch for ch in number if ch.isdigit())
+        return (int(digits), number[len(digits):])
 
     def _build_full_metrics(self) -> List[str]:
         gm  = self.global_metrics
         out = ["\n## 3. Full metric tables\n"]
 
-        groups: Dict[str, Dict] = {
-            "3.1 Dataset statistics":             {},
-            "3.2 Curve-level (GT)":               {},
-            "3.3 Per-pixel (GT)":                 {},
-            "3.4 SSIM summaries (denorm)":        {},
-            "3.4b SSIM summaries (normalised)":   {},
-            "3.5 Curve-level (reduced vs GT)":    {},
-            "3.6 Per-pixel (reduced vs GT)":      {},
-            "3.7 SSIM summaries (reduced vs GT)": {},
-            "3.8 NN improvement over baseline":   {},
-            "3.9 Slot occupancy & active count":  {},
-            "3.10 Matched Gaussian errors (permutation-invariant)": {},
-            "3.11 Interferometric data consistency": {},
-            "3.12 JEPA embedding diagnostics": {},
-        }
+        groups: Dict[str, Dict] = {title: {} for title, _match in self._METRIC_TAXONOMY}
 
         for k, v in sorted(gm.items()):
-            if self._is_per_slice_ssim(k):
+            if self._is_per_slice_ssim(k) or "_raw" in k or k in self._METRIC_SKIP_KEYS:
                 continue
-            if "_raw" in k or k in ("tracks", "track_positions", "split", "split_region"):
-                continue
-            if k in self._DATASET_KEYS or k.endswith("_status"):
-                groups["3.1 Dataset statistics"][k] = v
-            elif self._is_physics_key(k):
-                groups["3.11 Interferometric data consistency"][k] = v
-            elif k.startswith("jepa_"):
-                groups["3.12 JEPA embedding diagnostics"][k] = v
-            elif k.startswith("matched_"):
-                groups["3.10 Matched Gaussian errors (permutation-invariant)"][k] = v
-            elif self._is_occupancy_key(k):
-                groups["3.9 Slot occupancy & active count"][k] = v
-            elif self._is_improvement_key(k):
-                groups["3.8 NN improvement over baseline"][k] = v
-            elif self._is_reduced_key(k):
-                if k.startswith("ssim_red"):
-                    groups["3.7 SSIM summaries (reduced vs GT)"][k] = v
-                elif k.startswith("pixel_"):
-                    groups["3.6 Per-pixel (reduced vs GT)"][k] = v
-                else:
-                    groups["3.5 Curve-level (reduced vs GT)"][k] = v
-            elif k.startswith("pixel_"):
-                groups["3.3 Per-pixel (GT)"][k] = v
-            elif k.startswith("ssim_norm"):
-                groups["3.4b SSIM summaries (normalised)"][k] = v
-            elif k.startswith("ssim_"):
-                groups["3.4 SSIM summaries (denorm)"][k] = v
-            else:
-                groups["3.2 Curve-level (GT)"][k] = v
 
-        for title, d in groups.items():
-            if not d:
+            title            = next(title for title, match in self._METRIC_TAXONOMY if match(k))
+            groups[title][k] = v
+
+        for title in sorted(groups, key=self._section_order):
+            if not groups[title]:
                 continue
             out.append(f"\n### {title}\n")
-            out.append(self._dict_table(d))
+            out.append(self._dict_table(groups[title]))
             out.append("")
 
         return out

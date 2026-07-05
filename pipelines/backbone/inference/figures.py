@@ -421,13 +421,6 @@ class FigureComposer:
         red_n  = reduced.reduced_norm
         full_n = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
 
-        slice_range_idx = indices["slice_range_idx"]
-        slice_az_idx    = indices["slice_az_idx"]
-        slice_elev_idx  = indices["slice_elev_idx"]
-        all_range_idx   = indices["all_range_idx"]
-        all_az_idx      = indices["all_az_idx"]
-        all_elev_idx    = indices["all_elev_idx"]
-
         _N_elev, _az, _rg = red_n.shape
 
         reduced_dir = meta.figures_dir / "reduced"
@@ -455,66 +448,36 @@ class FigureComposer:
             log        = True,
         )]
 
-        figure_paths["slices_range_reduced"]   = []
-        figure_paths["slices_azimuth_reduced"] = []
-        figure_paths["slices_elev_reduced"]    = []
+        self._slice_set(
+            pred_cube      = red_n,
+            gt_cube        = gt_n,
+            full_cube      = full_n,
+            result         = result,
+            x_axis_np      = x_axis_np,
+            indices        = indices,
+            global_metrics = global_metrics,
+            ssim_prefix    = "red",
+            out_dir        = reduced_dir / "slices",
+            stem_prefix    = "reduced_",
+            group_suffix   = "_reduced",
+            ref_title      = "GT (unit-area)",
+            pred_title     = "Reduced (Capon, unit-area)",
+            err_title      = "|Reduced − GT|",
+            full_title     = "Full tomogram (unit-area)",
+            figure_paths   = figure_paths,
+        )
 
-        for axis, indices_arr, stem_fn, group in (
-            ("range",   slice_range_idx, lambda i: f"reduced_range_{int(i) + result.range_offset}",     "slices_range_reduced"),
-            ("azimuth", slice_az_idx,    lambda i: f"reduced_azimuth_{int(i) + result.azimuth_offset}", "slices_azimuth_reduced"),
-        ):
-            for i in indices_arr:
-                figure_paths[group] += slice_plotter.plot_tomogram_slice(
-                    pred_cube  = red_n,
-                    gt_cube    = gt_n,
-                    axis       = axis,
-                    index      = int(i),
-                    x_axis     = x_axis_np,
-                    out_dir    = reduced_dir / "slices",
-                    stem       = stem_fn(i),
-                    az_offset  = result.azimuth_offset,
-                    rg_offset  = result.range_offset,
-                    ssim_value = global_metrics[f"ssim_red_{axis}_{int(i)}"],
-                    ref_title  = "GT (unit-area)",
-                    pred_title = "Reduced (Capon, unit-area)",
-                    err_title  = "|Reduced − GT|",
-                    full_cube  = full_n,
-                    full_title = "Full tomogram (unit-area)",
-                )
-
-        for i in slice_elev_idx:
-            figure_paths["slices_elev_reduced"] += slice_plotter.plot_elevation_intensity_slice(
-                pred_cube  = red_n,
-                gt_cube    = gt_n,
-                elev_idx   = int(i),
-                x_axis     = x_axis_np,
-                out_dir    = reduced_dir / "slices",
-                stem       = f"reduced_elev_idx_{int(i)}",
-                az_offset  = result.azimuth_offset,
-                rg_offset  = result.range_offset,
-                ssim_value = global_metrics[f"ssim_red_elev_{int(i)}"],
-                ref_title  = "GT (unit-area)",
-                pred_title = "Reduced (Capon, unit-area)",
-                err_title  = "|Reduced − GT|",
-                full_cube  = full_n,
-                full_title = "Full tomogram (unit-area)",
-            )
-
-        for axis, n_slices, indices_arr, offset in (
-            ("range",   _rg,     all_range_idx, result.range_offset),
-            ("azimuth", _az,     all_az_idx,    result.azimuth_offset),
-            ("elev",    _N_elev, all_elev_idx,  0),
-        ):
-            figure_paths[f"ssim_{axis}_reduced"] = [slice_plotter.plot_ssim_curves(
-                global_metrics = global_metrics,
-                axis           = axis,
-                out_path       = reduced_dir / "ssim" / f"{axis}.png",
-                n_slices       = n_slices,
-                slice_indices  = indices_arr,
-                ax_offset      = offset,
-                prefix         = "red",
-                series_label   = "reduced × GT (unit-area)",
-            )]
+        self._ssim_curves_set(
+            global_metrics = global_metrics,
+            indices        = indices,
+            shape          = red_n.shape,
+            offsets        = {"range": result.range_offset, "azimuth": result.azimuth_offset},
+            ssim_prefix    = "red",
+            group_suffix   = "_reduced",
+            series_label   = "reduced × GT (unit-area)",
+            out_dir        = reduced_dir / "ssim",
+            figure_paths   = figure_paths,
+        )
 
         figure_paths["elev_metric_curves_reduced"] = slice_plotter.plot_elev_metric_curves(
             global_metrics = global_metrics,
