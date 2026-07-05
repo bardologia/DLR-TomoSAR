@@ -127,7 +127,7 @@ class TrainingPipeline:
         else:
             backbone_out = self._gaussian_out_channels()
 
-        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, x_len, config=backbone_config)
+        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, self.dataset_config.patch.size[0], config=backbone_config)
         module                 = JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)
 
         self._log_module(logger, module, backbone, dataset_in_channels, backbone_in, backbone_out)
