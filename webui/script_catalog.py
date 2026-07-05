@@ -37,6 +37,11 @@ class ScriptCatalog:
             "category"  : "Training",
             "purpose"   : "Train the JEPA predictor in latent space. Operates in three modes depending on which autoencoder runs are selected: backbone + profile autoencoder, image autoencoder + backbone, or image autoencoder + backbone + profile autoencoder. Each autoencoder is imported pretrained and either frozen or fine-tuned.",
         },
+        "train_unrolled": {
+            "title"     : "Train Unrolled",
+            "category"  : "Training",
+            "purpose"   : "Train the unrolled physics network (gamma_net): LISTA-style proximal-gradient iterations over the exact per-pixel kz steering operator, trained on coherence measurements synthesised from the ground-truth Gaussian profiles. Isolated from the backbone stack; requires the geometry field.",
+        },
         "infer_backbone": {
             "title"     : "Infer Backbone",
             "category"  : "Inference",
@@ -113,12 +118,13 @@ class ScriptCatalog:
         "train": {
             "title"    : "Train",
             "category" : "Training",
-            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, or the JEPA predictor.",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, the JEPA predictor, or the unrolled physics network.",
             "members"  : [
                 ("train_backbone",            "Backbone"),
                 ("train_profile_autoencoder", "Profile AE"),
                 ("train_image_autoencoder",   "Image AE"),
                 ("train_jepa",                "JEPA"),
+                ("train_unrolled",            "Unrolled"),
             ],
         },
         "infer": {

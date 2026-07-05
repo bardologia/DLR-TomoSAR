@@ -151,6 +151,30 @@ class LaunchLayout:
                 "test_azimuth",
             ]},
         ],
+        "training_unrolled": [
+            {"title": "Schedule", "fields": [
+                {"path": "epochs", "widget": NUM_EPOCHS},
+                "scheduler_epochs",
+                {"path": "eta_min", "widget": NUM_ETA_MIN},
+                {"path": "early_stop_patience", "widget": NUM_PATIENCE},
+                "early_stop_min_delta",
+            ]},
+            {"title": "Batch and loader", "fields": [
+                {"path": "batch_size", "widget": NUM_BATCH},
+                {"path": "num_workers", "widget": NUM_WORKERS},
+                {"path": "prefetch_factor", "widget": NUM_PREFETCH},
+            ]},
+            {"title": "Gradient clipping", "fields": [
+                "max_grad_norm",
+            ]},
+            {"title": "Patches and splits", "fields": [
+                "patch_size",
+                "patch_stride",
+                "train_azimuth",
+                "val_azimuth",
+                "test_azimuth",
+            ]},
+        ],
         "paths_rest": [
             {"title": "Run paths", "fields": ["log_base_dir", "secondary_labels"]},
         ],
@@ -527,6 +551,35 @@ class LaunchLayout:
                 {"key": "inference", "title": "Inference", "panels": [
                     {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},
+                ]},
+            ],
+        },
+        "train_unrolled": {
+            "essentials": [
+                "run_name",
+                {"path": "gpu", "widget": GPU_ONE},
+                "logdir",
+                {"path": "paths.dataset_path", "widget": PICK_DATASET},
+                {"path": "paths.parameters_path", "widget": PICK_PARAMS},
+                {"path": "seed", "widget": NUM_SEED},
+            ],
+            "sections": [
+                {"key": "model", "title": "Model", "panels": [
+                    {"kind": "fields", "groups": [{"title": "Unrolled model", "fields": ["model_name", "model_overrides"]}]},
+                ]},
+                {"key": "data", "title": "Data", "panels": [
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
+                ]},
+                {"key": "training", "title": "Training", "panels": [
+                    {"kind": "fields", "title": "Training", "template": "training_unrolled", "at": "training"},
+                ]},
+                {"key": "physics", "title": "Physics", "panels": [
+                    {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
+                    {"kind": "fields", "title": "Measurements and loss", "groups": [
+                        {"title": None, "fields": ["curve_loss", "measurement_noise_std", "power_floor"]},
+                    ]},
                 ]},
             ],
         },

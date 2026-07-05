@@ -5,8 +5,28 @@ from pathlib     import Path
 
 from configuration.dataset                import AugmentationConfig
 from configuration.normalization.general  import NormalizationConfig
-from configuration.training.general.run   import TrainingPathsConfig, TrainingQueueConfig
+from configuration.training.general.run   import TrainingPathsConfig
 from configuration.sar.geometry_config    import GeometryConfig
+
+
+@dataclass
+class UnrolledTrainingConfig:
+    epochs               : int        = 60
+    scheduler_epochs     : int | None = None
+    eta_min              : float      = 1e-6
+    early_stop_patience  : int        = 30
+    early_stop_min_delta : float      = 0.0
+    max_grad_norm        : float      = 1.0
+
+    batch_size      : int = 256
+    num_workers     : int = 4
+    prefetch_factor : int = 2
+
+    patch_size    : tuple[int, int] = (64, 64)
+    patch_stride  : int             = 32
+    train_azimuth : tuple[int, int] = (1000, 13000)
+    val_azimuth   : tuple[int, int] = (13064, 14500)
+    test_azimuth  : tuple[int, int] = (14564, 16000)
 
 
 @dataclass
@@ -18,11 +38,11 @@ class UnrolledEntryConfig:
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/unrolled")
     model_overrides : dict       = field(default_factory=dict)
 
-    paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
-    training      : TrainingQueueConfig = field(default_factory=TrainingQueueConfig)
-    geometry      : GeometryConfig      = field(default_factory=GeometryConfig)
-    normalization : NormalizationConfig = field(default_factory=NormalizationConfig)
-    augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
+    paths         : TrainingPathsConfig    = field(default_factory=TrainingPathsConfig)
+    training      : UnrolledTrainingConfig = field(default_factory=UnrolledTrainingConfig)
+    geometry      : GeometryConfig         = field(default_factory=GeometryConfig)
+    normalization : NormalizationConfig    = field(default_factory=NormalizationConfig)
+    augmentation  : AugmentationConfig     = field(default_factory=AugmentationConfig)
 
     curve_loss            : str   = "l1"
     measurement_noise_std : float = 0.0

@@ -2109,13 +2109,32 @@
         "logdir": "Base directory that receives one subdirectory per training run",
         "model_overrides": "Field overrides applied to the model config from the registry (e.g. n_iterations)",
         "paths": "Dataset locations: preprocessing run directory, extracted-parameters file, and secondary track labels",
-        "training": "Shared training-queue knobs; this pipeline reads epochs, batch/loader settings, patch tiling, azimuth splits, early stopping, eta_min, scheduler_epochs, and max_grad_norm, and ignores the backbone-only fields",
+        "training": "Training-loop knobs (epochs, schedule, early stopping, batch/loader settings, patch tiling, azimuth splits); a slim UnrolledTrainingConfig containing exactly the fields the lean trainer reads",
         "geometry": "Tomographic geometry configuration resolved against the dataset; supplies the height-axis convention and enables the per-pixel kz field the operator requires",
         "normalization": "Per-channel normalization recipes used by the dataset pipeline; output denormalization recovers physical Gaussian parameters before profile rendering",
         "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches",
         "curve_loss": "Profile reconstruction loss over the elevation axis: l1 or mse, masked to pixels with ground-truth power",
         "measurement_noise_std": "Standard deviation of complex Gaussian noise added to the synthesised coherence measurements; 0 trains on exact forward-model measurements",
         "power_floor": "Minimum integrated ground-truth profile power for a pixel to enter the loss and the coherence normalization"
+      }
+    },
+    "training/unrolled::UnrolledTrainingConfig": {
+      "summary": "Training-loop knobs for the unrolled physics pipeline; deliberately slimmer than the shared TrainingQueueConfig because the lean unrolled trainer supports exactly these fields",
+      "fields": {
+        "epochs": "Number of training epochs",
+        "scheduler_epochs": "Cosine schedule horizon in epochs; null uses the full epoch count",
+        "eta_min": "Final learning rate of the cosine annealing schedule",
+        "early_stop_patience": "Epochs without validation improvement before training stops",
+        "early_stop_min_delta": "Minimum validation-loss decrease that counts as an improvement",
+        "max_grad_norm": "Fixed gradient-norm clipping threshold",
+        "batch_size": "Patches per training batch",
+        "num_workers": "Dataloader worker processes",
+        "prefetch_factor": "Batches prefetched per dataloader worker",
+        "patch_size": "Spatial patch size (height, width) tiled from the scene",
+        "patch_stride": "Stride between neighbouring patches during tiling",
+        "train_azimuth": "Azimuth pixel range of the training split",
+        "val_azimuth": "Azimuth pixel range of the validation split",
+        "test_azimuth": "Azimuth pixel range of the test split"
       }
     }
   }

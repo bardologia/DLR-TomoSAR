@@ -29,6 +29,10 @@ class ProjectPaths:
             "config_module" : "configuration.training.jepa",
             "config_class"  : "JepaEntryConfig",
         },
+        "train_unrolled": {
+            "config_module" : "configuration.training.unrolled",
+            "config_class"  : "UnrolledEntryConfig",
+        },
         "infer_backbone": {
             "config_module" : "configuration.inference",
             "config_class"  : "BackboneInferenceEntryConfig",
@@ -67,6 +71,7 @@ class ProjectPaths:
         "train_profile_autoencoder" : "training",
         "train_image_autoencoder"   : "training",
         "train_jepa"                : "training",
+        "train_unrolled"            : "training",
         "infer_backbone"            : "inference",
         "infer_profile_autoencoder" : "inference",
         "infer_image_autoencoder"   : "inference",
