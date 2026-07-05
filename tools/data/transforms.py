@@ -7,7 +7,7 @@ import torch
 
 
 class Log1pTransform:
-    CEIL = 1000.0
+    CEIL = 200.0
 
     @staticmethod
     def compress(x, leaky_slope: float = 0.0):

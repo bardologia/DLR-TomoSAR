@@ -119,10 +119,10 @@ _SLOT_STRATEGIES: dict[str, ChannelStrategy] = {
 class OutputClampConfig:
     enabled           : bool  = True
     floor             : float = 0.0
-    ceil              : float = 1000.0
+    ceil              : float = 200.0
     leaky_slope       : float = 0.1
     param_leaky_slope : float = 0.1
-    amp_max           : float = 1000.0
+    amp_max           : float = 200.0
 
     def as_dict(self) -> dict:
         return {"enabled": self.enabled, "floor": self.floor, "ceil": self.ceil, "leaky_slope": self.leaky_slope, "param_leaky_slope": self.param_leaky_slope, "amp_max": self.amp_max}
@@ -155,10 +155,10 @@ class NormalizationConfig:
 
     clamp_output            : bool  = True
     clamp_floor             : float = 0.0
-    clamp_ceil              : float = 1000.0
+    clamp_ceil              : float = 200.0
     clamp_leaky_slope       : float = 0.1
     param_clamp_leaky_slope : float = 0.1
-    amp_max                 : float = 1000.0
+    amp_max                 : float = 200.0
 
     SLOT_FIELDS = {
         "pass/mag"      : "pass_mag",

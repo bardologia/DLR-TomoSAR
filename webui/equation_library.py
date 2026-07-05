@@ -692,7 +692,7 @@ class EquationLibrary:
                     "note"  : "Denormalised predictions are clamped to these bounds before curve reconstruction, using a leaky clamp (normalization.param_clamp_leaky_slope, default 0.1, persisted in normalization_stats.json as param_leaky_slope) so gradients survive saturation, then renormalised (gaussians.py GaussianClamp, loss.py _prepare). Three leaky floors stack at amplitude 0 (decompress and compress leak with clamp_leaky_slope, the bounds clamp with param_clamp_leaky_slope), so the below-floor recovery gradient scales as clamp_leaky_slope squared times param_clamp_leaky_slope; the two knobs keep that composition controllable.",
                     "vars"  : [
                         {"sym": r"a",                  "desc": "predicted amplitude"},
-                        {"sym": r"a_{\max}",           "desc": "normalization.amp_max, default 1000"},
+                        {"sym": r"a_{\max}",           "desc": "normalization.amp_max, default 200"},
                         {"sym": r"\mu",                "desc": "predicted mean elevation"},
                         {"sym": r"\sigma",             "desc": "predicted spread"},
                         {"sym": r"\Delta x",           "desc": "elevation axis step (m)"},

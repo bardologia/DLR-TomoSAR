@@ -104,7 +104,7 @@ def test_decompress_leaky_slope_keeps_gradient_below_floor():
 
 
 def test_decompress_leaky_slope_identity_inside_bounds():
-    inside = np.log1p(np.array([1.0, 500.0]))
+    inside = np.log1p(np.array([1.0, 150.0]))
 
     hard  = Log1pTransform.decompress(inside)
     leaky = Log1pTransform.decompress(inside, leaky_slope=0.1)
