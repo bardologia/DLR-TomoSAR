@@ -64,10 +64,24 @@ class App {
 
   async init() {
     this._initScenes();
+    this._initNav();
     await this._loadProject();
     this._initComponents();
     this._initRouter();
     this.reveal.scan();
+  }
+
+  _initNav() {
+    const nav = document.getElementById("nav");
+    if (!nav) return;
+    const edge = document.querySelector(".nav-edge");
+    nav.querySelectorAll("a[data-route]").forEach((a) => {
+      a.addEventListener("click", () => {
+        a.blur();
+        nav.classList.add("is-dismissed");
+      });
+    });
+    if (edge) edge.addEventListener("mouseenter", () => nav.classList.remove("is-dismissed"));
   }
 
   _initScenes() {

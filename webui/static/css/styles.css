@@ -120,6 +120,9 @@ em { font-style: italic; color: var(--accent); }
   transform: translateX(0);
   box-shadow: 8px 0 34px rgba(20, 22, 25, 0.17);
 }
+@media (min-width: 901px) {
+  #nav.is-dismissed { transform: translateX(-100%); box-shadow: none; }
+}
 
 .nav__brand { display: flex; align-items: center; gap: 11px; }
 
