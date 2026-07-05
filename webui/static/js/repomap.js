@@ -206,6 +206,7 @@ class RepoMapView {
       el.className   = "rm-node rm-node--" + n.role;
       el.dataset.id  = n.id;
       el.dataset.col = String(n.col || 0);
+      el.dataset.row = String(n.row || 0);
       el.style.gridColumn = String((n.col || 0) + 1);
       el.style.gridRow    = String((n.row || 0) + 1);
       el.style.setProperty("--role", this.ROLE_COLORS[n.role] || this.ROLE_COLORS.external);
@@ -357,7 +358,7 @@ class RepoMapView {
       const el = this.nodeById[id];
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height, col: Number(el.dataset.col) };
+      return { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height, col: Number(el.dataset.col), row: Number(el.dataset.row) };
     };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
@@ -368,6 +369,73 @@ class RepoMapView {
     // the elbow whose faces are still free of the opposite direction, keeping every side one-way.
     const AV = 22;
     const nodeBoxes = this.diagram.nodes.map((n) => box(n.id)).filter(Boolean);
+
+    // The grid leaves a card-free lane between every pair of adjacent columns and rows. A wire that
+    // would otherwise run straight through an intervening card is re-routed as a "staple" that travels
+    // those lanes only. Lane positions are derived from the actual card boxes so uneven card heights
+    // still yield a gap that clears every card in the band.
+    const obstacles = this.diagram.nodes.map((n) => ({ id: n.id, b: box(n.id) })).filter((o) => o.b);
+    const colBand = {}, rowBand = {};
+    obstacles.forEach(({ b }) => {
+      const cb = colBand[b.col] || (colBand[b.col] = { L: Infinity, R: -Infinity });
+      cb.L = Math.min(cb.L, b.x); cb.R = Math.max(cb.R, b.x + b.w);
+      const rb = rowBand[b.row] || (rowBand[b.row] = { T: Infinity, B: -Infinity });
+      rb.T = Math.min(rb.T, b.y); rb.B = Math.max(rb.B, b.y + b.h);
+    });
+    const colKeys = Object.keys(colBand).map(Number).sort((p, q) => p - q);
+    const rowKeys = Object.keys(rowBand).map(Number).sort((p, q) => p - q);
+    const GPAD = 15;
+    const vGutR = (c) => { const i = colKeys.indexOf(c); return (i >= 0 && i + 1 < colKeys.length) ? (colBand[c].R + colBand[colKeys[i + 1]].L) / 2 : colBand[c].R + GPAD; };
+    const vGutL = (c) => { const i = colKeys.indexOf(c); return (i > 0) ? (colBand[colKeys[i - 1]].R + colBand[c].L) / 2 : colBand[c].L - GPAD; };
+    const hGutB = (rw) => { const i = rowKeys.indexOf(rw); return (i >= 0 && i + 1 < rowKeys.length) ? (rowBand[rw].B + rowBand[rowKeys[i + 1]].T) / 2 : rowBand[rw].B + GPAD; };
+    const hGutT = (rw) => { const i = rowKeys.indexOf(rw); return (i > 0) ? (rowBand[rowKeys[i - 1]].B + rowBand[rw].T) / 2 : rowBand[rw].T - GPAD; };
+    const rowHasBelow = (rw) => rowKeys.indexOf(rw) < rowKeys.length - 1;
+
+    const polyPts = (d) => {
+      const t = d.replace(/,/g, " ").split(/\s+/).filter(Boolean); const pts = []; let x = 0, y = 0, i = 0;
+      while (i < t.length) {
+        const c = t[i++];
+        if      (c === "M" || c === "L") { x = +t[i++]; y = +t[i++]; pts.push([x, y]); }
+        else if (c === "H") { x = +t[i++]; pts.push([x, y]); }
+        else if (c === "V") { y = +t[i++]; pts.push([x, y]); }
+      }
+      return pts;
+    };
+    const segHitsBox = (p0, p1, R) => {
+      const inset = 3, x0 = R.x + inset, y0 = R.y + inset, x1 = R.x + R.w - inset, y1 = R.y + R.h - inset;
+      if (Math.abs(p0[1] - p1[1]) < 0.5) { const y = p0[1]; if (y <= y0 || y >= y1) return false; return Math.min(p0[0], p1[0]) < x1 && Math.max(p0[0], p1[0]) > x0; }
+      const x = p0[0]; if (x <= x0 || x >= x1) return false; return Math.min(p0[1], p1[1]) < y1 && Math.max(p0[1], p1[1]) > y0;
+    };
+    const hitsCard = (d, fromId, toId) => {
+      const pts = polyPts(d);
+      for (let i = 1; i < pts.length; i++) for (const o of obstacles) {
+        if (o.id === fromId || o.id === toId) continue;
+        if (segHitsBox(pts[i - 1], pts[i], o.b)) return true;
+      }
+      return false;
+    };
+    const hgOf = (r) => (r.a.row !== r.b.row) ? (r.b.row > r.a.row ? hGutT(r.b.row) : hGutB(r.b.row))
+                                              : (rowHasBelow(r.a.row) ? hGutB(r.a.row) : hGutT(r.a.row));
+    const stapleH = (r) => {                                    // column-spanning bypass through a row lane
+      const right = r.b.col > r.a.col;
+      const ax = right ? r.a.x + r.a.w : r.a.x, bx = right ? r.b.x : r.b.x + r.b.w;
+      const gA = (right ? vGutR(r.a.col) : vGutL(r.a.col)) + r.lane * 8;
+      const gB = (right ? vGutL(r.b.col) : vGutR(r.b.col)) + r.lane * 8;
+      const ay = (r.fa === "L" || r.fa === "R") ? r.pa.y : r.acy;
+      const by = (r.fb === "L" || r.fb === "R") ? r.pb.y : r.bcy;
+      const hg = r.hg + r.lane * 11;
+      return { d: `M ${ax} ${ay} H ${gA} V ${hg} H ${gB} V ${by} H ${bx}`, mx: (gA + gB) / 2, my: hg };
+    };
+    const stapleV = (r) => {                                    // row-spanning bypass through a column lane
+      const down = r.b.row > r.a.row;
+      const ay = down ? r.a.y + r.a.h : r.a.y, by = down ? r.b.y : r.b.y + r.b.h;
+      const ax = (r.fa === "T" || r.fa === "B") ? r.pa.x : r.acx;
+      const bx = (r.fb === "T" || r.fb === "B") ? r.pb.x : r.bcx;
+      const gx = r.gx + r.lane * 11;
+      const gy1 = (down ? hGutB(r.a.row) : hGutT(r.a.row)) + r.lane * 8, gy2 = (down ? hGutT(r.b.row) : hGutB(r.b.row)) + r.lane * 8;
+      return { d: `M ${ax} ${ay} V ${gy1} H ${gx} V ${gy2} H ${bx} V ${by}`, mx: gx, my: (r.acy + r.bcy) / 2 };
+    };
+
     const usage = {};
     const bump = (id, f, dir) => { const k = id + "|" + f; (usage[k] = usage[k] || { out: 0, in: 0 })[dir]++; };
     const clearOpp = (id, f, dir) => { const u = usage[id + "|" + f]; return !u || u[dir === "out" ? "in" : "out"] === 0; };
@@ -393,6 +461,12 @@ class RepoMapView {
       else if (sameCol)                    { r.cat = "side"; r.fa = dy >= 0 ? "B" : "T"; r.fb = dy >= 0 ? "T" : "B"; }
       recs.push(r);
     });
+
+    // A -> B and B -> A drawn between the same faces land on top of each other and read as one doubled
+    // wire; mark the pair so the aligned attach points can be split into two parallel lanes.
+    const havePair = {};
+    recs.forEach((r) => { havePair[r.e.from + " " + r.e.to] = true; });
+    recs.forEach((r) => { if (havePair[r.e.to + " " + r.e.from]) r.recip = (String(r.e.from) < String(r.e.to)) ? -1 : 1; });
 
     recs.forEach((r) => { if (r.cat !== "diag") { bump(r.e.from, r.fa, "out"); bump(r.e.to, r.fb, "in"); } });
     recs.forEach((r) => {
@@ -456,6 +530,11 @@ class RepoMapView {
       if (r.aligned) {
         r.pa = faceCenter(r.a, r.fa);
         r.pb = faceCenter(r.b, r.fb);
+        if (r.recip) {
+          const off = 7 * r.recip;
+          if (r.fa === "L" || r.fa === "R") { r.pa.y += off; r.pb.y += off; }
+          else                              { r.pa.x += off; r.pb.x += off; }
+        }
         reserved[r.e.from + "|" + r.fa] = true;
         reserved[r.e.to   + "|" + r.fb] = true;
         return;
@@ -485,8 +564,29 @@ class RepoMapView {
       });
     });
 
+    // Decide the route per wire: the plain elbow when it clears every card, else a gutter staple.
+    // Staples that share one gutter are then spread across parallel lanes so they never coincide.
     recs.forEach((r) => {
-      const geom  = this._route(r.pa, r.fa, r.pb, r.fb, r.bend);
+      r.lane = 0;
+      r.simpleGeom = this._route(r.pa, r.fa, r.pb, r.fb, r.bend);
+      if (!hitsCard(r.simpleGeom.d, r.e.from, r.e.to)) { r.route = "simple"; return; }
+      if (r.a.col !== r.b.col) { r.route = "H"; r.hg = hgOf(r); } else { r.route = "V"; r.gx = vGutR(r.a.col); }
+    });
+    const laneG = {};
+    recs.forEach((r) => {
+      if (r.route === "simple") return;
+      const k = r.route === "H" ? "H" + Math.round(r.hg) : "V" + Math.round(r.gx);
+      (laneG[k] = laneG[k] || []).push(r);
+    });
+    Object.values(laneG).forEach((list) => {
+      if (list.length < 2) return;
+      list.sort((p, q) => (p.acx + p.bcx + p.acy + p.bcy) - (q.acx + q.bcx + q.acy + q.bcy));
+      const n = list.length;
+      list.forEach((r, i) => { r.lane = i - (n - 1) / 2; });
+    });
+
+    recs.forEach((r) => {
+      let geom = r.route === "simple" ? r.simpleGeom : (r.route === "H" ? stapleH(r) : stapleV(r));
       const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
 
       const base = this._path(geom.d, "rm-wire", color);
