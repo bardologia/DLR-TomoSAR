@@ -2638,7 +2638,7 @@
             {
               "id": "prep",
               "label": "BackboneDatasetPreparation",
-              "module": "pipelines/shared/dataset/dataset_prep.py",
+              "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "io",
               "fn": "Sets n_gaussians from the gaussian config and builds the GaussianAxis, then runs the backbone DatasetPipeline and returns the train/val/test DataLoaders plus the PatchDataset dict.",
               "col": 0,
@@ -2775,7 +2775,7 @@
             {
               "id": "data",
               "label": "BackboneDatasetPreparation",
-              "module": "pipelines/shared/dataset/dataset_prep.py",
+              "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "external",
               "fn": "External dataset preparation supplying the input-image patch DataLoaders and the derived in_channels (see the Dataset diagram).",
               "col": 0,
@@ -3262,7 +3262,7 @@
             {
               "id": "dataprep",
               "label": "BackboneDatasetPreparation",
-              "module": "pipelines/shared/dataset/dataset_prep.py",
+              "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "data",
               "fn": "Shared preparation that crops patches and yields train/val/test DataLoaders of (input stack, GT params) plus the elevation x-axis.",
               "col": 2,
@@ -3958,7 +3958,7 @@
             {
               "id": "ds_prep",
               "label": "BackboneDatasetPreparation",
-              "module": "pipelines/shared/dataset/dataset_prep.py",
+              "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "orchestrator",
               "fn": "Sets n_gaussians, builds the GaussianAxis from profile length, and runs the DatasetPipeline to return loaders, datasets and the x-axis.",
               "col": 1,
