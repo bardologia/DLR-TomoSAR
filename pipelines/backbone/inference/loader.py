@@ -91,6 +91,7 @@ class RunLoader:
             num_workers                 = int(num_workers),
             shuffle_train               = False,
             pin_memory                  = bool(payload["pin_memory"]),
+            n_gaussians                 = int(payload["n_gaussians"]),
         )
 
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):

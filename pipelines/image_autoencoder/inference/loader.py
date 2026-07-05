@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib     import Path
 
 from torch.utils.data import DataLoader
@@ -59,7 +59,7 @@ class ImageAeRunLoader(RunLoader):
             num_workers = config.num_workers,
         )
 
-        norm_stats              = replace(Stats.load(self.meta_directory, self.logger), output_stats=None)
+        norm_stats              = Stats.load(self.meta_directory, self.logger)
         model, ae_name, ae_cfg  = self._build_model(device)
 
         ckpt_path               = self.run_directory / config.checkpoint_name
