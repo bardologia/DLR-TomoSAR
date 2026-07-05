@@ -45,6 +45,11 @@
       "num_keys": 391,
       "num_parameters": 14353291
     },
+    "nafnet": {
+      "signature": "d78f496c6241ea4da05b9e75e06d18d021bf70e0b7105d865f03433a5d5f04ab",
+      "num_keys": 664,
+      "num_parameters": 29160006
+    },
     "pixel_mlp": {
       "signature": "b2e4541ba1faa3b53e81c25509e79cdb32f3afde619d584f487d800b34c3866a",
       "num_keys": 26,
