@@ -23,9 +23,9 @@ class InferenceEntry:
     }
 
     DESCRIPTIONS = {
-        RunType.BACKBONE   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports over every backbone/JEPA run under the selected roots.",
-        RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run under the selected roots.",
-        RunType.IMAGE_AE   : "Image-autoencoder inference: reconstruction scoring over every standalone image-autoencoder run under the selected roots.",
+        RunType.BACKBONE   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports over every backbone/JEPA run found at any depth under the runs directory.",
+        RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run found at any depth under the runs directory.",
+        RunType.IMAGE_AE   : "Image-autoencoder inference: reconstruction scoring over every standalone image-autoencoder run found at any depth under the runs directory.",
     }
 
     def __init__(self, entry_script: Path, run_type: str) -> None:

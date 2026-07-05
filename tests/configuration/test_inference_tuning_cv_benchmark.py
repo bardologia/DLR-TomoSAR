@@ -91,7 +91,7 @@ def test_backbone_inference_entry_config_holds_inference():
     assert isinstance(cfg.inference, InferenceConfig)
     assert cfg.inference.gif_axes == ["elevation", "range", "azimuth"]
     assert isinstance(cfg.run_filter, list)
-    assert len(cfg.logs_dirs) == 2
+    assert cfg.runs_dir.endswith("/runs")
 
 
 def test_ae_inference_entry_configs_expose_only_their_tree():
@@ -103,6 +103,8 @@ def test_ae_inference_entry_configs_expose_only_their_tree():
     assert not hasattr(profile, "inference")
     assert not hasattr(image, "inference")
     assert not hasattr(BackboneInferenceEntryConfig(), "profile_inference")
+    assert profile.runs_dir.endswith("/profile_autoencoder")
+    assert image.runs_dir.endswith("/image_autoencoder")
 
 
 def test_tuning_config_positive_trials():

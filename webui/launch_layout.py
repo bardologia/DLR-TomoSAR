@@ -301,8 +301,8 @@ class LaunchLayout:
     ]
 
     INFER_ESSENTIALS = [
-        "logs_dirs",
-        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "logs_dirs", "multiBase": True}},
+        "runs_dir",
+        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
         {"path": "gpus", "widget": GPU_MANY},
         "poll_interval_s",
     ]

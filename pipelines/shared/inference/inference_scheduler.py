@@ -19,29 +19,29 @@ class InferenceScheduler:
         self.config       = config
         self.entry_script = entry_script
         self.run_type     = run_type
-        self.logs_dirs    = [Path(d) for d in config.logs_dirs]
+        self.runs_dir     = Path(config.runs_dir)
         self.work_dir     = Path("logs") / "inference" / run_type / RunTag.now()
 
-    def _roots(self, logger: Logger) -> list[Path]:
-        present = [root for root in self.logs_dirs if root.is_dir()]
-        missing = [root for root in self.logs_dirs if not root.is_dir()]
+    def _root(self, logger: Logger) -> Path | None:
+        if self.runs_dir.is_dir():
+            return self.runs_dir
 
-        if missing:
-            logger.subsection(f"Skipping {len(missing)} absent run root(s): {', '.join(str(root) for root in missing)}")
-
-        return present
+        logger.subsection(f"Runs directory does not exist: {self.runs_dir}")
+        return None
 
     def _candidate_dirs(self, logger: Logger) -> list[Path]:
-        roots = self._roots(logger)
+        root = self._root(logger)
+        if root is None:
+            return []
 
         if self.config.run_filter:
-            selected = [root / name for name in self.config.run_filter for root in roots if (root / name).is_dir()]
-            missing  = [name for name in self.config.run_filter if not any((root / name).is_dir() for root in roots)]
+            selected = [root / name for name in self.config.run_filter if (root / name).is_dir()]
+            missing  = [name for name in self.config.run_filter if not (root / name).is_dir()]
             if missing:
-                raise FileNotFoundError(f"No run directory named {missing} found under any of {[str(root) for root in roots]}")
+                raise FileNotFoundError(f"No run directory named {missing} found under {root}")
             return sorted(selected)
 
-        return sorted(directory for root in roots for directory in self._discover_runs(root, 0))
+        return sorted(self._discover_runs(root, 0))
 
     def _discover_runs(self, directory: Path, depth: int):
         for entry in sorted(directory.iterdir()):
@@ -94,7 +94,7 @@ class InferenceScheduler:
                 "Run type"  : self.run_type,
                 "Runs"      : len(run_dirs),
                 "GPUs"      : self.config.gpus,
-                "Run roots" : [str(root) for root in self.logs_dirs],
+                "Runs dir"  : str(self.runs_dir),
                 "Filter"    : self.config.run_filter or "all run directories",
                 "Workers"   : str(self.work_dir),
             }, title="Configuration")

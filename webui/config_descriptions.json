@@ -1469,8 +1469,8 @@
     "inference/backbone::BackboneInferenceEntryConfig": {
       "summary": "Entry config for the scheduler that runs sliding-window backbone/JEPA inference over multiple runs, queuing one worker process per run across a fixed pool of GPUs",
       "fields": {
-        "logs_dirs": "run-root directories scanned for runs to infer, default is the backbone and jepa roots under _RUNS_ROOT; missing roots are skipped with a log warning rather than erroring",
-        "run_filter": "run-directory names to restrict to (matched under logs_dirs), default empty list processes every directory found there; an unmatched name raises FileNotFoundError",
+        "runs_dir": "master runs directory scanned recursively for runs to infer, default is _RUNS_ROOT; every run at any depth (a directory holding a meta/ subdir) is discovered and non-backbone runs are skipped by type; a missing directory is skipped with a log warning rather than erroring",
+        "run_filter": "run names relative to runs_dir to restrict to (e.g. backbone/run_x), default empty list processes every run found there; an unmatched name raises FileNotFoundError",
         "gpus": "GPU device indices the GpuQueue cycles jobs across, default [0]; one run is launched per free GPU concurrently until the queue drains",
         "poll_interval_s": "seconds GpuQueue sleeps between reap/launch cycles while jobs are running or queued, default 5.0",
         "inference": "InferenceConfig used for every worker run, with run_directory replaced per-run, save_cubes=True, cpu_workers=16 and gif_axes=['elevation','range','azimuth']; all other InferenceConfig fields (split, checkpoint_name, save_plots, etc.) keep their normal defaults"
@@ -1566,10 +1566,10 @@
       }
     },
     "inference/image_autoencoder::ImageAeInferenceEntryConfig": {
-      "summary": "Entry point queuing image-autoencoder inference across every discovered run under one or more log directories",
+      "summary": "Entry point queuing image-autoencoder inference across every run discovered recursively under the runs directory",
       "fields": {
-        "logs_dirs": "List of root directories scanned for image-autoencoder run directories to run inference on",
-        "run_filter": "List of exact run-directory names to restrict inference to, empty processes every discovered run of this type",
+        "runs_dir": "Master runs directory scanned recursively for image-autoencoder runs to infer, defaults to the image_autoencoder subtree of the runs root; every run at any depth is discovered and non-image-autoencoder runs are skipped by type",
+        "run_filter": "List of run names relative to runs_dir to restrict inference to, empty processes every discovered run of this type",
         "gpus": "List of GPU device indices across which queued inference jobs are distributed and launched in parallel",
         "poll_interval_s": "Seconds between successive polls of the GPU job queue while waiting for a free GPU or a running job to finish",
         "image_inference": "ImageAeInferenceConfig template applied to each discovered run, with run_directory overridden per run"
@@ -1610,10 +1610,10 @@
       }
     },
     "inference/profile_autoencoder::ProfileAeInferenceEntryConfig": {
-      "summary": "Batch entry point queuing profile-autoencoder inference across every discovered run under the selected roots",
+      "summary": "Batch entry point queuing profile-autoencoder inference across every run discovered recursively under the runs directory",
       "fields": {
-        "logs_dirs": "list of root directories scanned for standalone profile-autoencoder runs to run inference on",
-        "run_filter": "list of exact run-directory names to restrict processing to, empty processes every discovered run",
+        "runs_dir": "master runs directory scanned recursively for standalone profile-autoencoder runs, defaults to the profile_autoencoder subtree of the runs root; every run at any depth is discovered and non-profile-autoencoder runs are skipped by type",
+        "run_filter": "list of run names relative to runs_dir to restrict processing to, empty processes every discovered run",
         "gpus": "list of GPU device indices across which queued inference jobs are distributed and launched in parallel",
         "poll_interval_s": "seconds between successive polls of the GPU queue while waiting for a free GPU or job completion",
         "profile_inference": "ProfileAeInferenceConfig template applied to each discovered run, with run_directory overridden per run"

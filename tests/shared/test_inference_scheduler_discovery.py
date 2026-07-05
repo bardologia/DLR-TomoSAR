@@ -18,7 +18,7 @@ def _make_run(directory: Path, config_name: str) -> None:
 
 
 def _scheduler(runs: Path, run_filter, run_type: str) -> InferenceScheduler:
-    config = SimpleNamespace(logs_dirs=[str(runs)], run_filter=run_filter, gpus=[0], poll_interval_s=1)
+    config = SimpleNamespace(runs_dir=str(runs), run_filter=run_filter, gpus=[0], poll_interval_s=1)
     return InferenceScheduler(config, Path("main/x.py"), run_type)
 
 
