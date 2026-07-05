@@ -15,6 +15,8 @@ class DatasetBrowser:
     MAX_DEPTH       = 3
     CHECKPOINT_NAME = "best_model.pt"
     INFERENCE_DIR   = "inference"
+    RUN_MARKER      = "meta"
+    RUN_MAX_DEPTH   = 6
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
@@ -50,15 +52,12 @@ class DatasetBrowser:
 
         entries = []
         for base in roots:
-            for entry in sorted(base.iterdir()):
-                if not entry.is_dir() or entry.name.startswith("."):
-                    continue
-
+            for run_dir in self._run_dirs(base):
                 entries.append({
-                    "name"           : entry.name,
-                    "path"           : str(entry),
-                    "has_checkpoint" : (entry / self.CHECKPOINT_NAME).is_file(),
-                    "has_inference"  : self._has_inference(entry),
+                    "name"           : str(run_dir.relative_to(base)),
+                    "path"           : str(run_dir),
+                    "has_checkpoint" : (run_dir / self.CHECKPOINT_NAME).is_file(),
+                    "has_inference"  : self._has_inference(run_dir),
                 })
 
         base_label = ", ".join(str(root) for root in roots)
@@ -105,6 +104,19 @@ class DatasetBrowser:
 
         self.logger.info(f"param_trials: listed {len(entries)} under {base}")
         return {"ok": True, "base": str(base), "trials": entries}
+
+    def _run_dirs(self, base: Path):
+        yield from self._walk_runs(base, 0)
+
+    def _walk_runs(self, directory: Path, depth: int):
+        for entry in sorted(directory.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+
+            if (entry / self.RUN_MARKER).is_dir():
+                yield entry
+            elif depth < self.RUN_MAX_DEPTH:
+                yield from self._walk_runs(entry, depth + 1)
 
     def _has_inference(self, run_dir: Path) -> bool:
         inference_dir = run_dir / self.INFERENCE_DIR

@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types   import SimpleNamespace
+
+from pipelines.shared.inference.inference_scheduler import InferenceScheduler
+from pipelines.shared.inference.run_classifier      import RunArtifacts, RunType
+
+
+class _SilentLogger:
+    def section(self, *args, **kwargs) -> None: ...
+    def subsection(self, *args, **kwargs) -> None: ...
+
+
+def _make_run(directory: Path, config_name: str) -> None:
+    (directory / "meta").mkdir(parents=True)
+    (directory / "meta" / config_name).write_text("{}")
+
+
+def _scheduler(runs: Path, run_filter, run_type: str) -> InferenceScheduler:
+    config = SimpleNamespace(logs_dirs=[str(runs)], run_filter=run_filter, gpus=[0], poll_interval_s=1)
+    return InferenceScheduler(config, Path("main/x.py"), run_type)
+
+
+def test_no_filter_discovers_runs_at_any_depth_and_respects_type(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "run_top", RunArtifacts.BACKBONE_CONFIG)
+    _make_run(runs / "group_a" / "run_a1", RunArtifacts.BACKBONE_CONFIG)
+    _make_run(runs / "group_a" / "deep" / "run_a2", RunArtifacts.BACKBONE_CONFIG)
+    _make_run(runs / "group_b" / "ae_run", RunArtifacts.PROFILE_AE_CONFIG)
+    (runs / "empty").mkdir(parents=True)
+
+    scheduler = _scheduler(runs, [], RunType.BACKBONE)
+    matched   = sorted(str(directory.relative_to(runs)) for directory in scheduler._run_dirs(_SilentLogger()))
+
+    assert matched == ["group_a/deep/run_a2", "group_a/run_a1", "run_top"]
+
+
+def test_filter_resolves_nested_relative_names(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "group_a" / "run_a1", RunArtifacts.BACKBONE_CONFIG)
+
+    scheduler = _scheduler(runs, ["group_a/run_a1"], RunType.BACKBONE)
+    selected  = [str(directory.relative_to(runs)) for directory in scheduler._candidate_dirs(_SilentLogger())]
+
+    assert selected == ["group_a/run_a1"]

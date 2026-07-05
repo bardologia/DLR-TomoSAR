@@ -11,6 +11,10 @@ from tools.runtime.run_tag                     import RunTag
 
 
 class InferenceScheduler:
+
+    RUN_MARKER    = "meta"
+    RUN_MAX_DEPTH = 6
+
     def __init__(self, config, entry_script: Path, run_type: str) -> None:
         self.config       = config
         self.entry_script = entry_script
@@ -37,7 +41,17 @@ class InferenceScheduler:
                 raise FileNotFoundError(f"No run directory named {missing} found under any of {[str(root) for root in roots]}")
             return sorted(selected)
 
-        return sorted(directory for root in roots for directory in root.iterdir() if directory.is_dir())
+        return sorted(directory for root in roots for directory in self._discover_runs(root, 0))
+
+    def _discover_runs(self, directory: Path, depth: int):
+        for entry in sorted(directory.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+
+            if (entry / self.RUN_MARKER).is_dir():
+                yield entry
+            elif depth < self.RUN_MAX_DEPTH:
+                yield from self._discover_runs(entry, depth + 1)
 
     def _run_dirs(self, logger: Logger) -> list[Path]:
         candidates = self._candidate_dirs(logger)
