@@ -1,5 +1,407 @@
 "use strict";
 
+class WireRouter {
+  constructor(boxes, edges, bounds) {
+    this.boxes   = boxes;
+    this.edges   = edges;
+    this.W       = bounds.w;
+    this.H       = bounds.h;
+    this.routes  = [];
+    this.faceUse = {};
+    this.pairs   = {};
+    Object.values(this.boxes).forEach((b) => { b.cx = b.x + b.w / 2; b.cy = b.y + b.h / 2; });
+  }
+
+  _bands() {
+    this.cols = {};
+    this.rows = {};
+    Object.values(this.boxes).forEach((b) => {
+      const c = this.cols[b.col] || (this.cols[b.col] = { L: Infinity, R: -Infinity });
+      c.L = Math.min(c.L, b.x); c.R = Math.max(c.R, b.x + b.w);
+      const r = this.rows[b.row] || (this.rows[b.row] = { T: Infinity, B: -Infinity });
+      r.T = Math.min(r.T, b.y); r.B = Math.max(r.B, b.y + b.h);
+    });
+    this.colKeys = Object.keys(this.cols).map(Number).sort((p, q) => p - q);
+    this.rowKeys = Object.keys(this.rows).map(Number).sort((p, q) => p - q);
+  }
+
+  _corridors() {
+    this.vcorr = [];
+    this.hcorr = [];
+    for (let i = 0; i <= this.colKeys.length; i++) {
+      const lo = i === 0 ? 8 : this.cols[this.colKeys[i - 1]].R + 6;
+      const hi = i === this.colKeys.length ? this.W - 8 : this.cols[this.colKeys[i]].L - 6;
+      this.vcorr.push({ lo, hi, members: [] });
+    }
+    for (let j = 0; j <= this.rowKeys.length; j++) {
+      const lo = j === 0 ? 8 : this.rows[this.rowKeys[j - 1]].B + 6;
+      const hi = j === this.rowKeys.length ? this.H - 8 : this.rows[this.rowKeys[j]].T - 6;
+      this.hcorr.push({ lo, hi, members: [] });
+    }
+  }
+
+  _face(b, f) {
+    if (f === "R") return { x: b.x + b.w, y: b.cy };
+    if (f === "L") return { x: b.x,       y: b.cy };
+    if (f === "B") return { x: b.cx, y: b.y + b.h };
+    return { x: b.cx, y: b.y };
+  }
+
+  _candidates(a, b) {
+    const cands = [];
+    const dc = b.col - a.col, dr = b.row - a.row;
+
+    if (dr === 0)            cands.push({ kind: "straight", fa: dc >= 0 ? "R" : "L", fb: dc >= 0 ? "L" : "R" });
+    if (dc === 0 && dr !== 0) cands.push({ kind: "straight", fa: dr > 0 ? "B" : "T", fb: dr > 0 ? "T" : "B" });
+
+    if (dc !== 0 && dr !== 0) {
+      cands.push({ kind: "hv", fa: dc > 0 ? "R" : "L", fb: dr > 0 ? "T" : "B" });
+      cands.push({ kind: "vh", fa: dr > 0 ? "B" : "T", fb: dc > 0 ? "L" : "R" });
+    }
+
+    this.vcorr.forEach((c, i) => {
+      const mid = (c.lo + c.hi) / 2;
+      cands.push({ kind: "zv", corr: i, fa: mid >= a.cx ? "R" : "L", fb: mid >= b.cx ? "R" : "L" });
+    });
+    this.hcorr.forEach((c, j) => {
+      const mid = (c.lo + c.hi) / 2;
+      cands.push({ kind: "zh", corr: j, fa: mid >= a.cy ? "B" : "T", fb: mid >= b.cy ? "B" : "T" });
+    });
+
+    return cands;
+  }
+
+  _pts(cand, a, b) {
+    const pa = this._face(a, cand.fa), pb = this._face(b, cand.fb);
+    if (cand.kind === "straight") return [pa, pb];
+    if (cand.kind === "hv")       return [pa, { x: pb.x, y: pa.y }, pb];
+    if (cand.kind === "vh")       return [pa, { x: pa.x, y: pb.y }, pb];
+    if (cand.kind === "zv") {
+      const c = this.vcorr[cand.corr], m = (c.lo + c.hi) / 2;
+      return [pa, { x: m, y: pa.y }, { x: m, y: pb.y }, pb];
+    }
+    const c = this.hcorr[cand.corr], m = (c.lo + c.hi) / 2;
+    return [pa, { x: pa.x, y: m }, { x: pb.x, y: m }, pb];
+  }
+
+  _length(pts) {
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) L += Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+    return L;
+  }
+
+  _segHitsBox(p0, p1, b) {
+    const x0 = b.x + 3, y0 = b.y + 3, x1 = b.x + b.w - 3, y1 = b.y + b.h - 3;
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    let t0 = 0.02, t1 = 0.98, ok = true;
+    [[-dx, p0.x - x0], [dx, x1 - p0.x], [-dy, p0.y - y0], [dy, y1 - p0.y]].forEach(([p, q]) => {
+      if (!ok) return;
+      if (Math.abs(p) < 1e-9) { if (q < 0) ok = false; return; }
+      const t = q / p;
+      if (p < 0) { if (t > t0) t0 = t; }
+      else       { if (t < t1) t1 = t; }
+    });
+    return ok && t0 < t1;
+  }
+
+  _hitCount(pts, skipA, skipB) {
+    let n = 0;
+    for (let i = 1; i < pts.length; i++) {
+      Object.entries(this.boxes).forEach(([id, b]) => {
+        if (id === skipA || id === skipB) return;
+        if (this._segHitsBox(pts[i - 1], pts[i], b)) n++;
+      });
+    }
+    return n;
+  }
+
+  _crossCount(pa, pb) {
+    let n = 0;
+    const ori = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    for (let i = 1; i < pa.length; i++) {
+      for (let j = 1; j < pb.length; j++) {
+        const a0 = pa[i - 1], a1 = pa[i], b0 = pb[j - 1], b1 = pb[j];
+        const o1 = ori(a0, a1, b0), o2 = ori(a0, a1, b1), o3 = ori(b0, b1, a0), o4 = ori(b0, b1, a1);
+        if (o1 !== o2 && o3 !== o4 && o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0) n++;
+      }
+    }
+    return n;
+  }
+
+  _faceCost(id, f, dir) {
+    const u = this.faceUse[id + "|" + f];
+    if (!u) return 0;
+    const opp = dir === "out" ? u.in : u.out;
+    return (opp ? 170 : 0) + (u.in + u.out) * 14;
+  }
+
+  _corrCost(corr, lo, hi) {
+    let n = 0;
+    corr.members.forEach(({ r }) => {
+      const p1 = r.pts[1], p2 = r.pts[2];
+      const mlo = Math.min(p1.x === p2.x ? p1.y : p1.x, p1.x === p2.x ? p2.y : p2.x);
+      const mhi = Math.max(p1.x === p2.x ? p1.y : p1.x, p1.x === p2.x ? p2.y : p2.x);
+      if (Math.min(hi, mhi) - Math.max(lo, mlo) > -10) n++;
+    });
+    return n * 28;
+  }
+
+  _evaluate(cand, a, b, e) {
+    const pts   = this._pts(cand, a, b);
+    const bends = cand.kind === "straight" ? 0 : (cand.kind === "hv" || cand.kind === "vh") ? 1 : 2;
+
+    let cost = bends * 120;
+    cost += this._length(pts) * 0.12;
+    cost += this._hitCount(pts, e.from, e.to) * 900;
+    cost += this._faceCost(e.from, cand.fa, "out");
+    cost += this._faceCost(e.to,   cand.fb, "in");
+
+    if (cand.kind === "zv") cost += this._corrCost(this.vcorr[cand.corr], Math.min(pts[1].y, pts[2].y), Math.max(pts[1].y, pts[2].y)) + ((cand.corr === 0 || cand.corr === this.vcorr.length - 1) ? 18 : 0);
+    if (cand.kind === "zh") cost += this._corrCost(this.hcorr[cand.corr], Math.min(pts[1].x, pts[2].x), Math.max(pts[1].x, pts[2].x)) + ((cand.corr === 0 || cand.corr === this.hcorr.length - 1) ? 18 : 0);
+
+    this.routes.forEach((r) => { cost += this._crossCount(pts, r.pts) * 34; });
+    return { cand, pts, cost };
+  }
+
+  _commit(it, ev) {
+    const r  = { e: it.e, a: it.a, b: it.b, cand: ev.cand, pts: ev.pts, aligned: ev.cand.kind === "straight" };
+    const fa = it.e.from + "|" + ev.cand.fa;
+    const fb = it.e.to   + "|" + ev.cand.fb;
+    (this.faceUse[fa] = this.faceUse[fa] || { in: 0, out: 0 }).out += 1;
+    (this.faceUse[fb] = this.faceUse[fb] || { in: 0, out: 0 }).in  += 1;
+    if (ev.cand.kind === "zv") { r.corr = this.vcorr[ev.cand.corr]; r.corr.members.push({ r }); }
+    if (ev.cand.kind === "zh") { r.corr = this.hcorr[ev.cand.corr]; r.corr.members.push({ r }); }
+    this.routes.push(r);
+  }
+
+  _routeEdges() {
+    const items = [];
+    (this.edges || []).forEach((e) => {
+      const a = this.boxes[e.from], b = this.boxes[e.to];
+      if (!a || !b) return;
+      this.pairs[e.from + ">" + e.to] = true;
+      items.push({ e, a, b });
+    });
+
+    const rest = [];
+    items.forEach((it) => {
+      const st  = this._candidates(it.a, it.b).find((c) => c.kind === "straight");
+      const pts = st ? this._pts(st, it.a, it.b) : null;
+      if (pts && this._hitCount(pts, it.e.from, it.e.to) === 0) this._commit(it, { cand: st, pts });
+      else rest.push(it);
+    });
+
+    rest.sort((p, q) => (Math.abs(p.b.cx - p.a.cx) + Math.abs(p.b.cy - p.a.cy)) - (Math.abs(q.b.cx - q.a.cx) + Math.abs(q.b.cy - q.a.cy)));
+    rest.forEach((it) => {
+      let best = null;
+      this._candidates(it.a, it.b).forEach((c) => {
+        if (c.kind === "straight") return;
+        const ev = this._evaluate(c, it.a, it.b, it.e);
+        if (!best || ev.cost < best.cost) best = ev;
+      });
+      if (best) this._commit(it, best);
+    });
+
+    this.routes.forEach((r) => {
+      if (r.aligned && this.pairs[r.e.to + ">" + r.e.from]) r.recip = String(r.e.from) < String(r.e.to) ? -1 : 1;
+    });
+  }
+
+  _headKey(r, end) {
+    const pts  = end === "a" ? r.pts : [...r.pts].reverse();
+    const f    = end === "a" ? r.cand.fa : r.cand.fb;
+    const side = f === "L" || f === "R";
+    for (let i = 1; i < pts.length; i++) {
+      if (side  && Math.abs(pts[i].y - pts[0].y) > 0.5) return pts[i].y;
+      if (!side && Math.abs(pts[i].x - pts[0].x) > 0.5) return pts[i].x;
+    }
+    const far = pts[pts.length - 1];
+    return side ? far.y : far.x;
+  }
+
+  _setEnd(r, end, c, v) {
+    const pts = r.pts, n = pts.length;
+    if (end === "a") { pts[0][c] = v; if (n > 2) pts[1][c] = v; }
+    else             { pts[n - 1][c] = v; if (n > 2) pts[n - 2][c] = v; }
+  }
+
+  _fanFaces() {
+    const groups = {}, reserved = {};
+
+    this.routes.forEach((r) => {
+      if (r.aligned) {
+        if (r.recip) {
+          const off = 7 * r.recip;
+          if (r.cand.fa === "L" || r.cand.fa === "R") { r.pts[0].y += off; r.pts[1].y += off; }
+          else                                        { r.pts[0].x += off; r.pts[1].x += off; }
+        }
+        reserved[r.e.from + "|" + r.cand.fa] = true;
+        reserved[r.e.to   + "|" + r.cand.fb] = true;
+        return;
+      }
+      const ka = r.e.from + "|" + r.cand.fa;
+      const kb = r.e.to   + "|" + r.cand.fb;
+      (groups[ka] = groups[ka] || []).push({ r, end: "a", key: this._headKey(r, "a") });
+      (groups[kb] = groups[kb] || []).push({ r, end: "b", key: this._headKey(r, "b") });
+    });
+
+    Object.entries(groups).forEach(([gk, list]) => {
+      list.sort((p, q) => p.key - q.key);
+      const face  = gk.slice(gk.indexOf("|") + 1);
+      const horiz = face === "L" || face === "R";
+      const n = list.length, keepCenter = !!reserved[gk];
+      list.forEach((item, i) => {
+        const bx   = item.end === "a" ? item.r.a : item.r.b;
+        const span = horiz ? bx.h : bx.w;
+        const m    = Math.min(horiz ? 13 : 16, span / 2 - 2);
+        const frac = n === 1 ? (keepCenter ? 0.72 : 0.5) : (keepCenter ? 0.08 + 0.84 * (i / (n - 1)) : i / (n - 1));
+        const v    = (horiz ? bx.y : bx.x) + m + (span - 2 * m) * frac;
+        this._setEnd(item.r, item.end, horiz ? "y" : "x", v);
+      });
+    });
+  }
+
+  _assignLanes() {
+    const lane = (corr, vert) => {
+      if (!corr.members.length) return;
+      const members = corr.members.map(({ r }) => {
+        const p1 = r.pts[1], p2 = r.pts[2];
+        const lo  = vert ? Math.min(p1.y, p2.y) : Math.min(p1.x, p2.x);
+        const hi  = vert ? Math.max(p1.y, p2.y) : Math.max(p1.x, p2.x);
+        const key = vert ? r.pts[0].x + r.pts[3].x : r.pts[0].y + r.pts[3].y;
+        return { r, lo, hi, key };
+      });
+
+      members.sort((p, q) => p.lo - q.lo);
+      const lanes = [];
+      members.forEach((m) => {
+        let L = lanes.find((l) => l.hi <= m.lo - 10);
+        if (!L) { L = { items: [], hi: -Infinity }; lanes.push(L); }
+        L.items.push(m); L.hi = Math.max(L.hi, m.hi);
+      });
+
+      lanes.forEach((l) => { l.key = l.items.reduce((s, m) => s + m.key, 0) / l.items.length; });
+      lanes.sort((p, q) => p.key - q.key);
+      const mid  = (corr.lo + corr.hi) / 2;
+      const step = lanes.length > 1 ? Math.min(11, (corr.hi - corr.lo - 8) / (lanes.length - 1)) : 0;
+      lanes.forEach((l, k) => {
+        const pos = Math.max(corr.lo + 3, Math.min(corr.hi - 3, mid + (k - (lanes.length - 1) / 2) * step));
+        const c   = vert ? "x" : "y";
+        l.items.forEach((m) => { m.r.pts[1][c] = pos; m.r.pts[2][c] = pos; });
+      });
+    };
+
+    this.vcorr.forEach((c) => lane(c, true));
+    this.hcorr.forEach((c) => lane(c, false));
+  }
+
+  _nudgeSeg(s, delta) {
+    const r = s.r, n = r.pts.length;
+    if (n === 2) return false;
+    const c = s.horiz ? "y" : "x";
+
+    if (s.i === 1 || s.i === n - 1) {
+      const end  = s.i === 1 ? "a" : "b";
+      const f    = end === "a" ? r.cand.fa : r.cand.fb;
+      const side = f === "L" || f === "R";
+      if (side !== s.horiz) return false;
+      const bx = end === "a" ? r.a : r.b;
+      const lo = (s.horiz ? bx.y : bx.x) + 8;
+      const hi = (s.horiz ? bx.y + bx.h : bx.x + bx.w) - 8;
+      const pt = end === "a" ? r.pts[0] : r.pts[n - 1];
+      const v  = pt[c] + delta;
+      if (v < lo || v > hi) return false;
+      this._setEnd(r, end, c, v);
+      return true;
+    }
+
+    if (r.corr) {
+      const v = r.pts[1][c] + delta;
+      if (v < r.corr.lo + 3 || v > r.corr.hi - 3) return false;
+      r.pts[1][c] = v; r.pts[2][c] = v;
+      return true;
+    }
+    return false;
+  }
+
+  _separate() {
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      const segs = [];
+      this.routes.forEach((r) => {
+        for (let i = 1; i < r.pts.length; i++) {
+          const a = r.pts[i - 1], b = r.pts[i];
+          const horiz = Math.abs(a.y - b.y) < 0.5, vert = Math.abs(a.x - b.x) < 0.5;
+          if (horiz === vert) continue;
+          segs.push({ r, i, horiz,
+                      lo: horiz ? Math.min(a.x, b.x) : Math.min(a.y, b.y),
+                      hi: horiz ? Math.max(a.x, b.x) : Math.max(a.y, b.y),
+                      perp: horiz ? a.y : a.x });
+        }
+      });
+
+      for (let i = 0; i < segs.length; i++) {
+        for (let j = i + 1; j < segs.length; j++) {
+          const s1 = segs[i], s2 = segs[j];
+          if (s1.r === s2.r || s1.horiz !== s2.horiz) continue;
+          const gap = Math.abs(s1.perp - s2.perp);
+          if (gap >= 8 || Math.min(s1.hi, s2.hi) - Math.max(s1.lo, s2.lo) < 10) continue;
+          const dir = s2.perp >= s1.perp ? 1 : -1;
+          const d   = 8.5 - gap;
+          if (this._nudgeSeg(s2, dir * d))       { s2.perp += dir * d; moved = true; }
+          else if (this._nudgeSeg(s1, -dir * d)) { s1.perp -= dir * d; moved = true; }
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  _dedupe() {
+    const taken = {};
+    const key = (id, pt) => id + "|" + Math.round(pt.x) + "|" + Math.round(pt.y);
+    this.routes.forEach((r) => {
+      if (r.aligned) { taken[key(r.e.from, r.pts[0])] = true; taken[key(r.e.to, r.pts[r.pts.length - 1])] = true; }
+    });
+    this.routes.forEach((r) => {
+      if (r.aligned) return;
+      [["a", r.e.from, r.cand.fa, r.pts[0]], ["b", r.e.to, r.cand.fb, r.pts[r.pts.length - 1]]].forEach(([end, id, f, pt]) => {
+        const c = (f === "L" || f === "R") ? "y" : "x";
+        let guard = 0;
+        while (taken[key(id, pt)] && guard < 24) { this._setEnd(r, end, c, pt[c] + 6); guard++; }
+        taken[key(id, pt)] = true;
+      });
+    });
+  }
+
+  _geoms() {
+    return this.routes.map((r) => {
+      const pts = r.pts;
+      let d = `M ${pts[0].x} ${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) d += ` L ${pts[i].x} ${pts[i].y}`;
+
+      let bi = 1, bl = -1;
+      for (let i = 1; i < pts.length; i++) {
+        const L = Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+        if (L > bl) { bl = L; bi = i; }
+      }
+
+      return { e: r.e, from: r.e.from, to: r.e.to, fcol: r.a.col, tcol: r.b.col,
+               d, mx: (pts[bi - 1].x + pts[bi].x) / 2, my: (pts[bi - 1].y + pts[bi].y) / 2 };
+    });
+  }
+
+  route() {
+    this._bands();
+    this._corridors();
+    this._routeEdges();
+    this._fanFaces();
+    this._assignLanes();
+    this._separate();
+    this._dedupe();
+    return this._geoms();
+  }
+}
+
 class RepoMapView {
   constructor(root) {
     this.root     = root;
@@ -200,6 +602,7 @@ class RepoMapView {
     const nrow = this.diagram.nrow || (this.diagram.nodes.reduce((m, n) => Math.max(m, n.row || 0), 0) + 1);
     this.colsEl.style.setProperty("--ncol", ncol);
     this.colsEl.style.setProperty("--nrow", nrow);
+    this.colsEl.style.setProperty("--rm-hgap", ncol >= 6 ? "40px" : "64px");
 
     this.diagram.nodes.forEach((n) => {
       const el = document.createElement("div");
@@ -354,215 +757,37 @@ class RepoMapView {
     this.labelEls = [];
 
     const crect = this.canvasEl.getBoundingClientRect();
-    const box   = (id) => {
-      const el = this.nodeById[id];
-      if (!el) return null;
+    const boxes = {};
+    this.diagram.nodes.forEach((n) => {
+      const el = this.nodeById[n.id];
+      if (!el) return;
       const r = el.getBoundingClientRect();
-      return { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height, col: Number(el.dataset.col), row: Number(el.dataset.row) };
-    };
+      boxes[n.id] = { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height,
+                      col: Number(el.dataset.col), row: Number(el.dataset.row) };
+    });
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
-    // Adjacent cards are joined by a straight line between their closest face centres. Anything
-    // diagonal takes a SINGLE elbow (one side face + one top/bottom face) so a wire never runs two
-    // side faces with a jog through the narrow column gap, nor two top/bottom faces through the row
-    // gap. Straight lines and blocked side routes claim their faces first; each diagonal then picks
-    // the elbow whose faces are still free of the opposite direction, keeping every side one-way.
-    // The grid leaves a card-free lane between every pair of adjacent columns and rows. A wire that
-    // would otherwise run straight through an intervening card is re-routed as a "staple" that travels
-    // those lanes only. Lane positions are derived from the actual card boxes so uneven card heights
-    // still yield a gap that clears every card in the band.
-    const obstacles = this.diagram.nodes.map((n) => ({ id: n.id, b: box(n.id) })).filter((o) => o.b);
-    const colBand = {}, rowBand = {};
-    obstacles.forEach(({ b }) => {
-      const cb = colBand[b.col] || (colBand[b.col] = { L: Infinity, R: -Infinity });
-      cb.L = Math.min(cb.L, b.x); cb.R = Math.max(cb.R, b.x + b.w);
-      const rb = rowBand[b.row] || (rowBand[b.row] = { T: Infinity, B: -Infinity });
-      rb.T = Math.min(rb.T, b.y); rb.B = Math.max(rb.B, b.y + b.h);
-    });
-    const colKeys = Object.keys(colBand).map(Number).sort((p, q) => p - q);
-    const rowKeys = Object.keys(rowBand).map(Number).sort((p, q) => p - q);
-    const GPAD = 15;
-    const vGutR = (c) => { const i = colKeys.indexOf(c); return (i >= 0 && i + 1 < colKeys.length) ? (colBand[c].R + colBand[colKeys[i + 1]].L) / 2 : colBand[c].R + GPAD; };
-    const vGutL = (c) => { const i = colKeys.indexOf(c); return (i > 0) ? (colBand[colKeys[i - 1]].R + colBand[c].L) / 2 : colBand[c].L - GPAD; };
-    const hGutB = (rw) => { const i = rowKeys.indexOf(rw); return (i >= 0 && i + 1 < rowKeys.length) ? (rowBand[rw].B + rowBand[rowKeys[i + 1]].T) / 2 : rowBand[rw].B + GPAD; };
-    const hGutT = (rw) => { const i = rowKeys.indexOf(rw); return (i > 0) ? (rowBand[rowKeys[i - 1]].B + rowBand[rw].T) / 2 : rowBand[rw].T - GPAD; };
-    const rowHasBelow = (rw) => rowKeys.indexOf(rw) < rowKeys.length - 1;
+    const bounds = { w: Math.max(w, this.colsEl.scrollWidth), h: Math.max(h, this.colsEl.scrollHeight) };
+    const routes = new WireRouter(boxes, this.diagram.edges || [], bounds).route();
 
-    const polyPts = (d) => {
-      const t = d.replace(/,/g, " ").split(/\s+/).filter(Boolean); const pts = []; let x = 0, y = 0, i = 0;
-      while (i < t.length) {
-        const c = t[i++];
-        if      (c === "M" || c === "L") { x = +t[i++]; y = +t[i++]; pts.push([x, y]); }
-        else if (c === "H") { x = +t[i++]; pts.push([x, y]); }
-        else if (c === "V") { y = +t[i++]; pts.push([x, y]); }
-      }
-      return pts;
-    };
-    const segHitsBox = (p0, p1, R) => {
-      const inset = 3, x0 = R.x + inset, y0 = R.y + inset, x1 = R.x + R.w - inset, y1 = R.y + R.h - inset;
-      if (Math.abs(p0[1] - p1[1]) < 0.5) { const y = p0[1]; if (y <= y0 || y >= y1) return false; return Math.min(p0[0], p1[0]) < x1 && Math.max(p0[0], p1[0]) > x0; }
-      const x = p0[0]; if (x <= x0 || x >= x1) return false; return Math.min(p0[1], p1[1]) < y1 && Math.max(p0[1], p1[1]) > y0;
-    };
-    const hitsCard = (d, fromId, toId) => {
-      const pts = polyPts(d);
-      for (let i = 1; i < pts.length; i++) for (const o of obstacles) {
-        if (o.id === fromId || o.id === toId) continue;
-        if (segHitsBox(pts[i - 1], pts[i], o.b)) return true;
-      }
-      return false;
-    };
-    const fcx = (bx, f) => f === "R" ? bx.x + bx.w : f === "L" ? bx.x : bx.x + bx.w / 2;
-    const fcy = (bx, f) => f === "B" ? bx.y + bx.h : f === "T" ? bx.y : bx.y + bx.h / 2;
-    const manhattan = (pa, pb) => Math.abs(pa.x - pb.x) + Math.abs(pa.y - pb.y);
-    const pathFor = (type, fa, pa, pb) =>
-      type === "straight" ? `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`
-    : (fa === "L" || fa === "R") ? `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`
-    :                              `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`;
+    routes.forEach((r) => {
+      const color = this.ROLE_COLORS[roleOf(r.from)] || this.ROLE_COLORS.external;
 
-    const recs = [];
-    (this.diagram.edges || []).forEach((e) => {
-      const a = box(e.from), b = box(e.to);
-      if (!a || !b) return;
-      const acx = a.x + a.w / 2, acy = a.y + a.h / 2, bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
-      recs.push({ e, a, b, acx, acy, bcx, bcy, dCol: b.col - a.col, dRow: b.row - a.row, lane: 0 });
-    });
-
-    // A -> B and B -> A drawn between the same faces land on top of each other and read as one doubled
-    // wire; mark the pair so the aligned attach points can be split into two parallel lanes.
-    const havePair = {};
-    recs.forEach((r) => { havePair[r.e.from + " " + r.e.to] = true; });
-    recs.forEach((r) => { if (havePair[r.e.to + " " + r.e.from]) r.recip = (String(r.e.from) < String(r.e.to)) ? -1 : 1; });
-
-    // Choose the route with the fewest bends that clears every other card; among equals prefer the
-    // shortest arrow. A straight join (0 bends) or a single elbow covers everything except genuine skip
-    // links -- same row or column with a card between the ends -- which take one detour bend through a
-    // card-free gutter lane. Faces are fixed here; the exact attach slot is shared out below.
-    recs.forEach((r) => {
-      const sameRow = r.dRow === 0, sameCol = r.dCol === 0, cands = [];
-      const add = (type, fa, fb) => {
-        const pa = { x: fcx(r.a, fa), y: fcy(r.a, fa) }, pb = { x: fcx(r.b, fb), y: fcy(r.b, fb) };
-        cands.push({ type, fa, fb, elbows: type === "straight" ? 0 : 1, len: manhattan(pa, pb), clear: !hitsCard(pathFor(type, fa, pa, pb), r.e.from, r.e.to) });
-      };
-      if (sameRow) add("straight", r.dCol >= 0 ? "R" : "L", r.dCol >= 0 ? "L" : "R");
-      if (sameCol) add("straight", r.dRow >= 0 ? "B" : "T", r.dRow >= 0 ? "T" : "B");
-      if (!sameRow && !sameCol) {
-        add("L", r.dCol >= 0 ? "R" : "L", r.dRow >= 0 ? "T" : "B");
-        add("L", r.dRow >= 0 ? "B" : "T", r.dCol >= 0 ? "L" : "R");
-      }
-      const clear = cands.filter((c) => c.clear).sort((p, q) => (p.elbows - q.elbows) || (p.len - q.len));
-      if (clear.length) { r.type = clear[0].type; r.fa = clear[0].fa; r.fb = clear[0].fb; r.aligned = r.type === "straight"; return; }
-
-      r.aligned = false;
-      if (Math.abs(r.dRow) >= Math.abs(r.dCol)) {                  // long run is vertical: use a column gutter
-        r.type = "Uv";
-        if (r.dCol === 0) { r.fa = "R"; r.fb = "R"; r.gut = vGutR(r.a.col); }
-        else { r.fa = r.dCol > 0 ? "R" : "L"; r.fb = r.dCol > 0 ? "L" : "R"; r.gut = r.dCol > 0 ? vGutR(r.a.col) : vGutL(r.a.col); }
-      } else {                                                     // long run is horizontal: use a row gutter
-        r.type = "U";
-        if (r.dRow === 0) { const below = rowHasBelow(r.a.row); r.fa = r.fb = below ? "B" : "T"; r.gut = below ? hGutB(r.a.row) : hGutT(r.a.row); }
-        else { r.fa = r.dRow > 0 ? "B" : "T"; r.fb = r.dRow > 0 ? "T" : "B"; r.gut = r.dRow > 0 ? hGutB(r.a.row) : hGutT(r.a.row); }
-      }
-    });
-
-    // Give every wire on a card face its own attach point, ordered by the far end so the fan stays
-    // crossing-free and no two arrows ever share a point; a straight join keeps the exact face centre.
-    const groups = {}, reserved = {};
-    const push = (id, face, item) => { (groups[id + "|" + face] = groups[id + "|" + face] || []).push(item); };
-    recs.forEach((r) => {
-      if (r.aligned) {
-        r.pa = { x: fcx(r.a, r.fa), y: fcy(r.a, r.fa) };
-        r.pb = { x: fcx(r.b, r.fb), y: fcy(r.b, r.fb) };
-        if (r.recip) {
-          const off = 7 * r.recip;
-          if (r.fa === "L" || r.fa === "R") { r.pa.y += off; r.pb.y += off; }
-          else                              { r.pa.x += off; r.pb.x += off; }
-        }
-        reserved[r.e.from + "|" + r.fa] = true;
-        reserved[r.e.to   + "|" + r.fb] = true;
-        return;
-      }
-      push(r.e.from, r.fa, { r, end: "a", perp: (r.fa === "L" || r.fa === "R") ? r.bcy : r.bcx });
-      push(r.e.to,   r.fb, { r, end: "b", perp: (r.fb === "L" || r.fb === "R") ? r.acy : r.acx });
-    });
-    Object.entries(groups).forEach(([key, list]) => {
-      list.sort((p, q) => p.perp - q.perp);
-      const face = key.slice(key.indexOf("|") + 1);
-      const horiz = face === "L" || face === "R";
-      const n = list.length, keepCenter = !!reserved[key];
-      list.forEach((item, i) => {
-        const r = item.r, bx = item.end === "a" ? r.a : r.b;
-        const span = horiz ? bx.h : bx.w;
-        const m    = Math.min(horiz ? 13 : 16, span / 2 - 2);
-        const frac = n === 1 ? (keepCenter ? 0.72 : 0.5) : (keepCenter ? 0.08 + 0.84 * (i / (n - 1)) : i / (n - 1));
-        const along = m + (span - 2 * m) * frac;
-        const pt = {};
-        if      (face === "R") { pt.x = bx.x + bx.w; pt.y = bx.y + along; }
-        else if (face === "L") { pt.x = bx.x;        pt.y = bx.y + along; }
-        else if (face === "B") { pt.y = bx.y + bx.h; pt.x = bx.x + along; }
-        else                   { pt.y = bx.y;        pt.x = bx.x + along; }
-        if (item.end === "a") r.pa = pt; else r.pb = pt;
-      });
-    });
-
-    // Final guard: no two arrows may share a point. Straight joins claim theirs first (so they stay
-    // straight); any bent wire landing on a taken point slides along its own face until it is clear.
-    const taken = {};
-    const key = (id, pt) => id + "|" + Math.round(pt.x) + "|" + Math.round(pt.y);
-    recs.forEach((r) => { if (r.type === "straight") { taken[key(r.e.from, r.pa)] = true; taken[key(r.e.to, r.pb)] = true; } });
-    recs.forEach((r) => {
-      if (r.type === "straight") return;
-      [[r.e.from, r.pa, r.fa], [r.e.to, r.pb, r.fb]].forEach(([id, pt, f]) => {
-        let guard = 0;
-        while (taken[key(id, pt)] && guard < 24) { if (f === "L" || f === "R") pt.y += 6; else pt.x += 6; guard++; }
-        taken[key(id, pt)] = true;
-      });
-    });
-
-    // Detour wires sharing one gutter get parallel lanes so their long runs never overlap.
-    const laneG = {};
-    recs.forEach((r) => { if (r.type === "U" || r.type === "Uv") { const k = r.type + Math.round(r.gut); (laneG[k] = laneG[k] || []).push(r); } });
-    Object.values(laneG).forEach((list) => {
-      if (list.length < 2) return;
-      list.sort((p, q) => (p.acx + p.bcx + p.acy + p.bcy) - (q.acx + q.bcx + q.acy + q.bcy));
-      const n = list.length;
-      list.forEach((r, i) => { r.lane = i - (n - 1) / 2; });
-    });
-
-    recs.forEach((r) => {
-      const pa = r.pa, pb = r.pb;
-      if      (r.type === "straight") r.geom = { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: (pa.y + pb.y) / 2 };
-      else if (r.type === "L") {
-        r.geom = (r.fa === "L" || r.fa === "R")
-          ? { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y }
-          : { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
-      } else if (r.type === "U") {
-        const g = r.gut + r.lane * 11;
-        r.geom = { d: `M ${pa.x} ${pa.y} V ${g} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: g };
-      } else {
-        const g = r.gut + r.lane * 11;
-        r.geom = { d: `M ${pa.x} ${pa.y} H ${g} V ${pb.y} H ${pb.x}`, mx: g, my: (pa.y + pb.y) / 2 };
-      }
-    });
-
-    recs.forEach((r) => {
-      const geom = r.geom;
-      const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
-
-      const base = this._path(geom.d, "rm-wire", color);
+      const base = this._path(r.d, "rm-wire", color);
       base.setAttribute("marker-end", "url(#rm-arrow)");
-      const flow = this._path(geom.d, "rm-flow", color);
+      const flow = this._path(r.d, "rm-flow", color);
       this.wiresEl.appendChild(base);
       this.wiresEl.appendChild(flow);
-      this.wireEls.push({ base, flow, from: r.e.from, to: r.e.to, fcol: r.a.col, tcol: r.b.col });
+      this.wireEls.push({ base, flow, from: r.from, to: r.to, fcol: r.fcol, tcol: r.tcol });
 
       if (r.e.label) {
         const lab = document.createElement("span");
         lab.className   = "rm-elabel rm-elabel--" + (r.e.kind || "data");
-        lab.style.left  = geom.mx + "px";
-        lab.style.top   = geom.my + "px";
+        lab.style.left  = r.mx + "px";
+        lab.style.top   = r.my + "px";
         lab.textContent = r.e.label;
         this.labelsEl.appendChild(lab);
-        this.labelEls.push({ el: lab, from: r.e.from, to: r.e.to, tcol: r.b.col });
+        this.labelEls.push({ el: lab, from: r.from, to: r.to, tcol: r.tcol });
       }
     });
 

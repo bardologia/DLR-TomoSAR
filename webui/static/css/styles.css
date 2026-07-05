@@ -3471,9 +3471,9 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .rm-canvas { position: relative; width: 100%; }
 .rm-cols {
   display: grid; width: 100%; min-height: 62vh; box-sizing: border-box;
-  grid-template-columns: repeat(var(--ncol, 4), minmax(210px, 1fr));
+  grid-template-columns: repeat(var(--ncol, 4), minmax(150px, 1fr));
   grid-template-rows: repeat(var(--nrow, 3), minmax(150px, 1fr));
-  gap: 46px 64px; padding: 40px 48px;
+  gap: 46px var(--rm-hgap, 64px); padding: 40px 44px;
 }
 
 /* ---- Orthogonal wires ---- */
