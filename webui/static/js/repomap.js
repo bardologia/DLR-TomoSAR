@@ -361,10 +361,9 @@ class RepoMapView {
     };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
-    // One-way faces: a node takes inputs on its LEFT and TOP, emits outputs on its
-    // RIGHT and BOTTOM. Downward-flowing wires therefore leave the bottom and enter the
-    // top (using the vertical faces), while level/upward wires stay on left/right; no face
-    // ever mixes an entering and a leaving wire. The rare backward edge arcs under as feedback.
+    // Faces are directional: inputs enter LEFT/TOP, outputs leave RIGHT/BOTTOM. Adjacent cards are
+    // joined by a straight line between their closest face centres; diagonals use a single elbow
+    // (one horizontal + one vertical face); backward/blocked edges take a side route.
     const AV = 22;
     const nodeBoxes = this.diagram.nodes.map((n) => box(n.id)).filter(Boolean);
     const recs = [];
@@ -384,22 +383,48 @@ class RepoMapView {
       });
       const sameRow = Math.abs(dy) <= AV, sameCol = Math.abs(dx) <= AV;
 
-      let fa, fb, shape, aligned = false;
-      if (sameRow && !between(false)) {                             // adjacent across a row: straight line
-        aligned = true; shape = "line";
-        if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; }
-      } else if (sameCol && !between(true)) {                       // adjacent down a column: straight line
-        aligned = true; shape = "line";
-        if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; }
-      } else if (dx >= 0 && dy > 0 && !sameCol) {                   // down to another column: single elbow
-        if (dx >= dy) { fa = "R"; fb = "T"; shape = "hv"; }         //   one horizontal face + one vertical
-        else          { fa = "B"; fb = "L"; shape = "vh"; }
-      } else if (dx >= 0) {                                         // up / blocked: balanced side route
-        fa = "R"; fb = "L"; shape = "hvh";
-      } else {                                                      // backward/feedback: off the vertical gap
-        fa = "L"; fb = "R"; shape = "hvh";
-      }
-      recs.push({ e, a, b, fa, fb, shape, aligned, acx, acy, bcx, bcy, bend: 0 });
+      let fa, fb, aligned = false;
+      if (sameRow && !between(false)) { aligned = true; if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; } }
+      else if (sameCol && !between(true)) { aligned = true; if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; } }
+      else if (dx >= 0 && dy > 0 && !sameCol) { if (dx >= dy) { fa = "R"; fb = "T"; } else { fa = "B"; fb = "L"; } }
+      else if (dx >= 0) { fa = "R"; fb = "L"; }
+      else { fa = "L"; fb = "R"; }
+      recs.push({ e, a, b, fa, fb, aligned, acx, acy, bcx, bcy, bend: 0 });
+    });
+
+    // Keep each face one-directional: if a face carries both entering and leaving wires, move the
+    // movable (non-straight) minority onto an empty or same-direction face that points its way.
+    const NB = { R: [1, 0], L: [-1, 0], B: [0, 1], T: [0, -1] };
+    const faceDir = {};                    // "id|face" -> { out: [recs], in: [recs] }
+    const reg = (id, f, r, dir) => { const k = id + "|" + f; (faceDir[k] = faceDir[k] || { out: [], in: [] })[dir].push(r); };
+    recs.forEach((r) => { reg(r.e.from, r.fa, r, "out"); reg(r.e.to, r.fb, r, "in"); });
+    this.diagram.nodes.forEach((n) => {
+      const id = n.id;
+      ["R", "L", "T", "B"].forEach((f) => {
+        const dd = faceDir[id + "|" + f];
+        if (!dd || !dd.out.length || !dd.in.length) return;         // absent or not mixed
+        const outMovable = dd.out.every((r) => !r.aligned), inMovable = dd.in.every((r) => !r.aligned);
+        let dir = (outMovable && inMovable) ? (dd.out.length <= dd.in.length ? "out" : "in")
+                : outMovable ? "out" : inMovable ? "in" : null;
+        if (!dir) return;
+        const opp = dir === "out" ? "in" : "out";
+        dd[dir].slice().forEach((r) => {
+          const self = dir === "out" ? r.a : r.b, other = dir === "out" ? r.b : r.a;
+          const vx = (other.x + other.w / 2) - (self.x + self.w / 2), vy = (other.y + other.h / 2) - (self.y + self.h / 2);
+          let best = null, bestDot = 0.01;
+          ["R", "L", "T", "B"].forEach((cf) => {
+            if (cf === f) return;
+            const cd = faceDir[id + "|" + cf];
+            if (cd && (!cd[dir].length || cd[opp].length)) return;  // occupied by the opposite direction
+            const dot = NB[cf][0] * vx + NB[cf][1] * vy;
+            if (dot > bestDot) { bestDot = dot; best = cf; }
+          });
+          if (!best) return;
+          faceDir[id + "|" + f][dir] = faceDir[id + "|" + f][dir].filter((x) => x !== r);
+          reg(id, best, r, dir);
+          if (dir === "out") r.fa = best; else r.fb = best;
+        });
+      });
     });
 
     // Straight wires attach at the exact middle of their facing sides. Every other wire gets a
@@ -439,13 +464,14 @@ class RepoMapView {
         else if (face === "L") { pt.x = bx.x;        pt.y = bx.y + along; }
         else if (face === "B") { pt.y = bx.y + bx.h; pt.x = bx.x + along; }
         else                   { pt.y = bx.y;        pt.x = bx.x + along; }
+        const zish = ((r.fa === "L" || r.fa === "R") === (r.fb === "L" || r.fb === "R"));
         if (item.end === "a") r.pa = pt;
-        else { r.pb = pt; r.bend = (r.shape === "hvh" && n > 1) ? (i - (n - 1) / 2) * 9 : 0; }
+        else { r.pb = pt; r.bend = (zish && n > 1) ? (i - (n - 1) / 2) * 9 : 0; }
       });
     });
 
     recs.forEach((r) => {
-      const geom  = this._orthPath(r.pa, r.pb, r.shape, r.bend);
+      const geom  = this._route(r.pa, r.fa, r.pb, r.fb, r.bend);
       const color = this.ROLE_COLORS[roleOf(r.e.from)] || this.ROLE_COLORS.external;
 
       const base = this._path(geom.d, "rm-wire", color);
@@ -477,23 +503,26 @@ class RepoMapView {
     return p;
   }
 
-  _orthPath(pa, pb, shape, bend) {
+  _route(pa, fa, pb, fb, bend) {
     const bnd = bend || 0;
+    const hA = fa === "L" || fa === "R", hB = fb === "L" || fb === "R";
 
-    if (shape === "line") {                                      // straight, middle to middle
-      return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: (pa.y + pb.y) / 2 };
+    if (hA && hB) {                                              // both side faces: straight or Z
+      if (Math.abs(pa.y - pb.y) < 1) return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };
+      let mx = (pa.x + pb.x) / 2 + bnd;
+      const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
+      if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
+      return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
     }
-    if (shape === "hv") {                                        // single elbow: across, then down
-      return { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };
+    if (!hA && !hB) {                                            // both top/bottom faces: straight or Z
+      if (Math.abs(pa.x - pb.x) < 1) return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
+      let my = (pa.y + pb.y) / 2 + bnd;
+      const lo = Math.min(pa.y, pb.y) + 8, hi = Math.max(pa.y, pb.y) - 8;
+      if (lo <= hi) my = Math.max(lo, Math.min(hi, my));
+      return { d: `M ${pa.x} ${pa.y} V ${my} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my };
     }
-    if (shape === "vh") {                                        // single elbow: down, then across
-      return { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
-    }
-
-    let mx = (pa.x + pb.x) / 2 + bnd;                            // hvh: facing L/R sides, balanced Z
-    const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
-    if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
-    return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
+    if (hA) return { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };  // side -> top/bottom
+    return { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };          // top/bottom -> side
   }
 
   _toggleTrace() {
