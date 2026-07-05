@@ -14,6 +14,7 @@ class ParameterCropper:
         self.logger        = logger
 
         split_regions.validate_within(layout.global_crop)
+        split_regions.validate_disjoint()
 
         self.logger.section("[ParameterCropper Initialized]")
         self.logger.metrics_table(split_regions.region_rows(), ["Split", "Crop", "Azimuth (lines)", "Range (samples)"])

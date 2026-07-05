@@ -102,3 +102,18 @@ def test_parameter_cropper_regions_load_distinct_data(test_data_dir, params_dir,
     val   = cropper.load_split("val")[0]
 
     assert not np.array_equal(train, val)
+
+
+@pytest.mark.real_data
+def test_parameter_cropper_rejects_overlapping_splits(test_data_dir, params_dir, tmp_path):
+    logger = Logger(log_dir=str(tmp_path / "logs"), name="split_overlap", level="ERROR")
+    layout = Layout(test_data_dir, logger=logger, parameters_path=params_dir / "parameters.npy")
+
+    splits = SplitRegions(
+        train = CropRegion(1000, 1060, 500, 560),
+        val   = CropRegion(1050, 1080, 500, 560),
+        test  = CropRegion(1080, 1100, 500, 560),
+    )
+
+    with pytest.raises(ValueError, match="overlap"):
+        ParameterCropper(layout, splits, logger=logger)
