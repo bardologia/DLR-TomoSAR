@@ -366,6 +366,7 @@ class RepoMapView {
     // top (using the vertical faces), while level/upward wires stay on left/right; no face
     // ever mixes an entering and a leaving wire. The rare backward edge arcs under as feedback.
     const AV = 22;
+    const nodeBoxes = this.diagram.nodes.map((n) => box(n.id)).filter(Boolean);
     const recs = [];
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
@@ -373,49 +374,73 @@ class RepoMapView {
       const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
       const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
       const dx  = bcx - acx, dy = bcy - acy;
-      let fa, fb, shape;
-      if (bcx < acx - 6) {                                          // rare backward/feedback edge
-        if      (Math.abs(dy) < 12)  { fa = "L"; fb = "R"; shape = "hvh"; }
-        else if (dy > 0)             { fa = "B"; fb = "T"; shape = "vhv"; }
-        else                         { fa = "T"; fb = "B"; shape = "vhv"; }
-      } else if (Math.abs(dy) <= AV) {                              // same row: straight across
+
+      // A straight line is only safe if no other card sits on it.
+      const between = (vertical) => nodeBoxes.some((o) => {
+        const ocx = o.x + o.w / 2, ocy = o.y + o.h / 2;
+        return vertical
+          ? (Math.abs(ocx - acx) <= o.w / 2 && ocy > Math.min(acy, bcy) + 1 && ocy < Math.max(acy, bcy) - 1)
+          : (Math.abs(ocy - acy) <= o.h / 2 && ocx > Math.min(acx, bcx) + 1 && ocx < Math.max(acx, bcx) - 1);
+      });
+      const sameRow = Math.abs(dy) <= AV, sameCol = Math.abs(dx) <= AV;
+
+      let fa, fb, shape, aligned = false;
+      if (sameRow && !between(false)) {                             // adjacent across a row: straight line
+        aligned = true; shape = "line";
+        if (dx >= 0) { fa = "R"; fb = "L"; } else { fa = "L"; fb = "R"; }
+      } else if (sameCol && !between(true)) {                       // adjacent down a column: straight line
+        aligned = true; shape = "line";
+        if (dy >= 0) { fa = "B"; fb = "T"; } else { fa = "T"; fb = "B"; }
+      } else if (dx >= 0 && dy > 0 && !sameCol) {                   // down to another column: single elbow
+        if (dx >= dy) { fa = "R"; fb = "T"; shape = "hv"; }         //   one horizontal face + one vertical
+        else          { fa = "B"; fb = "L"; shape = "vh"; }
+      } else if (dx >= 0) {                                         // up / blocked: balanced side route
         fa = "R"; fb = "L"; shape = "hvh";
-      } else if (dy > 0) {                                          // flowing down
-        if      (dx <= a.w * 0.5)    { fa = "B"; fb = "T"; shape = "vhv"; }   // ~same column: straight down
-        else if (dx >= dy)           { fa = "R"; fb = "T"; shape = "hv";  }   // right, then down (single elbow)
-        else                         { fa = "B"; fb = "L"; shape = "vh";  }   // down, then right (single elbow)
-      } else {                                                     // flowing up: balanced side route
-        fa = "R"; fb = "L"; shape = "hvh";
+      } else {                                                      // backward/feedback: off the vertical gap
+        fa = "L"; fb = "R"; shape = "hvh";
       }
-      recs.push({ e, a, b, fa, fb, shape, acx, acy, bcx, bcy, bend: 0 });
+      recs.push({ e, a, b, fa, fb, shape, aligned, acx, acy, bcx, bcy, bend: 0 });
     });
 
-    // Spread the wires meeting each node across that face so multiple arrows never share a
-    // point: entering and leaving wires get distinct attachment slots, sorted by the other
-    // endpoint's position to keep the fan crossing-free. Faces are chosen per wire direction,
-    // so a busy node naturally uses all four sides.
-    const groups = {};
+    // Straight wires attach at the exact middle of their facing sides. Every other wire gets a
+    // distinct slot along its face, sorted by the opposite endpoint so the fan stays
+    // crossing-free; a face that carries a straight wire keeps its middle free for it.
+    const faceCenter = (bx, f) =>
+      f === "R" ? { x: bx.x + bx.w,     y: bx.y + bx.h / 2 } :
+      f === "L" ? { x: bx.x,            y: bx.y + bx.h / 2 } :
+      f === "B" ? { x: bx.x + bx.w / 2, y: bx.y + bx.h }     :
+                  { x: bx.x + bx.w / 2, y: bx.y };
+    const groups = {}, reserved = {};
     const push = (id, face, item) => { (groups[id + "|" + face] = groups[id + "|" + face] || []).push(item); };
     recs.forEach((r) => {
+      if (r.aligned) {
+        r.pa = faceCenter(r.a, r.fa);
+        r.pb = faceCenter(r.b, r.fb);
+        reserved[r.e.from + "|" + r.fa] = true;
+        reserved[r.e.to   + "|" + r.fb] = true;
+        return;
+      }
       push(r.e.from, r.fa, { r, end: "a", perp: (r.fa === "L" || r.fa === "R") ? r.bcy : r.bcx });
       push(r.e.to,   r.fb, { r, end: "b", perp: (r.fb === "L" || r.fb === "R") ? r.acy : r.acx });
     });
-    Object.values(groups).forEach((list) => {
+    Object.entries(groups).forEach(([key, list]) => {
       list.sort((p, q) => p.perp - q.perp);
-      const n = list.length;
+      const face = key.slice(key.indexOf("|") + 1);
+      const horiz = face === "L" || face === "R";
+      const n = list.length, keepCenter = !!reserved[key];
       list.forEach((item, i) => {
-        const r = item.r, face = item.end === "a" ? r.fa : r.fb, bx = item.end === "a" ? r.a : r.b;
-        const horiz = face === "L" || face === "R";
-        const span  = horiz ? bx.h : bx.w;
-        const m     = Math.min(horiz ? 13 : 16, span / 2 - 2);
-        const along = n === 1 ? span / 2 : m + (span - 2 * m) * (i / (n - 1));
+        const r = item.r, bx = item.end === "a" ? r.a : r.b;
+        const span = horiz ? bx.h : bx.w;
+        const m    = Math.min(horiz ? 13 : 16, span / 2 - 2);
+        const frac = n === 1 ? (keepCenter ? 0.72 : 0.5) : i / (n - 1);
+        const along = m + (span - 2 * m) * frac;
         const pt = {};
         if      (face === "R") { pt.x = bx.x + bx.w; pt.y = bx.y + along; }
         else if (face === "L") { pt.x = bx.x;        pt.y = bx.y + along; }
         else if (face === "B") { pt.y = bx.y + bx.h; pt.x = bx.x + along; }
         else                   { pt.y = bx.y;        pt.x = bx.x + along; }
         if (item.end === "a") r.pa = pt;
-        else { r.pb = pt; r.bend = n === 1 ? 0 : (i - (n - 1) / 2) * 9; }
+        else { r.pb = pt; r.bend = (r.shape === "hvh" && n > 1) ? (i - (n - 1) / 2) * 9 : 0; }
       });
     });
 
@@ -455,23 +480,20 @@ class RepoMapView {
   _orthPath(pa, pb, shape, bend) {
     const bnd = bend || 0;
 
+    if (shape === "line") {                                      // straight, middle to middle
+      return { d: `M ${pa.x} ${pa.y} L ${pb.x} ${pb.y}`, mx: (pa.x + pb.x) / 2, my: (pa.y + pb.y) / 2 };
+    }
     if (shape === "hv") {                                        // single elbow: across, then down
       return { d: `M ${pa.x} ${pa.y} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my: pa.y };
     }
     if (shape === "vh") {                                        // single elbow: down, then across
       return { d: `M ${pa.x} ${pa.y} V ${pb.y} H ${pb.x}`, mx: pa.x, my: (pa.y + pb.y) / 2 };
     }
-    if (shape === "hvh") {                                       // facing L/R sides: balanced Z
-      let mx = (pa.x + pb.x) / 2 + bnd;
-      const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
-      if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
-      return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
-    }
 
-    let my = (pa.y + pb.y) / 2 + bnd;                            // vhv: facing T/B sides
-    const lo = Math.min(pa.y, pb.y) + 8, hi = Math.max(pa.y, pb.y) - 8;
-    if (lo <= hi) my = Math.max(lo, Math.min(hi, my));
-    return { d: `M ${pa.x} ${pa.y} V ${my} H ${pb.x} V ${pb.y}`, mx: (pa.x + pb.x) / 2, my };
+    let mx = (pa.x + pb.x) / 2 + bnd;                            // hvh: facing L/R sides, balanced Z
+    const lo = Math.min(pa.x, pb.x) + 8, hi = Math.max(pa.x, pb.x) - 8;
+    if (lo <= hi) mx = Math.max(lo, Math.min(hi, mx));
+    return { d: `M ${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`, mx, my: (pa.y + pb.y) / 2 };
   }
 
   _toggleTrace() {
