@@ -7,6 +7,7 @@ from configuration.dataset.profile_autoencoder import ProfileAugmentationConfig,
 from models                                     import BACKBONE_CONFIG_REGISTRY
 from models.image_autoencoder                   import IMAGE_AE_CONFIG_REGISTRY
 from models.profile_autoencoder                 import PROFILE_AE_CONFIG_REGISTRY
+from models.unrolled                            import UNROLLED_CONFIG_REGISTRY
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion, SplitRegions
 from pipelines.shared.inference.run_classifier            import RunArtifacts
@@ -114,6 +115,21 @@ class ImageAutoencoderConfigIO(ConfigIO):
     @classmethod
     def _serialize(cls, config) -> dict:
         return asdict(config)
+
+
+class UnrolledModelConfigIO(ConfigIO):
+    FILENAME     = "unrolled_model_config.json"
+    MISSING_NOUN = "unrolled"
+    UNKNOWN_NOUN = "unrolled model"
+    EXCLUDED     = {"shape_logger_types"}
+
+    @classmethod
+    def _registry(cls) -> dict:
+        return UNROLLED_CONFIG_REGISTRY
+
+    @classmethod
+    def _serialize(cls, config) -> dict:
+        return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
 
 
 class ProfileDatasetConfigIO:

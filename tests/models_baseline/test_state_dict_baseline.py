@@ -11,9 +11,11 @@ from models import (
     BACKBONE_MODEL_REGISTRY,
     IMAGE_AE_MODEL_REGISTRY,
     PROFILE_AE_MODEL_REGISTRY,
+    UNROLLED_MODEL_REGISTRY,
     get_backbone,
     get_image_autoencoder,
     get_profile_autoencoder,
+    get_unrolled,
 )
 
 BASELINE_PATH = Path(__file__).resolve().parents[1] / "state_dict_baseline.json"
@@ -22,6 +24,7 @@ MODEL_FAMILIES = {
     "backbone"            : (BACKBONE_MODEL_REGISTRY,   get_backbone),
     "profile_autoencoder" : (PROFILE_AE_MODEL_REGISTRY, get_profile_autoencoder),
     "image_autoencoder"   : (IMAGE_AE_MODEL_REGISTRY,   get_image_autoencoder),
+    "unrolled"            : (UNROLLED_MODEL_REGISTRY,   get_unrolled),
 }
 
 FAMILY_MODEL_CASES = [(family, name) for family, (registry, _factory) in MODEL_FAMILIES.items() for name in sorted(registry)]

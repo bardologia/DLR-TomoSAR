@@ -29,6 +29,7 @@ DEFER_HEAVY_IMPORTS = (
     "train_jepa",
     "train_profile_autoencoder",
     "train_image_autoencoder",
+    "train_unrolled",
     "infer_backbone",
     "infer_profile_autoencoder",
     "infer_image_autoencoder",
@@ -128,7 +129,7 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
     assert "CUDA_VISIBLE_DEVICES" not in os.environ
 
 
-@pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder"))
+@pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder", "train_unrolled"))
 def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
     source = _script_path(name).read_text()
 

@@ -957,6 +957,22 @@
         "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
       }
     },
+    "architectures/unrolled::GammaNetConfig": {
+      "summary": "Unrolled physics inversion network (gamma-Net-style LISTA): L unrolled proximal-gradient iterations over the discretized elevation axis, with learned per-iteration step sizes, nonnegative soft-thresholds, and a small per-pixel 1D convolutional prox refining the profile; the steering operator is built from the per-pixel kz field, so the forward model is encoded exactly rather than learned",
+      "fields": {
+        "n_iterations": "Number of unrolled proximal-gradient iterations (the network depth L)",
+        "prox_hidden": "Hidden channel width of the per-iteration 1D convolutional prox operating along the elevation axis",
+        "prox_kernel_size": "Kernel size of the prox convolutions along the elevation axis",
+        "step_init": "Initial gradient step size per iteration in Lipschitz-normalized units (the raw gradient is divided by n_tracks x n_points x dx^2); stored through a softplus reparameterization so learned steps stay positive",
+        "threshold_init": "Initial nonnegative soft-threshold per iteration; stored through a softplus reparameterization so learned thresholds stay positive",
+        "activation": "Activation function inside the prox blocks (relu, leaky_relu, gelu, elu, silu)",
+        "steps_lr": "AdamW learning rate for the per-iteration step sizes and thresholds",
+        "prox_lr": "AdamW learning rate for the prox convolution blocks",
+        "steps_wd": "Weight decay for the step-size and threshold parameters; 0 by default because shrinking them biases the inversion",
+        "prox_wd": "Weight decay for the prox convolution blocks",
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
+      }
+    },
     "architectures/image_autoencoder::ImageAutoencoderBaseConfig": {
       "summary": "Shared architecture and optimizer settings for the 2D image-space autoencoder family reconstructing the multi-channel input stack",
       "fields": {
@@ -2081,6 +2097,25 @@
         "svd_max_dim": "max matrix dimension for computing SVD-based rank/spectral stats, forwarded to each run's WeightXrayConfig",
         "duplicate_max_units": "max output-unit count scanned for duplicates, forwarded to each run's WeightXrayConfig",
         "max_layer_histograms": "max number of per-layer histograms rendered per run, forwarded to each run's WeightXrayConfig"
+      }
+    },
+    "training/unrolled::UnrolledEntryConfig": {
+      "summary": "Entry configuration for main/training/train_unrolled.py: trains the unrolled physics network on per-pixel coherence measurements synthesised from the ground-truth Gaussian profiles through the exact kz steering operator, isolated from the backbone training stack",
+      "fields": {
+        "run_name": "Optional run directory name; defaults to <model_name>_<timestamp> under logdir",
+        "model_name": "Key into the unrolled model registry (gamma_net)",
+        "gpu": "CUDA device index pinned before torch import",
+        "seed": "Global random seed for reproducibility",
+        "logdir": "Base directory that receives one subdirectory per training run",
+        "model_overrides": "Field overrides applied to the model config from the registry (e.g. n_iterations)",
+        "paths": "Dataset locations: preprocessing run directory, extracted-parameters file, and secondary track labels",
+        "training": "Shared training-queue knobs; this pipeline reads epochs, batch/loader settings, patch tiling, azimuth splits, early stopping, eta_min, scheduler_epochs, and max_grad_norm, and ignores the backbone-only fields",
+        "geometry": "Tomographic geometry configuration resolved against the dataset; supplies the height-axis convention and enables the per-pixel kz field the operator requires",
+        "normalization": "Per-channel normalization recipes used by the dataset pipeline; output denormalization recovers physical Gaussian parameters before profile rendering",
+        "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches",
+        "curve_loss": "Profile reconstruction loss over the elevation axis: l1 or mse, masked to pixels with ground-truth power",
+        "measurement_noise_std": "Standard deviation of complex Gaussian noise added to the synthesised coherence measurements; 0 trains on exact forward-model measurements",
+        "power_floor": "Minimum integrated ground-truth profile power for a pixel to enter the loss and the coherence normalization"
       }
     }
   }

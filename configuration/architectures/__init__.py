@@ -26,6 +26,9 @@ from configuration.architectures.backbone import (
     UNetSetPredConfig,
     ResUNetSetPredConfig,
 )
+from configuration.architectures.unrolled import (
+    GammaNetConfig,
+)
 from configuration.architectures.image_autoencoder import (
     ImageAutoencoderBaseConfig,
     Conv2dImageAutoencoderConfig,
