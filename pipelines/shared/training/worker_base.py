@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipelines.backbone.training.loss_probe import LossScaleProbeConfig
+from configuration.training import LossScaleProbeConfig
 
 
 class WorkerBase:

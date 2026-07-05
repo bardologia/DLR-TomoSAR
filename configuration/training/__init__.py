@@ -20,6 +20,7 @@ from configuration.training.backbone import (
     default_curriculum,
     PatchTrialsConfig,
     SecondaryTrialsConfig,
+    LossScaleProbeConfig,
     BackboneTrainerConfig,
     BackboneEntryConfig,
 )

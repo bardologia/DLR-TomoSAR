@@ -12,7 +12,7 @@ from models.image_autoencoder                            import get_image_autoen
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.shared.config.config_factory              import ConfigFactory
 from pipelines.shared.config.run_metadata                import TrainingRunMetadata
-from pipelines.shared.dataset.dataset_prep               import BackboneDatasetPreparation
+from pipelines.backbone.dataset.pipeline                 import BackboneDatasetPreparation
 from pipelines.shared.model.model_builder                import ModelBuilder
 from pipelines.shared.training.overfit_check             import OverfitCheck
 from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
@@ -95,8 +95,8 @@ class TrainingPipeline:
         cfg = self.trainer_config.param_loss
         return cfg.use_coherence_resyn or cfg.use_covariance_match or cfg.use_capon_cycle
 
-    def _prepare_datasets(self, run_meta, logger, seed):
-        return BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, seed, build_geometry_field=self._physics_geometry_active(), height_axis_convention=self.trainer_config.geometry.height_axis_convention).run()
+    def _prepare_datasets(self, run_directory, logger, seed):
+        return BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_directory, logger, seed, build_geometry_field=self._physics_geometry_active(), height_axis_convention=self.trainer_config.geometry.height_axis_convention).run()
 
     def _gaussian_out_channels(self) -> int:
         g = self.trainer_config.gaussian
@@ -252,7 +252,7 @@ class TrainingPipeline:
         run_meta = TrainingRunMetadata(self.trainer_config, self.backbone_name, Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
-        loaders, datasets, x_axis, x_len = self._prepare_datasets(run_meta, logger, self.entry.seed)
+        loaders, datasets, x_axis, x_len = self._prepare_datasets(run_meta.run_directory, logger, self.entry.seed)
 
         model, backbone_cfg = self._build_module(datasets, x_len, logger)
 
@@ -281,7 +281,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         pipeline = TrainingPipeline(self.config)
         run_meta = TrainingRunMetadata(pipeline.trainer_config, pipeline.backbone_name, work_dir, "pretrain_context")
 
-        loaders, datasets, x_axis, x_len = pipeline._prepare_datasets(run_meta, logger, self.config.seed)
+        loaders, datasets, x_axis, x_len = pipeline._prepare_datasets(run_meta.run_directory, logger, self.config.seed)
 
         model, backbone_cfg = pipeline._build_module(datasets, x_len, logger)
         norm_stats          = datasets["train"].normalizer

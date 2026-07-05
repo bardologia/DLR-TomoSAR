@@ -6,8 +6,9 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configuration.training.general.loss   import LossConfig
-from pipelines.backbone.training.loss_probe import LossScaleProbe, LossScaleProbeConfig
+from configuration.training                 import LossScaleProbeConfig
+from configuration.training.general.loss    import LossConfig
+from pipelines.backbone.training.loss_probe import LossScaleProbe
 
 from tests.backbone_training._helpers import gaussian_config, geometry_config, identity_normalizer, tiny_model, x_axis_tensor
 

@@ -4,23 +4,12 @@ import copy
 import math
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing      import Optional
 
 import torch
 
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
 from tools                                  import NullLogger, NullTracker
-
-
-@dataclass
-class LossScaleProbeConfig:
-    enabled        : bool          = True
-    n_batches      : int           = 10
-    reference      : Optional[str] = None
-    exit_after     : bool          = True
-    enabled_losses : dict          = field(default_factory=dict)
 
 
 class LossScaleProbe:

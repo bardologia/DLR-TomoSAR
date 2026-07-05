@@ -16,6 +16,7 @@ from pipelines.backbone.dataset.stats_computer  import StatsComputer
 from pipelines.backbone.dataset.spatial         import Cropper, Patcher
 from pipelines.backbone.dataset.metadata_writer import MetadataWriter
 from pipelines.shared.dataset.dataset_spatial           import Layout
+from tools.data.gaussians                       import GaussianAxis
 from tools.monitoring.logger                    import Logger
 from tools.sar                                  import GeometryField
 
@@ -188,3 +189,28 @@ class DatasetPipeline:
         datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
 
         return train_loader, val_loader, test_loader, datasets
+
+
+class BackboneDatasetPreparation:
+    def __init__(self, dataset_config, trainer_config, run_directory, logger, seed, build_geometry_field: bool = False, height_axis_convention: str = "height") -> None:
+        self.dataset_config         = dataset_config
+        self.trainer_config         = trainer_config
+        self.run_directory          = Path(run_directory)
+        self.logger                 = logger
+        self.seed                   = seed
+        self.build_geometry_field   = build_geometry_field
+        self.height_axis_convention = height_axis_convention
+
+    def run(self):
+        gaussian_cfg                    = self.trainer_config.gaussian
+        self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
+
+        dataset_pipeline = DatasetPipeline(self.dataset_config, self.run_directory, logger=self.logger, seed=self.seed, height_axis_convention=self.height_axis_convention, build_geometry_field=self.build_geometry_field)
+        x_len            = dataset_pipeline.profile_length
+        x_axis           = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, x_len)
+
+        self.dataset_config.x_axis = x_axis
+
+        train_loader, val_loader, test_loader, datasets = dataset_pipeline.run()
+
+        return (train_loader, val_loader, test_loader), datasets, x_axis, x_len

@@ -8,12 +8,11 @@ from pathlib     import Path
 
 import torch
 
-from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
+from configuration.training import BackboneEntryConfig, CurriculumInheritance, LossScaleProbeConfig, default_curriculum
 from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
-from pipelines.backbone.training.loss_probe  import LossScaleProbeConfig
 from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.backbone.training.trainer     import Trainer

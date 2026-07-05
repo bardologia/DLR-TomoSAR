@@ -132,6 +132,15 @@ class SecondaryTrialsConfig:
 
 
 @dataclass
+class LossScaleProbeConfig:
+    enabled        : bool       = True
+    n_batches      : int        = 10
+    reference      : str | None = None
+    exit_after     : bool       = True
+    enabled_losses : dict       = field(default_factory=dict)
+
+
+@dataclass
 class BackboneTrainerConfig:
     gaussian            : GaussianConfig
     geometry            : GeometryConfig           = field(default_factory=GeometryConfig)

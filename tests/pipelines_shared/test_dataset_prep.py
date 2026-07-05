@@ -5,11 +5,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from configuration.dataset             import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
-from configuration.sar.gaussian_config import GaussianConfig
-from pipelines.shared.dataset.dataset_prep     import BackboneDatasetPreparation
-from tools.data.regions                import CropRegion
-from tools.monitoring.logger           import Logger
+from configuration.dataset               import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
+from configuration.sar.gaussian_config   import GaussianConfig
+from pipelines.backbone.dataset.pipeline import BackboneDatasetPreparation
+from tools.data.regions                  import CropRegion
+from tools.monitoring.logger             import Logger
 
 
 def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
@@ -45,10 +45,9 @@ def test_backbone_preparation_returns_loaders_axis_and_datasets(test_data_dir, p
     dataset_config = _dataset_config(test_data_dir, params_dir)
     gaussian       = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     trainer_config = SimpleNamespace(gaussian=gaussian)
-    run_meta       = SimpleNamespace(run_directory=tmp_path)
     logger         = Logger(log_dir=str(tmp_path / "logs"), name="prep", level="ERROR")
 
-    prep = BackboneDatasetPreparation(dataset_config, trainer_config, run_meta, logger, seed=0)
+    prep = BackboneDatasetPreparation(dataset_config, trainer_config, tmp_path, logger, seed=0)
 
     loaders, datasets, x_axis, x_len = prep.run()
 
@@ -70,10 +69,9 @@ def test_backbone_preparation_loader_batches_consistent(test_data_dir, params_di
     dataset_config = _dataset_config(test_data_dir, params_dir)
     gaussian       = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     trainer_config = SimpleNamespace(gaussian=gaussian)
-    run_meta       = SimpleNamespace(run_directory=tmp_path)
     logger         = Logger(log_dir=str(tmp_path / "logs"), name="prep2", level="ERROR")
 
-    prep                       = BackboneDatasetPreparation(dataset_config, trainer_config, run_meta, logger, seed=0)
+    prep                       = BackboneDatasetPreparation(dataset_config, trainer_config, tmp_path, logger, seed=0)
     (train_loader, val_loader, test_loader), datasets, _, _ = prep.run()
 
     x, y = next(iter(train_loader))

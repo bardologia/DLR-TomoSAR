@@ -5,8 +5,7 @@ from pathlib import Path
 from configuration.training import ImageAeTrainerConfig
 from models.image_autoencoder                        import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
 from pipelines.autoencoder_common.training           import AutoencoderTrainingPipeline
-from pipelines.backbone.dataset.pipeline             import DatasetPipeline
-from pipelines.shared.dataset.dataset_prep                   import BackboneDatasetPreparation
+from pipelines.backbone.dataset.pipeline             import BackboneDatasetPreparation, DatasetPipeline
 from pipelines.shared.model.model_builder                     import ModelBuilder
 from pipelines.shared.training.training_runner                import EntryConfigTrainRunner
 from pipelines.image_autoencoder.training.trainer    import Trainer
@@ -37,7 +36,7 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         return model
 
     def _prepare_data(self, run_meta, logger):
-        loaders, datasets, x_axis, x_len      = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta, logger, self.entry.seed).run()
+        loaders, datasets, x_axis, x_len      = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta.run_directory, logger, self.entry.seed).run()
         train_loader, val_loader, test_loader = loaders
 
         in_channels = datasets["train"].input_channels
