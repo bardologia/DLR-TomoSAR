@@ -3453,14 +3453,18 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 /* ---- Graph stage ---- */
 .rm__stage { border-top: 1px solid var(--line); }
 .rm-graph {
-  max-height: 70vh; overflow: auto;
+  min-height: 62vh; max-height: 84vh; overflow: auto;
   background:
     radial-gradient(circle at 1px 1px, rgba(70,80,70,0.09) 1px, transparent 0) 0 0 / 24px 24px,
     #f7f8f5;
 }
-.rm-canvas { position: relative; width: max-content; min-width: 100%; }
-.rm-cols { display: flex; align-items: center; gap: 116px; padding: 40px 52px; min-height: 260px; }
-.rm-col { display: flex; flex-direction: column; gap: 26px; }
+.rm-canvas { position: relative; width: 100%; }
+.rm-cols {
+  display: grid; width: 100%; min-height: 58vh; box-sizing: border-box;
+  grid-template-columns: repeat(var(--ncol, 4), minmax(180px, 1fr));
+  grid-template-rows: repeat(var(--nrow, 3), minmax(148px, 1fr));
+  gap: 30px 44px; padding: 38px 46px;
+}
 
 /* ---- Orthogonal wires ---- */
 .rm-wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
@@ -3473,22 +3477,23 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .rm-flow.is-flow { opacity: 1; stroke-width: 2.6; stroke-dasharray: 5 6; animation-duration: 0.7s; }
 
 /* ---- Edge labels ---- */
-.rm-labels { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.rm-labels { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .rm-elabel {
-  position: absolute; transform: translate(-50%, -50%); max-width: 150px;
+  position: absolute; transform: translate(-50%, -50%); max-width: 190px;
   font: 500 0.63rem/1.15 var(--mono); color: var(--ink-dim);
   background: var(--surface); border: 1px solid var(--line); padding: 3px 7px; border-radius: 3px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  box-shadow: 0 1px 2px rgba(20,25,20,0.05);
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), opacity 0.2s var(--ease);
+  box-shadow: 0 1px 3px rgba(20,25,20,0.12); opacity: 0;
+  transition: opacity 0.16s var(--ease), color 0.16s var(--ease), border-color 0.16s var(--ease);
 }
 .rm-elabel--control { font-style: italic; color: var(--ink-faint); }
-.rm-elabel.is-lit { color: var(--ink); border-color: var(--accent); }
-.rm-elabel.is-dim { opacity: 0.12; }
+.rm-canvas.rm-showlabels .rm-elabel { opacity: 0.95; }
+.rm-elabel.is-show, .rm-elabel.is-lit { opacity: 1; color: var(--ink); border-color: var(--accent); z-index: 1; }
+.rm-elabel.is-dim { opacity: 0; }
 
 /* ---- Node cards ---- */
 .rm-node {
-  position: relative; z-index: 3; width: 238px;
+  position: relative; z-index: 3; width: 100%; max-width: 232px; place-self: center;
   background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--role);
   border-radius: 5px; padding: 12px 14px 11px; cursor: pointer;
   box-shadow: 0 1px 2px rgba(20,25,20,0.04);
@@ -3511,10 +3516,18 @@ select.ft-select { appearance: none; -webkit-appearance: none; cursor: pointer; 
 .rm-node__mod { display: block; font: 0.62rem/1.35 var(--mono); color: var(--ink-faint); word-break: break-all; }
 
 /* ---- Artifact ledger ---- */
-.rm__ledger { border-top: 1px solid var(--line); background: var(--surface); padding: 18px 22px 20px; }
-.rm-led__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-.rm-led__head h4 { margin: 0; font: 600 0.95rem/1 var(--sans); color: var(--ink); }
+.rm__ledger { border-top: 1px solid var(--line); background: var(--surface); padding: 14px 22px 18px; }
+.rm-led__toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 4px 0; margin: 0;
+  background: none; border: 0; cursor: pointer; text-align: left;
+}
+.rm-led__chev { display: inline-block; font-size: 0.7rem; color: var(--ink-faint); transition: transform 0.2s var(--ease); }
+.rm__ledger.is-open .rm-led__chev { transform: rotate(90deg); }
+.rm-led__lbl { font: 600 0.95rem/1 var(--sans); color: var(--ink); }
+.rm-led__toggle:hover .rm-led__lbl { color: var(--accent); }
+.rm-led__count { font: 600 0.62rem/1 var(--mono); color: var(--ink-faint); background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 6px; }
 .rm-led__sub { font: 0.68rem/1 var(--mono); color: var(--ink-faint); }
+.rm-led__body { margin-top: 14px; }
 .rm-led__scroll { overflow-x: auto; }
 table.rm-led { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 table.rm-led th {
@@ -3540,6 +3553,6 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 /* ---- Responsive ---- */
 @media (max-width: 720px) {
   .rm__title { flex-direction: column; gap: 10px; }
-  .rm-cols { gap: 84px; padding: 30px 30px; }
-  .rm-node { width: 200px; }
+  .rm-cols { gap: 22px 26px; padding: 24px; }
+  .rm-node { max-width: 210px; }
 }

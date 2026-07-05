@@ -56,10 +56,12 @@ def test_nodes_wellformed(folders):
             assert n["label"] and n["fn"] and n["module"]
 
 
-def test_columns_contiguous(folders):
+def test_grid_positions_unique(folders):
     for _, d in _diagrams(folders):
-        cols = sorted({n["col"] for n in d["nodes"]})
-        assert cols == list(range(len(cols))), d["key"]
+        cells = [(n["col"], n.get("row", 0)) for n in d["nodes"]]
+        assert len(cells) == len(set(cells)), d["key"]
+        for n in d["nodes"]:
+            assert isinstance(n.get("row", 0), int) and n.get("row", 0) >= 0, d["key"]
 
 
 def test_edges_reference_existing_nodes(folders):

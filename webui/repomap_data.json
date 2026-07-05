@@ -20,7 +20,8 @@
               "fn": "Bootstraps the pinned env and builds one ProcessingConfig session per win filter, then hands them to PreProcessScheduler.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "config",
@@ -30,7 +31,8 @@
               "fn": "Dataclass carrying crop, track selection, polarisation, beamforming method and run path settings.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -40,7 +42,8 @@
               "fn": "Sequences the tomogram, interferometric-inputs and geometry-field stages, then triggers the run manifest write.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "registry",
@@ -48,9 +51,10 @@
               "module": "pipelines/processing/generation/artifacts.py",
               "role": "io",
               "fn": "Creates the run directory structure and resolves the canonical .npy artifact output paths by name.",
-              "col": 1,
+              "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "tomo_launcher",
@@ -62,7 +66,8 @@
               "reads": [],
               "writes": [
                 "tomogram_spec.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "inf_launcher",
@@ -76,7 +81,8 @@
               ],
               "writes": [
                 "interferogram_spec.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "tomo_gen",
@@ -91,7 +97,8 @@
               "writes": [
                 "tomogram_full.npy",
                 "dem_full.npy"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "inf_gen",
@@ -110,7 +117,8 @@
                 "track_parameters.json",
                 "track_profiles.npz",
                 "interferogram_result.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "geom",
@@ -125,7 +133,8 @@
               ],
               "writes": [
                 "geometry_field.npz"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "meta",
@@ -140,7 +149,8 @@
                 "meta_tomogram_full.txt",
                 "meta_inputs.txt",
                 "dataset.json"
-              ]
+              ],
+              "row": 0
             }
           ],
           "edges": [
@@ -288,7 +298,9 @@
               "desc": "Job spec handed to the pyrat-env subprocess.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "preprocessing-analysis",
@@ -305,7 +317,8 @@
               "fn": "Bootstraps the env and runs PreprocessingInferenceScheduler over the selected preprocessing trials.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "config",
@@ -315,7 +328,8 @@
               "fn": "Dataclass naming the runs directory and the specific run tags (or auto-discovery) to plot.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "collector",
@@ -327,7 +341,8 @@
               "reads": [
                 "dataset.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "scheduler",
@@ -335,9 +350,10 @@
               "module": "pipelines/processing/generation/inference.py",
               "role": "orchestrator",
               "fn": "Sequences one StackInference session per discovered trial run directory.",
-              "col": 2,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "stack_pipeline",
@@ -345,11 +361,12 @@
               "module": "pipelines/processing/generation/inference.py",
               "role": "orchestrator",
               "fn": "Reads a run's dataset.json layout and drives the plotter over its stack artifacts.",
-              "col": 3,
+              "col": 2,
               "reads": [
                 "dataset.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "plotter",
@@ -357,7 +374,7 @@
               "module": "pipelines/processing/generation/plots.py",
               "role": "io",
               "fn": "Memory-maps the primary/secondary SLCs, interferograms and DEM and renders amplitude, phase and height overview figures.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "primary.npy",
                 "secondaries.npy",
@@ -368,7 +385,8 @@
                 "images/slc/*.png",
                 "images/interferograms/*.png",
                 "images/dem/dem_full.png"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -446,7 +464,9 @@
               "desc": "SLC amplitude, interferogram amplitude/phase and DEM figures under the run's images/ tree.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 4,
+          "nrow": 2
         }
       ]
     },
@@ -470,7 +490,8 @@
               "fn": "Bootstraps the sweep: pins GPUs, resolves the dataset queue and per-permutation plans, then runs one ParamExtractionPipeline per plan with a shared PeakInitialiser.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "config",
@@ -480,7 +501,8 @@
               "fn": "Dataclass holding the dataset base path, sweep lists (fit_k_values, fit_lambda_values, fit_modes), height range and Adam/batch knobs for each extraction run.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "tomo_in",
@@ -492,7 +514,8 @@
               "reads": [],
               "writes": [
                 "tomogram_full.npy"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "queue",
@@ -502,7 +525,8 @@
               "fn": "DatasetQueueResolver lists valid dataset directories under the base path and ExtractionPlanResolver expands the K x lambda x fit-mode grid into a list of ExtractionConfig plans.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -512,7 +536,8 @@
               "fn": "Per-plan orchestrator that discovers the tomogram and height range, drives the fit, mu-sorts the returned Gaussian stack via ParameterExtractor, and hands arrays to IO.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "sigma_fit",
@@ -524,7 +549,8 @@
               "reads": [
                 "tomogram_full.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "init",
@@ -534,7 +560,8 @@
               "fn": "CPU prominence peak-finder (scipy find_peaks over a process pool) that seeds per-pixel amplitude, mean and sigma initial guesses shared across all K.",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "kernel",
@@ -542,9 +569,10 @@
               "module": "pipelines/processing/param_extraction/sigma/kernels.py",
               "role": "model",
               "fn": "JAX jit/pmap Adam scan (selected by KernelBackendSelector) that fits per-pixel K-Gaussian amplitudes, means and sigmas, masking amp/mu gradients by fit mode.",
-              "col": 5,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "selector",
@@ -552,9 +580,10 @@
               "module": "pipelines/processing/param_extraction/sigma/selection.py",
               "role": "metric",
               "fn": "Scores each K by normalized MSE plus a lambda*K complexity penalty and picks the penalised-MSE-minimising model order per pixel, emitting best params and mse/penalised maps.",
-              "col": 6,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "io",
@@ -562,13 +591,14 @@
               "module": "pipelines/processing/param_extraction/io.py",
               "role": "io",
               "fn": "Saves the mu-sorted parameters.npy, the fit_diagnostics.npz and the param_extraction_meta.json describing K, lambda, thresholds and the source tomogram.",
-              "col": 6,
+              "col": 4,
               "reads": [],
               "writes": [
                 "parameters.npy",
                 "fit_diagnostics.npz",
                 "param_extraction_meta.json"
-              ]
+              ],
+              "row": 2
             }
           ],
           "edges": [
@@ -676,7 +706,9 @@
               "desc": "Self-describing run metadata; k_max drives downstream n_gaussians and preprocessing/threshold reuse.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "param-analysis",
@@ -693,7 +725,8 @@
               "fn": "Thin analysis entry that pins threads and runs the inference scheduler over one or more selected extraction trials.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "config",
@@ -703,7 +736,8 @@
               "fn": "Dataclass giving the params directory, optional run_tags selecting trials, and the make_plots flag.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "trial_in",
@@ -711,14 +745,15 @@
               "module": "pipelines/processing/param_extraction",
               "role": "external",
               "fn": "An extraction run directory (parameters.npy, fit_diagnostics.npz, param_extraction_meta.json and the source tomogram) produced by the Extraction stage.",
-              "col": 0,
+              "col": 2,
               "reads": [],
               "writes": [
                 "parameters.npy",
                 "fit_diagnostics.npz",
                 "param_extraction_meta.json",
                 "tomogram_full.npy"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "scheduler",
@@ -730,7 +765,8 @@
               "reads": [
                 "param_extraction_meta.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "run_pipe",
@@ -742,7 +778,8 @@
               "reads": [],
               "writes": [
                 "fit_metrics_summary.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "io",
@@ -756,7 +793,8 @@
                 "fit_diagnostics.npz",
                 "param_extraction_meta.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics",
@@ -768,7 +806,8 @@
               "reads": [
                 "tomogram_full.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "plots",
@@ -780,7 +819,8 @@
               "reads": [],
               "writes": [
                 "result plots (PNG)"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -910,7 +950,9 @@
               "desc": "Spatial colormaps, R2/parameter distributions, metrics bars and example fits written under the run's images/ directory.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -934,7 +976,8 @@
               "fn": "Declares split regions, input/output channel selection, patch size/stride, secondary labels and normalization settings for the dataset build.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "geom",
@@ -946,7 +989,8 @@
               "reads": [],
               "writes": [
                 "meta/geometry_field.npz"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -958,7 +1002,8 @@
               "reads": [
                 "meta/geometry_field.npz"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "cropper",
@@ -966,11 +1011,12 @@
               "module": "pipelines/backbone/dataset/spatial.py",
               "role": "io",
               "fn": "Memmaps the preprocessing primary/secondaries/interferograms/parameters/DEM arrays and slices each split region into a stacked input tensor and targets.",
-              "col": 1,
+              "col": 2,
               "reads": [
                 "preprocessing arrays (*.npy)"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "patcher",
@@ -980,7 +1026,8 @@
               "fn": "Computes the padded patch grid from spatial size, patch size and stride and extracts each windowed patch on demand.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "dataset",
@@ -988,9 +1035,10 @@
               "module": "pipelines/backbone/dataset/datasets.py",
               "role": "data",
               "fn": "Assembles the per-patch input tensor from configured channel representations, selects GT parameter channels, and normalizes both on access.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "augmenter",
@@ -998,9 +1046,10 @@
               "module": "pipelines/backbone/dataset/augmentation.py",
               "role": "transform",
               "fn": "Applies random flips, rot90 and normalized-space noise to train patches, keeping the kz field co-transformed.",
-              "col": 1,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "stats",
@@ -1008,11 +1057,12 @@
               "module": "pipelines/backbone/dataset/stats_computer.py",
               "role": "transform",
               "fn": "Fits per-slot-kind input and per-role output loc/scale strategies over sampled train values and saves them as normalization stats.",
-              "col": 3,
+              "col": 4,
               "reads": [],
               "writes": [
                 "normalization_stats.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "normalizer",
@@ -1024,7 +1074,8 @@
               "reads": [
                 "normalization_stats.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "metawriter",
@@ -1032,13 +1083,14 @@
               "module": "pipelines/backbone/dataset/metadata_writer.py",
               "role": "io",
               "fn": "Serializes the dataset config, global crop, per-split regions and patch grids to JSON in the run meta directory.",
-              "col": 4,
+              "col": 1,
               "reads": [],
               "writes": [
                 "meta/dataset_creation_config.json",
                 "meta/crop.json",
                 "meta/patch.json"
-              ]
+              ],
+              "row": 3
             },
             {
               "id": "loader",
@@ -1046,11 +1098,12 @@
               "module": "pipelines/shared/dataset/loaders.py",
               "role": "data",
               "fn": "Wraps the three PatchDatasets in seeded, batched train/val/test DataLoaders handed to the trainer.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [
                 "train/val/test DataLoaders"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -1198,7 +1251,9 @@
               "desc": "Normalized, batched patch loaders plus the underlying datasets carrying the fitted normalizer.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 4
         },
         {
           "key": "backbone-training",
@@ -1215,7 +1270,8 @@
               "fn": "Thin bootstrap that pins the GPU and hands off to BackboneTrainingLauncher.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "cfg",
@@ -1225,7 +1281,8 @@
               "fn": "Resolved CLI config carrying backbone name, trainer/dataset/geometry/curriculum settings, overfit-check and probe knobs, and trial-sweep fields.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "launcher",
@@ -1237,7 +1294,8 @@
               "reads": [],
               "writes": [
                 "docs/resolved_entry_config.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "dataset_pipeline",
@@ -1245,12 +1303,13 @@
               "module": "pipelines/backbone/dataset/pipeline.py",
               "role": "external",
               "fn": "Dataset-stage boundary that returns train/val/test loaders, the fitted normalizer and the datasets.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "train/val/test DataLoaders",
                 "normalization_stats.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "pipeline",
@@ -1260,7 +1319,8 @@
               "fn": "Runs the dataset pipeline, builds the model, runs the overfit gate, then constructs the trainer and drives train plus test.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "model_builder",
@@ -1268,9 +1328,10 @@
               "module": "pipelines/shared/model/model_builder.py",
               "role": "model",
               "fn": "Instantiates the named backbone with in/out channels and image-size overrides and reports parameter counts.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trainer",
@@ -1285,7 +1346,8 @@
               "writes": [
                 "best_model.pt",
                 "checkpoint.pt"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "loss",
@@ -1295,7 +1357,8 @@
               "fn": "Reconstructs Gaussian curves and computes the weighted sum of curve, parameter, TV and physics terms declared in loss_terms.py, plus occupancy diagnostics.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "overfit_check",
@@ -1303,11 +1366,12 @@
               "module": "pipelines/shared/training/overfit_check.py",
               "role": "transform",
               "fn": "Pre-training sanity gate that memorizes a few sanitized examples and aborts the run on failure.",
-              "col": 3,
+              "col": 1,
               "reads": [],
               "writes": [
                 "meta/overfit_report.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "loss_probe",
@@ -1315,9 +1379,10 @@
               "module": "pipelines/backbone/training/loss_probe.py",
               "role": "metric",
               "fn": "Optionally averages each loss term at weight 1 over a few batches to suggest comparable-magnitude weights, then may exit.",
-              "col": 3,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "diagnostics",
@@ -1327,7 +1392,8 @@
               "fn": "Selects representative validation pixels and logs predicted-vs-GT profile reconstructions and predicted-parameter histograms per epoch.",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "docs",
@@ -1339,7 +1405,8 @@
               "reads": [],
               "writes": [
                 "docs/model_doc.md"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "run_metadata",
@@ -1347,14 +1414,15 @@
               "module": "pipelines/shared/config/run_metadata.py",
               "role": "io",
               "fn": "Owns the run directory and logger and persists trainer/model configs, the run summary and final test metrics.",
-              "col": 4,
+              "col": 2,
               "reads": [],
               "writes": [
                 "meta/run_summary.json",
                 "docs/trainer_config.json",
                 "meta/model_config.json",
                 "test_metrics.json"
-              ]
+              ],
+              "row": 2
             }
           ],
           "edges": [
@@ -1525,7 +1593,9 @@
               "desc": "Final held-out test metrics saved at the end of the run.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "backbone-inference",
@@ -1542,7 +1612,8 @@
               "fn": "Thin bootstrap that constructs the shared InferenceEntry with RunType.BACKBONE.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "cfg",
@@ -1552,7 +1623,8 @@
               "fn": "Selects run directory, split, checkpoint, stitching window, and toggles for cubes, reduced baseline, data consistency, plots and animations.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -1562,7 +1634,8 @@
               "fn": "Loads the run, predicts the cube, evaluates metrics/reduced/consistency, composes figures and assembles the report.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "meta",
@@ -1570,9 +1643,10 @@
               "module": "pipelines/backbone/inference/run_metadata_paths.py",
               "role": "io",
               "fn": "Resolves and creates the timestamped output directory tree (figures, animations, logs, cubes, metrics, report paths).",
-              "col": 1,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loader",
@@ -1587,7 +1661,8 @@
                 "meta/run_summary.json",
                 "meta/dataset_creation_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "model_wrapper",
@@ -1595,9 +1670,10 @@
               "module": "pipelines/backbone/inference/model_wrapper.py",
               "role": "model",
               "fn": "Wraps the eval network to run a no-grad forward pass and denormalize plus Gaussian-clamp the predicted parameters.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "predictor",
@@ -1609,7 +1685,8 @@
               "reads": [],
               "writes": [
                 "cubes/*.npy"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "reduced",
@@ -1617,11 +1694,12 @@
               "module": "pipelines/backbone/inference/reduced.py",
               "role": "transform",
               "fn": "Reproduces a classical Capon tomogram from the trained secondary subset via TomogramLauncher and caches it as the baseline.",
-              "col": 3,
+              "col": 4,
               "reads": [],
               "writes": [
                 "reduced_tomogram_*.npy"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "metrics",
@@ -1633,7 +1711,8 @@
               "reads": [],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "data_consistency",
@@ -1641,14 +1720,15 @@
               "module": "pipelines/backbone/inference/data_consistency.py",
               "role": "metric",
               "fn": "Reprojects pred/GT curves to track coherences via the kz field and scores them against the measured interferogram phase.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "docs/trainer_config.json",
                 "meta/geometry_field.npz"
               ],
               "writes": [
                 "cubes/physics_*.npy"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "figures",
@@ -1661,7 +1741,8 @@
               "writes": [
                 "figures/*.png",
                 "animations/*.gif"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "report",
@@ -1673,7 +1754,8 @@
               "reads": [],
               "writes": [
                 "report.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -1863,7 +1945,9 @@
               "desc": "Assembled inference report with run summary, metric tables and embedded figures.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -1887,7 +1971,8 @@
               "fn": "Holds profile dataset settings: split regions, gaussian axis bounds, pixel subsample and keep-empty fractions, loader params and augmentation config.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "layout",
@@ -1895,11 +1980,12 @@
               "module": "pipelines/shared/dataset/dataset_spatial.py",
               "role": "io",
               "fn": "Resolves the preprocessing run layout and memory-maps the extracted Gaussian-parameter volume plus its global crop and profile length.",
-              "col": 1,
+              "col": 2,
               "reads": [
                 "parameters.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -1909,7 +1995,8 @@
               "fn": "Sequences dataset construction: builds the elevation axis, crops per-split parameters, fits the normalizer on train, then assembles the three DataLoaders.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "cropper",
@@ -1917,11 +2004,12 @@
               "module": "pipelines/profile_autoencoder/dataset/splitting.py",
               "role": "io",
               "fn": "Slices the memmapped parameter volume into per-split train/val/test region arrays validated against the global crop.",
-              "col": 2,
+              "col": 3,
               "reads": [
                 "parameters.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "curve",
@@ -1931,7 +2019,8 @@
               "fn": "Builds the shared elevation axis and evaluates Gaussian-mixture (amp, mu, sigma) parameters into per-pixel intensity curves.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "dataset",
@@ -1941,7 +2030,8 @@
               "fn": "Per-pixel Dataset that stacks amp/mu/sigma channels, selects active vs empty pixels, and on access synthesizes, augments and normalizes one profile curve.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "augment",
@@ -1949,9 +2039,10 @@
               "module": "pipelines/profile_autoencoder/dataset/augmentation.py",
               "role": "transform",
               "fn": "Applies train-only amplitude scaling, circular shift, flip and post-normalization Gaussian noise to each curve.",
-              "col": 3,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "norm",
@@ -1963,7 +2054,8 @@
               "reads": [],
               "writes": [
                 "profile_normalization_stats.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "loader",
@@ -1973,7 +2065,8 @@
               "fn": "Wraps the three ProfileDatasets into seeded, pinned train/val/test DataLoaders.",
               "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -2072,7 +2165,9 @@
               "desc": "Curve batches plus x_axis and profile length handed to the training stage.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         },
         {
           "key": "profileae-training",
@@ -2087,9 +2182,10 @@
               "module": "main/training/train_profile_autoencoder.py",
               "role": "entry",
               "fn": "Thin bootstrap that pins the GPU and hands ProfileAeEntryConfig + SingleTrainRunner to the SeedSweepLauncher.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "cfg",
@@ -2099,7 +2195,8 @@
               "fn": "Entry config for a profile-AE run: AE model name, AE loss, seed sweep, pixel subsample, augmentation and training knobs.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "runner",
@@ -2107,9 +2204,10 @@
               "module": "pipelines/profile_autoencoder/training/pipeline.py",
               "role": "orchestrator",
               "fn": "Per-seed runner (EntryConfigTrainRunner) that instantiates and runs the TrainingPipeline for the selected AE model.",
-              "col": 1,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "datasetpipe",
@@ -2117,9 +2215,10 @@
               "module": "pipelines/profile_autoencoder/dataset/pipeline.py",
               "role": "external",
               "fn": "Dataset stage that supplies the train/val/test DataLoaders, x_axis and profile length consumed here (see Dataset diagram).",
-              "col": 1,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -2127,13 +2226,14 @@
               "module": "pipelines/profile_autoencoder/training/pipeline.py",
               "role": "orchestrator",
               "fn": "Profile-AE training orchestrator built on the shared AutoencoderTrainingPipeline.run scheduler: prepares data, builds the model, saves metadata, runs the overfit gate, then trains.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [
                 "run_summary.json",
                 "profile_ae config json",
                 "profile_dataset config json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "model",
@@ -2143,7 +2243,8 @@
               "fn": "Builds the selected profile autoencoder (encoder->embedding->decoder) from the registry; reconstruct() returns curve_hat and latent z.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trainer",
@@ -2151,9 +2252,10 @@
               "module": "pipelines/profile_autoencoder/training/trainer.py",
               "role": "transform",
               "fn": "Profile trainer hook: reshapes each batch to (B, L, 1, 1), calls model.reconstruct and scores it with the reconstruction Loss.",
-              "col": 3,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loss",
@@ -2161,9 +2263,10 @@
               "module": "pipelines/profile_autoencoder/training/loss.py",
               "role": "metric",
               "fn": "Curve reconstruction loss (huber/charbonnier/curve_kind) comparing reconstructed against input profiles.",
-              "col": 4,
+              "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "aetrainer",
@@ -2171,11 +2274,12 @@
               "module": "pipelines/autoencoder_common/trainer.py",
               "role": "orchestrator",
               "fn": "Shared AE trainer (extends tools BaseTrainer): builds model_cfg param groups, runs the epoch/validation loop and checkpoints best_model.pt.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [
                 "best_model.pt"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -2274,7 +2378,9 @@
               "desc": "Persisted autoencoder architecture config and profile dataset config (ProfileAutoencoderConfigIO + ProfileDatasetConfigIO) used to rebuild the model and dataset downstream.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         },
         {
           "key": "profileae-inference",
@@ -2291,7 +2397,8 @@
               "fn": "Thin bootstrap that runs InferenceEntry with RunType.PROFILE_AE to launch the profile-AE inference pipeline.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "cfg",
@@ -2301,7 +2408,8 @@
               "fn": "Inference config: run directory, split, device, checkpoint name, batch/worker params and plotting/curve-sampling options.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "pipeline",
@@ -2313,7 +2421,8 @@
               "reads": [],
               "writes": [
                 "embeddings.npy"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "metadata",
@@ -2321,9 +2430,10 @@
               "module": "pipelines/autoencoder_common/inference/metadata.py",
               "role": "io",
               "fn": "Shared inference metadata: mints the timestamped output directory and the figures/logs/metrics/report paths.",
-              "col": 1,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loader",
@@ -2338,7 +2448,8 @@
                 "run_summary.json",
                 "profile_ae config json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "predictor",
@@ -2348,7 +2459,8 @@
               "fn": "Shared reconstruction loop; the profile subclass reshapes curves to (B,L,1,1), runs model.reconstruct, denormalizes to gt/pred and collects embeddings into an AeResult.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics",
@@ -2360,7 +2472,8 @@
               "reads": [],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "plots",
@@ -2372,7 +2485,8 @@
               "reads": [],
               "writes": [
                 "figures/*.png"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "report",
@@ -2384,7 +2498,8 @@
               "reads": [],
               "writes": [
                 "report.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -2502,7 +2617,9 @@
               "desc": "Assembled inference report with metric tables and reconstruction/embedding figures.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -2529,7 +2646,8 @@
                 "DatasetConfig",
                 "TrainerConfig.gaussian"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "dspipe",
@@ -2542,7 +2660,8 @@
               "writes": [
                 "meta/stats",
                 "meta/dataset_creation_config.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "loaders",
@@ -2552,7 +2671,8 @@
               "fn": "Train/val/test DataLoaders yielding PatchDataset tuples whose first element (batch[0]) is the normalized multi-channel input image the AE reconstructs.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "consumer",
@@ -2562,7 +2682,8 @@
               "fn": "Image-autoencoder training consumer that reads only batch[0], the input-image patch, from each loader (see the Training diagram).",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -2607,7 +2728,9 @@
               "desc": "Serialized dataset/split/patch configuration that the inference loader replays to rebuild the exact split PatchDataset.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 4,
+          "nrow": 2
         },
         {
           "key": "imageae-training",
@@ -2624,7 +2747,8 @@
               "fn": "Pins the GPU, then hands ImageAeEntryConfig and SingleTrainRunner to SeedSweepLauncher to execute one seed sweep.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "cfg",
@@ -2634,7 +2758,8 @@
               "fn": "Entry and trainer config carrying ae_model_name, model_overrides, ae_loss, geometry and dataset paths for the run.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -2644,7 +2769,8 @@
               "fn": "Sequences data prep, model build, metadata save, overfit check and training, then returns the run results and directory.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "data",
@@ -2652,9 +2778,10 @@
               "module": "pipelines/shared/dataset/dataset_prep.py",
               "role": "external",
               "fn": "External dataset preparation supplying the input-image patch DataLoaders and the derived in_channels (see the Dataset diagram).",
-              "col": 1,
+              "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "model",
@@ -2664,7 +2791,8 @@
               "fn": "Builds the image autoencoder (encoder-decoder exposing reconstruct) from the registry config, wiring in_channels from the dataset.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loss",
@@ -2672,9 +2800,10 @@
               "module": "pipelines/image_autoencoder/training/loss.py",
               "role": "metric",
               "fn": "Reconstruction loss (mse/huber/charbonnier) between the decoded image and the original input image.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trainer",
@@ -2686,7 +2815,8 @@
               "reads": [],
               "writes": [
                 "best_model.pt"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "configio",
@@ -2694,12 +2824,13 @@
               "module": "pipelines/shared/config/config_persistence.py",
               "role": "io",
               "fn": "Persists the image-autoencoder architecture config and the run_summary (model_name=image_ae, in/out channels, seed) to the run meta directory.",
-              "col": 3,
+              "col": 2,
               "reads": [],
               "writes": [
                 "meta/image_autoencoder config",
                 "meta/run_summary.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "jepa",
@@ -2712,7 +2843,8 @@
                 "best_model.pt",
                 "meta/image_autoencoder config"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -2810,7 +2942,9 @@
               "desc": "Run identity: model_name=image_ae, in/out channels, x_axis_length and seed, checked at inference load.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "imageae-inference",
@@ -2827,7 +2961,8 @@
               "fn": "Routes the IMAGE_AE run type into InferenceEntry, which schedules per-run reconstruction scoring via ImageAeInferenceRunner.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -2839,7 +2974,8 @@
               "reads": [],
               "writes": [
                 "embeddings.npy"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "meta",
@@ -2847,9 +2983,10 @@
               "module": "pipelines/autoencoder_common/inference/metadata.py",
               "role": "io",
               "fn": "Creates the output/figures/logs directories under run/inference/image_ae and holds the metrics and report paths.",
-              "col": 1,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loader",
@@ -2864,7 +3001,8 @@
                 "meta/dataset_creation_config.json",
                 "meta/stats"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "predictor",
@@ -2874,7 +3012,8 @@
               "fn": "Iterates the loader, reconstructs batch[0], denormalizes gt/pred and pools the latent into a per-patch embedding, yielding an AeResult.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics",
@@ -2886,7 +3025,8 @@
               "reads": [],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "plots",
@@ -2898,7 +3038,8 @@
               "reads": [],
               "writes": [
                 "figures/*.png"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "report",
@@ -2910,7 +3051,8 @@
               "reads": [],
               "writes": [
                 "report.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -3022,7 +3164,9 @@
               "desc": "Assembled inference report embedding the metric tables and figure sections.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -3046,7 +3190,8 @@
               "fn": "Pins the GPU environment, builds JepaEntryConfig, and launches SingleTrainRunner through the SeedSweepLauncher.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "cfg",
@@ -3054,9 +3199,10 @@
               "module": "configuration/training/jepa.py",
               "role": "config",
               "fn": "Dataclass carrying the backbone name, the profile/image autoencoder runs and freeze-or-finetune modes, target_provider, embedding_loss and param_loss knobs.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "pipeline",
@@ -3064,14 +3210,15 @@
               "module": "pipelines/jepa/training/pipeline.py",
               "role": "orchestrator",
               "fn": "Resolves the autoencoder runs, assembles JepaTrainerConfig, builds the module, runs the overfit gate, and launches the trainer.",
-              "col": 1,
+              "col": 2,
               "reads": [
                 "profile_autoencoder best_model.pt",
                 "image_autoencoder best_model.pt"
               ],
               "writes": [
                 "JEPA run meta (configs + ProfileStats)"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "preproc",
@@ -3079,11 +3226,12 @@
               "module": "pipelines/preprocessing",
               "role": "external",
               "fn": "Preprocessing run supplying the input SLC stack and per-pixel Gaussian-parameter arrays consumed by the dataset preparation.",
-              "col": 1,
+              "col": 0,
               "reads": [],
               "writes": [
                 "preprocessing input + parameter arrays"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "prof_ckpt",
@@ -3091,11 +3239,12 @@
               "module": "pipelines/profile_autoencoder",
               "role": "external",
               "fn": "Pretrained profile-autoencoder best_model.pt plus its config and ProfileStats, owned by the profile-autoencoder pipeline.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "profile_autoencoder best_model.pt"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "img_ckpt",
@@ -3103,11 +3252,12 @@
               "module": "pipelines/image_autoencoder",
               "role": "external",
               "fn": "Pretrained image-autoencoder best_model.pt plus its config, owned by the image-autoencoder pipeline, used as an optional spatial frontend.",
-              "col": 1,
+              "col": 3,
               "reads": [],
               "writes": [
                 "image_autoencoder best_model.pt"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "dataprep",
@@ -3115,11 +3265,12 @@
               "module": "pipelines/shared/dataset/dataset_prep.py",
               "role": "data",
               "fn": "Shared preparation that crops patches and yields train/val/test DataLoaders of (input stack, GT params) plus the elevation x-axis.",
-              "col": 2,
+              "col": 1,
               "reads": [
                 "preprocessing input + parameter arrays"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "module",
@@ -3127,12 +3278,13 @@
               "module": "pipelines/jepa/training/trainer.py",
               "role": "model",
               "fn": "Composes the backbone with the loaded profile and/or image autoencoders into one module whose forward maps a patch to a latent embedding.",
-              "col": 2,
+              "col": 3,
               "reads": [
                 "profile_autoencoder best_model.pt",
                 "image_autoencoder best_model.pt"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "coupling",
@@ -3140,9 +3292,10 @@
               "module": "pipelines/jepa/training/coupling.py",
               "role": "transform",
               "fn": "Freezes or fine-tunes each autoencoder and supplies the target embedding branch (live, stopgrad or EMA) that the backbone is trained to match.",
-              "col": 3,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trainer",
@@ -3150,11 +3303,12 @@
               "module": "pipelines/jepa/training/trainer.py",
               "role": "transform",
               "fn": "Trains the backbone predictor (optionally fine-tuning the autoencoders) in latent space and updates the EMA target after each optimizer step.",
-              "col": 3,
+              "col": 4,
               "reads": [],
               "writes": [
                 "JEPA predictor best_model.pt"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "loss",
@@ -3162,9 +3316,10 @@
               "module": "pipelines/jepa/training/loss.py",
               "role": "transform",
               "fn": "Scores predicted vs autoencoder-encoded GT embeddings via MSE/cosine/smooth-L1 plus optional curve reconstruction, falling back to backbone ParameterLoss when no profile AE is present.",
-              "col": 4,
+              "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "out_ckpt",
@@ -3176,7 +3331,8 @@
               "reads": [
                 "JEPA predictor best_model.pt"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -3324,7 +3480,9 @@
               "desc": "Trained backbone (plus coupled AE) predictor checkpoint with the elevation x-axis.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         },
         {
           "key": "jepa-inference",
@@ -3341,7 +3499,8 @@
               "fn": "Inspects the run's meta configs and selects the JEPA (profile) or JEPA-param (image-only) inference component set.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "in_ckpt",
@@ -3349,12 +3508,13 @@
               "module": "pipelines/jepa/training/trainer.py",
               "role": "external",
               "fn": "Trained JEPA predictor best_model.pt with meta configs and ProfileStats produced by JEPA training.",
-              "col": 0,
+              "col": 2,
               "reads": [],
               "writes": [
                 "JEPA predictor best_model.pt",
                 "JEPA run meta (configs + ProfileStats)"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "components",
@@ -3364,7 +3524,8 @@
               "fn": "Immutable binding of loader, predictor, embedding-evaluator classes and the param_space flag for a JEPA run.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "pipeline",
@@ -3372,11 +3533,12 @@
               "module": "pipelines/backbone/inference/pipeline.py",
               "role": "orchestrator",
               "fn": "Shared orchestrator that loads the run, predicts, evaluates metrics and embeddings, then writes figures and the report.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "loader",
@@ -3389,7 +3551,8 @@
                 "JEPA predictor best_model.pt",
                 "JEPA run meta (configs + ProfileStats)"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "adapter",
@@ -3399,7 +3562,8 @@
               "fn": "Runs backbone -> profile-AE decode -> denormalize, turning an input patch into a physical elevation curve.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "predictor",
@@ -3411,7 +3575,8 @@
               "reads": [],
               "writes": [
                 "pred/gt curve cubes + pixel maps"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "embed_eval",
@@ -3419,9 +3584,10 @@
               "module": "pipelines/jepa/inference/embedding.py",
               "role": "metric",
               "fn": "Scores embedding MSE/cosine and decoder-only versus full-chain curve MSE between predicted and GT-encoded embeddings.",
-              "col": 4,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "curve_cubes",
@@ -3433,7 +3599,8 @@
               "reads": [
                 "pred/gt curve cubes + pixel maps"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics_json",
@@ -3441,11 +3608,12 @@
               "module": "pipelines/backbone/inference/pipeline.py",
               "role": "io",
               "fn": "Aggregated pixel-space and JEPA embedding diagnostics written to metrics.json.",
-              "col": 5,
+              "col": 4,
               "reads": [
                 "metrics.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             }
           ],
           "edges": [
@@ -3559,7 +3727,9 @@
               "desc": "Global pixel-space metrics merged with JEPA embedding and chain diagnostics.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -3583,7 +3753,8 @@
               "fn": "Holds the paths, training, normalization and inference knobs for one run and feeds the factory.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "dataset_json",
@@ -3595,7 +3766,8 @@
               "reads": [
                 "dataset.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "factory",
@@ -3607,7 +3779,8 @@
               "reads": [
                 "dataset.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "run_meta",
@@ -3621,7 +3794,8 @@
                 "trainer_config.json",
                 "run_summary.json",
                 "test_metrics.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "config_io",
@@ -3639,7 +3813,8 @@
                 "profile_autoencoder_config.json",
                 "image_autoencoder_config.json",
                 "profile_dataset_config.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "train_pipeline",
@@ -3647,9 +3822,10 @@
               "module": "pipelines/backbone/training/pipeline.py",
               "role": "external",
               "fn": "Consumes the factory-built dataset and trainer configs to run a per-model training job.",
-              "col": 3,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "inference",
@@ -3661,7 +3837,8 @@
               "reads": [
                 "model_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             }
           ],
           "edges": [
@@ -3756,7 +3933,9 @@
               "desc": "Held-out test metrics used for cross-run comparison.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "shared-dataset",
@@ -3773,7 +3952,8 @@
               "fn": "Describes split regions, patch geometry, normalization and loader parameters for the dataset build.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "ds_prep",
@@ -3783,7 +3963,8 @@
               "fn": "Sets n_gaussians, builds the GaussianAxis from profile length, and runs the DatasetPipeline to return loaders, datasets and the x-axis.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "layout",
@@ -3796,7 +3977,8 @@
                 "dataset.json",
                 "tomogram_full.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "ds_pipeline",
@@ -3809,7 +3991,8 @@
                 "tomogram_full.npy",
                 "parameters"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "loader",
@@ -3819,7 +4002,8 @@
               "fn": "Wraps train/val/test datasets in DataLoaders with seeded workers and reproducible generators.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trainer",
@@ -3829,7 +4013,8 @@
               "fn": "Receives the DataLoaders, x-axis and datasets to train the network.",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -3908,7 +4093,9 @@
               "desc": "Per-pixel Gaussian parameter arrays used as regression targets.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 2
         },
         {
           "key": "shared-model",
@@ -3925,7 +4112,8 @@
               "fn": "Names the architecture and the fields to override for this run.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "registry",
@@ -3935,7 +4123,8 @@
               "fn": "Maps model names to their config-dataclass constructors for backbone, image-AE and profile-AE families.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "builder",
@@ -3943,9 +4132,10 @@
               "module": "pipelines/shared/model/model_builder.py",
               "role": "model",
               "fn": "Instantiates the registry config and validates and applies each model override.",
-              "col": 2,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "model_cfg",
@@ -3953,9 +4143,10 @@
               "module": "models/__init__.py",
               "role": "data",
               "fn": "The resolved architecture config passed on to build and persist the network.",
-              "col": 3,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "net",
@@ -3963,11 +4154,12 @@
               "module": "pipelines/backbone/training/launcher.py",
               "role": "external",
               "fn": "Builds the nn.Module from the config and persists it via the config-IO layer.",
-              "col": 4,
+              "col": 3,
               "reads": [],
               "writes": [
                 "model_config.json"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -4019,7 +4211,9 @@
               "desc": "Trained network weights consumed by inference.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 4,
+          "nrow": 2
         },
         {
           "key": "shared-training",
@@ -4036,7 +4230,8 @@
               "fn": "Thin bootstrap that pins the GPU env and hands an entry config plus runner class to SeedSweepLauncher.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "seed_launcher",
@@ -4046,7 +4241,8 @@
               "fn": "Applies ConfigCli to the entry config and forwards it to the seed sweep.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "worker_base",
@@ -4054,9 +4250,10 @@
               "module": "pipelines/shared/training/worker_base.py",
               "role": "orchestrator",
               "fn": "Base for the benchmark and cross-validation subprocess workers, fixing the run directory and loss-probe config for one training unit.",
-              "col": 1,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "seed_runner",
@@ -4066,7 +4263,8 @@
               "fn": "Deep-copies the config per seed, names each run, and invokes the runner factory for every seed.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "train_runner",
@@ -4076,7 +4274,8 @@
               "fn": "Runs the pretrain preflight then hands the config to the concrete per-model training pipeline.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "preflight",
@@ -4084,9 +4283,10 @@
               "module": "pipelines/shared/training/pretrain_preflight.py",
               "role": "transform",
               "fn": "Optionally runs batch-size finding and dataloader tuning through a PretrainOrchestrator before training starts.",
-              "col": 4,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "train_pipeline",
@@ -4099,7 +4299,8 @@
               "writes": [
                 "best_model.pt",
                 "test_metrics.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "overfit_gate",
@@ -4111,7 +4312,8 @@
               "reads": [],
               "writes": [
                 "overfit_report.json"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -4200,7 +4402,9 @@
               "desc": "Held-out test metrics written at the end of training.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         },
         {
           "key": "shared-inference",
@@ -4217,7 +4421,8 @@
               "fn": "Dispatches to scheduler or worker mode by --worker and selects the runner/config for the run type.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "scheduler",
@@ -4229,7 +4434,8 @@
               "reads": [],
               "writes": [
                 "resolved_config.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "run_classifier",
@@ -4237,13 +4443,14 @@
               "module": "pipelines/shared/inference/run_classifier.py",
               "role": "io",
               "fn": "Classifies a run directory as backbone, profile-AE or image-AE by which meta config file exists.",
-              "col": 2,
+              "col": 1,
               "reads": [
                 "model_config.json",
                 "profile_autoencoder_config.json",
                 "image_autoencoder_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "gpu_queue",
@@ -4253,7 +4460,8 @@
               "fn": "Runs the per-run worker subprocesses across the available GPUs and collects their results.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "worker",
@@ -4265,7 +4473,8 @@
               "reads": [
                 "resolved_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "resolver",
@@ -4273,13 +4482,14 @@
               "module": "pipelines/shared/inference/inference_components.py",
               "role": "io",
               "fn": "Chooses backbone vs JEPA spatial inference components by the meta configs present in the run.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "model_config.json",
                 "profile_autoencoder_config.json",
                 "image_autoencoder_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "infer_pipeline",
@@ -4287,11 +4497,12 @@
               "module": "pipelines/backbone/inference/pipeline.py",
               "role": "external",
               "fn": "Runs sliding-window prediction, stitching and reporting for the resolved run.",
-              "col": 5,
+              "col": 4,
               "reads": [
                 "best_model.pt"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             }
           ],
           "edges": [
@@ -4370,7 +4581,9 @@
               "desc": "Checkpoint loaded to score the run.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         },
         {
           "key": "shared-orchestration",
@@ -4387,7 +4600,8 @@
               "fn": "Supplies the run tag, log base directory and session/stage parameters for the orchestrators.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "staged_pipeline",
@@ -4400,7 +4614,8 @@
               "writes": [
                 "state.json",
                 "resolved_config.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "session_scheduler",
@@ -4410,7 +4625,8 @@
               "fn": "Enumerates sessions and dispatches them sequentially, collecting each session's output paths.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "staged_subclass",
@@ -4420,7 +4636,8 @@
               "fn": "Concrete multi-stage sweeps that mark stages and spawn per-stage GPU jobs on the shared scaffolding.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "session_subclass",
@@ -4430,7 +4647,8 @@
               "fn": "Concrete session producers for preprocessing and param-extraction that run one session at a time.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "process_pool",
@@ -4440,7 +4658,8 @@
               "fn": "Runs the session callables with a single worker so sessions execute strictly sequentially.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "state_out",
@@ -4448,12 +4667,13 @@
               "module": "pipelines/shared/orchestration/staged_pipeline.py",
               "role": "io",
               "fn": "Persisted stage state, resolved config and per-session output paths for resume and downstream use.",
-              "col": 3,
+              "col": 4,
               "reads": [],
               "writes": [
                 "state.json",
                 "resolved_config.json"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -4533,7 +4753,9 @@
               "desc": "Per-session output paths (e.g. preprocessing dataset, param arrays) fed downstream.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         }
       ]
     },
@@ -4557,7 +4779,8 @@
               "fn": "Pins the environment and either launches the CV scheduler or, with --worker, runs a single fold's train or infer subprocess.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "config",
@@ -4567,7 +4790,8 @@
               "fn": "Holds the k-fold run configuration: fold count and azimuth window, seeds, training and inference settings, GPUs, and dataset paths.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -4577,7 +4801,8 @@
               "fn": "Sequences fold planning, the training stage, the inference stage, and the report stage, marking each stage's completion status.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "factory",
@@ -4587,7 +4812,8 @@
               "fn": "Builds the azimuth-validated FoldPlanner and derives per-fold trainer, dataset, and inference configs from the CV config.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "planner",
@@ -4597,7 +4823,8 @@
               "fn": "Partitions the azimuth extent into n_folds guard-trimmed blocks and assigns disjoint train/val/test SplitRegions for each fold.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "train_stage",
@@ -4605,11 +4832,12 @@
               "module": "pipelines/cross_validation/stages.py",
               "role": "orchestrator",
               "fn": "Queues one training GpuJob per fold and seed and schedules them across the available GPUs.",
-              "col": 3,
+              "col": 2,
               "reads": [],
               "writes": [
                 "training_results.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "infer_stage",
@@ -4617,9 +4845,10 @@
               "module": "pipelines/cross_validation/stages.py",
               "role": "orchestrator",
               "fn": "Queues one inference GpuJob per fold, seed, and split, skipping missing checkpoints and disjoint splits, and runs them across GPUs.",
-              "col": 3,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "report_stage",
@@ -4627,9 +4856,10 @@
               "module": "pipelines/cross_validation/stages.py",
               "role": "orchestrator",
               "fn": "Collects per-fold results via FoldCollector and drives CrossValidationReport to write the aggregate report.",
-              "col": 3,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 3
             },
             {
               "id": "train_worker",
@@ -4637,9 +4867,10 @@
               "module": "pipelines/cross_validation/workers.py",
               "role": "transform",
               "fn": "Runs one fold's training in a GPU subprocess by dispatching to the backbone, JEPA, or profile-autoencoder training pipeline with the fold's split_regions.",
-              "col": 4,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "infer_worker",
@@ -4647,9 +4878,10 @@
               "module": "pipelines/cross_validation/workers.py",
               "role": "transform",
               "fn": "Runs one fold's inference for a given split via the backbone inference pipeline using run-resolved inference components.",
-              "col": 4,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "collector",
@@ -4657,13 +4889,14 @@
               "module": "pipelines/cross_validation/workers.py",
               "role": "io",
               "fn": "Reads each fold's checkpoint metadata and per-split inference metrics, groups seed replicas, and aggregates their mean and std.",
-              "col": 4,
+              "col": 3,
               "reads": [
                 "best_model.pt",
                 "metrics.json",
                 "training_results.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 3
             },
             {
               "id": "report",
@@ -4671,12 +4904,13 @@
               "module": "pipelines/cross_validation/cv_report.py",
               "role": "metric",
               "fn": "Computes cross-fold mean-and-std metrics and writes the aggregate markdown report, per-split comparison reports, and the summary JSON.",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [
                 "cv_aggregate_report.md",
                 "cv_summary.json"
-              ]
+              ],
+              "row": 3
             },
             {
               "id": "ext_train",
@@ -4684,11 +4918,12 @@
               "module": "pipelines/shared/training",
               "role": "external",
               "fn": "Trains one fold's model to convergence and saves its checkpoint (backbone/JEPA/AE training pipeline behind WorkerBase).",
-              "col": 5,
+              "col": 4,
               "reads": [],
               "writes": [
                 "best_model.pt"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "ext_infer",
@@ -4696,13 +4931,14 @@
               "module": "pipelines/shared/inference",
               "role": "external",
               "fn": "Reconstructs the tomogram and evaluation metrics for one fold-split from its checkpoint.",
-              "col": 5,
+              "col": 4,
               "reads": [
                 "best_model.pt"
               ],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -4845,7 +5081,9 @@
               "desc": "Machine-readable per-split, per-fold aggregate statistics for the CV run.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 4
         }
       ]
     },
@@ -4867,9 +5105,10 @@
               "module": "main/experiments/benchmark.py",
               "role": "entry",
               "fn": "Bootstraps the run: builds BenchmarkConfig via ConfigCli for the scheduler, or pins one GPU and dispatches a maxbatch/train/infer worker subprocess.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "compare_entry",
@@ -4877,11 +5116,12 @@
               "module": "main/analysis/compare_runs.py",
               "role": "entry",
               "fn": "Standalone entry that resolves a benchmark run tag and re-runs ComparisonStage to rebuild the leaderboard from existing training and inference outputs.",
-              "col": 0,
+              "col": 6,
               "reads": [
                 "metrics.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "cfg",
@@ -4891,7 +5131,8 @@
               "fn": "Benchmark run configuration: model sweep, seeds, sweep_loss_components, and the size_match / max_batch / training / inference / comparison sub-configs.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -4899,11 +5140,12 @@
               "module": "pipelines/benchmark/pipeline.py",
               "role": "orchestrator",
               "fn": "Sequences sweep validation, capacity matching, max-batch probing, queued training then inference, and the final comparison report.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "resolved_config.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "seedexpand",
@@ -4911,9 +5153,10 @@
               "module": "pipelines/benchmark/stages.py",
               "role": "transform",
               "fn": "Expands the model list into architecture x loss-component x seed run units and builds the per-unit worker CLI commands shared by the training and inference queues.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "sizematch",
@@ -4921,11 +5164,12 @@
               "module": "pipelines/benchmark/sizing.py",
               "role": "transform",
               "fn": "Binary-searches each model's width scale (WidthScaler rules, DegeneracyAuditor flags) until its parameter count matches the reference model, writing per-model overrides to size_match.json.",
-              "col": 2,
+              "col": 3,
               "reads": [],
               "writes": [
                 "size_match.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "maxbatch",
@@ -4940,7 +5184,8 @@
               ],
               "writes": [
                 "max_batch.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "trainworker",
@@ -4956,7 +5201,8 @@
               ],
               "writes": [
                 "best_model.pt"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "inferworker",
@@ -4971,7 +5217,8 @@
               ],
               "writes": [
                 "metrics.json"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "leaderboard",
@@ -4987,7 +5234,8 @@
               ],
               "writes": [
                 "benchmark_overview.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -5137,7 +5385,9 @@
               "desc": "Leaderboard ranking every capacity-matched architecture x loss unit against the reference model, with per-seed dispersion.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 7,
+          "nrow": 3
         },
         {
           "key": "benchmark-feedtuner",
@@ -5152,9 +5402,10 @@
               "module": "main/experiments/tune_dataloader.py",
               "role": "entry",
               "fn": "Pins one GPU and single-threads the loader, then runs the DataLoaderTuningPipeline for the configured feed mode.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "cfg",
@@ -5164,7 +5415,8 @@
               "fn": "DataLoader tuning configuration: mode, model_name, batch_sizes, worker_counts, prefetch_factors, timed_batches, data_wait_target and the refine flag.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "pipeline",
@@ -5172,11 +5424,12 @@
               "module": "pipelines/dataloader_tuning/pipeline.py",
               "role": "orchestrator",
               "fn": "Builds the feed target, constructs the GPU feed benchmark, runs the main and optional refine sweeps, and writes the recommended DataLoader configuration.",
-              "col": 1,
+              "col": 2,
               "reads": [],
               "writes": [
                 "results.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "adapters",
@@ -5184,9 +5437,10 @@
               "module": "pipelines/dataloader_tuning/adapters.py",
               "role": "transform",
               "fn": "Builds a FeedTarget (dataset, model, to_model_input, forward_loss) for the selected feed mode - synthetic, profile_autoencoder, image_autoencoder or backbone - reusing the real dataset and model builders.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "events",
@@ -5198,7 +5452,8 @@
               "reads": [],
               "writes": [
                 "@TUNE event stream"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "sweep",
@@ -5208,7 +5463,8 @@
               "fn": "Runs the benchmark across the LoaderSpec grid (main batch x worker phase, then a prefetch x pin refine phase), emitting each throughput record.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "benchmark",
@@ -5218,7 +5474,8 @@
               "fn": "Times one LoaderSpec end to end, reporting samples/s, data-wait fraction, GPU utilisation and feed ratio over a fixed number of warmup and timed batches.",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "report",
@@ -5230,7 +5487,8 @@
               "reads": [],
               "writes": [
                 "throughput figures"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -5321,7 +5579,9 @@
               "desc": "Live meta / result / recommendation / done events streamed to the web UI during the sweep.",
               "scope": "cross"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     },
@@ -5347,7 +5607,8 @@
               "reads": [
                 "resolved_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "config",
@@ -5357,7 +5618,8 @@
               "fn": "Dataclass defining the tuning run: training_type, GPU list, skip_models, trial/epoch budget, pruner settings and run paths.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "scheduler",
@@ -5372,7 +5634,8 @@
               "writes": [
                 "resolved_config.json",
                 "tuning_results.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "gpuqueue",
@@ -5382,7 +5645,8 @@
               "fn": "Runs the per-worker GpuJob commands across the available GPUs and reports each subprocess status back to the scheduler.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "worker",
@@ -5394,7 +5658,8 @@
               "reads": [
                 "resolved_config.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "tuner",
@@ -5404,7 +5669,8 @@
               "fn": "Assembles the search space from the config's tunable lr/arch params and drives study.optimize, running one training pipeline per trial (backbone / profile-AE / image-AE / JEPA variants).",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "sampler",
@@ -5412,9 +5678,10 @@
               "module": "pipelines/tuning/tuners.py",
               "role": "transform",
               "fn": "Suggests concrete hyperparameters from the space spec through the Optuna trial (float / categorical / indexed_categorical) and decodes them back for reporting.",
-              "col": 4,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "trial",
@@ -5424,7 +5691,8 @@
               "fn": "Thin subclasses of the real training pipelines/trainers that train one short candidate and report val loss to the trial each epoch, raising TrialPruned when the median pruner says stop.",
               "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "study",
@@ -5438,7 +5706,8 @@
               ],
               "writes": [
                 "optuna.db"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "bestwriter",
@@ -5452,7 +5721,8 @@
               ],
               "writes": [
                 "best_config.json"
-              ]
+              ],
+              "row": 1
             },
             {
               "id": "plotter",
@@ -5460,13 +5730,14 @@
               "module": "pipelines/tuning/plots.py",
               "role": "io",
               "fn": "Renders the study to publication-style PNGs (optimization history, per-param slice/rank, contours, param/duration importances, EDF, timeline).",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "optuna.db"
               ],
               "writes": [
                 "study_plots/*.png"
-              ]
+              ],
+              "row": 2
             }
           ],
           "edges": [
@@ -5615,7 +5886,9 @@
               "desc": "Optuna study diagnostic figures (optimization history, slice/rank, contours, importances, timeline).",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 7,
+          "nrow": 3
         }
       ]
     },
@@ -5639,7 +5912,8 @@
               "fn": "Pins threads, builds the config via ConfigCli, then runs the preprocessing comparison pipeline and logs the report path.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "config",
@@ -5647,9 +5921,10 @@
               "module": "configuration/comparison.py",
               "role": "config",
               "fn": "Supplies runs_dir, run_tags, pixel_sample, block_size, range_chunk, workers and make_plots for the window sweep.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "runs",
@@ -5657,12 +5932,13 @@
               "module": "pipelines/processing/",
               "role": "external",
               "fn": "Prior preprocessing runs, each a directory holding a tomogram and its config state.",
-              "col": 1,
+              "col": 3,
               "reads": [],
               "writes": [
                 "tomogram_full.npy",
                 "config_state.json"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "pipeline",
@@ -5670,9 +5946,10 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "orchestrator",
               "fn": "Sequences collect, threaded measure, optional plot, and report over the window trials.",
-              "col": 1,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "collector",
@@ -5680,11 +5957,12 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Discovers preprocessing runs and reads each config_state.json to recover the multilook window into a WindowTrial.",
-              "col": 2,
+              "col": 3,
               "reads": [
                 "config_state.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics",
@@ -5692,11 +5970,12 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "metric",
               "fn": "Chunks each tomogram's amplitude to measure peak-to-floor contrast, spurious peaks, residual speckle and azimuth correlation length.",
-              "col": 3,
+              "col": 4,
               "reads": [
                 "tomogram_full.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "spatial",
@@ -5706,7 +5985,8 @@
               "fn": "Computes block coefficient-of-variation, block std and FFT autocorrelation length for the speckle and blurring metrics (shared with the param comparison).",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "plots",
@@ -5714,11 +5994,12 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Renders one bar chart per window-quality metric across the trials.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [
                 "window_metric_pngs"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "table",
@@ -5726,9 +6007,10 @@
               "module": "pipelines/comparison/metric_table.py",
               "role": "transform",
               "fn": "Builds the per-window markdown metric table, bolding the best value in each column (shared with the param comparison).",
-              "col": 4,
+              "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "report",
@@ -5736,13 +6018,14 @@
               "module": "pipelines/comparison/preprocessing_comparison.py",
               "role": "io",
               "fn": "Assembles the markdown report from the metric table, bar plots and the bias-variance reading guide.",
-              "col": 5,
+              "col": 6,
               "reads": [
                 "window_metric_pngs"
               ],
               "writes": [
                 "window_report.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -5855,7 +6138,9 @@
               "desc": "Per-window metric table, comparison plots and the bias-variance reading guide.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 7,
+          "nrow": 3
         },
         {
           "key": "comparison-param",
@@ -5872,7 +6157,8 @@
               "fn": "Pins threads, builds the config via ConfigCli, then runs the parameter-extraction comparison pipeline.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "config",
@@ -5880,9 +6166,10 @@
               "module": "configuration/comparison.py",
               "role": "config",
               "fn": "Supplies params_dir, run_tags, pixel_sample, block_size and make_plots for the fit comparison.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "runs",
@@ -5890,14 +6177,15 @@
               "module": "pipelines/processing/param_extraction/",
               "role": "external",
               "fn": "Prior Gaussian-fit runs, each holding fitted parameters, meta, and fit diagnostics.",
-              "col": 1,
+              "col": 3,
               "reads": [],
               "writes": [
                 "parameters.npy",
                 "param_extraction_meta.json",
                 "fit_metrics_summary.json",
                 "fit_diagnostics.npz"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "pipeline",
@@ -5905,9 +6193,10 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "orchestrator",
               "fn": "Sequences collect, measure, optional plot and report over the K-family trials.",
-              "col": 1,
+              "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "collector",
@@ -5915,11 +6204,12 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Discovers runs marked by param_extraction_meta.json and reads their fit config (k_max, lambda_k, fit flags) into ParamTrials sorted by K.",
-              "col": 2,
+              "col": 3,
               "reads": [
                 "param_extraction_meta.json"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "metrics",
@@ -5927,7 +6217,7 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "metric",
               "fn": "Loads each trial's parameters, summary and diagnostics to compute R2, BIC, coverage, active/collapsed slots, mu separation and dominant-height coherence.",
-              "col": 3,
+              "col": 4,
               "reads": [
                 "parameters.npy",
                 "param_extraction_meta.json",
@@ -5935,7 +6225,8 @@
                 "fit_diagnostics.npz",
                 "tomogram_full.npy"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "spatial",
@@ -5945,7 +6236,8 @@
               "fn": "Returns the block std of the dominant-scatterer height map used for the spatial-coherence metric (shared with the preprocessing comparison).",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "plots",
@@ -5953,11 +6245,12 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Renders K-colour-coded bar charts of BIC, R2, slot collapse, coherence and slot usage.",
-              "col": 4,
+              "col": 5,
               "reads": [],
               "writes": [
                 "param_metric_pngs"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "ranking",
@@ -5965,9 +6258,10 @@
               "module": "pipelines/shared/comparison/comparison_report.py",
               "role": "metric",
               "fn": "ComparisonReportBase / RankingComputer build the within-K composite score, mean rank and wins from each family's per-trial metrics.",
-              "col": 4,
+              "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "table",
@@ -5975,9 +6269,10 @@
               "module": "pipelines/comparison/metric_table.py",
               "role": "transform",
               "fn": "Builds the per-trial metric table, bolding the best value within each K family (shared with the preprocessing comparison).",
-              "col": 4,
+              "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "report",
@@ -5985,14 +6280,15 @@
               "module": "pipelines/comparison/param_extraction_comparison.py",
               "role": "io",
               "fn": "Writes the overview (config table plus within-K leaderboards) and the metrics markdown embedding the comparison plots.",
-              "col": 5,
+              "col": 6,
               "reads": [
                 "param_metric_pngs"
               ],
               "writes": [
                 "param_overview.md",
                 "param_metrics.md"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -6158,7 +6454,9 @@
               "desc": "Per-trial metric table (best-in-bold within each K) with the comparison plots.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 7,
+          "nrow": 3
         },
         {
           "key": "comparison-inference",
@@ -6175,7 +6473,8 @@
               "fn": "Pins threads, builds the config via ConfigCli, collects the trials and writes the comparison report.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "config",
@@ -6183,9 +6482,10 @@
               "module": "configuration/comparison.py",
               "role": "config",
               "fn": "Supplies runs_dir, run_tags, output_dir and the compare_images / compare_gifs / embed_images flags.",
-              "col": 0,
+              "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "runs",
@@ -6193,13 +6493,14 @@
               "module": "pipelines/backbone/",
               "role": "external",
               "fn": "Per-trial run directories from training and inference, each holding a checkpoint and a latest inference run.",
-              "col": 0,
+              "col": 1,
               "reads": [],
               "writes": [
                 "best_model.pt",
                 "metrics.json",
                 "inference_media"
-              ]
+              ],
+              "row": 2
             },
             {
               "id": "collector",
@@ -6207,13 +6508,14 @@
               "module": "pipelines/comparison/trial_collector.py",
               "role": "io",
               "fn": "For each run_tag reads the best_model.pt checkpoint and the latest inference run (metrics.json, figures, animations, report.md) into a TrialRecord, extending the shared base collector.",
-              "col": 1,
+              "col": 2,
               "reads": [
                 "best_model.pt",
                 "metrics.json",
                 "inference_media"
               ],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "records",
@@ -6221,9 +6523,10 @@
               "module": "pipelines/comparison/trial_collector.py",
               "role": "data",
               "fn": "Per-trial container of checkpoint stats, the inference metrics dict, and figure/animation/report paths.",
-              "col": 2,
+              "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "ranking",
@@ -6231,9 +6534,10 @@
               "module": "pipelines/shared/comparison/comparison_report.py",
               "role": "metric",
               "fn": "ComparisonReportBase / RankingComputer build the magnitude-aware composite score, mean rank, wins and grouped leaderboard from the per-trial metrics.",
-              "col": 3,
+              "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "report",
@@ -6249,7 +6553,8 @@
                 "overview.md",
                 "metrics_comparison.md",
                 "figure_gif_reports"
-              ]
+              ],
+              "row": 0
             }
           ],
           "edges": [
@@ -6364,7 +6669,9 @@
               "desc": "Per-figure (figures_*.md) and per-animation (gif_comparison.md) side-by-side pages.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 5,
+          "nrow": 3
         }
       ]
     },
@@ -6388,7 +6695,8 @@
               "fn": "Pins threads, parses a WeightXrayEntryConfig via ConfigCli, and runs WeightXrayBatch over a runs directory.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "config",
@@ -6398,7 +6706,8 @@
               "fn": "Holds the runs directory, checkpoint filename, output subdir, plotting flags and threshold knobs, and materializes a per-run WeightXrayConfig with WeightXrayThresholds.",
               "col": 0,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "batch",
@@ -6408,7 +6717,8 @@
               "fn": "Selects run directories then x-rays each one, deriving its per-run WeightXrayConfig and logging the verdict and report path.",
               "col": 1,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "selector",
@@ -6416,11 +6726,12 @@
               "module": "tools/runtime/run_selector.py",
               "role": "io",
               "fn": "Discovers run directories containing the checkpoint file under the runs dir and filters, prompts, or returns all of them.",
-              "col": 1,
+              "col": 0,
               "reads": [
                 "best_model.pt"
               ],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "xray",
@@ -6430,7 +6741,8 @@
               "fn": "Sequences the per-run resolve, analyze, detect, summarize, plot and report steps for one checkpoint.",
               "col": 2,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "resolver",
@@ -6438,11 +6750,12 @@
               "module": "tools/diagnostics/weight_xray.py",
               "role": "io",
               "fn": "Loads the checkpoint with torch.load and locates the parameter tensor mapping inside it (top level or a configured key).",
-              "col": 2,
+              "col": 3,
               "reads": [
                 "best_model.pt"
               ],
-              "writes": []
+              "writes": [],
+              "row": 0
             },
             {
               "id": "analyzer",
@@ -6452,7 +6765,8 @@
               "fn": "Computes per-tensor basic, matrix, spectral (SVD stable/effective rank) and duplicate-unit statistics into a LayerReport for each parameter tensor.",
               "col": 3,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "detector",
@@ -6462,7 +6776,8 @@
               "fn": "Applies threshold rules to each LayerReport, attaching non-finite, dead-weight, uniform, exploded, rank-collapse, dead-neuron, duplicate, init-anomaly, norm-scale-collapse and large-bias issues.",
               "col": 4,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 1
             },
             {
               "id": "summarizer",
@@ -6472,7 +6787,8 @@
               "fn": "Aggregates the attached issues across tensors into severity counts, issue-code tallies and an overall verdict.",
               "col": 5,
               "reads": [],
-              "writes": []
+              "writes": [],
+              "row": 2
             },
             {
               "id": "plots",
@@ -6484,7 +6800,8 @@
               "reads": [],
               "writes": [
                 "plots/*.png"
-              ]
+              ],
+              "row": 0
             },
             {
               "id": "report",
@@ -6492,14 +6809,15 @@
               "module": "tools/diagnostics/weight_xray_report.py",
               "role": "io",
               "fn": "Prints console summary tables and writes the markdown and JSON x-ray reports (embedding the plots) into the run's output directory.",
-              "col": 6,
+              "col": 5,
               "reads": [
                 "plots/*.png"
               ],
               "writes": [
                 "weight_xray.md",
                 "weight_xray.json"
-              ]
+              ],
+              "row": 1
             }
           ],
           "edges": [
@@ -6624,7 +6942,9 @@
               "desc": "Machine-readable x-ray: the summary plus every LayerReport with its computed diagnostics and worst-case severity.",
               "scope": "within"
             }
-          ]
+          ],
+          "ncol": 6,
+          "nrow": 3
         }
       ]
     }

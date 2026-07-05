@@ -82,6 +82,9 @@ class RepoMapView {
       <div class="rm__head">
         <div class="rm__subtabs" role="tablist" aria-label="Stages"></div>
         <div class="rm__tools">
+          <button class="rm-tool rm-tool--labels" type="button" title="Show every data-exchange label at once (otherwise hover a class to reveal its labels)">
+            <span class="rm-tool__ic">&#8801;</span><span class="rm-tool__lb">Labels</span>
+          </button>
           <button class="rm-tool rm-tool--trace" type="button" title="Animate the data flow through the pipeline">
             <span class="rm-tool__ic">&#9654;</span><span class="rm-tool__lb">Trace flow</span>
           </button>
@@ -111,6 +114,7 @@ class RepoMapView {
       <div class="rm__ledger"></div>`;
 
     this.subtabsEl = this.panel.querySelector(".rm__subtabs");
+    this.labelsBtn = this.panel.querySelector(".rm-tool--labels");
     this.traceBtn  = this.panel.querySelector(".rm-tool--trace");
     this.nameEl    = this.panel.querySelector(".rm__stage-name");
     this.blurbEl   = this.panel.querySelector(".rm__blurb");
@@ -124,6 +128,10 @@ class RepoMapView {
     this.ledgerEl  = this.panel.querySelector(".rm__ledger");
 
     this.traceBtn.addEventListener("click", () => this._toggleTrace());
+    this.labelsBtn.addEventListener("click", () => {
+      const on = this.canvasEl.classList.toggle("rm-showlabels");
+      this.labelsBtn.classList.toggle("is-on", on);
+    });
 
     this.root.appendChild(this.foldersEl);
     this.root.appendChild(this.panel);
@@ -193,20 +201,18 @@ class RepoMapView {
     this.labelsEl.innerHTML = "";
     this.nodeById = {};
 
-    const maxCol = this.diagram.nodes.reduce((m, n) => Math.max(m, n.col || 0), 0);
-    const cols   = [];
-    for (let c = 0; c <= maxCol; c++) {
-      const col = document.createElement("div");
-      col.className = "rm-col";
-      this.colsEl.appendChild(col);
-      cols.push(col);
-    }
+    const ncol = this.diagram.ncol || (this.diagram.nodes.reduce((m, n) => Math.max(m, n.col || 0), 0) + 1);
+    const nrow = this.diagram.nrow || (this.diagram.nodes.reduce((m, n) => Math.max(m, n.row || 0), 0) + 1);
+    this.colsEl.style.setProperty("--ncol", ncol);
+    this.colsEl.style.setProperty("--nrow", nrow);
 
     this.diagram.nodes.forEach((n) => {
       const el = document.createElement("div");
       el.className   = "rm-node rm-node--" + n.role;
       el.dataset.id  = n.id;
       el.dataset.col = String(n.col || 0);
+      el.style.gridColumn = String((n.col || 0) + 1);
+      el.style.gridRow    = String((n.row || 0) + 1);
       el.style.setProperty("--role", this.ROLE_COLORS[n.role] || this.ROLE_COLORS.external);
 
       const io = [];
@@ -220,7 +226,9 @@ class RepoMapView {
         `<code class="rm-node__mod">${this._esc(n.module)}</code>`;
 
       el.addEventListener("click", () => this._focusNode(n.id));
-      cols[n.col || 0].appendChild(el);
+      el.addEventListener("mouseenter", () => this._hoverNode(n.id, true));
+      el.addEventListener("mouseleave", () => this._hoverNode(n.id, false));
+      this.colsEl.appendChild(el);
       this.nodeById[n.id] = el;
     });
   }
@@ -241,12 +249,29 @@ class RepoMapView {
       </tr>`;
     }).join("");
 
+    this.ledgerEl.classList.remove("is-open");
     this.ledgerEl.innerHTML = `
-      <div class="rm-led__head"><h4>Artifact ledger</h4><span class="rm-led__sub">what each stage saves and who reads it</span></div>
-      <div class="rm-led__scroll"><table class="rm-led">
-        <thead><tr><th>Artifact</th><th>Format</th><th>Written by</th><th>Read by</th><th>Holds</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>`;
+      <button class="rm-led__toggle" type="button" aria-expanded="false">
+        <span class="rm-led__chev">&#9656;</span>
+        <span class="rm-led__lbl">Artifact ledger</span>
+        <span class="rm-led__count">${arts.length}</span>
+        <span class="rm-led__sub">what each stage saves and who reads it</span>
+      </button>
+      <div class="rm-led__body" hidden>
+        <div class="rm-led__scroll"><table class="rm-led">
+          <thead><tr><th>Artifact</th><th>Format</th><th>Written by</th><th>Read by</th><th>Holds</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>`;
+
+    const toggle = this.ledgerEl.querySelector(".rm-led__toggle");
+    const body   = this.ledgerEl.querySelector(".rm-led__body");
+    toggle.addEventListener("click", () => {
+      const open = body.hasAttribute("hidden");
+      if (open) body.removeAttribute("hidden"); else body.setAttribute("hidden", "");
+      toggle.setAttribute("aria-expanded", String(open));
+      this.ledgerEl.classList.toggle("is-open", open);
+    });
 
     this.ledgerEl.querySelectorAll("tbody tr").forEach((tr) => {
       tr.addEventListener("mouseenter", () => this._highlightArtifact(tr));
@@ -276,6 +301,16 @@ class RepoMapView {
     });
   }
 
+  _hoverNode(id, on) {
+    if (this.selNode || this.trace.on) return;
+    this.labelEls.forEach((l) => {
+      if (l.from === id || l.to === id) l.el.classList.toggle("is-show", on);
+    });
+    this.wireEls.forEach((w) => {
+      if (w.from === id || w.to === id) w.base.classList.toggle("is-lit", on);
+    });
+  }
+
   _highlightArtifact(tr) {
     const names = new Set();
     if (tr.dataset.producer) names.add(tr.dataset.producer);
@@ -293,7 +328,7 @@ class RepoMapView {
     this.canvasEl.classList.remove("is-focused");
     Object.values(this.nodeById).forEach((el) => el.classList.remove("is-dim"));
     this.wireEls.forEach((w) => { w.base.classList.remove("is-lit", "is-dim"); w.flow.classList.remove("is-dim"); });
-    this.labelEls.forEach((l) => l.el.classList.remove("is-lit", "is-dim"));
+    this.labelEls.forEach((l) => l.el.classList.remove("is-lit", "is-dim", "is-show"));
   }
 
   _scheduleWires() {
@@ -329,26 +364,18 @@ class RepoMapView {
       const r = el.getBoundingClientRect();
       return { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height, col: Number(el.dataset.col) };
     };
-    const colOf  = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? (n.col || 0) : 0; };
     const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
 
-    const counts = {};
-    (this.diagram.edges || []).forEach((e) => {
-      const fc = colOf(e.from), tc = colOf(e.to);
-      if (tc > fc) { const k = fc + "_" + tc; counts[k] = (counts[k] || 0) + 1; }
-    });
-    const seen = {};
+    const inCount = {};
+    (this.diagram.edges || []).forEach((e) => { inCount[e.to] = (inCount[e.to] || 0) + 1; });
+    const inSeen = {};
 
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
       if (!a || !b) return;
 
-      let offset = 0;
-      if (b.col > a.col) {
-        const k = a.col + "_" + b.col;
-        const idx = (seen[k] = (seen[k] === undefined ? 0 : seen[k] + 1));
-        offset = idx - (counts[k] - 1) / 2;
-      }
+      const idx    = (inSeen[e.to] = (inSeen[e.to] === undefined ? 0 : inSeen[e.to] + 1));
+      const offset = (idx - (inCount[e.to] - 1) / 2) * 16;
 
       const geom  = this._orthGeom(a, b, offset);
       const color = this.ROLE_COLORS[roleOf(e.from)] || this.ROLE_COLORS.external;
@@ -383,19 +410,28 @@ class RepoMapView {
   }
 
   _orthGeom(a, b, offset) {
-    const ax = a.x + a.w, ay = a.y + a.h / 2;
-    const bx = b.x,       by = b.y + b.h / 2;
+    const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+    const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+    const dx  = bcx - acx, dy = bcy - acy;
+    const off = offset || 0;
 
-    if (bx >= ax + 24) {
-      let mx = (ax + bx) / 2 + offset * 22;
-      mx = Math.max(ax + 16, Math.min(bx - 16, mx));
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const right = dx >= 0;
+      const ax = right ? a.x + a.w : a.x;
+      const bx = right ? b.x : b.x + b.w;
+      const ay = acy, by = bcy;
+      let mx = (ax + bx) / 2 + off;
+      mx = right ? Math.max(ax + 14, Math.min(bx - 14, mx)) : Math.min(ax - 14, Math.max(bx + 14, mx));
       return { d: `M ${ax} ${ay} H ${mx} V ${by} H ${bx}`, mx, my: (ay + by) / 2 };
     }
 
-    const sx = a.x + a.w / 2, sy = a.y + a.h;
-    const tx = b.x + b.w / 2, ty = b.y + b.h;
-    const ly = Math.max(sy, ty) + 36;
-    return { d: `M ${sx} ${sy} V ${ly} H ${tx} V ${ty}`, mx: (sx + tx) / 2, my: ly };
+    const down = dy >= 0;
+    const ay = down ? a.y + a.h : a.y;
+    const by = down ? b.y : b.y + b.h;
+    const ax = acx, bx = bcx;
+    let my = (ay + by) / 2 + off;
+    my = down ? Math.max(ay + 12, Math.min(by - 12, my)) : Math.min(ay - 12, Math.max(by + 12, my));
+    return { d: `M ${ax} ${ay} V ${my} H ${bx} V ${by}`, mx: (ax + bx) / 2, my };
   }
 
   _toggleTrace() {
