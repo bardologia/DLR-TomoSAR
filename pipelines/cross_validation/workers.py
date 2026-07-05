@@ -166,6 +166,8 @@ class FoldTrainingWorker(CrossValidationWorker):
             geometry                   = cv.geometry,
             paths                      = cv.paths,
             training                   = cv.training,
+            normalization              = cv.normalization,
+            augmentation               = cv.augmentation,
         )
 
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:

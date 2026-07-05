@@ -56,6 +56,8 @@ class TuningWorker:
             param_loss                 = jepa.param_loss,
             paths                      = self.config.paths,
             training                   = self.config.training,
+            normalization              = self.config.normalization,
+            augmentation               = self.config.augmentation,
         )
 
     def _build_base_configs(self):
