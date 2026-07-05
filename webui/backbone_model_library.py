@@ -33,6 +33,8 @@ class BackboneModelLibrary:
         "multires_unet"      : "MultiResUNetConfig",
         "fpn"                : "FPNNetConfig",
         "u2net"              : "U2NetLiteConfig",
+        "pixel_mlp"          : "PixelMLPNetConfig",
+        "local_cnn"          : "LocalCNNConfig",
     }
 
     NOTE_FILES = {
@@ -57,6 +59,8 @@ class BackboneModelLibrary:
         "multires_unet"      : "MultiResUNet.md",
         "fpn"                : "FPN.md",
         "u2net"              : "U2-Net.md",
+        "pixel_mlp"          : "PixelMLP.md",
+        "local_cnn"          : "Local CNN.md",
     }
 
     FALLBACK_ACTIVATION    = "gelu"
