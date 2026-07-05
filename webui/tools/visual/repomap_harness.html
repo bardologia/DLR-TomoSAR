@@ -7,8 +7,9 @@
   <style>
     html, body { margin: 0; background: var(--bg, #f2f3ef); }
     #rm { width: 100%; }
-    /* Force the graph to its natural height so the screenshot is not clipped by max-height/scroll. */
-    .rm-graph { max-height: none !important; min-height: 0 !important; overflow: visible !important; }
+    /* Faithful production scroll behavior by default. With ?fit the graph expands to full height
+       so a whole (even scrolling) diagram is captured in one screenshot. */
+    body.fit .rm-graph { max-height: none !important; min-height: 0 !important; overflow: visible !important; }
   </style>
 </head>
 <body>

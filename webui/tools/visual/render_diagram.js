@@ -26,6 +26,7 @@ class DiagramRenderer {
       else if (a === "--width")  this.width    = Number(argv[++i]);
       else if (a === "--settle") this.settle   = Number(argv[++i]);
       else if (a === "--labels") this.labels   = true;
+      else if (a === "--fit")    this.fit      = true;
       else throw new Error("unknown/positional arg: " + a);
     }
     if (!this.jsonFile || !this.out) throw new Error("need --json <file> and --out <png>");
@@ -80,8 +81,10 @@ class DiagramRenderer {
     page.on("pageerror", (e) => errs.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
 
-    const harness = "file://" + path.join(__dirname, "repomap_harness.html");
+    const harness = "file://" + path.join(__dirname, "repomap_harness.html") + (this.fit ? "?fit=1" : "");
     await page.goto(harness, { waitUntil: "networkidle" });
+    if (this.fit) await page.evaluate(() => document.body.classList.add("fit"));
+    await page.evaluate(() => { const h = new URL(location.href); if (h.searchParams.get("fit")) document.body.classList.add("fit"); });
     await page.evaluate(async ({ folderMeta, diagram }) => { await window.renderDiagram(folderMeta, diagram); },
                         { folderMeta, diagram });
     await page.waitForSelector(".rm-node", { timeout: 8000 });
