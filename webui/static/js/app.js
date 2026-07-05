@@ -298,6 +298,7 @@ class App {
     }
     if (route === "ablation") this.ablationView.enter();
     if (route === "physics") this.physicsLossView.load();
+    if (route === "model" && document.querySelector("#model-mode .model-mode__btn.is-active")?.dataset.mode === "walkthrough") this.flowView.load();
     if (route === "repomap") this.repoMap.enter();
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
