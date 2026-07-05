@@ -9,18 +9,13 @@ from pathlib     import Path
 import torch
 
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, LossScaleProbeConfig, default_curriculum
-from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
-from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.inference.pipeline   import InferencePipeline
 from pipelines.backbone.training.experiments import AblationTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PatchSizeTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
-from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.pipeline    import TrainingPipeline
-from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.seed_sweep      import SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
-from tools.data.gaussians     import GaussianAxis, GaussianHead
 from tools.orchestration      import ExperimentStage, GpuJob
 from tools.monitoring.logger  import Logger
 from tools.runtime.config_cli import ConfigCli
@@ -35,41 +30,30 @@ class SingleTrainRunner(BaseSingleTrainRunner):
     def label(self) -> str:
         return self.config.backbone_name
 
-    def _build_pretrain_trainer(self, logger):
-        work_dir = Path(self.config.logdir) / "pretrain" / "context"
-
-        trainer_config            = self.factory.training_trainer_config(logdir=work_dir)
+    def _pipeline(self, logdir) -> TrainingPipeline:
+        trainer_config            = self.factory.training_trainer_config(logdir=logdir)
         trainer_config.curriculum = self.config.curriculum
         trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
 
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input
 
-        gaussian_cfg               = trainer_config.gaussian
-        dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
-
-        dataset_pipeline      = DatasetPipeline(config=dataset_config, training_run_directory=work_dir, logger=logger, seed=self.config.seed, height_axis_convention=trainer_config.geometry.height_axis_convention, build_geometry_field=TrainingPipeline.physics_geometry_active(trainer_config))
-        profile_length        = dataset_pipeline.layout.profile_length
-        dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, profile_length)
-
-        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
-        dataset                                            = datasets["train"]
-
         model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
 
-        in_channels  = dataset.input_channels
-        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
+        return TrainingPipeline(
+            trainer_config = trainer_config,
+            dataset_config = dataset_config,
+            backbone_name  = self.config.backbone_name,
+            model_config   = model_config,
+            seed           = self.config.seed,
+            run_name       = self.config.run_name,
+            overfit_check  = self.config.overfit_check,
+        )
 
-        overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.config.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = dataset_config.patch.size[0]
+    def _build_pretrain_trainer(self, logger):
+        work_dir = Path(self.config.logdir) / "pretrain" / "context"
 
-        model, model_cfg = get_backbone(self.config.backbone_name, config=model_config, **overrides)
-
-        trainer = Trainer(model=model, model_cfg=model_cfg, x_axis=dataset_config.x_axis, config=trainer_config, run_dir=work_dir, logger=logger, norm_stats=dataset.normalizer, emit_docs=False)
-        trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(trainer_config.curriculum))
-
-        return trainer, dataset, model
+        return self._pipeline(work_dir).build_pretrain_trainer(work_dir, logger)
 
     def _probe_config(self) -> LossScaleProbeConfig:
         return LossScaleProbeConfig(
@@ -92,28 +76,8 @@ class SingleTrainRunner(BaseSingleTrainRunner):
     def run(self):
         self._pretrain_preflight()
 
-        trainer_config            = self.factory.training_trainer_config(logdir=self.config.logdir)
-        trainer_config.curriculum = self.config.curriculum
-        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=self.factory._secondary_labels())
-
-        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
-
-        dataset_config              = self.factory.training_dataset_config()
-        dataset_config.input_config = self.config.input
-
-        pipeline = TrainingPipeline(
-            trainer_config = trainer_config,
-            dataset_config = dataset_config,
-            backbone_name  = self.config.backbone_name,
-            model_config   = model_config,
-            seed           = self.config.seed,
-            run_name       = self.config.run_name,
-            overfit_check  = self.config.overfit_check,
-        )
-
-        ConfigCli.save_resolved(self.config, pipeline.run_metadata.run_directory / "docs" / "resolved_entry_config.json")
-
-        results = pipeline.run(probe_config=self._probe_config())
+        pipeline = self._pipeline(self.config.logdir)
+        results  = pipeline.run(probe_config=self._probe_config(), resolved_entry_config=self.config)
 
         if self.config.infer_after:
             self._run_inference(pipeline.run_metadata.run_directory)

@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from configuration.training import ImageAeTrainerConfig
-from models.image_autoencoder                        import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
-from pipelines.autoencoder_common.training           import AutoencoderTrainingPipeline
-from pipelines.backbone.dataset.pipeline             import BackboneDatasetPreparation, DatasetPipeline
-from pipelines.shared.model.model_builder                     import ModelBuilder
-from pipelines.shared.training.training_runner                import EntryConfigTrainRunner
-from pipelines.image_autoencoder.training.trainer    import Trainer
-from pipelines.shared.config.config_persistence             import ImageAutoencoderConfigIO
-from tools.data.gaussians                            import GaussianAxis
+from models.image_autoencoder                     import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
+from pipelines.autoencoder_common.training        import AutoencoderTrainingPipeline
+from pipelines.backbone.dataset.pipeline          import BackboneDatasetPreparation
+from pipelines.shared.model.model_builder         import ModelBuilder
+from pipelines.shared.training.training_runner    import EntryConfigTrainRunner
+from pipelines.image_autoencoder.training.trainer import Trainer
+from pipelines.shared.config.config_persistence   import ImageAutoencoderConfigIO
 
 
 class TrainingPipeline(AutoencoderTrainingPipeline):
@@ -35,8 +32,8 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
         model, _ = get_image_autoencoder(self.ae_model_name, config)
         return model
 
-    def _prepare_data(self, run_meta, logger):
-        loaders, datasets, x_axis, x_len      = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_meta.run_directory, logger, self.entry.seed).run()
+    def _prepare_data(self, run_directory, logger):
+        loaders, datasets, x_axis, x_len      = BackboneDatasetPreparation(self.dataset_config, self.trainer_config, run_directory, logger, self.entry.seed).run()
         train_loader, val_loader, test_loader = loaders
 
         in_channels = datasets["train"].input_channels
@@ -55,23 +52,3 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     @property
     def label(self) -> str:
         return self.config.ae_model_name
-
-    def _build_pretrain_trainer(self, logger):
-        work_dir = Path(self.config.logdir) / "pretrain" / "context"
-        pipeline = TrainingPipeline(self.config)
-
-        dataset_config             = pipeline.dataset_config
-        gaussian_config            = pipeline.trainer_config.gaussian
-        dataset_config.n_gaussians = gaussian_config.n_default_gaussians
-
-        dataset_pipeline      = DatasetPipeline(dataset_config, work_dir, logger=logger, seed=self.config.seed)
-        profile_length        = dataset_pipeline.profile_length
-        dataset_config.x_axis = GaussianAxis.build(gaussian_config.x_min, gaussian_config.x_max, profile_length)
-
-        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
-
-        in_channels = datasets["train"].input_channels
-        model       = pipeline._build_model(in_channels, pipeline.autoencoder_cfg)
-        trainer     = Trainer(model, pipeline.autoencoder_cfg, dataset_config.x_axis, pipeline.trainer_config, work_dir, logger)
-
-        return trainer, datasets["train"], model

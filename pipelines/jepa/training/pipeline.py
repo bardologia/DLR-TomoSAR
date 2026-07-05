@@ -116,7 +116,7 @@ class TrainingPipeline:
         gate_backbone_config = check.sanitized_model_config(base_backbone_config)
 
         gate_module, gate_backbone_cfg = self._build_module(datasets, x_len, logger, backbone_config=gate_backbone_config)
-        profile_normalizer             = self._profile_normalizer(run_meta, logger)
+        profile_normalizer             = self._profile_normalizer(run_meta.metadata_directory, logger)
 
         gate_trainer = Trainer(gate_module, gate_backbone_cfg, x_axis, gate_trainer_config, check.work_directory, logger, datasets["train"].normalizer, profile_normalizer)
 
@@ -225,12 +225,12 @@ class TrainingPipeline:
 
         run_meta.save_run_summary(self.backbone_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len, seed=self.entry.seed)
 
-    def _profile_normalizer(self, run_meta, logger):
+    def _profile_normalizer(self, metadata_directory, logger):
         if self.autoencoder_cfg is None:
             return None
 
         stats = ProfileStats.load(self.profile_autoencoder_meta, logger=logger)
-        stats.save(run_meta.metadata_directory)
+        stats.save(metadata_directory)
 
         return ProfileNormalizer(stats)
 
@@ -248,6 +248,18 @@ class TrainingPipeline:
             run_meta.close()
         return results, run_meta.run_directory
 
+    def build_pretrain_trainer(self, work_dir, logger):
+        work_dir = Path(work_dir)
+
+        loaders, datasets, x_axis, x_len = self._prepare_datasets(work_dir, logger, self.entry.seed)
+
+        model, backbone_cfg = self._build_module(datasets, x_len, logger)
+        profile_normalizer  = self._profile_normalizer(work_dir / "meta", logger)
+
+        trainer = self._make_trainer(model, backbone_cfg, x_axis, work_dir, logger, datasets["train"].normalizer, profile_normalizer)
+
+        return trainer, datasets["train"], model
+
     def run(self):
         run_meta = TrainingRunMetadata(self.trainer_config, self.backbone_name, Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
@@ -264,7 +276,7 @@ class TrainingPipeline:
             run_meta.close()
             raise
 
-        profile_normalizer = self._profile_normalizer(run_meta, logger)
+        profile_normalizer = self._profile_normalizer(run_meta.metadata_directory, logger)
 
         return self._train(run_meta, logger, model, backbone_cfg, x_axis, datasets, loaders, profile_normalizer)
 
@@ -275,21 +287,6 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     @property
     def label(self) -> str:
         return self.config.backbone_name
-
-    def _build_pretrain_trainer(self, logger):
-        work_dir = Path(self.config.logdir) / "pretrain" / "context"
-        pipeline = TrainingPipeline(self.config)
-        run_meta = TrainingRunMetadata(pipeline.trainer_config, pipeline.backbone_name, work_dir, "pretrain_context")
-
-        loaders, datasets, x_axis, x_len = pipeline._prepare_datasets(run_meta.run_directory, logger, self.config.seed)
-
-        model, backbone_cfg = pipeline._build_module(datasets, x_len, logger)
-        norm_stats          = datasets["train"].normalizer
-        profile_normalizer  = pipeline._profile_normalizer(run_meta, logger)
-
-        trainer = pipeline._make_trainer(model, backbone_cfg, x_axis, work_dir, logger, norm_stats, profile_normalizer)
-
-        return trainer, datasets["train"], model
 
     def run(self):
         self._pretrain_preflight()

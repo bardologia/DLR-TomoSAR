@@ -59,6 +59,11 @@ class SingleTrainRunner:
 class EntryConfigTrainRunner(SingleTrainRunner):
     pipeline_class = None
 
+    def _build_pretrain_trainer(self, logger):
+        work_dir = Path(self.config.logdir) / "pretrain" / "context"
+
+        return self.pipeline_class(self.config).build_pretrain_trainer(work_dir, logger)
+
     def run(self):
         self._pretrain_preflight()
 

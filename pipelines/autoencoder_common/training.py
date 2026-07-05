@@ -54,7 +54,7 @@ class AutoencoderTrainingPipeline:
             "Trainable Parameters" : f"{n_params:,}",
         })
 
-    def _prepare_data(self, run_meta, logger):
+    def _prepare_data(self, run_directory, logger):
         raise NotImplementedError
 
     def _run_overfit_check(self, run_meta, logger, model_dim: int, x_axis, datasets) -> None:
@@ -73,22 +73,32 @@ class AutoencoderTrainingPipeline:
     def _save_metadata(self, run_meta, *args) -> None:
         raise NotImplementedError
 
-    def _make_trainer(self, run_meta, logger, model, x_axis):
-        return self.trainer_class(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_meta.run_directory, logger)
+    def _make_trainer(self, run_directory, logger, model, x_axis):
+        return self.trainer_class(model, self.autoencoder_cfg, x_axis, self.trainer_config, run_directory, logger)
 
     def _train(self, run_meta, logger, model, x_axis, train_loader, val_loader, test_loader):
-        trainer = self._make_trainer(run_meta, logger, model, x_axis)
+        trainer = self._make_trainer(run_meta.run_directory, logger, model, x_axis)
         try:
             results = trainer.train(train_loader, val_loader, test_loader)
         finally:
             run_meta.close()
         return results, run_meta.run_directory
 
+    def build_pretrain_trainer(self, work_dir, logger):
+        work_dir = Path(work_dir)
+
+        _train_loader, _val_loader, _test_loader, x_axis, model_dim, datasets, _metadata_args = self._prepare_data(work_dir, logger)
+
+        model   = self._build_model(model_dim, self.autoencoder_cfg)
+        trainer = self._make_trainer(work_dir, logger, model, x_axis)
+
+        return trainer, datasets["train"], model
+
     def run(self):
         run_meta = TrainingRunMetadata(self.trainer_config, self.run_label, Path(self.trainer_config.io.logdir), self.entry.run_name)
         logger   = run_meta.logger
 
-        train_loader, val_loader, test_loader, x_axis, model_dim, datasets, metadata_args = self._prepare_data(run_meta, logger)
+        train_loader, val_loader, test_loader, x_axis, model_dim, datasets, metadata_args = self._prepare_data(run_meta.run_directory, logger)
 
         model = self._build_model(model_dim, self.autoencoder_cfg)
         self._log_model(logger, model, model_dim)

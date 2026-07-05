@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from configuration.dataset                          import ProfileDatasetConfig
 from configuration.training                         import ProfileAeTrainerConfig
 from models.profile_autoencoder                     import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
@@ -59,9 +57,9 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
             augmentation                = self.entry.profile_augmentation,
         )
 
-    def _prepare_data(self, run_meta, logger):
+    def _prepare_data(self, run_directory, logger):
         profile_config   = self._profile_dataset_config()
-        dataset_pipeline = ProfileDatasetPipeline(profile_config, run_meta.run_directory, logger=logger, seed=self.entry.seed)
+        dataset_pipeline = ProfileDatasetPipeline(profile_config, run_directory, logger=logger, seed=self.entry.seed)
 
         (train_loader, val_loader, test_loader), datasets, x_axis, x_len, _normalizer = dataset_pipeline.run()
 
@@ -80,17 +78,3 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     @property
     def label(self) -> str:
         return self.config.ae_model_name
-
-    def _build_pretrain_trainer(self, logger):
-        work_dir = Path(self.config.logdir) / "pretrain" / "context"
-        pipeline = TrainingPipeline(self.config)
-
-        profile_config   = pipeline._profile_dataset_config()
-        dataset_pipeline = ProfileDatasetPipeline(profile_config, work_dir, logger=logger, seed=self.config.seed)
-
-        (_loaders, datasets, x_axis, x_len, _normalizer) = dataset_pipeline.run()
-
-        model   = pipeline._build_model(x_len, pipeline.autoencoder_cfg)
-        trainer = Trainer(model, pipeline.autoencoder_cfg, x_axis, pipeline.trainer_config, work_dir, logger)
-
-        return trainer, datasets["train"], model

@@ -8,11 +8,13 @@ from configuration.dataset  import DatasetConfig
 from configuration.training import BackboneTrainerConfig, OverfitCheckConfig
 from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
+from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.trainer     import Trainer
 from pipelines.shared.config.run_metadata    import TrainingRunMetadata
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.overfit_check import OverfitCheck
 from tools.data.gaussians          import GaussianAxis, GaussianHead
+from tools.runtime.config_cli      import ConfigCli
 from tools.runtime.reproducibility import Reproducibility
 
 
@@ -36,37 +38,34 @@ class TrainingPipeline:
         self.model_config   = model_config
         self.image_size     = patch_height
         self.seed           = seed
+        self.run_name       = run_name
         self.overfit_check  = overfit_check if overfit_check is not None else OverfitCheckConfig()
 
         Reproducibility.seed_everything(self.seed)
 
-        self.run_metadata = TrainingRunMetadata(
-            trainer_config = trainer_config,
-            model_name     = backbone_name,
-            base_logdir    = Path(trainer_config.io.logdir),
-            run_name       = run_name,
-        )
-        self.logger = self.run_metadata.logger
-
-        gaussian_cfg                    = trainer_config.gaussian
-        self.dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
-
-        self.dataset_pipeline = DatasetPipeline(
-            config                 = dataset_config,
-            training_run_directory = self.run_metadata.run_directory,
-            logger                 = self.logger,
-            seed                   = self.seed,
-            height_axis_convention = trainer_config.geometry.height_axis_convention,
-            build_geometry_field   = self.physics_geometry_active(trainer_config),
-        )
-
-        self.dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, self.dataset_pipeline.layout.profile_length)
+        self.dataset_config.n_gaussians = trainer_config.gaussian.n_default_gaussians
 
     @staticmethod
     def physics_geometry_active(trainer_config) -> bool:
         flags = ("use_coherence_resyn", "use_covariance_match", "use_capon_cycle")
 
         return any(getattr(cfg, flag) for cfg in trainer_config.curriculum.active_stages() for flag in flags)
+
+    def _build_dataset_pipeline(self, run_directory: Path, logger) -> DatasetPipeline:
+        gaussian_cfg = self.trainer_config.gaussian
+
+        dataset_pipeline = DatasetPipeline(
+            config                 = self.dataset_config,
+            training_run_directory = Path(run_directory),
+            logger                 = logger,
+            seed                   = self.seed,
+            height_axis_convention = self.trainer_config.geometry.height_axis_convention,
+            build_geometry_field   = self.physics_geometry_active(self.trainer_config),
+        )
+
+        self.dataset_config.x_axis = GaussianAxis.build(gaussian_cfg.x_min, gaussian_cfg.x_max, dataset_pipeline.layout.profile_length)
+
+        return dataset_pipeline
 
     def _run_overfit_check(self, train_dataset, in_channels: int, out_channels: int, x_axis) -> None:
         check = OverfitCheck(self.overfit_check, self.run_metadata.run_directory, self.logger)
@@ -123,22 +122,54 @@ class TrainingPipeline:
 
         return overrides
 
-    def _make_trainer(self, model, model_cfg, x_axis, norm_stats):
+    def _make_trainer(self, model, model_cfg, x_axis, norm_stats, run_dir: Path, logger, emit_docs: bool = True):
         return Trainer(
             model      = model,
             model_cfg  = model_cfg,
             x_axis     = x_axis,
             config     = self.trainer_config,
-            run_dir    = self.run_metadata.run_directory,
-            logger     = self.logger,
+            run_dir    = run_dir,
+            logger     = logger,
             norm_stats = norm_stats,
+            emit_docs  = emit_docs,
         )
 
-    def run(self, probe_config=None):
+    def build_pretrain_trainer(self, work_dir: Path, logger):
+        work_dir         = Path(work_dir)
+        dataset_pipeline = self._build_dataset_pipeline(work_dir, logger)
+
+        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
+
+        gaussian_cfg = self.trainer_config.gaussian
+        dataset      = datasets["train"]
+        in_channels  = dataset.input_channels
+        out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
+        x_axis       = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
+
+        model, model_cfg = get_backbone(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
+
+        trainer = self._make_trainer(model, model_cfg, x_axis, dataset.normalizer, work_dir, logger, emit_docs=False)
+        trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(self.trainer_config.curriculum))
+
+        return trainer, dataset, model
+
+    def run(self, probe_config=None, resolved_entry_config=None):
+        self.run_metadata = TrainingRunMetadata(
+            trainer_config = self.trainer_config,
+            model_name     = self.backbone_name,
+            base_logdir    = Path(self.trainer_config.io.logdir),
+            run_name       = self.run_name,
+        )
+        self.logger = self.run_metadata.logger
+
+        if resolved_entry_config is not None:
+            ConfigCli.save_resolved(resolved_entry_config, self.run_metadata.run_directory / "docs" / "resolved_entry_config.json")
+
         self.logger.section("[PyTorch Training Pipeline Execution]")
 
-        gaussian_cfg  = self.trainer_config.gaussian
-        x_axis_length = int(np.asarray(self.dataset_config.x_axis).size)
+        self.dataset_pipeline = self._build_dataset_pipeline(self.run_metadata.run_directory, self.logger)
+
+        gaussian_cfg = self.trainer_config.gaussian
 
         train_loader, val_loader, test_loader, datasets = self.dataset_pipeline.run()
 
@@ -147,6 +178,7 @@ class TrainingPipeline:
         n_gaussians   = gaussian_cfg.n_default_gaussians
         out_channels  = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, n_gaussians)
         x_axis        = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
+        x_axis_length = int(x_axis.size)
 
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
@@ -165,7 +197,7 @@ class TrainingPipeline:
         try:
             self._run_overfit_check(train_dataset, in_channels, out_channels, x_axis)
 
-            trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer)
+            trainer = self._make_trainer(model, model_cfg, x_axis, train_dataset.normalizer, self.run_metadata.run_directory, self.logger)
 
             trainer.maybe_run_loss_probe(train_loader, probe_config)
             results = trainer.train(train_loader, val_loader, test_loader)
