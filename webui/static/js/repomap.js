@@ -10,18 +10,20 @@ class RepoMapView {
     this.selNode  = null;
     this.ro       = null;
     this.rafId    = null;
+    this.wireEls  = [];
+    this.labelEls = [];
     this.trace    = { on: false, col: -1, timer: null };
 
     this.ROLE_COLORS = {
-      entry        : "#a78bfa",
-      orchestrator : "#6f9bff",
-      config       : "#fbbf24",
-      transform    : "#7dd3fc",
-      model        : "#f472b6",
-      data         : "#86efac",
-      io           : "#2dd4bf",
-      metric       : "#fb923c",
-      external     : "#93a1ac",
+      entry        : "#6d28d9",
+      orchestrator : "#1d4fd8",
+      config       : "#b45309",
+      transform    : "#0e7490",
+      model        : "#be185d",
+      data         : "#15803d",
+      io           : "#0f766e",
+      metric       : "#c2410c",
+      external     : "#64748b",
     };
     this.ROLE_LABELS = {
       entry        : "Entry",
@@ -32,7 +34,7 @@ class RepoMapView {
       data         : "Data",
       io           : "I/O",
       metric       : "Metric",
-      external      : "External",
+      external     : "External",
     };
     this.ROLE_ORDER = ["entry", "orchestrator", "config", "transform", "model", "data", "io", "metric", "external"];
   }
@@ -97,8 +99,8 @@ class RepoMapView {
         <div class="rm-graph">
           <div class="rm-canvas">
             <svg class="rm-wires" aria-hidden="true"><defs>
-              <marker id="rm-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
+              <marker id="rm-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                <path d="M0,1 L9,5 L0,9" fill="none" stroke="context-stroke" stroke-width="1.5"></path>
               </marker></defs>
             </svg>
             <div class="rm-cols"></div>
@@ -122,7 +124,6 @@ class RepoMapView {
     this.ledgerEl  = this.panel.querySelector(".rm__ledger");
 
     this.traceBtn.addEventListener("click", () => this._toggleTrace());
-    this.graphEl.addEventListener("scroll", () => this._scheduleWires());
 
     this.root.appendChild(this.foldersEl);
     this.root.appendChild(this.panel);
@@ -139,7 +140,7 @@ class RepoMapView {
     [...this.foldersEl.children].forEach((b) => b.classList.toggle("is-active", b.dataset.key === this.folder.folder));
 
     this.subtabsEl.innerHTML = "";
-    this.folder.diagrams.forEach((d, i) => {
+    this.folder.diagrams.forEach((d) => {
       const b = document.createElement("button");
       b.className   = "rm-sub";
       b.dataset.key = d.key;
@@ -215,8 +216,8 @@ class RepoMapView {
       el.innerHTML =
         `<div class="rm-node__top"><span class="rm-node__role">${this._esc(this.ROLE_LABELS[n.role] || n.role)}</span><span class="rm-node__io">${io.join("")}</span></div>` +
         `<h4 class="rm-node__name">${this._esc(n.label)}</h4>` +
-        `<p class="rm-node__fn" title="${this._esc(n.fn)}">${this._esc(n.fn)}</p>` +
-        `<code class="rm-node__mod" title="${this._esc(n.module)}">${this._esc(n.module)}</code>`;
+        `<p class="rm-node__fn">${this._esc(n.fn)}</p>` +
+        `<code class="rm-node__mod">${this._esc(n.module)}</code>`;
 
       el.addEventListener("click", () => this._focusNode(n.id));
       cols[n.col || 0].appendChild(el);
@@ -262,21 +263,22 @@ class RepoMapView {
     });
     this.canvasEl.classList.add("is-focused");
     Object.entries(this.nodeById).forEach(([nid, el]) => el.classList.toggle("is-dim", !incident.has(nid)));
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => {
-      const on = p.dataset.from === id || p.dataset.to === id;
-      p.classList.toggle("is-lit", on);
-      p.classList.toggle("is-dim", !on);
+    this.wireEls.forEach((w) => {
+      const on = w.from === id || w.to === id;
+      w.base.classList.toggle("is-lit", on);
+      w.base.classList.toggle("is-dim", !on);
+      w.flow.classList.toggle("is-dim", !on);
     });
-    this.labelsEl.querySelectorAll(".rm-elabel").forEach((l) => {
-      const on = l.dataset.from === id || l.dataset.to === id;
-      l.classList.toggle("is-lit", on);
-      l.classList.toggle("is-dim", !on);
+    this.labelEls.forEach((l) => {
+      const on = l.from === id || l.to === id;
+      l.el.classList.toggle("is-lit", on);
+      l.el.classList.toggle("is-dim", !on);
     });
   }
 
   _highlightArtifact(tr) {
     const names = new Set();
-    (tr.dataset.producer ? [tr.dataset.producer] : []).forEach((n) => names.add(n));
+    if (tr.dataset.producer) names.add(tr.dataset.producer);
     (tr.dataset.consumers ? tr.dataset.consumers.split("|") : []).forEach((n) => names.add(n));
     this.canvasEl.classList.add("is-focused");
     this.diagram.nodes.forEach((n) => {
@@ -290,8 +292,8 @@ class RepoMapView {
     if (this.selNode) return;
     this.canvasEl.classList.remove("is-focused");
     Object.values(this.nodeById).forEach((el) => el.classList.remove("is-dim"));
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => p.classList.remove("is-lit", "is-dim"));
-    this.labelsEl.querySelectorAll(".rm-elabel").forEach((l) => l.classList.remove("is-lit", "is-dim"));
+    this.wireEls.forEach((w) => { w.base.classList.remove("is-lit", "is-dim"); w.flow.classList.remove("is-dim"); });
+    this.labelEls.forEach((l) => l.el.classList.remove("is-lit", "is-dim"));
   }
 
   _scheduleWires() {
@@ -317,6 +319,8 @@ class RepoMapView {
     this.wiresEl.innerHTML = "";
     this.wiresEl.appendChild(defs);
     this.labelsEl.innerHTML = "";
+    this.wireEls  = [];
+    this.labelEls = [];
 
     const crect = this.canvasEl.getBoundingClientRect();
     const box   = (id) => {
@@ -325,67 +329,73 @@ class RepoMapView {
       const r = el.getBoundingClientRect();
       return { x: r.left - crect.left, y: r.top - crect.top, w: r.width, h: r.height, col: Number(el.dataset.col) };
     };
-    const roleOf = (id) => {
-      const n = this.diagram.nodes.find((nn) => nn.id === id);
-      return n ? n.role : "external";
-    };
+    const colOf  = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? (n.col || 0) : 0; };
+    const roleOf = (id) => { const n = this.diagram.nodes.find((nn) => nn.id === id); return n ? n.role : "external"; };
+
+    const counts = {};
+    (this.diagram.edges || []).forEach((e) => {
+      const fc = colOf(e.from), tc = colOf(e.to);
+      if (tc > fc) { const k = fc + "_" + tc; counts[k] = (counts[k] || 0) + 1; }
+    });
+    const seen = {};
 
     (this.diagram.edges || []).forEach((e) => {
       const a = box(e.from), b = box(e.to);
       if (!a || !b) return;
 
-      const geom  = this._edgeGeom(a, b);
+      let offset = 0;
+      if (b.col > a.col) {
+        const k = a.col + "_" + b.col;
+        const idx = (seen[k] = (seen[k] === undefined ? 0 : seen[k] + 1));
+        offset = idx - (counts[k] - 1) / 2;
+      }
+
+      const geom  = this._orthGeom(a, b, offset);
       const color = this.ROLE_COLORS[roleOf(e.from)] || this.ROLE_COLORS.external;
 
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", geom.d);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", color);
-      path.setAttribute("marker-end", "url(#rm-arrow)");
-      path.setAttribute("class", "rm-wire rm-wire--" + (e.kind || "data"));
-      path.dataset.from = e.from;
-      path.dataset.to   = e.to;
-      path.dataset.fcol = String(a.col);
-      path.dataset.tcol = String(b.col);
-      this.wiresEl.appendChild(path);
+      const base = this._path(geom.d, "rm-wire", color);
+      base.setAttribute("marker-end", "url(#rm-arrow)");
+      const flow = this._path(geom.d, "rm-flow", color);
+      this.wiresEl.appendChild(base);
+      this.wiresEl.appendChild(flow);
+      this.wireEls.push({ base, flow, from: e.from, to: e.to, fcol: a.col, tcol: b.col });
 
       if (e.label) {
         const lab = document.createElement("span");
-        lab.className    = "rm-elabel rm-elabel--" + (e.kind || "data");
-        lab.style.left   = geom.mx + "px";
-        lab.style.top    = geom.my + "px";
-        lab.textContent  = e.label;
-        lab.dataset.from = e.from;
-        lab.dataset.to   = e.to;
-        lab.dataset.tcol = String(b.col);
+        lab.className   = "rm-elabel rm-elabel--" + (e.kind || "data");
+        lab.style.left  = geom.mx + "px";
+        lab.style.top   = geom.my + "px";
+        lab.textContent = e.label;
         this.labelsEl.appendChild(lab);
+        this.labelEls.push({ el: lab, from: e.from, to: e.to, tcol: b.col });
       }
     });
 
     if (this.selNode) { const s = this.selNode; this.selNode = null; this._focusNode(s); }
   }
 
-  _edgeGeom(a, b) {
+  _path(d, cls, color) {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", d);
+    p.setAttribute("class", cls);
+    p.setAttribute("stroke", color);
+    return p;
+  }
+
+  _orthGeom(a, b, offset) {
     const ax = a.x + a.w, ay = a.y + a.h / 2;
     const bx = b.x,       by = b.y + b.h / 2;
 
-    if (bx > ax + 10) {
-      const dx = Math.max(34, (bx - ax) * 0.5);
-      return {
-        d  : `M${ax},${ay} C${ax + dx},${ay} ${bx - dx},${by} ${bx},${by}`,
-        mx : (ax + bx) / 2,
-        my : (ay + by) / 2 - 11,
-      };
+    if (bx >= ax + 24) {
+      let mx = (ax + bx) / 2 + offset * 22;
+      mx = Math.max(ax + 16, Math.min(bx - 16, mx));
+      return { d: `M ${ax} ${ay} H ${mx} V ${by} H ${bx}`, mx, my: (ay + by) / 2 };
     }
 
     const sx = a.x + a.w / 2, sy = a.y + a.h;
     const tx = b.x + b.w / 2, ty = b.y + b.h;
-    const dip = Math.max(sy, ty) + 52;
-    return {
-      d  : `M${sx},${sy} C${sx},${dip} ${tx},${dip} ${tx},${ty}`,
-      mx : (sx + tx) / 2,
-      my : dip - 6,
-    };
+    const ly = Math.max(sy, ty) + 36;
+    return { d: `M ${sx} ${sy} V ${ly} H ${tx} V ${ty}`, mx: (sx + tx) / 2, my: ly };
   }
 
   _toggleTrace() {
@@ -398,7 +408,7 @@ class RepoMapView {
     this.traceBtn.querySelector(".rm-tool__lb").textContent = "Stop";
     this.canvasEl.classList.add("is-tracing");
     Object.values(this.nodeById).forEach((el) => el.classList.remove("is-lit", "is-active"));
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => p.classList.remove("is-flow"));
+    this.wireEls.forEach((w) => { w.flow.classList.remove("is-flow"); w.base.classList.remove("is-lit"); });
     this._traceStep();
   }
 
@@ -412,23 +422,20 @@ class RepoMapView {
       if ((n.col || 0) <= c) this.nodeById[n.id].classList.add("is-lit");
       if ((n.col || 0) === c) this.nodeById[n.id].classList.add("is-active");
     });
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => {
-      p.classList.toggle("is-flow", Number(p.dataset.tcol) <= c && Number(p.dataset.fcol) < c + 1);
+    this.wireEls.forEach((w) => {
+      const flowing = w.tcol <= c && w.fcol < c + 1;
+      w.flow.classList.toggle("is-flow", flowing);
+      w.base.classList.toggle("is-lit", flowing);
     });
-    this.labelsEl.querySelectorAll(".rm-elabel").forEach((l) => {
-      l.classList.toggle("is-lit", Number(l.dataset.tcol) <= c);
-    });
+    this.labelEls.forEach((l) => l.el.classList.toggle("is-lit", l.tcol <= c));
 
-    if (c >= maxCol) {
-      this.trace.timer = setTimeout(() => this._stopTrace(), 1400);
-      return;
-    }
-    this.trace.timer = setTimeout(() => this._traceStep(), 820);
+    if (c >= maxCol) { this.trace.timer = setTimeout(() => this._stopTrace(), 1500); return; }
+    this.trace.timer = setTimeout(() => this._traceStep(), 840);
   }
 
   _revealAll() {
     Object.values(this.nodeById).forEach((el) => el.classList.add("is-lit"));
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => p.classList.add("is-flow"));
+    this.wireEls.forEach((w) => w.base.classList.add("is-lit"));
   }
 
   _stopTrace() {
@@ -442,8 +449,8 @@ class RepoMapView {
     if (!this.canvasEl) return;
     this.canvasEl.classList.remove("is-tracing");
     Object.values(this.nodeById || {}).forEach((el) => el.classList.remove("is-lit", "is-active"));
-    this.canvasEl.querySelectorAll(".rm-wire").forEach((p) => p.classList.remove("is-flow"));
-    this.labelsEl.querySelectorAll(".rm-elabel").forEach((l) => l.classList.remove("is-lit"));
+    this.wireEls.forEach((w) => { w.flow.classList.remove("is-flow"); w.base.classList.remove("is-lit"); });
+    this.labelEls.forEach((l) => l.el.classList.remove("is-lit"));
   }
 
   _esc(s) {
