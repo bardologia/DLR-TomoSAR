@@ -21,7 +21,8 @@ class ModelGallery {
   async load() {
     const data = await window.apiGet(this.endpoint);
     this.families = data.families || [];
-    this.flat = this.families.flatMap((f) => f.models.map((m) => ({ ...m, family: f.family })));
+    this.heads = (data.heads || []).map((h) => ({ ...h, isHead: true, family: "Output heads", params: "" }));
+    this.flat = this.families.flatMap((f) => f.models.map((m) => ({ ...m, family: f.family }))).concat(this.heads);
     this._renderList();
     const initial = this.flat.find((m) => m.recommended) || this.flat[0];
     if (initial) this._select(initial.key);
@@ -45,6 +46,22 @@ class ModelGallery {
       });
       this.listEl.appendChild(group);
     });
+
+    if (!this.heads.length) return;
+    const group = document.createElement("div");
+    group.className = "mlist__group";
+    group.innerHTML = `<div class="mlist__label">Output heads</div>`;
+    this.heads.forEach((h) => {
+      const item = document.createElement("button");
+      item.className = "mlist__item";
+      item.dataset.key = h.key;
+      item.innerHTML =
+        `<span class="mlist__name">${h.name}${h.default ? '<span class="mlist__star">default</span>' : ""}</span>` +
+        `<span class="mlist__params"></span>`;
+      item.addEventListener("click", () => this._select(h.key));
+      group.appendChild(item);
+    });
+    this.listEl.appendChild(group);
   }
 
   _select(key) {
@@ -57,6 +74,11 @@ class ModelGallery {
   _renderDetail(m) {
     this._pops = this._pops || [];
     this._closeFrom(0);
+
+    if (m.isHead) {
+      this._renderHeadDetail(m);
+      return;
+    }
 
     const isBackbone = this.kind === "backbone";
     const isJepa     = this.kind === "jepa";
@@ -90,6 +112,29 @@ class ModelGallery {
     this.detailEl.classList.add("is-swap");
     this._wireSchema();
     this._loadNote(m);
+  }
+
+  _renderHeadDetail(h) {
+    this.detailEl.innerHTML =
+      `<div class="mdetail__head">` +
+      `<div><span class="mdetail__family">Output heads</span>` +
+      `<h3 class="mdetail__name">${h.name}${h.default ? `<span class="mdetail__best">default</span>` : ""}</h3></div>` +
+      `</div>` +
+      `<div class="mdetail__legend">` +
+      `<span class="legend__dot"></span>Selectable on every backbone via the head config field` +
+      `<span class="legend__sep">/</span>${h.when}` +
+      `</div>` +
+      `<div class="mdetail__specs">` +
+      `<div class="spec"><span class="spec__k">head key</span><span class="spec__v mono">${h.key}</span></div>` +
+      `<div class="spec"><span class="spec__k">structure</span><span class="spec__v">${h.structure}</span></div>` +
+      `</div>` +
+      `<div class="mdetail__notes" data-note-host><span class="mdetail__when-label">Head notes</span>` +
+      `<div class="mdetail__note-body"><span class="mdetail__note-loading">loading notes...</span></div></div>`;
+
+    this.detailEl.classList.remove("is-swap");
+    void this.detailEl.offsetWidth;
+    this.detailEl.classList.add("is-swap");
+    this._loadNote(h);
   }
 
   _aeLegend(m) {

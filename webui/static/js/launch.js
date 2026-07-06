@@ -161,6 +161,7 @@ class LaunchView extends ConfigForm {
     this.activeSection = null;
     this.query         = "";
     this.modelFamilies = null;
+    this.modelHeads    = null;
     this.modelEndpoint = null;
     this.layoutEl      = null;
     this.navHost       = null;
@@ -216,6 +217,7 @@ class LaunchView extends ConfigForm {
       if (seq !== this.loadSeq) return;
       this.modelEndpoint = endpoint;
       this.modelFamilies = (models && models.families) || [];
+      this.modelHeads    = (models && models.heads) || [];
     }
 
     this._renderConfig(cfg);
@@ -257,6 +259,7 @@ class LaunchView extends ConfigForm {
 
     this.modelEndpoint = endpoint;
     this.modelFamilies = (models && models.families) || [];
+    this.modelHeads    = (models && models.heads) || [];
 
     const dirty         = this.dirty;
     const activeSection = this.activeSection;

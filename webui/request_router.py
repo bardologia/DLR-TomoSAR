@@ -187,7 +187,7 @@ class RequestRouter:
             self._send_json(handler, {"flows": self.flows.collect()})
             return
         if path == "/api/backbones":
-            self._send_json(handler, {"families": self.models.collect()})
+            self._send_json(handler, {"families": self.models.collect(), "heads": self.models.heads()})
             return
         if path.startswith("/api/backbones/") and path.endswith("/note"):
             key  = path[len("/api/backbones/"):-len("/note")]

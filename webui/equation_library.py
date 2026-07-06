@@ -1668,7 +1668,7 @@ class EquationLibrary:
                 {
                     "title" : "Set-prediction amplitude gate",
                     "tex"   : r"g_k = \sigma(\ell_k), \qquad \hat{a}_k = g_k\,a_k + (1 - g_k)\,o_k",
-                    "note"  : "The gated set-prediction heads (unet_setpred, resunet_setpred): an existence-logit PixelMLP emits one logit per Gaussian slot, and its sigmoid blends the regressed amplitude toward a learned per-slot off level. The off level lives in normalised output space because normalised zero is not physical zero; training drives o_k toward the normalised encoding of physical amplitude zero. Pairs with hungarian param matching; mu and sigma pass through ungated (GaussianHeadsMixin._set_prediction_forward).",
+                    "note"  : "The gated set-prediction head (head = set_pred, selectable on every backbone): an existence-logit PixelMLP emits one logit per Gaussian slot, and its sigmoid blends the regressed amplitude toward a learned per-slot off level. The off level lives in normalised output space because normalised zero is not physical zero; training drives o_k toward the normalised encoding of physical amplitude zero. Pairs with hungarian param matching; mu and sigma pass through ungated (OutputHeadsMixin._set_prediction_forward).",
                     "vars"  : [
                         {"sym": r"\ell_k",     "desc": "existence logit of slot k (per pixel)"},
                         {"sym": r"g_k",        "desc": "sigmoid existence gate in [0, 1]"},

@@ -47,6 +47,13 @@ class LaunchLayout:
         {"value": "sigma_amp_mu", "label": "sigma + amplitude + mean"},
     ]}
 
+    MULTI_HEADS = {"kind": "multi", "empty": "select at least one output head", "choices": [
+        {"value": "conv",         "label": "Conv (single projection)"},
+        {"value": "multihead",    "label": "Multihead (3 PixelMLP heads)"},
+        {"value": "per_gaussian", "label": "Per-Gaussian (K PixelMLP heads)"},
+        {"value": "set_pred",     "label": "Set-Prediction (gated heads)"},
+    ]}
+
     MULTI_SWEEP_LOSSES = {"kind": "multi", "empty": "select at least one loss component to sweep", "choices": [
         {"value": "param_l1",           "label": "Param L1 (baseline)"},
         {"value": "param_huber",        "label": "Param Huber"},
@@ -410,7 +417,7 @@ class LaunchLayout:
             "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name"]},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
@@ -520,7 +527,7 @@ class LaunchLayout:
             "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name"]},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                     {"kind": "fields", "title": "Autoencoders", "groups": [
                         {"title": "Profile autoencoder", "fields": [
@@ -611,6 +618,7 @@ class LaunchLayout:
                 {"key": "sweep", "title": "Sweep", "panels": [
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
                     {"kind": "fields", "groups": [
+                        {"title": "Output heads",    "fields": [{"path": "heads", "widget": MULTI_HEADS}]},
                         {"title": "Loss components", "fields": [{"path": "sweep_loss_components", "widget": MULTI_SWEEP_LOSSES}]},
                     ]},
                 ]},
@@ -681,7 +689,7 @@ class LaunchLayout:
             ],
             "sections": [
                 {"key": "model", "title": "Model", "when": {"field": "training_type", "in": ["backbone", "jepa"]}, "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name"]},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "folds", "title": "Folds", "panels": [
@@ -747,6 +755,7 @@ class LaunchLayout:
                 {"key": "search", "title": "Search", "panels": [
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
                     {"kind": "fields", "title": "Optuna search", "groups": [
+                        {"title": "Output heads", "fields": [{"path": "heads", "widget": MULTI_HEADS}]},
                         {"title": "Trials", "fields": ["tuning.n_trials", {"path": "tuning.n_epochs", "widget": NUM_EPOCHS}, {"path": "tuning.base_seed", "widget": NUM_SEED}, {"path": "tuning.early_stop_patience", "widget": NUM_PATIENCE}]},
                         {"title": "Pruner", "fields": ["tuning.pruner_n_startup_trials", "tuning.pruner_n_warmup_steps"]},
                         {"title": "Outputs", "fields": ["tuning.emit_trial_docs", "tuning.emit_study_plots"]},

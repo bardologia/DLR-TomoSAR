@@ -12,61 +12,56 @@ class BackboneModelLibrary:
     OPERATIONAL_HEADING = re.compile(r"correction|checkpoint continuity|review", re.IGNORECASE)
 
     CONFIG_CLASSES = {
-        "unet"               : "UNetConfig",
-        "unet_skip"          : "UNetSkipConfig",
-        "resunet"            : "ResUNetConfig",
-        "attention_unet"     : "AttentionUNetConfig",
-        "unetplusplus"       : "UNetPlusPlusConfig",
-        "linknet"            : "LinkNetConfig",
-        "swin_unet"          : "SwinUNetConfig",
-        "transunet"          : "TransUNetConfig",
-        "unetr"              : "UNETRConfig",
-        "unet_multihead"     : "UNetMultiHeadConfig",
-        "unet_pergaussian"   : "UNetPerGaussianConfig",
-        "unet_setpred"       : "UNetSetPredConfig",
-        "resunet_multihead"  : "ResUNetMultiHeadConfig",
-        "resunet_pergaussian": "ResUNetPerGaussianConfig",
-        "resunet_setpred"    : "ResUNetSetPredConfig",
-        "deeplabv3plus"      : "DeepLabV3PlusConfig",
-        "segformer"          : "SegFormerLiteConfig",
-        "convnext_unet"      : "ConvNeXtUNetConfig",
-        "dense_unet"         : "DenseUNetConfig",
-        "hrnet"              : "HRNetLiteConfig",
-        "multires_unet"      : "MultiResUNetConfig",
-        "fpn"                : "FPNNetConfig",
-        "u2net"              : "U2NetLiteConfig",
-        "pixel_mlp"          : "PixelMLPNetConfig",
-        "local_cnn"          : "LocalCNNConfig",
-        "nafnet"             : "NAFNetConfig",
+        "unet"           : "UNetConfig",
+        "unet_skip"      : "UNetSkipConfig",
+        "resunet"        : "ResUNetConfig",
+        "attention_unet" : "AttentionUNetConfig",
+        "unetplusplus"   : "UNetPlusPlusConfig",
+        "linknet"        : "LinkNetConfig",
+        "swin_unet"      : "SwinUNetConfig",
+        "transunet"      : "TransUNetConfig",
+        "unetr"          : "UNETRConfig",
+        "deeplabv3plus"  : "DeepLabV3PlusConfig",
+        "segformer"      : "SegFormerLiteConfig",
+        "convnext_unet"  : "ConvNeXtUNetConfig",
+        "dense_unet"     : "DenseUNetConfig",
+        "hrnet"          : "HRNetLiteConfig",
+        "multires_unet"  : "MultiResUNetConfig",
+        "fpn"            : "FPNNetConfig",
+        "u2net"          : "U2NetLiteConfig",
+        "pixel_mlp"      : "PixelMLPNetConfig",
+        "local_cnn"      : "LocalCNNConfig",
+        "nafnet"         : "NAFNetConfig",
     }
 
     NOTE_FILES = {
-        "unet"               : "UNet.md",
-        "unet_skip"          : "UNet Skip.md",
-        "resunet"            : "ResUNet.md",
-        "attention_unet"     : "Attention UNet.md",
-        "unetplusplus"       : "UNet++.md",
-        "linknet"            : "LinkNet.md",
-        "swin_unet"          : "SwinUNet.md",
-        "transunet"          : "TransUNet.md",
-        "unetr"              : "UNETR.md",
-        "unet_multihead"     : "UNet Multihead.md",
-        "unet_pergaussian"   : "UNet Per-Gaussian.md",
-        "unet_setpred"       : "UNet Set-Prediction.md",
-        "resunet_multihead"  : "ResUNet Multihead.md",
-        "resunet_pergaussian": "ResUNet Per-Gaussian.md",
-        "resunet_setpred"    : "ResUNet Set-Prediction.md",
-        "deeplabv3plus"      : "DeepLabV3+.md",
-        "segformer"          : "SegFormer.md",
-        "convnext_unet"      : "ConvNeXt UNet.md",
-        "dense_unet"         : "DenseUNet.md",
-        "hrnet"              : "HRNet.md",
-        "multires_unet"      : "MultiResUNet.md",
-        "fpn"                : "FPN.md",
-        "u2net"              : "U2-Net.md",
-        "pixel_mlp"          : "PixelMLP.md",
-        "local_cnn"          : "Local CNN.md",
-        "nafnet"             : "NAFNet.md",
+        "unet"           : "UNet.md",
+        "unet_skip"      : "UNet Skip.md",
+        "resunet"        : "ResUNet.md",
+        "attention_unet" : "Attention UNet.md",
+        "unetplusplus"   : "UNet++.md",
+        "linknet"        : "LinkNet.md",
+        "swin_unet"      : "SwinUNet.md",
+        "transunet"      : "TransUNet.md",
+        "unetr"          : "UNETR.md",
+        "deeplabv3plus"  : "DeepLabV3+.md",
+        "segformer"      : "SegFormer.md",
+        "convnext_unet"  : "ConvNeXt UNet.md",
+        "dense_unet"     : "DenseUNet.md",
+        "hrnet"          : "HRNet.md",
+        "multires_unet"  : "MultiResUNet.md",
+        "fpn"            : "FPN.md",
+        "u2net"          : "U2-Net.md",
+        "pixel_mlp"      : "PixelMLP.md",
+        "local_cnn"      : "Local CNN.md",
+        "nafnet"         : "NAFNet.md",
+    }
+
+    HEAD_NOTE_FILES = {
+        "conv"         : "Head Conv.md",
+        "multihead"    : "Head Multihead.md",
+        "per_gaussian" : "Head Per-Gaussian.md",
+        "set_pred"     : "Head Set-Prediction.md",
     }
 
     FALLBACK_ACTIVATION    = "gelu"
@@ -77,7 +72,7 @@ class BackboneModelLibrary:
     }
 
     def note(self, key: str) -> dict | None:
-        filename = self.NOTE_FILES.get(key)
+        filename = self.NOTE_FILES.get(key) or self.HEAD_NOTE_FILES.get(key)
         if filename is None:
             return None
 
@@ -86,7 +81,7 @@ class BackboneModelLibrary:
             return None
 
         markdown = self._strip_operational(path.read_text(encoding="utf-8"))
-        links    = {name[:-3]: model_key for model_key, name in self.NOTE_FILES.items()}
+        links    = {name[:-3]: model_key for model_key, name in {**self.NOTE_FILES, **self.HEAD_NOTE_FILES}.items()}
         return {"key": key, "note": filename[:-3], "markdown": markdown, "links": links}
 
     def _strip_operational(self, markdown: str) -> str:
@@ -136,6 +131,30 @@ class BackboneModelLibrary:
                 model["normalization"] = normalization
 
         return families
+
+    def heads(self) -> list[dict]:
+        return [
+            {
+                "key": "conv", "name": "Conv", "structure": "Single conv projection",
+                "default": True,
+                "when": "The default head. One convolution maps the backbone embedding straight to the packed parameter channels; every parameter shares the same projection.",
+            },
+            {
+                "key": "multihead", "name": "Multihead", "structure": "3 PixelMLP heads",
+                "default": False,
+                "when": "Systematic bias across parameter types. Separate PixelMLP heads regress amplitude, mean, and spread from the shared embedding.",
+            },
+            {
+                "key": "per_gaussian", "name": "Per-Gaussian", "structure": "K PixelMLP heads",
+                "default": False,
+                "when": "Systematic bias across Gaussian slots. One PixelMLP head per slot imposes slot independence.",
+            },
+            {
+                "key": "set_pred", "name": "Set-Prediction", "structure": "K PixelMLP heads + existence gate",
+                "default": False,
+                "when": "Attacking Gaussian slot collapse. Per-slot heads plus an existence-logit gate decouple the slot on/off decision from amplitude regression; pair with hungarian param matching.",
+            },
+        ]
 
     def _resolve_defaults(self) -> dict[str, tuple[str, str]]:
         module   = self._import_backbone_models_config()
@@ -245,42 +264,6 @@ class BackboneModelLibrary:
                         "key": "segformer", "name": "SegFormer", "skip": "Pyramid to MLP decoder",
                         "head": "1x1 conv", "params": "~5.2M", "recommended": False,
                         "when": "A strong hierarchical attention encoder with a near-trivial MLP decoder. The complementary hypothesis to the heavy-decoder transformers.",
-                    },
-                ],
-            },
-            {
-                "family" : "Multi-head CNN",
-                "blurb"  : "UNet backbones with stronger inductive biases on the parameter structure.",
-                "models" : [
-                    {
-                        "key": "unet_multihead", "name": "UNet Multihead", "skip": "Direct concatenation",
-                        "head": "3 PixelMLP heads", "params": "~31.0M", "recommended": False,
-                        "when": "Systematic bias across parameter types. Separate heads for amplitude, mean, and spread.",
-                    },
-                    {
-                        "key": "unet_pergaussian", "name": "UNet Per-Gaussian", "skip": "Direct concatenation",
-                        "head": "K PixelMLP heads", "params": "~31.0M", "recommended": False,
-                        "when": "Systematic bias across Gaussian slots. One head per component imposes slot independence.",
-                    },
-                    {
-                        "key": "unet_setpred", "name": "UNet Set-Prediction", "skip": "Direct concatenation",
-                        "head": "K PixelMLP heads + existence gate", "params": "~31.0M", "recommended": False,
-                        "when": "Attacking Gaussian slot collapse. Per-slot heads plus an existence-logit gate decouple the slot on/off decision from amplitude regression; pair with hungarian param matching.",
-                    },
-                    {
-                        "key": "resunet_multihead", "name": "ResUNet Multihead", "skip": "Skip + residual",
-                        "head": "3 PixelMLP heads", "params": "~32.4M", "recommended": False,
-                        "when": "Corrected stride-2 ResUNet backbone with parameter-type-specific heads. Isolates the head-structure question from the backbone.",
-                    },
-                    {
-                        "key": "resunet_pergaussian", "name": "ResUNet Per-Gaussian", "skip": "Skip + residual",
-                        "head": "K PixelMLP heads", "params": "~32.4M", "recommended": False,
-                        "when": "Corrected stride-2 ResUNet backbone with per-slot heads. Isolates the head-structure question from the backbone.",
-                    },
-                    {
-                        "key": "resunet_setpred", "name": "ResUNet Set-Prediction", "skip": "Skip + residual",
-                        "head": "K PixelMLP heads + existence gate", "params": "~32.4M", "recommended": False,
-                        "when": "The gated set-prediction heads on the stride-2 residual backbone. Completes the head-axis triple while holding the encode-decode path fixed.",
                     },
                 ],
             },

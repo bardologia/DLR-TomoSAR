@@ -219,11 +219,14 @@ class ModelTogglePanel {
 
 
 class ModelCardPanel {
-  constructor(view, leaf) {
-    this.view     = view;
-    this.leaf     = leaf;
-    this.families = view.modelFamilies || [];
-    this.cards    = new Map();
+  constructor(view, leaf, headLeaf = null) {
+    this.view      = view;
+    this.leaf      = leaf;
+    this.headLeaf  = headLeaf;
+    this.families  = view.modelFamilies || [];
+    this.heads     = view.modelHeads || [];
+    this.cards     = new Map();
+    this.headChips = new Map();
     this.currentEl = null;
   }
 
@@ -249,9 +252,47 @@ class ModelCardPanel {
     this.families.forEach((family) => body.appendChild(this._family(family)));
     root.appendChild(body);
 
+    if (this.headLeaf && this.heads.length) root.appendChild(this._headPicker());
+
     this.view.controls[this.leaf.path] = { leaf: this.leaf, reset: () => this._paint() };
+    if (this.headLeaf) this.view.controls[this.headLeaf.path] = { leaf: this.headLeaf, reset: () => this._paint() };
     this._paint();
     return root;
+  }
+
+  _headPicker() {
+    const block     = document.createElement("div");
+    block.className = "model-family";
+
+    const name       = document.createElement("div");
+    name.className   = "model-family__name";
+    name.textContent = "Output head";
+
+    const grid     = document.createElement("div");
+    grid.className = "model-family__grid";
+    this.heads.forEach((headSpec) => grid.appendChild(this._headChip(headSpec)));
+
+    block.appendChild(name);
+    block.appendChild(grid);
+    return block;
+  }
+
+  _headChip(headSpec) {
+    const chip     = document.createElement("button");
+    chip.type      = "button";
+    chip.className = "model-chip";
+    chip.title     = headSpec.when || "";
+
+    chip.innerHTML = `<span class="model-chip__name">${headSpec.name}</span><span class="model-chip__meta">${headSpec.structure || ""}</span>`;
+
+    chip.addEventListener("click", () => this._selectHead(headSpec.key));
+    this.headChips.set(headSpec.key, chip);
+    return chip;
+  }
+
+  _selectHead(key) {
+    this.view._setValue(this.headLeaf, key);
+    this._paint();
   }
 
   _family(family) {
@@ -304,6 +345,20 @@ class ModelCardPanel {
       card.setAttribute("aria-pressed", String(on));
       if (on) label = card.querySelector(".model-pick__name").textContent;
     });
+
+    if (this.headLeaf && this.headChips.size) {
+      const currentHead = this.view._effective(this.headLeaf);
+      let headLabel     = currentHead;
+
+      this.headChips.forEach((chip, key) => {
+        const on = key === currentHead;
+        chip.classList.toggle("is-on", on);
+        chip.setAttribute("aria-pressed", String(on));
+        if (on) headLabel = chip.querySelector(".model-chip__name").textContent;
+      });
+
+      label = `${label} · ${headLabel} head`;
+    }
 
     this.currentEl.textContent = label;
   }
@@ -2987,9 +3042,10 @@ class ConfigForm {
 
   _buildSpecialPanel(panel) {
     if (panel.panel === "model_card") {
-      const leaf = this.byPath.get(panel.fields[0]);
+      const leaf     = this.byPath.get(panel.fields[0]);
+      const headLeaf = panel.fields.length > 1 ? this.byPath.get(panel.fields[1]) : null;
       if (!leaf || !this.modelFamilies || !this.modelFamilies.length) return this._buildPathsPanel("Model", panel.fields);
-      return new window.ModelCardPanel(this, leaf).build();
+      return new window.ModelCardPanel(this, leaf, headLeaf).build();
     }
 
     if (panel.panel === "model_toggle") {
