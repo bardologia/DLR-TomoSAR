@@ -123,3 +123,34 @@ class WeightXrayEntryConfig:
             make_plots           = self.make_plots,
             embed_images         = self.embed_images,
         )
+
+
+@dataclass
+class TensorboardExportConfig:
+    run_directory        : Path = Path("logs")
+    tensorboard_dirname  : str  = "tensorboard"
+    output_subdir        : str  = "tensorboard_plots"
+
+    @property
+    def tensorboard_directory(self) -> Path:
+        return Path(self.run_directory) / self.tensorboard_dirname
+
+    @property
+    def plots_directory(self) -> Path:
+        return Path(self.run_directory) / self.output_subdir
+
+
+@dataclass
+class TensorboardExportEntryConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    tensorboard_dirname : str = "tensorboard"
+    output_subdir       : str = "tensorboard_plots"
+
+    def to_config(self, run_dir: Path) -> TensorboardExportConfig:
+        return TensorboardExportConfig(
+            run_directory       = Path(run_dir),
+            tensorboard_dirname = self.tensorboard_dirname,
+            output_subdir       = self.output_subdir,
+        )
