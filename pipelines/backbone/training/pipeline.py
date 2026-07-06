@@ -110,6 +110,7 @@ class TrainingPipeline:
 
         self.logger.section("[Model Built]")
         self.logger.subsection(f"Architecture : {self.backbone_name}")
+        self.logger.subsection(f"Head         : {model_cfg.head}")
         self.logger.subsection(f"In Channels  : {in_channels}")
         self.logger.subsection(f"Out Channels : {out_channels}")
         self.logger.subsection(f"Parameters   : {n_params:,}")

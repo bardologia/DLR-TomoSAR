@@ -7,7 +7,8 @@ import optuna
 from optuna.trial import TrialState
 
 from configuration.tuning     import TuningConfig
-from models                   import config_registry
+from models                   import BACKBONE_HEADS, config_registry
+from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.tuning.plots   import StudyPlotter
 from pipelines.tuning.tuners  import BestConfigWriter
 from tools                    import FileIO
@@ -46,8 +47,18 @@ class TuningScheduler:
     def _registry(self) -> dict:
         return config_registry(self.config.training_type)
 
+    def _model_keys(self) -> list[str]:
+        if self.config.training_type not in ("backbone", "jepa"):
+            return list(self._registry().keys())
+
+        unknown = [head for head in self.config.heads if head not in BACKBONE_HEADS]
+        if unknown:
+            sys.exit(f"ERROR: unknown head(s) {unknown}; valid: {', '.join(BACKBONE_HEADS)}")
+
+        return [ModelBuilder.model_key(name, head) for name in self._registry() for head in self.config.heads]
+
     def _search_space(self, model_name: str) -> dict:
-        config_cls = self._registry()[model_name]
+        config_cls = self._registry()[ModelBuilder.split_key(model_name)[0]]
         return {**config_cls.tunable_lr_params(), **config_cls.tunable_arch_params()}
 
     def _worker_job(self, model_name: str, n_trials: int, worker_index: int) -> GpuJob:
@@ -174,14 +185,19 @@ class TuningScheduler:
         self.logger = Logger(log_dir=str(self.run_dir), name="tune_scheduler")
 
         registry   = self._registry()
-        all_models = list(registry.keys())
+        all_models = self._model_keys()
         if target_model is not None:
-            if target_model not in registry:
+            name, head = ModelBuilder.split_key(target_model)
+            if name not in registry:
                 self.logger.close()
-                sys.exit(f"ERROR: unknown model '{target_model}'. Available: {list(registry.keys())}")
+                sys.exit(f"ERROR: unknown model '{name}'. Available: {list(registry.keys())}")
+            if head not in BACKBONE_HEADS:
+                self.logger.close()
+                sys.exit(f"ERROR: unknown head '{head}'. Available: {list(BACKBONE_HEADS)}")
             models_to_run = [target_model]
         else:
-            models_to_run = [m for m in all_models if m not in set(self.config.skip_models)]
+            skip          = set(self.config.skip_models)
+            models_to_run = [m for m in all_models if m not in skip and ModelBuilder.split_key(m)[0] not in skip]
 
         self.logger.section("Hyperparameter Tuning")
         self.logger.kv_table({

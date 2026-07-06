@@ -38,6 +38,7 @@ class JepaRunLoader(RunLoader):
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
         ae_cfg, ae_name = ProfileAutoencoderConfigIO.load(self.meta_directory)
         model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
+        self.model_head = model_config.head
 
         image_autoencoder, backbone_in = self._image_frontend(in_channels)
 
@@ -60,6 +61,7 @@ class JepaRunLoader(RunLoader):
 class JepaParamRunLoader(RunLoader):
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
         model_config, _       = BackboneModelConfigIO.load(self.meta_directory)
+        self.model_head       = model_config.head
         image_cfg, image_name = ImageAutoencoderConfigIO.load(self.meta_directory)
         image_autoencoder, _  = get_image_autoencoder(image_name, image_cfg)
 

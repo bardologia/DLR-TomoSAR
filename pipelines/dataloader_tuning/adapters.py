@@ -230,8 +230,10 @@ class BackboneFeedAdapter:
     def _config_factory(self):
         from configuration.training          import BackboneEntryConfig
         from pipelines.shared.config.config_factory import ConfigFactory
+        from pipelines.shared.model.model_builder   import ModelBuilder
 
-        entry       = BackboneEntryConfig(backbone_name=self.model_name, seed=self.config.seed)
+        name, head  = ModelBuilder.split_key(self.model_name)
+        entry       = BackboneEntryConfig(backbone_name=name, backbone_head=head, seed=self.config.seed)
         entry.paths = self.config.paths
 
         return ConfigFactory(entry)
@@ -255,15 +257,17 @@ class BackboneFeedAdapter:
 
     def _model(self, dataset, dataset_config, gaussian_cfg):
         from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+        from pipelines.shared.model.model_builder import ModelBuilder
 
+        name, head   = ModelBuilder.split_key(self.model_name)
         in_channels  = dataset.input_channels
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
-        overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:
+        overrides = {"in_channels": in_channels, "out_channels": out_channels, "head": head}
+        if name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = dataset_config.patch.size[0]
 
-        model, _ = get_backbone(self.model_name, config=BACKBONE_CONFIG_REGISTRY[self.model_name](), **overrides)
+        model, _ = get_backbone(name, config=BACKBONE_CONFIG_REGISTRY[name](), **overrides)
         return model, in_channels
 
     def build(self) -> FeedTarget:

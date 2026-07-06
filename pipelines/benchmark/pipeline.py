@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.benchmark import BenchmarkConfig
-from models                                     import config_registry
+from models                                     import BACKBONE_HEADS, config_registry
+from pipelines.shared.model.model_builder           import ModelBuilder
 from pipelines.shared.orchestration.staged_pipeline import StagedPipeline
 
 from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatchStage, SeedExpandedStage, SizeMatchStage, TrainingStage
@@ -14,13 +15,27 @@ class BenchmarkPipeline(StagedPipeline):
 
     def __init__(self, config: BenchmarkConfig, entry_script: Path) -> None:
         super().__init__(config, entry_script)
-        self.models = [m for m in self._registry().keys() if m not in set(config.skip_models)]
+        skip        = set(config.skip_models)
+        keys        = self._model_keys()
+        self.models = [key for key in keys if key not in skip and ModelBuilder.split_key(key)[0] not in skip]
 
     def _registry(self) -> dict:
         return config_registry(self.config.training_type)
 
+    def _model_keys(self) -> list[str]:
+        if self.config.training_type != "backbone":
+            return list(self._registry().keys())
+
+        return [ModelBuilder.model_key(name, head) for name in self._registry() for head in self.config.heads]
+
     def _validate_sweep(self) -> None:
         SeedExpandedStage.components(self.config)
+
+        unknown = [head for head in self.config.heads if head not in BACKBONE_HEADS]
+        if unknown:
+            raise SystemExit(f"unknown head(s) {unknown}; valid: {', '.join(BACKBONE_HEADS)}")
+        if self.config.training_type == "backbone" and not self.config.heads:
+            raise SystemExit("heads is empty; select at least one output head to benchmark")
 
     def _run_max_batch(self) -> dict:
         stage   = MaxBatchStage(config=self.config, entry_script=self.entry_script, run_tag=self.run_tag, models=self.models, logger=self.logger)

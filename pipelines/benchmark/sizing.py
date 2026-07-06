@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from configuration.benchmark import BenchmarkConfig
 from configuration.sar.gaussian_config          import GaussianConfig
 from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from pipelines.shared.model.model_builder       import ModelBuilder
 from tools.data.gaussians                       import GaussianHead
 from tools.monitoring.logger                    import Logger
 
@@ -25,32 +26,26 @@ class WidthScaler:
         feature_rules = [WidthRule(attribute="features", divisor=8)]
 
         self.rules : dict[str, list[WidthRule]] = {
-            "unet"                : feature_rules,
-            "unet_multihead"      : feature_rules,
-            "unet_pergaussian"    : feature_rules,
-            "unet_setpred"        : feature_rules,
-            "unet_skip"           : feature_rules,
-            "resunet"             : feature_rules,
-            "resunet_multihead"   : feature_rules,
-            "resunet_pergaussian" : feature_rules,
-            "resunet_setpred"     : feature_rules,
-            "attention_unet"      : feature_rules,
-            "unetplusplus"        : feature_rules,
-            "linknet"             : feature_rules,
-            "swin_unet"           : [WidthRule(attribute="mlp_ratio", divisor=0.25, is_float=True)],
-            "transunet"           : [WidthRule(attribute="cnn_features",  divisor=8)],
-            "unetr"               : [WidthRule(attribute="decoder_features", divisor=8)],
-            "deeplabv3plus"       : feature_rules,
-            "segformer"           : [WidthRule(attribute="embedding_dims", divisor=8, unlock=True), WidthRule(attribute="decoder_channels", divisor=8)],
-            "convnext_unet"       : feature_rules,
-            "dense_unet"          : [WidthRule(attribute="growth_rate", divisor=2)],
-            "hrnet"               : [WidthRule(attribute="base_channels", divisor=8)],
-            "multires_unet"       : feature_rules,
-            "fpn"                 : feature_rules + [WidthRule(attribute="pyramid_channels", divisor=8)],
-            "u2net"               : feature_rules,
-            "pixel_mlp"           : feature_rules,
-            "local_cnn"           : feature_rules,
-            "nafnet"              : [WidthRule(attribute="width", divisor=1)],
+            "unet"           : feature_rules,
+            "unet_skip"      : feature_rules,
+            "resunet"        : feature_rules,
+            "attention_unet" : feature_rules,
+            "unetplusplus"   : feature_rules,
+            "linknet"        : feature_rules,
+            "swin_unet"      : [WidthRule(attribute="mlp_ratio", divisor=0.25, is_float=True)],
+            "transunet"      : [WidthRule(attribute="cnn_features",  divisor=8)],
+            "unetr"          : [WidthRule(attribute="decoder_features", divisor=8)],
+            "deeplabv3plus"  : feature_rules,
+            "segformer"      : [WidthRule(attribute="embedding_dims", divisor=8, unlock=True), WidthRule(attribute="decoder_channels", divisor=8)],
+            "convnext_unet"  : feature_rules,
+            "dense_unet"     : [WidthRule(attribute="growth_rate", divisor=2)],
+            "hrnet"          : [WidthRule(attribute="base_channels", divisor=8)],
+            "multires_unet"  : feature_rules,
+            "fpn"            : feature_rules + [WidthRule(attribute="pyramid_channels", divisor=8)],
+            "u2net"          : feature_rules,
+            "pixel_mlp"      : feature_rules,
+            "local_cnn"      : feature_rules,
+            "nafnet"         : [WidthRule(attribute="width", divisor=1)],
         }
 
         self._enforce_locked()
@@ -64,14 +59,20 @@ class WidthScaler:
                 if rule.attribute in self.locked and not rule.unlock:
                     raise ValueError(f"Width rule for '{model_name}' targets locked hyperparameter '{rule.attribute}'. Locked parameters may not be scaled: {sorted(self.locked)}.")
 
-    def overrides(self, model_name: str, scale: float) -> dict:
-        if model_name not in self.rules:
-            raise ValueError(f"No width rule registered for model '{model_name}'. Available: {list(self.rules.keys())}")
+    def rules_for(self, model_key: str) -> list[WidthRule]:
+        name, _head = ModelBuilder.split_key(model_key)
+        if name not in self.rules:
+            raise ValueError(f"No width rule registered for model '{name}'. Available: {list(self.rules.keys())}")
 
-        defaults  = BACKBONE_CONFIG_REGISTRY[model_name]()
-        overrides = {}
+        return self.rules[name]
 
-        for rule in self.rules[model_name]:
+    def overrides(self, model_key: str, scale: float) -> dict:
+        rules       = self.rules_for(model_key)
+        name, _head = ModelBuilder.split_key(model_key)
+        defaults    = BACKBONE_CONFIG_REGISTRY[name]()
+        overrides   = {}
+
+        for rule in rules:
             base = getattr(defaults, rule.attribute)
 
             if isinstance(base, list):
@@ -81,10 +82,12 @@ class WidthScaler:
 
         return overrides
 
-    def scaled_config(self, model_name: str, scale: float):
-        config = BACKBONE_CONFIG_REGISTRY[model_name]()
+    def scaled_config(self, model_key: str, scale: float):
+        name, head = ModelBuilder.split_key(model_key)
+        config     = BACKBONE_CONFIG_REGISTRY[name]()
+        config.head = head
 
-        for attribute, value in self.overrides(model_name, scale).items():
+        for attribute, value in self.overrides(model_key, scale).items():
             setattr(config, attribute, value)
 
         return config
@@ -128,7 +131,7 @@ class DegeneracyAuditor:
     def _width_flags(self, result: SizeMatchResult) -> list[str]:
         flags = []
 
-        for rule in self.scaler.rules[result.model]:
+        for rule in self.scaler.rules_for(result.model):
             value   = result.overrides[rule.attribute]
             minimum = min(value) if isinstance(value, list) else value
 
@@ -171,8 +174,12 @@ class SizeMatcher:
             raise SystemExit(f"size_match.in_channels={self.in_channels} but the input configuration yields {expected} channels for {len(labels)} secondaries; capacity matching would count the wrong width")
 
     def reference_count(self) -> int:
-        reference = self.config.size_match.reference_model
-        return self._count(reference, BACKBONE_CONFIG_REGISTRY[reference]())
+        reference   = self.config.size_match.reference_model
+        name, head  = ModelBuilder.split_key(reference)
+        config      = BACKBONE_CONFIG_REGISTRY[name]()
+        config.head = head
+
+        return self._count(reference, config)
 
     def match(self, model_name: str, target: int) -> SizeMatchResult:
         size_match = self.config.size_match
@@ -223,12 +230,14 @@ class SizeMatcher:
     def _count_at(self, model_name: str, scale: float) -> int:
         return self._count(model_name, self.scaler.scaled_config(model_name, scale))
 
-    def _count(self, model_name: str, model_config) -> int:
+    def _count(self, model_key: str, model_config) -> int:
+        name, _head = ModelBuilder.split_key(model_key)
+
         overrides = {"in_channels": self.in_channels, "out_channels": self.out_channels}
-        if model_name in BACKBONE_IMAGE_SIZE_MODELS:
+        if name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = self.image_size
 
-        model, _   = get_backbone(model_name, config=model_config, **overrides)
+        model, _   = get_backbone(name, config=model_config, **overrides)
         parameters = sum(p.numel() for p in model.parameters())
 
         del model

@@ -184,6 +184,7 @@ class TrainingPipeline:
         if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = image_size
         if config is None:
+            overrides["head"] = self.entry.backbone_head
             for k, v in self.entry.model_overrides.items():
                 overrides[k] = v
         return get_backbone(self.backbone_name, config=config, **overrides)

@@ -72,12 +72,15 @@ class BenchmarkWorker(WorkerBase):
 
     def _jepa_entry_config(self, model_name: str, logdir: Path, run_name: str | None = None, seed: int | None = None):
         from configuration.training import JepaEntryConfig
+        from pipelines.shared.model.model_builder import ModelBuilder
 
-        jepa = self.config.jepa
+        jepa       = self.config.jepa
+        name, head = ModelBuilder.split_key(model_name)
 
         return JepaEntryConfig(
             run_name                   = run_name or model_name,
-            backbone_name              = model_name,
+            backbone_name              = name,
+            backbone_head              = head,
             seed                       = self.config.seed if seed is None else seed,
             logdir                     = logdir,
             profile_autoencoder_logdir = jepa.profile_autoencoder_logdir,
@@ -134,9 +137,12 @@ class TrainingWorker(BenchmarkWorker):
 
         from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
+        from pipelines.shared.model.model_builder import ModelBuilder
 
         stage_dir    = self.run_dir / "training"
-        model_config = BACKBONE_CONFIG_REGISTRY[model_name]()
+        name, head   = ModelBuilder.split_key(model_name)
+        model_config = BACKBONE_CONFIG_REGISTRY[name]()
+        model_config.head = head
 
         for attribute, value in self._size_overrides(model_name).items():
             setattr(model_config, attribute, value)
@@ -155,7 +161,7 @@ class TrainingWorker(BenchmarkWorker):
         pipeline = TrainingPipeline(
             trainer_config = trainer_config,
             dataset_config = dataset_config,
-            backbone_name  = model_name,
+            backbone_name  = name,
             model_config   = model_config,
             seed           = self.config.seed if seed is None else seed,
             run_name       = run_name,

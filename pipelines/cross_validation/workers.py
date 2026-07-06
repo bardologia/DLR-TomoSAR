@@ -117,7 +117,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         from pipelines.backbone.training.pipeline import TrainingPipeline
         from pipelines.shared.model.model_builder import ModelBuilder
 
-        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides, head=self.config.backbone_head)
 
         trainer_config            = self.factory.training_trainer_config(logdir=self.run_dir / "folds")
         trainer_config.curriculum = self.config.curriculum
@@ -151,6 +151,7 @@ class FoldTrainingWorker(CrossValidationWorker):
         return JepaEntryConfig(
             run_name                   = run_name,
             backbone_name              = cv.backbone_name,
+            backbone_head              = cv.backbone_head,
             seed                       = cv.seed if seed is None else seed,
             logdir                     = self.run_dir / "folds",
             model_overrides            = cv.model_overrides,

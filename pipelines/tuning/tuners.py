@@ -5,6 +5,7 @@ from pathlib import Path
 
 import optuna
 
+from pipelines.shared.model.model_builder import ModelBuilder
 from tools.data.io import FileIO
 
 
@@ -91,6 +92,8 @@ class Tuner:
         self.logger              = logger
         self.emit_trial_docs     = emit_trial_docs
 
+        self.backbone_name, self.head = ModelBuilder.split_key(model_name)
+
         self.sampler     = ParamSampler()
         self.space       = {**model_config_cls.tunable_lr_params(), **model_config_cls.tunable_arch_params()}
         self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
@@ -103,7 +106,8 @@ class Tuner:
     def _objective(self, trial: optuna.Trial) -> float:
         from pipelines.tuning.trial import TrialPipeline
 
-        model_config = self.model_config_cls()
+        model_config      = self.model_config_cls()
+        model_config.head = self.head
         self._apply_params(trial, model_config)
 
         trainer_cfg = copy.deepcopy(self.base_trainer_config)
@@ -117,7 +121,7 @@ class Tuner:
         pipeline = TrialPipeline(
             trainer_config = trainer_cfg,
             dataset_config = dataset_cfg,
-            backbone_name  = self.model_name,
+            backbone_name  = self.backbone_name,
             model_config   = model_config,
             seed           = self.tune_cfg.base_seed + trial.number,
             run_name       = f"trial_{trial.number:04d}",
@@ -216,6 +220,8 @@ class JepaTuner:
         self.log_dir          = log_dir
         self.logger           = logger
 
+        self.backbone_name, self.head = ModelBuilder.split_key(model_name)
+
         self.sampler     = ParamSampler()
         self.space       = model_config_cls.tunable_arch_params()
         self.best_writer = BestConfigWriter(model_name, self.space, Path(log_dir) / "best_config.json")
@@ -226,7 +232,8 @@ class JepaTuner:
         sampled = self.sampler.sample(trial, self.space)
 
         entry                 = copy.deepcopy(self.entry_template)
-        entry.backbone_name   = self.model_name
+        entry.backbone_name   = self.backbone_name
+        entry.backbone_head   = self.head
         entry.model_overrides = sampled
         entry.run_name        = f"trial_{trial.number:04d}"
         entry.seed            = self.tune_cfg.base_seed + trial.number

@@ -9,6 +9,7 @@ from models                                 import BACKBONE_CONFIG_REGISTRY
 from models.image_autoencoder               import IMAGE_AE_CONFIG_REGISTRY
 from models.profile_autoencoder             import PROFILE_AE_CONFIG_REGISTRY
 from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.shared.model.model_builder   import ModelBuilder
 from pipelines.tuning.trial                 import TrialImageAePipeline, TrialProfileAePipeline
 from pipelines.tuning.tuners                import AeTuner, JepaTuner, Tuner
 from tools.monitoring.logger                import Logger
@@ -95,7 +96,7 @@ class TuningWorker:
         if self.config.training_type == "jepa":
             return JepaTuner(
                 model_name       = model_name,
-                model_config_cls = BACKBONE_CONFIG_REGISTRY[model_name],
+                model_config_cls = BACKBONE_CONFIG_REGISTRY[ModelBuilder.split_key(model_name)[0]],
                 entry_template   = self._jepa_entry_template(),
                 tune_cfg         = tune_cfg,
                 log_dir          = str(self.run_dir / model_name),
@@ -106,7 +107,7 @@ class TuningWorker:
 
         return Tuner(
             model_name          = model_name,
-            model_config_cls    = BACKBONE_CONFIG_REGISTRY[model_name],
+            model_config_cls    = BACKBONE_CONFIG_REGISTRY[ModelBuilder.split_key(model_name)[0]],
             base_trainer_config = trainer_cfg,
             base_dataset_config = dataset_cfg,
             tune_cfg            = tune_cfg,

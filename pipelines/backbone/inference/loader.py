@@ -96,6 +96,7 @@ class RunLoader:
 
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
         model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
+        self.model_head = model_config.head
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
 
@@ -244,6 +245,7 @@ class RunLoader:
         self.logger.section(f"[Model]         : '{backbone_name}'")
         self.logger.kv_table({
             "Checkpoint":   ckpt_path,
+            "Head":         self.model_head,
             "In channels":  in_channels,
             "Out channels": out_channels,
             "K gaussians":  n_gaussians,

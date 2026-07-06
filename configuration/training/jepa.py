@@ -96,6 +96,7 @@ class JepaDefaults:
 class JepaEntryConfig:
     run_name        : str | None = None
     backbone_name   : str        = "resunet"
+    backbone_head   : str        = "conv"
     gpu             : int        = 0
     seed            : int        = 0
     seeds           : list[int]  = field(default_factory=list)

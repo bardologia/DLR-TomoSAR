@@ -28,7 +28,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
     @property
     def label(self) -> str:
-        return self.config.backbone_name
+        return ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
 
     def _pipeline(self, logdir) -> TrainingPipeline:
         trainer_config            = self.factory.training_trainer_config(logdir=logdir)
@@ -38,7 +38,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input
 
-        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides, head=self.config.backbone_head)
 
         return TrainingPipeline(
             trainer_config = trainer_config,
@@ -116,21 +116,22 @@ class TrainScheduler:
         self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root)
 
     def planner(self):
-        mode = self.config.trials_mode
+        mode      = self.config.trials_mode
+        model_key = ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
         if mode == "curriculum":
-            return CurriculumTrialPlanner(self.config.backbone_name, self.config.warmup_losses, self.config.complete_losses)
+            return CurriculumTrialPlanner(model_key, self.config.warmup_losses, self.config.complete_losses)
         if mode == "warmup":
-            return WarmupTrialPlanner(self.config.backbone_name, self.config.warmup_losses)
+            return WarmupTrialPlanner(model_key, self.config.warmup_losses)
         if mode == "presence":
-            return SlotPresenceTrialPlanner(self.config.backbone_name, self.config.presence_trials)
+            return SlotPresenceTrialPlanner(model_key, self.config.presence_trials)
         if mode == "secondary":
-            return SecondaryTrialPlanner.from_dataset(self.config.backbone_name, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
+            return SecondaryTrialPlanner.from_dataset(model_key, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "patch":
-            return PatchSizeTrialPlanner(self.config.backbone_name, self.config.patch_trials)
+            return PatchSizeTrialPlanner(model_key, self.config.patch_trials)
         if mode == "input":
-            return InputTrialPlanner.from_dataset(self.config.backbone_name, self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
+            return InputTrialPlanner.from_dataset(model_key, self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "ablation":
-            return AblationTrialPlanner(self.config.backbone_name, self.config.ablation_features, self.config.ablation_include_full)
+            return AblationTrialPlanner(model_key, self.config.ablation_features, self.config.ablation_include_full)
 
         raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'secondary', 'patch', 'input' or 'ablation'")
 
@@ -149,7 +150,7 @@ class TrainScheduler:
 
         self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
-            "Model"         : self.config.backbone_name,
+            "Model"         : ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head),
             "Mode"          : self.config.trials_mode,
             **planner.summary(),
             "Trials"        : len(experiments),

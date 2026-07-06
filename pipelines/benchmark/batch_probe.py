@@ -9,6 +9,7 @@ import torch
 
 from configuration.benchmark            import BenchmarkConfig
 from models                             import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
 from pipelines.backbone.training.pipeline import TrainingPipeline
@@ -64,7 +65,9 @@ class MaxBatchProbe:
         return trainer_config, dataset_config, datasets["train"], gaussian_cfg
 
     def _build_model(self, dataset_config, dataset, gaussian_cfg):
-        model_config = BACKBONE_CONFIG_REGISTRY[self.model_name]()
+        name, head   = ModelBuilder.split_key(self.model_name)
+        model_config = BACKBONE_CONFIG_REGISTRY[name]()
+        model_config.head = head
 
         for attribute, value in self.overrides.items():
             setattr(model_config, attribute, value)
@@ -73,10 +76,10 @@ class MaxBatchProbe:
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.model_name in BACKBONE_IMAGE_SIZE_MODELS:
+        if name in BACKBONE_IMAGE_SIZE_MODELS:
             overrides["image_size"] = dataset_config.patch.size[0]
 
-        return get_backbone(self.model_name, config=model_config, **overrides)
+        return get_backbone(name, config=model_config, **overrides)
 
     def _build_trainer(self, trainer_config, dataset_config, model, model_cfg, dataset):
         trainer = Trainer(
