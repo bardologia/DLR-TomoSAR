@@ -21,7 +21,7 @@ summary: Shallow full-resolution CNN control baseline; a fixed small receptive f
 
 ## Summary
 
-The trunk chains $B$ `ConvBlock`s — the same double-conv block used by the [[UNet]] family — at constant resolution, each block widening (or keeping) the channel count per `features`. With two $3\times3$ convolutions per block, the receptive field after $B$ blocks is $(4B+1)\times(4B+1)$: the default `features = [256, 256, 256]` gives a $13\times13$ window. Together with [[PixelMLP]] it brackets the spatial-context question: PixelMLP has none, LocalCNN has a fixed local window, and the encode-decode backbones aggregate context across the whole patch. Comparing the three at matched capacity decomposes backbone performance into per-pixel mapping, local smoothing, and long-range context.
+The trunk chains $B$ `ConvBlock`s — the same double-conv block used by the [[UNet]] family — at constant resolution, each block widening (or keeping) the channel count per `features`. With two $3\times3$ convolutions per block, the receptive field after $B$ blocks is $(4B+1)\times(4B+1)$: the default `features = [832, 832, 832]` gives a $13\times13$ window. Together with [[PixelMLP]] it brackets the spatial-context question: PixelMLP has none, LocalCNN has a fixed local window, and the encode-decode backbones aggregate context across the whole patch. Comparing the three at matched capacity decomposes backbone performance into per-pixel mapping, local smoothing, and long-range context.
 
 ---
 

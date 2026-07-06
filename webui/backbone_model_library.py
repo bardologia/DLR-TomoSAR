@@ -322,12 +322,12 @@ class BackboneModelLibrary:
                 "models" : [
                     {
                         "key": "pixel_mlp", "name": "PixelMLP", "skip": "None (single stream)",
-                        "head": "Single 1x1 conv", "params": "~3.2M", "recommended": False,
+                        "head": "Single 1x1 conv", "params": "~30.8M", "recommended": False,
                         "when": "The no-spatial-context control. A per-pixel MLP of 1x1 convolutions; the margin any spatial backbone holds over it is the measured value of spatial context.",
                     },
                     {
                         "key": "local_cnn", "name": "Local CNN", "skip": "None (single stream)",
-                        "head": "Single 1x1 conv", "params": "~3.0M", "recommended": False,
+                        "head": "Single 1x1 conv", "params": "~31.2M", "recommended": False,
                         "when": "The local-context-only control. Full-resolution 3x3 ConvBlocks with a fixed small receptive field, between PixelMLP and the encode-decode backbones.",
                     },
                 ],

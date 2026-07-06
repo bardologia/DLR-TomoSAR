@@ -1437,7 +1437,7 @@ class PixelMLPNetConfig:
     in_channels         : int       = 1
     out_channels        : int       = 6
     params_per_gaussian : int       = 3
-    features            : list[int] = field(default_factory=lambda: [1024, 1024, 1024, 1024])
+    features            : list[int] = field(default_factory=lambda: [3200, 3200, 3200, 3200])
     dropout             : float     = 0.15
     activation          : str       = "relu"
     normalization       : str       = "batch"
@@ -1469,7 +1469,7 @@ class PixelMLPNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"      : {"type": "indexed_categorical", "choices": [[512, 512, 512, 512], [1024, 1024, 1024, 1024], [768, 768, 768, 768, 768, 768]]},
+            "features"      : {"type": "indexed_categorical", "choices": [[2048, 2048, 2048, 2048], [3200, 3200, 3200, 3200], [2048, 2048, 2048, 2048, 2048, 2048, 2048, 2048]]},
             "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }
@@ -1486,7 +1486,7 @@ class LocalCNNConfig:
     in_channels         : int       = 1
     out_channels        : int       = 6
     params_per_gaussian : int       = 3
-    features            : list[int] = field(default_factory=lambda: [256, 256, 256])
+    features            : list[int] = field(default_factory=lambda: [832, 832, 832])
     dropout             : float     = 0.15
     activation          : str       = "relu"
     normalization       : str       = "batch"
@@ -1518,7 +1518,7 @@ class LocalCNNConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"      : {"type": "indexed_categorical", "choices": [[128, 128, 128], [256, 256, 256], [192, 192, 192, 192, 192]]},
+            "features"      : {"type": "indexed_categorical", "choices": [[512, 512, 512], [832, 832, 832], [704, 704, 704, 704]]},
             "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }

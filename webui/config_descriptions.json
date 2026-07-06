@@ -897,7 +897,7 @@
     "architectures/backbone::PixelMLPNetConfig": {
       "summary": "Pixel-wise MLP control baseline: a stack of 1x1 convolutions with no spatial context whatsoever, quantifying how much of backbone performance comes from per-pixel mapping capacity alone",
       "fields": {
-        "features": "Hidden layer widths of the per-pixel MLP, one entry per 1x1 convolution layer; the receptive field stays 1x1 regardless of depth; default [1024, 1024, 1024, 1024]",
+        "features": "Hidden layer widths of the per-pixel MLP, one entry per 1x1 convolution layer; the receptive field stays 1x1 regardless of depth; default [3200, 3200, 3200, 3200] (~30.8M, capacity-matched to the encode-decode backbones)",
         "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
         "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
@@ -916,7 +916,7 @@
     "architectures/backbone::LocalCNNConfig": {
       "summary": "Shallow full-resolution CNN control baseline: a stack of 3x3 ConvBlocks with no downsampling, providing local-context-only inversion between the pixel-wise MLP (no context) and the encode-decode backbones (global context)",
       "fields": {
-        "features": "Channel widths of the full-resolution trunk, one entry per ConvBlock (two 3x3 convolutions each); receptive field grows by 4 pixels per block (4L+1 total); default [256, 256, 256] = 13x13",
+        "features": "Channel widths of the full-resolution trunk, one entry per ConvBlock (two 3x3 convolutions each); receptive field grows by 4 pixels per block (4L+1 total); default [832, 832, 832] = 13x13 (~31.2M, capacity-matched to the encode-decode backbones)",
         "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
         "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
