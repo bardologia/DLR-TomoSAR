@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tests.models_baseline.test_state_dict_baseline import BASELINE_PATH, MODEL_FAMILIES, StateDictSignature
+from tests.models_baseline.test_state_dict_baseline import BASELINE_PATH, MODEL_FAMILIES, StateDictSignature, _build_case
 from tools.monitoring.logger import Logger
 
 
@@ -20,13 +20,13 @@ class BaselineGenerator:
     def run(self) -> None:
         baseline = {}
 
-        for family, (registry, factory) in MODEL_FAMILIES.items():
+        for family, (cases, factory) in MODEL_FAMILIES.items():
             baseline[family] = {}
 
-            for name in sorted(registry):
-                model, _config          = factory(name)
-                baseline[family][name]  = StateDictSignature.compute(model)
-                self.logger.info(f"{family}/{name}: {baseline[family][name]['num_keys']} keys, {baseline[family][name]['num_parameters']} parameters")
+            for key in sorted(cases):
+                model, _config        = _build_case(factory, cases[key])
+                baseline[family][key] = StateDictSignature.compute(model)
+                self.logger.info(f"{family}/{key}: {baseline[family][key]['num_keys']} keys, {baseline[family][key]['num_parameters']} parameters")
 
         BASELINE_PATH.write_text(json.dumps(baseline, indent=2) + "\n")
         self.logger.info(f"Baseline written to {BASELINE_PATH}")
