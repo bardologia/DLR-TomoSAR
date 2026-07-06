@@ -10,8 +10,8 @@ from models.blocks import (
     Decoder,
     DropPath,
     Encoder,
-    GaussianHeadsMixin,
     MultiHeadSelfAttention,
+    OutputHeadsMixin,
     PatchEmbedding,
     PixelMLP,
     ResidualConvBlock,
@@ -230,12 +230,13 @@ def test_block_backward_finite_grads():
     assert _finite(x.grad)
 
 
-class _GaussianModule(GaussianHeadsMixin):
-    def __init__(self):
+class _GaussianModule(OutputHeadsMixin):
+    def __init__(self, head: str = "conv"):
         class _Cfg:
             params_per_gaussian = 3
             out_channels        = 9
             activation          = "relu"
+        _Cfg.head                = head
         self.config              = _Cfg()
         self.embedding_channels  = 8
         self.hidden_channels     = 16
@@ -256,3 +257,21 @@ def test_gaussian_heads_per_gaussian():
     out = module._per_gaussian_forward(torch.randn(2, 8, 5, 5))
     assert out.shape == (2, 9, 5, 5)
     assert _finite(out)
+
+
+@pytest.mark.parametrize("head", ["conv", "multihead", "per_gaussian", "set_pred"])
+def test_output_head_dispatch(head):
+    module = _GaussianModule(head=head)
+    module._build_output_head()
+
+    out = module._head_forward(torch.randn(2, 8, 5, 5))
+
+    assert out.shape == (2, 9, 5, 5)
+    assert _finite(out)
+    assert len(module.head_parameters()) > 0
+
+
+def test_output_head_unknown_head_raises():
+    module = _GaussianModule(head="dense")
+    with pytest.raises(ValueError):
+        module._build_output_head()

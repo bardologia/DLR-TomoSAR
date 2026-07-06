@@ -4,48 +4,43 @@ import numpy as np
 import pytest
 import torch
 
-from models.backbone import BACKBONE_MODEL_REGISTRY, BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models.backbone import BACKBONE_MODEL_REGISTRY, BACKBONE_CONFIG_REGISTRY, BACKBONE_HEADS, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 
 
 DEVICE = torch.device("cpu")
 WINDOW = 64
 BATCH  = 2
 
-ALL_NAMES = sorted(BACKBONE_MODEL_REGISTRY.keys())
+ALL_NAMES      = sorted(BACKBONE_MODEL_REGISTRY.keys())
+GAUSSIAN_HEADS = [head for head in BACKBONE_HEADS if head != "conv"]
 
 SMALL_OVERRIDES = {
-    "unet"                : {"features": [8, 16], "bottleneck_factor": 1},
-    "unet_multihead"      : {"features": [8, 16], "bottleneck_factor": 1},
-    "unet_pergaussian"    : {"features": [8, 16], "bottleneck_factor": 1},
-    "unet_setpred"        : {"features": [8, 16], "bottleneck_factor": 1},
-    "unet_skip"           : {"features": [8, 16], "bottleneck_factor": 1},
-    "resunet"             : {"features": [8, 16], "bottleneck_factor": 1},
-    "resunet_multihead"   : {"features": [8, 16], "bottleneck_factor": 1},
-    "resunet_pergaussian" : {"features": [8, 16], "bottleneck_factor": 1},
-    "resunet_setpred"     : {"features": [8, 16], "bottleneck_factor": 1},
-    "attention_unet"      : {"features": [8, 16], "bottleneck_factor": 1},
-    "unetplusplus"        : {"features": [8, 16, 32, 64], "bottleneck_factor": 1},
-    "linknet"             : {"features": [16, 32, 64, 128], "initial_kernel_size": 3},
-    "swin_unet"           : {"image_size": WINDOW, "embedding_dim": 24, "depths": [2, 2, 2, 2], "num_heads": [1, 2, 4, 8], "window_size": 4},
-    "transunet"           : {"image_size": WINDOW, "cnn_features": [8, 16, 32, 64], "transformer_layers": 2, "transformer_heads": 2},
-    "unetr"               : {"image_size": WINDOW, "embedding_dim": 64, "transformer_layers": 4, "transformer_heads": 4, "decoder_features": [32, 16, 8, 8]},
-    "deeplabv3plus"       : {"features": [16, 32, 64, 128]},
-    "segformer"           : {"embedding_dims": [16, 32, 64, 128], "depths": [1, 1, 1, 1], "decoder_channels": 64},
-    "convnext_unet"       : {"features": [16, 32, 64, 128], "blocks_per_stage": 1, "bottleneck_factor": 1},
-    "dense_unet"          : {"growth_rate": 8, "block_layers": [2, 2, 2], "bottleneck_layers": 2},
-    "hrnet"               : {"base_channels": 16, "n_branches": 3, "blocks_per_stage": 1},
-    "multires_unet"       : {"features": [16, 32, 64, 128], "bottleneck_factor": 1},
-    "fpn"                 : {"features": [16, 32, 64, 128], "pyramid_channels": 32, "segmentation_convs": 1},
-    "u2net"               : {"features": [16, 32, 64, 128], "rsu_heights": (4, 3, 2)},
-    "pixel_mlp"           : {"features": [32, 32]},
-    "local_cnn"           : {"features": [8, 16]},
-    "nafnet"              : {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]},
+    "unet"           : {"features": [8, 16], "bottleneck_factor": 1},
+    "unet_skip"      : {"features": [8, 16], "bottleneck_factor": 1},
+    "resunet"        : {"features": [8, 16], "bottleneck_factor": 1},
+    "attention_unet" : {"features": [8, 16], "bottleneck_factor": 1},
+    "unetplusplus"   : {"features": [8, 16, 32, 64], "bottleneck_factor": 1},
+    "linknet"        : {"features": [16, 32, 64, 128], "initial_kernel_size": 3},
+    "swin_unet"      : {"image_size": WINDOW, "embedding_dim": 24, "depths": [2, 2, 2, 2], "num_heads": [1, 2, 4, 8], "window_size": 4},
+    "transunet"      : {"image_size": WINDOW, "cnn_features": [8, 16, 32, 64], "transformer_layers": 2, "transformer_heads": 2},
+    "unetr"          : {"image_size": WINDOW, "embedding_dim": 64, "transformer_layers": 4, "transformer_heads": 4, "decoder_features": [32, 16, 8, 8]},
+    "deeplabv3plus"  : {"features": [16, 32, 64, 128]},
+    "segformer"      : {"embedding_dims": [16, 32, 64, 128], "depths": [1, 1, 1, 1], "decoder_channels": 64},
+    "convnext_unet"  : {"features": [16, 32, 64, 128], "blocks_per_stage": 1, "bottleneck_factor": 1},
+    "dense_unet"     : {"growth_rate": 8, "block_layers": [2, 2, 2], "bottleneck_layers": 2},
+    "hrnet"          : {"base_channels": 16, "n_branches": 3, "blocks_per_stage": 1},
+    "multires_unet"  : {"features": [16, 32, 64, 128], "bottleneck_factor": 1},
+    "fpn"            : {"features": [16, 32, 64, 128], "pyramid_channels": 32, "segmentation_convs": 1},
+    "u2net"          : {"features": [16, 32, 64, 128], "rsu_heights": (4, 3, 2)},
+    "pixel_mlp"      : {"features": [32, 32]},
+    "local_cnn"      : {"features": [8, 16]},
+    "nafnet"         : {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]},
 }
 
 
-def _build(name):
+def _build(name, head: str = "conv"):
     overrides = dict(SMALL_OVERRIDES.get(name, {}))
-    model, config = get_backbone(name, **overrides)
+    model, config = get_backbone(name, head=head, **overrides)
     model = model.to(DEVICE).eval()
     return model, config
 
@@ -142,3 +137,33 @@ def test_registry_covers_all_models():
     assert set(BACKBONE_MODEL_REGISTRY.keys()) == set(BACKBONE_CONFIG_REGISTRY.keys())
     assert len(ALL_NAMES) > 0
     assert BACKBONE_IMAGE_SIZE_MODELS.issubset(set(ALL_NAMES))
+
+
+@pytest.mark.parametrize("head", GAUSSIAN_HEADS)
+@pytest.mark.parametrize("name", ALL_NAMES)
+def test_gaussian_head_forward_shape(name, head, make_input):
+    model, config = _build(name, head=head)
+    x             = make_input(config)
+
+    with torch.no_grad():
+        y = model(x)
+
+    assert y.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
+    assert torch.isfinite(y).all()
+
+
+@pytest.mark.parametrize("head", BACKBONE_HEADS)
+@pytest.mark.parametrize("name", ALL_NAMES)
+def test_param_groups_cover_every_parameter(name, head):
+    model, config = _build(name, head=head)
+
+    grouped = sum(len(group["params"]) for group in config.get_param_groups(model))
+    total   = sum(1 for _ in model.parameters())
+
+    assert grouped == total
+
+
+@pytest.mark.parametrize("name", ALL_NAMES)
+def test_unknown_head_raises(name):
+    with pytest.raises(ValueError):
+        _build(name, head="dense")

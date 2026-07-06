@@ -9,8 +9,6 @@ from configuration import architectures as arch
 
 BACKBONE_CONFIGS = [
     arch.UNetConfig,
-    arch.UNetMultiHeadConfig,
-    arch.UNetPerGaussianConfig,
     arch.ResUNetConfig,
     arch.UNetSkipConfig,
     arch.AttentionUNetConfig,
@@ -19,8 +17,6 @@ BACKBONE_CONFIGS = [
     arch.SwinUNetConfig,
     arch.TransUNetConfig,
     arch.UNETRConfig,
-    arch.ResUNetMultiHeadConfig,
-    arch.ResUNetPerGaussianConfig,
     arch.DeepLabV3PlusConfig,
     arch.SegFormerLiteConfig,
     arch.ConvNeXtUNetConfig,
@@ -68,6 +64,7 @@ def test_backbone_default_channels_are_positive(config_cls):
     assert instance.in_channels  > 0
     assert instance.out_channels > 0
     assert instance.params_per_gaussian == 3
+    assert instance.head == "conv"
 
 
 @pytest.mark.parametrize("config_cls", BACKBONE_CONFIGS, ids=[c.__name__ for c in BACKBONE_CONFIGS])

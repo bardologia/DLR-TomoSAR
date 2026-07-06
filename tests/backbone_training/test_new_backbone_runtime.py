@@ -13,11 +13,11 @@ from tools.monitoring.logger import Logger
 
 
 NEW_BACKBONES = {
-    "pixel_mlp"       : {"features": [16, 16]},
-    "local_cnn"       : {"features": [8, 8], "dropout": 0.0},
-    "nafnet"          : {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1], "dropout": 0.0},
-    "unet_setpred"    : {"features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0, "normalization": "instance"},
-    "resunet_setpred" : {"features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0, "normalization": "instance"},
+    "pixel_mlp"        : ("pixel_mlp", {"features": [16, 16]}),
+    "local_cnn"        : ("local_cnn", {"features": [8, 8], "dropout": 0.0}),
+    "nafnet"           : ("nafnet",    {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1], "dropout": 0.0}),
+    "unet-set_pred"    : ("unet",      {"head": "set_pred", "features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0, "normalization": "instance"}),
+    "resunet-set_pred" : ("resunet",   {"head": "set_pred", "features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0, "normalization": "instance"}),
 }
 
 
@@ -39,7 +39,8 @@ def _loader(n: int = 6, hw: int = 16) -> DataLoader:
 
 
 def _build_trainer(tmp_path, name: str, reserve_vram: bool = False) -> Trainer:
-    model, model_cfg = get_backbone(name, in_channels=2, out_channels=6, **NEW_BACKBONES[name])
+    backbone_name, overrides = NEW_BACKBONES[name]
+    model, model_cfg = get_backbone(backbone_name, in_channels=2, out_channels=6, **overrides)
 
     config = tiny_trainer_config(n_gaussians=2, epochs=1)
     config.training.use_ema      = True

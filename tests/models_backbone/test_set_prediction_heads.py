@@ -9,9 +9,9 @@ from models.backbone import get_backbone
 WINDOW = 32
 BATCH  = 2
 
-SETPRED_NAMES = ["unet_setpred", "resunet_setpred"]
+SETPRED_NAMES = ["unet", "resunet"]
 
-OVERRIDES = {"features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0}
+OVERRIDES = {"head": "set_pred", "features": [8, 16], "bottleneck_factor": 1, "dropout": 0.0}
 
 
 def _build(name):

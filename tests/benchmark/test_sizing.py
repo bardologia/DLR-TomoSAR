@@ -30,6 +30,23 @@ def test_width_scaler_registers_a_rule_for_every_model(scaler):
         assert rules
 
 
+def test_width_scaler_rules_match_the_backbone_registry(scaler):
+    from models import BACKBONE_MODEL_REGISTRY
+
+    assert set(scaler.rules) == set(BACKBONE_MODEL_REGISTRY)
+
+
+def test_width_scaler_resolves_rules_for_head_keys(scaler):
+    assert scaler.rules_for("resunet-set_pred") == scaler.rules["resunet"]
+
+
+def test_width_scaler_scaled_config_carries_the_head(scaler):
+    config = scaler.scaled_config("unet-multihead", 0.5)
+
+    assert config.head     == "multihead"
+    assert config.features == [32, 64, 128, 256]
+
+
 def test_width_scaler_rejects_rule_on_locked_parameter():
     with pytest.raises(ValueError):
         WidthScaler(locked=("features",))

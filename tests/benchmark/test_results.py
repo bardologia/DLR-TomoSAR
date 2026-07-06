@@ -154,10 +154,11 @@ def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
 
 
 def test_model_of_strips_both_loss_component_and_seed():
-    assert TrialCollector._model_of("unet__covariance_match_seed3") == "unet"
-    assert TrialCollector._model_of("resunet_multihead__mse_curve") == "resunet_multihead"
-    assert TrialCollector._model_of("unet_seed2")                   == "unet"
-    assert TrialCollector._model_of("unet")                         == "unet"
+    assert TrialCollector._model_of("unet__covariance_match_seed3")  == "unet"
+    assert TrialCollector._model_of("resunet-multihead__mse_curve")  == "resunet-multihead"
+    assert TrialCollector._model_of("unet-set_pred__param_l1_seed0") == "unet-set_pred"
+    assert TrialCollector._model_of("unet_seed2")                    == "unet"
+    assert TrialCollector._model_of("unet")                          == "unet"
 
 
 def test_size_match_attaches_to_every_component(tmp_path, logger_stub):
