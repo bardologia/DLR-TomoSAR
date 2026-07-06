@@ -101,7 +101,7 @@ class WeightXrayBatch:
         self.logger       = logger
 
     def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.entry_config.runs_dir, self.entry_config.checkpoint_filename, self.logger)
+        selector = RunSelector(self.entry_config.runs_dir, self.entry_config.checkpoint_filename, self.logger, action="x-ray")
 
         if self.entry_config.run_filter:
             return selector.filter(self.entry_config.run_filter)

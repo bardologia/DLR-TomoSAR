@@ -4,27 +4,28 @@ from pathlib import Path
 
 
 class RunSelector:
-    def __init__(self, runs_dir: Path, checkpoint_filename: str, logger) -> None:
-        self.runs_dir            = Path(runs_dir)
-        self.checkpoint_filename = checkpoint_filename
-        self.logger              = logger
+    def __init__(self, runs_dir: Path, marker: str, logger, action: str = "process") -> None:
+        self.runs_dir = Path(runs_dir)
+        self.marker   = marker
+        self.logger   = logger
+        self.action   = action
 
     def _discover(self) -> list[Path]:
         if not self.runs_dir.is_dir():
             raise FileNotFoundError(f"Runs directory does not exist: {self.runs_dir}")
 
-        checkpoints = self.runs_dir.rglob(self.checkpoint_filename)
+        checkpoints = self.runs_dir.rglob(self.marker)
         run_dirs    = sorted({path.parent for path in checkpoints if path.is_file()})
 
         if not run_dirs:
-            raise FileNotFoundError(f"No '{self.checkpoint_filename}' found in any directory under {self.runs_dir}")
+            raise FileNotFoundError(f"No '{self.marker}' found in any directory under {self.runs_dir}")
 
         return run_dirs
 
     def _present(self, run_dirs: list[Path]) -> None:
         rows = []
         for index, run_dir in enumerate(run_dirs, start=1):
-            checkpoint = run_dir / self.checkpoint_filename
+            checkpoint = run_dir / self.marker
             size_mb    = checkpoint.stat().st_size / (1024 * 1024)
             rows.append({
                 "#"          : index,
@@ -35,7 +36,7 @@ class RunSelector:
         self.logger.metrics_table(rows, columns=["#", "Run", "Checkpoint"], title=f"Runs under {self.runs_dir}")
 
     def _prompt(self, run_dirs: list[Path]) -> list[Path]:
-        raw       = input(f"Select run(s) to x-ray [1-{len(run_dirs)}, comma-separated, or 'all']: ").strip()
+        raw       = input(f"Select run(s) to {self.action} [1-{len(run_dirs)}, comma-separated, or 'all']: ").strip()
         selection = self._parse(raw, run_dirs)
 
         self.logger.ok(f"Selected {len(selection)} run(s): {', '.join(run_dir.name for run_dir in selection)}")
@@ -69,7 +70,7 @@ class RunSelector:
         for name in names:
             run_dir = by_key.get(name)
             if run_dir is None:
-                raise FileNotFoundError(f"No run '{name}' with '{self.checkpoint_filename}' under {self.runs_dir}")
+                raise FileNotFoundError(f"No run '{name}' with '{self.marker}' under {self.runs_dir}")
             selection.append(run_dir)
 
         ordered = list(dict.fromkeys(selection))
@@ -91,3 +92,35 @@ class RunSelector:
         self._present(run_dirs)
         self.logger.ok(f"Selected all {len(run_dirs)} run(s)")
         return run_dirs
+
+
+class TensorboardRunSelector(RunSelector):
+    EVENT_PATTERN = "events.out.tfevents.*"
+
+    def __init__(self, runs_dir: Path, tensorboard_dirname: str, logger) -> None:
+        super().__init__(runs_dir, tensorboard_dirname, logger, action="export")
+
+    def _discover(self) -> list[Path]:
+        if not self.runs_dir.is_dir():
+            raise FileNotFoundError(f"Runs directory does not exist: {self.runs_dir}")
+
+        events   = self.runs_dir.rglob(f"{self.marker}/{self.EVENT_PATTERN}")
+        run_dirs = sorted({path.parent.parent for path in events if path.is_file()})
+
+        if not run_dirs:
+            raise FileNotFoundError(f"No '{self.marker}' directory with event files found under {self.runs_dir}")
+
+        return run_dirs
+
+    def _present(self, run_dirs: list[Path]) -> None:
+        rows = []
+        for index, run_dir in enumerate(run_dirs, start=1):
+            events  = [path for path in (run_dir / self.marker).glob(self.EVENT_PATTERN) if path.is_file()]
+            size_mb = sum(path.stat().st_size for path in events) / (1024 * 1024)
+            rows.append({
+                "#"      : index,
+                "Run"    : str(run_dir.relative_to(self.runs_dir)),
+                "Events" : f"{len(events)} file(s), {size_mb:,.1f} MB",
+            })
+
+        self.logger.metrics_table(rows, columns=["#", "Run", "Events"], title=f"Runs under {self.runs_dir}")
