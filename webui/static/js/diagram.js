@@ -34,14 +34,19 @@ class ModelDiagram {
     unet_skip:           { skipKind: "resmaxpool", type: "unet" },
     resunet_multihead:   { skipKind: "residual", type: "unet" },
     resunet_pergaussian: { skipKind: "residual", type: "unet" },
+    unet_setpred:        { skipKind: "concat",   type: "unet", gated: true },
+    resunet_setpred:     { skipKind: "residual", type: "unet", gated: true },
     convnext_unet:       { skipKind: "convnext", type: "unet" },
     dense_unet:          { skipKind: "dense",    type: "unet" },
     multires_unet:       { skipKind: "respath",  type: "unet" },
     u2net:               { skipKind: "rsu",      type: "unet" },
+    nafnet:              { skipKind: "nafnet",   type: "unet" },
     segformer:           { skipKind: "pyramid",  type: "segformer" },
     deeplabv3plus:       { skipKind: "lowlevel", type: "deeplab" },
     hrnet:               { skipKind: "branch",   type: "hrnet" },
     fpn:                 { skipKind: "lateral",  type: "fpn" },
+    pixel_mlp:           { skipKind: "none",     type: "stack" },
+    local_cnn:           { skipKind: "none",     type: "stack" },
   };
 
   static spec(model) {
@@ -60,13 +65,14 @@ class ModelDiagram {
     let type = isT ? "transformer" : "unet";
 
     const over = this.KEYSPEC[model.key];
-    if (over) { skipKind = over.skipKind; type = over.type; }
+    let gated = false;
+    if (over) { skipKind = over.skipKind; type = over.type; gated = !!over.gated; }
 
-    const actMap = { relu: "ReLU", leaky_relu: "LeakyReLU", gelu: "GELU", silu: "SiLU" };
+    const actMap = { relu: "ReLU", leaky_relu: "LeakyReLU", gelu: "GELU", silu: "SiLU", simplegate: "SimpleGate" };
     const normMap = { batch: "BatchNorm", instance: "InstanceNorm", group: "GroupNorm", layer: "LayerNorm", none: null };
     const act = (model.activation || "relu").toLowerCase();
     const norm = (model.normalization || "batch").toLowerCase();
-    return { skipKind, heads, type, key: model.key, act: actMap[act] || "ReLU", norm: normMap[norm] !== undefined ? normMap[norm] : "BatchNorm" };
+    return { skipKind, heads, type, gated, key: model.key, act: actMap[act] || "ReLU", norm: normMap[norm] !== undefined ? normMap[norm] : "BatchNorm" };
   }
 
   /* ---------- primitives ---------- */
@@ -656,6 +662,25 @@ class ModelDiagram {
 
   static _headBlock(s) {
     const o = this._o;
+    if (s.gated) {
+      return {
+        id: "head", title: "Set-prediction heads",
+        caption: "per-slot PixelMLPs plus an existence-logit head; the sigmoid gate blends each slot's amplitude toward a learned off level",
+        ops: [
+          o.io("decoder features", "d1 : F1 x P x P"),
+          o.txt("PixelMLP x K", "amp, mu, sigma per slot"),
+          o.txt("Existence head", "PixelMLP -> K logits"),
+          o.txt("Sigmoid", "gate g in [0,1]"),
+          o.mul(),
+          o.txt("Amp blend", "g*amp + (1-g)*off_k"),
+          o.io("params", "3K x P x P"),
+        ],
+        shortcuts: [{ from: 1, to: 4, label: "amp" }],
+      };
+    }
+    if (s.key === "nafnet") {
+      return { id: "head", title: "Output head", caption: "3x3 conv to params", ops: [o.txt("Conv 3x3", "w -> 3K"), o.io("params", "3K x P x P")] };
+    }
     if (s.heads === 3 || s.heads === "K") {
       const labs = s.heads === 3
         ? [{ t: "PixelMLP", sub: "amp", out: "a" }, { t: "PixelMLP", sub: "mean", out: "mu" }, { t: "PixelMLP", sub: "spread", out: "sig" }]
@@ -739,6 +764,33 @@ class ModelDiagram {
       return [enc, bridge, rsu, rsud, dec, head1];
     }
 
+    if (s.skipKind === "nafnet") {
+      const nafblk = {
+        id: "nafblk", title: "NAFBlock",
+        caption: "two zero-initialised residual branches; SimpleGate is the only nonlinearity",
+        ops: [
+          o.txt("LayerNorm"),
+          o.txt("Conv 1x1", "C -> 2C"),
+          o.txt("DWConv 3x3", "per-channel"),
+          o.txt("SimpleGate", "split-half multiply"),
+          o.txt("SCA", "pool + 1x1, scale"),
+          o.txt("Conv 1x1", "-> C"),
+          o.sum(),
+          o.txt("LayerNorm"),
+          o.txt("Conv 1x1", "C -> 2C"),
+          o.txt("SimpleGate"),
+          o.txt("Conv 1x1", "-> C"),
+          o.sum(),
+          o.io("output"),
+        ],
+        shortcuts: [{ from: "top", to: 6, label: "beta res" }, { from: 6, to: 11, label: "gamma res" }],
+      };
+      const enc = { id: "enc", title: "Encoder stage", caption: "NAFBlocks, then stride-2 conv doubling channels", ops: [{ label: "NAFBlock", sub: "x N", block: "nafblk" }, o.txt("Conv 2x2 s2", "down, C -> 2C"), o.io("output", "2C x H/2")] };
+      const bridge = { id: "bridge", title: "Middle stack", caption: "deepest NAFBlocks at width x 16", ops: [{ label: "NAFBlock", sub: "x 12", block: "nafblk" }, o.io("output", "16w x H")] };
+      const dec = { id: "dec", title: "Decoder stage", caption: "1x1 conv + PixelShuffle up, add encoder skip, NAFBlocks", ops: [o.txt("Conv 1x1", "C -> 2C"), o.txt("PixelShuffle 2", "up, -> C/2"), o.sum(), { label: "NAFBlock", sub: "x N", block: "nafblk" }, o.io("output", "C/2 x 2H")], shortcuts: [{ from: "top", to: 2, label: "encoder skip" }] };
+      return [enc, bridge, nafblk, dec, head1];
+    }
+
     if (s.skipKind === "additive") {
       const enc = { id: "enc", title: "Encoder block", caption: "residual conv, then downsample", ops: [o.conv("Cin", "F"), ...na, o.conv("F", "F"), o.sum(), o.pool(), o.io("output", "F x H/2")], shortcuts: [{ from: "top", to: na.length + 2, label: "skip" }] };
       const bridge = { id: "bridge", title: "Bridge", caption: "bottleneck conv", ops: [o.conv("F", "2F"), ...na, o.conv("2F", "2F"), ...na, o.io("output", "2F x H")] };
@@ -770,10 +822,11 @@ class ModelDiagram {
     if (s.type === "deeplab") return this._bpDeepLab(s);
     if (s.type === "hrnet") return this._bpHRNet(s);
     if (s.type === "fpn") return this._bpFPN(s);
+    if (s.type === "stack") return this._bpStack(s);
 
     const cnnShapes = ["Cin x P x P", "F1 x P/2 x P/2", "F2 x P/4 x P/4", "F3 x P/8 x P/8", "F4 x P/16 x P/16", "Fb x P/16 x P/16", "F4 x P/8 x P/8", "F3 x P/4 x P/4", "F2 x P/2 x P/2", "F1 x P x P", "3K x P x P"];
     const txShapes = ["Cin x P x P", "D1 x N1", "D2 x N2", "D3 x N3", "D4 x N4", "Db x N4", "D4 x N3", "D3 x N2", "D2 x N1", "D1 x N1", "3K x P x P"];
-    const headSub = s.heads === 3 ? "3 x PixelMLP" : s.heads === "K" ? "K x PixelMLP" : "1x1 conv";
+    const headSub = s.gated ? "K x PixelMLP + gate" : s.heads === 3 ? "3 x PixelMLP" : s.heads === "K" ? "K x PixelMLP" : s.key === "nafnet" ? "3x3 conv" : "1x1 conv";
 
     const labels = {
       unet: { enc: "Encoder", dec: "Decoder", bott: "Bridge", skip: "concat" },
@@ -787,8 +840,11 @@ class ModelDiagram {
       unetr: { enc: "ViT encoder", dec: "Deconv decoder", bott: "ViT bridge", skip: "skip" },
       unet_multihead: { enc: "Encoder", dec: "Decoder", bott: "Bridge", skip: "concat" },
       unet_pergaussian: { enc: "Encoder", dec: "Decoder", bott: "Bridge", skip: "concat" },
+      unet_setpred: { enc: "Encoder", dec: "Decoder", bott: "Bridge", skip: "concat" },
       resunet_multihead: { enc: "Residual encoder", dec: "Residual decoder", bott: "Residual bridge", skip: "concat" },
       resunet_pergaussian: { enc: "Residual encoder", dec: "Residual decoder", bott: "Residual bridge", skip: "concat" },
+      resunet_setpred: { enc: "Residual encoder", dec: "Residual decoder", bott: "Residual bridge", skip: "concat" },
+      nafnet: { enc: "NAF stage", dec: "NAF stage", bott: "Middle stack", skip: "add", deco: "add" },
       convnext_unet: { enc: "ConvNeXt stage", dec: "ConvNeXt stage", bott: "Bottleneck", skip: "concat" },
       dense_unet: { enc: "Dense down", dec: "Dense up", bott: "Bottleneck", skip: "dense concat" },
       multires_unet: { enc: "MultiRes block", dec: "MultiRes block", bott: "MultiRes bridge", skip: "ResPath" },
@@ -1007,6 +1063,37 @@ class ModelDiagram {
     });
 
     return `<svg class="dgm dgm--net" viewBox="0 0 ${W} ${g.height}" preserveAspectRatio="xMidYMid meet" role="img">${this._defs()}${edges}${labels}${nodes}</svg>`;
+  }
+
+  static _bpStack(s) {
+    const o = this._o;
+    const na = this._na(s);
+    const isMlp = s.key === "pixel_mlp";
+    const W = 860, y = 130;
+
+    const trunkLabel = isMlp ? "MLP layer" : "ConvBlock";
+    const trunkSub1  = isMlp ? "F, RF stays 1x1" : "F, RF +4 px";
+    const nodes = [
+      { id: "in",  type: "grid", cx: 95,  cy: y, label: "input", sub: "Cin x P x P" },
+      { id: "t1",  cx: 250, cy: y, w: 150, label: trunkLabel, sub: trunkSub1, block: "trunk" },
+      { id: "t2",  cx: 420, cy: y, w: 150, label: trunkLabel, sub: isMlp ? "x L total" : "x B total", block: "trunk" },
+      { id: "hd",  cx: 590, cy: y, w: 140, label: "Output head", sub: "1x1 conv", block: "head" },
+      { id: "out", type: "grid", cx: 750, cy: y, out: true, label: "params", sub: "3K x P x P" },
+    ];
+    const edges = [
+      { from: "in", to: "t1", route: "H" },
+      { from: "t1", to: "t2", route: "H", label: "full res" },
+      { from: "t2", to: "hd", route: "H", label: "full res" },
+      { from: "hd", to: "out", route: "H" },
+    ];
+
+    const trunk = isMlp
+      ? { id: "trunk", title: "Pixel MLP layer", caption: "1x1 conv, norm, act; the receptive field stays a single pixel at any depth", ops: [o.txt("Conv 1x1", "C -> F"), ...na, o.txt("Dropout2d"), o.io("output", "F x P x P")] }
+      : { id: "trunk", title: "ConvBlock", caption: "double 3x3 conv at full resolution; the receptive field grows 4 px per block", ops: [o.conv("C", "F"), ...na, o.conv("F", "F"), ...na, o.io("output", "F x P x P")] };
+
+    const blocks = [trunk, this._headBlock(s)];
+    this._applyOrientation({ nodes, edges }, blocks);
+    return { network: this._netCustom({ nodes, edges, width: W, height: 240 }), blocks };
   }
 
   static _bpSegformer(s) {

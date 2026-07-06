@@ -3734,6 +3734,283 @@
       ]
     },
     {
+      "folder": "unrolled",
+      "title": "Unrolled Physics",
+      "blurb": "The isolated gamma_net family: LISTA-style unrolled inversion of the exact tomographic forward operator, trained on synthesised per-pixel coherence measurements. Shares only leaf utilities with the rest of the codebase so it can evolve independently.",
+      "diagrams": [
+        {
+          "key": "unrolled-training",
+          "stage": "Training",
+          "title": "Unrolled physics inversion training",
+          "entry": "main/training/train_unrolled.py",
+          "blurb": "Trains the gamma_net unrolled inversion network on per-pixel coherence measurements synthesised from the ground-truth Gaussian profiles through the exact kz steering operator. The pipeline reuses the backbone dataset stack with the geometry field forced on, and the trainer reuses the shared warmup, scheduler, EMA and VRAM-reservation runtime.",
+          "nodes": [
+            {
+              "id": "config",
+              "label": "UnrolledEntryConfig",
+              "module": "configuration/training/unrolled.py",
+              "role": "config",
+              "fn": "Slim entry dataclass: paths, UnrolledTrainingConfig (schedule, warmup, EMA, VRAM reservation), geometry, normalization, augmentation, curve loss and measurement-noise knobs.",
+              "col": 0,
+              "reads": [],
+              "writes": [],
+              "row": 0
+            },
+            {
+              "id": "entry",
+              "label": "train_unrolled.py",
+              "module": "main/training/train_unrolled.py",
+              "role": "entry",
+              "fn": "Pins the GPU environment, then defers to UnrolledTrainingLauncher with ConfigCli overrides.",
+              "col": 0,
+              "reads": [],
+              "writes": [],
+              "row": 1
+            },
+            {
+              "id": "factory",
+              "label": "ConfigFactory",
+              "module": "pipelines/shared/config/config_factory.py",
+              "role": "config",
+              "fn": "Duck-typed over the entry config: builds the DatasetConfig with split regions and patch tiling exactly as for backbone training.",
+              "col": 1,
+              "reads": [],
+              "writes": [],
+              "row": 0
+            },
+            {
+              "id": "pipeline",
+              "label": "UnrolledTrainingLauncher / UnrolledTrainingPipeline",
+              "module": "pipelines/unrolled/training/pipeline.py",
+              "role": "orchestrator",
+              "fn": "Resolves the entry config, creates the run directory, builds dataset, model and trainer, and persists the resolved config and model architecture.",
+              "col": 1,
+              "reads": [],
+              "writes": [],
+              "row": 1
+            },
+            {
+              "id": "model",
+              "label": "get_unrolled / GammaNet",
+              "module": "models/unrolled/gamma_net.py",
+              "role": "model",
+              "fn": "LISTA-style unroll: matched-filter init, then L iterations of Lipschitz-normalised gradient step, learned 1D prox along elevation, and nonnegative soft-threshold.",
+              "col": 2,
+              "reads": [],
+              "writes": [],
+              "row": 0
+            },
+            {
+              "id": "persist",
+              "label": "UnrolledModelConfigIO",
+              "module": "pipelines/shared/config/config_persistence.py",
+              "role": "io",
+              "fn": "Persists the GammaNetConfig to unrolled_model_config.json so a checkpoint reconstructs a structurally identical model.",
+              "col": 2,
+              "reads": [],
+              "writes": [],
+              "row": 1
+            },
+            {
+              "id": "dataset",
+              "label": "DatasetPipeline",
+              "module": "pipelines/backbone/dataset/pipeline.py",
+              "role": "external",
+              "fn": "The backbone dataset stack with build_geometry_field=True: patches carry (input, gt params, per-pixel kz) triples.",
+              "col": 2,
+              "reads": [],
+              "writes": [],
+              "row": 2
+            },
+            {
+              "id": "operator",
+              "label": "TomoOperator",
+              "module": "models/unrolled/gamma_net.py",
+              "role": "transform",
+              "fn": "Exact forward/adjoint pair built per batch from the kz map and elevation axis; reuses PhysicalLoss.synthesise_track for the forward map.",
+              "col": 3,
+              "reads": [],
+              "writes": [],
+              "row": 0
+            },
+            {
+              "id": "trainer",
+              "label": "UnrolledTrainer",
+              "module": "pipelines/unrolled/training/trainer.py",
+              "role": "orchestrator",
+              "fn": "Synthesises normalised coherence measurements from GT profiles, optimises the masked curve loss with AdamW, and validates, checkpoints and tests under the EMA weights when enabled.",
+              "col": 3,
+              "reads": [],
+              "writes": [],
+              "row": 1
+            },
+            {
+              "id": "curves",
+              "label": "GaussianCurve",
+              "module": "tools/data/gaussians.py",
+              "role": "transform",
+              "fn": "Renders the denormalised GT Gaussian parameters to power-normalised profiles on the elevation grid; these are both the measurement source and the regression target.",
+              "col": 3,
+              "reads": [],
+              "writes": [],
+              "row": 2
+            },
+            {
+              "id": "runtime",
+              "label": "Warmup / Scheduler / WeightEma / VramReservation",
+              "module": "tools/training/scheduling.py",
+              "role": "transform",
+              "fn": "Shared runtime components: linear LR warmup into cosine annealing, per-step EMA shadow updates, and the pre-training VRAM parking guard.",
+              "col": 4,
+              "reads": [],
+              "writes": [],
+              "row": 1
+            }
+          ],
+          "edges": [
+            {
+              "from": "config",
+              "to": "pipeline",
+              "label": "resolved entry config",
+              "kind": "data"
+            },
+            {
+              "from": "entry",
+              "to": "pipeline",
+              "label": "ConfigCli overrides",
+              "kind": "control"
+            },
+            {
+              "from": "pipeline",
+              "to": "factory",
+              "label": "training_dataset_config()",
+              "kind": "control"
+            },
+            {
+              "from": "factory",
+              "to": "dataset",
+              "label": "DatasetConfig + splits",
+              "kind": "data"
+            },
+            {
+              "from": "pipeline",
+              "to": "dataset",
+              "label": "build_geometry_field=True",
+              "kind": "control"
+            },
+            {
+              "from": "pipeline",
+              "to": "model",
+              "label": "get_unrolled(model_name)",
+              "kind": "control"
+            },
+            {
+              "from": "pipeline",
+              "to": "persist",
+              "label": "GammaNetConfig",
+              "kind": "io"
+            },
+            {
+              "from": "pipeline",
+              "to": "trainer",
+              "label": "loaders + x_axis + normalizer",
+              "kind": "control"
+            },
+            {
+              "from": "dataset",
+              "to": "trainer",
+              "label": "(input, gt, kz) batches",
+              "kind": "data"
+            },
+            {
+              "from": "trainer",
+              "to": "curves",
+              "label": "denormalised GT params",
+              "kind": "control"
+            },
+            {
+              "from": "curves",
+              "to": "operator",
+              "label": "normalised profiles s",
+              "kind": "data"
+            },
+            {
+              "from": "operator",
+              "to": "trainer",
+              "label": "coherence y = A s (+ noise)",
+              "kind": "data"
+            },
+            {
+              "from": "trainer",
+              "to": "model",
+              "label": "y, kz map, x axis",
+              "kind": "data"
+            },
+            {
+              "from": "model",
+              "to": "operator",
+              "label": "forward/adjoint per iteration",
+              "kind": "control"
+            },
+            {
+              "from": "trainer",
+              "to": "runtime",
+              "label": "warmup step, EMA update, VRAM fill/refill",
+              "kind": "control"
+            }
+          ],
+          "artifacts": [
+            {
+              "name": "best.pt",
+              "producer": "UnrolledTrainer",
+              "consumers": [
+                "UnrolledTrainer"
+              ],
+              "fmt": "PyTorch state dict",
+              "desc": "Best-validation weights (the EMA shadow when use_ema is on); reloaded before the final test pass.",
+              "scope": "within"
+            },
+            {
+              "name": "last.pt",
+              "producer": "UnrolledTrainer",
+              "consumers": [],
+              "fmt": "PyTorch state dict",
+              "desc": "Final-epoch weights saved after training completes.",
+              "scope": "within"
+            },
+            {
+              "name": "training_summary.json",
+              "producer": "UnrolledTrainer",
+              "consumers": [],
+              "fmt": "JSON",
+              "desc": "Per-epoch train/val loss and peak-MAE history plus final test metrics.",
+              "scope": "within"
+            },
+            {
+              "name": "unrolled_model_config.json",
+              "producer": "UnrolledModelConfigIO",
+              "consumers": [
+                "UnrolledModelConfigIO"
+              ],
+              "fmt": "JSON",
+              "desc": "Persisted GammaNetConfig for faithful checkpoint reconstruction.",
+              "scope": "within"
+            },
+            {
+              "name": "docs/resolved_entry_config.json",
+              "producer": "UnrolledTrainingPipeline",
+              "consumers": [],
+              "fmt": "JSON",
+              "desc": "The fully resolved entry configuration the run was launched with.",
+              "scope": "within"
+            }
+          ],
+          "ncol": 5,
+          "nrow": 3
+        }
+      ]
+    },
+    {
       "folder": "shared",
       "title": "Shared Foundation",
       "blurb": "The shared foundation layer every per-model TomoSAR pipeline plugs into: config construction and persistence, dataset and loader scaffolding, model instantiation, seed-sweep training with an overfit gate, typed inference dispatch, and reusable sweep and session orchestrators.",

@@ -55,6 +55,13 @@ class PipelineLibrary:
                 "stages" : ["Couple pretrained AE", "Predict embedding", "Target embedding", "Embedding + recon loss", "Optimise & diagnostics"],
             },
             {
+                "key"    : "unrolled_train",
+                "name"   : "Unrolled Physics (Train)",
+                "script" : "train_unrolled",
+                "blurb"  : "Train the gamma_net unrolled inversion: synthesise per-pixel coherence measurements from the GT Gaussian profiles through the exact kz steering operator, then learn the proximal-gradient iterations (steps, thresholds, 1D prox) that invert them back to elevation profiles.",
+                "stages" : ["Render GT profiles", "Synthesise coherence", "Unrolled inversion", "Masked curve loss", "Optimise & checkpoint"],
+            },
+            {
                 "key"    : "inference",
                 "name"   : "Inference",
                 "script" : "infer_backbone",

@@ -1627,6 +1627,59 @@ class EquationLibrary:
             ],
         }
 
+    def _learned_inversion(self) -> dict:
+        return {
+            "group" : "Learned Inversion",
+            "blurb" : "The unrolled physics network (gamma_net) that inverts the forward model directly, and the gated set-prediction head that makes slot existence explicit.",
+            "items" : [
+                {
+                    "title" : "Matched-filter initialisation",
+                    "tex"   : r"\mathbf{s}^{0} = \max\!\Big(0,\ \tfrac{1}{T}\,\mathrm{Re}\!\left[\mathbf{A}^{\!H}\mathbf{y}\right]\Big)",
+                    "note"  : "The unrolled network starts from the beamforming solution: the adjoint of the per-pixel steering operator applied to the coherence measurements, averaged over tracks and clipped to nonnegative reflectivity (GammaNet.forward, TomoOperator.adjoint).",
+                    "vars"  : [
+                        {"sym": r"\mathbf{s}^{0}",   "desc": "initial reflectivity profile on the elevation grid (length N)"},
+                        {"sym": r"\mathbf{y}",       "desc": "complex coherence measurements over the T tracks (per pixel)"},
+                        {"sym": r"\mathbf{A}",       "desc": "per-pixel steering operator, A_tn = exp(j kz_t z_n) dz, built from the geometry-field kz map"},
+                        {"sym": r"T",                "desc": "number of tracks"},
+                    ],
+                },
+                {
+                    "title" : "Unrolled proximal-gradient iteration",
+                    "tex"   : r"\mathbf{r}^{l} = \mathbf{s}^{l} + \alpha_l\,\frac{\mathrm{Re}\!\left[\mathbf{A}^{\!H}(\mathbf{y} - \mathbf{A}\mathbf{s}^{l})\right]}{L_{\mathrm{lip}}}, \qquad \mathbf{s}^{l+1} = \max\!\big(0,\ \mathcal{P}_l(\mathbf{r}^{l}) - \theta_l\big)",
+                    "note"  : "One layer of gamma_net: a gradient step on the data-fidelity term with a learned step size, a learned per-pixel 1D convolutional prox along the elevation axis, and a nonnegative soft-threshold with a learned threshold. Steps and thresholds are softplus-reparameterised so they stay positive; each of the L layers has its own alpha_l, theta_l and prox (GammaNet.forward, ProfileProx).",
+                    "vars"  : [
+                        {"sym": r"\mathbf{s}^{l}",     "desc": "profile estimate after layer l"},
+                        {"sym": r"\alpha_l",           "desc": "learned step size of layer l (softplus of a raw parameter)"},
+                        {"sym": r"\theta_l",           "desc": "learned soft-threshold of layer l"},
+                        {"sym": r"\mathcal{P}_l",      "desc": "learned prox of layer l: residual Conv1d -> act -> Conv1d along elevation"},
+                        {"sym": r"L_{\mathrm{lip}}",   "desc": "Lipschitz normaliser of the gradient (next card)"},
+                    ],
+                },
+                {
+                    "title" : "Lipschitz-normalised gradient step",
+                    "tex"   : r"L_{\mathrm{lip}} = T\,N\,\mathrm{d}z^{2}",
+                    "note"  : "Bound on the spectral norm of A^H A used to normalise the gradient so step_init = 1.0 is stable for any track count, grid length or grid spacing. Without this normalisation the iteration diverges: the raw operator norm is of order T*N*dz^2 (about 230 for the default layout), far beyond a unit step.",
+                    "vars"  : [
+                        {"sym": r"T",              "desc": "number of tracks"},
+                        {"sym": r"N",              "desc": "number of elevation grid points"},
+                        {"sym": r"\mathrm{d}z",    "desc": "elevation grid spacing (m)"},
+                    ],
+                },
+                {
+                    "title" : "Set-prediction amplitude gate",
+                    "tex"   : r"g_k = \sigma(\ell_k), \qquad \hat{a}_k = g_k\,a_k + (1 - g_k)\,o_k",
+                    "note"  : "The gated set-prediction heads (unet_setpred, resunet_setpred): an existence-logit PixelMLP emits one logit per Gaussian slot, and its sigmoid blends the regressed amplitude toward a learned per-slot off level. The off level lives in normalised output space because normalised zero is not physical zero; training drives o_k toward the normalised encoding of physical amplitude zero. Pairs with hungarian param matching; mu and sigma pass through ungated (GaussianHeadsMixin._set_prediction_forward).",
+                    "vars"  : [
+                        {"sym": r"\ell_k",     "desc": "existence logit of slot k (per pixel)"},
+                        {"sym": r"g_k",        "desc": "sigmoid existence gate in [0, 1]"},
+                        {"sym": r"a_k",        "desc": "raw regressed amplitude of slot k (normalised space)"},
+                        {"sym": r"o_k",        "desc": "learned scalar off level of slot k, initialised at 0"},
+                        {"sym": r"\hat{a}_k",  "desc": "gated amplitude emitted in the 3K-channel output"},
+                    ],
+                },
+            ],
+        }
+
     def collect(self) -> list[dict]:
         return [
             self._signal_model(),
@@ -1635,6 +1688,7 @@ class EquationLibrary:
             self._dataset(),
             self._training_loss(),
             self._training_optim(),
+            self._learned_inversion(),
             self._inference(),
             self._tuning(),
         ]

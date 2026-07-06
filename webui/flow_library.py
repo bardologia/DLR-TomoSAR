@@ -1045,6 +1045,96 @@ class FlowLibrary:
             "nodes": nodes, "steps": steps,
         }
 
+    def _unrolled_train(self) -> dict:
+        nodes = [
+            {"id": "gt",    "tex": r"\Theta",                    "role": "measured",     "kind": "tensor", "shape": "3K x P x P",  "desc": "normalised GT Gaussian parameters from the dataset patch",                  "sample": [["-0.63", "0.58"], ["0.41", "-0.22"]]},
+            {"id": "kz",    "tex": r"K_z",                        "role": "measured",     "kind": "tensor", "shape": "T x P x P",   "desc": "per-pixel interferometric wavenumber map from the geometry field",          "sample": [["-0.14", "-0.05"], ["0.06", "0.15"]]},
+            {"id": "gphys", "tex": r"\Theta_{\mathrm{phys}}",   "role": "intermediate", "kind": "tensor", "shape": "3K x P x P",  "desc": "denormalised physical parameters (a, mu, sigma)",                           "sample": [["0.81", "12.4", "1.9"], ["0.55", "31.8", "2.6"]]},
+            {"id": "s",     "tex": r"\mathbf{s}",                "role": "calculated",   "kind": "tensor", "shape": "N x P x P",   "desc": "power-normalised GT elevation profile: measurement source and target",      "sample": ["0.00", "0.04", "0.13", "0.05", "0.00"]},
+            {"id": "y",     "tex": r"\mathbf{y}",                "role": "calculated",   "kind": "tensor", "shape": "T x P x P",   "desc": "synthesised complex coherence per track, optional complex noise added",     "sample": ["0.93-0.12j", "0.71+0.30j", "0.42+0.51j"]},
+            {"id": "s0",    "tex": r"\mathbf{s}^{0}",            "role": "intermediate", "kind": "tensor", "shape": "N x P x P",   "desc": "matched-filter (beamforming) initialisation",                               "sample": ["0.02", "0.31", "0.94", "0.38", "0.05"]},
+            {"id": "r",     "tex": r"\mathbf{r}^{l}",            "role": "intermediate", "kind": "tensor", "shape": "N x P x P",   "desc": "profile after the Lipschitz-normalised gradient step of layer l",           "sample": ["0.01", "0.28", "0.99", "0.35", "0.02"]},
+            {"id": "sl",    "tex": r"\mathbf{s}^{L}",            "role": "calculated",   "kind": "tensor", "shape": "N x P x P",   "desc": "final unrolled estimate after L prox-gradient layers",                      "sample": ["0.00", "0.05", "0.12", "0.06", "0.00"]},
+            {"id": "mask",  "tex": r"\mathbb{1}_{\mathrm{pow}}", "role": "intermediate", "kind": "tensor", "shape": "P x P",       "desc": "power mask: pixels whose integrated GT profile exceeds the floor",          "sample": ["1", "0", "1", "1"]},
+            {"id": "loss",  "tex": r"\mathcal{L}",               "role": "calculated",   "kind": "scalar", "shape": "1",           "desc": "power-masked L1/MSE curve loss over the elevation axis",                    "sample": "2.4e-2"},
+            {"id": "eta",   "tex": r"\eta_{\mathrm{eff}}",      "role": "intermediate", "kind": "vector", "shape": "2",           "desc": "per-group effective LR: base x cosine x linear warmup (steps, prox)",       "sample": ["9.1e-4", "9.1e-4"]},
+            {"id": "ema",   "tex": r"\bar{\theta}",             "role": "intermediate", "kind": "vector", "shape": "|theta|",     "desc": "EMA shadow weights updated after every optimizer step",                     "sample": ["0.42", "-0.11", "..."]},
+            {"id": "best",  "tex": r"\theta^{\star}",           "role": "final",        "kind": "vector", "shape": "|theta|",     "desc": "best-validation checkpoint (the EMA weights when use_ema is on)",           "sample": ["0.41", "-0.12", "..."]},
+        ]
+        steps = [
+            {
+                "id": "unr_render", "title": "Profile rendering and power normalisation", "phase": "A - Measurement synthesis",
+                "note": "The batch GT parameters are denormalised to physical units and rendered to profiles on the elevation grid; each profile is divided by its integrated power so the inversion is scale-free. Pixels below the power floor are masked out of everything downstream.",
+                "inputs": ["gt"], "outputs": ["gphys", "s", "mask"],
+                "lines": [
+                    [{"id": "gphys", "tex": r"\Theta_{\mathrm{phys}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathrm{denorm}\big("}, {"id": "gt", "tex": r"\Theta", "role": "measured"}, {"tex": r"\big),\qquad c_h = \sum_k a_k\,e^{-(x_h-\mu_k)^2/2\sigma_k^2}"}],
+                    [{"id": "s", "tex": r"\mathbf{s}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathbf{c}\,\big/\,\max\!\big(\textstyle\sum_h c_h\,\mathrm{d}z,\ \varepsilon\big),\qquad"}, {"id": "mask", "tex": r"\mathbb{1}_{\mathrm{pow}}", "role": "intermediate"}, {"tex": r"= \big[\textstyle\sum_h c_h\,\mathrm{d}z > \varepsilon\big]"}],
+                ],
+            },
+            {
+                "id": "unr_synth", "title": "Coherence synthesis through the exact operator", "phase": "A - Measurement synthesis",
+                "note": "The per-pixel steering operator is built from the geometry-field kz map and the elevation axis; pushing the normalised GT profile through it yields the complex coherence vector the network must invert. Optional complex Gaussian noise (measurement_noise_std) breaks the inverse-crime purity.",
+                "inputs": ["s", "kz"], "outputs": ["y"],
+                "lines": [
+                    [{"id": "y", "tex": r"y_t", "role": "calculated"}, {"tex": "="}, {"tex": r"\sum_h"}, {"id": "s", "tex": r"s_h", "role": "calculated"}, {"tex": r"\,e^{\,j\,"}, {"id": "kz", "tex": r"\kappa_{z,t}", "role": "measured"}, {"tex": r"x_h}\,\mathrm{d}z \;+\; \tfrac{\sigma_n}{\sqrt{2}}\,(\epsilon_1 + j\epsilon_2)"}],
+                ],
+            },
+            {
+                "id": "unr_init", "title": "Matched-filter initialisation", "phase": "B - Unrolled inversion",
+                "note": "gamma_net starts from the beamforming solution: the adjoint of the steering operator applied to the measurements, averaged over tracks and clipped to nonnegative reflectivity.",
+                "inputs": ["y", "kz"], "outputs": ["s0"],
+                "lines": [
+                    [{"id": "s0", "tex": r"\mathbf{s}^{0}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\max\!\Big(0,\ \tfrac{1}{T}\,\mathrm{Re}\big[\mathbf{A}^{H}"}, {"id": "y", "tex": r"\mathbf{y}", "role": "calculated"}, {"tex": r"\big]\Big)"}],
+                ],
+            },
+            {
+                "id": "unr_iter", "title": "Learned proximal-gradient layers", "phase": "B - Unrolled inversion",
+                "note": "Each of the L layers takes a gradient step on the data fidelity, normalised by the operator's Lipschitz bound T*N*dz^2 so step_init = 1 is stable, refines the profile with a learned per-pixel 1D conv prox along elevation, and applies a nonnegative soft-threshold. Steps and thresholds are softplus-reparameterised per layer.",
+                "inputs": ["s0", "y", "kz"], "outputs": ["r", "sl"],
+                "lines": [
+                    [{"id": "r", "tex": r"\mathbf{r}^{l}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\mathbf{s}^{l} + \alpha_l\,\frac{\mathrm{Re}\big[\mathbf{A}^{H}(\mathbf{y} - \mathbf{A}\mathbf{s}^{l})\big]}{T\,N\,\mathrm{d}z^{2}}"}],
+                    [{"id": "sl", "tex": r"\mathbf{s}^{l+1}", "role": "calculated"}, {"tex": "="}, {"tex": r"\max\!\big(0,\ \mathcal{P}_l("}, {"id": "r", "tex": r"\mathbf{r}^{l}", "role": "intermediate"}, {"tex": r") - \theta_l\big),\qquad l = 0,\dots,L-1"}],
+                ],
+            },
+            {
+                "id": "unr_loss", "title": "Power-masked curve loss", "phase": "C - Loss",
+                "note": "The reconstruction error is averaged along the elevation axis per pixel, then averaged over pixels that carry GT power; empty pixels contribute nothing. curve_loss selects L1 (default) or MSE.",
+                "inputs": ["sl", "s", "mask"], "outputs": ["loss"],
+                "lines": [
+                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": "="}, {"tex": r"\frac{\sum_p \mathbb{1}_{\mathrm{pow},p}\;\tfrac{1}{N}\sum_h \big|"}, {"id": "sl", "tex": r"s^{L}_{p,h}", "role": "calculated"}, {"tex": r" - "}, {"id": "s", "tex": r"s_{p,h}", "role": "calculated"}, {"tex": r"\big|}{\max\big(\sum_p \mathbb{1}_{\mathrm{pow},p},\ 1\big)}"}],
+                ],
+            },
+            {
+                "id": "unr_optim", "title": "AdamW step with warmup and cosine schedule", "phase": "D - Optimise",
+                "note": "Two parameter groups (steps + thresholds, prox convolutions) with their own LR and weight decay from GammaNetConfig.get_param_groups. Gradients are clipped to max_grad_norm; the effective LR is the cosine-annealed base scaled by the linear warmup factor while warmup is active.",
+                "inputs": ["loss"], "outputs": ["eta"],
+                "lines": [
+                    [{"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\eta_{\mathrm{base}}\;\cdot\;\underbrace{\big(\rho + (1-\rho)\,\tfrac{t}{T_w}\big)}_{\mathrm{warmup}}\;\cdot\;\underbrace{\tfrac{1}{2}\big(1 + \cos\pi\tfrac{e}{E}\big)}_{\mathrm{cosine}}"}],
+                ],
+            },
+            {
+                "id": "unr_ema", "title": "EMA shadow and averaged evaluation", "phase": "D - Optimise",
+                "note": "When use_ema is on, a shadow copy of the weights is blended after every optimizer step, and validation, best-checkpointing and the final test all run with the shadow weights swapped in (WeightEma.applied).",
+                "inputs": ["eta"], "outputs": ["ema"],
+                "lines": [
+                    [{"id": "ema", "tex": r"\bar{\theta}", "role": "intermediate"}, {"tex": r"\leftarrow"}, {"tex": r"\beta\,\bar{\theta} + (1-\beta)\,\theta_t,\qquad \beta = \mathrm{ema\_decay}"}],
+                ],
+            },
+            {
+                "id": "unr_ckpt", "title": "Checkpointing, early stop and test", "phase": "D - Optimise",
+                "note": "The best validation loss checkpoints best.pt (the EMA weights when enabled); training stops after early_stop_patience epochs without improvement; the best weights are reloaded for the test pass, and history plus test metrics (loss, peak MAE in metres) land in training_summary.json.",
+                "inputs": ["ema", "loss"], "outputs": ["best"],
+                "lines": [
+                    [{"id": "best", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\arg\min_{e}\ \mathcal{L}^{\mathrm{val}}_{e},\qquad \mathrm{stop\ after}\ p\ \mathrm{epochs\ without\ improvement}"}],
+                ],
+            },
+        ]
+        return {
+            "key": "unrolled_train", "name": "Unrolled Physics (Train)",
+            "blurb": "Ground-truth Gaussian profiles are rendered, power-normalised and pushed through the exact per-pixel steering operator to synthesise coherence measurements; gamma_net inverts them with L learned proximal-gradient layers, and a power-masked curve loss is optimised by AdamW with linear warmup, cosine annealing, optional EMA weight averaging and best-epoch checkpointing.",
+            "nodes": nodes, "steps": steps,
+        }
+
     def _inference(self) -> dict:
         nodes = [
             {"id": "ckpt",     "tex": r"\theta^{\star}",           "role": "measured",     "kind": "vector", "shape": "|theta|",        "desc": "best-epoch checkpoint weights (params) with bundled x-axis; per-slot norm stats load from the run meta", "sample": ["0.31", "-0.08", "..."]},
@@ -1991,6 +2081,7 @@ class FlowLibrary:
             self._profile_ae_train(),
             self._image_ae_train(),
             self._jepa_train(),
+            self._unrolled_train(),
             self._inference(),
             self._profile_ae_infer(),
             self._image_ae_infer(),
