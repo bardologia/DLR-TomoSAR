@@ -918,6 +918,19 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "export_tensorboard_plots": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+                        ]},
+                        {"title": "Output", "fields": ["tensorboard_dirname", "output_subdir"]},
+                    ]},
+                ]},
+            ],
+        },
     }
 
     def _field_entry(self, item, prefix, widgets):

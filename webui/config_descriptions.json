@@ -11,7 +11,7 @@
     "cross_validation": "The stage that estimates generalization by partitioning the stack along azimuth into k folds and training and evaluating on each. It orchestrates per-fold training, inference, and comparison for the backbone and its autoencoder variants. The configs here control the azimuth-range fold partitioning, the top-level k-fold orchestration, and the JEPA and profile-autoencoder cross-validation setups selecting pretrained models, targets, losses, and pixel sampling.",
     "tuning": "The stage that searches hyperparameter spaces with Optuna to improve a chosen model family. It wires the search budget, pruning, and resources to a nested training configuration and swaps in per-trial hyperparameter samples. The configs here control the Optuna search controls and artifact emission, the entry point binding model type, resources, and data to the search, and the JEPA-specific search space over autoencoder pairing, target strategy, and loss weights.",
     "comparison": "The stage that rebuilds side-by-side comparisons across completed runs and trials without re-running training or inference. It aggregates existing inference or preprocessing outputs into a single report grouped by the varied factor. The configs here control comparison of backbone inference runs, of preprocessing trials differing by multilook window, of Gaussian-fit extraction trials grouped by component count, and the standalone rebuild of an existing benchmark comparison report.",
-    "diagnostics": "The stage that inspects trained checkpoints for weight-tensor pathologies independently of any data run. The weight-xray diagnostic classifies each tensor against numeric thresholds and emits a per-run report and plots. The configs here control the pathology classification thresholds, the single-run diagnostic and its report and plot outputs, and the batch webui entry that selects backbone runs and builds a per-run configuration."
+    "diagnostics": "The stage that inspects completed training runs independently of any data run. The weight-xray diagnostic classifies each checkpoint tensor against numeric thresholds and emits a per-run report and plots; the tensorboard export renders every logged scalar series as a publication-quality figure inside the run directory, pairing train and validation series of the same metric in one shared figure. The configs here control the pathology classification thresholds, the single-run diagnostics and their report and plot outputs, and the batch webui entries that select runs and build a per-run configuration."
   },
   "configs": {
     "sar/gaussian_config::GaussianConfig": {
@@ -1974,6 +1974,23 @@
         "svd_max_dim": "max matrix dimension for computing SVD-based rank/spectral stats, forwarded to each run's WeightXrayConfig",
         "duplicate_max_units": "max output-unit count scanned for duplicates, forwarded to each run's WeightXrayConfig",
         "max_layer_histograms": "max number of per-layer histograms rendered per run, forwarded to each run's WeightXrayConfig"
+      }
+    },
+    "diagnostics::TensorboardExportConfig": {
+      "summary": "Per-run tensorboard plot export: reads the run's tensorboard event log and renders every scalar series as a publication-quality figure inside the run directory, mirroring the tag hierarchy as folders; train and validation series of the same metric share one figure",
+      "fields": {
+        "run_directory": "training run directory holding the tensorboard event log; the exported plots are written inside it",
+        "tensorboard_dirname": "name of the subdirectory inside the run directory that holds the tensorboard event files, defaults to tensorboard",
+        "output_subdir": "subdirectory name inside the run directory where the exported figures are written, defaults to tensorboard_plots"
+      }
+    },
+    "diagnostics::TensorboardExportEntryConfig": {
+      "summary": "Batch webui entry selecting training runs with tensorboard event logs and building a per-run TensorboardExportConfig via to_config",
+      "fields": {
+        "runs_dir": "parent directory recursively scanned (rglob) by TensorboardRunSelector for run subdirectories whose tensorboard_dirname holds event files",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to export; empty triggers interactive selection on a tty, else all runs",
+        "tensorboard_dirname": "name of the subdirectory inside each run directory that holds the tensorboard event files, forwarded to each run's TensorboardExportConfig",
+        "output_subdir": "subdirectory name inside each run directory where that run's exported figures are written, forwarded to each run's TensorboardExportConfig"
       }
     },
     "training/unrolled::UnrolledEntryConfig": {

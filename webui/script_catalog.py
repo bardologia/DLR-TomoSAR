@@ -112,6 +112,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Scan a runs directory, select one or more checkpoints, and diagnose each: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics inside each run directory.",
         },
+        "export_tensorboard_plots": {
+            "title"     : "Export TensorBoard Plots",
+            "category"  : "Analysis",
+            "purpose"   : "Scan a runs directory for training runs with TensorBoard event logs, select one or more, and export every scalar series as a publication-quality figure inside each run directory, mirroring the tag hierarchy as folders. Train and validation series of the same metric share one figure.",
+        },
     }
 
     GROUPS = {
