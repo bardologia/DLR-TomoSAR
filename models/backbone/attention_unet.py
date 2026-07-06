@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import AttentionUNetConfig
-from ..blocks                          import ConvBlock, build_norm2d, build_upsample, initialize_weights, match_spatial_size
+from ..blocks                          import ConvBlock, OutputHeadsMixin, build_norm2d, build_upsample, initialize_weights, match_spatial_size
 
 class AttentionGate(nn.Module):
     def __init__(
@@ -66,7 +66,7 @@ class AttentionGate(nn.Module):
 
         return self.output_transform(skip_connection * attention_weights)
 
-class AttentionUNet(nn.Module):
+class AttentionUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: AttentionUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -144,11 +144,8 @@ class AttentionUNet(nn.Module):
                 )
             )
 
-        self.output_head = nn.Conv2d(
-            in_channels  = feature_sizes[0],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = feature_sizes[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -175,5 +172,5 @@ class AttentionUNet(nn.Module):
             x    = decoder_block(x)
 
         x   = match_spatial_size(source=x, reference=original_input)
-        out = self.output_head(x)
+        out = self._head_forward(x)
         return out

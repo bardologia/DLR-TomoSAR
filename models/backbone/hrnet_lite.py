@@ -6,7 +6,7 @@ import torch.nn.functional as functional
 
 from configuration.architectures import HRNetLiteConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights
-from ..blocks                          import ResidualConvBlock
+from ..blocks                          import OutputHeadsMixin, ResidualConvBlock
 
 
 class BranchFusion(nn.Module):
@@ -64,7 +64,7 @@ class BranchFusion(nn.Module):
         return outputs
 
 
-class HRNetLite(nn.Module):
+class HRNetLite(nn.Module, OutputHeadsMixin):
     def __init__(self, config: HRNetLiteConfig | None = None):
         super().__init__()
         if config is None:
@@ -124,7 +124,8 @@ class HRNetLite(nn.Module):
             build_activation(config.activation),
         )
 
-        self.output_head = nn.Conv2d(base * 2, config.out_channels, kernel_size=1)
+        self.embedding_channels = base * 2
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -142,4 +143,4 @@ class HRNetLite(nn.Module):
             upsampled.append(functional.interpolate(branch, size=target_size, mode="bilinear", align_corners=False))
 
         x = self.final_fuse(torch.cat(upsampled, dim=1))
-        return self.output_head(x)
+        return self._head_forward(x)

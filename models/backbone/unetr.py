@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import UNETRConfig
-from ..blocks                          import ConvBlock, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                          import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
 class ProgressiveProjectionHead(nn.Module):
@@ -54,7 +54,7 @@ class ProgressiveProjectionHead(nn.Module):
         return self.layers(x)
 
 
-class UNETR(nn.Module):
+class UNETR(nn.Module, OutputHeadsMixin):
     def __init__(self, config: UNETRConfig | None = None):
         super().__init__()
         config      = config or UNETRConfig()
@@ -185,11 +185,8 @@ class UNETR(nn.Module):
             )
         else:
             self.final_upsample = nn.Identity()
-        self.output_head = nn.Conv2d(
-            in_channels  = decoder_features[-1],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = decoder_features[-1]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -228,5 +225,5 @@ class UNETR(nn.Module):
 
         x   = self.final_upsample(x)
         x   = match_spatial_size(source=x, reference=original_input)
-        out = self.output_head(x)
+        out = self._head_forward(x)
         return out

@@ -6,7 +6,7 @@ import torch.nn.functional as functional
 
 from configuration.architectures import FPNNetConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights
-from ..blocks                          import ResidualConvBlock
+from ..blocks                          import OutputHeadsMixin, ResidualConvBlock
 
 
 class SegmentationBlock(nn.Module):
@@ -38,7 +38,7 @@ class SegmentationBlock(nn.Module):
         return self.layers(x)
 
 
-class FPNNet(nn.Module):
+class FPNNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: FPNNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -84,7 +84,8 @@ class FPNNet(nn.Module):
             nn.Dropout2d(config.dropout),
         )
 
-        self.output_head = nn.Conv2d(pyramid_channels, config.out_channels, kernel_size=1)
+        self.embedding_channels = pyramid_channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -114,4 +115,4 @@ class FPNNet(nn.Module):
             fused = out if fused is None else fused + out
 
         x = self.fuse_block(fused)
-        return self.output_head(x)
+        return self._head_forward(x)

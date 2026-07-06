@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import SegFormerLiteConfig
-from ..blocks                          import DropPath, build_activation, initialize_weights
+from ..blocks                          import DropPath, OutputHeadsMixin, build_activation, initialize_weights
 
 
 class OverlapPatchEmbedding(nn.Module):
@@ -101,7 +101,7 @@ class SegFormerStage(nn.Module):
         return x.transpose(1, 2).reshape(B, C, h, w)
 
 
-class SegFormerLite(nn.Module):
+class SegFormerLite(nn.Module, OutputHeadsMixin):
     def __init__(self, config: SegFormerLiteConfig | None = None):
         super().__init__()
         if config is None:
@@ -152,9 +152,13 @@ class SegFormerLite(nn.Module):
             nn.Dropout2d(config.dropout),
         )
 
-        self.output_head = nn.Conv2d(config.decoder_channels, config.out_channels, kernel_size=1)
+        self.embedding_channels = config.decoder_channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
+
+    def _head_activation(self) -> str:
+        return self.config.ffn_activation
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         input_size = x.shape[2:]
@@ -175,7 +179,7 @@ class SegFormerLite(nn.Module):
             fused.append(features)
 
         x = self.fuse(torch.cat(fused, dim=1))
-        x = self.output_head(x)
+        x = self._head_forward(x)
         x = functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
 
         return x

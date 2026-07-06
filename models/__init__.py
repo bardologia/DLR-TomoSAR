@@ -1,5 +1,5 @@
 from .backbone import *  # noqa: F401,F403
-from .backbone import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, BACKBONE_MODEL_REGISTRY, get_backbone
+from .backbone import BACKBONE_CONFIG_REGISTRY, BACKBONE_HEADS, BACKBONE_IMAGE_SIZE_MODELS, BACKBONE_MODEL_REGISTRY, get_backbone
 from .blocks   import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from .profile_autoencoder import (
     PROFILE_AE_CONFIG_REGISTRY,
@@ -47,6 +47,7 @@ __all__ = [
     "BACKBONE_CONFIG_REGISTRY",
     "config_registry",
     "BACKBONE_MODEL_REGISTRY",
+    "BACKBONE_HEADS",
     "BACKBONE_IMAGE_SIZE_MODELS",
     "get_backbone",
     "DropPath",

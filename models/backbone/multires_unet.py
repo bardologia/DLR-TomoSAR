@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from configuration.architectures import MultiResUNetConfig
 from ..blocks                          import build_activation, build_norm2d, build_upsample, initialize_weights
-from ..blocks                          import match_spatial_size
+from ..blocks                          import OutputHeadsMixin, match_spatial_size
 
 
 class MultiResBlock(nn.Module):
@@ -67,7 +67,7 @@ class ResPath(nn.Module):
         return x
 
 
-class MultiResUNet(nn.Module):
+class MultiResUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: MultiResUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -106,7 +106,8 @@ class MultiResUNet(nn.Module):
             )
             self.decoder_blocks.append(MultiResBlock(reversed_features[index + 1] * 2, reversed_features[index + 1], config.dropout, config.activation, config.normalization, config.conv_bias))
 
-        self.output_head = nn.Conv2d(feature_sizes[0], config.out_channels, kernel_size=1)
+        self.embedding_channels = feature_sizes[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -125,4 +126,4 @@ class MultiResUNet(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 
-        return self.output_head(x)
+        return self._head_forward(x)

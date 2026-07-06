@@ -4,10 +4,10 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import LocalCNNConfig, PixelMLPNetConfig
-from ..blocks                    import ConvBlock, build_activation, build_norm2d, initialize_weights
+from ..blocks                    import ConvBlock, OutputHeadsMixin, build_activation, build_norm2d, initialize_weights
 
 
-class PixelMLPNet(nn.Module):
+class PixelMLPNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: PixelMLPNetConfig | None = None):
         super().__init__()
         self.config = config if config is not None else PixelMLPNetConfig()
@@ -25,16 +25,17 @@ class PixelMLPNet(nn.Module):
                 layers.append(nn.Dropout2d(self.config.dropout))
             channels = feature_size
 
-        self.trunk       = nn.Sequential(*layers)
-        self.output_head = nn.Conv2d(channels, self.config.out_channels, kernel_size=1)
+        self.trunk              = nn.Sequential(*layers)
+        self.embedding_channels = channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.output_head(self.trunk(x))
+        return self._head_forward(self.trunk(x))
 
 
-class LocalCNN(nn.Module):
+class LocalCNN(nn.Module, OutputHeadsMixin):
     def __init__(self, config: LocalCNNConfig | None = None):
         super().__init__()
         self.config = config if config is not None else LocalCNNConfig()
@@ -57,10 +58,11 @@ class LocalCNN(nn.Module):
             )
             channels = feature_size
 
-        self.trunk       = nn.Sequential(*blocks)
-        self.output_head = nn.Conv2d(channels, self.config.out_channels, kernel_size=1)
+        self.trunk              = nn.Sequential(*blocks)
+        self.embedding_channels = channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.output_head(self.trunk(x))
+        return self._head_forward(self.trunk(x))

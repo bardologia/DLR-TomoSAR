@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import SwinUNetConfig
-from ..blocks                          import DropPath, build_activation, initialize_weights, match_spatial_size, scaled_dot_product, tokens_to_feature_map
+from ..blocks                          import DropPath, OutputHeadsMixin, build_activation, initialize_weights, match_spatial_size, scaled_dot_product, tokens_to_feature_map
 
 
 class WindowAttention(nn.Module):
@@ -280,7 +280,7 @@ class SwinStage(nn.Module):
         return x
 
 
-class SwinUNet(nn.Module):
+class SwinUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: SwinUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -379,13 +379,13 @@ class SwinUNet(nn.Module):
             kernel_size  = config.patch_size,
             stride       = config.patch_size,
         )
-        self.output_head = nn.Conv2d(
-            in_channels  = dims[0],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = dims[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
+
+    def _head_activation(self) -> str:
+        return self.config.ffn_activation
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
@@ -426,5 +426,5 @@ class SwinUNet(nn.Module):
         feature_map = tokens_to_feature_map(x, height, width)
         feature_map = self.final_upsample(feature_map)
         feature_map = match_spatial_size(source=feature_map, reference=original_input)
-        out         = self.output_head(feature_map)
+        out         = self._head_forward(feature_map)
         return out

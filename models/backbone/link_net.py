@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import LinkNetConfig
-from ..blocks                          import build_activation, build_norm2d, initialize_weights, match_spatial_size
+from ..blocks                          import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights, match_spatial_size
 
 class ResidualEncoderBlock(nn.Module):
     def __init__(
@@ -103,7 +103,7 @@ class BottleneckDecoderBlock(nn.Module):
         return self.layers(x)
 
 
-class LinkNet(nn.Module):
+class LinkNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: LinkNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -172,11 +172,8 @@ class LinkNet(nn.Module):
             )
         )
 
-        self.output_head = nn.Conv2d(
-            in_channels  = feature_sizes[0],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = feature_sizes[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -202,5 +199,5 @@ class LinkNet(nn.Module):
                 x = decoded
 
         x   = match_spatial_size(source=x, reference=original_input)
-        out = self.output_head(x)
+        out = self._head_forward(x)
         return out

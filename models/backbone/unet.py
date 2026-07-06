@@ -3,12 +3,12 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetSetPredConfig
+from configuration.architectures import UNetConfig
 from ..blocks                          import initialize_weights
-from ..blocks                          import ConvBlock, Decoder, Encoder, GaussianHeadsMixin
+from ..blocks                          import ConvBlock, Decoder, Encoder, OutputHeadsMixin
 
 
-class UNetBackbone(nn.Module, GaussianHeadsMixin):
+class UNetBackbone(nn.Module, OutputHeadsMixin):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -48,7 +48,6 @@ class UNetBackbone(nn.Module, GaussianHeadsMixin):
         )
 
         self.embedding_channels = feature_sizes[0]
-        self.hidden_channels    = max(self.embedding_channels // 2, 16)
 
     def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         x, skip_connections = self.encoder(x)
@@ -59,51 +58,9 @@ class UNetBackbone(nn.Module, GaussianHeadsMixin):
 class UNet(UNetBackbone):
     def __init__(self, config: UNetConfig | None = None):
         super().__init__(config if config is not None else UNetConfig())
-
-        self.output_head = nn.Conv2d(
-            in_channels  = self.embedding_channels,
-            out_channels = self.config.out_channels,
-            kernel_size  = 1,
-        )
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        embedding = self.encode_decode(x)
-        return self.output_head(embedding)
-
-
-class UNetMultiHead(UNetBackbone):
-    def __init__(self, config: UNetMultiHeadConfig | None = None):
-        super().__init__(config if config is not None else UNetMultiHeadConfig())
-        self._resolve_gaussian_layout()
-        self._build_triple_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._triple_head_forward(self.encode_decode(x))
-
-
-class UNetPerGaussian(UNetBackbone):
-    def __init__(self, config: UNetPerGaussianConfig | None = None):
-        super().__init__(config if config is not None else UNetPerGaussianConfig())
-        self._resolve_gaussian_layout()
-        self._build_per_gaussian_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._per_gaussian_forward(self.encode_decode(x))
-
-
-class UNetSetPred(UNetBackbone):
-    def __init__(self, config: UNetSetPredConfig | None = None):
-        super().__init__(config if config is not None else UNetSetPredConfig())
-        self._resolve_gaussian_layout()
-        self._build_set_prediction_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._set_prediction_forward(self.encode_decode(x))
+        return self._head_forward(self.encode_decode(x))

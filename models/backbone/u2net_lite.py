@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import U2NetLiteConfig
-from ..blocks                          import build_activation, build_norm2d, initialize_weights
+from ..blocks                          import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights
 
 
 class RSUConv(nn.Module):
@@ -100,7 +100,7 @@ class RSUDilated(nn.Module):
         return x + x_in
 
 
-class U2NetLite(nn.Module):
+class U2NetLite(nn.Module, OutputHeadsMixin):
     def __init__(self, config: U2NetLiteConfig | None = None):
         super().__init__()
         if config is None:
@@ -130,8 +130,9 @@ class U2NetLite(nn.Module):
             RSU(heights[0], f1 + f0, mid(f0), f0, config.activation, config.normalization, config.conv_bias),
         ])
 
-        self.dropout     = nn.Dropout2d(config.dropout) if config.dropout > 0 else nn.Identity()
-        self.output_head = nn.Conv2d(f0, config.out_channels, kernel_size=1)
+        self.dropout            = nn.Dropout2d(config.dropout) if config.dropout > 0 else nn.Identity()
+        self.embedding_channels = f0
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -149,4 +150,4 @@ class U2NetLite(nn.Module):
             x = stage(torch.cat([x, skip], dim=1))
 
         x = self.dropout(x)
-        return self.output_head(x)
+        return self._head_forward(x)

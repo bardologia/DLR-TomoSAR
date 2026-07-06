@@ -1,7 +1,5 @@
 from configuration.architectures.backbone import (
     UNetConfig,
-    UNetMultiHeadConfig,
-    UNetPerGaussianConfig,
     ResUNetConfig,
     UNetSkipConfig,
     AttentionUNetConfig,
@@ -10,8 +8,6 @@ from configuration.architectures.backbone import (
     SwinUNetConfig,
     TransUNetConfig,
     UNETRConfig,
-    ResUNetMultiHeadConfig,
-    ResUNetPerGaussianConfig,
     DeepLabV3PlusConfig,
     SegFormerLiteConfig,
     ConvNeXtUNetConfig,
@@ -23,8 +19,6 @@ from configuration.architectures.backbone import (
     PixelMLPNetConfig,
     LocalCNNConfig,
     NAFNetConfig,
-    UNetSetPredConfig,
-    ResUNetSetPredConfig,
 )
 from configuration.architectures.unrolled import (
     GammaNetConfig,

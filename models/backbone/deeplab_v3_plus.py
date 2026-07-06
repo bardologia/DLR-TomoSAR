@@ -6,7 +6,7 @@ import torch.nn.functional as functional
 
 from configuration.architectures import DeepLabV3PlusConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights
-from ..blocks                          import ResidualConvBlock
+from ..blocks                          import OutputHeadsMixin, ResidualConvBlock
 
 
 class ConvNormAct(nn.Module):
@@ -72,7 +72,7 @@ class ASPP(nn.Module):
         return self.project(torch.cat(branch_outputs, dim=1))
 
 
-class DeepLabV3Plus(nn.Module):
+class DeepLabV3Plus(nn.Module, OutputHeadsMixin):
     def __init__(self, config: DeepLabV3PlusConfig | None = None):
         super().__init__()
         if config is None:
@@ -126,7 +126,8 @@ class DeepLabV3Plus(nn.Module):
             ConvNormAct(aspp_channels, aspp_channels, kernel_size=3, activation=config.activation, normalization=config.normalization, bias=config.conv_bias),
         )
 
-        self.output_head = nn.Conv2d(aspp_channels, config.out_channels, kernel_size=1)
+        self.embedding_channels = aspp_channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -150,4 +151,4 @@ class DeepLabV3Plus(nn.Module):
         x = self.decoder_blocks(x)
         x = functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
 
-        return self.output_head(x)
+        return self._head_forward(x)

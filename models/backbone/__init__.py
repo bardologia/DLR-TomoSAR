@@ -1,8 +1,8 @@
-from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, LocalCNNConfig, MultiResUNetConfig, NAFNetConfig, PixelMLPNetConfig, ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, ResUNetSetPredConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetMultiHeadConfig, UNetPerGaussianConfig, UNetPlusPlusConfig, UNetSetPredConfig, UNetSkipConfig
+from configuration.architectures import AttentionUNetConfig, ConvNeXtUNetConfig, DeepLabV3PlusConfig, DenseUNetConfig, FPNNetConfig, HRNetLiteConfig, LinkNetConfig, LocalCNNConfig, MultiResUNetConfig, NAFNetConfig, PixelMLPNetConfig, ResUNetConfig, SegFormerLiteConfig, SwinUNetConfig, TransUNetConfig, U2NetLiteConfig, UNETRConfig, UNetConfig, UNetPlusPlusConfig, UNetSkipConfig
 from ..blocks       import DropPath, build_activation, build_norm2d, build_upsample, initialize_weights
 from ..registry     import RegistryFactory
-from .unet          import UNet, UNetMultiHead, UNetPerGaussian, UNetSetPred
-from .resunet       import ResUNet, ResUNetMultiHead, ResUNetPerGaussian, ResUNetSetPred, UNetSkip
+from .unet          import UNet
+from .resunet       import ResUNet, UNetSkip
 from .attention_unet import AttentionUNet
 from .unet_plus_plus  import UNetPlusPlus
 from .link_net        import LinkNet
@@ -21,63 +21,53 @@ from .pixel_baselines import LocalCNN, PixelMLPNet
 from .nafnet          import NAFNet
 
 BACKBONE_MODEL_REGISTRY: dict[str, type] = {
-    "unet"                : UNet,
-    "unet_multihead"      : UNetMultiHead,
-    "unet_pergaussian"    : UNetPerGaussian,
-    "unet_setpred"        : UNetSetPred,
-    "unet_skip"           : UNetSkip,
-    "resunet"             : ResUNet,
-    "resunet_multihead"   : ResUNetMultiHead,
-    "resunet_pergaussian" : ResUNetPerGaussian,
-    "resunet_setpred"     : ResUNetSetPred,
-    "attention_unet"      : AttentionUNet,
-    "unetplusplus"        : UNetPlusPlus,
-    "linknet"             : LinkNet,
-    "swin_unet"           : SwinUNet,
-    "transunet"           : TransUNet,
-    "unetr"               : UNETR,
-    "deeplabv3plus"       : DeepLabV3Plus,
-    "segformer"           : SegFormerLite,
-    "convnext_unet"       : ConvNeXtUNet,
-    "dense_unet"          : DenseUNet,
-    "hrnet"               : HRNetLite,
-    "multires_unet"       : MultiResUNet,
-    "fpn"                 : FPNNet,
-    "u2net"               : U2NetLite,
-    "pixel_mlp"           : PixelMLPNet,
-    "local_cnn"           : LocalCNN,
-    "nafnet"              : NAFNet,
+    "unet"           : UNet,
+    "unet_skip"      : UNetSkip,
+    "resunet"        : ResUNet,
+    "attention_unet" : AttentionUNet,
+    "unetplusplus"   : UNetPlusPlus,
+    "linknet"        : LinkNet,
+    "swin_unet"      : SwinUNet,
+    "transunet"      : TransUNet,
+    "unetr"          : UNETR,
+    "deeplabv3plus"  : DeepLabV3Plus,
+    "segformer"      : SegFormerLite,
+    "convnext_unet"  : ConvNeXtUNet,
+    "dense_unet"     : DenseUNet,
+    "hrnet"          : HRNetLite,
+    "multires_unet"  : MultiResUNet,
+    "fpn"            : FPNNet,
+    "u2net"          : U2NetLite,
+    "pixel_mlp"      : PixelMLPNet,
+    "local_cnn"      : LocalCNN,
+    "nafnet"         : NAFNet,
 }
 
 BACKBONE_CONFIG_REGISTRY: dict[str, type] = {
-    "unet"                : UNetConfig,
-    "unet_multihead"      : UNetMultiHeadConfig,
-    "unet_pergaussian"    : UNetPerGaussianConfig,
-    "unet_setpred"        : UNetSetPredConfig,
-    "unet_skip"           : UNetSkipConfig,
-    "resunet"             : ResUNetConfig,
-    "resunet_multihead"   : ResUNetMultiHeadConfig,
-    "resunet_pergaussian" : ResUNetPerGaussianConfig,
-    "resunet_setpred"     : ResUNetSetPredConfig,
-    "attention_unet"      : AttentionUNetConfig,
-    "unetplusplus"        : UNetPlusPlusConfig,
-    "linknet"             : LinkNetConfig,
-    "swin_unet"           : SwinUNetConfig,
-    "transunet"           : TransUNetConfig,
-    "unetr"               : UNETRConfig,
-    "deeplabv3plus"       : DeepLabV3PlusConfig,
-    "segformer"           : SegFormerLiteConfig,
-    "convnext_unet"       : ConvNeXtUNetConfig,
-    "dense_unet"          : DenseUNetConfig,
-    "hrnet"               : HRNetLiteConfig,
-    "multires_unet"       : MultiResUNetConfig,
-    "fpn"                 : FPNNetConfig,
-    "u2net"               : U2NetLiteConfig,
-    "pixel_mlp"           : PixelMLPNetConfig,
-    "local_cnn"           : LocalCNNConfig,
-    "nafnet"              : NAFNetConfig,
+    "unet"           : UNetConfig,
+    "unet_skip"      : UNetSkipConfig,
+    "resunet"        : ResUNetConfig,
+    "attention_unet" : AttentionUNetConfig,
+    "unetplusplus"   : UNetPlusPlusConfig,
+    "linknet"        : LinkNetConfig,
+    "swin_unet"      : SwinUNetConfig,
+    "transunet"      : TransUNetConfig,
+    "unetr"          : UNETRConfig,
+    "deeplabv3plus"  : DeepLabV3PlusConfig,
+    "segformer"      : SegFormerLiteConfig,
+    "convnext_unet"  : ConvNeXtUNetConfig,
+    "dense_unet"     : DenseUNetConfig,
+    "hrnet"          : HRNetLiteConfig,
+    "multires_unet"  : MultiResUNetConfig,
+    "fpn"            : FPNNetConfig,
+    "u2net"          : U2NetLiteConfig,
+    "pixel_mlp"      : PixelMLPNetConfig,
+    "local_cnn"      : LocalCNNConfig,
+    "nafnet"         : NAFNetConfig,
 }
 
+
+BACKBONE_HEADS: tuple[str, ...] = ("conv", "multihead", "per_gaussian", "set_pred")
 
 BACKBONE_IMAGE_SIZE_MODELS: frozenset[str] = frozenset({"swin_unet", "transunet", "unetr"})
 
@@ -87,14 +77,8 @@ get_backbone = RegistryFactory(BACKBONE_MODEL_REGISTRY, BACKBONE_CONFIG_REGISTRY
 
 __all__ = [
     "UNet",
-    "UNetMultiHead",
-    "UNetPerGaussian",
-    "UNetSetPred",
     "UNetSkip",
     "ResUNet",
-    "ResUNetMultiHead",
-    "ResUNetPerGaussian",
-    "ResUNetSetPred",
     "AttentionUNet",
     "UNetPlusPlus",
     "LinkNet",
@@ -113,14 +97,8 @@ __all__ = [
     "LocalCNN",
     "NAFNet",
     "UNetConfig",
-    "UNetMultiHeadConfig",
-    "UNetPerGaussianConfig",
-    "UNetSetPredConfig",
     "UNetSkipConfig",
     "ResUNetConfig",
-    "ResUNetMultiHeadConfig",
-    "ResUNetPerGaussianConfig",
-    "ResUNetSetPredConfig",
     "AttentionUNetConfig",
     "UNetPlusPlusConfig",
     "LinkNetConfig",
@@ -141,6 +119,7 @@ __all__ = [
     "get_backbone",
     "BACKBONE_MODEL_REGISTRY",
     "BACKBONE_CONFIG_REGISTRY",
+    "BACKBONE_HEADS",
     "BACKBONE_IMAGE_SIZE_MODELS",
     "build_activation",
     "build_norm2d",

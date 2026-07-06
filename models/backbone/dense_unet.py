@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from configuration.architectures import DenseUNetConfig
 from ..blocks                          import build_activation, build_norm2d, initialize_weights
-from ..blocks                          import match_spatial_size
+from ..blocks                          import OutputHeadsMixin, match_spatial_size
 
 
 class DenseLayer(nn.Module):
@@ -59,7 +59,7 @@ class TransitionDown(nn.Module):
         return self.layers(x)
 
 
-class DenseUNet(nn.Module):
+class DenseUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: DenseUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -97,7 +97,8 @@ class DenseUNet(nn.Module):
             self.dense_up.append(block)
             up_channels = block.new_channels
 
-        self.output_head = nn.Conv2d(up_channels, config.out_channels, kernel_size=1)
+        self.embedding_channels = up_channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -119,4 +120,4 @@ class DenseUNet(nn.Module):
             x = torch.cat([x, skip], dim=1)
             x = block(x)
 
-        return self.output_head(x)
+        return self._head_forward(x)

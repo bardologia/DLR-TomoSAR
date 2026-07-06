@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import ConvNeXtUNetConfig
-from ..blocks                          import ChannelLayerNorm, ConvNeXtBlock, initialize_weights
+from ..blocks                          import ChannelLayerNorm, ConvNeXtBlock, OutputHeadsMixin, initialize_weights
 from ..blocks                          import match_spatial_size
 
 
@@ -21,7 +21,7 @@ class ConvNeXtStage(nn.Module):
         return self.blocks(self.projection(x))
 
 
-class ConvNeXtUNet(nn.Module):
+class ConvNeXtUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: ConvNeXtUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -71,9 +71,13 @@ class ConvNeXtUNet(nn.Module):
             self.upsample_layers.append(nn.ConvTranspose2d(reversed_features[index], reversed_features[index + 1], kernel_size=2, stride=2))
             self.decoder_stages.append(ConvNeXtStage(reversed_features[index + 1] * 2, reversed_features[index + 1], config.blocks_per_stage, config.ffn_ratio, take_rates(), config.ffn_activation, config.layer_scale_init))
 
-        self.output_head = nn.Conv2d(feature_sizes[0], config.out_channels, kernel_size=1)
+        self.embedding_channels = feature_sizes[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
+
+    def _head_activation(self) -> str:
+        return self.config.ffn_activation
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.stem(x)
@@ -92,4 +96,4 @@ class ConvNeXtUNet(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = stage(x)
 
-        return self.output_head(x)
+        return self._head_forward(x)

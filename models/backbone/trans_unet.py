@@ -5,10 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import TransUNetConfig
-from ..blocks                          import ConvBlock, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                          import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, tokens_to_feature_map
 
 
-class TransUNet(nn.Module):
+class TransUNet(nn.Module, OutputHeadsMixin):
     def __init__(self, config: TransUNetConfig | None = None):
         super().__init__()
         if config is None:
@@ -100,11 +100,8 @@ class TransUNet(nn.Module):
                 )
             )
 
-        self.output_head = nn.Conv2d(
-            in_channels  = cnn_features[0],
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = cnn_features[0]
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -146,5 +143,5 @@ class TransUNet(nn.Module):
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 
-        out  = self.output_head(x)
+        out  = self._head_forward(x)
         return out

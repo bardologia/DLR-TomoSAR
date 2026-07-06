@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import NAFNetConfig
-from ..blocks                    import ChannelLayerNorm, initialize_weights, match_spatial_size
+from ..blocks                    import ChannelLayerNorm, OutputHeadsMixin, initialize_weights, match_spatial_size
 
 
 class SimpleGate(nn.Module):
@@ -64,7 +64,9 @@ class NAFBlock(nn.Module):
         return x + branch * self.gamma
 
 
-class NAFNet(nn.Module):
+class NAFNet(nn.Module, OutputHeadsMixin):
+    conv_head_kernel_size = 3
+
     def __init__(self, config: NAFNetConfig | None = None):
         super().__init__()
         self.config = config if config is not None else NAFNetConfig()
@@ -96,9 +98,13 @@ class NAFNet(nn.Module):
             channels //= 2
             self.decoder_stages.append(self._stage(channels, n_blocks))
 
-        self.output_head = nn.Conv2d(channels, self.config.out_channels, kernel_size=3, padding=1)
+        self.embedding_channels = channels
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
+
+    def _head_activation(self) -> str:
+        return "gelu"
 
     def _stage(self, channels: int, n_blocks: int) -> nn.Sequential:
         return nn.Sequential(*[NAFBlock(channels, self.config.dw_expand, self.config.ffn_expand, self.config.dropout) for _ in range(n_blocks)])
@@ -120,4 +126,4 @@ class NAFNet(nn.Module):
             x = x + skip
             x = stage(x)
 
-        return self.output_head(x)
+        return self._head_forward(x)

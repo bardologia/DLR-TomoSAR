@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import UNetPlusPlusConfig
-from ..blocks                          import ConvBlock, initialize_weights, match_spatial_size
+from ..blocks                          import ConvBlock, OutputHeadsMixin, initialize_weights, match_spatial_size
 
-class UNetPlusPlus(nn.Module):
+class UNetPlusPlus(nn.Module, OutputHeadsMixin):
     def __init__(self, config: UNetPlusPlusConfig | None = None):
         super().__init__()
         if config is None:
@@ -54,11 +54,8 @@ class UNetPlusPlus(nn.Module):
 
         self.dense_0_4 = ConvBlock(level_0 * 4 + level_1, level_0, dropout, act, norm, bias)
 
-        self.output_head = nn.Conv2d(
-            in_channels  = level_0,
-            out_channels = config.out_channels,
-            kernel_size  = 1,
-        )
+        self.embedding_channels = level_0
+        self._build_output_head()
 
         initialize_weights(module=self, mode=config.init_mode)
 
@@ -100,5 +97,5 @@ class UNetPlusPlus(nn.Module):
         up_1_3   = self._upsample_and_match(source=node_1_3, reference=node_0_0)
         node_0_4 = self.dense_0_4(torch.cat([node_0_0, node_0_1, node_0_2, node_0_3, up_1_3], dim=1))
 
-        out = self.output_head(node_0_4)
+        out = self._head_forward(node_0_4)
         return out

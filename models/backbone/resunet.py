@@ -3,12 +3,12 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import ResUNetConfig, ResUNetMultiHeadConfig, ResUNetPerGaussianConfig, ResUNetSetPredConfig, UNetSkipConfig
+from configuration.architectures import ResUNetConfig, UNetSkipConfig
 from ..blocks                          import build_upsample, initialize_weights
-from ..blocks                          import GaussianHeadsMixin, ResidualConvBlock, match_spatial_size
+from ..blocks                          import OutputHeadsMixin, ResidualConvBlock, match_spatial_size
 
 
-class ResUNetBackbone(nn.Module, GaussianHeadsMixin):
+class ResUNetBackbone(nn.Module, OutputHeadsMixin):
     def __init__(self, config, downsample: str = "stride"):
         super().__init__()
         self.config          = config
@@ -82,7 +82,6 @@ class ResUNetBackbone(nn.Module, GaussianHeadsMixin):
             )
 
         self.embedding_channels = feature_sizes[0]
-        self.hidden_channels    = max(self.embedding_channels // 2, 16)
 
     def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         skip_connections: list[torch.Tensor] = []
@@ -110,68 +109,20 @@ class ResUNetBackbone(nn.Module, GaussianHeadsMixin):
 class ResUNet(ResUNetBackbone):
     def __init__(self, config: ResUNetConfig | None = None):
         super().__init__(config if config is not None else ResUNetConfig())
-
-        self.output_head = nn.Conv2d(
-            in_channels  = self.embedding_channels,
-            out_channels = self.config.out_channels,
-            kernel_size  = 1,
-        )
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        embedding = self.encode_decode(x)
-        return self.output_head(embedding)
-
-
-class ResUNetMultiHead(ResUNetBackbone):
-    def __init__(self, config: ResUNetMultiHeadConfig | None = None):
-        super().__init__(config if config is not None else ResUNetMultiHeadConfig())
-        self._resolve_gaussian_layout()
-        self._build_triple_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._triple_head_forward(self.encode_decode(x))
-
-
-class ResUNetPerGaussian(ResUNetBackbone):
-    def __init__(self, config: ResUNetPerGaussianConfig | None = None):
-        super().__init__(config if config is not None else ResUNetPerGaussianConfig())
-        self._resolve_gaussian_layout()
-        self._build_per_gaussian_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._per_gaussian_forward(self.encode_decode(x))
-
-
-class ResUNetSetPred(ResUNetBackbone):
-    def __init__(self, config: ResUNetSetPredConfig | None = None):
-        super().__init__(config if config is not None else ResUNetSetPredConfig())
-        self._resolve_gaussian_layout()
-        self._build_set_prediction_heads()
-
-        initialize_weights(module=self, mode=self.config.init_mode)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._set_prediction_forward(self.encode_decode(x))
+        return self._head_forward(self.encode_decode(x))
 
 
 class UNetSkip(ResUNetBackbone):
     def __init__(self, config: UNetSkipConfig | None = None):
         super().__init__(config if config is not None else UNetSkipConfig(), downsample="maxpool")
-
-        self.output_head = nn.Conv2d(
-            in_channels  = self.embedding_channels,
-            out_channels = self.config.out_channels,
-            kernel_size  = 1,
-        )
+        self._build_output_head()
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        embedding = self.encode_decode(x)
-        return self.output_head(embedding)
+        return self._head_forward(self.encode_decode(x))
