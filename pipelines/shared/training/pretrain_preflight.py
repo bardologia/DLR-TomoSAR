@@ -10,12 +10,12 @@ from tools.training.pretraining          import PretrainContext, PretrainOrchest
 
 
 class PretrainPreflight:
-    def __init__(self, pretrain_config, training_config, build_context: Callable[[Logger, torch.device], PretrainContext], logdir: Path, label: Optional[str] = None) -> None:
-        self.pretrain = pretrain_config
-        self.training = training_config
-        self.build    = build_context
-        self.logdir   = Path(logdir)
-        self.label    = label
+    def __init__(self, pretrain_config, training_config, build_context: Callable[[Logger, torch.device], PretrainContext], run_directory: Path, label: Optional[str] = None) -> None:
+        self.pretrain      = pretrain_config
+        self.training      = training_config
+        self.build         = build_context
+        self.run_directory = Path(run_directory)
+        self.label         = label
 
     def _enabled(self) -> bool:
         return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader)
@@ -24,7 +24,7 @@ class PretrainPreflight:
         if not self._enabled():
             return
 
-        result_dir = self.logdir / "pretrain"
+        result_dir = self.run_directory / "pretrain"
         result_dir.mkdir(parents=True, exist_ok=True)
 
         logger = Logger(log_dir=str(result_dir / "logs"), name="pretrain", level="INFO")

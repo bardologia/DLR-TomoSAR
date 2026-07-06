@@ -291,18 +291,21 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     def label(self) -> str:
         return RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.param_loss)
 
+    def _resolve_run_name(self) -> str:
+        return RunNaming.compose(self.label, self.config.run_name or RunTag.now())
+
+    def _run_inference(self, run_directory) -> None:
+        from pipelines.backbone.inference.pipeline           import InferencePipeline
+        from pipelines.shared.inference.inference_components import InferenceComponentsResolver
+
+        inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
+        components       = InferenceComponentsResolver.for_run(Path(run_directory))
+        InferencePipeline(inference_config, components=components).run()
+
     def run(self):
-        self._pretrain_preflight()
+        results, run_directory = super().run()
 
-        self.config.run_name = RunNaming.compose(self.label, self.config.run_name or RunTag.now())
-
-        results, run_directory = TrainingPipeline(self.config).run()
         if self.config.infer_after:
-            from pipelines.backbone.inference.pipeline           import InferencePipeline
-            from pipelines.shared.inference.inference_components import InferenceComponentsResolver
-
-            inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
-            components       = InferenceComponentsResolver.for_run(Path(run_directory))
-            InferencePipeline(inference_config, components=components).run()
+            self._run_inference(run_directory)
 
         return results

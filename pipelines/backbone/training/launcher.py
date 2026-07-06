@@ -32,7 +32,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
     def label(self) -> str:
         return RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum)
 
-    def _run_name(self) -> str:
+    def _resolve_run_name(self) -> str:
         return RunNaming.compose(self.label, self.config.run_name or RunTag.now())
 
     def _pipeline(self, logdir) -> TrainingPipeline:
@@ -51,12 +51,12 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             backbone_name  = self.config.backbone_name,
             model_config   = model_config,
             seed           = self.config.seed,
-            run_name       = self._run_name(),
+            run_name       = self.config.run_name,
             overfit_check  = self.config.overfit_check,
         )
 
     def _build_pretrain_trainer(self, logger):
-        work_dir = Path(self.config.logdir) / "pretrain" / "context"
+        work_dir = self.run_directory / "pretrain" / "context"
 
         return self._pipeline(work_dir).build_pretrain_trainer(work_dir, logger)
 
@@ -79,6 +79,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         return InferencePipeline(inference_config).run()
 
     def run(self):
+        self._resolve_run_directory()
         self._pretrain_preflight()
 
         pipeline = self._pipeline(self.config.logdir)

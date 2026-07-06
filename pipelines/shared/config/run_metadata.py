@@ -21,8 +21,7 @@ class TrainingRunMetadata:
         self.model_name     = model_name
         self.base_logdir    = Path(base_logdir)
 
-        timestamp     = RunTag.now()
-        resolved_name = run_name or f"run_{model_name}_{timestamp}"
+        resolved_name = self.resolve_name(model_name, run_name)
 
         self.run_directory      = self.base_logdir / resolved_name
         self.tensorboard_dir    = self.run_directory / "tensorboard"
@@ -51,6 +50,10 @@ class TrainingRunMetadata:
             "Backend"       : "PyTorch",
             "Devices"       : f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
         })
+
+    @staticmethod
+    def resolve_name(model_name: str, run_name: str | None) -> str:
+        return run_name or f"run_{model_name}_{RunTag.now()}"
 
     def __enter__(self) -> "TrainingRunMetadata":
         return self
