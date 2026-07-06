@@ -1028,7 +1028,7 @@
     "training/backbone::BackboneEntryConfig": {
       "summary": "Top-level entry config launching one backbone training run or fanning out a multi-trial GPU sweep",
       "fields": {
-        "run_name": "Optional human-readable label for the run directory; None auto-generates a name",
+        "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
         "backbone_name": "Backbone architecture key looked up in the model registry (unet, resunet, swin_unet, transunet, unetr, and others), default resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Primary GPU device index on which a single run executes",
@@ -1401,7 +1401,7 @@
     "training/jepa::JepaEntryConfig": {
       "summary": "Top-level entry point wiring one JEPA backbone-training run, its coupled autoencoders, and optional inference",
       "fields": {
-        "run_name": "Optional human-readable label for the run directory; None auto-generates a name",
+        "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
         "backbone_name": "Registry key of the backbone architecture that predicts Gaussian parameters or profile embeddings from the input SAR patch, default resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Single GPU device index on which the run executes",

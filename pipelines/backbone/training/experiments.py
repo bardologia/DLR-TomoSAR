@@ -8,8 +8,7 @@ from tools.baselines import TrackBaselines
 
 
 class TrialPlanner:
-    def __init__(self, model_name: str, warmup_losses: dict) -> None:
-        self.model_name    = model_name
+    def __init__(self, warmup_losses: dict) -> None:
         self.warmup_losses = warmup_losses
 
     @staticmethod
@@ -18,8 +17,8 @@ class TrialPlanner:
 
 
 class CurriculumTrialPlanner(TrialPlanner):
-    def __init__(self, model_name: str, warmup_losses: dict, complete_losses: dict) -> None:
-        super().__init__(model_name, warmup_losses)
+    def __init__(self, warmup_losses: dict, complete_losses: dict) -> None:
+        super().__init__(warmup_losses)
         self.complete_losses = complete_losses
 
     def summary(self) -> dict:
@@ -30,7 +29,7 @@ class CurriculumTrialPlanner(TrialPlanner):
 
         for warmup_label, warmup_loss in self.warmup_losses.items():
             for complete_label, complete_loss in self.complete_losses.items():
-                run_name  = f"{self.model_name}_w-{warmup_label}_c-{complete_label}"
+                run_name  = f"w-{warmup_label}_c-{complete_label}"
                 overrides = {"curriculum.enabled": True, "curriculum.inherit": False}
                 overrides.update(self._stage_overrides("warmup",   warmup_loss))
                 overrides.update(self._stage_overrides("complete", complete_loss))
@@ -47,7 +46,7 @@ class WarmupTrialPlanner(TrialPlanner):
         plans = []
 
         for label, loss in self.warmup_losses.items():
-            run_name  = f"{self.model_name}_nc-{label}"
+            run_name  = f"nc-{label}"
             overrides = {"curriculum.enabled": False}
             overrides.update(self._stage_overrides("complete", loss))
             plans.append((run_name, overrides))
@@ -57,8 +56,7 @@ class WarmupTrialPlanner(TrialPlanner):
 
 class SlotPresenceTrialPlanner:
 
-    def __init__(self, model_name: str, presence_trials: dict) -> None:
-        self.model_name      = model_name
+    def __init__(self, presence_trials: dict) -> None:
         self.presence_trials = presence_trials
 
     def summary(self) -> dict:
@@ -79,7 +77,7 @@ class SlotPresenceTrialPlanner:
         plans = []
 
         for trial_label, spec in self.presence_trials.items():
-            run_name = f"{self.model_name}_pr-{trial_label}"
+            run_name = f"pr-{trial_label}"
             plans.append((run_name, self._overrides(spec)))
 
         return plans
@@ -87,8 +85,7 @@ class SlotPresenceTrialPlanner:
 
 class AblationTrialPlanner:
 
-    def __init__(self, model_name: str, features: list, include_full: bool) -> None:
-        self.model_name   = model_name
+    def __init__(self, features: list, include_full: bool) -> None:
         self.features     = list(features)
         self.include_full = include_full
 
@@ -129,10 +126,10 @@ class AblationTrialPlanner:
 
     def _run_name(self, step: int) -> str:
         if step == 0:
-            return f"{self.model_name}_abl-0-full"
+            return "abl-0-full"
         if step == len(self.features):
-            return f"{self.model_name}_abl-{step}-baseline"
-        return f"{self.model_name}_abl-{step}-no_{self.features[step - 1]['label']}"
+            return f"abl-{step}-baseline"
+        return f"abl-{step}-no_{self.features[step - 1]['label']}"
 
     def plan(self) -> list[tuple[str, dict]]:
         enabled = self._enabled_overrides()
@@ -152,21 +149,20 @@ class InputTrialPlanner:
 
     INPUT_KEYS = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")
 
-    def __init__(self, model_name: str, input_trials: dict, candidates: list[str]) -> None:
-        self.model_name   = model_name
+    def __init__(self, input_trials: dict, candidates: list[str]) -> None:
         self.input_trials = input_trials
         self.candidates   = list(candidates)
 
         self._validate()
 
     @classmethod
-    def from_dataset(cls, model_name: str, input_trials: dict, geometry, dataset_path: str | Path) -> "InputTrialPlanner":
+    def from_dataset(cls, input_trials: dict, geometry, dataset_path: str | Path) -> "InputTrialPlanner":
         path = geometry.baselines_file(dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Input trials need the baselines table to enumerate all tracks, but {path} does not exist")
 
         table = TrackBaselines.load(path)
-        return cls(model_name, input_trials, list(table.labels[1:]))
+        return cls(input_trials, list(table.labels[1:]))
 
     def _validate(self) -> None:
         if not self.input_trials:
@@ -192,16 +188,15 @@ class InputTrialPlanner:
         plans = []
 
         for label, spec in self.input_trials.items():
-            run_name = f"{self.model_name}_in-{label}"
+            run_name = f"in-{label}"
             plans.append((run_name, self._overrides(spec)))
 
         return plans
 
 
 class PatchSizeTrialPlanner:
-    def __init__(self, model_name: str, trials) -> None:
-        self.model_name = model_name
-        self.trials     = trials
+    def __init__(self, trials) -> None:
+        self.trials = trials
 
         self._validate()
 
@@ -217,8 +212,10 @@ class PatchSizeTrialPlanner:
 
     def summary(self) -> dict:
         return {
-            "Patch sizes"  : list(self.trials.sizes),
-            "Stride ratio" : self.trials.stride_ratio,
+            "Patch sizes"     : list(self.trials.sizes),
+            "Stride ratio"    : self.trials.stride_ratio,
+            "Max-batch probe" : self.trials.find_max_batch,
+            "Scale LR"        : self.trials.scale_lr,
         }
 
     def plan(self) -> list[tuple[str, dict]]:
@@ -226,8 +223,13 @@ class PatchSizeTrialPlanner:
 
         for size in self.trials.sizes:
             stride    = max(1, int(round(size * self.trials.stride_ratio)))
-            run_name  = f"{self.model_name}_p-{size}"
-            overrides = {"training.patch_size": (size, size), "training.patch_stride": stride}
+            run_name  = f"p-{size}"
+            overrides = {
+                "training.patch_size"          : (size, size),
+                "training.patch_stride"        : stride,
+                "pretrain.find_batch_size"     : self.trials.find_max_batch,
+                "training.scale_lr_with_batch" : self.trials.scale_lr,
+            }
             plans.append((run_name, overrides))
 
         return plans
@@ -238,21 +240,20 @@ class SecondaryTrialPlanner:
     STRATEGIES   = ("uniform", "gaussian", "consecutive", "spaced")
     MAX_ATTEMPTS = 1000
 
-    def __init__(self, model_name: str, trials, candidates: list[str]) -> None:
-        self.model_name = model_name
+    def __init__(self, trials, candidates: list[str]) -> None:
         self.trials     = trials
         self.candidates = list(candidates)
 
         self._validate()
 
     @classmethod
-    def from_dataset(cls, model_name: str, trials, geometry, dataset_path: str | Path) -> "SecondaryTrialPlanner":
+    def from_dataset(cls, trials, geometry, dataset_path: str | Path) -> "SecondaryTrialPlanner":
         path = geometry.baselines_file(dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Secondary trials need the baselines table, but {path} does not exist")
 
         table = TrackBaselines.load(path)
-        return cls(model_name, trials, list(table.labels[1:]))
+        return cls(trials, list(table.labels[1:]))
 
     def _validate(self) -> None:
         t = self.trials
@@ -357,7 +358,7 @@ class SecondaryTrialPlanner:
 
         plans = []
         for index, labels in enumerate(selections):
-            run_name = f"{self.model_name}_sec-{self.trials.strategy}-t{index:02d}_{'-'.join(labels)}"
+            run_name = f"sec-{self.trials.strategy}-t{index:02d}_{'-'.join(labels)}"
             plans.append((run_name, {"paths.secondary_labels": tuple(labels)}))
 
         return plans

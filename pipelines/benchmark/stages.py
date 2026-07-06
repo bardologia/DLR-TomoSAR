@@ -9,6 +9,7 @@ from pipelines.backbone.training.loss_terms    import LossComponentCatalog
 from pipelines.benchmark.results                import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
+from pipelines.shared.training.run_naming                import RunNaming
 from pipelines.shared.training.seed_sweep                import SeedSet
 from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.data.io                              import FileIO
@@ -33,13 +34,19 @@ class SeedExpandedStage:
 
         return components
 
-    def _unit_base(self, model: str, component: str | None) -> str:
+    @staticmethod
+    def unit_base(config: BenchmarkConfig, model: str, component: str | None) -> str:
+        if config.training_type == "backbone":
+            return RunNaming.benchmark_unit(model, component, config.loss)
+        if config.training_type == "jepa":
+            return RunNaming.benchmark_unit(model, None, config.jepa.param_loss)
+
         return model if component is None else f"{model}__{component}"
 
     def _expand(self, config: BenchmarkConfig, models: list[str]) -> list[str]:
         components = self.components(config)
         pairs      = [(model, component) for model in models for component in components]
-        self._pair = {self._unit_base(model, component): (model, component) for model, component in pairs}
+        self._pair = {self.unit_base(config, model, component): (model, component) for model, component in pairs}
 
         units      = SeedSet.units(list(self._pair.keys()), config.seeds)
         self._unit = {name: (base, seed) for base, seed, name in units}

@@ -15,10 +15,12 @@ from pipelines.shared.config.run_metadata                import TrainingRunMetad
 from pipelines.backbone.dataset.pipeline                 import BackboneDatasetPreparation
 from pipelines.shared.model.model_builder                import ModelBuilder
 from pipelines.shared.training.overfit_check             import OverfitCheck
+from pipelines.shared.training.run_naming                import RunNaming
 from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
 from tools.runtime.reproducibility                       import Reproducibility
+from tools.runtime.run_tag                               import RunTag
 
 
 
@@ -287,10 +289,12 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
     @property
     def label(self) -> str:
-        return self.config.backbone_name
+        return RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.param_loss)
 
     def run(self):
         self._pretrain_preflight()
+
+        self.config.run_name = RunNaming.compose(self.label, self.config.run_name or RunTag.now())
 
         results, run_directory = TrainingPipeline(self.config).run()
         if self.config.infer_after:

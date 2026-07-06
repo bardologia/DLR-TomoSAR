@@ -14,11 +14,13 @@ from pipelines.backbone.training.experiments import AblationTrialPlanner, Curric
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
+from pipelines.shared.training.run_naming      import RunNaming
 from pipelines.shared.training.seed_sweep      import SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
 from tools.orchestration      import ExperimentStage, GpuJob
 from tools.monitoring.logger  import Logger
 from tools.runtime.config_cli import ConfigCli
+from tools.runtime.run_tag    import RunTag
 
 
 class SingleTrainRunner(BaseSingleTrainRunner):
@@ -28,7 +30,10 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
     @property
     def label(self) -> str:
-        return ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
+        return RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum)
+
+    def _run_name(self) -> str:
+        return RunNaming.compose(self.label, self.config.run_name or RunTag.now())
 
     def _pipeline(self, logdir) -> TrainingPipeline:
         trainer_config            = self.factory.training_trainer_config(logdir=logdir)
@@ -46,7 +51,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             backbone_name  = self.config.backbone_name,
             model_config   = model_config,
             seed           = self.config.seed,
-            run_name       = self.config.run_name,
+            run_name       = self._run_name(),
             overfit_check  = self.config.overfit_check,
         )
 
@@ -116,22 +121,21 @@ class TrainScheduler:
         self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root)
 
     def planner(self):
-        mode      = self.config.trials_mode
-        model_key = ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
+        mode = self.config.trials_mode
         if mode == "curriculum":
-            return CurriculumTrialPlanner(model_key, self.config.warmup_losses, self.config.complete_losses)
+            return CurriculumTrialPlanner(self.config.warmup_losses, self.config.complete_losses)
         if mode == "warmup":
-            return WarmupTrialPlanner(model_key, self.config.warmup_losses)
+            return WarmupTrialPlanner(self.config.warmup_losses)
         if mode == "presence":
-            return SlotPresenceTrialPlanner(model_key, self.config.presence_trials)
+            return SlotPresenceTrialPlanner(self.config.presence_trials)
         if mode == "secondary":
-            return SecondaryTrialPlanner.from_dataset(model_key, self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
+            return SecondaryTrialPlanner.from_dataset(self.config.secondary_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "patch":
-            return PatchSizeTrialPlanner(model_key, self.config.patch_trials)
+            return PatchSizeTrialPlanner(self.config.patch_trials)
         if mode == "input":
-            return InputTrialPlanner.from_dataset(model_key, self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
+            return InputTrialPlanner.from_dataset(self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "ablation":
-            return AblationTrialPlanner(model_key, self.config.ablation_features, self.config.ablation_include_full)
+            return AblationTrialPlanner(self.config.ablation_features, self.config.ablation_include_full)
 
         raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'secondary', 'patch', 'input' or 'ablation'")
 

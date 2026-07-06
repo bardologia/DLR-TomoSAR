@@ -15,7 +15,9 @@ class BenchmarkWorker(WorkerBase):
         self.factory = ConfigFactory(config)
 
     def _run_name(self, model_name: str, component: str | None, seed: int | None) -> str:
-        unit = model_name if component is None else f"{model_name}__{component}"
+        from pipelines.benchmark.stages import SeedExpandedStage
+
+        unit = SeedExpandedStage.unit_base(self.config, model_name, component)
         return unit if seed is None else SeedSet.run_name(unit, seed)
 
     def _apply_loss_component(self, trainer_config, component: str | None) -> None:

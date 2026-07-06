@@ -6,6 +6,7 @@ from pathlib import Path
 import optuna
 
 from pipelines.shared.model.model_builder import ModelBuilder
+from pipelines.shared.training.run_naming import RunNaming
 from tools.data.io import FileIO
 
 
@@ -118,13 +119,15 @@ class Tuner:
         trainer_cfg.early_stopping.patience = self.tune_cfg.early_stop_patience
         trainer_cfg.io.logdir               = str(Path(self.log_dir) / "trials" / f"trial_{trial.number:04d}")
 
+        run_tag = RunNaming.training_tag(self.backbone_name, self.head, trainer_cfg.curriculum)
+
         pipeline = TrialPipeline(
             trainer_config = trainer_cfg,
             dataset_config = dataset_cfg,
             backbone_name  = self.backbone_name,
             model_config   = model_config,
             seed           = self.tune_cfg.base_seed + trial.number,
-            run_name       = f"trial_{trial.number:04d}",
+            run_name       = RunNaming.compose(run_tag, f"trial_{trial.number:04d}"),
             trial          = trial,
             emit_docs      = self.emit_trial_docs,
         )
@@ -230,12 +233,13 @@ class JepaTuner:
         from pipelines.tuning.trial import TrialJepaPipeline
 
         sampled = self.sampler.sample(trial, self.space)
+        run_tag = RunNaming.tag(self.backbone_name, self.head, self.entry_template.param_loss)
 
         entry                 = copy.deepcopy(self.entry_template)
         entry.backbone_name   = self.backbone_name
         entry.backbone_head   = self.head
         entry.model_overrides = sampled
-        entry.run_name        = f"trial_{trial.number:04d}"
+        entry.run_name        = RunNaming.compose(run_tag, f"trial_{trial.number:04d}")
         entry.seed            = self.tune_cfg.base_seed + trial.number
         entry.logdir          = Path(self.log_dir) / "trials"
 

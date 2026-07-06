@@ -8,6 +8,9 @@ from pathlib     import Path
 import numpy as np
 import torch
 
+from configuration.training.general.loss  import ParamMatching
+from models                                import BACKBONE_HEADS
+from pipelines.shared.model.model_builder  import ModelBuilder
 from pipelines.shared.training.seed_sweep import SeedSet
 from tools.data.io               import FileIO
 from tools.metrics.scoring       import FiniteScalar
@@ -132,7 +135,18 @@ class TrialCollector:
 
     @staticmethod
     def _model_of(trial_name: str) -> str:
-        return SeedSet.base(trial_name).split("__")[0]
+        base = SeedSet.base(trial_name).split("__")[0]
+
+        for matching in ParamMatching:
+            if not base.endswith(f"_{matching.value}"):
+                continue
+
+            trimmed = base[: -len(f"_{matching.value}")]
+            for head in BACKBONE_HEADS:
+                if trimmed.endswith(f"_{head}"):
+                    return ModelBuilder.model_key(trimmed[: -len(f"_{head}")], head)
+
+        return base
 
     def collect(self) -> list[TrialRecord]:
         size_match, training_results = self._aggregate_sources()

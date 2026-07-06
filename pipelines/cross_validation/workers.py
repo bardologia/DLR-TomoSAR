@@ -111,6 +111,17 @@ class CrossValidationWorker(WorkerBase):
     def fold_name(self, fold_index: int) -> str:
         return FoldNaming.name(fold_index)
 
+    def fold_run_name(self, fold_index: int, seed: int | None) -> str:
+        from pipelines.shared.training.run_naming import RunNaming
+
+        fold = FoldNaming.run_name(fold_index, seed)
+        if self.config.training_type == "backbone":
+            return RunNaming.compose(RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum), fold)
+        if self.config.training_type == "jepa":
+            return RunNaming.compose(RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.jepa.param_loss), fold)
+
+        return fold
+
 
 class FoldTrainingWorker(CrossValidationWorker):
     def _run_backbone(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
@@ -132,7 +143,7 @@ class FoldTrainingWorker(CrossValidationWorker):
             backbone_name  = self.config.backbone_name,
             model_config   = model_config,
             seed           = self.config.seed if seed is None else seed,
-            run_name       = FoldNaming.run_name(fold_index, seed),
+            run_name       = self.fold_run_name(fold_index, seed),
         )
 
         pipeline.run(probe_config=self._probe_config())
@@ -140,7 +151,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_jepa(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.jepa.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._jepa_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
+        TrainingPipeline(self._jepa_entry_config(self.fold_run_name(fold_index, seed), seed), split_regions=split_regions).run()
 
     def _jepa_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import JepaEntryConfig
@@ -174,7 +185,7 @@ class FoldTrainingWorker(CrossValidationWorker):
     def _run_profile_autoencoder(self, fold_index: int, seed: int | None, split_regions: SplitRegions) -> None:
         from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-        TrainingPipeline(self._ae_entry_config(FoldNaming.run_name(fold_index, seed), seed), split_regions=split_regions).run()
+        TrainingPipeline(self._ae_entry_config(self.fold_run_name(fold_index, seed), seed), split_regions=split_regions).run()
 
     def _ae_entry_config(self, run_name: str, seed: int | None):
         from configuration.training import ProfileAeEntryConfig
@@ -216,7 +227,7 @@ class FoldInferenceWorker(CrossValidationWorker):
         from pipelines.backbone.inference.pipeline import InferencePipeline
         from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
-        run_directory = self.run_dir / "folds" / FoldNaming.run_name(fold_index, seed)
+        run_directory = self.run_dir / "folds" / self.fold_run_name(fold_index, seed)
 
         components = InferenceComponentsResolver.for_run(run_directory)
         pipeline   = InferencePipeline(self.factory.fold_inference_config(run_directory, split), components=components)
