@@ -87,15 +87,16 @@ The projection is applied when input and output channels differ *or* when the bl
 
 ---
 
-## Head variants
+## Output heads
 
-Three concrete models share the `ResUNetBackbone.encode_decode` body and differ only in the output head, all configured by `out_channels` and `params_per_gaussian` (so $K = \texttt{out\_channels} / \texttt{params\_per\_gaussian} = 6/3 = 2$ Gaussians by default):
+The head is a config axis, not a model variant: `ResUNetConfig.head` selects the output head built by `OutputHeadsMixin._build_output_head` on top of the shared `ResUNetBackbone.encode_decode` body, all configured by `out_channels` and `params_per_gaussian` (so $K = \texttt{out\_channels} / \texttt{params\_per\_gaussian} = 6/3 = 2$ Gaussians by default):
 
-- `ResUNet` (`ResUNetConfig`): a single $1\times1$ `nn.Conv2d` from `embedding_channels = features[0]` to `out_channels`, emitting the full $3K$-channel map in one projection (`models/backbone/resunet.py:114-118`).
-- `ResUNetMultiHead` (`ResUNetMultiHeadConfig`): three `PixelMLP` heads (`head_amp`, `head_mu`, `head_sigma`), each a $1\times1$–`Act`–$1\times1$ stack mapping `embedding_channels → hidden_channels → K` (`GaussianHeadsMixin._build_triple_heads`); `_triple_head_forward` stacks them and reshapes to $(B, 3K, H, W)$ interleaved per parameter (`models/blocks.py:305-317`).
-- `ResUNetPerGaussian` (`ResUNetPerGaussianConfig`): an `nn.ModuleList` of $K$ `PixelMLP` heads, each emitting the `params_per_gaussian` channels of one Gaussian; `_per_gaussian_forward` reshapes to $(B, K\cdot\texttt{params\_per\_gaussian}, H, W)$ grouped per Gaussian (`models/blocks.py:319-330`).
+- [[Head Conv]] (`head = "conv"`, default): a single $1\times1$ `nn.Conv2d` from `embedding_channels = features[0]` to `out_channels`, emitting the full $3K$-channel map in one projection.
+- [[Head Multihead]] (`head = "multihead"`): three `PixelMLP` heads (`head_amp`, `head_mu`, `head_sigma`), each a $1\times1$–`Act`–$1\times1$ stack mapping `embedding_channels → hidden_channels → K`; `_triple_head_forward` stacks them and reshapes to $(B, 3K, H, W)$ interleaved per parameter.
+- [[Head Per-Gaussian]] (`head = "per_gaussian"`): an `nn.ModuleList` of $K$ `PixelMLP` heads, each emitting the `params_per_gaussian` channels of one Gaussian; `_per_gaussian_forward` reshapes to $(B, K\cdot\texttt{params\_per\_gaussian}, H, W)$ grouped per Gaussian.
+- [[Head Set-Prediction]] (`head = "set_pred"`): the per-Gaussian heads plus an existence gate that blends each slot's amplitude toward a learned off level.
 
-Here `hidden_channels = max(features[0] // 2, 16)` (`models/backbone/resunet.py:85`). All three heads emit $3K = 6$ output channels; the multihead and per-Gaussian variants differ only in channel ordering (parameter-major vs Gaussian-major). The `_resolve_gaussian_layout` check requires `out_channels` divisible by `params_per_gaussian` (`models/blocks.py:298-303`).
+Here `hidden_channels = max(embedding_channels // 2, 16)` (`OutputHeadsMixin._build_output_head`). Every head emits the same $3K = 6$ output channels in the same interleaved ordering, so heads are interchangeable downstream. The `_resolve_gaussian_layout` check requires `out_channels` divisible by `params_per_gaussian`.
 
 ---
 
