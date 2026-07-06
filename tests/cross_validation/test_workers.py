@@ -235,7 +235,8 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
     assert captured["ran"]                       is True
     assert captured["config"].run_directory      == expected_dir
     assert expected_dir.name.endswith("_fold_1")
-    assert expected_dir.name.startswith(f"{worker.config.backbone_name}-{worker.config.backbone_head}-K_")
+    assert expected_dir.name.startswith(f"{worker.config.backbone_name}-{worker.config.backbone_head}-")
+    assert "-K_" in expected_dir.name
     assert captured["config"].split              == "test"
     assert captured["config"].output_subdir      == "test"
 

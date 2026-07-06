@@ -18,7 +18,11 @@ class RunNaming:
         if not parts:
             raise ValueError("Cannot name a run from a loss config with no enabled loss terms")
 
-        return "_".join(parts)
+        return "-".join(parts)
+
+    @staticmethod
+    def matching_tag(loss: LossConfig) -> str:
+        return loss.param_matching.value
 
     @staticmethod
     def gaussians_tag(n_gaussians: int) -> str:
@@ -29,14 +33,9 @@ class RunNaming:
         letters = "".join(letter for letter, probability in cls.AUGMENTATION_FLAGS if getattr(augmentation, probability) > 0.0)
         return letters or "noaug"
 
-    @staticmethod
-    def presence_tag(loss: LossConfig) -> str:
-        letters = ("A" if loss.use_active_normalization else "") + ("B" if loss.presence_balance else "") + ("F" if loss.amp_focal_gamma > 0.0 else "")
-        return letters or "none"
-
     @classmethod
     def stem(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
-        return "-".join((model_name, head, cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation), cls.presence_tag(loss)))
+        return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation)))
 
     @classmethod
     def tag(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
