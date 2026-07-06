@@ -18,6 +18,7 @@ from tools.runtime.config_cli import ConfigCli
 from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
+from configuration.diagnostics              import TensorboardExportEntryConfig
 from configuration.training                 import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
@@ -53,6 +54,12 @@ def test_compare_runs_layout_claims_every_config_field_exactly_once():
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(ComparisonEntryConfig())]
 
     LaunchLayout().build("compare_runs", leaves)
+
+
+def test_export_tensorboard_plots_layout_claims_every_config_field_exactly_once():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(TensorboardExportEntryConfig())]
+
+    LaunchLayout().build("export_tensorboard_plots", leaves)
 
 
 def test_every_registered_script_is_reachable_from_the_catalog():

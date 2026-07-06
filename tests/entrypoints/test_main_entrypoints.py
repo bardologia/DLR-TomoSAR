@@ -43,6 +43,7 @@ DEFER_HEAVY_IMPORTS = (
     "extract_params",
     "analyze_preprocessing",
     "analyze_param_extraction",
+    "export_tensorboard_plots",
 )
 
 CLI_MODULES = (
@@ -58,6 +59,7 @@ CLI_MODULES = (
     "benchmark",
     "cross_validate",
     "compare_runs",
+    "export_tensorboard_plots",
 )
 
 ENTRY_CONFIGS = {
@@ -73,6 +75,7 @@ ENTRY_CONFIGS = {
     "benchmark"                 : ("configuration.benchmark",                    "BenchmarkConfig"),
     "cross_validate"            : ("configuration.cross_validation",             "CrossValidationConfig"),
     "compare_runs"              : ("configuration.comparison",                   "ComparisonEntryConfig"),
+    "export_tensorboard_plots"  : ("configuration.diagnostics",                  "TensorboardExportEntryConfig"),
 }
 
 
