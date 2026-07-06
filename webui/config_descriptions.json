@@ -982,7 +982,9 @@
       "summary": "Sweep of patch edge sizes and stride ratio for the patch-size trial planner",
       "fields": {
         "sizes": "Candidate square patch edge lengths in pixels swept by the patch-size trial planner, all must be positive",
-        "stride_ratio": "Patch stride as a fraction of patch size, valid range (0, 1]; 0.5 gives 50% overlap"
+        "stride_ratio": "Patch stride as a fraction of patch size, valid range (0, 1]; 0.5 gives 50% overlap",
+        "find_max_batch": "Run the real-loss max-batch-size probe (pretrain.find_batch_size) before every patch trial so each size trains at the largest batch that fits the VRAM budget instead of hitting OOM",
+        "scale_lr": "Scale each patch trial's learning rate linearly by resolved batch_size / lr_reference_batch_size (training.scale_lr_with_batch), so trials whose probe lowered the batch also lower the LR"
       }
     },
     "training/backbone::SecondaryTrialsConfig": {

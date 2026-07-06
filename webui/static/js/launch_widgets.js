@@ -440,8 +440,9 @@ class ExperimentBuilder {
     this.strategySelect = null;
     this.strategyNoteEl = null;
     this.secondaryRows  = [];
-    this.patchEl        = null;
-    this.patchSizesEl   = null;
+    this.patchEl         = null;
+    this.patchSizesEl    = null;
+    this.patchFlagPaints = [];
     this.warmupCatalogEl     = null;
     this.warmupCatalogGridEl = null;
     this.warmupCountEl       = null;
@@ -648,6 +649,12 @@ class ExperimentBuilder {
     const ratioLeaf = this.patch.get("stride_ratio");
     if (ratioLeaf) head.appendChild(this._patchRatio(ratioLeaf));
 
+    const findLeaf = this.patch.get("find_max_batch");
+    if (findLeaf) head.appendChild(this._patchFlag(findLeaf, "max batch", "probe the largest batch that fits the VRAM budget before each trial run"));
+
+    const scaleLeaf = this.patch.get("scale_lr");
+    if (scaleLeaf) head.appendChild(this._patchFlag(scaleLeaf, "scale lr", "scale the learning rate linearly by resolved batch / lr_reference_batch_size"));
+
     head.appendChild(LaunchWidgetDom.mini("Add size", () => {
       const sizes = this._patchSizes();
       sizes.push(sizes.length ? sizes[sizes.length - 1] : 64);
@@ -656,7 +663,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "each size trains the same model end to end; stride = round(size x stride_ratio)";
+    note.textContent = "each size trains the same model end to end; stride = round(size x stride_ratio); max batch probes the largest OOM-safe batch per trial, scale lr rescales the learning rate to the batch the probe resolved";
 
     const sizes     = document.createElement("div");
     sizes.className = "exp-patch__sizes";
@@ -696,6 +703,38 @@ class ExperimentBuilder {
       input.value = leaf.value;
       input.classList.remove("is-dirty");
     } };
+    return wrap;
+  }
+
+  _patchFlag(leaf, label, hint) {
+    const wrap     = document.createElement("label");
+    wrap.className = "exp-patch__flag";
+    wrap.title     = `${hint} (--${leaf.path})`;
+    wrap.innerHTML = `<span>${label}</span>`;
+
+    const toggle     = document.createElement("button");
+    toggle.type      = "button";
+    toggle.className = "switch";
+    toggle.setAttribute("role", "switch");
+    toggle.innerHTML = `<span class="switch__knob"></span>`;
+
+    const paint = () => {
+      const on = this.view._effective(leaf) === "True";
+      toggle.classList.toggle("is-on", on);
+      toggle.classList.toggle("is-dirty", this.view.dirty[leaf.path] !== undefined);
+      toggle.setAttribute("aria-checked", String(on));
+    };
+
+    toggle.addEventListener("click", () => {
+      this.view._setValue(leaf, this.view._effective(leaf) === "True" ? "False" : "True");
+      paint();
+    });
+
+    wrap.appendChild(toggle);
+    paint();
+
+    this.patchFlagPaints.push(paint);
+    this.view.controls[leaf.path] = { leaf, reset: paint };
     return wrap;
   }
 
@@ -763,6 +802,8 @@ class ExperimentBuilder {
     const sizes = this._patchSizes();
     this.patchSizesEl.innerHTML = "";
     sizes.forEach((size, index) => this.patchSizesEl.appendChild(this._patchChip(size, index, sizes)));
+
+    this.patchFlagPaints.forEach((paint) => paint());
   }
 
   _presenceMatchMap() {

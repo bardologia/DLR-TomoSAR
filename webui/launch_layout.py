@@ -446,7 +446,7 @@ class LaunchLayout:
                         "trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "input_trials",
                         "secondary_trials.strategy", "secondary_trials.n_secondaries", "secondary_trials.n_trials", "secondary_trials.mean",
                         "secondary_trials.sigma", "secondary_trials.block_step", "secondary_trials.spacing", "secondary_trials.seed",
-                        "patch_trials.sizes", "patch_trials.stride_ratio",
+                        "patch_trials.sizes", "patch_trials.stride_ratio", "patch_trials.find_max_batch", "patch_trials.scale_lr",
                     ]},
                     {"kind": "fields", "groups": [
                         {"title": "Fan-out execution", "fields": [{"path": "gpus", "widget": GPU_MANY}, "poll_interval_s"]},

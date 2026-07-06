@@ -115,8 +115,10 @@ def _default_input_trials() -> dict:
 
 @dataclass
 class PatchTrialsConfig:
-    sizes        : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
-    stride_ratio : float     = 0.5
+    sizes          : list[int] = field(default_factory=lambda: [32, 48, 64, 96, 128])
+    stride_ratio   : float     = 0.5
+    find_max_batch : bool      = True
+    scale_lr       : bool      = True
 
 
 @dataclass
