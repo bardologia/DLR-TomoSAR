@@ -13,10 +13,47 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from configuration.dataset                import AugmentationConfig
-from configuration.training               import LossConfig
+from configuration.training               import LossConfig, ParamMatching
 from models                               import BACKBONE_MODEL_REGISTRY
 from pipelines.shared.training.run_naming import RunNaming
 from tools.monitoring.logger              import Logger
+
+
+class LegacyNaming:
+
+    MATCHING_ALIASES = {"sort_gt_by_mu": "sorted_gt", "hungarian_active": "hungarian", "hungarian": "hungarian", "sorted_gt": "sorted_gt"}
+
+    @classmethod
+    def normalize_matching(cls, raw) -> str | None:
+        token = str(raw).split(".")[-1].lower()
+        return cls.MATCHING_ALIASES.get(token)
+
+    @staticmethod
+    def run_prefix(model: str) -> str:
+        return f"run_{model}"
+
+    @staticmethod
+    def underscore_stem(model: str, head: str, matching: str) -> str:
+        return f"{model}_{head}_{matching}"
+
+    @classmethod
+    def underscore_tag(cls, model: str, head: str, matching: str, loss: LossConfig) -> str:
+        names = [term.name for term in RunNaming.NAMING_ORDER if getattr(loss, term.use_flag)]
+        return f"{cls.underscore_stem(model, head, matching)}_{'-'.join(names)}"
+
+    @staticmethod
+    def presence_letters(loss: LossConfig) -> str:
+        letters = ("A" if loss.use_active_normalization else "") + ("B" if loss.presence_balance else "") + ("F" if loss.amp_focal_gamma > 0.0 else "")
+        return letters or "none"
+
+    @classmethod
+    def presence_stem(cls, model: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
+        return "-".join((model, head, RunNaming.gaussians_tag(n_gaussians), RunNaming.augmentation_tag(augmentation), cls.presence_letters(loss)))
+
+    @classmethod
+    def presence_tag(cls, model: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
+        weights = "_".join(f"{term.name}_{getattr(loss, term.weight_key):g}" for term in RunNaming.NAMING_ORDER if getattr(loss, term.use_flag))
+        return f"{cls.presence_stem(model, head, loss, n_gaussians, augmentation)}-{weights}"
 
 
 class RunRenamer:
@@ -113,13 +150,16 @@ class RunRenamer:
             self.logger.warning(f"skip {run_dir.name}: trainer config has neither a loss curriculum nor a param_loss")
             return None
 
+        matching = self._matching(payload, summary)
+        if matching is None:
+            self.logger.warning(f"skip {run_dir.name}: no recognizable matching strategy in trainer config or run summary")
+            return None
+
         head         = model_config["config"].get("head", "conv")
-        loss         = self._loss_config(payload)
+        loss         = self._loss_config(payload, matching)
         augmentation = self._augmentation(dataset["augmentation"])
         n_gaussians  = trainer["gaussian"]["n_default_gaussians"]
 
-        old_stem = f"{model}_{head}_{self._matching(payload)}"
-        old_tag  = f"{old_stem}_{self._old_loss_tag(loss)}"
         new_stem = RunNaming.stem(model, head, loss, n_gaussians, augmentation)
         new_tag  = RunNaming.tag(model, head, loss, n_gaussians, augmentation)
 
@@ -129,20 +169,23 @@ class RunRenamer:
             return None
 
         if "__" in name:
-            base, rest = name.split("__", 1)
-            if base in (old_stem, model):
-                return f"{new_stem}__{rest}"
+            base, component = name.split("__", 1)
+            old_stems       = (LegacyNaming.presence_stem(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_stem(model, head, matching), model)
+            if base in old_stems:
+                return f"{new_stem}__{component}"
 
-            self.logger.warning(f"skip {name}: unit prefix '{base}' matches neither '{old_stem}' nor '{model}'")
+            self.logger.warning(f"skip {name}: unit prefix '{base}' matches no known naming generation {old_stems}")
             return None
 
-        if name == old_tag:
-            return new_tag
+        old_tags = (LegacyNaming.presence_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_tag(model, head, matching, loss), LegacyNaming.run_prefix(model))
+        for old_tag in old_tags:
+            if name == old_tag:
+                return new_tag
 
-        if name.startswith(f"{old_tag}_"):
-            return f"{new_tag}{name[len(old_tag):]}"
+            if name.startswith(f"{old_tag}_"):
+                return f"{new_tag}{name[len(old_tag):]}"
 
-        self.logger.warning(f"skip {name}: does not start with the expected old tag '{old_tag}'")
+        self.logger.warning(f"skip {name}: matches no known naming generation {old_tags}")
         return None
 
     def _read_json(self, path: Path) -> dict | None:
@@ -157,20 +200,23 @@ class RunRenamer:
 
         return trainer.get("param_loss")
 
-    def _loss_config(self, payload: dict) -> LossConfig:
-        known = {spec.name for spec in fields(LossConfig)}
-        return LossConfig(**{key: value for key, value in payload.items() if key in known})
+    def _matching(self, payload: dict, summary: dict) -> str | None:
+        raw = payload.get("param_matching") or payload.get("param_match") or summary.get("param_match")
+        if raw is None:
+            return None
+
+        return LegacyNaming.normalize_matching(raw)
+
+    def _loss_config(self, payload: dict, matching: str) -> LossConfig:
+        known  = {spec.name for spec in fields(LossConfig)}
+        config = LossConfig(**{key: value for key, value in payload.items() if key in known and key != "param_matching"})
+
+        config.param_matching = ParamMatching(matching)
+        return config
 
     def _augmentation(self, payload: dict) -> AugmentationConfig:
         known = {spec.name for spec in fields(AugmentationConfig)}
         return AugmentationConfig(**{key: value for key, value in payload.items() if key in known})
-
-    def _matching(self, payload: dict) -> str:
-        return str(payload["param_matching"]).split(".")[-1].lower()
-
-    def _old_loss_tag(self, loss: LossConfig) -> str:
-        names = [term.name for term in RunNaming.NAMING_ORDER if getattr(loss, term.use_flag)]
-        return "-".join(names)
 
     def _rename_runs(self, parent: Path, mapping: dict[str, str]) -> None:
         for old, new in mapping.items():
@@ -213,7 +259,7 @@ class RunRenamer:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-K_N-aug-presence-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
+    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
     parser.add_argument("roots", nargs="+", type=Path, help="any mix of run directories and roots holding them at any depth: training/trial roots, benchmark or cross-validation run tags (training/ or folds/), tuning trial trees, or whole runs roots")
     parser.add_argument("--apply", action="store_true", help="perform the renames; without it the script only prints the plan")
     args = parser.parse_args()
