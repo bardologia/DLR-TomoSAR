@@ -36,9 +36,9 @@
       "num_parameters": 31013830
     },
     "local_cnn": {
-      "signature": "7952dbb9c0fca31d482dce1efe3a560a1d16145a4a7a9b980b3dc70462c776b4",
+      "signature": "ebdc9cdc95b684493c0b1c89f55aa17deaf40197fe929d7696c0480c8d1d8353",
       "num_keys": 38,
-      "num_parameters": 2956038
+      "num_parameters": 31172550
     },
     "multires_unet": {
       "signature": "8cec14f9728bc829dea3a3b96017ef185db0f0fb8a117668122c1a30c33a19a9",
@@ -51,9 +51,9 @@
       "num_parameters": 29160006
     },
     "pixel_mlp": {
-      "signature": "b2e4541ba1faa3b53e81c25509e79cdb32f3afde619d584f487d800b34c3866a",
+      "signature": "785f5e8f39700b51ff47dc27a2713038bf006dcbe21f65cb8978aa1cb358ca55",
       "num_keys": 26,
-      "num_parameters": 3161094
+      "num_parameters": 30768006
     },
     "resunet": {
       "signature": "35b6c81e5144a70347ebe98d2bdf3f11ddf1e861343bb1d1f77f1f06ed49ddfd",
