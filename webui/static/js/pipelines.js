@@ -185,17 +185,22 @@ class PipelineFlow {
         stages.appendChild(chip);
       });
 
-      const play = document.createElement("span");
-      play.className = "flow-row__play";
-      play.innerHTML = "&#9658; watch the process";
-      stages.appendChild(play);
+      const hasScene = window.ProcessAnimator && window.ProcessAnimator.SCENES[p.key];
+      if (hasScene) {
+        const play = document.createElement("span");
+        play.className = "flow-row__play";
+        play.innerHTML = "&#9658; watch the process";
+        stages.appendChild(play);
+      }
 
       row.appendChild(lead);
       row.appendChild(stages);
-      row.addEventListener("click", (e) => {
-        if (e.target.closest(".flow-row__run")) return;
-        this._openProcess(p);
-      });
+      if (hasScene) {
+        row.addEventListener("click", (e) => {
+          if (e.target.closest(".flow-row__run")) return;
+          this._openProcess(p);
+        });
+      }
       this.hostEl.appendChild(row);
     });
 
