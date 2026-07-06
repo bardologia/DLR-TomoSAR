@@ -23,7 +23,6 @@ CANDIDATES = ["PS04", "PS06", "PS08", "PS10", "PS12", "PS14"]
 
 def test_curriculum_planner_crosses_warmup_and_complete():
     planner = CurriculumTrialPlanner(
-        "resunet",
         {"w1": {"use_param_l1": True}, "w2": {"use_l1_curve": True}},
         {"c1": {"use_mse_curve": True}},
     )
@@ -34,36 +33,35 @@ def test_curriculum_planner_crosses_warmup_and_complete():
     assert planner.summary() == {"Warmup losses": 2, "Complete losses": 1}
 
     run_name, overrides = plans[0]
-    assert run_name == "resunet_w-w1_c-c1"
+    assert run_name == "w-w1_c-c1"
     assert overrides["curriculum.enabled"] is True
     assert overrides["curriculum.warmup.use_param_l1"] is True
     assert overrides["curriculum.complete.use_mse_curve"] is True
 
 
 def test_warmup_planner_disables_curriculum():
-    planner = WarmupTrialPlanner("unet", {"a": {"use_param_l1": True}, "b": {"use_mse_curve": True}})
+    planner = WarmupTrialPlanner({"a": {"use_param_l1": True}, "b": {"use_mse_curve": True}})
 
     plans = planner.plan()
 
     assert len(plans) == 2
     assert all(overrides["curriculum.enabled"] is False for _, overrides in plans)
-    assert plans[0][0] == "unet_nc-a"
+    assert plans[0][0] == "nc-a"
     assert plans[0][1]["curriculum.complete.use_param_l1"] is True
 
 
 def test_presence_planner_disables_curriculum():
     planner = SlotPresenceTrialPlanner(
-        "resunet",
         {"AB": {"use_active_normalization": True, "presence_balance": True}},
     )
 
     plans = planner.plan()
 
     assert len(plans) == 1
-    assert [name for name, _ in plans] == ["resunet_pr-AB"]
+    assert [name for name, _ in plans] == ["pr-AB"]
     assert planner.summary()["Total runs"] == 1
 
-    ov = dict(plans)["resunet_pr-AB"]
+    ov = dict(plans)["pr-AB"]
 
     assert ov["curriculum.enabled"] is False
     assert "curriculum.complete.param_match" not in ov
@@ -72,13 +70,13 @@ def test_presence_planner_disables_curriculum():
 
 
 def test_presence_planner_default_matrix():
-    planner = SlotPresenceTrialPlanner("resunet", _default_presence_trials())
+    planner = SlotPresenceTrialPlanner(_default_presence_trials())
 
     plans = dict(planner.plan())
 
     assert len(plans) == 10
-    assert "resunet_pr-none" in plans
-    assert plans["resunet_pr-none"] == {"curriculum.enabled": False}
+    assert "pr-none" in plans
+    assert plans["pr-none"] == {"curriculum.enabled": False}
 
     for name, overrides in plans.items():
         if overrides.get("curriculum.warmup.amp_focal_gamma"):
@@ -86,33 +84,53 @@ def test_presence_planner_default_matrix():
 
 
 def test_patch_planner_emits_size_and_stride():
-    planner = PatchSizeTrialPlanner("resunet", PatchTrialsConfig(sizes=[32, 64], stride_ratio=0.5))
+    planner = PatchSizeTrialPlanner(PatchTrialsConfig(sizes=[32, 64], stride_ratio=0.5))
 
     plans = planner.plan()
 
     assert len(plans) == 2
 
     name, overrides = plans[0]
-    assert name == "resunet_p-32"
+    assert name == "p-32"
     assert overrides["training.patch_size"]   == (32, 32)
     assert overrides["training.patch_stride"] == 16
 
     assert plans[1][1]["training.patch_stride"] == 32
 
 
+def test_patch_planner_probes_max_batch_and_scales_lr_by_default():
+    planner = PatchSizeTrialPlanner(PatchTrialsConfig(sizes=[32, 64], stride_ratio=0.5))
+
+    for _name, overrides in planner.plan():
+        assert overrides["pretrain.find_batch_size"]     is True
+        assert overrides["training.scale_lr_with_batch"] is True
+
+    assert planner.summary()["Max-batch probe"] is True
+    assert planner.summary()["Scale LR"]        is True
+
+
+def test_patch_planner_can_disable_probe_and_lr_scaling():
+    planner = PatchSizeTrialPlanner(PatchTrialsConfig(sizes=[32], stride_ratio=0.5, find_max_batch=False, scale_lr=False))
+
+    overrides = planner.plan()[0][1]
+
+    assert overrides["pretrain.find_batch_size"]     is False
+    assert overrides["training.scale_lr_with_batch"] is False
+
+
 def test_patch_planner_rejects_empty_sizes():
     with pytest.raises(ValueError):
-        PatchSizeTrialPlanner("resunet", PatchTrialsConfig(sizes=[], stride_ratio=0.5))
+        PatchSizeTrialPlanner(PatchTrialsConfig(sizes=[], stride_ratio=0.5))
 
 
 def test_patch_planner_rejects_bad_stride_ratio():
     with pytest.raises(ValueError):
-        PatchSizeTrialPlanner("resunet", PatchTrialsConfig(sizes=[32], stride_ratio=1.5))
+        PatchSizeTrialPlanner(PatchTrialsConfig(sizes=[32], stride_ratio=1.5))
 
 
 def test_secondary_consecutive_blocks():
     trials  = SecondaryTrialsConfig(strategy="consecutive", n_secondaries=2, block_step=1)
-    planner = SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+    planner = SecondaryTrialPlanner(trials, CANDIDATES)
 
     plans = planner.plan()
 
@@ -120,12 +138,12 @@ def test_secondary_consecutive_blocks():
 
     name, overrides = plans[0]
     assert overrides["paths.secondary_labels"] == ("PS04", "PS06")
-    assert name.startswith("resunet_sec-consecutive-t00")
+    assert name.startswith("sec-consecutive-t00")
 
 
 def test_secondary_spaced_picks_strided_labels():
     trials  = SecondaryTrialsConfig(strategy="spaced", n_secondaries=2, block_step=1, spacing=2)
-    planner = SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+    planner = SecondaryTrialPlanner(trials, CANDIDATES)
 
     plans = planner.plan()
 
@@ -134,7 +152,7 @@ def test_secondary_spaced_picks_strided_labels():
 
 def test_secondary_uniform_produces_distinct_trials():
     trials  = SecondaryTrialsConfig(strategy="uniform", n_secondaries=2, n_trials=4, seed=0)
-    planner = SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+    planner = SecondaryTrialPlanner(trials, CANDIDATES)
 
     plans = planner.plan()
 
@@ -148,32 +166,32 @@ def test_secondary_gaussian_requires_mean_and_sigma():
     trials = SecondaryTrialsConfig(strategy="gaussian", n_secondaries=2, n_trials=2)
 
     with pytest.raises(ValueError):
-        SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+        SecondaryTrialPlanner(trials, CANDIDATES)
 
 
 def test_secondary_rejects_unknown_strategy():
     trials = SecondaryTrialsConfig(strategy="bogus", n_secondaries=2)
 
     with pytest.raises(ValueError):
-        SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+        SecondaryTrialPlanner(trials, CANDIDATES)
 
 
 def test_secondary_rejects_too_many_secondaries():
     trials = SecondaryTrialsConfig(strategy="consecutive", n_secondaries=99)
 
     with pytest.raises(ValueError):
-        SecondaryTrialPlanner("resunet", trials, CANDIDATES)
+        SecondaryTrialPlanner(trials, CANDIDATES)
 
 
 def test_input_planner_default_variant_drops_interferograms():
-    planner = InputTrialPlanner("resunet", _default_input_trials(), CANDIDATES)
+    planner = InputTrialPlanner(_default_input_trials(), CANDIDATES)
 
     plans = planner.plan()
 
     assert len(plans) == 1
 
     name, overrides = plans[0]
-    assert name == "resunet_in-amp-allsec-noifg"
+    assert name == "in-amp-allsec-noifg"
     assert overrides["input.use_primary"]        is True
     assert overrides["input.use_secondaries"]    is True
     assert overrides["input.use_interferograms"] is False
@@ -182,23 +200,23 @@ def test_input_planner_default_variant_drops_interferograms():
 
 def test_input_planner_uses_all_tracks_per_variant():
     trials  = {"a": {"use_interferograms": False}, "b": {"use_dem": True}}
-    planner = InputTrialPlanner("unet", trials, CANDIDATES)
+    planner = InputTrialPlanner(trials, CANDIDATES)
 
     plans = dict(planner.plan())
 
-    assert set(plans) == {"unet_in-a", "unet_in-b"}
+    assert set(plans) == {"in-a", "in-b"}
     assert all(overrides["paths.secondary_labels"] == tuple(CANDIDATES) for overrides in plans.values())
     assert planner.summary() == {"Input variants": 2, "Tracks": f"all ({len(CANDIDATES)} secondaries)"}
 
 
 def test_input_planner_rejects_unknown_keys():
     with pytest.raises(ValueError):
-        InputTrialPlanner("resunet", {"bad": {"use_phase": True}}, CANDIDATES)
+        InputTrialPlanner({"bad": {"use_phase": True}}, CANDIDATES)
 
 
 def test_input_planner_rejects_empty_trials():
     with pytest.raises(ValueError):
-        InputTrialPlanner("resunet", {}, CANDIDATES)
+        InputTrialPlanner({}, CANDIDATES)
 
 
 ABL_FEATURES = [
@@ -209,61 +227,61 @@ ABL_FEATURES = [
 
 
 def test_ablation_planner_cumulative_full_to_baseline():
-    planner = AblationTrialPlanner("resunet", ABL_FEATURES, include_full=True)
+    planner = AblationTrialPlanner(ABL_FEATURES, include_full=True)
 
     plans = planner.plan()
     names = [name for name, _ in plans]
 
     assert names == [
-        "resunet_abl-0-full",
-        "resunet_abl-1-no_active_norm",
-        "resunet_abl-2-no_focal",
-        "resunet_abl-3-baseline",
+        "abl-0-full",
+        "abl-1-no_active_norm",
+        "abl-2-no_focal",
+        "abl-3-baseline",
     ]
     assert planner.summary()["Total runs"] == 4
 
-    full = dict(plans)["resunet_abl-0-full"]
+    full = dict(plans)["abl-0-full"]
     assert full["curriculum.warmup.use_active_normalization"] is True
     assert full["curriculum.warmup.amp_focal_gamma"]      == 2.0
     assert full["curriculum.warmup.presence_balance"]     is True
 
-    step1 = dict(plans)["resunet_abl-1-no_active_norm"]
+    step1 = dict(plans)["abl-1-no_active_norm"]
     assert step1["curriculum.warmup.use_active_normalization"] is False
     assert step1["curriculum.warmup.amp_focal_gamma"]     == 2.0
     assert step1["curriculum.warmup.presence_balance"]    is True
 
-    baseline = dict(plans)["resunet_abl-3-baseline"]
+    baseline = dict(plans)["abl-3-baseline"]
     assert baseline["curriculum.warmup.use_active_normalization"] is False
     assert baseline["curriculum.warmup.amp_focal_gamma"]  == 0.0
     assert baseline["curriculum.warmup.presence_balance"] is False
 
 
 def test_ablation_planner_without_full_run():
-    planner = AblationTrialPlanner("unet", ABL_FEATURES, include_full=False)
+    planner = AblationTrialPlanner(ABL_FEATURES, include_full=False)
 
     plans = planner.plan()
 
     assert [name for name, _ in plans] == [
-        "unet_abl-1-no_active_norm",
-        "unet_abl-2-no_focal",
-        "unet_abl-3-baseline",
+        "abl-1-no_active_norm",
+        "abl-2-no_focal",
+        "abl-3-baseline",
     ]
     assert planner.summary()["Total runs"] == 3
 
 
 def test_ablation_planner_rejects_empty_features():
     with pytest.raises(ValueError):
-        AblationTrialPlanner("resunet", [], include_full=True)
+        AblationTrialPlanner([], include_full=True)
 
 
 def test_ablation_planner_rejects_feature_without_degrade():
     with pytest.raises(ValueError):
-        AblationTrialPlanner("resunet", [{"label": "x"}], include_full=True)
+        AblationTrialPlanner([{"label": "x"}], include_full=True)
 
 
 def test_ablation_planner_rejects_feature_without_enable():
     with pytest.raises(ValueError, match="enable"):
-        AblationTrialPlanner("resunet", [{"label": "x", "degrade": {"curriculum.enabled": False}}], include_full=True)
+        AblationTrialPlanner([{"label": "x", "degrade": {"curriculum.enabled": False}}], include_full=True)
 
 
 def test_ablation_planner_rejects_duplicate_labels():
@@ -273,7 +291,7 @@ def test_ablation_planner_rejects_duplicate_labels():
     ]
 
     with pytest.raises(ValueError, match="unique"):
-        AblationTrialPlanner("resunet", features, include_full=True)
+        AblationTrialPlanner(features, include_full=True)
 
 
 def test_ablation_planner_allows_complete_terms_with_disabled_curriculum():
@@ -282,12 +300,12 @@ def test_ablation_planner_allows_complete_terms_with_disabled_curriculum():
         {"label": "covariance", "enable": {"curriculum.complete.use_covariance_match": True},    "degrade": {"curriculum.complete.use_covariance_match": False}},
     ]
 
-    planner = AblationTrialPlanner("resunet", features, include_full=True)
+    planner = AblationTrialPlanner(features, include_full=True)
 
     names = [name for name, _ in planner.plan()]
-    assert names == ["resunet_abl-0-full", "resunet_abl-1-no_curriculum", "resunet_abl-2-baseline"]
+    assert names == ["abl-0-full", "abl-1-no_curriculum", "abl-2-baseline"]
 
-    no_curriculum = dict(planner.plan())["resunet_abl-1-no_curriculum"]
+    no_curriculum = dict(planner.plan())["abl-1-no_curriculum"]
     assert no_curriculum["curriculum.enabled"]                       is False
     assert no_curriculum["curriculum.complete.use_covariance_match"] is True
 
@@ -393,13 +411,13 @@ def test_ablation_catalog_covers_normalization_and_clamp():
 
 @pytest.mark.real_data
 def test_input_from_dataset_uses_full_stack(test_data_dir):
-    planner = InputTrialPlanner.from_dataset("resunet", _default_input_trials(), GeometryConfig(), test_data_dir)
+    planner = InputTrialPlanner.from_dataset(_default_input_trials(), GeometryConfig(), test_data_dir)
 
     plans = planner.plan()
 
     assert len(plans) == 1
     name, overrides = plans[0]
-    assert name == "resunet_in-amp-allsec-noifg"
+    assert name == "in-amp-allsec-noifg"
     assert overrides["input.use_interferograms"] is False
     assert len(overrides["paths.secondary_labels"]) == len(planner.candidates) >= 1
 
@@ -407,7 +425,7 @@ def test_input_from_dataset_uses_full_stack(test_data_dir):
 @pytest.mark.real_data
 def test_secondary_from_dataset_loads_candidates(test_data_dir):
     trials  = SecondaryTrialsConfig(strategy="consecutive", n_secondaries=2, block_step=1)
-    planner = SecondaryTrialPlanner.from_dataset("resunet", trials, GeometryConfig(), test_data_dir)
+    planner = SecondaryTrialPlanner.from_dataset(trials, GeometryConfig(), test_data_dir)
 
     plans = planner.plan()
 
@@ -430,7 +448,7 @@ def test_ablation_catalog_paths_are_entry_config_leaves():
 
 def test_ablation_default_plan_round_trips_through_config_cli():
     config  = BackboneEntryConfig()
-    planner = AblationTrialPlanner(config.backbone_name, config.ablation_features, config.ablation_include_full)
+    planner = AblationTrialPlanner(config.ablation_features, config.ablation_include_full)
 
     plans = planner.plan()
     assert len(plans) == len(config.ablation_features) + 1
@@ -445,8 +463,8 @@ def test_ablation_default_plan_round_trips_through_config_cli():
         trial = _apply({**overrides, "run_name": run_name, "logdir": "/tmp/abl"})
         assert trial.run_name == run_name
 
-    full     = _apply(dict(plans)[f"{config.backbone_name}_abl-0-full"])
-    baseline = _apply(dict(plans)[f"{config.backbone_name}_abl-{len(config.ablation_features)}-baseline"])
+    full     = _apply(dict(plans)["abl-0-full"])
+    baseline = _apply(dict(plans)[f"abl-{len(config.ablation_features)}-baseline"])
     assert full.curriculum.enabled                         is True
     assert full.backbone_name                              == "resunet"
     assert full.curriculum.complete.use_param_l1           is True

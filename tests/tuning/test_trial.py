@@ -252,7 +252,10 @@ class FakeJepaTraining:
 
 class FakeJepaEntry:
     def __init__(self):
-        self.training = FakeJepaTraining()
+        from configuration.training import LossConfig
+
+        self.training   = FakeJepaTraining()
+        self.param_loss = LossConfig(use_param_l1=True)
 
 
 def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_path, monkeypatch):
@@ -281,7 +284,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
 
     entry = captured["entry"]
     assert entry.backbone_name == "vit"
-    assert entry.run_name      == "trial_0000"
+    assert entry.run_name      == "vit_conv_hungarian_param_l1_trial_0000"
     assert set(entry.model_overrides.keys()) == {"depth", "hidden_dim"}
     assert entry.model_overrides["depth"]      in [2, 4, 8]
     assert entry.model_overrides["hidden_dim"] in [64, 128]

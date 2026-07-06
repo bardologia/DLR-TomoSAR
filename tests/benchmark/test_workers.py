@@ -20,13 +20,18 @@ def config(tmp_path):
     return config
 
 
-def test_run_name_encodes_component_and_seed(config):
-    worker = BenchmarkWorker(config, "tag")
+def test_run_name_encodes_model_head_matching_component_and_seed(config):
+    from pipelines.shared.training.run_naming import RunNaming
 
-    assert worker._run_name("unet", None, None)       == "unet"
-    assert worker._run_name("unet", None, 5)          == "unet_seed5"
-    assert worker._run_name("unet", "param_l1", None) == "unet__param_l1"
-    assert worker._run_name("unet", "param_l1", 5)    == "unet__param_l1_seed5"
+    worker   = BenchmarkWorker(config, "tag")
+    matching = config.loss.param_matching.value
+    tag      = RunNaming.benchmark_unit("unet", None, config.loss)
+
+    assert worker._run_name("unet", None, None)       == tag
+    assert worker._run_name("unet", None, 5)          == f"{tag}_seed5"
+    assert worker._run_name("unet", "param_l1", None) == f"unet_conv_{matching}__param_l1"
+    assert worker._run_name("unet", "param_l1", 5)    == f"unet_conv_{matching}__param_l1_seed5"
+    assert tag.startswith(f"unet_conv_{matching}_param_l1")
 
 
 def test_size_overrides_empty_without_file(config):

@@ -209,22 +209,30 @@ def test_training_seed_sweep_job_uses_base_model_and_seed(config, logger_stub):
     config.seeds = [7]
     stage = TrainingStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    assert stage.items == ["unet__param_l1_seed7"]
+    unit = f"unet_conv_{config.loss.param_matching.value}__param_l1"
+    assert stage.items == [f"{unit}_seed7"]
 
-    job = stage._job("unet__param_l1_seed7")
+    job = stage._job(f"{unit}_seed7")
     assert job.command[job.command.index("--model") + 1] == "unet"
     assert job.command[job.command.index("--seed")  + 1] == "7"
     assert job.command[job.command.index("--worker") + 1] == "train"
-    assert job.log_path == stage.stage_dir / "unet__param_l1_seed7" / "worker.log"
+    assert job.log_path == stage.stage_dir / f"{unit}_seed7" / "worker.log"
 
 
 def test_inference_seed_sweep_matches_training_run_names(config, logger_stub):
     config.seeds = [3, 4]
     stage = InferenceStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    assert stage.items == ["unet__param_l1_seed3", "unet__param_l1_seed4"]
+    unit = f"unet_conv_{config.loss.param_matching.value}__param_l1"
+    assert stage.items == [f"{unit}_seed3", f"{unit}_seed4"]
 
-    job = stage._job("unet__param_l1_seed4")
+    job = stage._job(f"{unit}_seed4")
     assert job.command[job.command.index("--model") + 1] == "unet"
     assert job.command[job.command.index("--seed")  + 1] == "4"
     assert job.command[job.command.index("--worker") + 1] == "infer"
+
+
+def test_unit_base_names_model_head_matching_and_component(config):
+    unit = SeedExpandedStage.unit_base(config, "resunet-set_pred", "mse_curve")
+
+    assert unit == f"resunet_set_pred_{config.loss.param_matching.value}__mse_curve"

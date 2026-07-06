@@ -231,9 +231,11 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
 
     worker.run(1, "test")
 
-    expected_dir = worker.run_dir / "folds" / "fold_1"
+    expected_dir = worker.run_dir / "folds" / worker.fold_run_name(1, None)
     assert captured["ran"]                       is True
     assert captured["config"].run_directory      == expected_dir
+    assert expected_dir.name.endswith("_fold_1")
+    assert expected_dir.name.startswith(f"{worker.config.backbone_name}_{worker.config.backbone_head}_")
     assert captured["config"].split              == "test"
     assert captured["config"].output_subdir      == "test"
 
@@ -262,4 +264,7 @@ def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypa
     assert trainer_config.curriculum.enabled is True
     assert trainer_config.curriculum.complete.use_covariance_match is True
     assert trainer_config.geometry.baselines_origin == str(config.geometry.baselines_file(test_data_dir))
-    assert captured["run_name"] == "fold_1_seed7"
+    from pipelines.shared.training.run_naming import RunNaming
+
+    run_tag = RunNaming.training_tag(config.backbone_name, config.backbone_head, config.curriculum)
+    assert captured["run_name"] == f"{run_tag}_fold_1_seed7"

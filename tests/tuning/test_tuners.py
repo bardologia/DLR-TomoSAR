@@ -257,7 +257,7 @@ def test_tuner_objective_materializes_trial_config(fake_logger, tune_cfg, tmp_pa
 
     assert captured["backbone_name"] == "unet"
     assert captured["seed"]          == tune_cfg.base_seed + 0
-    assert captured["run_name"]      == "trial_0000"
+    assert captured["run_name"]      == "unet_conv_hungarian_param_l1_trial_0000"
     assert captured["emit_docs"]     is True
     assert captured["trial"].number  == 0
 
@@ -294,7 +294,10 @@ class _FakeEarlyStop:
 
 class _FakeTrainerConfig:
     def __init__(self):
+        from configuration.training import LossConfig, LossCurriculumConfig
+
         self.training       = _FakeTrainingLoop()
         self.scheduler      = _FakeScheduler()
         self.early_stopping = _FakeEarlyStop()
         self.io             = _FakeIO()
+        self.curriculum     = LossCurriculumConfig(complete=LossConfig(use_param_l1=True))
