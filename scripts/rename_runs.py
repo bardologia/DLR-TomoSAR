@@ -21,8 +21,10 @@ from tools.monitoring.logger              import Logger
 
 class RunRenamer:
 
-    PATCH_FILES  = (Path("meta") / "run_summary.json", Path("docs") / "trainer_config.json", Path("docs") / "resolved_entry_config.json")
-    RESULT_FILES = ("training_results.json", "inference_results.json")
+    PATCH_FILES    = (Path("meta") / "run_summary.json", Path("docs") / "trainer_config.json", Path("docs") / "resolved_entry_config.json")
+    RESULT_FILES   = ("training_results.json", "inference_results.json")
+    RUNS_SUBDIRS   = ("training", "folds")
+    SCHEDULER_FILE = Path("batch_train_logs") / "train_scheduler_results.json"
 
     def __init__(self, roots: list[Path], apply: bool) -> None:
         self.roots  = [Path(root) for root in roots]
@@ -33,51 +35,48 @@ class RunRenamer:
         if not root.is_dir():
             raise FileNotFoundError(f"{root} is not a directory")
 
-        if (root / "training").is_dir():
-            self._process_benchmark_tag(root)
+        groups = {}
+        self._discover(root, groups)
+
+        if not groups:
+            raise FileNotFoundError(f"{root} holds no training runs (*/meta/run_summary.json) and no run collections (*/training, */folds)")
+
+        for parent in sorted(groups):
+            self._process_runs(parent, groups[parent])
+
+    def _discover(self, directory: Path, groups: dict[Path, list[Path]]) -> None:
+        if (directory / "meta" / "run_summary.json").is_file():
+            groups.setdefault(directory.parent, []).append(directory)
             return
 
-        if (root / "meta" / "run_summary.json").is_file():
-            self._process_runs_root(root.parent, [root])
+        collections = [directory / sub for sub in self.RUNS_SUBDIRS if (directory / sub).is_dir()]
+        if collections:
+            for collection in collections:
+                self._discover(collection, groups)
             return
 
-        children = [child for child in sorted(root.iterdir()) if child.is_dir()]
-        tags     = [child for child in children if (child / "training").is_dir()]
-        runs     = [child for child in children if (child / "meta" / "run_summary.json").is_file()]
+        for child in sorted(directory.iterdir()):
+            if child.is_dir():
+                self._discover(child, groups)
 
-        if not tags and not runs:
-            raise FileNotFoundError(f"{root} holds no benchmark run tags (*/training) and no training runs (*/meta/run_summary.json)")
-
-        for tag_dir in tags:
-            self._process_benchmark_tag(tag_dir)
-
-        if runs:
-            self._process_runs_root(root, runs)
-
-    def _process_benchmark_tag(self, tag_dir: Path) -> None:
-        self.logger.section(f"[{self._mode()}] benchmark tag {tag_dir}")
-
-        run_dirs = sorted(path for path in (tag_dir / "training").iterdir() if path.is_dir())
-        mapping  = self._plan(run_dirs)
-        if not mapping:
-            self.logger.info("nothing to rename")
-            return
-
-        self._rename_runs(tag_dir / "training", mapping)
-
-        if self.apply:
-            for name in self.RESULT_FILES:
-                self._patch_file(tag_dir / "pipeline" / name, mapping)
-
-    def _process_runs_root(self, root: Path, run_dirs: list[Path]) -> None:
-        self.logger.section(f"[{self._mode()}] runs root {root}")
+    def _process_runs(self, parent: Path, run_dirs: list[Path]) -> None:
+        self.logger.section(f"[{self._mode()}] {parent}")
 
         mapping = self._plan(run_dirs)
         if not mapping:
             self.logger.info("nothing to rename")
             return
 
-        self._rename_runs(root, mapping)
+        self._rename_runs(parent, mapping)
+
+        if not self.apply:
+            return
+
+        self._patch_file(parent / self.SCHEDULER_FILE, mapping)
+
+        if parent.name in self.RUNS_SUBDIRS:
+            for name in self.RESULT_FILES:
+                self._patch_file(parent.parent / "pipeline" / name, mapping)
 
     def _mode(self) -> str:
         return "APPLY" if self.apply else "DRY RUN"
@@ -215,7 +214,7 @@ class RunRenamer:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-K_N-aug-presence-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
-    parser.add_argument("roots", nargs="+", type=Path, help="run directories, roots holding training runs, benchmark run-tag directories (containing training/), or a benchmarks root holding them")
+    parser.add_argument("roots", nargs="+", type=Path, help="any mix of run directories and roots holding them at any depth: training/trial roots, benchmark or cross-validation run tags (training/ or folds/), tuning trial trees, or whole runs roots")
     parser.add_argument("--apply", action="store_true", help="perform the renames; without it the script only prints the plan")
     args = parser.parse_args()
 
