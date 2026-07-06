@@ -33,9 +33,14 @@ class RunNaming:
         letters = "".join(letter for letter, probability in cls.AUGMENTATION_FLAGS if getattr(augmentation, probability) > 0.0)
         return letters or "noaug"
 
+    @staticmethod
+    def presence_tag(loss: LossConfig) -> str:
+        letters = ("A" if loss.use_active_normalization else "") + ("B" if loss.presence_balance else "")
+        return letters or "none"
+
     @classmethod
     def stem(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
-        return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation)))
+        return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation), cls.presence_tag(loss)))
 
     @classmethod
     def tag(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:

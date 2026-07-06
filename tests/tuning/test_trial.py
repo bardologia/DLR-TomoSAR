@@ -289,7 +289,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
 
     entry = captured["entry"]
     assert entry.backbone_name == "vit"
-    assert entry.run_name      == "vit-conv-hungarian-K_5-hv-param_l1_0.1_trial_0000"
+    assert entry.run_name      == "vit-conv-hungarian-K_5-hv-none-param_l1_0.1_trial_0000"
     assert set(entry.model_overrides.keys()) == {"depth", "hidden_dim"}
     assert entry.model_overrides["depth"]      in [2, 4, 8]
     assert entry.model_overrides["hidden_dim"] in [64, 128]

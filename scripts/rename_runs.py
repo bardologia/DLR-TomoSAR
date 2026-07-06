@@ -55,6 +55,14 @@ class LegacyNaming:
         weights = "_".join(f"{term.name}_{getattr(loss, term.weight_key):g}" for term in RunNaming.NAMING_ORDER if getattr(loss, term.use_flag))
         return f"{cls.presence_stem(model, head, loss, n_gaussians, augmentation)}-{weights}"
 
+    @staticmethod
+    def flagless_stem(model: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
+        return "-".join((model, head, RunNaming.matching_tag(loss), RunNaming.gaussians_tag(n_gaussians), RunNaming.augmentation_tag(augmentation)))
+
+    @classmethod
+    def flagless_tag(cls, model: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
+        return f"{cls.flagless_stem(model, head, loss, n_gaussians, augmentation)}-{RunNaming.loss_tag(loss)}"
+
 
 class RunRenamer:
 
@@ -170,14 +178,14 @@ class RunRenamer:
 
         if "__" in name:
             base, component = name.split("__", 1)
-            old_stems       = (LegacyNaming.presence_stem(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_stem(model, head, matching), model)
+            old_stems       = (LegacyNaming.flagless_stem(model, head, loss, n_gaussians, augmentation), LegacyNaming.presence_stem(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_stem(model, head, matching), model)
             if base in old_stems:
                 return f"{new_stem}__{component}"
 
             self.logger.warning(f"skip {name}: unit prefix '{base}' matches no known naming generation {old_stems}")
             return None
 
-        old_tags = (LegacyNaming.presence_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_tag(model, head, matching, loss), LegacyNaming.run_prefix(model))
+        old_tags = (LegacyNaming.flagless_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.presence_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_tag(model, head, matching, loss), LegacyNaming.run_prefix(model))
         for old_tag in old_tags:
             if name == old_tag:
                 return new_tag
@@ -259,7 +267,7 @@ class RunRenamer:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
+    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-presence-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
     parser.add_argument("roots", nargs="+", type=Path, help="any mix of run directories and roots holding them at any depth: training/trial roots, benchmark or cross-validation run tags (training/ or folds/), tuning trial trees, or whole runs roots")
     parser.add_argument("--apply", action="store_true", help="perform the renames; without it the script only prints the plan")
     args = parser.parse_args()
