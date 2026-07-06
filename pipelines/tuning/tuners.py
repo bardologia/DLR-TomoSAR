@@ -5,6 +5,7 @@ from pathlib import Path
 
 import optuna
 
+from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.shared.training.run_naming import RunNaming
 from tools.data.io import FileIO
@@ -119,7 +120,7 @@ class Tuner:
         trainer_cfg.early_stopping.patience = self.tune_cfg.early_stop_patience
         trainer_cfg.io.logdir               = str(Path(self.log_dir) / "trials" / f"trial_{trial.number:04d}")
 
-        run_tag = RunNaming.training_tag(self.backbone_name, self.head, trainer_cfg.curriculum)
+        run_tag = RunNaming.training_tag(self.backbone_name, self.head, trainer_cfg.curriculum, trainer_cfg.gaussian.n_default_gaussians, dataset_cfg.augmentation)
 
         pipeline = TrialPipeline(
             trainer_config = trainer_cfg,
@@ -232,8 +233,9 @@ class JepaTuner:
     def _objective(self, trial: optuna.Trial) -> float:
         from pipelines.tuning.trial import TrialJepaPipeline
 
-        sampled = self.sampler.sample(trial, self.space)
-        run_tag = RunNaming.tag(self.backbone_name, self.head, self.entry_template.param_loss)
+        sampled     = self.sampler.sample(trial, self.space)
+        n_gaussians = ConfigFactory(self.entry_template).gaussian_config().n_default_gaussians
+        run_tag     = RunNaming.tag(self.backbone_name, self.head, self.entry_template.param_loss, n_gaussians, self.entry_template.augmentation)
 
         entry                 = copy.deepcopy(self.entry_template)
         entry.backbone_name   = self.backbone_name

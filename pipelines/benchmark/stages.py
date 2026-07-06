@@ -5,6 +5,7 @@ from dataclasses import asdict
 from pathlib     import Path
 
 from configuration.benchmark import BenchmarkConfig
+from configuration.sar.gaussian_config          import GaussianConfig
 from pipelines.backbone.training.loss_terms    import LossComponentCatalog
 from pipelines.benchmark.results                import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
@@ -35,11 +36,15 @@ class SeedExpandedStage:
         return components
 
     @staticmethod
-    def unit_base(config: BenchmarkConfig, model: str, component: str | None) -> str:
+    def n_gaussians(config: BenchmarkConfig) -> int:
+        return GaussianConfig.from_dataset(config.paths.dataset_path, config.paths.parameters_path).n_default_gaussians
+
+    @classmethod
+    def unit_base(cls, config: BenchmarkConfig, model: str, component: str | None) -> str:
         if config.training_type == "backbone":
-            return RunNaming.benchmark_unit(model, component, config.loss)
+            return RunNaming.benchmark_unit(model, component, config.loss, cls.n_gaussians(config), config.augmentation)
         if config.training_type == "jepa":
-            return RunNaming.benchmark_unit(model, None, config.jepa.param_loss)
+            return RunNaming.benchmark_unit(model, None, config.jepa.param_loss, cls.n_gaussians(config), config.augmentation)
 
         return model if component is None else f"{model}__{component}"
 

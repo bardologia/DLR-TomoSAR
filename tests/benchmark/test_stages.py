@@ -37,6 +37,13 @@ def config(tmp_path):
     return config
 
 
+@pytest.fixture
+def data_config(config, test_data_dir):
+    config.paths.dataset_path    = test_data_dir
+    config.paths.parameters_path = test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
+    return config
+
+
 ENTRY = Path("/entry/run_benchmark.py")
 
 
@@ -145,9 +152,10 @@ def test_sizematch_load_cached_returns_when_complete(config, logger_stub):
     assert set(cached) == {"unet", "resunet"}
 
 
-def test_training_and_inference_stages_subclass_queued_bases(config, logger_stub):
-    train = TrainingStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
-    infer = InferenceStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+@pytest.mark.real_data
+def test_training_and_inference_stages_subclass_queued_bases(data_config, logger_stub):
+    train = TrainingStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+    infer = InferenceStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
     assert isinstance(train, QueuedTrainingStage)
     assert isinstance(infer, QueuedInferenceStage)
@@ -205,11 +213,12 @@ def test_sweep_components_collapse_for_non_backbone(config):
     assert SeedExpandedStage.components(config) == [None]
 
 
-def test_training_seed_sweep_job_uses_base_model_and_seed(config, logger_stub):
-    config.seeds = [7]
-    stage = TrainingStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+@pytest.mark.real_data
+def test_training_seed_sweep_job_uses_base_model_and_seed(data_config, logger_stub):
+    data_config.seeds = [7]
+    stage = TrainingStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    unit = f"unet_conv_{config.loss.param_matching.value}__param_l1"
+    unit = "unet-conv-K_5-hv-A__param_l1"
     assert stage.items == [f"{unit}_seed7"]
 
     job = stage._job(f"{unit}_seed7")
@@ -219,11 +228,12 @@ def test_training_seed_sweep_job_uses_base_model_and_seed(config, logger_stub):
     assert job.log_path == stage.stage_dir / f"{unit}_seed7" / "worker.log"
 
 
-def test_inference_seed_sweep_matches_training_run_names(config, logger_stub):
-    config.seeds = [3, 4]
-    stage = InferenceStage(config=config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
+@pytest.mark.real_data
+def test_inference_seed_sweep_matches_training_run_names(data_config, logger_stub):
+    data_config.seeds = [3, 4]
+    stage = InferenceStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    unit = f"unet_conv_{config.loss.param_matching.value}__param_l1"
+    unit = "unet-conv-K_5-hv-A__param_l1"
     assert stage.items == [f"{unit}_seed3", f"{unit}_seed4"]
 
     job = stage._job(f"{unit}_seed4")
@@ -232,7 +242,8 @@ def test_inference_seed_sweep_matches_training_run_names(config, logger_stub):
     assert job.command[job.command.index("--worker") + 1] == "infer"
 
 
-def test_unit_base_names_model_head_matching_and_component(config):
-    unit = SeedExpandedStage.unit_base(config, "resunet-set_pred", "mse_curve")
+@pytest.mark.real_data
+def test_unit_base_names_model_head_stem_and_component(data_config):
+    unit = SeedExpandedStage.unit_base(data_config, "resunet-set_pred", "mse_curve")
 
-    assert unit == f"resunet_set_pred_{config.loss.param_matching.value}__mse_curve"
+    assert unit == "resunet-set_pred-K_5-hv-A__mse_curve"

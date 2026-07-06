@@ -30,7 +30,8 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
     @property
     def label(self) -> str:
-        return RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum)
+        n_gaussians = self.factory.gaussian_config().n_default_gaussians
+        return RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum, n_gaussians, self.config.augmentation)
 
     def _resolve_run_name(self) -> str:
         return RunNaming.compose(self.label, self.config.run_name or RunTag.now())

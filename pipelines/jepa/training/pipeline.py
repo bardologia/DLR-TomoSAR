@@ -289,7 +289,8 @@ class SingleTrainRunner(EntryConfigTrainRunner):
 
     @property
     def label(self) -> str:
-        return RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.param_loss)
+        n_gaussians = ConfigFactory(self.config).gaussian_config().n_default_gaussians
+        return RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.param_loss, n_gaussians, self.config.augmentation)
 
     def _resolve_run_name(self) -> str:
         return RunNaming.compose(self.label, self.config.run_name or RunTag.now())

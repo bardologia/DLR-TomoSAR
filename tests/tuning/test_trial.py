@@ -251,14 +251,19 @@ class FakeJepaTraining:
 
 
 class FakeJepaEntry:
-    def __init__(self):
-        from configuration.training import LossConfig
+    def __init__(self, test_data_dir: Path):
+        from configuration.dataset               import AugmentationConfig
+        from configuration.training              import LossConfig
+        from configuration.training.general.run  import TrainingPathsConfig
 
-        self.training   = FakeJepaTraining()
-        self.param_loss = LossConfig(use_param_l1=True)
+        self.training     = FakeJepaTraining()
+        self.param_loss   = LossConfig(use_param_l1=True)
+        self.paths        = TrainingPathsConfig(dataset_path=test_data_dir, parameters_path=test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy")
+        self.augmentation = AugmentationConfig()
 
 
-def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_path, monkeypatch):
+@pytest.mark.real_data
+def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_path, monkeypatch, test_data_dir):
     captured = {}
 
     class CaptureJepaPipeline:
@@ -273,7 +278,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
     tuner = JepaTuner(
         model_name       = "vit",
         model_config_cls = FakeJepaConfig,
-        entry_template   = FakeJepaEntry(),
+        entry_template   = FakeJepaEntry(test_data_dir),
         tune_cfg         = tune_cfg,
         log_dir          = str(tmp_path),
         logger           = fake_logger,
@@ -284,17 +289,18 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
 
     entry = captured["entry"]
     assert entry.backbone_name == "vit"
-    assert entry.run_name      == "vit_conv_hungarian_param_l1_trial_0000"
+    assert entry.run_name      == "vit-conv-K_5-hv-none-param_l1_0.1_trial_0000"
     assert set(entry.model_overrides.keys()) == {"depth", "hidden_dim"}
     assert entry.model_overrides["depth"]      in [2, 4, 8]
     assert entry.model_overrides["hidden_dim"] in [64, 128]
 
 
-def test_jepa_tuner_space_uses_arch_params_only(fake_logger, tune_cfg, tmp_path):
+@pytest.mark.real_data
+def test_jepa_tuner_space_uses_arch_params_only(fake_logger, tune_cfg, tmp_path, test_data_dir):
     tuner = JepaTuner(
         model_name       = "vit",
         model_config_cls = FakeJepaConfig,
-        entry_template   = FakeJepaEntry(),
+        entry_template   = FakeJepaEntry(test_data_dir),
         tune_cfg         = tune_cfg,
         log_dir          = str(tmp_path),
         logger           = fake_logger,

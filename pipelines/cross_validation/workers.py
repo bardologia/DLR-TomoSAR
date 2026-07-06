@@ -116,9 +116,11 @@ class CrossValidationWorker(WorkerBase):
 
         fold = FoldNaming.run_name(fold_index, seed)
         if self.config.training_type == "backbone":
-            return RunNaming.compose(RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum), fold)
+            n_gaussians = self.factory.gaussian_config().n_default_gaussians
+            return RunNaming.compose(RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum, n_gaussians, self.config.augmentation), fold)
         if self.config.training_type == "jepa":
-            return RunNaming.compose(RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.jepa.param_loss), fold)
+            n_gaussians = self.factory.gaussian_config().n_default_gaussians
+            return RunNaming.compose(RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.jepa.param_loss, n_gaussians, self.config.augmentation), fold)
 
         return fold
 

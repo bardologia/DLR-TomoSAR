@@ -215,7 +215,7 @@ def test_tuner_run_optimizes_with_injected_objective(fake_logger, tune_cfg, tmp_
         model_name          = "unet",
         model_config_cls    = UNetConfig,
         base_trainer_config = _FakeTrainerConfig(),
-        base_dataset_config = object(),
+        base_dataset_config = _FakeDatasetConfig(),
         tune_cfg            = tune_cfg,
         log_dir             = str(tmp_path),
         logger              = fake_logger,
@@ -245,7 +245,7 @@ def test_tuner_objective_materializes_trial_config(fake_logger, tune_cfg, tmp_pa
         model_name          = "unet",
         model_config_cls    = UNetConfig,
         base_trainer_config = _FakeTrainerConfig(),
-        base_dataset_config = object(),
+        base_dataset_config = _FakeDatasetConfig(),
         tune_cfg            = tune_cfg,
         log_dir             = str(tmp_path),
         logger              = fake_logger,
@@ -257,7 +257,7 @@ def test_tuner_objective_materializes_trial_config(fake_logger, tune_cfg, tmp_pa
 
     assert captured["backbone_name"] == "unet"
     assert captured["seed"]          == tune_cfg.base_seed + 0
-    assert captured["run_name"]      == "unet_conv_hungarian_param_l1_trial_0000"
+    assert captured["run_name"]      == "unet-conv-K_3-hv-none-param_l1_0.1_trial_0000"
     assert captured["emit_docs"]     is True
     assert captured["trial"].number  == 0
 
@@ -294,6 +294,7 @@ class _FakeEarlyStop:
 
 class _FakeTrainerConfig:
     def __init__(self):
+        from configuration.sar.gaussian_config import GaussianConfig
         from configuration.training import LossConfig, LossCurriculumConfig
 
         self.training       = _FakeTrainingLoop()
@@ -301,3 +302,11 @@ class _FakeTrainerConfig:
         self.early_stopping = _FakeEarlyStop()
         self.io             = _FakeIO()
         self.curriculum     = LossCurriculumConfig(complete=LossConfig(use_param_l1=True))
+        self.gaussian       = GaussianConfig(n_default_gaussians=3, x_min=-20.0, x_max=80.0)
+
+
+class _FakeDatasetConfig:
+    def __init__(self):
+        from configuration.dataset import AugmentationConfig
+
+        self.augmentation = AugmentationConfig()

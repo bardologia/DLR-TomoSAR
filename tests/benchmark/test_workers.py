@@ -20,18 +20,21 @@ def config(tmp_path):
     return config
 
 
-def test_run_name_encodes_model_head_matching_component_and_seed(config):
+@pytest.mark.real_data
+def test_run_name_encodes_model_head_gaussians_aug_presence_component_and_seed(config, test_data_dir, params_dir):
     from pipelines.shared.training.run_naming import RunNaming
 
-    worker   = BenchmarkWorker(config, "tag")
-    matching = config.loss.param_matching.value
-    tag      = RunNaming.benchmark_unit("unet", None, config.loss)
+    config.paths.dataset_path    = test_data_dir
+    config.paths.parameters_path = params_dir / "parameters.npy"
+
+    worker = BenchmarkWorker(config, "tag")
+    tag    = RunNaming.benchmark_unit("unet", None, config.loss, 5, config.augmentation)
 
     assert worker._run_name("unet", None, None)       == tag
     assert worker._run_name("unet", None, 5)          == f"{tag}_seed5"
-    assert worker._run_name("unet", "param_l1", None) == f"unet_conv_{matching}__param_l1"
-    assert worker._run_name("unet", "param_l1", 5)    == f"unet_conv_{matching}__param_l1_seed5"
-    assert tag.startswith(f"unet_conv_{matching}_param_l1")
+    assert worker._run_name("unet", "param_l1", None) == "unet-conv-K_5-hv-A__param_l1"
+    assert worker._run_name("unet", "param_l1", 5)    == "unet-conv-K_5-hv-A__param_l1_seed5"
+    assert tag.startswith("unet-conv-K_5-hv-A-param_l1_1")
 
 
 def test_size_overrides_empty_without_file(config):

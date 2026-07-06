@@ -153,14 +153,15 @@ def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
     assert dispersion["metrics"]["curve_rmse_gt"]    == pytest.approx(float(np.std([2.0, 4.0], ddof=1)))
 
 
-def test_model_of_strips_head_matching_loss_component_and_seed():
-    assert TrialCollector._model_of("unet_conv_hungarian__covariance_match_seed3")   == "unet"
-    assert TrialCollector._model_of("resunet_multihead_hungarian__mse_curve")        == "resunet-multihead"
-    assert TrialCollector._model_of("unet_set_pred_sorted_gt__param_l1_seed0")       == "unet-set_pred"
-    assert TrialCollector._model_of("convnext_unet_conv_hungarian__param_l1")        == "convnext_unet"
-    assert TrialCollector._model_of("unet_per_gaussian_hungarian__param_l1")         == "unet-per_gaussian"
-    assert TrialCollector._model_of("unet_seed2")                                    == "unet"
-    assert TrialCollector._model_of("unet")                                          == "unet"
+def test_model_of_strips_head_stem_loss_component_and_seed():
+    assert TrialCollector._model_of("unet-conv-K_3-hv-A__covariance_match_seed3")            == "unet"
+    assert TrialCollector._model_of("resunet-multihead-K_3-hv-A__mse_curve")                 == "resunet-multihead"
+    assert TrialCollector._model_of("unet-set_pred-K_5-noaug-none__param_l1_seed0")          == "unet-set_pred"
+    assert TrialCollector._model_of("convnext_unet-conv-K_3-hv-AB__param_l1")                == "convnext_unet"
+    assert TrialCollector._model_of("unet-per_gaussian-K_3-hv-A__param_l1")                  == "unet-per_gaussian"
+    assert TrialCollector._model_of("unet-conv-K_5-hv-A-param_l1_1_cosine_curve_0.05_seed2") == "unet"
+    assert TrialCollector._model_of("unet_seed2")                                            == "unet"
+    assert TrialCollector._model_of("unet")                                                  == "unet"
 
 
 def test_size_match_attaches_to_every_component(tmp_path, logger_stub):

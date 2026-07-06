@@ -8,7 +8,6 @@ from pathlib     import Path
 import numpy as np
 import torch
 
-from configuration.training.general.loss  import ParamMatching
 from models                                import BACKBONE_HEADS
 from pipelines.shared.model.model_builder  import ModelBuilder
 from pipelines.shared.training.seed_sweep import SeedSet
@@ -135,16 +134,11 @@ class TrialCollector:
 
     @staticmethod
     def _model_of(trial_name: str) -> str:
-        base = SeedSet.base(trial_name).split("__")[0]
+        base  = SeedSet.base(trial_name).split("__")[0]
+        parts = base.split("-")
 
-        for matching in ParamMatching:
-            if not base.endswith(f"_{matching.value}"):
-                continue
-
-            trimmed = base[: -len(f"_{matching.value}")]
-            for head in BACKBONE_HEADS:
-                if trimmed.endswith(f"_{head}"):
-                    return ModelBuilder.model_key(trimmed[: -len(f"_{head}")], head)
+        if len(parts) >= 2 and parts[1] in BACKBONE_HEADS:
+            return ModelBuilder.model_key(parts[0], parts[1])
 
         return base
 
