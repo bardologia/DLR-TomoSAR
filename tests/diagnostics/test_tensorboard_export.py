@@ -6,7 +6,7 @@ import pytest
 from torch.utils.tensorboard import SummaryWriter
 
 from configuration.diagnostics            import TensorboardExportConfig, TensorboardExportEntryConfig
-from tools.diagnostics.tensorboard_export import ScalarTagGrouper, TensorboardExport, TensorboardExportBatch, TensorboardScalarReader
+from tools.diagnostics.tensorboard_export import CurveGroup, CurveLabeler, ScalarCurvePlots, ScalarTagGrouper, TensorboardExport, TensorboardExportBatch, TensorboardScalarReader
 
 
 class RecordingLogger:
@@ -78,6 +78,39 @@ def test_tag_segments_are_sanitized_for_filesystem_paths():
     groups = ScalarTagGrouper().group(_series(["metrics/my metric: a*b"]))
 
     assert groups[0].stem == "metrics/my_metric_a_b"
+
+
+def test_labels_humanize_segments_acronyms_and_units():
+    labeler = CurveLabeler()
+
+    assert labeler.title("loss")                              == "Loss"
+    assert labeler.title("loss_components/param_l1")          == "Loss Components / Param L1"
+    assert labeler.title("system/resources/ram_used_gb")      == "System / Resources / RAM Used (GB)"
+    assert labeler.y_label("system/resources/gpu0_vram_pct")  == "GPU0 VRAM (%)"
+    assert labeler.y_label("system/resources/disk_read_mb_s") == "Disk Read (MB/s)"
+    assert labeler.y_label("lr/warmup_factor")                == "Warmup Factor"
+
+
+def test_long_titles_wrap_instead_of_overflowing():
+    title = CurveLabeler().title("permutation/validation/perm/placeholder/precision/slot_0")
+
+    assert "\n" in title
+    assert all(len(line) <= CurveLabeler.WRAP_WIDTH for line in title.split("\n"))
+
+
+def _group_of_values(values):
+    array = np.asarray(values, dtype=np.float64)
+    return CurveGroup(stem="g", title="g", series=[(None, np.arange(array.size, dtype=np.int64), array)])
+
+
+def test_wide_positive_ranges_render_on_a_log_axis():
+    assert ScalarCurvePlots()._log_scaled(_group_of_values([1e-6, 1e-4, 1e-2])) is True
+
+
+def test_narrow_or_signed_ranges_stay_linear():
+    assert ScalarCurvePlots()._log_scaled(_group_of_values([0.1, 0.4]))        is False
+    assert ScalarCurvePlots()._log_scaled(_group_of_values([-1e-6, 1e-2]))     is False
+    assert ScalarCurvePlots()._log_scaled(_group_of_values([0.0, 1e-2, 1e4]))  is False
 
 
 @pytest.fixture

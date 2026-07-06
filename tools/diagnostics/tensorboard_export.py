@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+import textwrap
 
 from dataclasses import dataclass
 from pathlib     import Path
@@ -9,6 +10,8 @@ from typing      import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy             as np
+
+from matplotlib.ticker import MaxNLocator
 
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
@@ -103,13 +106,58 @@ class ScalarTagGrouper:
         return sorted(groups, key=lambda group: group.stem)
 
 
+class CurveLabeler:
+    ACRONYMS = {"lr", "gpu", "cpu", "ram", "vram", "shm", "rss", "vms", "uss", "ema", "l1", "l2", "mse", "mae", "rmse", "ssim", "bic", "f1", "gt", "kz", "dem", "iqr"}
+
+    UNIT_SUFFIXES = (("mb_s", "MB/s"), ("gb_s", "GB/s"), ("gb", "GB"), ("mb", "MB"), ("pct", "%"), ("w", "W"), ("c", "°C"))
+
+    WRAP_WIDTH = 52
+
+    def _token(self, token: str) -> str:
+        match = re.fullmatch(r"([a-z]+)(\d*)", token)
+        if match and match.group(1) in self.ACRONYMS:
+            return match.group(1).upper() + match.group(2)
+        return token.capitalize()
+
+    def _split_unit(self, segment: str) -> Tuple[List[str], Optional[str]]:
+        tokens = segment.split("_")
+        for suffix, unit in self.UNIT_SUFFIXES:
+            suffix_tokens = suffix.split("_")
+            if len(tokens) > len(suffix_tokens) and tokens[-len(suffix_tokens):] == suffix_tokens:
+                return tokens[:-len(suffix_tokens)], unit
+        return tokens, None
+
+    def _segment(self, segment: str, with_unit: bool) -> str:
+        tokens, unit = self._split_unit(segment) if with_unit else (segment.split("_"), None)
+        text         = " ".join(self._token(token) for token in tokens if token)
+        return f"{text} ({unit})" if unit else text
+
+    def y_label(self, title: str) -> str:
+        return self._segment(title.split("/")[-1], with_unit=True)
+
+    def title(self, title: str) -> str:
+        segments = title.split("/")
+        rendered = [self._segment(segment, with_unit=(index == len(segments) - 1)) for index, segment in enumerate(segments)]
+        return "\n".join(textwrap.wrap(" / ".join(rendered), self.WRAP_WIDTH))
+
+
 class ScalarCurvePlots(PlotBase):
     save_dpi = 300
 
     SERIES_COLORS = {"Training": "#1f77b4", "Validation": "#ff7f0e", None: "#1f77b4"}
+    SPARSE_POINTS = 40
+    LOG_SPAN      = 1e3
 
-    def _y_label(self, group: CurveGroup) -> str:
-        return group.title.split("/")[-1].replace("_", " ")
+    def __init__(self) -> None:
+        self.labeler = CurveLabeler()
+
+    def _log_scaled(self, group: CurveGroup) -> bool:
+        values = np.concatenate([values for _label, _steps, values in group.series])
+        values = values[np.isfinite(values)]
+
+        if values.size == 0 or values.min() <= 0:
+            return False
+        return bool(values.max() / values.min() >= self.LOG_SPAN)
 
     def render(self, group: CurveGroup, path: Path) -> Path:
         self._apply_style()
@@ -117,12 +165,19 @@ class ScalarCurvePlots(PlotBase):
         fig, ax = plt.subplots(figsize=(6.2, 3.9))
 
         for label, steps, values in group.series:
-            marker = "o" if steps.size == 1 else None
-            ax.plot(steps, values, lw=1.3, color=self.SERIES_COLORS[label], label=label, marker=marker, markersize=3.5)
+            marker = "o" if steps.size <= self.SPARSE_POINTS else None
+            ax.plot(steps, values, lw=1.4, color=self.SERIES_COLORS[label], label=label, marker=marker, markersize=3.0)
 
-        ax.set_title(group.title)
+        if self._log_scaled(group):
+            ax.set_yscale("log")
+
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.grid(which="major", linewidth=0.5, alpha=0.3)
+        ax.set_axisbelow(True)
+
+        ax.set_title(self.labeler.title(group.title))
         ax.set_xlabel("Step")
-        ax.set_ylabel(self._y_label(group))
+        ax.set_ylabel(self.labeler.y_label(group.title))
 
         if len(group.series) > 1:
             ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
