@@ -22,7 +22,7 @@ class PixelMLPNet(nn.Module, OutputHeadsMixin):
             layers.append(build_norm2d(self.config.normalization, feature_size))
             layers.append(build_activation(self.config.activation))
             if self.config.dropout > 0:
-                layers.append(nn.Dropout2d(self.config.dropout))
+                layers.append(nn.Dropout(self.config.dropout))
             channels = feature_size
 
         self.trunk              = nn.Sequential(*layers)

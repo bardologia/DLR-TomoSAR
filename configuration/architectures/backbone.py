@@ -1199,7 +1199,7 @@ class PixelMLPNetConfig:
     params_per_gaussian : int       = 3
     head                : str       = "conv"
     features            : list[int] = field(default_factory=lambda: [3200, 3200, 3200, 3200])
-    dropout             : float     = 0.15
+    dropout             : float     = 0.30
     activation          : str       = "relu"
     normalization       : str       = "batch"
     conv_bias           : bool      = False
@@ -1208,11 +1208,11 @@ class PixelMLPNetConfig:
     trunk_lr       : float = 3e-4
     output_head_lr : float = 1e-3
 
-    trunk_wd       : float = 1e-4
+    trunk_wd       : float = 1e-2
     output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (
-        nn.Conv2d, nn.Dropout2d,
+        nn.Conv2d, nn.Dropout,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
     ))
@@ -1249,7 +1249,7 @@ class LocalCNNConfig:
     params_per_gaussian : int       = 3
     head                : str       = "conv"
     features            : list[int] = field(default_factory=lambda: [832, 832, 832])
-    dropout             : float     = 0.15
+    dropout             : float     = 0.30
     activation          : str       = "relu"
     normalization       : str       = "batch"
     conv_bias           : bool      = False
@@ -1258,7 +1258,7 @@ class LocalCNNConfig:
     trunk_lr       : float = 3e-4
     output_head_lr : float = 1e-3
 
-    trunk_wd       : float = 1e-4
+    trunk_wd       : float = 1e-2
     output_head_wd : float = 1e-4
 
     shape_logger_types  : tuple           = field(default_factory=lambda: (

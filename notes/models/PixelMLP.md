@@ -21,7 +21,7 @@ summary: Pixel-wise MLP control baseline realised as a stack of 1×1 convolution
 
 ## Summary
 
-The trunk applies $L$ layers of ($1\times1$ conv → norm → act → optional `Dropout2d`), each mapping the per-pixel channel vector to the next hidden width in `features`; a final $1\times1$ `output_head` emits the flat `out_channels` $= 3K$ Gaussian-parameter stack. Classical tomographic inversion — beamforming, Capon, and compressive-sensing spectral estimation — operates strictly per pixel on the covariance signature, so this baseline is the learned analogue of that regime: whatever it achieves is attributable to per-pixel mapping capacity alone, and any margin the spatial backbones ([[UNet]] and the rest of the [[Model Zoo]]) hold over it is the measured value of spatial context for this task.
+The trunk applies $L$ layers of ($1\times1$ conv → norm → act → optional element-wise `Dropout`), each mapping the per-pixel channel vector to the next hidden width in `features`; a final $1\times1$ `output_head` emits the flat `out_channels` $= 3K$ Gaussian-parameter stack. Classical tomographic inversion — beamforming, Capon, and compressive-sensing spectral estimation — operates strictly per pixel on the covariance signature, so this baseline is the learned analogue of that regime: whatever it achieves is attributable to per-pixel mapping capacity alone, and any margin the spatial backbones ([[UNet]] and the rest of the [[Model Zoo]]) hold over it is the measured value of spatial context for this task.
 
 ---
 
