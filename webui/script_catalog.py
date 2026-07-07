@@ -67,6 +67,11 @@ class ScriptCatalog:
             "category"  : "Experiments",
             "purpose"   : "Run K-fold cross-validation for a model across azimuth folds, training and inferring each fold across GPUs.",
         },
+        "sweep_patches": {
+            "title"     : "Patch-Size Sweep",
+            "category"  : "Experiments",
+            "purpose"   : "Validate the context-window prediction W* = w sqrt(N/n): for each selected track count n, train the same backbone across all patch sizes admissible at the architecture's minimum step, then report the best patch size per n against the sample-budget prediction.",
+        },
         "tune": {
             "title"     : "Tune",
             "category"  : "Experiments",

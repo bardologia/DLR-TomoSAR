@@ -19,6 +19,7 @@ from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
 from configuration.diagnostics              import TensorboardExportEntryConfig
+from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
@@ -33,6 +34,7 @@ _TRAINING_PAGES = [
     ("train_unrolled",            UnrolledEntryConfig),
     ("benchmark",                 BenchmarkConfig),
     ("cross_validate",            CrossValidationConfig),
+    ("sweep_patches",             PatchSweepConfig),
     ("tune",                      TuningEntryConfig),
 ]
 

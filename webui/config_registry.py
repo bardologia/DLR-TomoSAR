@@ -21,12 +21,13 @@ class ConfigRegistry:
         "inference"        : "Inference",
         "benchmark"        : "Benchmark",
         "cross_validation" : "Cross-validation",
+        "patch_sweep"      : "Patch Sweep",
         "tuning"           : "Tuning",
         "comparison"       : "Run Comparison",
         "diagnostics"      : "Diagnostics",
     }
 
-    SECTION_ORDER = ["sar", "param_extraction", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "tuning", "comparison", "diagnostics"]
+    SECTION_ORDER = ["sar", "param_extraction", "normalization", "dataset", "architectures", "training", "inference", "benchmark", "cross_validation", "patch_sweep", "tuning", "comparison", "diagnostics"]
 
     def __init__(self, paths: ProjectPaths) -> None:
         self.paths        = paths

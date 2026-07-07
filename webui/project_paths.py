@@ -50,6 +50,11 @@ class ProjectPaths:
             "config_module" : "configuration.cross_validation.general",
             "config_class"  : "CrossValidationConfig",
         },
+        "sweep_patches": {
+            "file"          : "sweep_patches",
+            "config_module" : "configuration.patch_sweep.general",
+            "config_class"  : "PatchSweepConfig",
+        },
     }
 
     def __init__(self) -> None:
@@ -77,6 +82,7 @@ class ProjectPaths:
         "infer_image_autoencoder"   : "inference",
         "benchmark"                 : "experiments",
         "cross_validate"            : "experiments",
+        "sweep_patches"             : "experiments",
         "tune"                      : "experiments",
         "tune_dataloader"           : "experiments",
         "analyze_preprocessing"     : "analysis",

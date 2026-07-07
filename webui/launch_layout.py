@@ -744,6 +744,45 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "sweep_patches": {
+            "essentials": [
+                "run_tag",
+                {"path": "gpus", "widget": GPU_MANY},
+                {"path": "paths.dataset_path", "widget": PICK_DATASET},
+                {"path": "paths.parameters_path", "widget": PICK_PARAMS},
+                {"path": "seed", "widget": NUM_SEED},
+                "resume",
+                "poll_interval_s",
+            ],
+            "sections": [
+                {"key": "model", "title": "Model", "panels": [
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
+                    {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
+                ]},
+                {"key": "sweep", "title": "Sweep", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Track counts", "fields": ["track_counts", "boxcar_window"]},
+                        {"title": "Patch grid", "fields": ["patch.minimum", "patch.maximum", "patch.step", "patch.stride_ratio", "patch.constant_pixel_budget"]},
+                    ]},
+                ]},
+                {"key": "data", "title": "Data", "panels": [
+                    {"kind": "fields", "title": "Paths", "template": "paths_rest", "at": "paths"},
+                    {"kind": "fields", "title": "Input channels", "template": "input", "at": "input"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
+                ]},
+                {"key": "training", "title": "Training", "panels": [
+                    {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
+                ]},
+                {"key": "loss", "title": "Loss", "panels": [
+                    {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
+                    {"kind": "pair", "title": "Loss stages", "template": "loss", "base": "curriculum.complete", "override": "curriculum.warmup"},
+                ]},
+                {"key": "geometry", "title": "Geometry", "panels": [
+                    {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
+                ]},
+            ],
+        },
         "tune": {
             "type_tab": {"field": "training_type", "options": [["backbone", "Backbone"], ["profile_autoencoder", "Profile AE"], ["image_autoencoder", "Image AE"], ["jepa", "JEPA"]]},
             "essentials": [

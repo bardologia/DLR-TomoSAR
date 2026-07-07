@@ -24,6 +24,7 @@ class TensorboardManager:
         "train_jepa"                : ("logdir",),
         "benchmark"                 : ("paths.log_base_dir",),
         "cross_validate"            : ("paths.log_base_dir",),
+        "sweep_patches"             : ("paths.log_base_dir",),
     }
 
     STARTUP_TIMEOUT_S = 90.0
