@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -59,6 +60,9 @@ CLI_MODULES = (
     "benchmark",
     "cross_validate",
     "compare_runs",
+    "compare_trials",
+    "compare_param_extraction_trials",
+    "compare_preprocessing_trials",
     "export_tensorboard_plots",
 )
 
@@ -75,8 +79,13 @@ ENTRY_CONFIGS = {
     "benchmark"                 : ("configuration.benchmark",                    "BenchmarkConfig"),
     "cross_validate"            : ("configuration.cross_validation",             "CrossValidationConfig"),
     "compare_runs"              : ("configuration.comparison",                   "ComparisonEntryConfig"),
+    "compare_trials"            : ("configuration.comparison",                   "TrialComparisonConfig"),
+    "compare_param_extraction_trials" : ("configuration.comparison",             "ParamExtractionComparisonConfig"),
+    "compare_preprocessing_trials"    : ("configuration.comparison",             "PreprocessingComparisonConfig"),
     "export_tensorboard_plots"  : ("configuration.diagnostics",                  "TensorboardExportEntryConfig"),
 }
+
+ENTRY_SCRIPTS = sorted(script for subdir in _SUBDIRS for script in (_MAIN_DIR / subdir).glob("*.py") if not script.stem.startswith("_"))
 
 
 @pytest.fixture
@@ -114,6 +123,14 @@ def test_module_exposes_main_callable(name, main_on_path, frozen_env):
     module = _import_main(name)
 
     assert callable(module.main)
+
+
+@pytest.mark.parametrize("script", ENTRY_SCRIPTS, ids=lambda script: script.stem)
+def test_script_imports_in_launcher_subprocess(script, tmp_path):
+    code   = f"import runpy; runpy.run_path({str(script)!r}, run_name='launcher_import_check')"
+    result = subprocess.run([sys.executable, "-u", "-c", code], cwd=str(tmp_path), capture_output=True, text=True, timeout=120)
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("name", DEFER_HEAVY_IMPORTS)

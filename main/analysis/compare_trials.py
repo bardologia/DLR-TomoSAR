@@ -5,9 +5,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from pathlib import Path
 
-from tools.runtime.run_tag import RunTag
-
 from _bootstrap import EnvironmentPinner
+
+from tools.runtime.run_tag import RunTag
 
 
 def main() -> None:
