@@ -100,6 +100,7 @@ class BenchmarkConfig:
     skip_models     : list[str]  = field(default_factory=list)
     run_tag         : str | None = None
     resume          : bool       = True
+    infer_after     : bool       = True
     seed            : int        = 0
     seeds           : list[int]  = field(default_factory=list)
     poll_interval_s : float      = 5.0
@@ -113,4 +114,4 @@ class BenchmarkConfig:
         return self.training_type == "backbone"
 
     def runs_inference(self) -> bool:
-        return self.training_type in ("backbone", "jepa")
+        return self.infer_after and self.training_type in ("backbone", "jepa")

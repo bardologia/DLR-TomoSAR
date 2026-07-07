@@ -670,6 +670,7 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
                 {"key": "inference", "title": "Inference", "when": {"field": "training_type", "in": ["backbone", "jepa"]}, "panels": [
+                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_queue", "at": "inference"},
                     {"kind": "fields", "groups": [{"title": "Comparison report", "fields": ["comparison.embed_images"]}]},
                 ]},

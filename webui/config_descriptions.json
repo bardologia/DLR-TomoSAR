@@ -1736,6 +1736,7 @@
         "skip_models": "model names excluded from the training_type's registry before the sweep is expanded",
         "run_tag": "optional identifier tagging this benchmark's run directory and output artifacts; None auto-generates one",
         "resume": "whether to skip stage units whose cached PASS result already exists under the run directory instead of rerunning them",
+        "infer_after": "Whether to run the inference stage automatically after training; only applies when training_type is backbone or jepa, and off leaves the comparison report without inference galleries",
         "seed": "base random seed used for the max-batch probe and as the default per-unit seed when seeds is empty",
         "seeds": "list of seeds expanded across every (model, loss-component) pair, one full run launched per seed",
         "poll_interval_s": "seconds between polls of queued job status while waiting for GPUs or completed jobs",
