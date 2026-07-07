@@ -7,9 +7,13 @@ import pytest
 import torch
 
 from configuration.inference import InferenceConfig
+from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_MODEL_REGISTRY, get_backbone
 from pipelines.backbone.inference.loader import RunLoader
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO
+
+from tests.models_backbone._helpers import SMALL_OVERRIDES, WINDOW
 
 
 def _write_fake_checkpoint(path: Path, x_axis: np.ndarray) -> dict:
@@ -121,6 +125,46 @@ def test_inference_metadata_create_dirs(tmp_path):
     assert meta.animations_dir.is_dir()
     assert meta.logs_dir.is_dir()
     assert meta.cube_dir.is_dir()
+
+
+@pytest.mark.parametrize("name", sorted(BACKBONE_MODEL_REGISTRY))
+def test_build_model_reconstructs_every_registry_backbone(name, tmp_path):
+    in_channels  = 2
+    out_channels = 6
+    meta_dir     = tmp_path / "meta"
+    meta_dir.mkdir()
+
+    config = BACKBONE_CONFIG_REGISTRY[name]()
+    for key, value in SMALL_OVERRIDES.get(name, {}).items():
+        setattr(config, key, value)
+
+    torch.manual_seed(0)
+    trained, config = get_backbone(name, config=config, in_channels=in_channels, out_channels=out_channels)
+    trained.eval()
+
+    BackboneModelConfigIO.save(config, name, meta_dir)
+
+    x_axis    = np.linspace(-20.0, 80.0, 32).astype(np.float32)
+    ckpt_path = tmp_path / "best_model.pt"
+    torch.save({"params": trained.state_dict(), "x_axis": x_axis, "epoch": 1, "best_val_loss": 0.1, "best_epoch": 1}, str(ckpt_path))
+
+    loader  = RunLoader(tmp_path, logger=None)
+    rebuilt = loader._build_model(name, in_channels, out_channels, WINDOW)
+
+    ckpt, _, _ = loader._load_checkpoint(ckpt_path, "cpu")
+    rebuilt.load_state_dict(ckpt["params"])
+    rebuilt.eval()
+
+    torch.manual_seed(1)
+    x = torch.randn(1, in_channels, WINDOW, WINDOW)
+
+    with torch.no_grad():
+        expected = trained(x)
+        actual   = ModelWrapper(rebuilt, "cpu")(x.numpy())
+
+    assert loader.model_head == config.head
+    assert actual.shape == (1, out_channels, WINDOW, WINDOW)
+    assert np.allclose(actual, expected.numpy(), atol=1e-6)
 
 
 def test_full_run_load_skips_without_run_dir():
