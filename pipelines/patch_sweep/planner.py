@@ -10,11 +10,12 @@ from tools.baselines                       import TrackBaselines
 
 @dataclass(frozen=True)
 class SweepUnit:
-    track_count      : int
-    patch_size       : int
-    patch_stride     : int
-    batch_size       : int
-    secondary_labels : tuple
+    track_count             : int
+    patch_size              : int
+    patch_stride            : int
+    batch_size              : int
+    lr_reference_batch_size : int
+    secondary_labels        : tuple
 
     @property
     def name(self) -> str:
@@ -119,12 +120,13 @@ class PatchSweepPlanner:
     def selections(self) -> dict[int, tuple]:
         return {n: SecondarySpread.even(self.candidates, n - 1) for n in sorted(self.config.track_counts)}
 
-    def _batch_size(self, patch_size: int) -> int:
-        training = self.config.training
+    def _pixel_rescaled(self, base: int, patch_size: int) -> int:
         if not self.config.patch.constant_pixel_budget:
-            return training.batch_size
+            return base
 
-        pixel_budget = training.batch_size * training.patch_size[0] * training.patch_size[1]
+        reference    = self.config.training.patch_size
+        pixel_budget = base * reference[0] * reference[1]
+
         return max(1, pixel_budget // (patch_size * patch_size))
 
     def predicted_optimum(self, track_count: int) -> float:
@@ -157,11 +159,12 @@ class PatchSweepPlanner:
         for track_count, labels in self.selections().items():
             for size in sizes:
                 plans.append(SweepUnit(
-                    track_count      = track_count,
-                    patch_size       = size,
-                    patch_stride     = max(1, int(round(size * stride_ratio))),
-                    batch_size       = self._batch_size(size),
-                    secondary_labels = labels,
+                    track_count             = track_count,
+                    patch_size              = size,
+                    patch_stride            = max(1, int(round(size * stride_ratio))),
+                    batch_size              = self._pixel_rescaled(self.config.training.batch_size, size),
+                    lr_reference_batch_size = self._pixel_rescaled(self.config.training.lr_reference_batch_size, size),
+                    secondary_labels        = labels,
                 ))
 
         return plans

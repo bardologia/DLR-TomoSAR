@@ -117,6 +117,31 @@ def test_fixed_batch_when_the_budget_is_disabled():
     assert {unit.batch_size for unit in planner.units()} == {planner.config.training.batch_size}
 
 
+def test_constant_pixel_budget_keeps_the_lr_scale_constant():
+    planner    = make_planner([5], maximum=128)
+    configured = planner.config.training.batch_size / planner.config.training.lr_reference_batch_size
+
+    for unit in planner.units():
+        assert unit.batch_size / unit.lr_reference_batch_size == pytest.approx(configured)
+
+
+def test_lr_reference_rescales_with_the_pixel_budget():
+    planner = make_planner([5], maximum=128)
+    by_size = {unit.patch_size: unit.lr_reference_batch_size for unit in planner.units()}
+
+    reference = planner.config.training.lr_reference_batch_size * planner.config.training.patch_size[0] * planner.config.training.patch_size[1]
+
+    assert by_size[64]  == planner.config.training.lr_reference_batch_size
+    assert by_size[16]  == reference // (16 * 16)
+    assert by_size[128] == reference // (128 * 128)
+
+
+def test_lr_reference_untouched_when_the_budget_is_disabled():
+    planner = make_planner([5], constant_pixel_budget=False)
+
+    assert {unit.lr_reference_batch_size for unit in planner.units()} == {planner.config.training.lr_reference_batch_size}
+
+
 def test_predicted_optimum_matches_the_closed_form():
     planner = make_planner([5])
 

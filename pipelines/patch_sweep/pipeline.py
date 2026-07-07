@@ -45,15 +45,17 @@ class PatchSweepPipeline(StagedPipeline):
         }, title="Configuration")
 
         self.logger.subsection("Sweep plan")
-        rows = [{
+        scaling = self.config.training.scale_lr_with_batch
+        rows    = [{
             "Unit"        : unit.name,
             "Tracks"      : unit.track_count,
             "Patch"       : unit.patch_size,
             "Stride"      : unit.patch_stride,
             "Batch"       : unit.batch_size,
+            "LR scale"    : f"{unit.batch_size / unit.lr_reference_batch_size if scaling else 1.0:.2f}",
             "Secondaries" : ", ".join(unit.secondary_labels),
         } for unit in planner.units()]
-        self.logger.metrics_table(rows, ["Unit", "Tracks", "Patch", "Stride", "Batch", "Secondaries"])
+        self.logger.metrics_table(rows, ["Unit", "Tracks", "Patch", "Stride", "Batch", "LR scale", "Secondaries"])
 
         try:
             training_results = self._run_training(planner)

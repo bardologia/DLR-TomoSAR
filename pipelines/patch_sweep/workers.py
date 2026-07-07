@@ -14,9 +14,10 @@ class SweepTrainingWorker(WorkerBase):
     def _apply_unit(self, unit: SweepUnit) -> None:
         self.config.paths.secondary_labels = unit.secondary_labels
 
-        self.config.training.patch_size   = (unit.patch_size, unit.patch_size)
-        self.config.training.patch_stride = unit.patch_stride
-        self.config.training.batch_size   = unit.batch_size
+        self.config.training.patch_size              = (unit.patch_size, unit.patch_size)
+        self.config.training.patch_stride            = unit.patch_stride
+        self.config.training.batch_size              = unit.batch_size
+        self.config.training.lr_reference_batch_size = unit.lr_reference_batch_size
 
     def run(self, unit_name: str) -> None:
         from pipelines.backbone.training.pipeline import TrainingPipeline
