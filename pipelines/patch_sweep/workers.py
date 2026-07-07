@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from configuration.patch_sweep              import PatchSweepConfig
+from pipelines.patch_sweep.planner          import PatchSweepPlanner, SweepUnit
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.shared.model.model_builder   import ModelBuilder
+from pipelines.shared.training.worker_base  import WorkerBase
+
+
+class SweepTrainingWorker(WorkerBase):
+    def __init__(self, config: PatchSweepConfig, run_tag: str) -> None:
+        super().__init__(config=config, run_tag=run_tag)
+
+    def _apply_unit(self, unit: SweepUnit) -> None:
+        self.config.paths.secondary_labels = unit.secondary_labels
+
+        self.config.training.patch_size   = (unit.patch_size, unit.patch_size)
+        self.config.training.patch_stride = unit.patch_stride
+        self.config.training.batch_size   = unit.batch_size
+
+    def run(self, unit_name: str) -> None:
+        from pipelines.backbone.training.pipeline import TrainingPipeline
+
+        unit = PatchSweepPlanner.from_dataset(self.config).unit(unit_name)
+        self._apply_unit(unit)
+
+        factory      = ConfigFactory(self.config)
+        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides, head=self.config.backbone_head)
+
+        trainer_config            = factory.training_trainer_config(logdir=self.run_dir / "training")
+        trainer_config.curriculum = self.config.curriculum
+        trainer_config.geometry   = self.config.geometry.resolved(self.config.paths.dataset_path, secondary_labels=factory._secondary_labels())
+
+        dataset_config              = factory.training_dataset_config()
+        dataset_config.input_config = self.config.input
+
+        pipeline = TrainingPipeline(
+            trainer_config = trainer_config,
+            dataset_config = dataset_config,
+            backbone_name  = self.config.backbone_name,
+            model_config   = model_config,
+            seed           = self.config.seed,
+            run_name       = unit_name,
+        )
+
+        pipeline.run(probe_config=self._probe_config())
