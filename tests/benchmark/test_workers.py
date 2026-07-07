@@ -142,6 +142,35 @@ def test_max_batch_worker_raises_on_probe_fail(config, monkeypatch):
         worker.run("unet")
 
 
+@pytest.mark.real_data
+def test_training_worker_scales_the_lr_from_the_measured_batch(config, test_data_dir, params_dir, monkeypatch):
+    from pipelines.benchmark.workers import TrainingWorker
+
+    config.paths.dataset_path    = test_data_dir
+    config.paths.parameters_path = params_dir / "parameters.npy"
+    config.training.train_azimuth = (1000, 1400)
+    config.training.val_azimuth   = (1400, 1700)
+    config.training.test_azimuth  = (1700, 2000)
+
+    worker = TrainingWorker(config, "tag")
+    FileIO.save_json({"resunet-conv": {"status": "PASS", "batch_size": 500}}, worker.run_dir / "pipeline" / "max_batch.json")
+
+    captured = {}
+
+    class FakePipeline:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+        def run(self, probe_config=None):
+            return None
+
+    monkeypatch.setattr("pipelines.backbone.training.pipeline.TrainingPipeline", FakePipeline)
+
+    worker.run("resunet-conv")
+
+    assert captured["trainer_config"].optimizer.lr_scale == pytest.approx(500 / 256)
+    assert captured["dataset_config"].batch_size         == 500
+
+
 def test_training_entry_configs_carry_the_overfit_check(config):
     from pipelines.benchmark.workers import TrainingWorker
 
