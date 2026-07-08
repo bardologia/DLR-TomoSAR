@@ -155,13 +155,22 @@ class SweepTheoryComparison:
         self.logger.info(f"n={n} | selection {spread}: {', '.join(labels)}")
         self.logger.info(f"n={n} | kz [rad/m]: {kz_values}  S={bands['kz-aware']['S']:.3f}  kappa={bands['kz-aware']['kappa']:.3f}")
 
-        for record in group:
-            loss = f"{record['test_loss']:.6f}" if record["test_loss"] is not None else "incomplete -- excluded"
-            self.logger.info(f"n={n} |   p={record['patch']:3d}  test avg_loss = {loss}")
-
         if not complete:
+            for record in group:
+                self.logger.info(f"n={n} |   p={record['patch']:3d}  test avg_loss = incomplete -- excluded")
             self.logger.warning(f"n={n} | no complete units, no verdict")
             return
+
+        base = complete[0]["test_loss"]
+        gain = base - min(record["test_loss"] for record in complete)
+
+        for record in group:
+            if record["test_loss"] is None:
+                self.logger.info(f"n={n} |   p={record['patch']:3d}  test avg_loss = incomplete -- excluded")
+                continue
+
+            captured = (base - record["test_loss"]) / gain if gain > 0 else float("nan")
+            self.logger.info(f"n={n} |   p={record['patch']:3d}  test avg_loss = {record['test_loss']:.6f}  captured {captured * 100:5.1f}% of total gain")
 
         best = min(complete, key=lambda record: record["test_loss"])
 
@@ -183,15 +192,24 @@ class SweepTheoryComparison:
         else:
             favours = f"favours {closer} by {margin:.1f} px"
 
-        self.verdicts.append({"n": n, "best": best["patch"], "favours": favours})
-        self.logger.info(f"n={n} | VERDICT: {favours}")
+        ceiling    = 2.0 * self.boxcar
+        admissible = next((patch for patch in patches if patch >= ceiling), None)
+        knee       = next((record["patch"] for record in complete if gain > 0 and (base - record["test_loss"]) / gain >= 0.8), None)
+
+        if knee is not None and admissible is not None:
+            relation = "matches" if knee == admissible else ("below" if knee < admissible else "above")
+            self.logger.info(f"n={n} | ceiling 2w={ceiling:.0f} -> first admissible {admissible}; knee80 = {knee} ({relation})")
+
+        self.verdicts.append({"n": n, "best": best["patch"], "knee": knee, "favours": favours})
+        self.logger.info(f"n={n} | VERDICT (floors): {favours}")
 
     def summary(self) -> None:
         self.logger.info("")
         self.logger.info(f"boxcar w={self.boxcar:.0f}  N={len(self.aperture.field.labels)}  ceiling 2w={2 * self.boxcar:.0f}  kappa_N={np.sqrt(self.aperture.moment(self.aperture.field.labels) / len(self.aperture.field.labels)):.3f}")
 
         for verdict in self.verdicts:
-            self.logger.info(f"n={verdict['n']:2d}  best={verdict['best']:3d}  -> {verdict['favours']}")
+            knee = verdict["knee"] if verdict["knee"] is not None else "-"
+            self.logger.info(f"n={verdict['n']:2d}  argmin={verdict['best']:3d}  knee80={knee:>3}  floors: {verdict['favours']}")
 
     def run(self) -> None:
         for n, group in self.groups().items():
