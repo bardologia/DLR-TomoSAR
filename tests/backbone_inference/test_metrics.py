@@ -291,6 +291,7 @@ def test_matched_identical_is_perfect():
 
     assert out["matched_mu_mae"]  == pytest.approx(0.0, abs=1e-6)
     assert out["matched_sig_mae"] == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_amp_mae"] == pytest.approx(0.0, abs=1e-6)
     assert out["matched_recall"]    == pytest.approx(1.0, abs=1e-6)
     assert out["matched_precision"] == pytest.approx(1.0, abs=1e-6)
 
@@ -307,6 +308,7 @@ def test_matched_is_invariant_to_pred_slot_permutation():
 
     pred = params.copy()
     for k in range(N_GAUSSIANS):
+        pred[3 * k]     += 0.1 * rng.standard_normal((H, W)).astype(np.float32)
         pred[3 * k + 1] += 0.5 * rng.standard_normal((H, W)).astype(np.float32)
         pred[3 * k + 2] += 0.2 * rng.standard_normal((H, W)).astype(np.float32)
 
@@ -315,6 +317,7 @@ def test_matched_is_invariant_to_pred_slot_permutation():
 
     assert reor["matched_mu_mae"]  == pytest.approx(base["matched_mu_mae"],  rel=1e-5)
     assert reor["matched_sig_mae"] == pytest.approx(base["matched_sig_mae"], rel=1e-5)
+    assert reor["matched_amp_mae"] == pytest.approx(base["matched_amp_mae"], rel=1e-5)
     assert reor["matched_recall"]  == pytest.approx(base["matched_recall"],  rel=1e-5)
 
 
@@ -334,6 +337,24 @@ def test_matched_recall_penalises_filler_far_from_gt():
     assert out["matched_recall_gt2"]    == pytest.approx(0.5, abs=1e-6)
     assert out["matched_precision_gt2"] == pytest.approx(0.5, abs=1e-6)
     assert out["matched_mu_mae_gt2"]    == pytest.approx((0.0 + 35.0) / 2.0, abs=1e-5)
+
+
+def test_matched_amp_error_over_matched_pairs():
+    H, W = 4, 4
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+    pred = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0], gt[1], gt[2] = 1.0, 0.0,  3.0
+    gt[3], gt[4], gt[5] = 0.8, 40.0, 3.0
+
+    pred[0], pred[1], pred[2] = 0.7, 0.0,  3.0
+    pred[3], pred[4], pred[5] = 1.0, 40.0, 3.0
+
+    out = _matched(pred, gt, tol=5.0)
+
+    assert out["matched_amp_mae"]     == pytest.approx((0.3 + 0.2) / 2.0, abs=1e-6)
+    assert out["matched_amp_rmse"]    == pytest.approx(np.sqrt((0.3 ** 2 + 0.2 ** 2) / 2.0), abs=1e-6)
+    assert out["matched_amp_mae_gt2"] == pytest.approx((0.3 + 0.2) / 2.0, abs=1e-6)
 
 
 @pytest.mark.real_data

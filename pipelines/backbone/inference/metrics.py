@@ -340,6 +340,8 @@ class Metrics:
         sum_mu_se        = np.zeros(n_buckets, dtype=np.float64)
         sum_sig_ae       = np.zeros(n_buckets, dtype=np.float64)
         sum_sig_se       = np.zeros(n_buckets, dtype=np.float64)
+        sum_amp_ae       = np.zeros(n_buckets, dtype=np.float64)
+        sum_amp_se       = np.zeros(n_buckets, dtype=np.float64)
         n_matched_bucket = np.zeros(n_buckets, dtype=np.float64)
         tp_bucket        = np.zeros(n_buckets, dtype=np.float64)
 
@@ -353,6 +355,7 @@ class Metrics:
             rm   = rows[matched]
             dmu  = np.abs(mu_pred [i, matched] - mu_gt [jm, rm])
             dsig = np.abs(sig_pred[i, matched] - sig_gt[jm, rm])
+            damp = np.abs(amp_pred[i, matched] - amp_gt[jm, rm])
             ck   = gt_count[matched]
             tp   = ck[dmu <= match_tol]
 
@@ -360,6 +363,8 @@ class Metrics:
             sum_mu_se        += np.bincount(ck, weights=dmu * dmu,   minlength=n_buckets)
             sum_sig_ae       += np.bincount(ck, weights=dsig,        minlength=n_buckets)
             sum_sig_se       += np.bincount(ck, weights=dsig * dsig, minlength=n_buckets)
+            sum_amp_ae       += np.bincount(ck, weights=damp,        minlength=n_buckets)
+            sum_amp_se       += np.bincount(ck, weights=damp * damp, minlength=n_buckets)
             n_matched_bucket += np.bincount(ck,                      minlength=n_buckets)
             tp_bucket        += np.bincount(tp,                      minlength=n_buckets)
 
@@ -374,6 +379,8 @@ class Metrics:
         out["matched_mu_rmse"]  = float(np.sqrt(sum_mu_se.sum()  / total_matched)) if total_matched > 0 else float("nan")
         out["matched_sig_mae"]  = float(sum_sig_ae.sum() / total_matched)          if total_matched > 0 else float("nan")
         out["matched_sig_rmse"] = float(np.sqrt(sum_sig_se.sum() / total_matched)) if total_matched > 0 else float("nan")
+        out["matched_amp_mae"]  = float(sum_amp_ae.sum() / total_matched)          if total_matched > 0 else float("nan")
+        out["matched_amp_rmse"] = float(np.sqrt(sum_amp_se.sum() / total_matched)) if total_matched > 0 else float("nan")
 
         recall    = total_tp / total_gt   if total_gt   > 0 else float("nan")
         precision = total_tp / total_pred if total_pred > 0 else float("nan")
@@ -394,6 +401,7 @@ class Metrics:
             if n_k > 0:
                 out[f"matched_mu_mae_gt{k}"]  = float(sum_mu_ae[k]  / n_k)
                 out[f"matched_sig_mae_gt{k}"] = float(sum_sig_ae[k] / n_k)
+                out[f"matched_amp_mae_gt{k}"] = float(sum_amp_ae[k] / n_k)
 
             gt_active_k = k * pixel_count_hist[k]
             if gt_active_k > 0:

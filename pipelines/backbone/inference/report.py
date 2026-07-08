@@ -343,6 +343,7 @@ class Report:
             ("Matched μ MAE",   gm["matched_mu_mae"],    "Mean |Δμ| over matched pairs (all counts)"),
             ("Matched μ RMSE",  gm["matched_mu_rmse"],   "Root mean squared Δμ"),
             ("Matched σ MAE",   gm["matched_sig_mae"],   "Mean |Δσ| over matched pairs"),
+            ("Matched a MAE",   gm["matched_amp_mae"],   "Mean |Δa| over matched pairs"),
             ("Detection recall",     gm["matched_recall"],    "Share of GT Gaussians matched within tolerance"),
             ("Detection precision",  gm["matched_precision"], "Share of predicted Gaussians matching a GT within tolerance"),
             ("Detection F1",         gm["matched_f1"],        "Harmonic mean of recall and precision"),
