@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
@@ -14,16 +13,14 @@ if str(REPO_ROOT) not in sys.path:
 from tools.monitoring.logger import Logger
 from tools.reporting.plotting import PlotBase
 
-SPLIT_AZIMUTH = 13000
-SPLIT_RANGE   = 4000
+SPLIT_AZIMUTH = 12000
+SPLIT_RANGE   = 3500
 
-PATCH_AZ_MIN  = 1000
-PATCH_AZ_MAX  = 13000
-PATCH_RG_MIN  = 500
-PATCH_RG_MAX  = 4000
+PATCH_MIN     = 16
+PATCH_MAX     = 112
+PATCH_STEP    = 16
 
 BOXCAR_WINDOW = 20
-SWEEP_STEPS   = 600
 
 ACCENT = "#B03052"
 GOOD   = "#1E6E46"
@@ -81,66 +78,67 @@ class PatchRedundancySweep(PlotBase):
         self.output_dir = output_dir
         self.logger     = Logger(log_dir="logs", name="patch_padding_redundancy")
 
-    def patch_grid(self):
-        fraction = np.linspace(0.0, 1.0, SWEEP_STEPS)
-        patch_az = np.round(PATCH_AZ_MIN + fraction * (PATCH_AZ_MAX - PATCH_AZ_MIN)).astype(int)
-        patch_rg = np.round(PATCH_RG_MIN + fraction * (PATCH_RG_MAX - PATCH_RG_MIN)).astype(int)
-        return patch_az, patch_rg
+    def patch_sizes(self):
+        return np.arange(PATCH_MIN, PATCH_MAX + 1, PATCH_STEP)
 
-    def evaluate_sweep(self, patch_az, patch_rg):
-        return self.model.evaluate(SPLIT_AZIMUTH, SPLIT_RANGE, patch_az, patch_rg)
+    def evaluate_sweep(self, patch):
+        return self.model.evaluate(SPLIT_AZIMUTH, SPLIT_RANGE, patch, patch)
 
-    def log_summary(self, patch_az, patch_rg, results):
+    def log_summary(self, patch, results):
         self.logger.section("Patch padding / redundancy sweep")
         self.logger.info(f"split = {SPLIT_AZIMUTH} az x {SPLIT_RANGE} rg  |  boxcar w = {self.model.w}")
         self.logger.info(f"padding thickness (constant) = {self.model.w} px on every side")
 
-        marks = np.linspace(0, len(patch_az) - 1, 7).astype(int)
-        for i in marks:
+        for i in range(len(patch)):
             self.logger.info(
-                f"patch {patch_az[i]:5d} x {patch_rg[i]:4d}  |  "
-                f"pad={results['padding_pixels'][i]:10.0f}  "
-                f"red%={results['pct_redundant'][i]:5.2f}  "
-                f"2w%={results['pct_two_w'][i]:5.2f}  "
-                f"fresh%={results['pct_fresh'][i]:5.2f}  "
-                f"patches={results['patch_count'][i]:4.0f}"
+                f"patch {patch[i]:4d}  |  "
+                f"pad={results['padding_pixels'][i]:7.0f}  "
+                f"red%={results['pct_redundant'][i]:6.2f}  "
+                f"2w%={results['pct_two_w'][i]:6.2f}  "
+                f"fresh%={results['pct_fresh'][i]:6.2f}  "
+                f"patches={results['patch_count'][i]:8.0f}"
             )
 
-    def plot_pct_redundant(self, patch_az, results):
+    def plot_pct_redundant(self, patch, results):
         fig, ax = plt.subplots(figsize=(6.4, 4.2))
-        ax.plot(patch_az, results["pct_redundant"], color=ACCENT, lw=2.0)
-        ax.set_xlabel("patch size — azimuth (px), range scales $500\\!\\to\\!4000$")
+        ax.plot(patch, results["pct_redundant"], color=ACCENT, lw=2.0, marker="o", ms=5)
+        ax.set_xlabel("patch size (px)")
         ax.set_ylabel("redundant pixels (%)")
-        ax.set_title("Redundant share falls as the patch grows")
-        ax.set_ylim(bottom=0)
+        ax.set_title("Redundant share falls as the patch grows past $2w$")
+        ax.set_xticks(patch)
+        ax.set_ylim(0, 105)
         fig.tight_layout()
         return self._save(fig, self.output_dir / "pct_redundant.png")
 
-    def plot_pct_fresh(self, patch_az, results):
+    def plot_pct_fresh(self, patch, results):
         fig, ax = plt.subplots(figsize=(6.4, 4.2))
-        ax.plot(patch_az, results["pct_fresh"], color=GOOD, lw=2.0)
-        ax.set_xlabel("patch size — azimuth (px), range scales $500\\!\\to\\!4000$")
+        ax.plot(patch, results["pct_fresh"], color=GOOD, lw=2.0, marker="o", ms=5)
+        ax.set_xlabel("patch size (px)")
         ax.set_ylabel("fresh pixels outside $2w$, not redundant (%)")
-        ax.set_title("Fresh share rises as the patch grows")
+        ax.set_title("Fresh core only appears once the patch clears $2w$")
+        ax.set_xticks(patch)
+        ax.set_ylim(bottom=0)
         fig.tight_layout()
         return self._save(fig, self.output_dir / "pct_fresh.png")
 
-    def plot_padding_pixels(self, patch_az, results):
+    def plot_padding_pixels(self, patch, results):
         fig, ax = plt.subplots(figsize=(6.4, 4.2))
-        ax.plot(patch_az, results["padding_pixels"] / 1e6, color=INK, lw=2.0)
-        ax.set_xlabel("patch size — azimuth (px), range scales $500\\!\\to\\!4000$")
-        ax.set_ylabel("padding pixels (millions), thickness fixed at $w$")
+        ax.plot(patch, results["padding_pixels"], color=INK, lw=2.0, marker="o", ms=5)
+        ax.set_xlabel("patch size (px)")
+        ax.set_ylabel("padding pixels per patch")
         ax.set_title("Padding grows in count but stays a $w$-thick band")
+        ax.set_xticks(patch)
         ax.set_ylim(bottom=0)
         fig.tight_layout()
         return self._save(fig, self.output_dir / "padding_pixels.png")
 
-    def plot_two_w_pixels(self, patch_az, results):
+    def plot_two_w_pixels(self, patch, results):
         fig, ax = plt.subplots(figsize=(6.4, 4.2))
-        ax.plot(patch_az, results["two_w_pixels"] / 1e6, color=ACCENT, lw=2.0)
-        ax.set_xlabel("patch size — azimuth (px), range scales $500\\!\\to\\!4000$")
-        ax.set_ylabel("real pixels inside the $2w$ band (millions)")
+        ax.plot(patch, results["two_w_pixels"], color=ACCENT, lw=2.0, marker="o", ms=5)
+        ax.set_xlabel("patch size (px)")
+        ax.set_ylabel("real pixels inside the $2w$ band")
         ax.set_title("Contaminated $2w$ pixels, excluding the padding")
+        ax.set_xticks(patch)
         ax.set_ylim(bottom=0)
         fig.tight_layout()
         return self._save(fig, self.output_dir / "two_w_pixels.png")
@@ -148,16 +146,16 @@ class PatchRedundancySweep(PlotBase):
     def run(self) -> None:
         self._apply_style()
 
-        patch_az, patch_rg = self.patch_grid()
-        results            = self.evaluate_sweep(patch_az, patch_rg)
+        patch   = self.patch_sizes()
+        results = self.evaluate_sweep(patch)
 
-        self.log_summary(patch_az, patch_rg, results)
+        self.log_summary(patch, results)
 
         saved = [
-            self.plot_pct_redundant(patch_az, results),
-            self.plot_pct_fresh(patch_az, results),
-            self.plot_padding_pixels(patch_az, results),
-            self.plot_two_w_pixels(patch_az, results),
+            self.plot_pct_redundant(patch, results),
+            self.plot_pct_fresh(patch, results),
+            self.plot_padding_pixels(patch, results),
+            self.plot_two_w_pixels(patch, results),
         ]
 
         for path in saved:
