@@ -5,7 +5,9 @@ import math
 import pytest
 
 from configuration.patch_sweep import PatchSweepConfig
+from configuration.sar.geometry_config import GeometryConfig
 from pipelines.patch_sweep.planner import ArchitecturePatchStep, PatchSweepPlanner, SecondarySpread
+from tools.baselines import TrackBaselines
 
 
 def make_candidates(n: int = 28) -> list[str]:
@@ -66,6 +68,53 @@ def test_track_counts_must_fit_the_dataset():
 def test_track_counts_must_be_unique():
     with pytest.raises(ValueError, match="unique"):
         make_planner([5, 5])
+
+
+def make_table() -> TrackBaselines:
+    labels   = ["REF"] + [f"T{i}" for i in range(6)]
+    vertical = [0.0, -0.9, 0.4, -2.1, -0.2, -1.5, 0.1]
+
+    return TrackBaselines(
+        labels         = labels,
+        vertical       = vertical,
+        horizontal     = [0.0] * len(labels),
+        vertical_std   = [0.0] * len(labels),
+        horizontal_std = [0.0] * len(labels),
+    )
+
+
+def test_candidates_are_ordered_by_the_geometry_baseline_component():
+    geometry = GeometryConfig(baseline_component="vertical")
+    ordered  = PatchSweepPlanner.baseline_ordered(geometry, make_table())
+
+    assert ordered == ["T2", "T4", "T0", "T3", "T5", "T1"]
+
+
+def test_baseline_ordering_never_includes_the_reference():
+    geometry = GeometryConfig(baseline_component="vertical")
+
+    assert "REF" not in PatchSweepPlanner.baseline_ordered(geometry, make_table())
+
+
+@pytest.mark.real_data
+def test_dataset_selection_spans_the_full_baseline_aperture(test_data_dir):
+    config = PatchSweepConfig(track_counts=[5, 9, 29])
+    config.paths.dataset_path = test_data_dir
+
+    planner  = PatchSweepPlanner.from_dataset(config)
+    geometry = config.geometry
+    table    = TrackBaselines.load(geometry.baselines_file(test_data_dir))
+    values   = dict(zip(table.labels, table.baselines(geometry.baseline_component, look_angle_deg=geometry.look_angle_deg)))
+
+    candidate_values = [values[label] for label in planner.candidates]
+
+    assert candidate_values == sorted(candidate_values)
+
+    for track_count, labels in planner.selections().items():
+        selected = [values[label] for label in labels]
+
+        assert min(selected) == min(candidate_values)
+        assert max(selected) == max(candidate_values)
 
 
 def test_even_spread_keeps_the_endpoints():

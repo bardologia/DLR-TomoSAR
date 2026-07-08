@@ -72,7 +72,14 @@ class PatchSweepPlanner:
             raise FileNotFoundError(f"The patch sweep needs the baselines table to enumerate all tracks, but {path} does not exist")
 
         table = TrackBaselines.load(path)
-        return cls(config, list(table.labels[1:]))
+        return cls(config, cls.baseline_ordered(config.geometry, table))
+
+    @staticmethod
+    def baseline_ordered(geometry, table: TrackBaselines) -> list:
+        values     = table.baselines(geometry.baseline_component, look_angle_deg=geometry.look_angle_deg)
+        candidates = list(zip(table.labels[1:], values[1:]))
+
+        return [label for label, value in sorted(candidates, key=lambda item: item[1])]
 
     @property
     def total_tracks(self) -> int:
