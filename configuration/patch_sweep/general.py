@@ -24,7 +24,7 @@ class PatchGridConfig:
 class PatchSweepConfig:
     backbone_name   : str  = "resunet"
     backbone_head   : str  = "conv"
-    model_overrides : dict = field(default_factory=dict)
+    model_overrides : dict = field(default_factory=lambda: {"features": [64, 128, 256]})
 
     track_counts  : list[int] = field(default_factory=lambda: [5, 9, 29])
     boxcar_window : int       = 20

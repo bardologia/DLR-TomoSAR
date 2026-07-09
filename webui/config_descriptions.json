@@ -2054,7 +2054,7 @@
       "fields": {
         "backbone_name": "Backbone architecture identifier resolved via ModelBuilder's registry; also the source of the admissible patch step, e.g. resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred)",
-        "model_overrides": "Dict of architecture-config field overrides applied to the backbone before instantiation, shared across all sweep units",
+        "model_overrides": "Dict of architecture-config field overrides applied to the backbone before instantiation, shared across all sweep units; the default narrows the resunet to a three-level feature pyramid so the admissible patch step is 8",
         "track_counts": "Total track counts n (primary + secondaries) to sweep; for each n the secondaries are picked evenly spaced over the dataset's baseline-ordered track list",
         "boxcar_window": "Side w of the boxcar covariance window the ground-truth Capon inversion used, in pixels; sets the predicted optimum W* = w sqrt(N/n) drawn in the report",
         "patch": "PatchGridConfig sub-config defining the swept patch-size grid and the per-size stride and batch rules",

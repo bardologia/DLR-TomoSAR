@@ -29,6 +29,13 @@ def test_step_scales_with_the_pyramid_depth():
     assert ArchitecturePatchStep("resunet", "conv", {"features": [32, 64]}).resolve() == 4
 
 
+def test_sweep_default_narrows_the_pyramid_to_three_levels_for_step_eight():
+    config = PatchSweepConfig()
+
+    assert len(config.model_overrides["features"]) == 3
+    assert ArchitecturePatchStep(config.backbone_name, config.backbone_head, config.model_overrides).resolve() == 8
+
+
 def test_step_rejects_backbones_outside_the_verified_unet_family():
     with pytest.raises(ValueError, match="patch.step"):
         ArchitecturePatchStep("pixel_mlp", "conv", {}).resolve()
@@ -43,18 +50,18 @@ def test_explicit_step_overrides_the_architecture():
 def test_sizes_run_from_one_step_to_maximum():
     planner = make_planner([5], maximum=128)
 
-    assert planner.patch_sizes() == [16, 32, 48, 64, 80, 96, 112, 128]
+    assert planner.patch_sizes() == [8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]
 
 
 def test_minimum_must_be_admissible():
-    planner = make_planner([5], minimum=24)
+    planner = make_planner([5], minimum=20)
 
     with pytest.raises(ValueError, match="multiple of the admissible step"):
         planner.patch_sizes()
 
 
 def test_single_size_grid_is_rejected():
-    planner = make_planner([5], maximum=16)
+    planner = make_planner([5], maximum=8)
 
     with pytest.raises(ValueError, match="at least 2"):
         planner.patch_sizes()
@@ -144,9 +151,9 @@ def test_units_cover_the_full_cross_product():
     planner = make_planner([5, 9], maximum=64)
     units   = planner.units()
 
-    assert len(units) == 2 * 4
+    assert len(units) == 2 * 8
     assert sorted({unit.track_count for unit in units}) == [5, 9]
-    assert {unit.name for unit in units} == {f"n{n:02d}-p{s:03d}" for n in (5, 9) for s in (16, 32, 48, 64)}
+    assert {unit.name for unit in units} == {f"n{n:02d}-p{s:03d}" for n in (5, 9) for s in range(8, 65, 8)}
 
 
 def test_constant_pixel_budget_rescales_the_batch():

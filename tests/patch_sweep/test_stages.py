@@ -29,8 +29,8 @@ def make_stage(tmp_path: Path, resume: bool = False) -> SweepTrainingStage:
 def test_stage_builds_one_item_per_unit(tmp_path):
     stage = make_stage(tmp_path)
 
-    assert len(stage.items) == 8
-    assert stage.items[0] == "n05-p016"
+    assert len(stage.items) == 16
+    assert stage.items[0] == "n05-p008"
 
 
 def test_job_carries_the_unit_and_run_context(tmp_path):
