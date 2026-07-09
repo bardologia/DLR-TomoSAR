@@ -14,7 +14,7 @@ def main() -> None:
     from tools.runtime.config_cli                       import ConfigCli
     from tools.monitoring.logger                        import Logger
 
-    config = ConfigCli(PreprocessInferenceConfig(), description="Render stack-overview plots for one or more preprocessing trials").apply()
+    config = ConfigCli(PreprocessInferenceConfig(), description="Render stack-overview plots and amplitude/phase/DEM value distributions for one or more preprocessing trials").apply()
     logger = Logger(log_dir="logs", name="analyze_preprocessing")
 
     logger.section("Preprocessing inference queue")

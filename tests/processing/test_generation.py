@@ -10,9 +10,10 @@ import numpy as np
 import pytest
 
 from configuration.sar.processing_config import ProcessingConfig, PathConfig
-from pipelines.processing.generation.plots     import StackPlotter
-from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
-from pipelines.processing.generation.inference import StackInferencePipeline
+from pipelines.processing.generation.plots         import StackPlotter
+from pipelines.processing.generation.artifacts     import ArtifactRegistry, MetadataManager
+from pipelines.processing.generation.inference     import StackInferencePipeline
+from pipelines.processing.generation.distributions import ValueDistribution, StackDistributionAnalyzer
 from tools.data.regions import CropRegion
 from tools.monitoring.logger import Logger
 
@@ -173,6 +174,69 @@ def test_stackplotter_smoke(tmp_path, primary, secondaries, interferograms, dem_
     assert "primary" in saved
     assert "dem_full" in saved
     assert all(p.is_file() for p in saved.values())
+
+
+def test_value_distribution_log_conserves_counts():
+    rng    = np.random.default_rng(0)
+    values = rng.gamma(shape=1.0, scale=0.1, size=(32, 32)).astype(np.float32)
+
+    result = ValueDistribution(values, scale="log", n_bins=16).compute()
+
+    assert result["histogram"]["scale"] == "log"
+    assert len(result["histogram"]["bin_edges"]) == 17
+    assert len(result["histogram"]["counts"]) == 16
+    assert sum(result["histogram"]["counts"]) == values.size
+    assert result["statistics"]["count"] == values.size
+    assert result["statistics"]["min"] <= result["statistics"]["median"] <= result["statistics"]["max"]
+
+
+def test_value_distribution_honours_fixed_range_and_nonfinite():
+    values      = np.array([-np.pi, 0.0, np.pi / 2, np.nan], dtype=np.float32)
+    result      = ValueDistribution(values, scale="linear", n_bins=8, value_range=(-np.pi, np.pi)).compute()
+    edges       = result["histogram"]["bin_edges"]
+
+    assert result["statistics"]["n_nonfinite"] == 1
+    assert result["statistics"]["count"]       == 3
+    assert edges[0]  == pytest.approx(-np.pi)
+    assert edges[-1] == pytest.approx(np.pi)
+
+
+@pytest.mark.real_data
+def test_stack_distribution_analyzer_smoke(tmp_path, primary, secondaries, interferograms, dem_full, pass_labels, logger):
+    az, rg = slice(0, 24), slice(0, 24)
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True)
+
+    primary_path        = data_dir / "primary.npy"
+    secondaries_path    = data_dir / "secondaries.npy"
+    interferograms_path = data_dir / "interferograms.npy"
+    dem_path            = data_dir / "dem.npy"
+
+    np.save(primary_path,        np.array(primary[az, rg]))
+    np.save(secondaries_path,    np.array(secondaries[:3, az, rg]))
+    np.save(interferograms_path, np.array(interferograms[:3, az, rg]))
+    np.save(dem_path,            np.array(dem_full[az, rg]))
+
+    analyzer = StackDistributionAnalyzer(tmp_path / "run", CLIP, logger, n_bins=32, fig_dpi=40, save_dpi=40)
+
+    saved   = analyzer.run(primary_path, secondaries_path, interferograms_path, dem_path, pass_labels=pass_labels[:4])
+    payload = json.loads(saved["value_distributions_json"].read_text())
+
+    assert saved["value_distributions_json"].is_file()
+    assert payload["reference_pass"] == pass_labels[0]
+    assert list(payload["passes"].keys())         == list(pass_labels[:4])
+    assert list(payload["interferograms"].keys()) == list(pass_labels[1:4])
+    assert set(payload["dem"]["height"].keys())   == {"statistics", "histogram"}
+
+    primary_entry = payload["passes"][pass_labels[0]]
+    assert primary_entry["role"] == "primary"
+    assert {"amplitude", "phase"} <= set(primary_entry.keys())
+    assert primary_entry["phase"]["histogram"]["bin_edges"][0] == pytest.approx(-np.pi)
+
+    pngs = list((tmp_path / "run" / "images" / "distributions").rglob("*.png"))
+    assert len(pngs) == 4 * 2 + 3 * 2 + 1
+    assert all(p.is_file() for p in pngs)
 
 
 @pytest.mark.real_data

@@ -15,9 +15,6 @@ from tools.monitoring.logger             import Logger
 
 
 class StackPlotter(PlotBase):
-    PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
-    PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
-
     def __init__(self, run_directory: Path, max_amplitude_clip: float, logger: Logger, fig_dpi: int = 150, save_dpi: int = 300) -> None:
         self.max_amplitude_clip = max_amplitude_clip
         self.logger             = logger

@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 from pathlib import Path
 
+from pipelines.processing.generation.distributions import StackDistributionAnalyzer
 from pipelines.processing.generation.plots         import StackPlotter
 from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                         import FileIO
@@ -41,18 +42,37 @@ class StackInferencePipeline:
             pass_labels         = layout.get("pass_labels"),
         )
 
+    def _analyze_distributions(self, layout: dict) -> dict[str, Path]:
+        artifacts = layout["artifacts"]
+
+        analyzer = StackDistributionAnalyzer(
+            run_directory      = self.run_dir,
+            max_amplitude_clip = float(layout["max_amplitude_clip"]),
+            logger             = self.logger,
+        )
+
+        return analyzer.run(
+            primary_path        = self.data_dir / artifacts["primary"],
+            secondaries_path    = self.data_dir / artifacts["secondaries"],
+            interferograms_path = self.data_dir / artifacts["interferograms"],
+            dem_path            = self.data_dir / artifacts["dem_full"],
+            pass_labels         = layout.get("pass_labels"),
+        )
+
     def run(self) -> dict[str, Path]:
-        layout = self._layout()
-        saved  = self._plot(layout)
+        layout        = self._layout()
+        saved         = self._plot(layout)
+        distributions = self._analyze_distributions(layout)
 
         gc.collect()
 
         self.logger.section("[Pre-Processing Inference Completed]")
 
         return {
-            "images"        : self.run_dir / "images",
-            "run_directory" : self.run_dir,
-            "figures"       : len(saved),
+            "images"             : self.run_dir / "images",
+            "run_directory"      : self.run_dir,
+            "figures"            : len(saved),
+            "distributions_json" : distributions["value_distributions_json"],
         }
 
 

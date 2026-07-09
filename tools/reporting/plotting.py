@@ -12,6 +12,9 @@ matplotlib.use("Agg")
 
 
 class PlotBase:
+    PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
+    PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
+
     SCIENTIFIC_RC: dict = {
         "font.family"         : "serif",
         "font.serif"          : ["Times New Roman", "DejaVu Serif"],
