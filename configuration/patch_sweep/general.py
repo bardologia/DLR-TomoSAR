@@ -22,7 +22,7 @@ class PatchGridConfig:
 
 @dataclass
 class PatchSweepConfig:
-    backbone_name   : str  = "resunet"
+    backbone_name   : str  = "unet"
     backbone_head   : str  = "conv"
     model_overrides : dict = field(default_factory=lambda: {"features": [64, 128, 256]})
 
