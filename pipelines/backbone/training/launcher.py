@@ -24,17 +24,31 @@ from tools.runtime.run_tag    import RunTag
 
 
 class SingleTrainRunner(BaseSingleTrainRunner):
+
+    pipeline_class = TrainingPipeline
+
     def __init__(self, config) -> None:
         super().__init__(config)
         self.factory = ConfigFactory(config)
 
     @property
+    def model_name(self) -> str:
+        return self.config.backbone_name
+
+    @property
+    def model_head(self) -> str:
+        return self.config.backbone_head
+
+    @property
     def label(self) -> str:
         n_gaussians = self.factory.gaussian_config().n_default_gaussians
-        return RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum, n_gaussians, self.config.augmentation)
+        return RunNaming.training_tag(self.model_name, self.model_head, self.config.curriculum, n_gaussians, self.config.augmentation)
 
     def _resolve_run_name(self) -> str:
         return RunNaming.compose(self.label, self.config.run_name or RunTag.now())
+
+    def _model_config(self):
+        return ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides, head=self.config.backbone_head)
 
     def _pipeline(self, logdir) -> TrainingPipeline:
         trainer_config            = self.factory.training_trainer_config(logdir=logdir)
@@ -44,13 +58,11 @@ class SingleTrainRunner(BaseSingleTrainRunner):
         dataset_config              = self.factory.training_dataset_config()
         dataset_config.input_config = self.config.input
 
-        model_config = ModelBuilder.config_from_registry(self.config.backbone_name, self.config.model_overrides, head=self.config.backbone_head)
-
-        return TrainingPipeline(
+        return self.pipeline_class(
             trainer_config = trainer_config,
             dataset_config = dataset_config,
-            backbone_name  = self.config.backbone_name,
-            model_config   = model_config,
+            backbone_name  = self.model_name,
+            model_config   = self._model_config(),
             seed           = self.config.seed,
             run_name       = self.config.run_name,
             overfit_check  = self.config.overfit_check,
@@ -70,6 +82,9 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             enabled_losses = {},
         )
 
+    def _inference_components(self):
+        return None
+
     def _run_inference(self, run_directory: Path):
         gc.collect()
         if torch.cuda.is_available():
@@ -77,7 +92,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
         inference_config = replace(self.config.inference, run_directory=Path(run_directory), output_subdir=None)
 
-        return InferencePipeline(inference_config).run()
+        return InferencePipeline(inference_config, components=self._inference_components()).run()
 
     def run(self):
         self._resolve_run_directory()

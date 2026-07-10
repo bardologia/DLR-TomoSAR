@@ -10,6 +10,7 @@ from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.trainer     import Trainer
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO
 from pipelines.shared.config.run_metadata    import TrainingRunMetadata
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.overfit_check import OverfitCheck
@@ -19,6 +20,9 @@ from tools.runtime.reproducibility import Reproducibility
 
 
 class TrainingPipeline:
+
+    MODEL_CONFIG_IO = BackboneModelConfigIO
+
     def __init__(
         self,
         trainer_config : BackboneTrainerConfig,
@@ -88,7 +92,7 @@ class TrainingPipeline:
         base_config       = self.model_config if self.model_config is not None else ModelBuilder.config_from_registry(self.backbone_name, {})
         gate_model_config = check.sanitized_model_config(base_config)
 
-        gate_model, gate_model_cfg = get_backbone(self.backbone_name, config=gate_model_config, **self._model_overrides(in_channels, out_channels))
+        gate_model, gate_model_cfg = self._model_factory()(self.backbone_name, config=gate_model_config, **self._model_overrides(in_channels, out_channels))
 
         gate_trainer = Trainer(
             model      = gate_model,
@@ -104,7 +108,7 @@ class TrainingPipeline:
         check.run(gate_trainer, train_dataset)
 
     def _build_model(self, in_channels: int, out_channels: int):
-        model, model_cfg = get_backbone(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
+        model, model_cfg = self._model_factory()(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
 
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -122,6 +126,9 @@ class TrainingPipeline:
             overrides["image_size"] = self.image_size
 
         return overrides
+
+    def _model_factory(self):
+        return get_backbone
 
     def _make_trainer(self, model, model_cfg, x_axis, norm_stats, run_dir: Path, logger, emit_docs: bool = True):
         return Trainer(
@@ -147,7 +154,7 @@ class TrainingPipeline:
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
         x_axis       = np.asarray(self.dataset_config.x_axis, dtype=np.float32)
 
-        model, model_cfg = get_backbone(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
+        model, model_cfg = self._model_factory()(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
 
         trainer = self._make_trainer(model, model_cfg, x_axis, dataset.normalizer, work_dir, logger, emit_docs=False)
         trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(self.trainer_config.curriculum))
@@ -184,7 +191,7 @@ class TrainingPipeline:
         model, model_cfg = self._build_model(in_channels=in_channels, out_channels=out_channels)
 
         self.run_metadata.save_trainer_config()
-        self.run_metadata.save_model_config(model_cfg, self.backbone_name)
+        self.run_metadata.save_model_config(model_cfg, self.backbone_name, config_io=self.MODEL_CONFIG_IO)
 
         self.run_metadata.save_run_summary(
             model_name       = self.backbone_name,
