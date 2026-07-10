@@ -45,6 +45,10 @@ class ProjectPaths:
             "config_module" : "configuration.inference",
             "config_class"  : "ImageAeInferenceEntryConfig",
         },
+        "infer_unrolled": {
+            "config_module" : "configuration.inference",
+            "config_class"  : "UnrolledInferenceEntryConfig",
+        },
         "cross_validate": {
             "file"          : "cross_validate",
             "config_module" : "configuration.cross_validation.general",
@@ -80,6 +84,7 @@ class ProjectPaths:
         "infer_backbone"            : "inference",
         "infer_profile_autoencoder" : "inference",
         "infer_image_autoencoder"   : "inference",
+        "infer_unrolled"            : "inference",
         "benchmark"                 : "experiments",
         "cross_validate"            : "experiments",
         "sweep_patches"             : "experiments",

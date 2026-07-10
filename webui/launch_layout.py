@@ -301,6 +301,13 @@ class LaunchLayout:
             {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
             {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
         ],
+        "unrolled_inference": [
+            {"title": "Run", "fields": ["run_directory", "output_subdir", "device", "log_level", {"path": "seed", "widget": NUM_SEED}]},
+            {"title": "Execution", "fields": ["split", "checkpoint_name", "measurement_noise_std", "chunk_cells"]},
+            {"title": "Report", "fields": ["save_plots", "n_example_profiles", "save_profile_cube"]},
+            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
+            {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
+        ],
         "embedding_loss": [
             {"title": "Embedding losses", "fields": [
                 {"gate": "use_embedding_mse",      "fields": [{"path": "weight_embedding_mse", "widget": NUM_WEIGHT}]},
@@ -370,6 +377,15 @@ class LaunchLayout:
         "sections": [
             {"key": "image-ae", "title": "Image AE", "panels": [
                 {"kind": "fields", "title": "Image autoencoder inference", "template": "image_inference", "at": "image_inference"},
+            ]},
+        ],
+    }
+
+    INFER_UNROLLED_LAYOUT = {
+        "essentials": INFER_ESSENTIALS,
+        "sections": [
+            {"key": "unrolled", "title": "Unrolled", "panels": [
+                {"kind": "fields", "title": "Unrolled physics-network inference", "template": "unrolled_inference", "at": "unrolled_inference"},
             ]},
         ],
     }
@@ -602,6 +618,7 @@ class LaunchLayout:
         "infer_backbone":            INFER_BACKBONE_LAYOUT,
         "infer_profile_autoencoder": INFER_PROFILE_AE_LAYOUT,
         "infer_image_autoencoder":   INFER_IMAGE_AE_LAYOUT,
+        "infer_unrolled":            INFER_UNROLLED_LAYOUT,
         "benchmark": {
             "type_tab": {"field": "training_type", "options": [["backbone", "Backbone"], ["profile_autoencoder", "Profile AE"], ["jepa", "JEPA"]]},
             "essentials": [

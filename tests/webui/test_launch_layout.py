@@ -19,6 +19,7 @@ from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
 from configuration.diagnostics              import TensorboardExportEntryConfig
+from configuration.inference                import BackboneInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
 from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
@@ -39,8 +40,23 @@ _TRAINING_PAGES = [
 ]
 
 
+_INFERENCE_PAGES = [
+    ("infer_backbone",            BackboneInferenceEntryConfig),
+    ("infer_profile_autoencoder", ProfileAeInferenceEntryConfig),
+    ("infer_image_autoencoder",   ImageAeInferenceEntryConfig),
+    ("infer_unrolled",            UnrolledInferenceEntryConfig),
+]
+
+
 @pytest.mark.parametrize("key, flow_config", _TRAINING_PAGES)
 def test_training_layout_claims_every_config_field_exactly_once(key, flow_config):
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
+
+    LaunchLayout().build(key, leaves)
+
+
+@pytest.mark.parametrize("key, flow_config", _INFERENCE_PAGES)
+def test_inference_layout_claims_every_config_field_exactly_once(key, flow_config):
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
 
     LaunchLayout().build(key, leaves)

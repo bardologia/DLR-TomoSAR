@@ -57,6 +57,11 @@ class ScriptCatalog:
             "category"  : "Inference",
             "purpose"   : "Image-autoencoder inference: reconstruction scoring. Sweeps every run root and runs only standalone image-autoencoder runs.",
         },
+        "infer_unrolled": {
+            "title"     : "Infer Unrolled",
+            "category"  : "Inference",
+            "purpose"   : "Unrolled physics-network inference: re-synthesises coherences from the ground-truth profiles over a split region, inverts them with the trained network, and reports error maps, metrics, and profile overlays. Sweeps every run root and runs only unrolled runs.",
+        },
         "benchmark": {
             "title"     : "Benchmark",
             "category"  : "Experiments",
@@ -140,11 +145,12 @@ class ScriptCatalog:
         "infer": {
             "title"    : "Infer",
             "category" : "Inference",
-            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, or the image autoencoder.",
+            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, the image autoencoder, or the unrolled physics network.",
             "members"  : [
                 ("infer_backbone",            "Backbone"),
                 ("infer_profile_autoencoder", "Profile AE"),
                 ("infer_image_autoencoder",   "Image AE"),
+                ("infer_unrolled",            "Unrolled"),
             ],
         },
         "analyze": {

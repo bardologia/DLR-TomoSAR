@@ -1636,6 +1636,45 @@
         "profile_inference": "ProfileAeInferenceConfig template applied to each discovered run, with run_directory overridden per run"
       }
     },
+    "inference/unrolled::UnrolledInferencePaths": {
+      "summary": "Output subdirectory and filename layout for unrolled-physics-network inference artifacts",
+      "fields": {
+        "figures_subdir": "Subdirectory name under the inference output directory where error maps and profile figures are written",
+        "logs_subdir": "Subdirectory name under the inference output directory where inference log files are written",
+        "metrics_filename": "Filename of the JSON file holding the computed inversion metrics",
+        "report_filename": "Filename of the assembled markdown inference report"
+      }
+    },
+    "inference/unrolled::UnrolledInferenceConfig": {
+      "summary": "Runs a trained unrolled physics network over a dataset split region, re-synthesising coherence measurements from the ground-truth profiles through the exact kz steering operator and scoring the inverted profiles against those targets",
+      "fields": {
+        "run_directory": "Path to the unrolled training run directory holding the checkpoint and receiving inference outputs",
+        "output_subdir": "Optional fixed subdirectory name under run_directory/inference/unrolled for this call's outputs, None auto-generates a timestamped subdirectory",
+        "device": "Torch device string for inference, e.g. cuda or cpu",
+        "seed": "Random seed applied before prediction so the optional synthetic measurement-noise draw is reproducible",
+        "log_level": "Logging verbosity threshold, e.g. INFO or DEBUG",
+        "split": "Dataset split region to run inference on: train, val, or test",
+        "checkpoint_name": "Filename under the run's checkpoints directory to load, best.pt or last.pt",
+        "measurement_noise_std": "Complex noise standard deviation added to the synthesised coherences, None reuses the value the run was trained with",
+        "chunk_cells": "Upper bound on elevation bins times pixels processed per prediction chunk, bounding peak memory during region inference",
+        "save_plots": "Whether to write error maps, the error histogram, peak-height maps, and profile-overlay figures to disk",
+        "n_example_profiles": "Number of best, median, and worst pixels each rendered as ground-truth versus prediction profile overlays",
+        "save_profile_cube": "Whether to persist the full predicted profile cube as profile_cube.npy next to the metrics",
+        "fig_dpi": "Resolution in DPI applied to on-screen figure rendering (matplotlib figure.dpi)",
+        "save_dpi": "Resolution in DPI applied when figures are saved to disk (matplotlib savefig.dpi)",
+        "paths": "UnrolledInferencePaths sub-config naming the output subdirectories and result filenames for this inference run"
+      }
+    },
+    "inference/unrolled::UnrolledInferenceEntryConfig": {
+      "summary": "Entry point queuing unrolled-physics-network inference across every run discovered recursively under the runs directory",
+      "fields": {
+        "runs_dir": "Master runs directory scanned recursively for unrolled runs to infer, defaults to the unrolled subtree of the runs root; every run at any depth is discovered and non-unrolled runs are skipped by type",
+        "run_filter": "List of run names relative to runs_dir to restrict inference to, empty processes every discovered run of this type",
+        "gpus": "List of GPU device indices across which queued inference jobs are distributed and launched in parallel",
+        "poll_interval_s": "Seconds between successive polls of the GPU job queue while waiting for a free GPU or a running job to finish",
+        "unrolled_inference": "UnrolledInferenceConfig template applied to each discovered run, with run_directory overridden per run"
+      }
+    },
     "benchmark/dataloader_tuning::DataLoaderTuningEntryConfig": {
       "summary": "Entry point sweeping DataLoader batch size, worker count and prefetch to find the fastest configuration that keeps the GPU fed",
       "fields": {
