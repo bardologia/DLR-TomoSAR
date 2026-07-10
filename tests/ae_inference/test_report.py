@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from pipelines.autoencoder_common.inference.report import AeReportBase
+from pipelines.shared.inference.report import InferenceReportBase
 from pipelines.image_autoencoder.inference.report import ImageAeReport
 from pipelines.profile_autoencoder.inference.report import ProfileAeReport
 
@@ -47,8 +47,8 @@ def _profile_run():
 
 
 def test_image_and_profile_reports_share_base():
-    assert issubclass(ImageAeReport, AeReportBase)
-    assert issubclass(ProfileAeReport, AeReportBase)
+    assert issubclass(ImageAeReport, InferenceReportBase)
+    assert issubclass(ProfileAeReport, InferenceReportBase)
 
 
 def test_image_report_assembles_with_title_and_metrics(tmp_path):

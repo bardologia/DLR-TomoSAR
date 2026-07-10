@@ -7,10 +7,10 @@ from tools.reporting.markdown  import MarkdownDoc, ScalarFormatter
 from tools.reporting.reporting import ReportAssets
 
 
-class AeReportBase:
+class InferenceReportBase:
     METRIC_GROUPS   : list = []
     FIGURE_SECTIONS : list = []
-    DOC_TITLE       : str  = "Autoencoder Inference Report"
+    DOC_TITLE       : str  = "Inference Report"
 
     def __init__(self, output_dir: Path, run, config, metrics: dict, figures: Dict[str, List[Path]], report_path: Path) -> None:
         self.output_dir  = Path(output_dir)

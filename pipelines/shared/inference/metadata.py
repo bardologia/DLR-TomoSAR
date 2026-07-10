@@ -4,8 +4,8 @@ from tools.data.io         import FileIO
 from tools.runtime.run_tag import RunTag
 
 
-class AeInferenceMetadata:
-    SUBDIR = "ae"
+class InferenceMetadata:
+    SUBDIR: str
 
     def __init__(self, config) -> None:
         paths = config.paths

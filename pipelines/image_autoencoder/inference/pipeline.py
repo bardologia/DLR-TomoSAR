@@ -10,11 +10,11 @@ from pipelines.image_autoencoder.inference.metrics    import ImageAeMetrics
 from pipelines.image_autoencoder.inference.plots      import ImageAePlots
 from pipelines.image_autoencoder.inference.predictor  import ImageAePredictor
 from pipelines.image_autoencoder.inference.report     import ImageAeReport
-from pipelines.autoencoder_common.inference.metadata  import AeInferenceMetadata
+from pipelines.shared.inference.metadata              import InferenceMetadata
 from tools.monitoring.logger                          import Logger
 
 
-class ImageAeInferenceMetadata(AeInferenceMetadata):
+class ImageAeInferenceMetadata(InferenceMetadata):
     SUBDIR = "image_ae"
 
 

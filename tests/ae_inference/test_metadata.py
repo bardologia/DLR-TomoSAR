@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from pipelines.autoencoder_common.inference.metadata import AeInferenceMetadata
+from pipelines.shared.inference.metadata import InferenceMetadata
 from pipelines.image_autoencoder.inference.pipeline import ImageAeInferenceMetadata
 from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferenceMetadata
 
@@ -13,8 +13,8 @@ def _config(tmp_path, output_subdir=""):
 
 
 def test_metadata_share_base():
-    assert issubclass(ImageAeInferenceMetadata, AeInferenceMetadata)
-    assert issubclass(ProfileAeInferenceMetadata, AeInferenceMetadata)
+    assert issubclass(ImageAeInferenceMetadata, InferenceMetadata)
+    assert issubclass(ProfileAeInferenceMetadata, InferenceMetadata)
 
 
 def test_subdir_distinguishes_image_and_profile(tmp_path):

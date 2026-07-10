@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pipelines.autoencoder_common.inference.report import AeReportBase
+from pipelines.shared.inference.report import InferenceReportBase
 
 
-class ImageAeReport(AeReportBase):
+class ImageAeReport(InferenceReportBase):
     DOC_TITLE = "Image Autoencoder Inference Report"
 
     METRIC_GROUPS = [

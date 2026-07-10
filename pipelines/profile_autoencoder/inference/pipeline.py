@@ -10,11 +10,11 @@ from pipelines.profile_autoencoder.inference.metrics     import ProfileAeMetrics
 from pipelines.profile_autoencoder.inference.plots       import ProfileAePlots
 from pipelines.profile_autoencoder.inference.predictor   import ProfileAePredictor
 from pipelines.profile_autoencoder.inference.report      import ProfileAeReport
-from pipelines.autoencoder_common.inference.metadata     import AeInferenceMetadata
+from pipelines.shared.inference.metadata                 import InferenceMetadata
 from tools.monitoring.logger                             import Logger
 
 
-class ProfileAeInferenceMetadata(AeInferenceMetadata):
+class ProfileAeInferenceMetadata(InferenceMetadata):
     SUBDIR = "profile_ae"
 
 
