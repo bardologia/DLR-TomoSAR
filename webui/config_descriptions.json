@@ -2126,7 +2126,7 @@
         "paths": "TrainingPathsConfig sub-config holding filesystem locations for the dataset, extracted parameters, and secondary-track labels",
         "training": "TrainingQueueConfig sub-config bundling training-loop and queue settings (epochs, batch size, workers, AMP, EMA, resume, scheduler/warmup/clip knobs)",
         "pretrain": "PretrainConfig sub-config for optional pre-training preflight (batch-size search, dataloader tuning, VRAM budget)",
-        "curriculum": "LossCurriculumConfig defining the two-stage warmup/complete loss schedule and its swap epoch, defaults to the physics-loss curriculum with coherence resynthesis and covariance matching enabled in the complete stage",
+        "curriculum": "LossCurriculumConfig defining the two-stage warmup/complete loss schedule and its swap epoch; defaults to the physics-loss curriculum with hungarian param matching in both stages, the recommended pairing for the set-prediction existence gate",
         "geometry": "GeometryConfig sub-config of raw SAR acquisition geometry defaults, resolved against the dataset's baselines table before training starts",
         "input": "InputConfig sub-config selecting which channel groups feed the network, defaults to the full stack; use_interferograms must stay enabled because the existence trunk consumes exactly those channels",
         "normalization": "NormalizationConfig sub-config controlling per-channel input/output normalization strategies and output clamping",

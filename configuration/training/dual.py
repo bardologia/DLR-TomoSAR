@@ -9,9 +9,18 @@ from configuration.inference.general            import InferenceConfig
 from configuration.sar.geometry_config          import GeometryConfig
 from configuration.normalization.general        import NormalizationConfig
 from configuration.training.backbone            import _default_inference, default_curriculum
-from configuration.training.general.loss        import LossCurriculumConfig
+from configuration.training.general.loss        import LossCurriculumConfig, ParamMatching
 from configuration.training.general.runtime     import OverfitCheckConfig
 from configuration.training.general.pretraining import PretrainConfig
+
+
+def dual_curriculum() -> LossCurriculumConfig:
+    curriculum = default_curriculum()
+
+    curriculum.warmup.param_matching   = ParamMatching.HUNGARIAN
+    curriculum.complete.param_matching = ParamMatching.HUNGARIAN
+
+    return curriculum
 
 
 @dataclass
@@ -27,7 +36,7 @@ class DualEntryConfig:
     paths         : TrainingPathsConfig  = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
     pretrain      : PretrainConfig       = field(default_factory=PretrainConfig)
-    curriculum    : LossCurriculumConfig = field(default_factory=default_curriculum)
+    curriculum    : LossCurriculumConfig = field(default_factory=dual_curriculum)
     geometry      : GeometryConfig       = field(default_factory=GeometryConfig)
     input         : InputConfig          = field(default_factory=InputConfig.full_stack)
     normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)

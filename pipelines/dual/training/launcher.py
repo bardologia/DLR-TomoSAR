@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from configuration.training import CurriculumInheritance, DualEntryConfig, default_curriculum
+from configuration.training import CurriculumInheritance, DualEntryConfig, dual_curriculum
 from models.dual                          import DUAL_CONFIG_REGISTRY
 from pipelines.backbone.training.launcher import SingleTrainRunner
 from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS
@@ -43,6 +43,6 @@ class DualTrainingLauncher:
         cli    = ConfigCli(DualEntryConfig(), description="Train the dual-input ResUNet set-prediction model: a full-stack trunk feeds the gaussian heads while an interferogram-only trunk feeds the existence gate")
         config = cli.apply(argv)
 
-        CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()
+        CurriculumInheritance(config.curriculum, dual_curriculum(), cli.overrides).apply()
 
         SeedSweepRunner(config, DualSingleTrainRunner).run()
