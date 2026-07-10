@@ -118,7 +118,7 @@ class ImageAutoencoderConfigIO(ConfigIO):
 
 
 class UnrolledModelConfigIO(ConfigIO):
-    FILENAME     = "unrolled_model_config.json"
+    FILENAME     = RunArtifacts.UNROLLED_CONFIG
     MISSING_NOUN = "unrolled"
     UNKNOWN_NOUN = "unrolled model"
     EXCLUDED     = {"shape_logger_types"}

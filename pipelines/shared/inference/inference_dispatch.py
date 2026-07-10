@@ -40,3 +40,15 @@ class ImageAeInferenceRunner:
         config = replace(self.entry.image_inference, run_directory=Path(run_directory), output_subdir=None)
 
         ImageAeInferencePipeline(config).run()
+
+
+class UnrolledInferenceRunner:
+    def __init__(self, entry_config) -> None:
+        self.entry = entry_config
+
+    def run(self, run_directory: Path) -> None:
+        from pipelines.unrolled.inference.pipeline import UnrolledInferencePipeline
+
+        config = replace(self.entry.unrolled_inference, run_directory=Path(run_directory), output_subdir=None)
+
+        UnrolledInferencePipeline(config).run()

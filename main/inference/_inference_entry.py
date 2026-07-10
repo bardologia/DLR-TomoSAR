@@ -14,18 +14,21 @@ class InferenceEntry:
         RunType.BACKBONE   : "BackboneInferenceRunner",
         RunType.PROFILE_AE : "ProfileAeInferenceRunner",
         RunType.IMAGE_AE   : "ImageAeInferenceRunner",
+        RunType.UNROLLED   : "UnrolledInferenceRunner",
     }
 
     CONFIGS = {
         RunType.BACKBONE   : "BackboneInferenceEntryConfig",
         RunType.PROFILE_AE : "ProfileAeInferenceEntryConfig",
         RunType.IMAGE_AE   : "ImageAeInferenceEntryConfig",
+        RunType.UNROLLED   : "UnrolledInferenceEntryConfig",
     }
 
     DESCRIPTIONS = {
         RunType.BACKBONE   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports over every backbone/JEPA run found at any depth under the runs directory.",
         RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run found at any depth under the runs directory.",
         RunType.IMAGE_AE   : "Image-autoencoder inference: reconstruction scoring over every standalone image-autoencoder run found at any depth under the runs directory.",
+        RunType.UNROLLED   : "Unrolled physics-network inference: synthesised-coherence inversion scoring over every unrolled run found at any depth under the runs directory.",
     }
 
     def __init__(self, entry_script: Path, run_type: str) -> None:
@@ -40,13 +43,14 @@ class InferenceEntry:
     def _worker(self, run_dir: str, config_path: str, gpu_id: int) -> None:
         EnvironmentPinner.gpu(gpu_id)
 
-        from pipelines.shared.inference.inference_dispatch import BackboneInferenceRunner, ImageAeInferenceRunner, ProfileAeInferenceRunner
+        from pipelines.shared.inference.inference_dispatch import BackboneInferenceRunner, ImageAeInferenceRunner, ProfileAeInferenceRunner, UnrolledInferenceRunner
         from tools.runtime.config_cli           import ConfigCli
 
         runners = {
             "BackboneInferenceRunner"  : BackboneInferenceRunner,
             "ProfileAeInferenceRunner" : ProfileAeInferenceRunner,
             "ImageAeInferenceRunner"   : ImageAeInferenceRunner,
+            "UnrolledInferenceRunner"  : UnrolledInferenceRunner,
         }
 
         config = ConfigCli.load_resolved(self._entry_config(), Path(config_path))
