@@ -10,10 +10,12 @@ import torch
 from models import (
     BACKBONE_HEADS,
     BACKBONE_MODEL_REGISTRY,
+    DUAL_MODEL_REGISTRY,
     IMAGE_AE_MODEL_REGISTRY,
     PROFILE_AE_MODEL_REGISTRY,
     UNROLLED_MODEL_REGISTRY,
     get_backbone,
+    get_dual,
     get_image_autoencoder,
     get_profile_autoencoder,
     get_unrolled,
@@ -46,6 +48,7 @@ MODEL_FAMILIES = {
     "profile_autoencoder" : (_plain_cases(PROFILE_AE_MODEL_REGISTRY), get_profile_autoencoder),
     "image_autoencoder"   : (_plain_cases(IMAGE_AE_MODEL_REGISTRY),   get_image_autoencoder),
     "unrolled"            : (_plain_cases(UNROLLED_MODEL_REGISTRY),   get_unrolled),
+    "dual"                : (_plain_cases(DUAL_MODEL_REGISTRY),       get_dual),
 }
 
 FAMILY_MODEL_CASES = [(family, key) for family, (cases, _factory) in MODEL_FAMILIES.items() for key in sorted(cases)]

@@ -32,6 +32,12 @@ from .unrolled import (
     TomoOperator,
     get_unrolled,
 )
+from .dual import (
+    DUAL_CONFIG_REGISTRY,
+    DUAL_MODEL_REGISTRY,
+    DualResUNet,
+    get_dual,
+)
 
 def config_registry(training_type: str) -> dict:
     if training_type == "profile_autoencoder":
@@ -40,6 +46,8 @@ def config_registry(training_type: str) -> dict:
         return IMAGE_AE_CONFIG_REGISTRY
     if training_type == "unrolled":
         return UNROLLED_CONFIG_REGISTRY
+    if training_type == "dual":
+        return DUAL_CONFIG_REGISTRY
     return BACKBONE_CONFIG_REGISTRY
 
 
@@ -80,4 +88,8 @@ __all__ = [
     "GammaNet",
     "TomoOperator",
     "get_unrolled",
+    "DUAL_CONFIG_REGISTRY",
+    "DUAL_MODEL_REGISTRY",
+    "DualResUNet",
+    "get_dual",
 ]

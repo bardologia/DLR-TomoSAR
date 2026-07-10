@@ -8,6 +8,7 @@ from models.backbone            import BACKBONE_CONFIG_REGISTRY, BACKBONE_MODEL_
 from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY, PROFILE_AE_MODEL_REGISTRY
 from models.image_autoencoder   import IMAGE_AE_CONFIG_REGISTRY, IMAGE_AE_MODEL_REGISTRY
 from models.unrolled            import UNROLLED_CONFIG_REGISTRY, UNROLLED_MODEL_REGISTRY
+from models.dual                import DUAL_CONFIG_REGISTRY, DUAL_MODEL_REGISTRY
 from models                     import config_registry
 
 
@@ -16,6 +17,7 @@ ALL_REGISTRIES = {
     "profile_ae" : PROFILE_AE_CONFIG_REGISTRY,
     "image_ae"   : IMAGE_AE_CONFIG_REGISTRY,
     "unrolled"   : UNROLLED_CONFIG_REGISTRY,
+    "dual"       : DUAL_CONFIG_REGISTRY,
 }
 
 REGISTRY_ENTRIES = [
@@ -68,6 +70,10 @@ def test_unrolled_config_and_model_registries_share_keys():
     assert set(UNROLLED_CONFIG_REGISTRY) == set(UNROLLED_MODEL_REGISTRY)
 
 
+def test_dual_config_and_model_registries_share_keys():
+    assert set(DUAL_CONFIG_REGISTRY) == set(DUAL_MODEL_REGISTRY)
+
+
 def test_image_size_models_are_known_backbones():
     assert BACKBONE_IMAGE_SIZE_MODELS.issubset(set(BACKBONE_CONFIG_REGISTRY))
 
@@ -77,6 +83,7 @@ def test_config_registry_dispatch_matches_named_registries():
     assert config_registry("profile_autoencoder") is PROFILE_AE_CONFIG_REGISTRY
     assert config_registry("image_autoencoder")   is IMAGE_AE_CONFIG_REGISTRY
     assert config_registry("unrolled")            is UNROLLED_CONFIG_REGISTRY
+    assert config_registry("dual")                is DUAL_CONFIG_REGISTRY
 
 
 def test_config_registry_unknown_falls_back_to_backbone():

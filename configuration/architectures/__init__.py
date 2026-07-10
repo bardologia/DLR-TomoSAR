@@ -23,6 +23,9 @@ from configuration.architectures.backbone import (
 from configuration.architectures.unrolled import (
     GammaNetConfig,
 )
+from configuration.architectures.dual import (
+    DualResUNetConfig,
+)
 from configuration.architectures.image_autoencoder import (
     ImageAutoencoderBaseConfig,
     Conv2dImageAutoencoderConfig,

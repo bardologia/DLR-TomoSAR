@@ -5,6 +5,7 @@ from pathlib     import Path
 
 from configuration.dataset.profile_autoencoder import ProfileAugmentationConfig, ProfileDatasetConfig
 from models                                     import BACKBONE_CONFIG_REGISTRY
+from models.dual                                import DUAL_CONFIG_REGISTRY
 from models.image_autoencoder                   import IMAGE_AE_CONFIG_REGISTRY
 from models.profile_autoencoder                 import PROFILE_AE_CONFIG_REGISTRY
 from models.unrolled                            import UNROLLED_CONFIG_REGISTRY
@@ -126,6 +127,21 @@ class UnrolledModelConfigIO(ConfigIO):
     @classmethod
     def _registry(cls) -> dict:
         return UNROLLED_CONFIG_REGISTRY
+
+    @classmethod
+    def _serialize(cls, config) -> dict:
+        return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
+
+
+class DualModelConfigIO(ConfigIO):
+    FILENAME     = RunArtifacts.DUAL_CONFIG
+    MISSING_NOUN = "dual-input"
+    UNKNOWN_NOUN = "dual-input model"
+    EXCLUDED     = {"shape_logger_types"}
+
+    @classmethod
+    def _registry(cls) -> dict:
+        return DUAL_CONFIG_REGISTRY
 
     @classmethod
     def _serialize(cls, config) -> dict:

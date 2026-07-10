@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pipelines.shared.config.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO, UnrolledModelConfigIO
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO, DualModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO, UnrolledModelConfigIO
 from pipelines.shared.inference.run_classifier import RunArtifacts, RunClassifier, RunType
 
 
@@ -34,6 +34,11 @@ def test_classify_unrolled(tmp_path):
     assert RunClassifier.classify(run) == RunType.UNROLLED
 
 
+def test_classify_dual(tmp_path):
+    run = _make_run(tmp_path, "dual_model_config.json")
+    assert RunClassifier.classify(run) == RunType.DUAL
+
+
 def test_classify_jepa_run_routes_to_backbone(tmp_path):
     run = _make_run(tmp_path, "model_config.json", "profile_autoencoder_config.json")
     assert RunClassifier.classify(run) == RunType.BACKBONE
@@ -61,3 +66,4 @@ def test_run_classifier_artifacts_match_config_io_filenames():
     assert ProfileAutoencoderConfigIO.FILENAME  == RunArtifacts.PROFILE_AE_CONFIG
     assert ImageAutoencoderConfigIO.FILENAME    == RunArtifacts.IMAGE_AE_CONFIG
     assert UnrolledModelConfigIO.FILENAME       == RunArtifacts.UNROLLED_CONFIG
+    assert DualModelConfigIO.FILENAME           == RunArtifacts.DUAL_CONFIG
