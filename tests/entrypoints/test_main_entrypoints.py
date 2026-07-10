@@ -31,10 +31,12 @@ DEFER_HEAVY_IMPORTS = (
     "train_profile_autoencoder",
     "train_image_autoencoder",
     "train_unrolled",
+    "train_dual",
     "infer_backbone",
     "infer_profile_autoencoder",
     "infer_image_autoencoder",
     "infer_unrolled",
+    "infer_dual",
     "generate_interferograms",
     "generate_tomogram",
     "tune",
@@ -54,6 +56,7 @@ CLI_MODULES = (
     "infer_profile_autoencoder",
     "infer_image_autoencoder",
     "infer_unrolled",
+    "infer_dual",
     "analyze_preprocessing",
     "analyze_param_extraction",
     "pre_process",
@@ -75,6 +78,7 @@ ENTRY_CONFIGS = {
     "infer_profile_autoencoder" : ("configuration.inference",          "ProfileAeInferenceEntryConfig"),
     "infer_image_autoencoder"   : ("configuration.inference",          "ImageAeInferenceEntryConfig"),
     "infer_unrolled"            : ("configuration.inference",          "UnrolledInferenceEntryConfig"),
+    "infer_dual"                : ("configuration.inference",          "DualInferenceEntryConfig"),
     "pre_process"               : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
     "extract_params"            : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
     "analyze_preprocessing"     : ("configuration.sar.processing_config", "PreprocessInferenceConfig"),
@@ -155,7 +159,7 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
     assert "CUDA_VISIBLE_DEVICES" not in os.environ
 
 
-@pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder", "train_unrolled"))
+@pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder", "train_unrolled", "train_dual"))
 def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
     source = _script_path(name).read_text()
 

@@ -15,6 +15,7 @@ class InferenceEntry:
         RunType.PROFILE_AE : "ProfileAeInferenceRunner",
         RunType.IMAGE_AE   : "ImageAeInferenceRunner",
         RunType.UNROLLED   : "UnrolledInferenceRunner",
+        RunType.DUAL       : "DualInferenceRunner",
     }
 
     CONFIGS = {
@@ -22,6 +23,7 @@ class InferenceEntry:
         RunType.PROFILE_AE : "ProfileAeInferenceEntryConfig",
         RunType.IMAGE_AE   : "ImageAeInferenceEntryConfig",
         RunType.UNROLLED   : "UnrolledInferenceEntryConfig",
+        RunType.DUAL       : "DualInferenceEntryConfig",
     }
 
     DESCRIPTIONS = {
@@ -29,6 +31,7 @@ class InferenceEntry:
         RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run found at any depth under the runs directory.",
         RunType.IMAGE_AE   : "Image-autoencoder inference: reconstruction scoring over every standalone image-autoencoder run found at any depth under the runs directory.",
         RunType.UNROLLED   : "Unrolled physics-network inference: synthesised-coherence inversion scoring over every unrolled run found at any depth under the runs directory.",
+        RunType.DUAL       : "Dual-input ResUNet inference: sliding-window prediction, stitched cubes, and reports over every dual run found at any depth under the runs directory.",
     }
 
     def __init__(self, entry_script: Path, run_type: str) -> None:
@@ -43,7 +46,7 @@ class InferenceEntry:
     def _worker(self, run_dir: str, config_path: str, gpu_id: int) -> None:
         EnvironmentPinner.gpu(gpu_id)
 
-        from pipelines.shared.inference.inference_dispatch import BackboneInferenceRunner, ImageAeInferenceRunner, ProfileAeInferenceRunner, UnrolledInferenceRunner
+        from pipelines.shared.inference.inference_dispatch import BackboneInferenceRunner, DualInferenceRunner, ImageAeInferenceRunner, ProfileAeInferenceRunner, UnrolledInferenceRunner
         from tools.runtime.config_cli           import ConfigCli
 
         runners = {
@@ -51,6 +54,7 @@ class InferenceEntry:
             "ProfileAeInferenceRunner" : ProfileAeInferenceRunner,
             "ImageAeInferenceRunner"   : ImageAeInferenceRunner,
             "UnrolledInferenceRunner"  : UnrolledInferenceRunner,
+            "DualInferenceRunner"      : DualInferenceRunner,
         }
 
         config = ConfigCli.load_resolved(self._entry_config(), Path(config_path))
