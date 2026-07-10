@@ -44,3 +44,6 @@ from configuration.training.unrolled import (
     UnrolledEntryConfig,
     UnrolledTrainingConfig,
 )
+from configuration.training.dual import (
+    DualEntryConfig,
+)
