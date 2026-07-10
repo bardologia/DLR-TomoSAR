@@ -42,6 +42,11 @@ class ScriptCatalog:
             "category"  : "Training",
             "purpose"   : "Train the unrolled physics network (gamma_net): LISTA-style proximal-gradient iterations over the exact per-pixel kz steering operator, trained on coherence measurements synthesised from the ground-truth Gaussian profiles. Isolated from the backbone stack; requires the geometry field.",
         },
+        "train_dual": {
+            "title"     : "Train Dual",
+            "category"  : "Training",
+            "purpose"   : "Train the dual-input ResUNet set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate. Shares the backbone dataset, loss curriculum, and trainer.",
+        },
         "infer_backbone": {
             "title"     : "Infer Backbone",
             "category"  : "Inference",
@@ -61,6 +66,11 @@ class ScriptCatalog:
             "title"     : "Infer Unrolled",
             "category"  : "Inference",
             "purpose"   : "Unrolled physics-network inference: re-synthesises coherences from the ground-truth profiles over a split region, inverts them with the trained network, and reports error maps, metrics, and profile overlays. Sweeps every run root and runs only unrolled runs.",
+        },
+        "infer_dual": {
+            "title"     : "Infer Dual",
+            "category"  : "Inference",
+            "purpose"   : "Dual-input ResUNet inference: sliding-window prediction, stitched cubes, and reports through the shared backbone inference pipeline. Sweeps every run root and runs only dual runs.",
         },
         "benchmark": {
             "title"     : "Benchmark",
@@ -133,24 +143,26 @@ class ScriptCatalog:
         "train": {
             "title"    : "Train",
             "category" : "Training",
-            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, the JEPA predictor, or the unrolled physics network.",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, the JEPA predictor, the unrolled physics network, or the dual-input ResUNet.",
             "members"  : [
                 ("train_backbone",            "Backbone"),
                 ("train_profile_autoencoder", "Profile AE"),
                 ("train_image_autoencoder",   "Image AE"),
                 ("train_jepa",                "JEPA"),
                 ("train_unrolled",            "Unrolled"),
+                ("train_dual",                "Dual"),
             ],
         },
         "infer": {
             "title"    : "Infer",
             "category" : "Inference",
-            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, the image autoencoder, or the unrolled physics network.",
+            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, the image autoencoder, the unrolled physics network, or the dual-input ResUNet.",
             "members"  : [
                 ("infer_backbone",            "Backbone"),
                 ("infer_profile_autoencoder", "Profile AE"),
                 ("infer_image_autoencoder",   "Image AE"),
                 ("infer_unrolled",            "Unrolled"),
+                ("infer_dual",                "Dual"),
             ],
         },
         "analyze": {

@@ -390,6 +390,15 @@ class LaunchLayout:
         ],
     }
 
+    INFER_DUAL_LAYOUT = {
+        "essentials": INFER_ESSENTIALS,
+        "sections": [
+            {"key": "dual", "title": "Dual", "panels": [
+                {"kind": "fields", "title": "Dual-input ResUNet inference", "template": "inference_full", "at": "inference"},
+            ]},
+        ],
+    }
+
     LAYOUTS = {
         "pre_process": {
             "sections": [
@@ -586,6 +595,39 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "train_dual": {
+            "essentials": TRAIN_ESSENTIALS,
+            "sections": [
+                {"key": "model", "title": "Model", "panels": [
+                    {"kind": "fields", "groups": [{"title": "Dual model", "fields": ["model_name", "model_overrides"]}]},
+                ]},
+                {"key": "data", "title": "Data", "panels": [
+                    {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
+                    {"kind": "fields", "title": "Input channels", "template": "input", "at": "input"},
+                    {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
+                    {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
+                ]},
+                {"key": "training", "title": "Training", "panels": [
+                    {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
+                    {"kind": "fields", "title": "Throughput probe", "groups": [
+                        {"title": None, "fields": [{"gate": "probe_enabled", "fields": ["probe_n_batches", "probe_reference", "probe_exit_after"]}]},
+                    ]},
+                    {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
+                ]},
+                {"key": "loss", "title": "Loss", "panels": [
+                    {"kind": "fields", "title": "Curriculum", "template": "curriculum_head", "at": "curriculum"},
+                    {"kind": "pair", "title": "Loss stages", "template": "loss", "base": "curriculum.complete", "override": "curriculum.warmup"},
+                ]},
+                {"key": "geometry", "title": "Geometry", "panels": [
+                    {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
+                ]},
+                {"key": "inference", "title": "Inference", "panels": [
+                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
+                    {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},
+                ]},
+            ],
+        },
         "train_unrolled": {
             "essentials": [
                 "run_name",
@@ -619,6 +661,7 @@ class LaunchLayout:
         "infer_profile_autoencoder": INFER_PROFILE_AE_LAYOUT,
         "infer_image_autoencoder":   INFER_IMAGE_AE_LAYOUT,
         "infer_unrolled":            INFER_UNROLLED_LAYOUT,
+        "infer_dual":                INFER_DUAL_LAYOUT,
         "benchmark": {
             "type_tab": {"field": "training_type", "options": [["backbone", "Backbone"], ["profile_autoencoder", "Profile AE"], ["jepa", "JEPA"]]},
             "essentials": [

@@ -19,9 +19,9 @@ from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
 from configuration.diagnostics              import TensorboardExportEntryConfig
-from configuration.inference                import BackboneInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
+from configuration.inference                import BackboneInferenceEntryConfig, DualInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
 from configuration.patch_sweep.general      import PatchSweepConfig
-from configuration.training                 import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
+from configuration.training                 import BackboneEntryConfig, DualEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
@@ -33,6 +33,7 @@ _TRAINING_PAGES = [
     ("train_profile_autoencoder", ProfileAeEntryConfig),
     ("train_image_autoencoder",   ImageAeEntryConfig),
     ("train_unrolled",            UnrolledEntryConfig),
+    ("train_dual",                DualEntryConfig),
     ("benchmark",                 BenchmarkConfig),
     ("cross_validate",            CrossValidationConfig),
     ("sweep_patches",             PatchSweepConfig),
@@ -45,6 +46,7 @@ _INFERENCE_PAGES = [
     ("infer_profile_autoencoder", ProfileAeInferenceEntryConfig),
     ("infer_image_autoencoder",   ImageAeInferenceEntryConfig),
     ("infer_unrolled",            UnrolledInferenceEntryConfig),
+    ("infer_dual",                DualInferenceEntryConfig),
 ]
 
 

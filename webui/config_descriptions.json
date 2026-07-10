@@ -844,6 +844,31 @@
         "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
       }
     },
+    "architectures/dual::DualResUNetConfig": {
+      "summary": "Dual-input ResUNet with a split set-prediction head: a full-stack ResUNet trunk feeds the per-gaussian parameter heads while a second trunk that sees only the interferogram channels feeds the sigmoid existence gate, so component presence is judged from interferometric phase alone",
+      "fields": {
+        "in_channels": "Number of input feature-map channels fed to the parameter trunk, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
+        "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
+        "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
+        "head": "Fixed to set_pred: the model exists to split the set-prediction head across two trunks and rejects any other head",
+        "ifg_channels": "Indices of the interferogram channels inside the assembled input tensor, sliced out as the existence trunk's input; overridden at build time from the dataset's input configuration and persisted with the model config",
+        "features": "Per-level residual-block channel widths shared by both trunks, one entry per resolution stage; default [64, 128, 256, 512]",
+        "bottleneck_factor": "Channel-width multiplier for the U-Net bottleneck relative to the deepest encoder level, applied to both trunks; categorical over {1, 2, 4}",
+        "dropout": "Dropout probability applied inside the residual blocks of both trunks, 0.0 disables it",
+        "activation": "Nonlinearity used throughout the residual blocks and head PixelMLPs: relu, leaky_relu, gelu, silu, or elu",
+        "normalization": "Convolutional normalization layer applied inside residual blocks: batch, instance, group, or none (identity)",
+        "upsample_mode": "Decoder upsampling operator for both trunks: convtranspose (learned) or bilinear (fixed interpolation)",
+        "conv_bias": "Whether convolution layers carry an additive bias term, usually disabled when a normalization layer follows",
+        "init_mode": "Weight initialization scheme for conv/linear layers: default (framework default, no override), kaiming, or xavier",
+        "params_trunk_lr": "Learning rate for the full-stack parameter trunk (encoder, bottleneck, and decoder), tuned log-uniform over 1e-5..1e-2",
+        "existence_trunk_lr": "Learning rate for the interferogram-only existence trunk (encoder, bottleneck, and decoder), tuned log-uniform over 1e-5..1e-2",
+        "output_head_lr": "Learning rate for the set-prediction head group (per-gaussian PixelMLPs, existence head, and amp_off)",
+        "params_trunk_wd": "Weight decay for the parameter trunk group",
+        "existence_trunk_wd": "Weight decay for the existence trunk group",
+        "output_head_wd": "Weight decay for the set-prediction head group",
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
+      }
+    },
     "architectures/image_autoencoder::ImageAutoencoderBaseConfig": {
       "summary": "Shared architecture and optimizer settings for the 2D image-space autoencoder family reconstructing the multi-channel input stack",
       "fields": {
@@ -1675,6 +1700,16 @@
         "unrolled_inference": "UnrolledInferenceConfig template applied to each discovered run, with run_directory overridden per run"
       }
     },
+    "inference/dual::DualInferenceEntryConfig": {
+      "summary": "Entry config for the scheduler that runs sliding-window dual-input ResUNet inference over multiple runs, queuing one worker process per run across a fixed pool of GPUs",
+      "fields": {
+        "runs_dir": "master runs directory scanned recursively for runs to infer, default is the dual subfolder of _RUNS_ROOT; every run at any depth (a directory holding a meta/ subdir) is discovered and non-dual runs are skipped by type",
+        "run_filter": "run names relative to runs_dir to restrict to, default empty list processes every run found there; an unmatched name raises FileNotFoundError",
+        "gpus": "GPU device indices the GpuQueue cycles jobs across, default [0]; one run is launched per free GPU concurrently until the queue drains",
+        "poll_interval_s": "seconds GpuQueue sleeps between reap/launch cycles while jobs are running or queued, default 5.0",
+        "inference": "InferenceConfig used for every worker run, with run_directory replaced per-run, save_cubes=True, cpu_workers=16 and gif_axes=['elevation','range','azimuth']; all other InferenceConfig fields keep their normal defaults"
+      }
+    },
     "benchmark/dataloader_tuning::DataLoaderTuningEntryConfig": {
       "summary": "Entry point sweeping DataLoader batch size, worker count and prefetch to find the fastest configuration that keeps the GPU fed",
       "fields": {
@@ -2076,6 +2111,33 @@
         "train_azimuth": "Azimuth pixel range of the training split",
         "val_azimuth": "Azimuth pixel range of the validation split",
         "test_azimuth": "Azimuth pixel range of the test split"
+      }
+    },
+    "training/dual::DualEntryConfig": {
+      "summary": "Top-level entry config launching one dual-input ResUNet training run through the shared backbone dataset, curriculum, and trainer machinery",
+      "fields": {
+        "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
+        "model_name": "Dual-family model key looked up in the dual registry, default dual_resunet",
+        "gpu": "Primary GPU device index on which a single run executes",
+        "seed": "Base random seed for a single training run, controlling weight init, shuffling, and augmentation",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed (empty falls back to seed)",
+        "logdir": "Base directory under which this run's output subdirectory and TensorBoard logs are written",
+        "model_overrides": "Dict of architecture-config field overrides applied to the dual model config before instantiation",
+        "paths": "TrainingPathsConfig sub-config holding filesystem locations for the dataset, extracted parameters, and secondary-track labels",
+        "training": "TrainingQueueConfig sub-config bundling training-loop and queue settings (epochs, batch size, workers, AMP, EMA, resume, scheduler/warmup/clip knobs)",
+        "pretrain": "PretrainConfig sub-config for optional pre-training preflight (batch-size search, dataloader tuning, VRAM budget)",
+        "curriculum": "LossCurriculumConfig defining the two-stage warmup/complete loss schedule and its swap epoch, defaults to the physics-loss curriculum with coherence resynthesis and covariance matching enabled in the complete stage",
+        "geometry": "GeometryConfig sub-config of raw SAR acquisition geometry defaults, resolved against the dataset's baselines table before training starts",
+        "input": "InputConfig sub-config selecting which channel groups feed the network, defaults to the full stack; use_interferograms must stay enabled because the existence trunk consumes exactly those channels",
+        "normalization": "NormalizationConfig sub-config controlling per-channel input/output normalization strategies and output clamping",
+        "augmentation": "AugmentationConfig sub-config setting horizontal/vertical flip, rot90, and additive-noise probabilities applied to training patches",
+        "probe_enabled": "Toggle a short pre-training loss-scale probe that suggests per-term loss weights before the real run starts",
+        "probe_n_batches": "Number of training batches the loss-scale probe averages over before reporting suggested weights",
+        "probe_reference": "Loss-term name used as the reference scale in the probe's suggested-weight table; None normalizes each term independently to 1.0",
+        "probe_exit_after": "Exit the run after the probe report instead of continuing into full training",
+        "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
+        "infer_after": "Run the shared inference pipeline with the dual components automatically on the trained checkpoint once training completes",
+        "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after is set"
       }
     },
     "patch_sweep/general::PatchGridConfig": {

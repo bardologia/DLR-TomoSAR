@@ -33,6 +33,10 @@ class ProjectPaths:
             "config_module" : "configuration.training.unrolled",
             "config_class"  : "UnrolledEntryConfig",
         },
+        "train_dual": {
+            "config_module" : "configuration.training.dual",
+            "config_class"  : "DualEntryConfig",
+        },
         "infer_backbone": {
             "config_module" : "configuration.inference",
             "config_class"  : "BackboneInferenceEntryConfig",
@@ -48,6 +52,10 @@ class ProjectPaths:
         "infer_unrolled": {
             "config_module" : "configuration.inference",
             "config_class"  : "UnrolledInferenceEntryConfig",
+        },
+        "infer_dual": {
+            "config_module" : "configuration.inference",
+            "config_class"  : "DualInferenceEntryConfig",
         },
         "cross_validate": {
             "file"          : "cross_validate",
@@ -81,10 +89,12 @@ class ProjectPaths:
         "train_image_autoencoder"   : "training",
         "train_jepa"                : "training",
         "train_unrolled"            : "training",
+        "train_dual"                : "training",
         "infer_backbone"            : "inference",
         "infer_profile_autoencoder" : "inference",
         "infer_image_autoencoder"   : "inference",
         "infer_unrolled"            : "inference",
+        "infer_dual"                : "inference",
         "benchmark"                 : "experiments",
         "cross_validate"            : "experiments",
         "sweep_patches"             : "experiments",
