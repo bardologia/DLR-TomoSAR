@@ -6,8 +6,7 @@ from pathlib     import Path
 import torch
 
 from configuration.training           import SchedulerConfig, WarmupConfig
-from models.unrolled                  import TomoOperator
-from tools.data.gaussians             import GaussianCurve
+from pipelines.unrolled.synthesis     import MeasurementSynthesiser
 from tools.data.io                    import FileIO
 from tools.training                   import WeightEma
 from tools.training.scheduling        import Scheduler, Warmup
@@ -28,7 +27,6 @@ class UnrolledTrainer:
         self.training     = entry_config.training
         self.logger       = logger
         self.norm_stats   = norm_stats
-        self.ppg          = ppg
         self.run_dir      = Path(run_dir)
 
         if entry_config.curve_loss not in self.LOSS_KINDS:
@@ -37,7 +35,8 @@ class UnrolledTrainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model  = model.to(self.device)
         self.x_axis = torch.as_tensor(x_axis, dtype=torch.float32, device=self.device)
-        self.dx     = float(self.x_axis[1] - self.x_axis[0])
+
+        self.synthesiser = MeasurementSynthesiser(self.x_axis, ppg, entry_config.power_floor, entry_config.measurement_noise_std)
 
         self.optimizer = torch.optim.AdamW(model_cfg.get_param_groups(self.model), betas=(0.9, 0.999), eps=1e-8)
         self.base_lrs  = [float(group["lr"]) for group in self.optimizer.param_groups]
@@ -75,20 +74,8 @@ class UnrolledTrainer:
     @torch.no_grad()
     def _synthesise_measurements(self, gt_params: torch.Tensor, kz_map: torch.Tensor):
         gt_phys = self.norm_stats.denormalize_output(gt_params.float())
-        curves  = GaussianCurve.reconstruct(gt_phys, self.x_axis, self.ppg).float()
 
-        power = curves.sum(dim=1) * self.dx
-        mask  = power > self.entry_config.power_floor
-
-        target       = curves / power.clamp(min=self.entry_config.power_floor).unsqueeze(1)
-        measurements = TomoOperator.forward(target, kz_map, self.x_axis, self.dx)
-
-        noise_std = self.entry_config.measurement_noise_std
-        if noise_std > 0.0:
-            noise        = torch.randn_like(measurements.real) + 1j * torch.randn_like(measurements.real)
-            measurements = measurements + noise_std / (2.0 ** 0.5) * noise
-
-        return measurements, target, mask
+        return self.synthesiser.synthesise(gt_phys, kz_map)
 
     def _curve_loss(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         diff = pred - target
