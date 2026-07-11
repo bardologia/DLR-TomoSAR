@@ -123,9 +123,10 @@ class PatchTrialsConfig:
 
 @dataclass
 class PhysicsTrialsConfig:
-    components       : list[str]   = field(default_factory=lambda: ["coherence_resyn", "covariance_match"])
-    weights          : list[float] = field(default_factory=lambda: [0.01, AblationCatalog.PHYSICS_WEIGHT, 0.25])
-    include_baseline : bool        = True
+    components        : list[str]   = field(default_factory=lambda: ["coherence_resyn", "covariance_match"])
+    weights           : list[float] = field(default_factory=lambda: [0.01, AblationCatalog.PHYSICS_WEIGHT, 0.25])
+    curriculum_states : list[bool]  = field(default_factory=lambda: [True, False])
+    include_baseline  : bool        = True
 
 
 @dataclass

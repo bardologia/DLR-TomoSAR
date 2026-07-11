@@ -1011,11 +1011,12 @@
       }
     },
     "training/backbone::PhysicsTrialsConfig": {
-      "summary": "Sweep of physics loss components and weights for the physics-loss trial planner",
+      "summary": "Sweep of physics loss components, weights, and curriculum states for the physics-loss trial planner",
       "fields": {
-        "components": "Physics loss components to test, each crossed with every weight as one training run: total_power, moments, coherence_resyn, covariance_match, or capon_cycle",
-        "weights": "Candidate loss weights applied to the tested component in the curriculum complete stage, all must be positive",
-        "include_baseline": "Prepend one run of the plain base config with every physics term disabled, as the reference for the sweep"
+        "components": "Physics loss components to test, each crossed with every weight and curriculum state as one training run: total_power, moments, coherence_resyn, covariance_match, or capon_cycle",
+        "weights": "Candidate loss weights applied to the tested component in the complete-stage loss, all must be positive",
+        "curriculum_states": "Curriculum states crossed into the sweep: True warms up on the base warmup loss and adds the tested physics term only after the swap epoch, False trains the complete-stage loss plus the tested term from the first epoch",
+        "include_baseline": "Prepend one run of the plain base config per curriculum state with every physics term disabled, as the reference for the sweep"
       }
     },
     "training/backbone::PatchTrialsConfig": {
@@ -1098,7 +1099,7 @@
         "warmup_losses": "Named loss-term override presets: in trials_mode=curriculum applied to the curriculum warmup stage and crossed against every complete_losses preset (one run per pair); in trials_mode=warmup applied instead to the complete stage with curriculum disabled, one run per preset",
         "complete_losses": "Named loss-term override presets applied to the curriculum complete stage, used only by trials_mode=curriculum where each preset is crossed against every warmup_losses preset (one run per pair)",
         "presence_trials": "Named presets combining active_normalization, presence_balance, and amp_focal_gamma overrides, swept with curriculum disabled",
-        "physics_trials": "PhysicsTrialsConfig sub-config for the physics-loss sweep crossing every selected component with every candidate weight on top of the base config",
+        "physics_trials": "PhysicsTrialsConfig sub-config for the physics-loss sweep crossing every selected component with every candidate weight and curriculum state on top of the base config",
         "secondary_trials": "SecondaryTrialsConfig sub-config for the secondary-track selection sweep (strategy, count, sampling seed)",
         "patch_trials": "PatchTrialsConfig sub-config for the patch-size and stride sweep",
         "input_trials": "Named input-channel presets (use_primary/use_secondaries/use_interferograms/use_dem) swept while always keeping the full secondary-track list",

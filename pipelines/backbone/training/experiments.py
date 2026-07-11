@@ -113,16 +113,33 @@ class PhysicsLossTrialPlanner:
         if len(set(self.trials.weights)) != len(self.trials.weights):
             raise ValueError(f"physics_trials.weights must be unique, got {self.trials.weights}")
 
+        if not self.trials.curriculum_states:
+            raise ValueError("physics_trials.curriculum_states must list at least one curriculum state to test")
+
+        if any(not isinstance(state, bool) for state in self.trials.curriculum_states):
+            raise ValueError(f"physics_trials.curriculum_states must be booleans, got {self.trials.curriculum_states}")
+
+        if len(set(self.trials.curriculum_states)) != len(self.trials.curriculum_states):
+            raise ValueError(f"physics_trials.curriculum_states must be unique, got {self.trials.curriculum_states}")
+
     def summary(self) -> dict:
+        n_grid   = len(self.trials.components) * len(self.trials.weights) * len(self.trials.curriculum_states)
+        n_extras = len(self.trials.curriculum_states) if self.trials.include_baseline else 0
+
         return {
             "Components" : list(self.trials.components),
             "Weights"    : list(self.trials.weights),
+            "Curriculum" : ["on" if state else "off" for state in self.trials.curriculum_states],
             "Baseline"   : self.trials.include_baseline,
-            "Total runs" : len(self.trials.components) * len(self.trials.weights) + (1 if self.trials.include_baseline else 0),
+            "Total runs" : n_grid + n_extras,
         }
 
-    def _neutral_overrides(self) -> dict:
-        overrides = {"curriculum.inherit": False}
+    @staticmethod
+    def _curriculum_suffix(enabled: bool) -> str:
+        return "cur" if enabled else "nc"
+
+    def _neutral_overrides(self, enabled: bool) -> dict:
+        overrides = {"curriculum.enabled": enabled, "curriculum.inherit": False}
 
         for stage in ("warmup", "complete"):
             for component in self.COMPONENTS:
@@ -135,15 +152,17 @@ class PhysicsLossTrialPlanner:
         plans = []
 
         if self.trials.include_baseline:
-            plans.append(("phys-baseline", self._neutral_overrides()))
+            for enabled in self.trials.curriculum_states:
+                plans.append((f"phys-baseline-{self._curriculum_suffix(enabled)}", self._neutral_overrides(enabled)))
 
         for component in self.trials.components:
             for weight in self.trials.weights:
-                run_name  = f"phys-{component}-w{weight:g}"
-                overrides = self._neutral_overrides()
-                overrides[f"curriculum.complete.use_{component}"]    = True
-                overrides[f"curriculum.complete.weight_{component}"] = weight
-                plans.append((run_name, overrides))
+                for enabled in self.trials.curriculum_states:
+                    run_name  = f"phys-{component}-w{weight:g}-{self._curriculum_suffix(enabled)}"
+                    overrides = self._neutral_overrides(enabled)
+                    overrides[f"curriculum.complete.use_{component}"]    = True
+                    overrides[f"curriculum.complete.weight_{component}"] = weight
+                    plans.append((run_name, overrides))
 
         return plans
 
