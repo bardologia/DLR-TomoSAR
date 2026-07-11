@@ -1289,7 +1289,7 @@
               "label": "TrainingLauncher / TrainScheduler / SingleTrainRunner",
               "module": "pipelines/backbone/training/launcher.py",
               "role": "orchestrator",
-              "fn": "Routes to a single seeded run or fans out curriculum/warmup/presence/physics/secondary/patch/input/ablation trial planners across GPUs.",
+              "fn": "Routes to a single seeded run or fans out curriculum/warmup/presence/physics/pair/secondary/patch/input/ablation trial planners across GPUs.",
               "col": 1,
               "reads": [],
               "writes": [

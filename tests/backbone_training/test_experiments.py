@@ -4,13 +4,14 @@ import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
     CurriculumTrialPlanner,
     InputTrialPlanner,
     PatchSizeTrialPlanner,
+    PairLossTrialPlanner,
     PhysicsLossTrialPlanner,
     SecondaryTrialPlanner,
     SlotPresenceTrialPlanner,
@@ -382,6 +383,159 @@ def test_physics_plan_round_trips_through_config_cli():
 
 def test_physics_planner_paths_are_entry_config_leaves():
     planner = PhysicsLossTrialPlanner(PhysicsTrialsConfig())
+    leaves  = {path for path, _ in ConfigCli._leaves(BackboneEntryConfig())}
+
+    unknown = [path for _, overrides in planner.plan() for path in overrides if path not in leaves]
+
+    assert unknown == []
+
+
+def test_pair_planner_crosses_components_and_weights():
+    trials  = PairTrialsConfig(base_component="param_l1", components=["cosine_curve", "coherence_resyn"], weights=[0.01, 0.05], include_baseline=False)
+    planner = PairLossTrialPlanner(trials)
+
+    plans = planner.plan()
+    names = [name for name, _ in plans]
+
+    assert len(plans) == 4
+    assert names == [
+        "pair-cosine_curve-w0.01",
+        "pair-cosine_curve-w0.05",
+        "pair-coherence_resyn-w0.01",
+        "pair-coherence_resyn-w0.05",
+    ]
+    assert planner.summary()["Total runs"] == 4
+    assert planner.summary()["Base"]       == "param_l1 @ 1"
+
+    overrides = dict(plans)["pair-cosine_curve-w0.05"]
+    assert overrides["curriculum.enabled"]                    is False
+    assert overrides["curriculum.inherit"]                    is False
+    assert overrides["curriculum.complete.use_param_l1"]      is True
+    assert overrides["curriculum.complete.weight_param_l1"]   == 1.0
+    assert overrides["curriculum.complete.use_cosine_curve"]  is True
+    assert overrides["curriculum.complete.weight_cosine_curve"] == 0.05
+
+
+def test_pair_planner_neutralizes_every_other_term():
+    trials  = PairTrialsConfig(base_component="param_l1", components=["covariance_match"], weights=[0.1], include_baseline=False)
+    planner = PairLossTrialPlanner(trials)
+
+    overrides = planner.plan()[0][1]
+    enabled   = [path for path, value in overrides.items() if path.startswith("curriculum.complete.use_") and value is True]
+
+    assert sorted(enabled) == ["curriculum.complete.use_covariance_match", "curriculum.complete.use_param_l1"]
+    assert overrides["curriculum.complete.use_cosine_curve"]      is False
+    assert overrides["curriculum.complete.weight_cosine_curve"]   == 0.0
+    assert overrides["curriculum.complete.use_coherence_resyn"]   is False
+    assert overrides["curriculum.complete.weight_coherence_resyn"] == 0.0
+
+
+def test_pair_planner_uses_catalog_flags_for_irregular_names():
+    trials  = PairTrialsConfig(base_component="param_l1", components=["total_power_relerr"], weights=[0.1], include_baseline=False)
+    planner = PairLossTrialPlanner(trials)
+
+    name, overrides = planner.plan()[0]
+
+    assert name == "pair-total_power_relerr-w0.1"
+    assert overrides["curriculum.complete.use_total_power"]    is True
+    assert overrides["curriculum.complete.weight_total_power"] == 0.1
+
+
+def test_pair_planner_prepends_base_only_baseline():
+    trials  = PairTrialsConfig(base_component="cosine_curve", base_weight=0.5, components=["param_l1"], weights=[0.01], include_baseline=True)
+    planner = PairLossTrialPlanner(trials)
+
+    plans = planner.plan()
+
+    assert [name for name, _ in plans] == ["pair-baseline", "pair-param_l1-w0.01"]
+
+    baseline = dict(plans)["pair-baseline"]
+    enabled  = [path for path, value in baseline.items() if path.startswith("curriculum.complete.use_") and value is True]
+
+    assert enabled == ["curriculum.complete.use_cosine_curve"]
+    assert baseline["curriculum.complete.weight_cosine_curve"] == 0.5
+
+
+def test_pair_planner_default_config_targets_param_l1_partners():
+    planner = PairLossTrialPlanner(PairTrialsConfig())
+
+    plans = planner.plan()
+
+    assert len(plans) == 10
+    assert "pair-baseline" in dict(plans)
+    assert f"pair-coherence_resyn-w{AblationCatalog.PHYSICS_WEIGHT:g}" in dict(plans)
+
+
+def test_pair_planner_rejects_unknown_base_component():
+    with pytest.raises(ValueError, match="base_component"):
+        PairLossTrialPlanner(PairTrialsConfig(base_component="bogus", components=["cosine_curve"], weights=[0.1]))
+
+
+def test_pair_planner_rejects_non_positive_base_weight():
+    with pytest.raises(ValueError, match="base_weight"):
+        PairLossTrialPlanner(PairTrialsConfig(base_weight=0.0, components=["cosine_curve"], weights=[0.1]))
+
+
+def test_pair_planner_rejects_empty_components():
+    with pytest.raises(ValueError, match="at least one"):
+        PairLossTrialPlanner(PairTrialsConfig(components=[], weights=[0.1]))
+
+
+def test_pair_planner_rejects_unknown_component():
+    with pytest.raises(ValueError, match="bogus"):
+        PairLossTrialPlanner(PairTrialsConfig(components=["bogus"], weights=[0.1]))
+
+
+def test_pair_planner_rejects_base_repeated_as_candidate():
+    with pytest.raises(ValueError, match="repeat"):
+        PairLossTrialPlanner(PairTrialsConfig(base_component="param_l1", components=["param_l1", "cosine_curve"], weights=[0.1]))
+
+
+def test_pair_planner_rejects_duplicate_components():
+    with pytest.raises(ValueError, match="unique"):
+        PairLossTrialPlanner(PairTrialsConfig(components=["moments", "moments"], weights=[0.1]))
+
+
+def test_pair_planner_rejects_bad_weights():
+    with pytest.raises(ValueError, match="at least one"):
+        PairLossTrialPlanner(PairTrialsConfig(components=["moments"], weights=[]))
+
+    with pytest.raises(ValueError, match="positive"):
+        PairLossTrialPlanner(PairTrialsConfig(components=["moments"], weights=[0.1, -0.1]))
+
+    with pytest.raises(ValueError, match="unique"):
+        PairLossTrialPlanner(PairTrialsConfig(components=["moments"], weights=[0.1, 0.1]))
+
+
+def test_pair_plan_round_trips_through_config_cli():
+    trials  = PairTrialsConfig(base_component="param_l1", components=["cosine_curve"], weights=[0.05], include_baseline=True)
+    planner = PairLossTrialPlanner(trials)
+
+    def _apply(overrides: dict):
+        cli   = ConfigCli(BackboneEntryConfig())
+        trial = cli.apply(ConfigCli.to_argv(overrides) + ["--trial"])
+        CurriculumInheritance(trial.curriculum, default_curriculum(), cli.overrides).apply()
+        return trial
+
+    plans = dict(planner.plan())
+
+    baseline = _apply({**plans["pair-baseline"], "run_name": "pair-baseline", "logdir": "/tmp/pair"})
+    assert baseline.curriculum.enabled                         is False
+    assert baseline.curriculum.initial_stage.use_param_l1      is True
+    assert baseline.curriculum.initial_stage.use_cosine_curve  is False
+    assert baseline.curriculum.initial_stage.use_coherence_resyn is False
+
+    tested = _apply({**plans["pair-cosine_curve-w0.05"], "run_name": "pair-cosine_curve-w0.05", "logdir": "/tmp/pair"})
+    assert tested.curriculum.enabled                              is False
+    assert tested.curriculum.initial_stage.use_param_l1           is True
+    assert tested.curriculum.initial_stage.weight_param_l1        == 1.0
+    assert tested.curriculum.initial_stage.use_cosine_curve       is True
+    assert tested.curriculum.initial_stage.weight_cosine_curve    == 0.05
+    assert tested.curriculum.initial_stage.use_covariance_match   is False
+
+
+def test_pair_planner_paths_are_entry_config_leaves():
+    planner = PairLossTrialPlanner(PairTrialsConfig())
     leaves  = {path for path, _ in ConfigCli._leaves(BackboneEntryConfig())}
 
     unknown = [path for _, overrides in planner.plan() for path in overrides if path not in leaves]

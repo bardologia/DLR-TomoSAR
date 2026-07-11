@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pipelines.backbone.training.loss_terms import LOSS_TERMS
 from tools.baselines import TrackBaselines
 
 
@@ -163,6 +164,86 @@ class PhysicsLossTrialPlanner:
                     overrides[f"curriculum.complete.use_{component}"]    = True
                     overrides[f"curriculum.complete.weight_{component}"] = weight
                     plans.append((run_name, overrides))
+
+        return plans
+
+
+class PairLossTrialPlanner:
+
+    def __init__(self, trials) -> None:
+        self.trials = trials
+        self.terms  = {term.name: term for term in LOSS_TERMS}
+
+        self._validate()
+
+    def _validate(self) -> None:
+        names = tuple(self.terms)
+
+        if self.trials.base_component not in self.terms:
+            raise ValueError(f"Unknown pair_trials.base_component '{self.trials.base_component}'; allowed components are {names}")
+
+        if self.trials.base_weight <= 0:
+            raise ValueError(f"pair_trials.base_weight={self.trials.base_weight} must be positive")
+
+        if not self.trials.components:
+            raise ValueError("pair_trials.components must list at least one loss component to test")
+
+        unknown = [component for component in self.trials.components if component not in self.terms]
+        if unknown:
+            raise ValueError(f"Unknown pair_trials.components {unknown}; allowed components are {names}")
+
+        if self.trials.base_component in self.trials.components:
+            raise ValueError(f"pair_trials.components must not repeat the base component '{self.trials.base_component}'")
+
+        duplicates = sorted({component for component in self.trials.components if self.trials.components.count(component) > 1})
+        if duplicates:
+            raise ValueError(f"pair_trials.components must be unique, duplicated: {duplicates}")
+
+        if not self.trials.weights:
+            raise ValueError("pair_trials.weights must list at least one weight to test")
+
+        if any(weight <= 0 for weight in self.trials.weights):
+            raise ValueError(f"pair_trials.weights must all be positive, got {self.trials.weights}")
+
+        if len(set(self.trials.weights)) != len(self.trials.weights):
+            raise ValueError(f"pair_trials.weights must be unique, got {self.trials.weights}")
+
+    def summary(self) -> dict:
+        return {
+            "Base"       : f"{self.trials.base_component} @ {self.trials.base_weight:g}",
+            "Components" : list(self.trials.components),
+            "Weights"    : list(self.trials.weights),
+            "Baseline"   : self.trials.include_baseline,
+            "Total runs" : len(self.trials.components) * len(self.trials.weights) + (1 if self.trials.include_baseline else 0),
+        }
+
+    def _base_overrides(self) -> dict:
+        overrides = {"curriculum.enabled": False, "curriculum.inherit": False}
+
+        for term in self.terms.values():
+            overrides[f"curriculum.complete.{term.use_flag}"]   = False
+            overrides[f"curriculum.complete.{term.weight_key}"] = 0.0
+
+        base = self.terms[self.trials.base_component]
+        overrides[f"curriculum.complete.{base.use_flag}"]   = True
+        overrides[f"curriculum.complete.{base.weight_key}"] = self.trials.base_weight
+
+        return overrides
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        if self.trials.include_baseline:
+            plans.append(("pair-baseline", self._base_overrides()))
+
+        for component in self.trials.components:
+            term = self.terms[component]
+            for weight in self.trials.weights:
+                run_name  = f"pair-{component}-w{weight:g}"
+                overrides = self._base_overrides()
+                overrides[f"curriculum.complete.{term.use_flag}"]   = True
+                overrides[f"curriculum.complete.{term.weight_key}"] = weight
+                plans.append((run_name, overrides))
 
         return plans
 

@@ -18,6 +18,7 @@ from configuration.training.general import (
 )
 from configuration.training.backbone import (
     default_curriculum,
+    PairTrialsConfig,
     PatchTrialsConfig,
     PhysicsTrialsConfig,
     SecondaryTrialsConfig,

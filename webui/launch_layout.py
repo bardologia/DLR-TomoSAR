@@ -477,6 +477,7 @@ class LaunchLayout:
                     {"kind": "special", "panel": "experiment_builder", "fields": [
                         "trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "input_trials",
                         "physics_trials.components", "physics_trials.weights", "physics_trials.curriculum_states", "physics_trials.include_baseline",
+                        "pair_trials.base_component", "pair_trials.base_weight", "pair_trials.components", "pair_trials.weights", "pair_trials.include_baseline",
                         "secondary_trials.strategy", "secondary_trials.n_secondaries", "secondary_trials.n_trials", "secondary_trials.mean",
                         "secondary_trials.sigma", "secondary_trials.block_step", "secondary_trials.spacing", "secondary_trials.seed",
                         "patch_trials.sizes", "patch_trials.stride_ratio", "patch_trials.find_max_batch", "patch_trials.scale_lr",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -68,6 +69,14 @@ def test_sweep_loss_choices_match_the_component_catalog():
     choices = {choice["value"] for choice in LaunchLayout.MULTI_SWEEP_LOSSES["choices"]}
 
     assert choices == set(LossComponentCatalog.names())
+
+
+def test_pair_components_in_experiment_builder_match_the_catalog():
+    js    = (WEBUI_ROOT / "static" / "js" / "launch_widgets.js").read_text()
+    block = js.split("static PAIR_COMPONENTS = [", 1)[1].split("];", 1)[0]
+    names = set(re.findall(r'"([a-z0-9_]+)"', block))
+
+    assert names == set(LossComponentCatalog.names())
 
 
 def test_compare_runs_layout_claims_every_config_field_exactly_once():

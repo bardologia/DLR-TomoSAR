@@ -371,6 +371,7 @@ class ExperimentBuilder {
     { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
     { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
     { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one training run per pair plus an optional no-physics baseline" },
+    { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one training run per pair plus an optional base-only baseline" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
@@ -388,6 +389,12 @@ class ExperimentBuilder {
   static PHYSICS_CURRICULUM = [
     { key: true,  suffix: "cur", label: "curriculum on · physics after the swap" },
     { key: false, suffix: "nc",  label: "curriculum off · physics from epoch 0" },
+  ];
+
+  static PAIR_COMPONENTS = [
+    "mse_curve", "l1_curve", "huber_curve", "charbonnier_curve", "cosine_curve",
+    "total_power_relerr", "moments", "coherence_resyn", "covariance_match", "capon_cycle",
+    "param_huber", "param_mse", "smoothness_tv", "param_l1",
   ];
 
   static PRESENCE_MATCHES = [
@@ -429,10 +436,12 @@ class ExperimentBuilder {
     this.secondary = new Map();
     this.patch     = new Map();
     this.physics   = new Map();
+    this.pair      = new Map();
     byPath.forEach((leaf) => {
       if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "patch_trials")     this.patch.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "physics_trials")   this.physics.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "pair_trials")      this.pair.set(leaf.path.split(".").pop(), leaf);
     });
 
     this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
@@ -440,6 +449,7 @@ class ExperimentBuilder {
     this.secondary.forEach((leaf) => this.claimed.push(leaf.path));
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
     this.physics.forEach((leaf) => this.claimed.push(leaf.path));
+    this.pair.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
     if (this.inputTrialsLeaf)    this.claimed.push(this.inputTrialsLeaf.path);
@@ -464,6 +474,10 @@ class ExperimentBuilder {
     this.physicsComponentsEl = null;
     this.physicsWeightsEl    = null;
     this.physicsCurriculumEl = null;
+    this.pairEl              = null;
+    this.pairBaseSelect      = null;
+    this.pairCandidatesEl    = null;
+    this.pairWeightsEl       = null;
     this.warmupCatalogEl     = null;
     this.warmupCatalogGridEl = null;
     this.warmupCountEl       = null;
@@ -511,6 +525,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
     if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
     if (this.modeLeaf && this.physics.size)       body.appendChild(this._physicsPanel());
+    if (this.modeLeaf && this.pair.size)          body.appendChild(this._pairPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
 
@@ -541,6 +556,7 @@ class ExperimentBuilder {
     this._paintSecondary();
     this._paintPatch();
     this._paintPhysics();
+    this._paintPair();
     this._paintPresence();
     this._paintInput();
     this._paintWarmupCatalog();
@@ -1071,6 +1087,257 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _pairPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-patch exp-pair";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">loss pair sweep</span>`;
+
+    const baseLeaf = this.pair.get("base_component");
+    if (baseLeaf) {
+      const select     = document.createElement("select");
+      select.className = "run-select exp-secondary__strategy";
+      select.title     = `base component held in every run (--${baseLeaf.path})`;
+      ExperimentBuilder.PAIR_COMPONENTS.forEach((name) => {
+        const opt       = document.createElement("option");
+        opt.value       = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      select.addEventListener("change", () => this._setPairBase(select.value));
+      head.appendChild(select);
+
+      this.pairBaseSelect = select;
+      this.view.controls[baseLeaf.path] = { leaf: baseLeaf, reset: () => this._repaintPair() };
+    }
+
+    const baseWeightLeaf = this.pair.get("base_weight");
+    if (baseWeightLeaf) head.appendChild(this._pairBaseWeight(baseWeightLeaf));
+
+    const baselineLeaf = this.pair.get("include_baseline");
+    if (baselineLeaf) head.appendChild(this._patchFlag(baselineLeaf, "baseline", "prepend one run that trains the base component alone, as the reference"));
+
+    head.appendChild(LaunchWidgetDom.mini("Add weight", () => {
+      const weights = this._pairWeights();
+      weights.push(weights.length ? weights[weights.length - 1] : 0.05);
+      this._emitPairWeights(weights);
+    }));
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "each checked component joins the base component at each weight as a two-term loss with every other term disabled; curriculum stays off so the pair applies from epoch 0";
+
+    const candidatesHead       = document.createElement("div");
+    candidatesHead.className   = "exp-presence__sub";
+    candidatesHead.textContent = "second components";
+
+    const candidates      = document.createElement("div");
+    candidates.className  = "exp-builder__names exp-presence__strategies";
+    this.pairCandidatesEl = candidates;
+
+    const weightsHead       = document.createElement("div");
+    weightsHead.className   = "exp-presence__sub";
+    weightsHead.textContent = "weights";
+
+    const weights      = document.createElement("div");
+    weights.className  = "exp-patch__sizes";
+    this.pairWeightsEl = weights;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(candidatesHead);
+    panel.appendChild(candidates);
+    panel.appendChild(weightsHead);
+    panel.appendChild(weights);
+    this.pairEl = panel;
+
+    const componentsLeaf = this.pair.get("components");
+    if (componentsLeaf) this.view.controls[componentsLeaf.path] = { leaf: componentsLeaf, reset: () => this._repaintPair() };
+
+    const weightsLeaf = this.pair.get("weights");
+    if (weightsLeaf) this.view.controls[weightsLeaf.path] = { leaf: weightsLeaf, reset: () => this._repaintPair() };
+
+    this._paintPair();
+    return panel;
+  }
+
+  _pairBaseWeight(leaf) {
+    const wrap     = document.createElement("label");
+    wrap.className = "exp-patch__ratio";
+    wrap.title     = `weight of the base component in every run (--${leaf.path})`;
+    wrap.innerHTML = `<span>base weight</span>`;
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input";
+    input.type       = "number";
+    input.step       = "any";
+    input.min        = "0";
+    input.spellcheck = false;
+    input.value      = leaf.value;
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
+      this.view._setValue(leaf, input.value);
+    });
+
+    wrap.appendChild(input);
+    this.view.controls[leaf.path] = { leaf, reset: () => {
+      input.value = leaf.value;
+      input.classList.remove("is-dirty");
+    } };
+    return wrap;
+  }
+
+  _pairBase() {
+    const leaf = this.pair.get("base_component");
+    if (!leaf) return "param_l1";
+
+    const value = this.view._effective(leaf).replace(/^['"]|['"]$/g, "");
+    return ExperimentBuilder.PAIR_COMPONENTS.includes(value) ? value : "param_l1";
+  }
+
+  _pairCandidates() {
+    const leaf = this.pair.get("components");
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+  }
+
+  _pairWeights() {
+    const leaf = this.pair.get("weights");
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  }
+
+  _pairBaselineOn() {
+    const leaf = this.pair.get("include_baseline");
+    return leaf ? this.view._effective(leaf) === "True" : false;
+  }
+
+  _emitPairCandidates(candidates) {
+    const leaf = this.pair.get("components");
+    if (!leaf) return;
+
+    this.view._setValue(leaf, PythonLiteral.render(candidates));
+    this._repaintPair();
+  }
+
+  _emitPairWeights(weights) {
+    const leaf = this.pair.get("weights");
+    if (!leaf) return;
+
+    const clean = weights.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0);
+    this.view._setValue(leaf, PythonLiteral.render(clean));
+    this._repaintPair();
+  }
+
+  _setPairBase(name) {
+    const leaf = this.pair.get("base_component");
+    if (!leaf) return;
+
+    this.view._setValue(leaf, name);
+
+    const candidates = this._pairCandidates().filter((value) => value !== name);
+    if (candidates.length) this._emitPairCandidates(candidates);
+    else this._repaintPair();
+  }
+
+  _togglePairCandidate(name) {
+    if (name === this._pairBase()) return;
+
+    const current = this._pairCandidates();
+    if (current.includes(name)) {
+      if (current.length <= 1) return;
+      this._emitPairCandidates(current.filter((value) => value !== name));
+    } else {
+      this._emitPairCandidates(ExperimentBuilder.PAIR_COMPONENTS.filter((value) => current.includes(value) || value === name));
+    }
+  }
+
+  _pairWeightChip(weight, index, weights) {
+    const chip     = document.createElement("div");
+    chip.className = "exp-patch__chip";
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input exp-patch__size";
+    input.type       = "number";
+    input.step       = "any";
+    input.min        = "0";
+    input.spellcheck = false;
+    input.value      = String(weight);
+    input.title      = "weight of the second component";
+    input.addEventListener("change", () => {
+      const next  = weights.slice();
+      next[index] = Number(input.value);
+      this._emitPairWeights(next);
+    });
+
+    const remove = LaunchWidgetDom.mini("×", () => {
+      const next = weights.slice();
+      next.splice(index, 1);
+      this._emitPairWeights(next);
+    });
+    remove.classList.add("exp-patch__remove");
+    remove.title = "Remove weight";
+
+    chip.appendChild(input);
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _paintPair() {
+    if (!this.pairEl) return;
+
+    const base = this._pairBase();
+    if (this.pairBaseSelect) this.pairBaseSelect.value = base;
+
+    if (this.pairCandidatesEl) {
+      this.pairCandidatesEl.innerHTML = "";
+      const active = this._pairCandidates();
+      ExperimentBuilder.PAIR_COMPONENTS.forEach((name) => {
+        if (name === base) return;
+        const on   = active.includes(name);
+        const chip = document.createElement("button");
+        chip.type        = "button";
+        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+        chip.textContent = name;
+        chip.title       = on ? "Click to drop this component from the sweep" : "Click to test this component as the second term";
+        chip.addEventListener("click", () => this._togglePairCandidate(name));
+        this.pairCandidatesEl.appendChild(chip);
+      });
+    }
+
+    if (this.pairWeightsEl) {
+      const weights = this._pairWeights();
+      this.pairWeightsEl.innerHTML = "";
+      weights.forEach((weight, index) => this.pairWeightsEl.appendChild(this._pairWeightChip(weight, index, weights)));
+    }
+
+    this.patchFlagPaints.forEach((paint) => paint());
+  }
+
+  _repaintPair() {
+    this._paintPair();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _presenceMatchMap() {
     if (!this.presenceMatchLeaf) return {};
     try {
@@ -1353,6 +1620,7 @@ class ExperimentBuilder {
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
     if (this.physicsEl)          this.physicsEl.hidden          = mode !== "physics";
+    if (this.pairEl)             this.pairEl.hidden             = mode !== "pair";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
   }
@@ -1516,6 +1784,7 @@ class ExperimentBuilder {
     this._paintSecondary();
     this._paintPatch();
     this._paintPhysics();
+    this._paintPair();
     this._paintAll();
   }
 
@@ -1856,6 +2125,15 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "pair") {
+      const nCand    = this._pairCandidates().length;
+      const nWeight  = this._pairWeights().length;
+      const baseline = this._pairBaselineOn();
+      const total    = nCand * nWeight + (baseline ? 1 : 0);
+      this.summaryEl.textContent = `${this._pairBase()} + ${nCand} candidate${nCand === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      return;
+    }
+
     if (mode === "presence") {
       const cells = this._presenceCells().length;
       const strat = this._presenceStrategies().length;
@@ -1901,6 +2179,11 @@ class ExperimentBuilder {
         this._physicsWeights().forEach((weight) => {
           suffixes.forEach((suffix) => names.push(`${model}_phys-${component}-w${weight}-${suffix}`));
         });
+      });
+    } else if (mode === "pair") {
+      if (this._pairBaselineOn()) names.push(`${model}_pair-baseline`);
+      this._pairCandidates().forEach((component) => {
+        this._pairWeights().forEach((weight) => names.push(`${model}_pair-${component}-w${weight}`));
       });
     } else if (mode === "presence") {
       this._presenceCells().forEach((cell) => {

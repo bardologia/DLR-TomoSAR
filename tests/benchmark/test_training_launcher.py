@@ -121,7 +121,7 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
 
 
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    for mode in ("curriculum", "warmup", "presence", "physics", "secondary", "patch", "input", "ablation"):
+    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path
         config.trials_mode = mode
