@@ -12,7 +12,8 @@ class DualResUNetConfig:
     params_per_gaussian : int       = 3
     head                : str       = "set_pred"
     ifg_channels        : tuple     = (5, 6, 7, 8)
-    features            : list[int] = field(default_factory=lambda: [64, 128, 256, 512])
+    params_features     : list[int] = field(default_factory=lambda: [64, 128, 256])
+    existence_features  : list[int] = field(default_factory=lambda: [64, 128])
     bottleneck_factor   : int       = 2
     dropout             : float     = 0.15
     activation          : str       = "relu"
@@ -50,7 +51,8 @@ class DualResUNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"          : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
+            "params_features"    : {"type": "indexed_categorical", "choices": [[32, 64, 128], [64, 128, 256], [48, 96, 192]]},
+            "existence_features" : {"type": "indexed_categorical", "choices": [[32, 64], [64, 128], [48, 96]]},
             "bottleneck_factor" : {"type": "categorical",         "choices": [1, 2, 4]},
             "activation"        : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization"     : {"type": "categorical",         "choices": ["batch", "instance", "group"]},

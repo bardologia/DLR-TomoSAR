@@ -10,11 +10,12 @@ WINDOW = 32
 BATCH  = 2
 
 OVERRIDES = {
-    "in_channels"       : 5,
-    "ifg_channels"      : (3, 4),
-    "features"          : [8, 16],
-    "bottleneck_factor" : 1,
-    "dropout"           : 0.0,
+    "in_channels"        : 5,
+    "ifg_channels"       : (3, 4),
+    "params_features"    : [8, 16],
+    "existence_features" : [8],
+    "bottleneck_factor"  : 1,
+    "dropout"            : 0.0,
 }
 
 
@@ -36,6 +37,28 @@ def _gate(model, x: torch.Tensor) -> torch.Tensor:
 
 def test_registry_holds_dual_resunet():
     assert set(DUAL_MODEL_REGISTRY) == {"dual_resunet"}
+
+
+def test_default_trunks_are_three_and_two_levels():
+    model, config = get_dual("dual_resunet")
+
+    assert config.params_features    == [64, 128, 256]
+    assert config.existence_features == [64, 128]
+    assert len(model.trunk_params.encoder_blocks)    == 3
+    assert len(model.trunk_existence.encoder_blocks) == 2
+
+
+def test_trunks_take_independent_widths():
+    model, config = get_dual("dual_resunet", **{**OVERRIDES, "existence_features": [4]})
+
+    assert model.trunk_existence.embedding_channels == 4
+    assert model.existence_head.mlp[0].in_channels  == 4
+    assert model.gaussian_heads[0].mlp[0].in_channels == model.trunk_params.embedding_channels
+
+    with torch.no_grad():
+        out = model.eval()(torch.randn(BATCH, config.in_channels, WINDOW, WINDOW))
+
+    assert out.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
 
 
 def test_forward_shape_is_three_k_channels():
