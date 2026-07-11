@@ -4,13 +4,14 @@ import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import PatchTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
     CurriculumTrialPlanner,
     InputTrialPlanner,
     PatchSizeTrialPlanner,
+    PhysicsLossTrialPlanner,
     SecondaryTrialPlanner,
     SlotPresenceTrialPlanner,
     WarmupTrialPlanner,
@@ -217,6 +218,131 @@ def test_input_planner_rejects_unknown_keys():
 def test_input_planner_rejects_empty_trials():
     with pytest.raises(ValueError):
         InputTrialPlanner({}, CANDIDATES)
+
+
+def test_physics_planner_crosses_components_and_weights():
+    trials  = PhysicsTrialsConfig(components=["coherence_resyn", "capon_cycle"], weights=[0.01, 0.05], include_baseline=False)
+    planner = PhysicsLossTrialPlanner(trials)
+
+    plans = planner.plan()
+    names = [name for name, _ in plans]
+
+    assert len(plans) == 4
+    assert names == [
+        "phys-coherence_resyn-w0.01",
+        "phys-coherence_resyn-w0.05",
+        "phys-capon_cycle-w0.01",
+        "phys-capon_cycle-w0.05",
+    ]
+    assert planner.summary()["Total runs"] == 4
+
+    overrides = dict(plans)["phys-capon_cycle-w0.05"]
+    assert overrides["curriculum.complete.use_capon_cycle"]    is True
+    assert overrides["curriculum.complete.weight_capon_cycle"] == 0.05
+
+
+def test_physics_planner_neutralizes_untested_terms():
+    trials  = PhysicsTrialsConfig(components=["coherence_resyn"], weights=[0.1], include_baseline=False)
+    planner = PhysicsLossTrialPlanner(trials)
+
+    overrides = planner.plan()[0][1]
+
+    assert overrides["curriculum.inherit"] is False
+
+    for component in PhysicsLossTrialPlanner.COMPONENTS:
+        assert overrides[f"curriculum.warmup.use_{component}"]    is False
+        assert overrides[f"curriculum.warmup.weight_{component}"] == 0.0
+
+    for component in set(PhysicsLossTrialPlanner.COMPONENTS) - {"coherence_resyn"}:
+        assert overrides[f"curriculum.complete.use_{component}"]    is False
+        assert overrides[f"curriculum.complete.weight_{component}"] == 0.0
+
+
+def test_physics_planner_prepends_baseline_run():
+    trials  = PhysicsTrialsConfig(components=["total_power"], weights=[0.01], include_baseline=True)
+    planner = PhysicsLossTrialPlanner(trials)
+
+    plans = planner.plan()
+
+    assert [name for name, _ in plans] == ["phys-baseline", "phys-total_power-w0.01"]
+    assert planner.summary()["Total runs"] == 2
+
+    baseline = dict(plans)["phys-baseline"]
+    assert not any(value is True for value in baseline.values())
+
+
+def test_physics_planner_default_config_covers_recommended_terms():
+    planner = PhysicsLossTrialPlanner(PhysicsTrialsConfig())
+
+    plans = planner.plan()
+
+    assert len(plans) == 7
+    assert "phys-baseline" in dict(plans)
+    assert f"phys-coherence_resyn-w{AblationCatalog.PHYSICS_WEIGHT:g}" in dict(plans)
+    assert f"phys-covariance_match-w{AblationCatalog.PHYSICS_WEIGHT:g}" in dict(plans)
+
+
+def test_physics_planner_rejects_empty_components():
+    with pytest.raises(ValueError, match="at least one"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=[], weights=[0.1]))
+
+
+def test_physics_planner_rejects_unknown_component():
+    with pytest.raises(ValueError, match="smoothness_tv"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=["smoothness_tv"], weights=[0.1]))
+
+
+def test_physics_planner_rejects_duplicate_components():
+    with pytest.raises(ValueError, match="unique"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=["moments", "moments"], weights=[0.1]))
+
+
+def test_physics_planner_rejects_empty_weights():
+    with pytest.raises(ValueError, match="weight"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=["moments"], weights=[]))
+
+
+def test_physics_planner_rejects_non_positive_weights():
+    with pytest.raises(ValueError, match="positive"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=["moments"], weights=[0.1, 0.0]))
+
+
+def test_physics_planner_rejects_duplicate_weights():
+    with pytest.raises(ValueError, match="unique"):
+        PhysicsLossTrialPlanner(PhysicsTrialsConfig(components=["moments"], weights=[0.1, 0.1]))
+
+
+def test_physics_plan_round_trips_through_config_cli():
+    trials  = PhysicsTrialsConfig(components=["coherence_resyn", "covariance_match"], weights=[0.05], include_baseline=True)
+    planner = PhysicsLossTrialPlanner(trials)
+
+    def _apply(overrides: dict):
+        cli   = ConfigCli(BackboneEntryConfig())
+        trial = cli.apply(ConfigCli.to_argv(overrides) + ["--trial"])
+        CurriculumInheritance(trial.curriculum, default_curriculum(), cli.overrides).apply()
+        return trial
+
+    plans = dict(planner.plan())
+
+    baseline = _apply({**plans["phys-baseline"], "run_name": "phys-baseline", "logdir": "/tmp/phys"})
+    assert baseline.curriculum.complete.use_coherence_resyn  is False
+    assert baseline.curriculum.complete.use_covariance_match is False
+
+    tested = _apply({**plans["phys-coherence_resyn-w0.05"], "run_name": "phys-coherence_resyn-w0.05", "logdir": "/tmp/phys"})
+    assert tested.curriculum.complete.use_coherence_resyn     is True
+    assert tested.curriculum.complete.weight_coherence_resyn  == 0.05
+    assert tested.curriculum.complete.use_covariance_match    is False
+    assert tested.curriculum.warmup.use_coherence_resyn       is False
+    assert tested.curriculum.warmup.weight_coherence_resyn    == 0.0
+
+
+def test_physics_planner_paths_are_entry_config_leaves():
+    planner = PhysicsLossTrialPlanner(PhysicsTrialsConfig())
+    leaves  = {path for path, _ in ConfigCli._leaves(BackboneEntryConfig())}
+
+    unknown = [path for _, overrides in planner.plan() for path in overrides if path not in leaves]
+
+    assert unknown == []
 
 
 ABL_FEATURES = [

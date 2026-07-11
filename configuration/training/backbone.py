@@ -122,6 +122,13 @@ class PatchTrialsConfig:
 
 
 @dataclass
+class PhysicsTrialsConfig:
+    components       : list[str]   = field(default_factory=lambda: ["coherence_resyn", "covariance_match"])
+    weights          : list[float] = field(default_factory=lambda: [0.01, AblationCatalog.PHYSICS_WEIGHT, 0.25])
+    include_baseline : bool        = True
+
+
+@dataclass
 class SecondaryTrialsConfig:
     strategy      : str          = "consecutive"
     n_secondaries : int          = 4
@@ -193,6 +200,7 @@ class BackboneEntryConfig:
     warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
     complete_losses  : dict                  = field(default_factory=_default_complete_losses)
     presence_trials  : dict                  = field(default_factory=_default_presence_trials)
+    physics_trials   : PhysicsTrialsConfig   = field(default_factory=PhysicsTrialsConfig)
     secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     input_trials     : dict                  = field(default_factory=_default_input_trials)

@@ -370,10 +370,19 @@ class ExperimentBuilder {
   static MODES = [
     { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
     { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
+    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one training run per pair plus an optional no-physics baseline" },
     { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one training run per input variant" },
+  ];
+
+  static PHYSICS_COMPONENTS = [
+    { key: "total_power",      label: "total power" },
+    { key: "moments",          label: "profile moments" },
+    { key: "coherence_resyn",  label: "coherence resyn" },
+    { key: "covariance_match", label: "covariance match" },
+    { key: "capon_cycle",      label: "capon cycle" },
   ];
 
   static PRESENCE_MATCHES = [
@@ -414,15 +423,18 @@ class ExperimentBuilder {
 
     this.secondary = new Map();
     this.patch     = new Map();
+    this.physics   = new Map();
     byPath.forEach((leaf) => {
       if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "patch_trials")     this.patch.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "physics_trials")   this.physics.set(leaf.path.split(".").pop(), leaf);
     });
 
     this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
     if (this.modeLeaf) this.claimed.push("trials_mode");
     this.secondary.forEach((leaf) => this.claimed.push(leaf.path));
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
+    this.physics.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
     if (this.inputTrialsLeaf)    this.claimed.push(this.inputTrialsLeaf.path);
@@ -443,6 +455,9 @@ class ExperimentBuilder {
     this.patchEl         = null;
     this.patchSizesEl    = null;
     this.patchFlagPaints = [];
+    this.physicsEl           = null;
+    this.physicsComponentsEl = null;
+    this.physicsWeightsEl    = null;
     this.warmupCatalogEl     = null;
     this.warmupCatalogGridEl = null;
     this.warmupCountEl       = null;
@@ -489,6 +504,7 @@ class ExperimentBuilder {
     if (this.modeLeaf) body.appendChild(this._warmupCatalogPanel());
     if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
     if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
+    if (this.modeLeaf && this.physics.size)       body.appendChild(this._physicsPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
 
@@ -518,6 +534,7 @@ class ExperimentBuilder {
     this._paintMode();
     this._paintSecondary();
     this._paintPatch();
+    this._paintPhysics();
     this._paintPresence();
     this._paintInput();
     this._paintWarmupCatalog();
@@ -806,6 +823,187 @@ class ExperimentBuilder {
     this.patchFlagPaints.forEach((paint) => paint());
   }
 
+  _physicsPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-patch exp-physics";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">physics loss sweep</span>`;
+
+    const baselineLeaf = this.physics.get("include_baseline");
+    if (baselineLeaf) head.appendChild(this._patchFlag(baselineLeaf, "baseline", "prepend one run of the plain base config with every physics term disabled, as the reference"));
+
+    head.appendChild(LaunchWidgetDom.mini("Add weight", () => {
+      const weights = this._physicsWeights();
+      weights.push(weights.length ? weights[weights.length - 1] : 0.05);
+      this._emitPhysicsWeights(weights);
+    }));
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "each checked component trains once per weight on top of the base config, with every other physics term disabled in both curriculum stages; the tested term enters the complete stage";
+
+    const componentsHead       = document.createElement("div");
+    componentsHead.className   = "exp-presence__sub";
+    componentsHead.textContent = "components";
+
+    const components         = document.createElement("div");
+    components.className     = "exp-builder__names exp-presence__strategies";
+    this.physicsComponentsEl = components;
+
+    const weightsHead       = document.createElement("div");
+    weightsHead.className   = "exp-presence__sub";
+    weightsHead.textContent = "weights";
+
+    const weights         = document.createElement("div");
+    weights.className     = "exp-patch__sizes";
+    this.physicsWeightsEl = weights;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(componentsHead);
+    panel.appendChild(components);
+    panel.appendChild(weightsHead);
+    panel.appendChild(weights);
+    this.physicsEl = panel;
+
+    const componentsLeaf = this.physics.get("components");
+    if (componentsLeaf) this.view.controls[componentsLeaf.path] = { leaf: componentsLeaf, reset: () => this._repaintPhysics() };
+
+    const weightsLeaf = this.physics.get("weights");
+    if (weightsLeaf) this.view.controls[weightsLeaf.path] = { leaf: weightsLeaf, reset: () => this._repaintPhysics() };
+
+    this._paintPhysics();
+    return panel;
+  }
+
+  _physicsComponents() {
+    const leaf = this.physics.get("components");
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+  }
+
+  _physicsWeights() {
+    const leaf = this.physics.get("weights");
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  }
+
+  _physicsBaselineOn() {
+    const leaf = this.physics.get("include_baseline");
+    return leaf ? this.view._effective(leaf) === "True" : false;
+  }
+
+  _emitPhysicsComponents(components) {
+    const leaf = this.physics.get("components");
+    if (!leaf) return;
+
+    this.view._setValue(leaf, PythonLiteral.render(components));
+    this._repaintPhysics();
+  }
+
+  _emitPhysicsWeights(weights) {
+    const leaf = this.physics.get("weights");
+    if (!leaf) return;
+
+    const clean = weights.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0);
+    this.view._setValue(leaf, PythonLiteral.render(clean));
+    this._repaintPhysics();
+  }
+
+  _togglePhysicsComponent(key) {
+    const current = this._physicsComponents();
+
+    if (current.includes(key)) {
+      if (current.length <= 1) return;
+      this._emitPhysicsComponents(current.filter((value) => value !== key));
+    } else {
+      const order = ExperimentBuilder.PHYSICS_COMPONENTS.map((entry) => entry.key);
+      this._emitPhysicsComponents(order.filter((value) => current.includes(value) || value === key));
+    }
+  }
+
+  _physicsWeightChip(weight, index, weights) {
+    const chip     = document.createElement("div");
+    chip.className = "exp-patch__chip";
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input exp-patch__size";
+    input.type       = "number";
+    input.step       = "any";
+    input.min        = "0";
+    input.spellcheck = false;
+    input.value      = String(weight);
+    input.title      = "physics loss weight applied to the tested component";
+    input.addEventListener("change", () => {
+      const next  = weights.slice();
+      next[index] = Number(input.value);
+      this._emitPhysicsWeights(next);
+    });
+
+    const remove = LaunchWidgetDom.mini("×", () => {
+      const next = weights.slice();
+      next.splice(index, 1);
+      this._emitPhysicsWeights(next);
+    });
+    remove.classList.add("exp-patch__remove");
+    remove.title = "Remove weight";
+
+    chip.appendChild(input);
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _paintPhysics() {
+    if (!this.physicsEl) return;
+
+    if (this.physicsComponentsEl) {
+      this.physicsComponentsEl.innerHTML = "";
+      const active = this._physicsComponents();
+      ExperimentBuilder.PHYSICS_COMPONENTS.forEach(({ key, label }) => {
+        const on   = active.includes(key);
+        const chip = document.createElement("button");
+        chip.type        = "button";
+        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+        chip.textContent = label;
+        chip.title       = on ? "Click to drop this component from the sweep" : "Click to sweep this component";
+        chip.addEventListener("click", () => this._togglePhysicsComponent(key));
+        this.physicsComponentsEl.appendChild(chip);
+      });
+    }
+
+    if (this.physicsWeightsEl) {
+      const weights = this._physicsWeights();
+      this.physicsWeightsEl.innerHTML = "";
+      weights.forEach((weight, index) => this.physicsWeightsEl.appendChild(this._physicsWeightChip(weight, index, weights)));
+    }
+
+    this.patchFlagPaints.forEach((paint) => paint());
+  }
+
+  _repaintPhysics() {
+    this._paintPhysics();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _presenceMatchMap() {
     if (!this.presenceMatchLeaf) return {};
     try {
@@ -1087,6 +1285,7 @@ class ExperimentBuilder {
     if (this.warmupCatalogEl)    this.warmupCatalogEl.hidden    = mode !== "warmup";
     if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
     if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
+    if (this.physicsEl)          this.physicsEl.hidden          = mode !== "physics";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
   }
@@ -1249,6 +1448,7 @@ class ExperimentBuilder {
     this._paintMode();
     this._paintSecondary();
     this._paintPatch();
+    this._paintPhysics();
     this._paintAll();
   }
 
@@ -1579,6 +1779,15 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "physics") {
+      const nComp    = this._physicsComponents().length;
+      const nWeight  = this._physicsWeights().length;
+      const baseline = this._physicsBaselineOn();
+      const total    = nComp * nWeight + (baseline ? 1 : 0);
+      this.summaryEl.textContent = `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      return;
+    }
+
     if (mode === "presence") {
       const cells = this._presenceCells().length;
       const strat = this._presenceStrategies().length;
@@ -1617,6 +1826,11 @@ class ExperimentBuilder {
     const names = [];
     if (mode === "patch") {
       this._patchSizes().forEach((size) => names.push(`${model}_p-${size}`));
+    } else if (mode === "physics") {
+      if (this._physicsBaselineOn()) names.push(`${model}_phys-baseline`);
+      this._physicsComponents().forEach((component) => {
+        this._physicsWeights().forEach((weight) => names.push(`${model}_phys-${component}-w${weight}`));
+      });
     } else if (mode === "presence") {
       this._presenceCells().forEach((cell) => {
         this._presenceStrategies().forEach((strategy) => names.push(`${model}_pr-${cell}-${strategy}`));
