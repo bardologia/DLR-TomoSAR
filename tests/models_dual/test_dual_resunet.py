@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 import torch
 
+from models.backbone.resunet import ResUNetBackbone
+from models.backbone.unet    import UNetBackbone
 from models.dual import DUAL_MODEL_REGISTRY, get_dual
 
 
@@ -11,7 +13,8 @@ BATCH  = 2
 
 OVERRIDES = {
     "in_channels"        : 5,
-    "ifg_channels"       : (3, 4),
+    "params_channels"    : (0, 1, 2, 3, 4),
+    "existence_channels" : (3, 4),
     "params_features"    : [8, 16],
     "existence_features" : [8],
     "bottleneck_factor"  : 1,
@@ -19,8 +22,8 @@ OVERRIDES = {
 }
 
 
-def _build():
-    model, config = get_dual("dual_resunet", **OVERRIDES)
+def _build(**extra):
+    model, config = get_dual("dual_resunet", **{**OVERRIDES, **extra})
     return model.eval(), config
 
 
@@ -31,7 +34,7 @@ def _force_gate(model, logit_value: float) -> None:
 
 
 def _gate(model, x: torch.Tensor) -> torch.Tensor:
-    embedding = model.trunk_existence.encode_decode(x.index_select(1, model.ifg_index))
+    embedding = model.trunk_existence.encode_decode(x.index_select(1, model.existence_index))
     return torch.sigmoid(model.existence_head(embedding))
 
 
@@ -48,15 +51,28 @@ def test_default_trunks_are_three_and_two_levels():
     assert len(model.trunk_existence.encoder_blocks) == 2
 
 
+def test_trunk_architectures_are_selectable():
+    model, config = _build(params_backbone="unet", existence_backbone="unet_skip")
+
+    assert isinstance(model.trunk_params, UNetBackbone)
+    assert isinstance(model.trunk_existence, ResUNetBackbone)
+    assert model.trunk_existence.downsample_mode == "maxpool"
+
+    with torch.no_grad():
+        out = model(torch.randn(BATCH, config.in_channels, WINDOW, WINDOW))
+
+    assert out.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
+
+
 def test_trunks_take_independent_widths():
-    model, config = get_dual("dual_resunet", **{**OVERRIDES, "existence_features": [4]})
+    model, config = _build(existence_features=[4])
 
     assert model.trunk_existence.embedding_channels == 4
     assert model.existence_head.mlp[0].in_channels  == 4
     assert model.gaussian_heads[0].mlp[0].in_channels == model.trunk_params.embedding_channels
 
     with torch.no_grad():
-        out = model.eval()(torch.randn(BATCH, config.in_channels, WINDOW, WINDOW))
+        out = model(torch.randn(BATCH, config.in_channels, WINDOW, WINDOW))
 
     assert out.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
 
@@ -70,7 +86,7 @@ def test_forward_shape_is_three_k_channels():
     assert out.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
 
 
-def test_existence_trunk_sees_only_ifg_channels():
+def test_existence_trunk_sees_only_its_channels():
     model, config = _build()
 
     x         = torch.randn(BATCH, config.in_channels, WINDOW, WINDOW)
@@ -81,7 +97,21 @@ def test_existence_trunk_sees_only_ifg_channels():
         assert torch.equal(_gate(model, x), _gate(model, perturbed))
 
 
-def test_params_trunk_sees_all_channels():
+def test_params_trunk_sees_only_its_channels():
+    model, config = _build(params_channels=(0, 1, 2))
+
+    x         = torch.randn(BATCH, config.in_channels, WINDOW, WINDOW)
+    perturbed = x.clone()
+    perturbed[:, 3:] = torch.randn(BATCH, 2, WINDOW, WINDOW)
+
+    with torch.no_grad():
+        embedding_a = model.trunk_params.encode_decode(x.index_select(1, model.params_index))
+        embedding_b = model.trunk_params.encode_decode(perturbed.index_select(1, model.params_index))
+
+    assert torch.equal(embedding_a, embedding_b)
+
+
+def test_params_trunk_sees_all_channels_by_default():
     model, config = _build()
 
     x         = torch.randn(BATCH, config.in_channels, WINDOW, WINDOW)
@@ -115,7 +145,7 @@ def test_open_gate_passes_raw_amplitude():
 
     with torch.no_grad():
         out       = model(x)
-        embedding = model.trunk_params.encode_decode(x)
+        embedding = model.trunk_params.encode_decode(x.index_select(1, model.params_index))
         raw       = torch.stack([head(embedding) for head in model.gaussian_heads], dim=1)
 
     ppg = config.params_per_gaussian
@@ -132,7 +162,7 @@ def test_gate_leaves_mu_sigma_untouched():
 
     with torch.no_grad():
         out       = model(x)
-        embedding = model.trunk_params.encode_decode(x)
+        embedding = model.trunk_params.encode_decode(x.index_select(1, model.params_index))
         raw       = torch.stack([head(embedding) for head in model.gaussian_heads], dim=1)
 
     ppg      = config.params_per_gaussian
@@ -167,16 +197,21 @@ def test_param_groups_cover_every_parameter_exactly_once():
     assert set(grouped) == set(every)
 
 
-def test_empty_ifg_channels_rejected():
-    with pytest.raises(ValueError, match="ifg_channels"):
-        get_dual("dual_resunet", **{**OVERRIDES, "ifg_channels": ()})
+def test_unknown_trunk_backbone_rejected():
+    with pytest.raises(ValueError, match="params_backbone"):
+        _build(params_backbone="swin_unet")
 
 
-def test_out_of_range_ifg_channel_rejected():
+def test_empty_trunk_channels_rejected():
+    with pytest.raises(ValueError, match="existence_channels"):
+        _build(existence_channels=())
+
+
+def test_out_of_range_trunk_channel_rejected():
     with pytest.raises(ValueError, match="out of range"):
-        get_dual("dual_resunet", **{**OVERRIDES, "ifg_channels": (3, 5)})
+        _build(existence_channels=(3, 5))
 
 
 def test_non_set_pred_head_rejected():
     with pytest.raises(ValueError, match="set_pred"):
-        get_dual("dual_resunet", **{**OVERRIDES, "head": "conv"})
+        _build(head="conv")

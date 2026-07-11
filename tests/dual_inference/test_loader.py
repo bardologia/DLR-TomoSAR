@@ -17,7 +17,8 @@ SMALL_OVERRIDES = {
     "existence_features" : [8],
     "bottleneck_factor"  : 1,
     "dropout"            : 0.0,
-    "ifg_channels"       : (3, 4),
+    "params_channels"    : (0, 1, 2, 3, 4),
+    "existence_channels" : (3, 4),
 }
 
 
@@ -57,6 +58,7 @@ def test_build_model_reconstructs_every_registry_dual_model(name, tmp_path):
         actual   = ModelWrapper(rebuilt, "cpu")(x.numpy())
 
     assert loader.model_head == "set_pred"
-    assert tuple(rebuilt.config.ifg_channels) == (3, 4)
+    assert tuple(rebuilt.config.params_channels)    == (0, 1, 2, 3, 4)
+    assert tuple(rebuilt.config.existence_channels) == (3, 4)
     assert actual.shape == (1, out_channels, WINDOW, WINDOW)
     assert np.allclose(actual, expected.numpy(), atol=1e-6)

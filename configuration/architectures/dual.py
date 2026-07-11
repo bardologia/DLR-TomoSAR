@@ -11,7 +11,12 @@ class DualResUNetConfig:
     out_channels        : int       = 6
     params_per_gaussian : int       = 3
     head                : str       = "set_pred"
-    ifg_channels        : tuple     = (5, 6, 7, 8)
+    params_backbone     : str       = "resunet"
+    existence_backbone  : str       = "resunet"
+    params_input        : tuple     = ("pass", "ifg", "dem")
+    existence_input     : tuple     = ("ifg",)
+    params_channels     : tuple     = (0, 1, 2, 3, 4, 5, 6, 7, 8)
+    existence_channels  : tuple     = (5, 6, 7, 8)
     params_features     : list[int] = field(default_factory=lambda: [64, 128, 256])
     existence_features  : list[int] = field(default_factory=lambda: [64, 128])
     bottleneck_factor   : int       = 2
@@ -51,6 +56,8 @@ class DualResUNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            "params_backbone"    : {"type": "categorical",         "choices": ["resunet", "unet_skip", "unet"]},
+            "existence_backbone" : {"type": "categorical",         "choices": ["resunet", "unet_skip", "unet"]},
             "params_features"    : {"type": "indexed_categorical", "choices": [[32, 64, 128], [64, 128, 256], [48, 96, 192]]},
             "existence_features" : {"type": "indexed_categorical", "choices": [[32, 64], [64, 128], [48, 96]]},
             "bottleneck_factor" : {"type": "categorical",         "choices": [1, 2, 4]},

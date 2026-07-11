@@ -26,7 +26,18 @@ class DualSingleTrainRunner(SingleTrainRunner):
         return "set_pred"
 
     def _model_config(self):
-        return ModelBuilder.config_from_registry(self.config.model_name, self.config.model_overrides, registry=DUAL_CONFIG_REGISTRY)
+        trunk_overrides = {
+            "params_backbone"    : self.config.params_backbone,
+            "existence_backbone" : self.config.existence_backbone,
+            "params_input"       : tuple(self.config.params_input),
+            "existence_input"    : tuple(self.config.existence_input),
+        }
+
+        duplicated = [key for key in trunk_overrides if key in self.config.model_overrides]
+        if duplicated:
+            raise ValueError(f"Select {duplicated} via the dedicated entry fields, not model_overrides")
+
+        return ModelBuilder.config_from_registry(self.config.model_name, {**trunk_overrides, **self.config.model_overrides}, registry=DUAL_CONFIG_REGISTRY)
 
     def _inference_components(self):
         return DUAL_INFERENCE_COMPONENTS

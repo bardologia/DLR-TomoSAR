@@ -30,6 +30,7 @@ class LaunchLayout:
     NUM_DPI      = {"kind": "number", "int": True, "min": 72, "max": 600, "presets": [110, 150, 300, 600]}
 
     CH_AE_MODE      = {"kind": "choice", "options": ["frozen", "finetune"]}
+    CH_TRUNK        = {"kind": "choice", "options": ["resunet", "unet_skip", "unet"]}
     CH_PROVIDER     = {"kind": "choice", "options": ["stopgrad", "live"]}
     CH_NORM_GLOBAL  = {"kind": "choice", "options": ["per_slot"] + NORM_PRESETS}
     CH_NORM_CHANNEL = {"kind": "choice", "options": ["default"] + NORM_PRESETS}
@@ -40,6 +41,12 @@ class LaunchLayout:
     MULTI_K      = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add K, Enter", "empty": "select at least one K"}
     MULTI_LAMBDA = {"kind": "multi", "numeric": True, "placeholder": "add lambda, Enter", "empty": "select at least one lambda"}
     MULTI_INT    = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add value, Enter", "empty": "add at least one value"}
+
+    MULTI_TRUNK_INPUT = {"kind": "multi", "empty": "select at least one channel group", "choices": [
+        {"value": "pass", "label": "Passes (amplitudes)"},
+        {"value": "ifg",  "label": "Interferograms"},
+        {"value": "dem",  "label": "DEM"},
+    ]}
 
     MULTI_FIT_MODES = {"kind": "multi", "empty": "select at least one fit mode", "choices": [
         {"value": "sigma",        "label": "sigma only"},
@@ -599,7 +606,17 @@ class LaunchLayout:
             "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
-                    {"kind": "fields", "groups": [{"title": "Dual model", "fields": ["model_name", "model_overrides"]}]},
+                    {"kind": "fields", "groups": [
+                        {"title": "Dual model", "fields": ["model_name", "model_overrides"]},
+                        {"title": "Parameter trunk (gaussian heads)", "fields": [
+                            {"path": "params_backbone", "widget": CH_TRUNK},
+                            {"path": "params_input",    "widget": MULTI_TRUNK_INPUT},
+                        ]},
+                        {"title": "Existence trunk (presence gate)", "fields": [
+                            {"path": "existence_backbone", "widget": CH_TRUNK},
+                            {"path": "existence_input",    "widget": MULTI_TRUNK_INPUT},
+                        ]},
+                    ]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},

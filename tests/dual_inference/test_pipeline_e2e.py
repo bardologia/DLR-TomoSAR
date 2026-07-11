@@ -106,9 +106,10 @@ def test_dual_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_path):
     assert RunClassifier.classify(run_directory) == RunType.DUAL
 
     model_payload = json.loads((run_directory / "meta" / "dual_model_config.json").read_text())
-    assert model_payload["model_name"]             == "dual_resunet"
-    assert model_payload["config"]["in_channels"]  == 5
-    assert model_payload["config"]["ifg_channels"] == [3, 4]
+    assert model_payload["model_name"]                   == "dual_resunet"
+    assert model_payload["config"]["in_channels"]        == 5
+    assert model_payload["config"]["params_channels"]    == [0, 1, 2, 3, 4]
+    assert model_payload["config"]["existence_channels"] == [3, 4]
 
     run_summary = json.loads((run_directory / "meta" / "run_summary.json").read_text())
     assert run_summary["model_name"]   == "dual_resunet"
