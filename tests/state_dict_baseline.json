@@ -474,9 +474,9 @@
   },
   "dual": {
     "dual_resunet": {
-      "signature": "278963c0c2a8a01abd3e64d61029d6172a1f3795e8ca546488dd24ece1783d1c",
-      "num_keys": 253,
-      "num_parameters": 64871530
+      "signature": "38d774e4873596407bd21b26d656786c763f102021cca3088a4a0a1849af84c9",
+      "num_keys": 169,
+      "num_parameters": 10001258
     }
   }
 }
