@@ -16,6 +16,10 @@ class SeedSet:
         return f"{base}_seed{seed}"
 
     @staticmethod
+    def nested_run_name(base: str, seed: int) -> str:
+        return f"{base}/seed{seed}"
+
+    @staticmethod
     def base(run_name: str) -> str:
         return run_name.split("_seed")[0]
 
@@ -48,7 +52,7 @@ class SeedSweepRunner:
     def _run_seed(self, base_name: str, seed: int):
         config          = deepcopy(self.config)
         config.seed     = seed
-        config.run_name = SeedSet.run_name(base_name, seed)
+        config.run_name = SeedSet.nested_run_name(base_name, seed)
         return self.runner_factory(config).run()
 
     def run(self):
