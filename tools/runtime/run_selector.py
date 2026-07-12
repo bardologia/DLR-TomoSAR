@@ -94,6 +94,36 @@ class RunSelector:
         return run_dirs
 
 
+class ReportRunSelector(RunSelector):
+    def __init__(self, runs_dir: Path, inference_dirname: str, report_filename: str, logger) -> None:
+        super().__init__(runs_dir, inference_dirname, logger, action="collect")
+        self.report_filename = report_filename
+
+    def _discover(self) -> list[Path]:
+        if not self.runs_dir.is_dir():
+            raise FileNotFoundError(f"Runs directory does not exist: {self.runs_dir}")
+
+        reports  = self.runs_dir.rglob(f"{self.marker}/*/{self.report_filename}")
+        run_dirs = sorted({path.parent.parent.parent for path in reports if path.is_file()})
+
+        if not run_dirs:
+            raise FileNotFoundError(f"No '{self.report_filename}' found in any '{self.marker}' output under {self.runs_dir}")
+
+        return run_dirs
+
+    def _present(self, run_dirs: list[Path]) -> None:
+        rows = []
+        for index, run_dir in enumerate(run_dirs, start=1):
+            reports = sorted(path for path in (run_dir / self.marker).glob(f"*/{self.report_filename}") if path.is_file())
+            rows.append({
+                "#"       : index,
+                "Run"     : str(run_dir.relative_to(self.runs_dir)),
+                "Reports" : f"{len(reports)} report(s), latest {reports[-1].parent.name}",
+            })
+
+        self.logger.metrics_table(rows, columns=["#", "Run", "Reports"], title=f"Runs under {self.runs_dir}")
+
+
 class TensorboardRunSelector(RunSelector):
     EVENT_PATTERN = "events.out.tfevents.*"
 

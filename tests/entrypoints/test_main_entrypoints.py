@@ -49,6 +49,7 @@ DEFER_HEAVY_IMPORTS = (
     "analyze_preprocessing",
     "analyze_param_extraction",
     "export_tensorboard_plots",
+    "collect_reports",
 )
 
 CLI_MODULES = (
@@ -71,6 +72,7 @@ CLI_MODULES = (
     "compare_param_extraction_trials",
     "compare_preprocessing_trials",
     "export_tensorboard_plots",
+    "collect_reports",
 )
 
 ENTRY_CONFIGS = {
@@ -93,6 +95,7 @@ ENTRY_CONFIGS = {
     "compare_param_extraction_trials" : ("configuration.comparison",             "ParamExtractionComparisonConfig"),
     "compare_preprocessing_trials"    : ("configuration.comparison",             "PreprocessingComparisonConfig"),
     "export_tensorboard_plots"  : ("configuration.diagnostics",                  "TensorboardExportEntryConfig"),
+    "collect_reports"           : ("configuration.diagnostics",                  "ReportCollectionEntryConfig"),
 }
 
 ENTRY_SCRIPTS = sorted(script for subdir in _SUBDIRS for script in (_MAIN_DIR / subdir).glob("*.py") if not script.stem.startswith("_"))

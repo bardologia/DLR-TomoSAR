@@ -154,3 +154,41 @@ class TensorboardExportEntryConfig:
             tensorboard_dirname = self.tensorboard_dirname,
             output_subdir       = self.output_subdir,
         )
+
+
+@dataclass
+class ReportCollectionConfig:
+    run_directory : Path = Path("logs")
+    collector_dir : Path = Path("results/collected_reports")
+
+    inference_dirname : str  = "inference"
+    report_filename   : str  = "report.md"
+    latest_only       : bool = True
+    embed_images      : bool = False
+
+    @property
+    def inference_directory(self) -> Path:
+        return Path(self.run_directory) / self.inference_dirname
+
+
+@dataclass
+class ReportCollectionEntryConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    collector_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/results/collected_reports")
+
+    inference_dirname : str  = "inference"
+    report_filename   : str  = "report.md"
+    latest_only       : bool = True
+    embed_images      : bool = False
+
+    def to_config(self, run_dir: Path) -> ReportCollectionConfig:
+        return ReportCollectionConfig(
+            run_directory     = Path(run_dir),
+            collector_dir     = Path(self.collector_dir),
+            inference_dirname = self.inference_dirname,
+            report_filename   = self.report_filename,
+            latest_only       = self.latest_only,
+            embed_images      = self.embed_images,
+        )
