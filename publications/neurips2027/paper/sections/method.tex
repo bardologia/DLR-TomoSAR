@@ -19,4 +19,13 @@
 \subsection{Context budget and patch size}
 \label{sec:method_patch}
 
-\todo{The patch-size law with stated assumptions; derivation sketch here, full derivation in the appendix.}
+How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is a deterministic functional --- spectral scan and mixture fit --- of the sample covariance
+\begin{equation}
+  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}},
+  \label{eq:label_cov}
+\end{equation}
+estimated over the $w \times w$ window $B(x)$ centred on $x$, where $\mathbf{y}(x')$ is the full-stack sample vector. Two consequences follow, independent of scene content. First, the label at $x$ depends on the data only through $B(x)$. Second, two labels share input samples exactly when their windows overlap: at offset $\tau = (\tau_a, \tau_r)$ the shared count is $(w - |\tau_a|)_+ (w - |\tau_r|)_+$, with $(\cdot)_+ = \max(\cdot, 0)$. Under speckle that decorrelates at the resolution-cell scale, the label autocorrelation is therefore triangular per axis, $\rho(\tau) = (1 - |\tau|/w)_+$, and exactly zero beyond $w$: disjoint windows average disjoint, independent samples.
+
+The label is a noisy estimate of the underlying spectrum from a finite look budget, and the reducible part of the held-out error is the distance to that underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are certifiably tied to the same statistic --- looks from pixels whose windows overlap $B(x)$, all of which lie within distance $w$ of $x$. A patch of side $W$ captures $\min(W, 2w)^2$ of that informative square, growing quadratically until $W = 2w$ and exactly flat beyond. The law follows: held-out accuracy improves with patch size up to $W = 2w$ and saturates there, independently of the input stack size $n$.
+
+The saturation point is what makes the law falsifiable. A sample-budget account of the same question --- the network must repay the label's $w^2 \times N$ look budget with area, giving a floor $W^{*} = w\sqrt{N/n}$ --- predicts a knee that moves with $n$. The patch sweep of Section~\ref{sec:experiments_ablations} discriminates the two accounts and selects the ceiling: the knee stays at the window scale for every stack size tested. Appendix~\ref{app:patch_law} gives the full derivation, the sample-budget alternative and its Fisher-information refinement, and the complete sweep data.
