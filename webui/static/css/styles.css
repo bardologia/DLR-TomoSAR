@@ -2545,6 +2545,7 @@ main { margin-left: var(--navw); }
   align-self: start;
 }
 .cube-group.is-open { border-color: var(--line-strong); }
+.cube-group.is-current .cube-group__count { background: var(--accent); color: #f7f9ff; }
 .cube-group__head {
   display: flex; align-items: center; gap: 9px; width: 100%;
   padding: 9px 12px;
@@ -2565,7 +2566,7 @@ main { margin-left: var(--navw); }
   background: var(--line-strong); color: var(--ink-dim);
   font-size: 11px; text-align: center;
 }
-.cube-group__body { display: none; flex-direction: column; padding: 4px; border-top: 1px solid var(--line); }
+.cube-group__body { display: none; flex-direction: column; padding: 4px; border-top: 1px solid var(--line); max-height: 280px; overflow-y: auto; scrollbar-color: rgba(180, 195, 205, 0.25) transparent; }
 .cube-group.is-open .cube-group__body { display: flex; }
 .cube-run {
   display: flex; flex-direction: column; gap: 2px; width: 100%;

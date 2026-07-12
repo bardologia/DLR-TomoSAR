@@ -377,11 +377,11 @@ class TomogramView {
     const selectedGroup = (this.cubes.find((c) => c.id === this.selectedId) || {}).group;
 
     groups.forEach((cubes, group) => {
-      const isOpen = this.openGroups.has(group) || group === selectedGroup;
+      const isOpen = this.openGroups.has(group);
       const label  = group === "." ? "runs" : group;
 
       const card = document.createElement("div");
-      card.className = "cube-group" + (isOpen ? " is-open" : "");
+      card.className = "cube-group" + (isOpen ? " is-open" : "") + (group === selectedGroup ? " is-current" : "");
 
       const head = document.createElement("button");
       head.type = "button";
@@ -428,6 +428,7 @@ class TomogramView {
 
     this._stopSweeps();
     this.selectedId = cubeId;
+    this.openGroups.delete((this.cubes.find((c) => c.id === cubeId) || {}).group);
     this.meta = null;
     this.point = null;
     this.locked = null;
