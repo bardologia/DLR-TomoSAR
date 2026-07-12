@@ -12,8 +12,46 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from project_paths import ProjectPaths
-from web_logger    import WebLogger
+from project_paths            import ProjectPaths
+from tools.reporting.plotting import PlotBase
+from web_logger               import WebLogger
+
+
+class SliceFigureArchiver(PlotBase):
+
+    LABELS = {
+        "pred"    : "Prediction",
+        "gt"      : "GT (Gaussian)",
+        "reduced" : "Capon reduced",
+        "full"    : "Capon full (raw)",
+    }
+
+    def render(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, axis: str, az: int, rg: int, space: str, path: Path) -> Path:
+        x_label   = "azimuth index" if axis == "range" else "range index"
+        title_pos = f"range = {rg}" if axis == "range" else f"azimuth = {az}"
+        y_label   = "elevation bin" if source == "full" else "elevation [m]"
+        cbar      = "intensity (per-column normalised)" if space == "normalized" else "intensity"
+        extent    = [0, int(data.shape[1]), float(heights[0]), float(heights[-1])]
+
+        previous = PlotBase.style
+        PlotBase.use_style("paper")
+        try:
+            return self._imshow_figure(
+                data,
+                x_label        = x_label,
+                y_label        = y_label,
+                title          = f"{self.LABELS[source]} — {title_pos}",
+                cmap           = "jet",
+                vmin           = vmin,
+                vmax           = vmax,
+                extent         = extent,
+                origin         = "lower",
+                colorbar_label = cbar,
+                figsize        = self.figsize(self.FULL_WIDTH),
+                path           = path,
+            )
+        finally:
+            PlotBase.use_style(previous)
 
 
 class CubeExplorer:
@@ -21,12 +59,13 @@ class CubeExplorer:
     SOURCES = ("pred", "gt", "reduced", "full")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths  = paths
-        self.logger = logger
-        self.roots  = set()
-        self.lock   = threading.Lock()
-        self.loaded = None
-        self.status = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
+        self.paths    = paths
+        self.logger   = logger
+        self.archiver = SliceFigureArchiver()
+        self.roots    = set()
+        self.lock     = threading.Lock()
+        self.loaded   = None
+        self.status   = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
 
     def list_cubes(self, base: str) -> dict:
         root, error = self._catalog_root(base)
@@ -159,29 +198,14 @@ class CubeExplorer:
         if entry is None or axis not in ("range", "azimuth"):
             return None
 
-        cube               = entry["cube"]
-        n_elev, n_az, n_rg = cube.shape
+        n_elev, n_az, n_rg = entry["cube"].shape
         az = int(np.clip(az, 0, n_az - 1))
         rg = int(np.clip(rg, 0, n_rg - 1))
 
-        if axis == "range":
-            data = cube[:, :, rg]
-        else:
-            data = cube[:, az, :]
-
-        if space == "normalized":
-            peak = data.max(axis=0, keepdims=True)
-            safe = np.where(peak > 1e-12, peak, 1.0)
-            data = (data / safe).astype(np.float32)
-            vmin, vmax = 0.0, 1.0
-        else:
-            vmin, vmax = entry["vmin"], entry["vmax"]
-
-        sort_idx = np.argsort(entry["x_axis"])
-        data     = np.flipud(data[sort_idx])
+        data, heights, vmin, vmax = self._cut(entry, axis, az, rg, space)
 
         buf = io.BytesIO()
-        plt.imsave(buf, data, cmap="jet", vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.flipud(data), cmap="jet", vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
     def plane_png(self, cube_id: str, source: str, frac: float, space: str = "physical") -> bytes | None:
@@ -207,6 +231,52 @@ class CubeExplorer:
         buf = io.BytesIO()
         plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap="jet", vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
+
+    def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+            entries = self.loaded["entries"]
+            meta    = self.loaded["meta"]
+
+        stamp_dir = self._stamp_dir(cube_id)
+        if stamp_dir is None:
+            return {"ok": False, "error": f"unknown cube id: {cube_id}"}
+        if space not in ("physical", "normalized"):
+            return {"ok": False, "error": f"unknown space: {space}"}
+
+        az = int(np.clip(az, 0, meta["n_az"] - 1))
+        rg = int(np.clip(rg, 0, meta["n_rg"] - 1))
+
+        rel     = Path("figures") / "cube_slices" / f"az{az:04d}_rg{rg:04d}"
+        out_dir = stamp_dir / rel
+
+        files = []
+        for source in meta["sources"]:
+            for axis in ("range", "azimuth"):
+                data, heights, vmin, vmax = self._cut(entries[source], axis, az, rg, space)
+                saved = self.archiver.render(data, heights, vmin, vmax, source, axis, az, rg, space, out_dir / f"{axis}_{source}_{space}.png")
+                files.append(saved.name)
+
+        self.logger.ok(f"saved {len(files)} slice figures to {out_dir}")
+        return {"ok": True, "dir": str(out_dir), "rel": str(rel), "az": az, "rg": rg, "files": files}
+
+    @staticmethod
+    def _cut(entry: dict, axis: str, az: int, rg: int, space: str) -> tuple[np.ndarray, np.ndarray, float, float]:
+        cube = entry["cube"]
+        data = cube[:, :, rg] if axis == "range" else cube[:, az, :]
+
+        if space == "normalized":
+            peak = data.max(axis=0, keepdims=True)
+            safe = np.where(peak > 1e-12, peak, 1.0)
+            data = (data / safe).astype(np.float32)
+            vmin, vmax = 0.0, 1.0
+        else:
+            vmin, vmax = entry["vmin"], entry["vmax"]
+
+        order   = np.argsort(entry["x_axis"])
+        heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
+        return data[order], heights, float(vmin), float(vmax)
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
         with self.lock:

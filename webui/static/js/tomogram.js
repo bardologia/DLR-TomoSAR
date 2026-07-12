@@ -206,6 +206,8 @@ class TomogramSweep {
 
 class TomogramView {
   static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
+  static HOLD_SAVE_MS = 4000;
+  static HOLD_HINT_MS = 800;
 
   constructor(refs) {
     this.strip = refs.strip;
@@ -250,6 +252,11 @@ class TomogramView {
     this.point = null;
     this.mode = "map";
     this.locked = null;
+    this.holdTimer = null;
+    this.holdHintTimer = null;
+    this.holdHintOn = false;
+    this.holdFired = false;
+    this.holdSaving = false;
     this.entered = false;
     this.polling = false;
     this.profMode = "raw";
@@ -267,6 +274,9 @@ class TomogramView {
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
     this.topdown.addEventListener("mousemove", (ev) => this._onMove(ev));
+    this.topdown.addEventListener("mousedown", (ev) => this._onHoldStart(ev));
+    this.topdown.addEventListener("mouseup", () => this._cancelHold());
+    this.topdown.addEventListener("mouseleave", () => this._cancelHold());
     this.topdown.addEventListener("click", (ev) => this._onClick(ev));
     this.topdown.addEventListener("load", () => this.mapWrap.classList.remove("is-loading"));
     this.topdown.addEventListener("error", () => this.mapWrap.classList.remove("is-loading"));
@@ -668,11 +678,65 @@ class TomogramView {
   }
 
   _onClick(ev) {
+    if (this.holdFired) {
+      this.holdFired = false;
+      return;
+    }
     if (this.mode !== "map") return;
     const point = this._pointFromEvent(ev);
     if (!point) return;
     this._follow(point, true);
     this._enterSlices(point);
+  }
+
+  _onHoldStart(ev) {
+    if (this.mode !== "map" || ev.button !== 0 || !this.meta) return;
+
+    ev.preventDefault();
+    this.holdFired = false;
+    this._cancelHold();
+
+    this.holdHintTimer = setTimeout(() => {
+      this.holdHintOn = true;
+      this.coords.textContent = "keep holding to save the slice figures…";
+    }, TomogramView.HOLD_HINT_MS);
+
+    this.holdTimer = setTimeout(() => this._fireHoldSave(), TomogramView.HOLD_SAVE_MS);
+  }
+
+  _cancelHold() {
+    clearTimeout(this.holdHintTimer);
+    clearTimeout(this.holdTimer);
+    this.holdHintTimer = null;
+    this.holdTimer = null;
+    this.holdHintOn = false;
+  }
+
+  async _fireHoldSave() {
+    this._cancelHold();
+    if (this.mode !== "map" || !this.meta || !this.point || !this.selectedId) return;
+
+    this.holdFired = true;
+    if (this.holdSaving) return;
+
+    this.holdSaving = true;
+    this.holdHintOn = true;
+
+    const { az, rg } = this.point;
+    this.coords.textContent = `saving slice figures at az = ${az} · rg = ${rg}…`;
+
+    const res = await window.apiPost("/api/cubes/save_slices", { id: this.selectedId, az, rg, space: this.space });
+
+    this.holdSaving = false;
+    this.holdHintOn = false;
+    if (this.point) this.coords.textContent = `az = ${this.point.az} · rg = ${this.point.rg} · click to lock`;
+
+    if (!res || !res.ok) {
+      window.toast((res && res.error) || "Slice figure save failed.", "error");
+      return;
+    }
+
+    window.toast(`Saved ${res.files.length} slice figures → ${res.rel}`, "ok");
   }
 
   _setManualCut() {
@@ -755,7 +819,7 @@ class TomogramView {
 
     this.point = point;
     this._moveCross(point);
-    this.coords.textContent = `az = ${point.az} · rg = ${point.rg} · click to lock`;
+    if (!this.holdHintOn) this.coords.textContent = `az = ${point.az} · rg = ${point.rg} · click to lock`;
     this._syncCutInputs(point.az, point.rg);
 
     this._drawSlices(point.az, point.rg);

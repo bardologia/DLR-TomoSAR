@@ -341,6 +341,16 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
+        if path == "/api/cubes/save_slices":
+            result = self.cubes.save_slices(
+                cube_id = body.get("id", ""),
+                az      = int(body.get("az", 0)),
+                rg      = int(body.get("rg", 0)),
+                space   = body.get("space", "physical"),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
         if path == "/api/tensorboard/start":
             interpreter = body.get("interpreter") or self._preferred_interpreter(body.get("script_key", "train_backbone"))
             logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train_backbone"), {}, interpreter)
