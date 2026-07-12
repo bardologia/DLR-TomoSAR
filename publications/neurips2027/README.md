@@ -15,6 +15,10 @@ cd paper && make
 
 Requires `tectonic` (installed via snap). Output lands in `paper/build/`, which is gitignored; only LaTeX source is committed.
 
+## Figures
+
+Paper figures are rendered by plot classes deriving from `PaperPlotBase` (`tools/reporting/plotting.py`) into `paper/figures/` (gitignored, regenerable). The class pins the print style: figures created at final column size (`FULL_WIDTH` 5.5 in, `HALF_WIDTH` 2.65 in via `PaperPlotBase.figsize`), 9pt/8pt fonts, STIX math to match the Times body, Okabe-Ito colorblind-safe cycle, 300 DPI, and `_save` accepts only `.pdf` (vector plots) or `.png` (raster maps). Multi-panel figures are composed in LaTeX with `subcaption` from single-plot files, per the vault plotting rules.
+
 ## Kit refresh procedure (on 2027 CFP release)
 
 1. Download the 2027 ZIP into `template_kit/`, replacing the 2026 files.

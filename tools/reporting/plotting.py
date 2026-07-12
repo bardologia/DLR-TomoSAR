@@ -240,3 +240,40 @@ class PlotBase:
             origin         = origin,
             colorbar_label = lambda cm_used: int_label if cm_used == panels[0][2] else "|error|",
         )
+
+
+class PaperPlotBase(PlotBase):
+    FULL_WIDTH : float = 5.5
+    HALF_WIDTH : float = 2.65
+
+    OKABE_ITO = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#F0E442", "#000000"]
+
+    PAPER_RC: dict = {
+        "font.size"        : 9,
+        "axes.titlesize"   : 9,
+        "axes.labelsize"   : 9,
+        "xtick.labelsize"  : 8,
+        "ytick.labelsize"  : 8,
+        "legend.fontsize"  : 8,
+        "mathtext.fontset" : "stix",
+        "lines.linewidth"  : 1.2,
+        "lines.markersize" : 4,
+    }
+
+    fig_dpi  : int = 300
+    save_dpi : int = 300
+
+    def _apply_style(self) -> None:
+        super()._apply_style()
+        plt.rcParams.update(self.PAPER_RC)
+        plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.OKABE_ITO)
+
+    @classmethod
+    def figsize(cls, width: float, aspect: float = 0.62) -> Tuple[float, float]:
+        return (width, width * aspect)
+
+    @staticmethod
+    def _save(fig: plt.Figure, path: Path) -> Path:
+        if path.suffix not in (".pdf", ".png"):
+            raise ValueError(f"paper figures must be saved as .pdf (vector) or .png (raster maps), got '{path.suffix}' for {path}")
+        return PlotBase._save(fig, path)

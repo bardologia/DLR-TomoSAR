@@ -9,7 +9,7 @@ import numpy             as np
 import pytest
 from PIL import Image
 
-from tools.reporting.plotting import PlotBase
+from tools.reporting.plotting import PaperPlotBase, PlotBase
 
 
 @pytest.fixture
@@ -329,3 +329,67 @@ def test_shared_clim_real_tomogram_intensity(tomogram_full, small_window):
     lo, hi = PlotBase._shared_clim(layer, q_low=5.0, q_high=95.0)
     assert lo <= hi
     assert np.isfinite(lo) and np.isfinite(hi)
+
+
+@pytest.fixture
+def paper_plotter():
+    return PaperPlotBase()
+
+
+def test_paper_style_sets_print_font_sizes(paper_plotter):
+    paper_plotter._apply_style()
+    assert plt.rcParams["font.size"]       == 9
+    assert plt.rcParams["axes.labelsize"]  == 9
+    assert plt.rcParams["xtick.labelsize"] == 8
+    assert plt.rcParams["legend.fontsize"] == 8
+
+
+def test_paper_style_sets_stix_mathtext(paper_plotter):
+    paper_plotter._apply_style()
+    assert plt.rcParams["mathtext.fontset"] == "stix"
+
+
+def test_paper_style_sets_okabe_ito_cycle(paper_plotter):
+    paper_plotter._apply_style()
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    assert colors == PaperPlotBase.OKABE_ITO
+
+
+def test_paper_style_uses_print_dpi(paper_plotter):
+    paper_plotter._apply_style()
+    assert plt.rcParams["figure.dpi"]  == 300
+    assert plt.rcParams["savefig.dpi"] == 300
+
+
+def test_paper_style_keeps_scientific_base(paper_plotter):
+    paper_plotter._apply_style()
+    assert plt.rcParams["pdf.fonttype"] == 42
+    assert "serif" in plt.rcParams["font.family"]
+
+
+def test_paper_figsize_full_width():
+    w, h = PaperPlotBase.figsize(PaperPlotBase.FULL_WIDTH)
+    assert w == pytest.approx(5.5)
+    assert h == pytest.approx(5.5 * 0.62)
+
+
+def test_paper_figsize_custom_aspect():
+    w, h = PaperPlotBase.figsize(PaperPlotBase.HALF_WIDTH, aspect=1.0)
+    assert w == pytest.approx(2.65)
+    assert h == pytest.approx(2.65)
+
+
+def test_paper_save_writes_pdf(paper_plotter, tmp_path):
+    fig = plt.figure()
+    fig.add_subplot(111).plot([0, 1], [0, 1])
+    out = paper_plotter._save(fig, tmp_path / "fig.pdf")
+
+    assert out.exists()
+    assert out.read_bytes()[:5] == b"%PDF-"
+
+
+def test_paper_save_rejects_other_formats(paper_plotter, tmp_path):
+    fig = plt.figure()
+    with pytest.raises(ValueError, match="paper figures"):
+        paper_plotter._save(fig, tmp_path / "fig.svg")
+    plt.close(fig)
