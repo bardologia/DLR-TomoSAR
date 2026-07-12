@@ -231,7 +231,22 @@ with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the
   \E \norm{f - \ell}^2 \;=\; \E \norm{f - \phi(\mathbf{R})}^2 \;+\; \E \norm{\varepsilon}^2.
   \label{eq:risk_decomp}
 \end{equation}
-Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation. A larger patch lowers it only through additional looks informative about the pixel's covariance. Pixels within $w$ supply exactly those: anchored to the label by the shared sum of Eq.~(\ref{eq:shared_private}), their looks average away $\varepsilon$. Pixels beyond $w$ are independent of every sample that formed the label; using them rests on a homogeneity prior the label construction neither uses nor certifies.
+Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation. The window geometry then sorts the pixels around $x$ into three regimes. Within $w/2$, the pixel stacks are looks of Eq.~(\ref{eq:label_cov}): they formed the label. Within $w$, the windows overlap and the labels share information through the shared looks, a common component in their covariance estimates (Eq.~\ref{eq:shared_private}). Beyond $w$, every sample is independent of the label, and any contribution rests on a homogeneity prior the label construction neither uses nor certifies. Table~\ref{tab:context_regimes} gives the overview.
+
+\begin{table}[H]
+  \centering
+  \caption{The three offset regimes around pixel $x$: pixel stacks inside the window form the label, overlapping windows share looks and correlate, disjoint windows are independent.}
+  \label{tab:context_regimes}
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    offset from $x$ & geometry & link to $\ell(x)$ & certified role in the patch \\
+    \midrule
+    $\lVert\tau\rVert_\infty \le w/2$      & pixel inside $B(x)$ & look of Eq.~(\ref{eq:label_cov})  & forms the label \\
+    $w/2 < \lVert\tau\rVert_\infty < w$    & windows overlap     & shared looks, $\rho(\tau) > 0$    & averages away $\varepsilon$ \\
+    $\lVert\tau\rVert_\infty \ge w$        & windows disjoint    & independent, $\rho(\tau) = 0$     & none \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 The certified context is therefore the square of side $2w$ centred on the pixel, of which a patch of side $W$ captures
 \begin{equation}
