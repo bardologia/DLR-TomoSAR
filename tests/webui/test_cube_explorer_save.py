@@ -71,7 +71,7 @@ def test_save_slices_writes_paper_figures(tmp_path):
     assert result["ok"], result
 
     out_dir = Path(result["dir"])
-    assert out_dir == Path(cube_id) / "figures" / "cube_slices" / "az0003_rg0002"
+    assert out_dir == Path(cube_id).parent.parent / "figures" / "cube_slices" / "az0003_rg0002"
     assert result["rel"] == "figures/cube_slices/az0003_rg0002"
 
     expected = {f"{axis}_{source}_physical.png" for source in ("pred", "gt", "reduced") for axis in ("range", "azimuth")}

@@ -248,8 +248,9 @@ class CubeExplorer:
         az = int(np.clip(az, 0, meta["n_az"] - 1))
         rg = int(np.clip(rg, 0, meta["n_rg"] - 1))
 
+        run_dir = stamp_dir.parent.parent
         rel     = Path("figures") / "cube_slices" / f"az{az:04d}_rg{rg:04d}"
-        out_dir = stamp_dir / rel
+        out_dir = run_dir / rel
 
         files = []
         for source in meta["sources"]:
