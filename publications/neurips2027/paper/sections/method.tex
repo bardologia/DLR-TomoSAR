@@ -106,14 +106,16 @@
 \subsection{Context budget and patch size}
 \label{sec:method_patch}
 
-How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is $\ell(x) = \phi\bigl(\hat{\mathbf{R}}(x)\bigr)$, where $\phi$ denotes the deterministic spectral scan and mixture fit and
+How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is the deterministic spectral scan and mixture fit $\phi$ applied to the sample covariance of the $w \times w$ window $B(x)$ centred on $x$ ($w = 20$\,px in production):
 \begin{equation}
-  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}}
+  \ell(x) \;=\; \phi\bigl(\hat{\mathbf{R}}(x)\bigr),
+  \qquad
+  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}},
   \label{eq:label_cov}
 \end{equation}
-is the sample covariance over the $w \times w$ window $B(x)$ centred on $x$ ($w = 20$\,px in production), with $\mathbf{y}(x')$ the full-stack sample vector. The analysis rests on two assumptions the labelling pipeline already makes. Speckle decorrelates at the resolution-cell scale, so sample vectors at distinct pixels are independent. And the covariance is approximately constant at the window scale: the boxcar average of Eq.~(\ref{eq:label_cov}) is consistent only where $\mathbf{R}$ is locally constant, and $w$ is chosen as the homogeneity scale of the scene.
+with $\mathbf{y}$ the full-stack sample vector. Two assumptions, both already made by the labelling pipeline, carry the analysis: speckle decorrelates at the resolution-cell scale, so distinct pixels are independent; and the covariance is locally constant at the window scale, $w$ being the homogeneity scale of the scene.
 
-Write $x' = x + \tau$ for an offset $\tau = (\tau_a, \tau_r)$, with $\lVert\tau\rVert_\infty = \max(|\tau_a|, |\tau_r|)$. Two consequences are exact. The label depends on its own window alone --- $\hat{\mathbf{R}}(x)$, and with it $\ell(x)$, is a function of $\{\mathbf{y}(p)\}_{p \in B(x)}$ and of nothing else --- and disjoint windows yield independent labels:
+Write $x' = x + \tau$ for the pixel at offset $\tau = (\tau_a, \tau_r)$. Two consequences are exact. Each label is a function of its own window alone, so disjoint windows yield independent labels:
 \begin{equation}
   \lVert\tau\rVert_\infty \ge w
   \;\Longrightarrow\;
@@ -122,23 +124,23 @@ Write $x' = x + \tau$ for an offset $\tau = (\tau_a, \tau_r)$, with $\lVert\tau\
   \ell(x) \indep \ell(x').
   \label{eq:independence}
 \end{equation}
-For $\lVert\tau\rVert_\infty < w$ each windowed sum splits over the window intersection into a shared part and a private part:
+Overlapping windows split over their intersection into a shared and a private sum:
 \begin{align}
   w^2\,\hat{\mathbf{R}}(x)  &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}},
   \label{eq:shared_private}\\
   w^2\,\hat{\mathbf{R}}(x') &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}.
 \end{align}
-The first sum is common to both estimates and collects
+The shared sum collects
 \begin{equation}
   \bigl|B(x) \cap B(x')\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
   \label{eq:shared_count}
 \end{equation}
-looks, with $(\cdot)_+ = \max(\cdot, 0)$; the second sums draw on disjoint pixel sets, private to each window. The private sums are independent of each other and of the shared sum, so every statistical link between two labels flows through the looks their windows share, and the correlation between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x')$ is the shared fraction of the window,
+looks, with $(\cdot)_+$ the positive part. The private sums are independent of each other and of the shared one, so every link between two labels flows through the shared looks, and the correlation between corresponding entries of the two estimates is the shared fraction of the window,
 \begin{equation}
   \rho(\tau) \;=\; \Bigl(1 - \tfrac{|\tau_a|}{w}\Bigr)_{\!+}\Bigl(1 - \tfrac{|\tau_r|}{w}\Bigr)_{\!+},
   \label{eq:triangle}
 \end{equation}
-the self-convolution of the boxcar --- triangular per axis, inherited by the labels to first order in the linearisation of $\phi$. The link drains linearly with the offset and dies exactly at the window scale,
+the self-convolution of the boxcar, inherited by the labels through the linearisation of $\phi$. The link drains linearly and dies exactly at the window scale,
 \begin{equation}
   \lVert\tau\rVert_\infty \to w:
   \qquad
@@ -215,7 +217,7 @@ meeting the independence of Eq.~(\ref{eq:independence}) at the boundary. Figure~
     \caption{}
     \label{fig:corr_law_triangle}
   \end{subfigure}
-  \caption{The label correlation law. (a)~Two labels are linked exactly through the looks their windows share (shaded): $x'$ closer than $w$ overlaps $B(x)$, while $B(x'')$ is disjoint and its label independent. The centred patch that contains every overlapping window spans $W = 2w$. (b)~The overlap is the correlation: each window pair drops onto the triangle $\rho(\tau)$ of Eq.~(\ref{eq:triangle}) at its offset --- the shaded overlap shrinks linearly, reaches zero at $\tau = w$ (Eq.~\ref{eq:drain}), and stays zero beyond (Eq.~\ref{eq:independence}); the patch spanning the whole triangle is $2w$.}
+  \caption{The label correlation law. (a)~Two labels are linked exactly through the looks their windows share (shaded): the window at $x'$ overlaps $B(x)$, the one at $x''$ is disjoint and its label independent; the centred patch containing every overlapping window spans $W = 2w$. (b)~The overlap is the correlation: each window pair drops onto the triangle of Eq.~(\ref{eq:triangle}) at its offset, reaching zero at the window scale (Eq.~\ref{eq:drain}) and staying zero beyond (Eq.~\ref{eq:independence}); the patch spanning the whole triangle is $2w$.}
   \label{fig:corr_law}
 \end{figure}
 
@@ -224,18 +226,23 @@ The law follows from the held-out risk. The label is a noisy realisation of the 
   \ell(x) \;=\; \phi\bigl(\mathbf{R}(x)\bigr) + \varepsilon(x),
   \label{eq:label_noise}
 \end{equation}
-with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the test loss of a predictor $f$ splits along the same line:
+with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the test loss of a predictor $f$ splits accordingly:
 \begin{equation}
   \E \norm{f - \ell}^2 \;=\; \E \norm{f - \phi(\mathbf{R})}^2 \;+\; \E \norm{\varepsilon}^2.
   \label{eq:risk_decomp}
 \end{equation}
-The second term is beyond any predictor's reach; the reducible part is the distance to the underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are informative about $\mathbf{R}(x)$, and the label construction certifies which looks those are. Pixels within $w$ of $x$ are anchored to the label through shared samples (Eq.~\ref{eq:shared_private}): their looks sample the same $\mathbf{R}(x)$, averaging away $\varepsilon$. Pixels farther than $w$ are exactly independent of every sample that formed $\ell(x)$; any contribution from them rests on extrapolating homogeneity across windows that share no data --- a scene prior the label construction neither uses nor certifies.
+Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation. A larger patch lowers it only through additional looks informative about the pixel's covariance. Pixels within $w$ supply exactly those: anchored to the label by the shared sum of Eq.~(\ref{eq:shared_private}), their looks average away $\varepsilon$. Pixels beyond $w$ are independent of every sample that formed the label; using them rests on a homogeneity prior the label construction neither uses nor certifies.
 
-The certified context is therefore the square of side $2w$ centred on $x$, and a patch of side $W$ captures
+The certified context is therefore the square of side $2w$ centred on the pixel, of which a patch of side $W$ captures
 \begin{equation}
   L(W) \;=\; \min(W, 2w)^2
   \label{eq:ceiling}
 \end{equation}
-of it: the pooled look count grows quadratically until $W = 2w$ and is exactly flat beyond. The floor is immediate --- a patch narrower than the window withholds inputs that generated its own target, so the minimum useful patch is $W = w$, at which point the patch holds exactly the label's own $w^2$ looks. The useful patch is the band $w \le W \le 2w$, and the upper end carries the law's sharpest prediction: since Eq.~(\ref{eq:ceiling}) contains no property of the input stack, held-out accuracy must saturate at the window scale for every stack size $n$. The sweep of Section~\ref{sec:experiments_ablations} confirms it (Table~\ref{tab:patch_sweep}, Figure~\ref{fig:patch_sweep}).
+looks: quadratic growth up to the ceiling, exactly flat beyond. The floor is immediate, since a patch narrower than the window withholds inputs that generated its own target. The useful patch is the band
+\begin{equation}
+  w \;\le\; W \;\le\; 2w,
+  \label{eq:band}
+\end{equation}
+whose upper end carries the law's sharpest prediction: Eq.~(\ref{eq:ceiling}) contains no property of the input stack, so held-out accuracy must saturate at the window scale for every stack size. The sweep of Section~\ref{sec:experiments_ablations} confirms it (Table~\ref{tab:patch_sweep}, Figure~\ref{fig:patch_sweep}).
 
-Three remarks bound the law's scope. Organised structure larger than a resolution cell --- building faces, slopes --- correlates samples across disjoint windows and can only soften the ceiling upward: it delays saturation, it cannot create an optimum below $2w$. The law bounds \emph{certified} information, not what priors can add: a model may exploit scene regularities beyond $2w$, they are simply not guaranteed by the label construction. And its only constant is the pipeline's own $w$, so it transfers to a new scene by re-reading the window from that scene's configuration --- whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).
+Three remarks bound the scope. Organised structure larger than a resolution cell correlates samples across disjoint windows and can only soften the ceiling upward, never create an optimum below it. The law bounds \emph{certified} information: a model may exploit scene regularities beyond the ceiling, they are simply not guaranteed by the label construction. And its only constant is the pipeline's own $w$, so the law transfers to a new scene by re-reading the window from that scene's configuration; whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).
