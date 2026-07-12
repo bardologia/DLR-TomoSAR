@@ -158,6 +158,7 @@ def test_figure_composer_compose_creates_files(tmp_path):
     assert "profiles_best"      in figure_paths
     assert "pixel_mse_map"      in figure_paths
     assert "param_distributions" in figure_paths
+    assert "param_error_hists"  in figure_paths
     assert "active_count_map"   in figure_paths
     assert "slices_range"       in figure_paths
     assert "ssim_range"         in figure_paths

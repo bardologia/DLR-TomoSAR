@@ -113,6 +113,18 @@ def test_param_plotter_error_maps(tmp_path):
     _assert_files(paths)
 
 
+def test_param_plotter_error_hists(tmp_path):
+    params  = _params()
+    noise   = np.random.default_rng(1).normal(0.0, 0.1, params.shape).astype(np.float32)
+    plotter = ParamPlotter()
+
+    paths = plotter.plot_param_error_hists(
+        params_pred=params + noise, params_gt=params, n_gaussians=N_GAUSSIANS, out_dir=tmp_path,
+    )
+    _assert_files(paths)
+    assert len(paths) == N_GAUSSIANS * 3
+
+
 def test_param_scatter_r2_value_exact():
     gt   = np.array([1.0, 2.0, 3.0, 4.0])
     pred = gt.copy()

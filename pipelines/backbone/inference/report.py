@@ -667,15 +667,17 @@ class Report:
             ("param_distributions",    "6.1 Parameter distributions (GT vs Pred)"),
             ("param_scatter",          "6.2 Parameter scatter plots (GT vs Pred, with R²)"),
             ("param_error_maps",       "6.3 Parameter absolute-error maps |Pred − GT|"),
-            ("active_count_map",       "6.4 Active Gaussian count map"),
+            ("param_error_hists",      "6.4 Parameter error histograms (matched Pred − GT)"),
+            ("active_count_map",       "6.5 Active Gaussian count map"),
         )
         if any(fp.get(key) for key, _title in param_groups):
             out.append("\n## 6. Gaussian parameter analysis\n")
             out.append(
-                "All parameter figures are permutation-invariant: the distributions (6.1), scatter (6.2) and "
-                "error maps (6.3) Hungarian-match predicted Gaussians to GT Gaussians per pixel before scoring, "
-                "and the active-count map (6.4) compares counts only. For aggregate ordering-independent accuracy "
-                "see §2.5.\n"
+                "All parameter figures are permutation-invariant: the distributions (6.1), scatter (6.2), "
+                "error maps (6.3) and error histograms (6.4) Hungarian-match predicted Gaussians to GT Gaussians "
+                "per pixel before scoring, and the active-count map (6.5) compares counts only. The error "
+                "histograms show the signed per-pixel error, so a shift away from the zero line reads directly "
+                "as parameter bias. For aggregate ordering-independent accuracy see §2.5.\n"
             )
             self._section(out, param_groups)
 

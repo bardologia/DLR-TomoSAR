@@ -178,6 +178,13 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
+        figure_paths["param_error_hists"] = param_plotter.plot_param_error_hists(
+            params_pred = result.params_pred[: run.n_gaussians * 3],
+            params_gt   = result.params_gt  [: run.n_gaussians * 3],
+            n_gaussians = run.n_gaussians,
+            out_dir     = meta.figures_dir / "param_error_hists",
+        )
+
         figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
@@ -187,7 +194,7 @@ class FigureComposer:
             rg_offset   = result.range_offset,
         )
 
-        logger.subsection(f"Param plots : distributions, scatter, error maps, active-count map written to {meta.figures_dir}")
+        logger.subsection(f"Param plots : distributions, scatter, error maps, error histograms, active-count map written to {meta.figures_dir}")
 
     def _compose_slot_organization(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
         org_plotter = self.plotter.organization

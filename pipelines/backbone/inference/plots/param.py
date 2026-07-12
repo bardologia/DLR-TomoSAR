@@ -266,3 +266,62 @@ class ParamPlotter(PlotTools):
                 ))
 
         return paths
+
+    def plot_param_error_hists(
+        self,
+        params_pred : np.ndarray,
+        params_gt   : np.ndarray,
+        n_gaussians : int,
+        out_dir     : Path,
+        bins        : int = 80,
+    ) -> List[Path]:
+
+        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        paths   = []
+
+        for k in range(n_gaussians):
+            gt_amp_flat = params_gt[3 * k].reshape(-1)
+            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
+
+            for j, (fname, lbl) in enumerate(self.PARAM_LABELS):
+                ch    = 3 * k + j
+                short = self.PARAM_SHORT[j]
+
+                if ch >= params_gt.shape[0] or ch >= aligned.shape[0]:
+                    continue
+
+                gt_flat   = params_gt[ch].reshape(-1)
+                pred_flat = aligned  [ch].reshape(-1)
+                matched   = is_active & np.isfinite(gt_flat) & np.isfinite(pred_flat)
+
+                err = (pred_flat - gt_flat)[matched]
+                if err.size == 0:
+                    continue
+
+                half      = max(float(np.percentile(np.abs(err), 99.5)), 1e-6)
+                bin_edges = np.linspace(-half, half, bins + 1)
+                err_in    = err[(err >= bin_edges[0]) & (err <= bin_edges[-1])]
+                if err_in.size == 0:
+                    continue
+
+                bias   = float(np.mean(err))
+                median = float(np.median(err))
+                mae    = float(np.mean(np.abs(err)))
+
+                fig, ax = plt.subplots(figsize=(4.8, 3.4))
+
+                ax.hist(err_in, bins=bin_edges, density=True, color="C3", alpha=0.65, edgecolor="none")
+                ax.axvline(0.0,    color="black", linestyle="-",  linewidth=0.9, label="zero error")
+                ax.axvline(median, color="C0",    linestyle="--", linewidth=0.9, label=f"median={median:.3g}")
+                ax.axvline(bias,   color="C3",    linestyle="--", linewidth=0.9, label=f"mean={bias:.3g}")
+
+                ax.set_title(f"GT g{k + 1} — {lbl} error  (matched, active, MAE={mae:.3g})", fontsize=10)
+                ax.set_xlabel(f"Δ{short} (matched pred − GT)")
+                ax.set_ylabel("density")
+                ax.legend(fontsize=7, framealpha=0.9)
+                ax.grid(True, which="both", linewidth=0.3, alpha=0.4)
+                fig.tight_layout()
+
+                paths.append(self._save(fig, out_dir / f"g{k + 1}_{fname}.png"))
+
+        return paths

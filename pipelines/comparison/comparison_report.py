@@ -22,6 +22,7 @@ class TrialComparisonReport(ComparisonReportBase):
         ("param_distributions", "Parameter distributions"),
         ("param_scatter",       "Parameter scatter plots"),
         ("param_error_maps",    "Parameter error maps"),
+        ("param_error_hists",   "Parameter error histograms"),
         ("slots",               "Slot diagnostics"),
         ("ssim",                "SSIM curves (denorm)"),
         ("ssim_norm",           "SSIM curves (unit-area)"),
