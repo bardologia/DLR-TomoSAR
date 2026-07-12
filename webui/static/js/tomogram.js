@@ -233,6 +233,7 @@ class TomogramView {
     this.jumpAz = refs.jumpAz;
     this.jumpRg = refs.jumpRg;
     this.jumpGo = refs.jumpGo;
+    this.jumpPrint = refs.jumpPrint;
     this.jumpAzRange = refs.jumpAzRange;
     this.jumpRgRange = refs.jumpRgRange;
     this.progress = refs.progress;
@@ -256,7 +257,7 @@ class TomogramView {
     this.holdHintTimer = null;
     this.holdHintOn = false;
     this.holdFired = false;
-    this.holdSaving = false;
+    this.saving = false;
     this.entered = false;
     this.polling = false;
     this.profMode = "raw";
@@ -303,6 +304,7 @@ class TomogramView {
     if (this.jumpAz) this.jumpAz.addEventListener("change", () => this._setManualCut());
     if (this.jumpRg) this.jumpRg.addEventListener("change", () => this._setManualCut());
     if (this.jumpGo) this.jumpGo.addEventListener("click", () => this._setManualCut());
+    if (this.jumpPrint) this.jumpPrint.addEventListener("click", () => this._printSlices());
   }
 
   leave() {
@@ -714,22 +716,40 @@ class TomogramView {
 
   async _fireHoldSave() {
     this._cancelHold();
-    if (this.mode !== "map" || !this.meta || !this.point || !this.selectedId) return;
+    if (this.mode !== "map" || !this.meta || !this.point) return;
 
     this.holdFired = true;
-    if (this.holdSaving) return;
-
-    this.holdSaving = true;
     this.holdHintOn = true;
 
     const { az, rg } = this.point;
     this.coords.textContent = `saving slice figures at az = ${az} · rg = ${rg}…`;
 
-    const res = await window.apiPost("/api/cubes/save_slices", { id: this.selectedId, az, rg, space: this.space });
+    await this._saveSlices(az, rg);
 
-    this.holdSaving = false;
     this.holdHintOn = false;
     if (this.point) this.coords.textContent = `az = ${this.point.az} · rg = ${this.point.rg} · click to lock`;
+  }
+
+  _printSlices() {
+    if (!this.meta) return;
+
+    const az = this._clampInt(this.jumpAz ? this.jumpAz.value : 0, this.meta.n_az);
+    const rg = this._clampInt(this.jumpRg ? this.jumpRg.value : 0, this.meta.n_rg);
+
+    this._syncCutInputs(az, rg, true);
+    this._saveSlices(az, rg);
+  }
+
+  async _saveSlices(az, rg) {
+    if (!this.meta || !this.selectedId || this.saving) return;
+
+    this.saving = true;
+    if (this.jumpPrint) this.jumpPrint.disabled = true;
+
+    const res = await window.apiPost("/api/cubes/save_slices", { id: this.selectedId, az, rg, space: this.space });
+
+    this.saving = false;
+    if (this.jumpPrint) this.jumpPrint.disabled = false;
 
     if (!res || !res.ok) {
       window.toast((res && res.error) || "Slice figure save failed.", "error");

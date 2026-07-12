@@ -233,6 +233,7 @@ class App {
       jumpAz        : document.getElementById("cube-jump-az"),
       jumpRg        : document.getElementById("cube-jump-rg"),
       jumpGo        : document.getElementById("cube-jump-go"),
+      jumpPrint     : document.getElementById("cube-jump-print"),
       jumpAzRange   : document.getElementById("cube-jump-az-range"),
       jumpRgRange   : document.getElementById("cube-jump-rg-range"),
       sweeps        : ["elevation", "azimuth", "range"].map((axis) => {
