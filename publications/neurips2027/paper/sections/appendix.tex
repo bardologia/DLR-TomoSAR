@@ -1,7 +1,7 @@
 \section{Full derivation of the patch-size law}
 \label{app:patch_law}
 
-This appendix derives the context ceiling stated in Section~\ref{sec:method_patch}, develops the sample-budget account that was registered against it, and reports the sweep that adjudicates between the two. Throughout, $w$ is the side of the boxcar covariance window used by the labelling pipeline ($w = 20$\,px in production), $N$ the number of passes in the labelling stack ($N = 29$), $n \le N$ the number of passes in the network input, $W$ the input patch side, and $\tau = (\tau_a, \tau_r)$ a pixel offset in azimuth and range.
+This appendix derives the patch-size law stated in Section~\ref{sec:method_patch} --- the useful patch is bounded below by the label window $w$ and exhausted at twice the window --- and reports the sweep that tests it. Throughout, $w$ is the side of the boxcar covariance window used by the labelling pipeline ($w = 20$\,px in production), $n$ the number of passes in the network input, $W$ the input patch side, and $\tau = (\tau_a, \tau_r)$ a pixel offset in azimuth and range.
 
 \subsection{Assumptions}
 \label{app:patch_assumptions}
@@ -9,7 +9,6 @@ This appendix derives the context ceiling stated in Section~\ref{sec:method_patc
 \begin{itemize}
   \item[\textbf{A1}] \emph{Speckle decorrelation at the resolution-cell scale.} Sample vectors at distinct pixels are statistically independent. Fully developed speckle satisfies this; organised long-range structure weakens it (Appendix~\ref{app:patch_limits}).
   \item[\textbf{A2}] \emph{Homogeneity at the window scale.} The true covariance $\mathbf{R}(\cdot)$ is approximately constant over any $w \times w$ window. This is not an additional hypothesis: the labelling pipeline itself relies on it, since the boxcar average of Eq.~(\ref{eq:label_cov}) estimates $\mathbf{R}(x)$ consistently only where $\mathbf{R}$ is locally constant, and $w$ is chosen as the homogeneity scale of the scene.
-  \item[\textbf{A3}] \emph{Equal per-pass quality.} All passes carry comparable SNR and coherence (one campaign, one sensor).
 \end{itemize}
 
 \subsection{The label correlation law}
@@ -21,19 +20,80 @@ The label at pixel $x$ is $\ell(x) = \phi\bigl(\hat{\mathbf{R}}(x)\bigr)$, where
 
 \textbf{Exact independence beyond $w$.} If $|\tau_a| \ge w$ or $|\tau_r| \ge w$, then $B(x) \cap B(x+\tau) = \emptyset$, and under A1 the labels $\ell(x)$ and $\ell(x+\tau)$ are functions of disjoint independent sample sets --- independent, not merely uncorrelated. Two disjoint boxcar averages of independent speckle share nothing.
 
-\textbf{Triangular correlation within $w$.} The windows share
+\textbf{Shared and private looks within $w$.} Fix an offset $\tau$ with $|\tau_a|, |\tau_r| < w$ and write $x' = x + \tau$. Each windowed sum splits over the window intersection into a shared part and a private part,
 \begin{equation}
-  \bigl|B(x) \cap B(x+\tau)\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
+  w^2\,\hat{\mathbf{R}}(x) \;=\;
+  \underbrace{\sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\textstyle \mathbf{S}(\tau) \text{ --- shared looks}}
+  \;+\; \underbrace{\sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\text{private to } x},
+  \qquad
+  w^2\,\hat{\mathbf{R}}(x') \;=\; \mathbf{S}(\tau)
+  \;+\; \underbrace{\sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\text{private to } x'},
+  \label{eq:shared_private}
+\end{equation}
+where the shared term collects
+\begin{equation}
+  \bigl|B(x) \cap B(x')\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
   \label{eq:shared_count}
 \end{equation}
-samples. Under A1--A2 the covariance between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x+\tau)$ is proportional to this count, so the entry-wise correlation is the separable triangle
+looks. Under A1 the two private sums are independent of each other and of $\mathbf{S}(\tau)$, so every statistical link between the two estimates flows through the shared looks, and the correlation between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x')$ is the shared fraction of the window,
 \begin{equation}
   \rho(\tau) \;=\; \Bigl(1 - \tfrac{|\tau_a|}{w}\Bigr)_{\!+}\Bigl(1 - \tfrac{|\tau_r|}{w}\Bigr)_{\!+},
   \label{eq:triangle}
 \end{equation}
-the self-convolution of the boxcar, and the labels inherit it to first order in the linearisation of $\phi$ (delta method). The exact zero of the previous paragraph does not depend on this linearisation.
+the self-convolution of the boxcar --- triangular per axis. The labels inherit it to first order in the linearisation of $\phi$ (delta method); the exact zero of the previous paragraph does not depend on this linearisation. Figure~\ref{fig:corr_law} shows the geometry.
 
-\subsection{The ceiling}
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.56\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize]
+      \draw[black!45, thin, fill=black!2] (0,0) rectangle (5.6,3.9);
+      \draw[black!7, step=0.2] (0,0) grid (5.6,3.9);
+      \draw[figink, dashed, thin] (0.55,0.35) rectangle ++(3.0,3.0);
+      \node[font=\tiny, text=figink, anchor=south west, inner sep=1.5pt] at (0.57,3.37) {$W = 2w$};
+      \fill[oiBlue!25] (1.30,1.10) rectangle (2.20,2.15);
+      \draw[oiGreen, dashed, thin] (0.70,0.65) rectangle ++(1.5,1.5);
+      \fill[oiGreen] (1.39,1.34) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiGreen!70!black, anchor=east, inner sep=1.5pt] at (1.35,1.40) {$x'$};
+      \node[font=\tiny, text=oiGreen!70!black, anchor=north west, inner sep=1.5pt] at (0.72,0.63) {$B(x')$};
+      \draw[oiBlue, dashed, thin] (1.30,1.10) rectangle ++(1.5,1.5);
+      \fill[oiBlue] (1.99,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiBlue, anchor=west, inner sep=1.5pt] at (2.15,1.85) {$x$};
+      \node[font=\tiny, text=oiBlue, anchor=south west, inner sep=1.5pt] at (1.32,2.62) {$B(x)$};
+      \draw[black!50, dashed, thin] (3.60,1.10) rectangle ++(1.5,1.5);
+      \fill[black!50] (4.29,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=black!60, anchor=west, inner sep=1.5pt] at (4.45,1.85) {$x''$};
+      \node[font=\tiny, text=black!60, anchor=south west, inner sep=1.5pt] at (3.62,2.62) {$B(x'')$};
+      \node[font=\tiny, text=oiBlue!80!black, anchor=north west, align=left, inner sep=1.5pt] at (0.80,0.30) {shared looks $\mathbf{S}(\tau)$};
+      \draw[oiBlue!70, thin] (1.55,0.32) -- (1.75,1.30);
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_grid}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.40\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize]
+      \draw[-{Stealth[length=1.5mm]}, black!60] (-2.9,0) -- (2.9,0) node[right, font=\tiny]{$\tau$};
+      \draw[-{Stealth[length=1.5mm]}, black!60] (0,-0.05) -- (0,2.05) node[left, font=\tiny]{$\rho(\tau)$};
+      \draw[black!35, thin, dashed] (-0.05,1.6) -- (0.05,1.6);
+      \node[font=\tiny, anchor=east] at (-0.08,1.6) {$1$};
+      \draw[oiBlue, thick] (-2.2,0) -- (0,1.6) -- (2.2,0);
+      \draw[black!45, thin] (-2.2,0) -- (-2.2,-0.07);
+      \draw[black!45, thin] (2.2,0) -- (2.2,-0.07);
+      \node[font=\tiny, anchor=north] at (-2.2,-0.09) {$-w$};
+      \node[font=\tiny, anchor=north] at (2.2,-0.09) {$w$};
+      \draw[|-|, black!70] (-2.2,-0.72) -- (2.2,-0.72);
+      \node[font=\tiny, text=figink, anchor=north] at (0,-0.80) {$W = 2w$};
+      \node[coordinate] at (0,-1.35) {};
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_triangle}
+  \end{subfigure}
+  \caption{The label correlation law. (a)~Two labels are linked exactly through the looks their windows share (shaded): $x'$ closer than $w$ overlaps $B(x)$, while $B(x'')$ is disjoint and its label independent. The centred patch that contains every overlapping window spans $W = 2w$. (b)~Per axis, the shared fraction of Eq.~(\ref{eq:shared_count}) is the triangle $\rho(\tau)$, supported on $\pm w$; the patch spanning the whole triangle is $2w$.}
+  \label{fig:corr_law}
+\end{figure}
+
+\subsection{The floor and the ceiling}
 \label{app:patch_ceiling}
 
 Held-out risk separates the two things a predictor could chase. Writing $\ell(x) = \phi(\mathbf{R}(x)) + \varepsilon(x)$, with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, the test loss of a predictor $f$ decomposes as $\E \norm{f - \ell}^2 = \E \norm{f - \phi(\mathbf{R})}^2 + \E \norm{\varepsilon}^2$: the reducible part is the distance to the underlying statistic, not to the label realisation. A larger patch can lower it only by supplying additional looks that are informative about $\mathbf{R}(x)$, and the label construction itself certifies which looks those are. Pixels within $w$ of $x$ are anchored to the label through shared samples: their windows overlap $B(x)$, the corresponding covariance estimates are correlated (Eq.~\ref{eq:triangle}), and --- because overlapping homogeneity windows must agree on their intersection (A2) --- their remaining looks sample the same $\mathbf{R}(x)$, averaging away $\varepsilon$. Pixels farther than $w$ are, under A1, exactly independent of every sample that formed $\ell(x)$; any contribution from them rests on extrapolating homogeneity across windows that share no data --- a scene prior the label construction neither uses nor certifies.
@@ -45,39 +105,16 @@ The certified context is therefore the square of side $2w$ centred on $x$, and a
 \end{equation}
 of it: the pooled look count grows quadratically until $W = 2w$ and is exactly flat beyond. The law follows --- held-out accuracy improves with patch size up to $W = 2w$ and saturates, independently of $n$, since Eq.~(\ref{eq:ceiling}) contains no property of the input stack.
 
-Two neighbouring readings bracket this one and make the experiment sharp. If the network needed only to \emph{reproduce the label realisation}, the patch would need to contain no more than the label's own inputs, and accuracy would saturate at $W = w$. If homogeneity could instead be \emph{chained} across successively overlapping windows, information would accrue without bound and no saturation would appear. The three readings predict knees at $w$, at $2w$, and nowhere; a sweep distinguishes them.
-
-\subsection{The registered alternative --- a sample-budget floor}
-\label{app:patch_floor}
-
-A competing account of the optimum was registered alongside the ceiling before the sweep; we develop it in full because rejecting it is part of the evidence for the law.
-
-The labels are manufactured from $N$ passes; the network input contains $n < N$. One independent speckle look occupies $o_a \times o_r$ pixels, where $o_a = \rho_a/\delta_a$ and $o_r = \rho_r/\delta_r$ are the azimuth and range oversampling factors (resolution over pixel spacing). The labelling covariance therefore pools $L = w^2/(o_a o_r)$ looks over $N$ passes --- in production $L \approx 121 \approx 4.2\,N$, comfortably above the $L \ge 2N$ Reed--Mallett--Brennan soundness bound. If estimation information scales as looks $\times$ passes, an $n$-pass input must repay the label's budget with area, $L' = L\,N/n$ looks, which converts back to pixel area as
-\begin{equation}
-  A_{\mathrm{ctx}} \;=\; L'\,o_a o_r \;=\; \frac{N}{n}\,w^2
-  \quad\Longrightarrow\quad
-  W^{*} \;=\; w\sqrt{N/n},
-  \label{eq:floor}
-\end{equation}
-with the oversampling factors cancelling exactly: the floor depends only on the window and the pass ratio.
-
-Pass count is, moreover, a coarse currency, and the floor sharpens under a Fisher-information account. Elevation enters pass $i$ only through the phase $e^{\mathrm{j} k_z^{(i)} z}$, so estimating $z$ is single-tone frequency estimation with the vertical wavenumbers $k_z^{(i)}$ as sample positions; with the common complex amplitude a nuisance parameter, the per-look Fisher information about $z$ is proportional to the centred second moment of the pass set's $k_z$ sampling,
-\begin{equation}
-  S_T \;=\; \sum_{i \in T} \bigl(k_z^{(i)} - \bar{k}_z\bigr)^2,
-  \label{eq:kz_moment}
-\end{equation}
-equivalently the mean squared $k_z$ separation over all pass pairs. Repeating the budget argument with $S$ as the currency gives $W^{*} = w\sqrt{S_N/S_n}$; Eq.~(\ref{eq:floor}) is its special case for aperture-preserving subsets, whose $S$ is proportional to pass count.
-
-Both variants share the signature that matters: the floor moves with the input stack. Across the sweep's stack sizes $n \in \{2, 3, 5, 9, 15\}$ the pass-count floor predicts knees at $76, 62, 48, 36, 28$\,px, and the $k_z$-aware variant shifts these values (for the sweep's even-spread selections, $36$\,px at $n = 5$ and $31$\,px at $n = 9$) without changing the trend. The ceiling predicts $2w = 40$\,px for every $n$. The production five-pass subset is the configuration in which the two accounts collide least --- its floor, $48$--$49$\,px, happens to sit just past the ceiling --- which is why both hypotheses remained live until a multi-$n$ sweep could separate them.
+The floor is immediate. The label at $x$ is a function of every sample in $B(x)$ and of nothing else, so a patch narrower than the window withholds inputs that generated its own target: the minimum useful patch is $W = w$, at which point the patch holds exactly the label's own $w^2$ looks. Between $w$ and $2w$ each additional ring of pixels still contributes shared looks (Eq.~\ref{eq:shared_private}); at $2w$ the certified information is exhausted. The useful patch is the band $w \le W \le 2w$, and the upper end is where the sweep must find the knee --- for every stack size.
 
 \subsection{The sweep}
 \label{app:patch_sweep}
 
-One model was trained per (patch side, stack size) cell on the grid $W \in \{16, 24, \ldots, 72\}$ and $n \in \{2, 3, 5, 9, 15\}$, with baseline-ordered even-spread pass selection at each $n$. The backbone is a three-level U-Net, so every grid size is admissible and the ceiling $2w = 40$\,px lies on the grid. The pixel budget per epoch is constant across patch sizes --- larger patches see no more data --- which removes the compute penalty of large patches by construction: the error curves saturate rather than turn upward, the argmin is censored by noise and the grid edge, and the knee is the meaningful statistic. Table~\ref{tab:patch_sweep} reports the held-out test loss.
+One model was trained per (patch side, stack size) cell on the grid $W \in \{16, 24, \ldots, 72\}$ and $n \in \{2, 3, 5, 9, 15\}$, with baseline-ordered even-spread pass selection at each $n$. The backbone is a three-level U-Net, so every grid size is admissible and the ceiling $2w = 40$\,px lies on the grid. The pixel budget per epoch is constant across patch sizes --- larger patches see no more data --- which removes the compute penalty of large patches by construction: the error curves saturate rather than turn upward, the argmin is censored by noise and the grid edge, and the knee is the meaningful statistic. Table~\ref{tab:patch_sweep} reports the held-out test loss; Figure~\ref{fig:patch_sweep} plots the curves.
 
 \begin{table}[t]
   \centering
-  \caption{Patch-size sweep: held-out test loss per patch side $W$ and input stack size $n$ (three-level U-Net, even-spread pass selection, constant pixel budget per epoch, single seed). Bold marks each column's minimum. The bottom rows juxtapose the observed knee$_{80}$ --- the smallest patch capturing at least $80\%$ of the column's total loss reduction --- with the two registered predictions: the ceiling holds for every $n$, the floor's predicted drift from $76$ to $28$\,px does not occur.}
+  \caption{Patch-size sweep: held-out test loss per patch side $W$ and input stack size $n$ (three-level U-Net, even-spread pass selection, constant pixel budget per epoch, single seed). Bold marks each column's minimum. The bottom rows compare the observed knee$_{80}$ --- the smallest patch capturing at least $80\%$ of the column's total loss reduction --- with the predicted ceiling: every column saturates at the window scale.}
   \label{tab:patch_sweep}
   \begin{tabular}{@{}l ccccc@{}}
     \toprule
@@ -96,17 +133,54 @@ One model was trained per (patch side, stack size) cell on the grid $W \in \{16,
     \midrule
     knee$_{80}$ observed (px)      & 56 & 48 & 40 & 40 & 48 \\
     ceiling $2w$ (px)              & 40 & 40 & 40 & 40 & 40 \\
-    floor $w\sqrt{N/n}$ (px)       & 76 & 62 & 48 & 36 & 28 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Four observations carry the verdict.
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.78\textwidth, height=0.46\textwidth,
+      xlabel={patch side $W$ (px)},
+      ylabel={held-out test loss},
+      xmin=13, xmax=75, ymin=0.093, ymax=0.202,
+      xtick={16,24,32,40,48,56,64,72},
+      tick label style={font=\scriptsize},
+      label style={font=\small},
+      legend style={font=\scriptsize, draw=black!30, fill=white, at={(0.97,0.97)}, anchor=north east},
+      axis line style={black!60},
+    ]
+      \addplot[oiBlue, semithick, mark=*, mark size=1.5pt] coordinates
+        {(16,0.1742) (24,0.1949) (32,0.1619) (40,0.1544) (48,0.1544) (56,0.1485) (64,0.1574) (72,0.1521)};
+      \addlegendentry{$n = 2$}
+      \addplot[oiVermilion, semithick, mark=square*, mark size=1.4pt] coordinates
+        {(16,0.1489) (24,0.1725) (32,0.1390) (40,0.1316) (48,0.1266) (56,0.1274) (64,0.1259) (72,0.1294)};
+      \addlegendentry{$n = 3$}
+      \addplot[oiGreen, semithick, mark=triangle*, mark size=1.8pt] coordinates
+        {(16,0.1384) (24,0.1588) (32,0.1242) (40,0.1200) (48,0.1263) (56,0.1209) (64,0.1210) (72,0.1206)};
+      \addlegendentry{$n = 5$}
+      \addplot[oiOrange, semithick, mark=diamond*, mark size=1.8pt] coordinates
+        {(16,0.1275) (24,0.1477) (32,0.1187) (40,0.1109) (48,0.1078) (56,0.1096) (64,0.1085) (72,0.1110)};
+      \addlegendentry{$n = 9$}
+      \addplot[oiPurple, semithick, mark=pentagon*, mark size=1.8pt] coordinates
+        {(16,0.1129) (24,0.1219) (32,0.1031) (40,0.1029) (48,0.0995) (56,0.1001) (64,0.0993) (72,0.1008)};
+      \addlegendentry{$n = 15$}
+      \draw[black!55, dashed] (axis cs:20,0.093) -- (axis cs:20,0.202);
+      \draw[black!85, dashed, semithick] (axis cs:40,0.093) -- (axis cs:40,0.202);
+      \node[font=\scriptsize, anchor=south west, text=black!70] at (axis cs:20.4,0.0945) {$w$};
+      \node[font=\scriptsize, anchor=south west, text=black!85] at (axis cs:40.4,0.0945) {$2w$};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Patch sweep, plotted from Table~\ref{tab:patch_sweep}: held-out test loss versus patch side for five input stack sizes. Every curve completes its descent at the window scale and is flat past the $2w$ ceiling; more passes lower the whole curve without moving where it saturates.}
+  \label{fig:patch_sweep}
+\end{figure}
+
+Three observations carry the result.
 \begin{itemize}
-  \item The knee stays in the band $40$--$56$\,px --- at the ceiling or within two grid steps above it --- with no trend in $n$, while the sample-budget floors demand a knee sliding from $76$ down to $28$\,px.
-  \item The ceiling already captures most of each curve: $77, 75, 100, 84, 73\%$ of the total gain is in hand at $W = 40$\,px for $n = 2, 3, 5, 9, 15$, and no curve improves by more than $0.006$ loss anywhere past it.
-  \item More passes lower the entire curve without moving where context saturates: stack size buys accuracy, not context reach --- the qualitative content of Eq.~(\ref{eq:ceiling}). The budget accounts survive as information-content statements (they correctly order the columns of Table~\ref{tab:patch_sweep}) but not as predictors of the patch optimum.
-  \item Of the three readings in Appendix~\ref{app:patch_ceiling}, the data select the middle one: the knee sits at $2w$, not at $w$ (the grid resolves $16$--$24$\,px, where every curve is still far from saturated), and the flat tails to $72$\,px rule out unbounded accrual.
+  \item The knee sits in the band $40$--$56$\,px --- at the ceiling or within two grid steps above it --- for every stack size, with no trend in $n$: where context saturates is a property of the label window, not of the input stack.
+  \item The ceiling already captures most of each curve: $77, 75, 100, 84, 73\%$ of the total gain is in hand at $W = 2w = 40$\,px for $n = 2, 3, 5, 9, 15$, and no curve improves by more than $0.006$ loss anywhere past it --- the flat tails to $72$\,px are the predicted plateau.
+  \item More passes lower the entire curve without moving the knee: stack size buys accuracy, not context reach --- the qualitative content of Eq.~(\ref{eq:ceiling}).
 \end{itemize}
 
 Two caveats are visible in the table. Every curve rises from $16$ to $24$\,px before its main descent ($+0.009$ to $+0.024$ loss); the rise is shared across all five stack sizes, so it is not seed noise, and its cause is open. And the sweep is single-seed: tail wiggles of $\pm 0.005$ past the knee are within run-to-run noise, which is why knee$_{80}$ rather than the argmin carries the conclusion. \todo{Repeat the sweep over $\ge 3$ seeds and report mean $\pm$ std per cell.}
@@ -116,9 +190,8 @@ Two caveats are visible in the table. Every curve rises from $16$ to $24$\,px be
 
 \begin{itemize}
   \item A1 fails gracefully. Organised structure larger than a resolution cell --- building faces, slopes --- correlates samples across disjoint windows and softens the ceiling upward; it can delay saturation, not create a second optimum below $2w$. The knees observed up to $56$\,px are consistent with mild softening of this kind.
-  \item The Fisher refinement prices only the second moment of the $k_z$ sampling. Vertical resolution (aperture span) and ambiguity (sampling gaps) cannot be repaid with patch area at any $W$, and per-pass SNR differences are ignored (A3).
   \item The law bounds \emph{certified} information, not what priors can add: a model may exploit scene regularities beyond $2w$ --- they are simply not guaranteed by the label construction --- and the flat tails of Table~\ref{tab:patch_sweep} indicate that on this scene such priors add little.
-  \item The constants are the pipeline's own ($w$, the $k_z$ set), so the law transfers to a new scene by re-reading them from its configuration; whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).
+  \item The law's only constant is the pipeline's own $w$, so it transfers to a new scene by re-reading the window from its configuration; whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).
 \end{itemize}
 
 \section{Architecture and training details}

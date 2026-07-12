@@ -9,7 +9,94 @@
 \subsection{Existence-gated set prediction}
 \label{sec:method_setpred}
 
-\todo{Backbone and heads; permutation handling via Hungarian matching versus sorted ground truth; presence/existence gating; loss composition with weights.}
+\todo{Backbone and heads; permutation handling via Hungarian matching versus sorted ground truth; presence/existence gating; loss composition with weights. Reference Figures~\ref{fig:setperm} and~\ref{fig:head} from the prose.}
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize]
+    \node[pbox, minimum height=9mm] (gtl) at (-1.55,2.70) {extracted\\label};
+    \node[pbox, minimum height=9mm] (prl) at (-1.55,0.60) {network\\output};
+    \foreach \cx/\col/\ga/\gm/\gs/\lab in {0.0/oiBlue/0.58/-0.29/0.108/{(a_1, \mu_1, \sigma_1)}, 1.9/oiOrange/0.38/0.07/0.18/{(a_2, \mu_2, \sigma_2)}, 3.8/oiGreen/0.29/0.43/0.108/{(a_3, \mu_3, \sigma_3)}} {
+      \draw[\col!70, thin, rounded corners=2pt, fill=\col!4] (\cx,2.10) rectangle ++(1.6,1.2);
+      \draw[black!25, thin] (\cx+0.10,2.42) -- (\cx+1.50,2.42);
+      \draw[\col, thick, domain=-0.62:0.62, samples=41, smooth, shift={(\cx+0.8,2.42)}]
+        plot (\x,{\ga*exp(-(\x-\gm)*(\x-\gm)/(2*\gs*\gs))});
+      \node[font=\tiny, text=\col] at (\cx+0.8,2.26) {$\lab$};
+    }
+    \foreach \cx/\col/\ga/\gm/\gs/\lab in {0.0/oiOrange/0.38/0.07/0.18/{(a_2, \mu_2, \sigma_2)}, 1.9/oiGreen/0.29/0.43/0.108/{(a_3, \mu_3, \sigma_3)}, 3.8/oiBlue/0.58/-0.29/0.108/{(a_1, \mu_1, \sigma_1)}} {
+      \draw[\col!70, thin, rounded corners=2pt, fill=\col!4] (\cx,0.00) rectangle ++(1.6,1.2);
+      \draw[black!25, thin] (\cx+0.10,0.32) -- (\cx+1.50,0.32);
+      \draw[\col, thick, domain=-0.62:0.62, samples=41, smooth, shift={(\cx+0.8,0.32)}]
+        plot (\x,{\ga*exp(-(\x-\gm)*(\x-\gm)/(2*\gs*\gs))});
+      \node[font=\tiny, text=\col] at (\cx+0.8,0.16) {$\lab$};
+    }
+    \foreach \x/\e in {0.8/{\ell_1}, 2.7/{\ell_2}, 4.6/{\ell_3}} {
+      \draw[oiVermilion!80, densely dashed, {Stealth[length=1.4mm]}-{Stealth[length=1.4mm]}, thin] (\x,2.05) -- (\x,1.25);
+      \node[font=\tiny, text=oiVermilion, fill=white, inner sep=1pt] at (\x,1.65) {$\e$};
+    }
+    \draw[pflow] (gtl.east) -- (-0.05,2.70);
+    \draw[pflow] (prl.east) -- (-0.05,0.60);
+    \node[font=\tiny, text=figsoft, align=center, anchor=west] at (5.55,1.90) {fixed slot-wise loss:};
+    \node[font=\scriptsize, text=oiVermilion, align=center, anchor=west] at (5.55,1.58) {$\ell_1 + \ell_2 + \ell_3 \gg 0$};
+    \node[font=\tiny, text=figsoft, align=center, anchor=west] at (5.55,1.28) {on a perfect answer};
+    \draw[pflow] (5.5,2.70) -- (6.1,2.70);
+    \draw[pflow] (5.5,0.60) -- (6.1,0.60);
+    \foreach \yb in {2.10, 0.00} {
+      \draw[black!40, thin, rounded corners=2pt, fill=black!2] (7.55,\yb) rectangle ++(2.6,1.2);
+      \begin{scope}[shift={(7.70,\yb+0.18)}]
+        \draw[->, black!45, thin] (0,0) -- (2.30,0) node[above left, font=\tiny, inner sep=1pt]{$z$};
+        \draw[oiBlue!60, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.52*exp(-(\x-0.60)^2/(2*0.18*0.18))});
+        \draw[oiOrange!70, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.35*exp(-(\x-1.20)^2/(2*0.30*0.30))});
+        \draw[oiGreen!70, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.26*exp(-(\x-1.80)^2/(2*0.18*0.18))});
+        \draw[figink, semithick, domain=0.05:2.25, samples=110, smooth]
+          plot (\x,{0.52*exp(-(\x-0.60)^2/(2*0.18*0.18)) + 0.35*exp(-(\x-1.20)^2/(2*0.30*0.30)) + 0.26*exp(-(\x-1.80)^2/(2*0.18*0.18))});
+      \end{scope}
+    }
+    \node[font=\normalsize] at (8.85,1.65) {$=$};
+    \node[font=\tiny, text=figink] at (8.85,1.32) {the same profile};
+  \end{tikzpicture}
+  \caption{The output is a set, not a vector. Label and prediction hold the same three components in different slots and compose the same spectrum, yet a fixed slot-wise loss charges each slot against a fixed target: the loss is large on a perfect answer, and its gradient drags every slot toward a different scatterer.}
+  \label{fig:setperm}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize,
+      exc/.style={-{Stealth[length=1.5mm]}, oiVermilion!85, semithick, densely dashed}]
+    \node[pbox, minimum height=26mm, minimum width=15mm] (bb) at (0,0) {backbone\\embedding};
+    \node[pbox, minimum height=7mm] (h1) at (2.6,1.4)  {slot head 1};
+    \node[pbox, minimum height=7mm] (h2) at (2.6,0)    {slot head 2};
+    \node[pbox, minimum height=7mm] (h3) at (2.6,-1.4) {slot head $K$};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g1) at (4.9,1.4)  {gate};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g2) at (4.9,0)    {gate};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g3) at (4.9,-1.4) {gate};
+    \node[pboxaccent, minimum height=6mm] (o1) at (7.0,1.4)  {$a_1, \mu_1, \sigma_1$};
+    \node[pboxaccent, minimum height=6mm] (o2) at (7.0,0)    {$a_2, \mu_2, \sigma_2$};
+    \node[pboxaccent, minimum height=6mm] (o3) at (7.0,-1.4) {$a_K, \mu_K, \sigma_K$};
+    \node[pbox, minimum height=7mm] (eh) at (2.2,-2.85) {existence head};
+    \node[font=\scriptsize, text=oiVermilion, anchor=west] at (4.80,-2.85) {$g_k = \sigma(e_k)$ per slot};
+    \draw[pflow] (bb.east) -- (h1.west);
+    \draw[pflow] (bb.east) -- (h2.west);
+    \draw[pflow] (bb.east) -- (h3.west);
+    \draw[pflow] (bb.south) |- (eh.west);
+    \draw[pflow] (h1.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_1$} (g1.west);
+    \draw[pflow] (h2.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_2$} (g2.west);
+    \draw[pflow] (h3.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_K$} (g3.west);
+    \draw[pflow] (g1.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_1$} (o1.west);
+    \draw[pflow] (g2.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_2$} (o2.west);
+    \draw[pflow] (g3.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_K$} (o3.west);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,0.10) -- (4.35,-2.75) -- (4.35,0.70)  -| (g1.south);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,0.00) -- (4.45,-2.85) -- (4.45,-0.70) -| (g2.south);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,-0.10) -- (4.55,-2.95) -- (4.55,-2.10) -| (g3.south);
+    \node[font=\scriptsize, text=figink, anchor=north] at (3.5,-3.55)
+      {each gate: $a_k = g_k\,\hat a_k + (1 - g_k)\,a_{\mathrm{off},k}$; \; $\mu_k, \sigma_k$ pass through; \; $a_{\mathrm{off},k}$ learned per slot};
+  \end{tikzpicture}
+  \caption{The existence-gated set-prediction head. Each slot regresses a parameter triplet; a shared existence head emits one logit per slot, and the sigmoid gate $g_k = \sigma(e_k)$ blends the regressed amplitude with a learned off state: a closed slot collapses onto the empty target at near-zero loss regardless of its regression, so detection uncertainty flows through the logit instead of dimming amplitudes.}
+  \label{fig:head}
+\end{figure}
 
 \subsection{Slot collapse under ground-truth imbalance}
 \label{sec:method_collapse}
@@ -26,6 +113,6 @@ How much spatial context should the network see? The supervision fixes the answe
 \end{equation}
 estimated over the $w \times w$ window $B(x)$ centred on $x$, where $\mathbf{y}(x')$ is the full-stack sample vector. Two consequences follow, independent of scene content. First, the label at $x$ depends on the data only through $B(x)$. Second, two labels share input samples exactly when their windows overlap: at offset $\tau = (\tau_a, \tau_r)$ the shared count is $(w - |\tau_a|)_+ (w - |\tau_r|)_+$, with $(\cdot)_+ = \max(\cdot, 0)$. Under speckle that decorrelates at the resolution-cell scale, the label autocorrelation is therefore triangular per axis, $\rho(\tau) = (1 - |\tau|/w)_+$, and exactly zero beyond $w$: disjoint windows average disjoint, independent samples.
 
-The label is a noisy estimate of the underlying spectrum from a finite look budget, and the reducible part of the held-out error is the distance to that underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are certifiably tied to the same statistic --- looks from pixels whose windows overlap $B(x)$, all of which lie within distance $w$ of $x$. A patch of side $W$ captures $\min(W, 2w)^2$ of that informative square, growing quadratically until $W = 2w$ and exactly flat beyond. The law follows: held-out accuracy improves with patch size up to $W = 2w$ and saturates there, independently of the input stack size $n$.
+The label is a noisy estimate of the underlying spectrum from a finite look budget, and the reducible part of the held-out error is the distance to that underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are certifiably tied to the same statistic --- looks from pixels whose windows overlap $B(x)$, all of which lie within distance $w$ of $x$. The label construction therefore fixes a band for the useful patch. Below $W = w$ the patch withholds inputs that generated its own target: the minimum useful patch is the label window itself. Above it, a patch of side $W$ captures $\min(W, 2w)^2$ of the informative square, growing quadratically until $W = 2w$ and exactly flat beyond: held-out accuracy saturates at twice the window, independently of the input stack size $n$.
 
-The saturation point is what makes the law falsifiable. A sample-budget account of the same question --- the network must repay the label's $w^2 \times N$ look budget with area, giving a floor $W^{*} = w\sqrt{N/n}$ --- predicts a knee that moves with $n$. The patch sweep of Section~\ref{sec:experiments_ablations} discriminates the two accounts and selects the ceiling: the knee stays at the window scale for every stack size tested. Appendix~\ref{app:patch_law} gives the full derivation, the sample-budget alternative and its Fisher-information refinement, and the complete sweep data.
+The saturation point is the law's sharpest prediction: because $\min(W, 2w)^2$ contains no property of the input stack, the knee must sit at the window scale for every stack size. The patch sweep of Section~\ref{sec:experiments_ablations} confirms it: across stacks of $2$--$15$ passes, held-out accuracy saturates at $40$--$56$\,px against the predicted $2w = 40$\,px, flat in $n$ (Figure~\ref{fig:patch_sweep}). Appendix~\ref{app:patch_law} gives the full derivation and the complete sweep data.

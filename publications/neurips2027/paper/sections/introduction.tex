@@ -3,25 +3,75 @@
 
 Estimating, at every pixel of a scene, a small unordered collection of physical components --- how many there are, and the continuous parameters of each --- is a recurring structure in scientific imaging. Multibaseline synthetic aperture radar (SAR) tomography is a canonical instance \citep{reigber2000tomography}. A stack of $N$ coherent passes with distinct orthogonal baselines samples, at every pixel, the Fourier spectrum of the elevation power distribution $p(z)$, and inverting those samples resolves the scatterers layered along elevation within a single resolution cell --- the vertical structure of buildings, vegetation, and terrain. In the parametric regime this work targets, $p(z)$ is modelled as a $K$-component Gaussian mixture, and the quantities of interest are the power, elevation, and vertical spread $(a_k, \mu_k, \sigma_k)$ of each scatterer, where the effective number of scatterers varies from pixel to pixel and is itself unknown.
 
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize]
+    \begin{scope}[on background layer]
+      \fill[oiBlue!4, rounded corners=4pt] (-1.15,1.45) rectangle (12.85,4.05);
+      \fill[black!3, rounded corners=4pt]  (-1.15,-1.55) rectangle (12.85,1.25);
+    \end{scope}
+    \node[font=\scriptsize\itshape, text=oiBlue!80!black, anchor=north west] at (-1.05,4.00) {this work --- one forward pass per patch};
+    \node[font=\scriptsize\itshape, text=figsoft, anchor=north west] at (-1.05,1.20) {classical labelling pipeline --- iterative fit restarted at every pixel};
+
+    \foreach \i in {4,3,2,1} \draw[black!35, thin, fill=black!2] (-0.60+0.08*\i, 2.00+0.08*\i) rectangle ++(1.05,1.05);
+    \draw[black!60, thin, fill=white] (-0.60,2.00) rectangle ++(1.05,1.05);
+    \draw[black!8, step=0.21, shift={(-0.60,2.00)}] (0,0) grid (1.05,1.05);
+    \node[align=center, anchor=north] at (0.05,1.90) {reduced stack\\[-1pt]{\tiny $n$ passes, $|A|$ and $\phi$ channels}};
+
+    \draw[pflow] (1.15,2.65) -- (1.75,2.65);
+    \foreach \x/\h in {1.95/1.5, 2.30/1.0, 2.65/1.0, 3.00/1.5}
+      \draw[oiBlue!70, semithick, fill=oiBlue!8, rounded corners=1pt] (\x,2.65-\h/2) rectangle ++(0.24,\h);
+    \node[align=center, anchor=north] at (2.60,1.90) {fully convolutional\\[-1pt]trunk $f_\theta$};
+
+    \draw[pflow] (3.40,2.65) -- (4.00,2.65);
+    \node[pboxaccent, minimum height=11mm, anchor=west] (head) at (4.00,2.65) {existence-gated\\slot head\\[-1pt]{\tiny $g_k = \sigma(e_k)$}};
+    \draw[pflow] (head.east) -- ++(0.55,0);
+
+    \foreach \i in {5,4,3,2,1} \draw[black!35, thin, fill=black!2] (6.55+0.08*\i, 1.97+0.08*\i) rectangle ++(1.05,1.05);
+    \draw[black!60, thin, fill=white] (6.55,1.97) rectangle ++(1.05,1.05);
+    \draw[black!8, step=0.21, shift={(6.55,1.97)}] (0,0) grid (1.05,1.05);
+    \node[align=center, anchor=south] (outmaps) at (7.45,3.50) {$3K$ parameter maps\\[-1pt]{\tiny $(a_k, \mu_k, \sigma_k)$ per pixel}};
+
+    \draw[black!45, thin] (9.05,1.97) -- (12.35,1.97);
+    \draw[oiVermilion, semithick, domain=9.15:12.25, samples=90, smooth]
+      plot (\x,{1.97+0.85*exp(-(\x-10.05)^2/0.045)+0.55*exp(-(\x-11.35)^2/0.075)});
+    \node[align=center, anchor=north] at (10.70,1.87) {elevation spectrum $p(z)$\\[-1pt]{\tiny mixture of $K$ Gaussians}};
+    \draw[pflow] (8.55,2.65) -- (9.15,2.65);
+
+    \foreach \i in {8,7,6,5,4,3,2,1} \draw[black!35, thin, fill=black!2] (-0.68+0.055*\i, -0.90+0.055*\i) rectangle ++(0.95,0.95);
+    \draw[black!60, thin, fill=white] (-0.68,-0.90) rectangle ++(0.95,0.95);
+    \node[align=center, anchor=north] at (-0.05,-1.00) {full stack\\[-1pt]{\tiny all passes}};
+
+    \draw[pflow] (0.85,-0.20) -- (1.45,-0.20);
+    \node[pbox, minimum height=9mm, anchor=west] (cov) at (1.45,-0.20) {windowed covariance\\$\hat{\mathbf{R}}(x)$, $w \times w$};
+    \draw[pflow] (cov.east) -- ++(0.45,0);
+    \node[pbox, minimum height=9mm, anchor=west] (scan) at (4.45,-0.20) {spectral scan\\(Capon)};
+    \draw[pflow] (scan.east) -- ++(0.45,0);
+    \node[pbox, minimum height=9mm, anchor=west] (fit) at (6.70,-0.20) {per-pixel mixture fit\\(nonlinear least squares)};
+    \draw[pflow] (fit.east) -- ++(0.45,0);
+    \node[pbox, minimum height=9mm, anchor=west] (lbl) at (10.20,-0.20) {labels\\$(a_k, \mu_k, \sigma_k)$};
+
+    \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]}, oiVermilion, densely dashed, semithick]
+      (lbl.north) -- ++(0,0.85) -- (8.85,1.10) -- (8.85,2.30) -- (8.10,2.30);
+    \node[font=\tiny, text=oiVermilion, anchor=north] at (9.95,1.04) {matched set loss (training)};
+  \end{tikzpicture}
+  \caption{A fully convolutional network with an existence-gated set-prediction head maps a reduced multibaseline stack to all $3K$ Gaussian-mixture parameter maps in one forward pass, trained with a matched set loss against labels that the classical pipeline --- windowed covariance, spectral scan, per-pixel iterative fit --- extracts from the full stack.}
+  \label{fig:teaser}
+\end{figure}
+
 The classical route is spectral estimation followed by independent per-pixel model fitting: estimate the covariance over a local $w \times w$ window, scan a spectral estimator --- beamforming, Capon, or sparsity-regularized inversion \citep{zhu2010tomosar} --- along elevation, and fit the mixture by nonlinear least squares at every pixel. The result is accurate but structurally wasteful. The iterative fit restarts from scratch at each of the millions of pixels of a scene; it is sensitive to initialization where scatterers are closely spaced; and it treats neighbouring pixels as unrelated problems even though the covariance estimates that feed them share most of their samples. Amortized inversion \citep{gregor2010lista, yang2016admmnet} removes the first cost by construction: a fully convolutional network maps the input stack to all $3K$ parameter maps in a single forward pass, and spatial context enters through the receptive field rather than through hand-designed windows. The formulation also decouples the input from the supervision. We train the network to reproduce, from a reduced five-pass subset of the stack, the parameters the classical pipeline extracts from the full stack, so amortization doubles as acquisition-budget reduction.
 
 Amortizing the fit, however, changes the output type. A pixel's scatterers form a \emph{set}: any permutation of the $K$ predicted components composes the same spectrum, yet a fixed-slot regression loss charges each slot against a fixed target, so a network can reconstruct the profile exactly and still receive gradients that drag every slot toward a different scatterer. Set prediction resolves this with permutation-invariant training, matching predictions to targets by bipartite assignment \citep{kuhn1955hungarian, zhang2019dspn, carion2020detr} or by iterative attention over slots \citep{locatello2020slot}. That literature, however, operates in an image-level regime: tens of slots, one set per image, and broadly balanced cardinalities. Dense parameter retrieval pushes set prediction into a different corner of the problem space --- one set per pixel, millions of sets per scene, continuous physical targets, and extreme cardinality imbalance: in our data roughly three quarters of all pixels contain no scatterer, and a two-component model already covers $93.9\%$ of the occupied ones. Under this imbalance, na\"ive slot regression does not merely converge slowly. Its surplus slots collapse to zero output, and we show that this collapse is a minimum of the training loss rather than an optimization failure.
 
 We address this regime with an \emph{existence-gated} set prediction head. Each slot emits a parameter triplet together with an existence logit; the predicted spectrum is the composition of the slot Gaussians weighted by their gate activations; and a matched presence loss supervises the logits directly. The gate separates \emph{whether} a scatterer exists from \emph{how bright} it is: under a per-slot regression loss, the loss-optimal response to detection uncertainty is to shrink amplitudes toward the conditional mean, which --- with most of the label mass at zero --- dims uncertain detections below the activity threshold, so detections are lost to dimming. The gate reroutes that uncertainty into a dedicated coordinate whose supervision is informative exactly where the regression signal is silent (Section~\ref{sec:method_collapse}). Figure~\ref{fig:teaser} summarizes the approach.
 
-We complement the architecture with an analysis of how much spatial context the estimator can use. Because the supervising labels are not point observations but statistics estimated over a $w \times w$ window, the labels of two pixels share input samples exactly when their windows overlap, that is, within a distance $w$. A patch centred on a pixel therefore captures every label-correlated neighbour once its side reaches $2w$, and additional context past that scale cannot add information about the label --- a ceiling that is independent of the number of passes in the stack. A patch-size sweep across track counts confirms the law: the accuracy knee sits at the predicted scale for every stack size tested (Section~\ref{sec:method_patch}).
+We complement the architecture with an analysis of how much spatial context the estimator can use. Because the supervising labels are not point observations but statistics estimated over a $w \times w$ window, the labels of two pixels share input samples exactly when their windows overlap, that is, within a distance $w$. The label construction therefore brackets the useful patch from both sides: the patch must span at least the label's own window $w$, and it captures every label-correlated neighbour once its side reaches $2w$ --- past that scale additional context cannot add information about the label, whatever the number of passes in the stack. A patch-size sweep across track counts confirms the law: the accuracy knee sits at the window scale for every stack size tested (Section~\ref{sec:method_patch}).
 
 Our contributions are:
 \begin{itemize}
   \item \textbf{Formulation and architecture.} We cast dense tomographic parameter retrieval as per-pixel set prediction of continuous physical parameters and instantiate it with an existence-gated Gaussian mixture head on a fully convolutional trunk, trained with matched presence supervision (Section~\ref{sec:method_setpred}).
   \item \textbf{Slot collapse, mechanism and remedy.} We characterize slot collapse under ground-truth cardinality imbalance as a loss optimum, trace it to conditional-mean shrinkage past the activity threshold, and attribute the remedy by controlled head~$\times$~matching factorials: the gain comes from the gated head, not the bipartite matching --- under permutation-invariant losses the matcher never enters the gradient and paired runs are bit-identical (Sections~\ref{sec:method_collapse} and~\ref{sec:experiments_ablations}).
-  \item \textbf{A context-budget law.} For estimators supervised by window-estimated labels we derive a patch-size ceiling at twice the label window, and verify it empirically: across stacks of $2$--$15$ passes the accuracy knee stays at the predicted scale, flat in the number of passes (Sections~\ref{sec:method_patch} and~\ref{sec:experiments_ablations}).
+  \item \textbf{A context-budget law.} For estimators supervised by window-estimated labels we derive the useful-context band --- at least the label window $w$, at most twice the window --- and verify the ceiling empirically: across stacks of $2$--$15$ passes the accuracy knee stays at the window scale, flat in the number of passes (Sections~\ref{sec:method_patch} and~\ref{sec:experiments_ablations}).
   \item \textbf{A capacity-matched benchmark.} We evaluate $17$ backbone families under $8$ training objectives, two heads, and two assignment schemes --- $145$ trained configurations, each width-scaled to ${\approx}30$\,M parameters under an identical recipe. Gated set prediction occupies the top eight ranks of the composite score; against the UNet with parameter-space MSE reference, the best configuration improves curve $R^2$ by $0.17$, per-pixel $R^2$ by $0.23$, and matched detection F1 by $0.10$ (Section~\ref{sec:experiments_main}). \todo{Refresh all headline numbers from the frozen multi-seed benchmark (mean $\pm$ std) before submission.}
 \end{itemize}
 
-\begin{figure}[t]
-  \centering
-  \todo{Figure 1 teaser: reduced five-pass stack (amplitude and interferometric-phase channels) $\to$ fully convolutional trunk $\to$ existence-gated slot head $\to$ per-pixel Gaussian-mixture parameter maps; contrast one forward pass against the classical per-pixel loop (windowed covariance $\to$ spectral scan $\to$ iterative fit), which also manufactures the training labels from the full stack.}
-  \caption{\todo{One-sentence summary of the method readable without the main text.}}
-  \label{fig:teaser}
-\end{figure}
