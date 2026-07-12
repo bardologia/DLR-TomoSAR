@@ -15,3 +15,6 @@ __pycache__/
 node_modules/
 package-lock.json
 .pytest_cache/
+
+publications/**/build/
+publications/**/*.pdf
