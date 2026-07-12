@@ -219,7 +219,17 @@ meeting the independence of Eq.~(\ref{eq:independence}) at the boundary. Figure~
   \label{fig:corr_law}
 \end{figure}
 
-The law follows from the held-out risk. Writing $\ell(x) = \phi(\mathbf{R}(x)) + \varepsilon(x)$, with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, the test loss of a predictor $f$ decomposes as $\E \norm{f - \ell}^2 = \E \norm{f - \phi(\mathbf{R})}^2 + \E \norm{\varepsilon}^2$: the reducible part is the distance to the underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are informative about $\mathbf{R}(x)$, and the label construction certifies which looks those are. Pixels within $w$ of $x$ are anchored to the label through shared samples (Eq.~\ref{eq:shared_private}): their looks sample the same $\mathbf{R}(x)$, averaging away $\varepsilon$. Pixels farther than $w$ are exactly independent of every sample that formed $\ell(x)$; any contribution from them rests on extrapolating homogeneity across windows that share no data --- a scene prior the label construction neither uses nor certifies.
+The law follows from the held-out risk. The label is a noisy realisation of the underlying statistic,
+\begin{equation}
+  \ell(x) \;=\; \phi\bigl(\mathbf{R}(x)\bigr) + \varepsilon(x),
+  \label{eq:label_noise}
+\end{equation}
+with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the test loss of a predictor $f$ splits along the same line:
+\begin{equation}
+  \E \norm{f - \ell}^2 \;=\; \E \norm{f - \phi(\mathbf{R})}^2 \;+\; \E \norm{\varepsilon}^2.
+  \label{eq:risk_decomp}
+\end{equation}
+The second term is beyond any predictor's reach; the reducible part is the distance to the underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are informative about $\mathbf{R}(x)$, and the label construction certifies which looks those are. Pixels within $w$ of $x$ are anchored to the label through shared samples (Eq.~\ref{eq:shared_private}): their looks sample the same $\mathbf{R}(x)$, averaging away $\varepsilon$. Pixels farther than $w$ are exactly independent of every sample that formed $\ell(x)$; any contribution from them rests on extrapolating homogeneity across windows that share no data --- a scene prior the label construction neither uses nor certifies.
 
 The certified context is therefore the square of side $2w$ centred on $x$, and a patch of side $W$ captures
 \begin{equation}
