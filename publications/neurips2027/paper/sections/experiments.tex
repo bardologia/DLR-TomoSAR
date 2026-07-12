@@ -16,7 +16,83 @@
 \subsection{Ablations}
 \label{sec:experiments_ablations}
 
-\todo{Presence-loss levers and matching axis; head and backbone families; loss variants; patch-size sweep against the predicted optimum.}
+\todo{Presence-loss levers and matching axis; head and backbone families; loss variants.}
+
+\paragraph{Patch-size sweep.}
+One model was trained per (patch side, stack size) cell on the grid $W \in \{16, 24, \ldots, 72\}$ and $n \in \{2, 3, 5, 9, 15\}$, with baseline-ordered even-spread pass selection at each $n$. The backbone is a three-level U-Net, so every grid size is admissible and the ceiling $2w = 40$\,px lies on the grid. The pixel budget per epoch is constant across patch sizes --- larger patches see no more data --- which removes the compute penalty of large patches by construction: the error curves saturate rather than turn upward, the argmin is censored by noise and the grid edge, and the knee is the meaningful statistic. Table~\ref{tab:patch_sweep} reports the held-out test loss; Figure~\ref{fig:patch_sweep} plots the curves.
+
+\begin{table}[t]
+  \centering
+  \caption{Patch-size sweep: held-out test loss per patch side $W$ and input stack size $n$ (three-level U-Net, even-spread pass selection, constant pixel budget per epoch, single seed). Bold marks each column's minimum. The bottom rows compare the observed knee$_{80}$ --- the smallest patch capturing at least $80\%$ of the column's total loss reduction --- with the predicted ceiling: every column saturates at the window scale.}
+  \label{tab:patch_sweep}
+  \begin{tabular}{@{}l ccccc@{}}
+    \toprule
+    & \multicolumn{5}{c}{input stack size $n$} \\
+    \cmidrule(l){2-6}
+    patch side $W$ (px) & 2 & 3 & 5 & 9 & 15 \\
+    \midrule
+    16 & 0.1742 & 0.1489 & 0.1384 & 0.1275 & 0.1129 \\
+    24 & 0.1949 & 0.1725 & 0.1588 & 0.1477 & 0.1219 \\
+    32 & 0.1619 & 0.1390 & 0.1242 & 0.1187 & 0.1031 \\
+    40 & 0.1544 & 0.1316 & \textbf{0.1200} & 0.1109 & 0.1029 \\
+    48 & 0.1544 & 0.1266 & 0.1263 & \textbf{0.1078} & 0.0995 \\
+    56 & \textbf{0.1485} & 0.1274 & 0.1209 & 0.1096 & 0.1001 \\
+    64 & 0.1574 & \textbf{0.1259} & 0.1210 & 0.1085 & \textbf{0.0993} \\
+    72 & 0.1521 & 0.1294 & 0.1206 & 0.1110 & 0.1008 \\
+    \midrule
+    knee$_{80}$ observed (px)      & 56 & 48 & 40 & 40 & 48 \\
+    ceiling $2w$ (px)              & 40 & 40 & 40 & 40 & 40 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.78\textwidth, height=0.46\textwidth,
+      xlabel={patch side $W$ (px)},
+      ylabel={held-out test loss},
+      xmin=13, xmax=75, ymin=0.093, ymax=0.202,
+      xtick={16,24,32,40,48,56,64,72},
+      tick label style={font=\scriptsize},
+      label style={font=\small},
+      legend style={font=\scriptsize, draw=black!30, fill=white, at={(0.97,0.97)}, anchor=north east},
+      axis line style={black!60},
+    ]
+      \addplot[oiBlue, semithick, mark=*, mark size=1.5pt] coordinates
+        {(16,0.1742) (24,0.1949) (32,0.1619) (40,0.1544) (48,0.1544) (56,0.1485) (64,0.1574) (72,0.1521)};
+      \addlegendentry{$n = 2$}
+      \addplot[oiVermilion, semithick, mark=square*, mark size=1.4pt] coordinates
+        {(16,0.1489) (24,0.1725) (32,0.1390) (40,0.1316) (48,0.1266) (56,0.1274) (64,0.1259) (72,0.1294)};
+      \addlegendentry{$n = 3$}
+      \addplot[oiGreen, semithick, mark=triangle*, mark size=1.8pt] coordinates
+        {(16,0.1384) (24,0.1588) (32,0.1242) (40,0.1200) (48,0.1263) (56,0.1209) (64,0.1210) (72,0.1206)};
+      \addlegendentry{$n = 5$}
+      \addplot[oiOrange, semithick, mark=diamond*, mark size=1.8pt] coordinates
+        {(16,0.1275) (24,0.1477) (32,0.1187) (40,0.1109) (48,0.1078) (56,0.1096) (64,0.1085) (72,0.1110)};
+      \addlegendentry{$n = 9$}
+      \addplot[oiPurple, semithick, mark=pentagon*, mark size=1.8pt] coordinates
+        {(16,0.1129) (24,0.1219) (32,0.1031) (40,0.1029) (48,0.0995) (56,0.1001) (64,0.0993) (72,0.1008)};
+      \addlegendentry{$n = 15$}
+      \draw[black!55, dashed] (axis cs:20,0.093) -- (axis cs:20,0.202);
+      \draw[black!85, dashed, semithick] (axis cs:40,0.093) -- (axis cs:40,0.202);
+      \node[font=\scriptsize, anchor=south west, text=black!70] at (axis cs:20.4,0.0945) {$w$};
+      \node[font=\scriptsize, anchor=south west, text=black!85] at (axis cs:40.4,0.0945) {$2w$};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Patch sweep, plotted from Table~\ref{tab:patch_sweep}: held-out test loss versus patch side for five input stack sizes. Every curve completes its descent at the window scale and is flat past the $2w$ ceiling; more passes lower the whole curve without moving where it saturates.}
+  \label{fig:patch_sweep}
+\end{figure}
+
+Three observations carry the result.
+\begin{itemize}
+  \item The knee sits in the band $40$--$56$\,px --- at the ceiling or within two grid steps above it --- for every stack size, with no trend in $n$: where context saturates is a property of the label window, not of the input stack.
+  \item The ceiling already captures most of each curve: $77, 75, 100, 84, 73\%$ of the total gain is in hand at $W = 2w = 40$\,px for $n = 2, 3, 5, 9, 15$, and no curve improves by more than $0.006$ loss anywhere past it --- the flat tails to $72$\,px are the predicted plateau.
+  \item More passes lower the entire curve without moving the knee: stack size buys accuracy, not context reach --- the qualitative content of Eq.~(\ref{eq:ceiling}).
+\end{itemize}
+
+Two caveats are visible in the table. Every curve rises from $16$ to $24$\,px before its main descent ($+0.009$ to $+0.024$ loss); the rise is shared across all five stack sizes, so it is not seed noise, and its cause is open. And the sweep is single-seed: tail wiggles of $\pm 0.005$ past the knee are within run-to-run noise, which is why knee$_{80}$ rather than the argmin carries the conclusion. \todo{Repeat the sweep over $\ge 3$ seeds and report mean $\pm$ std per cell.}
 
 \subsection{Analysis}
 \label{sec:experiments_analysis}

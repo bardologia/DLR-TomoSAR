@@ -106,13 +106,89 @@
 \subsection{Context budget and patch size}
 \label{sec:method_patch}
 
-How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is a deterministic functional --- spectral scan and mixture fit --- of the sample covariance
+How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is $\ell(x) = \phi\bigl(\hat{\mathbf{R}}(x)\bigr)$, where $\phi$ denotes the deterministic spectral scan and mixture fit and
 \begin{equation}
-  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}},
+  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}}
   \label{eq:label_cov}
 \end{equation}
-estimated over the $w \times w$ window $B(x)$ centred on $x$, where $\mathbf{y}(x')$ is the full-stack sample vector. Two consequences follow, independent of scene content. First, the label at $x$ depends on the data only through $B(x)$. Second, two labels share input samples exactly when their windows overlap: at offset $\tau = (\tau_a, \tau_r)$ the shared count is $(w - |\tau_a|)_+ (w - |\tau_r|)_+$, with $(\cdot)_+ = \max(\cdot, 0)$. Under speckle that decorrelates at the resolution-cell scale, the label autocorrelation is therefore triangular per axis, $\rho(\tau) = (1 - |\tau|/w)_+$, and exactly zero beyond $w$: disjoint windows average disjoint, independent samples.
+is the sample covariance over the $w \times w$ window $B(x)$ centred on $x$ ($w = 20$\,px in production), with $\mathbf{y}(x')$ the full-stack sample vector. The analysis rests on two assumptions the labelling pipeline already makes. Speckle decorrelates at the resolution-cell scale, so sample vectors at distinct pixels are independent. And the covariance is approximately constant at the window scale: the boxcar average of Eq.~(\ref{eq:label_cov}) is consistent only where $\mathbf{R}$ is locally constant, and $w$ is chosen as the homogeneity scale of the scene.
 
-The label is a noisy estimate of the underlying spectrum from a finite look budget, and the reducible part of the held-out error is the distance to that underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are certifiably tied to the same statistic --- looks from pixels whose windows overlap $B(x)$, all of which lie within distance $w$ of $x$. The label construction therefore fixes a band for the useful patch. Below $W = w$ the patch withholds inputs that generated its own target: the minimum useful patch is the label window itself. Above it, a patch of side $W$ captures $\min(W, 2w)^2$ of the informative square, growing quadratically until $W = 2w$ and exactly flat beyond: held-out accuracy saturates at twice the window, independently of the input stack size $n$.
+Two consequences are exact. The label at $x$ is a function of the samples in $B(x)$ alone --- nothing outside the window enters it. And labels farther apart than $w$ are independent: their windows are disjoint, and two disjoint boxcar averages of independent speckle share nothing. Within $w$, write $x' = x + \tau$ for an offset $\tau = (\tau_a, \tau_r)$ with $|\tau_a|, |\tau_r| < w$; each windowed sum splits over the window intersection into a shared part and a private part:
+\begin{align}
+  w^2\,\hat{\mathbf{R}}(x)  &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}},
+  \label{eq:shared_private}\\
+  w^2\,\hat{\mathbf{R}}(x') &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}.
+\end{align}
+The first sum is common to both estimates and collects
+\begin{equation}
+  \bigl|B(x) \cap B(x')\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
+  \label{eq:shared_count}
+\end{equation}
+looks, with $(\cdot)_+ = \max(\cdot, 0)$; the second sums draw on disjoint pixel sets, private to each window. The private sums are independent of each other and of the shared sum, so every statistical link between two labels flows through the looks their windows share, and the correlation between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x')$ is the shared fraction of the window,
+\begin{equation}
+  \rho(\tau) \;=\; \Bigl(1 - \tfrac{|\tau_a|}{w}\Bigr)_{\!+}\Bigl(1 - \tfrac{|\tau_r|}{w}\Bigr)_{\!+},
+  \label{eq:triangle}
+\end{equation}
+the self-convolution of the boxcar --- triangular per axis, inherited by the labels to first order in the linearisation of $\phi$. Figure~\ref{fig:corr_law} shows the geometry.
 
-The saturation point is the law's sharpest prediction: because $\min(W, 2w)^2$ contains no property of the input stack, the knee must sit at the window scale for every stack size. The patch sweep of Section~\ref{sec:experiments_ablations} confirms it: across stacks of $2$--$15$ passes, held-out accuracy saturates at $40$--$56$\,px against the predicted $2w = 40$\,px, flat in $n$ (Figure~\ref{fig:patch_sweep}). Appendix~\ref{app:patch_law} gives the full derivation and the complete sweep data.
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.56\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize]
+      \draw[black!45, thin, fill=black!2] (0,0) rectangle (5.6,3.9);
+      \draw[black!7, step=0.2] (0,0) grid (5.6,3.9);
+      \draw[figink, dashed, thin] (0.55,0.35) rectangle ++(3.0,3.0);
+      \node[font=\tiny, text=figink, anchor=south west, inner sep=1.5pt] at (0.57,3.37) {$W = 2w$};
+      \fill[oiBlue!25] (1.30,1.10) rectangle (2.20,2.15);
+      \draw[oiGreen, dashed, thin] (0.70,0.65) rectangle ++(1.5,1.5);
+      \fill[oiGreen] (1.39,1.34) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiGreen!70!black, anchor=east, inner sep=1.5pt] at (1.35,1.40) {$x'$};
+      \node[font=\tiny, text=oiGreen!70!black, anchor=north west, inner sep=1.5pt] at (0.72,0.63) {$B(x')$};
+      \draw[oiBlue, dashed, thin] (1.30,1.10) rectangle ++(1.5,1.5);
+      \fill[oiBlue] (1.99,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiBlue, anchor=west, inner sep=1.5pt] at (2.15,1.85) {$x$};
+      \node[font=\tiny, text=oiBlue, anchor=south west, inner sep=1.5pt] at (1.32,2.62) {$B(x)$};
+      \draw[black!50, dashed, thin] (3.60,1.10) rectangle ++(1.5,1.5);
+      \fill[black!50] (4.29,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=black!60, anchor=west, inner sep=1.5pt] at (4.45,1.85) {$x''$};
+      \node[font=\tiny, text=black!60, anchor=south west, inner sep=1.5pt] at (3.62,2.62) {$B(x'')$};
+      \node[font=\tiny, text=oiBlue!80!black, anchor=north west, align=left, inner sep=1.5pt] at (0.80,0.30) {shared looks};
+      \draw[oiBlue!70, thin] (1.55,0.32) -- (1.75,1.30);
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_grid}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.40\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize]
+      \draw[-{Stealth[length=1.5mm]}, black!60] (-2.9,0) -- (2.9,0) node[right, font=\tiny]{$\tau$};
+      \draw[-{Stealth[length=1.5mm]}, black!60] (0,-0.05) -- (0,2.05) node[left, font=\tiny]{$\rho(\tau)$};
+      \draw[black!35, thin, dashed] (-0.05,1.6) -- (0.05,1.6);
+      \node[font=\tiny, anchor=east] at (-0.08,1.6) {$1$};
+      \draw[oiBlue, thick] (-2.2,0) -- (0,1.6) -- (2.2,0);
+      \draw[black!45, thin] (-2.2,0) -- (-2.2,-0.07);
+      \draw[black!45, thin] (2.2,0) -- (2.2,-0.07);
+      \node[font=\tiny, anchor=north] at (-2.2,-0.09) {$-w$};
+      \node[font=\tiny, anchor=north] at (2.2,-0.09) {$w$};
+      \draw[|-|, black!70] (-2.2,-0.72) -- (2.2,-0.72);
+      \node[font=\tiny, text=figink, anchor=north] at (0,-0.80) {$W = 2w$};
+      \node[coordinate] at (0,-1.35) {};
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_triangle}
+  \end{subfigure}
+  \caption{The label correlation law. (a)~Two labels are linked exactly through the looks their windows share (shaded): $x'$ closer than $w$ overlaps $B(x)$, while $B(x'')$ is disjoint and its label independent. The centred patch that contains every overlapping window spans $W = 2w$. (b)~Per axis, the shared fraction of Eq.~(\ref{eq:shared_count}) is the triangle $\rho(\tau)$, supported on $\pm w$; the patch spanning the whole triangle is $2w$.}
+  \label{fig:corr_law}
+\end{figure}
+
+The law follows from the held-out risk. Writing $\ell(x) = \phi(\mathbf{R}(x)) + \varepsilon(x)$, with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, the test loss of a predictor $f$ decomposes as $\E \norm{f - \ell}^2 = \E \norm{f - \phi(\mathbf{R})}^2 + \E \norm{\varepsilon}^2$: the reducible part is the distance to the underlying statistic, not to the label realisation. A larger patch lowers it only by supplying additional looks that are informative about $\mathbf{R}(x)$, and the label construction certifies which looks those are. Pixels within $w$ of $x$ are anchored to the label through shared samples (Eq.~\ref{eq:shared_private}): their looks sample the same $\mathbf{R}(x)$, averaging away $\varepsilon$. Pixels farther than $w$ are exactly independent of every sample that formed $\ell(x)$; any contribution from them rests on extrapolating homogeneity across windows that share no data --- a scene prior the label construction neither uses nor certifies.
+
+The certified context is therefore the square of side $2w$ centred on $x$, and a patch of side $W$ captures
+\begin{equation}
+  L(W) \;=\; \min(W, 2w)^2
+  \label{eq:ceiling}
+\end{equation}
+of it: the pooled look count grows quadratically until $W = 2w$ and is exactly flat beyond. The floor is immediate --- a patch narrower than the window withholds inputs that generated its own target, so the minimum useful patch is $W = w$, at which point the patch holds exactly the label's own $w^2$ looks. The useful patch is the band $w \le W \le 2w$, and the upper end carries the law's sharpest prediction: since Eq.~(\ref{eq:ceiling}) contains no property of the input stack, held-out accuracy must saturate at the window scale for every stack size $n$. The sweep of Section~\ref{sec:experiments_ablations} confirms it (Table~\ref{tab:patch_sweep}, Figure~\ref{fig:patch_sweep}).
+
+Three remarks bound the law's scope. Organised structure larger than a resolution cell --- building faces, slopes --- correlates samples across disjoint windows and can only soften the ceiling upward: it delays saturation, it cannot create an optimum below $2w$. The law bounds \emph{certified} information, not what priors can add: a model may exploit scene regularities beyond $2w$, they are simply not guaranteed by the label construction. And its only constant is the pipeline's own $w$, so it transfers to a new scene by re-reading the window from that scene's configuration --- whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).
