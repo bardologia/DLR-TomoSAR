@@ -270,6 +270,7 @@ class Report:
         self._subsection_index = 3
 
         out += self._build_active_count_headline()
+        out += self._build_param_population_headline()
         out += self._build_matched_headline()
         out += self._build_slot_organization_headline()
         out += self._build_tracks_table()
@@ -324,6 +325,44 @@ class Report:
 
         out.append(self._three_col_table(agree_rows, header=("Metric", "Fraction", "Description")))
         out.append("")
+
+        return out
+
+    def _build_param_population_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "slot_0_amp_active_gt_mean" not in gm:
+            return []
+
+        n_K = self.run_summary["n_gaussians"]
+        out = [f"\n### {self._next_subsection()} Per-slot parameter statistics (GT vs Pred, by activity)\n"]
+        out.append(
+            "Mean ± std of each Gaussian parameter per GT slot, split by that slot's GT activity "
+            "(amplitude > 1e-3): the active population, its inactive complement, and all pixels. "
+            "GT columns average the ground-truth parameter maps directly, so the inactive rows expose "
+            "the placeholder fill and the active-vs-global gap shows how much it dilutes unconditioned "
+            "averages. Pred columns average the Hungarian-aligned emissions placed in this slot (as in "
+            "§6); pixels where the model emitted no active Gaussian for the slot carry no value and are "
+            "excluded — §2.4 gives the corresponding emission fractions. The inactive Pred rows therefore "
+            "characterise the model's false fires in slots the GT leaves empty.\n"
+        )
+
+        for k in range(n_K):
+            out.append(f"**Slot {k}** (GT-active fraction {self._fmt(gm.get(f'slot_{k}_active_gt_frac', float('nan')))})\n")
+
+            table = MarkdownTable(("Parameter", "Population", "GT mean", "GT std", "Pred mean", "Pred std"))
+            for param, label in (("amp", "a"), ("mu", "μ"), ("sig", "σ")):
+                for scope in ("active", "inactive", "global"):
+                    table.add_row(
+                        label,
+                        scope,
+                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_gt_mean",   float("nan"))),
+                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_gt_std",    float("nan"))),
+                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_pred_mean", float("nan"))),
+                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_pred_std",  float("nan"))),
+                    )
+
+            out += table.render()
+            out.append("")
 
         return out
 
@@ -561,6 +600,7 @@ class Report:
         ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
+        ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
         ("3.8 NN improvement over baseline",                     lambda k: k in Report._IMPROVEMENT_KEYS),
         ("3.7 SSIM summaries (reduced vs GT)",                   lambda k: k.startswith("ssim_red")),
@@ -677,7 +717,7 @@ class Report:
                 "error maps (6.3) and error histograms (6.4) Hungarian-match predicted Gaussians to GT Gaussians "
                 "per pixel before scoring, and the active-count map (6.5) compares counts only. The error "
                 "histograms show the signed per-pixel error, so a shift away from the zero line reads directly "
-                "as parameter bias. For aggregate ordering-independent accuracy see §2.5.\n"
+                "as parameter bias. For aggregate ordering-independent accuracy see §2.6.\n"
             )
             self._section(out, param_groups)
 
@@ -696,7 +736,7 @@ class Report:
                 "Usage shows per-slot activation; the per-slot distributions reveal whether each slot specialises "
                 "in a height (μ), width (σ) or amplitude band; the μ-rank and matched-GT matrices show whether "
                 "the channel index tracks height order (a diagonal means the model spontaneously emits slots "
-                "sorted by μ). See §2.6 for the scalar summaries.\n"
+                "sorted by μ). See §2.7 for the scalar summaries.\n"
             )
             self._numbered_section(out, "6b.", org_groups)
 

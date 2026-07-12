@@ -273,6 +273,56 @@ def _reorder_groups(params: np.ndarray, order: list) -> np.ndarray:
     return grouped[order].reshape(K * 3, *params.shape[1:])
 
 
+def test_param_population_stats_active_inactive_global_means():
+    H, W = 4, 4
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0, :, :2] = 2.0
+    gt[1, :, :2] = 10.0
+    gt[2, :, :2] = 4.0
+
+    pred            = gt.copy()
+    pred[0, :, :2] += 0.5
+    pred[1, :, :2] += 1.0
+
+    res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt)
+    out = Metrics(res, _x_axis(), N_GAUSSIANS)._param_population_stats()
+
+    assert out["slot_0_amp_active_gt_mean"]   == pytest.approx(2.0)
+    assert out["slot_0_amp_inactive_gt_mean"] == pytest.approx(0.0)
+    assert out["slot_0_amp_global_gt_mean"]   == pytest.approx(1.0)
+    assert out["slot_0_mu_active_gt_mean"]    == pytest.approx(10.0)
+    assert out["slot_0_mu_global_gt_mean"]    == pytest.approx(5.0)
+    assert out["slot_0_sig_active_gt_std"]    == pytest.approx(0.0)
+
+    assert out["slot_0_amp_active_pred_mean"] == pytest.approx(2.5)
+    assert out["slot_0_mu_active_pred_mean"]  == pytest.approx(11.0)
+    assert np.isnan(out["slot_0_amp_inactive_pred_mean"])
+    assert out["slot_0_amp_global_pred_mean"] == pytest.approx(2.5)
+
+    assert np.isnan(out["slot_1_amp_active_gt_mean"])
+    assert out["slot_1_amp_global_gt_mean"] == pytest.approx(0.0)
+
+
+def test_param_population_stats_pred_is_permutation_invariant():
+    H, W = 5, 5
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0], gt[1], gt[2] = 1.0, -10.0, 3.0
+    gt[3], gt[4], gt[5] = 1.0,  10.0, 4.0
+    gt[6], gt[7], gt[8] = 1.0,  40.0, 5.0
+
+    order = [2, 0, 1, 3, 4]
+    pred  = _reorder_groups(gt, order)
+
+    res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt)
+    out = Metrics(res, _x_axis(), N_GAUSSIANS)._param_population_stats()
+
+    for k in range(3):
+        for param in ("amp", "mu", "sig"):
+            assert out[f"slot_{k}_{param}_active_pred_mean"] == pytest.approx(out[f"slot_{k}_{param}_active_gt_mean"])
+
+
 def _matched(pred, gt, n_gaussians=N_GAUSSIANS, tol=5.0):
     res = _make_result(np.zeros((N_ELEV, *pred.shape[1:]), np.float32), np.zeros((N_ELEV, *pred.shape[1:]), np.float32), params_pred=pred, params_gt=gt)
     return Metrics(res, _x_axis(), n_gaussians)._matched_gaussian_metrics(match_tol=tol)

@@ -316,6 +316,33 @@ class Metrics:
 
         return out
 
+    def _param_population_stats(self) -> Dict[str, float]:
+        pp      = self.result.params_pred
+        pg      = self.result.params_gt
+        n_K     = self.n_gaussians
+        aligned = GaussianMatcher().aligned_prediction(pp, pg, n_K)
+        out: Dict[str, float] = {}
+
+        for k in range(n_K):
+            gt_amp   = pg[3 * k].reshape(-1)
+            finite   = np.isfinite(gt_amp)
+            active   = finite & (gt_amp > ParamMatcher.ACTIVE_AMP_THR)
+            inactive = finite & ~active
+            scopes   = (("active", active), ("inactive", inactive), ("global", finite))
+
+            for j, param in enumerate(("amp", "mu", "sig")):
+                ch        = 3 * k + j
+                gt_flat   = pg     [ch].reshape(-1)
+                pred_flat = aligned[ch].reshape(-1)
+
+                for scope, mask in scopes:
+                    for source, values in (("gt", gt_flat), ("pred", pred_flat)):
+                        vals = values[mask & np.isfinite(values)]
+                        out[f"slot_{k}_{param}_{scope}_{source}_mean"] = float(vals.mean(dtype=np.float64)) if vals.size else float("nan")
+                        out[f"slot_{k}_{param}_{scope}_{source}_std"]  = float(vals.std(dtype=np.float64))  if vals.size else float("nan")
+
+        return out
+
     def _matched_gaussian_metrics(self, match_tol: float = 5.0) -> Dict[str, float]:
         pp  = self.result.params_pred
         pg  = self.result.params_gt
@@ -473,6 +500,7 @@ class Metrics:
 
         if param_space:
             metrics.update(self._active_count_stats())
+            metrics.update(self._param_population_stats())
             metrics.update(self._matched_gaussian_metrics(match_tol=match_tol))
             metrics.update(self._slot_organization_stats())
 

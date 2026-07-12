@@ -167,6 +167,29 @@ def test_report_includes_slot_occupancy_section(tmp_path):
     assert "3.9 Slot occupancy & active count" in "\n".join(lines)
 
 
+def test_report_includes_param_population_section(tmp_path):
+    gm = _global_metrics()
+
+    report = Report(
+        output_dir       = tmp_path,
+        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
+        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
+        checkpoint_meta  = {"epoch": 0, "best_epoch": 0, "best_val_loss": 1.0},
+        global_metrics   = gm,
+        figure_paths     = {},
+        gif_paths        = {},
+        report_path      = tmp_path / "report.md",
+    )
+
+    text  = report.assemble().read_text(encoding="utf-8")
+    lines = report._build_full_metrics()
+
+    assert "slot_0_amp_active_gt_mean" in gm
+    assert "Per-slot parameter statistics (GT vs Pred, by activity)" in text
+    assert "GT-active fraction" in text
+    assert "3.9b Per-slot parameter statistics by activity" in "\n".join(lines)
+
+
 def _metric_group(key: str) -> str:
     return next(title for title, match in Report._METRIC_TAXONOMY if match(key))
 
@@ -183,7 +206,10 @@ def test_report_metric_taxonomy_routes_keys():
     assert _metric_group("active_frac_gt")           == "3.9 Slot occupancy & active count"
     assert _metric_group("count_exact_frac")         == "3.9 Slot occupancy & active count"
     assert _metric_group("slot_0_active_pred_frac")  == "3.9 Slot occupancy & active count"
-    assert _metric_group("slot_0_mu_pred_mean")      == "3.2 Curve-level (GT)"
+    assert _metric_group("slot_0_mu_active_pred_mean")  == "3.9b Per-slot parameter statistics by activity"
+    assert _metric_group("slot_0_amp_inactive_gt_std")  == "3.9b Per-slot parameter statistics by activity"
+    assert _metric_group("slot_0_sig_global_gt_mean")   == "3.9b Per-slot parameter statistics by activity"
+    assert _metric_group("slot_usage_entropy")       == "3.2 Curve-level (GT)"
     assert _metric_group("matched_mu_mae")           == "3.10 Matched Gaussian errors (permutation-invariant)"
     assert _metric_group("physics_valid_fraction")   == "3.11 Interferometric data consistency"
     assert _metric_group("phase_agreement_gt_mean")  == "3.11 Interferometric data consistency"
