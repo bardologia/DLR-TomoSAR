@@ -5,42 +5,16 @@ import re
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-import numpy as np
 import torch
 
 from models                                import BACKBONE_HEADS
 from pipelines.shared.model.model_builder  import ModelBuilder
 from pipelines.shared.training.seed_sweep import SeedSet
 from tools.data.io               import FileIO
-from tools.metrics.scoring       import FiniteScalar
 from tools.monitoring.logger     import Logger
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
 _CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
-
-
-class SeedAggregation:
-    @staticmethod
-    def mean_std(values: list[float]) -> tuple[float, float | None]:
-        mean = float(np.mean(values))
-        std  = float(np.std(values, ddof=1)) if len(values) > 1 else None
-
-        return mean, std
-
-    @staticmethod
-    def aggregate(dicts: list[dict], keys: list[str]) -> tuple[dict, dict]:
-        means, stds = {}, {}
-
-        for key in keys:
-            values = [FiniteScalar.coerce(d.get(key)) for d in dicts]
-            values = [value for value in values if value is not None]
-
-            if not values:
-                continue
-
-            means[key], stds[key] = SeedAggregation.mean_std(values)
-
-        return means, stds
 
 
 @dataclass

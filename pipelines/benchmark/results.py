@@ -5,8 +5,9 @@ from pathlib     import Path
 
 import numpy as np
 
-from pipelines.shared.comparison.trial_collection import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.comparison.trial_collection import TrialCollector, TrialRecord
 from pipelines.shared.training.seed_sweep        import SeedSet
+from tools.metrics.scoring              import SeedAggregation
 from tools.monitoring.logger            import Logger
 
 

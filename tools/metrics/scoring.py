@@ -25,6 +25,30 @@ class FiniteScalar:
         return None
 
 
+class SeedAggregation:
+    @staticmethod
+    def mean_std(values: list[float]) -> tuple[float, float | None]:
+        mean = float(np.mean(values))
+        std  = float(np.std(values, ddof=1)) if len(values) > 1 else None
+
+        return mean, std
+
+    @staticmethod
+    def aggregate(dicts: list[dict], keys: list[str]) -> tuple[dict, dict]:
+        means, stds = {}, {}
+
+        for key in keys:
+            values = [FiniteScalar.coerce(d.get(key)) for d in dicts]
+            values = [value for value in values if value is not None]
+
+            if not values:
+                continue
+
+            means[key], stds[key] = SeedAggregation.mean_std(values)
+
+        return means, stds
+
+
 class R2:
 
     EPSILON = 1e-12

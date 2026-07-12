@@ -6,10 +6,11 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.shared.comparison.trial_collection                 import SeedAggregation, TrialCollector, TrialRecord
+from pipelines.shared.comparison.trial_collection                 import TrialCollector, TrialRecord
 from pipelines.shared.training.worker_base             import WorkerBase
 from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
 from tools.data.io                                      import FileIO
+from tools.metrics.scoring                             import SeedAggregation
 from tools.data.regions                                import SplitRegions
 from tools.monitoring.logger                           import Logger
 
