@@ -21,6 +21,7 @@ class InferenceScheduler:
         self.run_type     = run_type
         self.runs_dir     = Path(config.runs_dir)
         self.work_dir     = Path("logs") / "inference" / run_type / RunTag.now()
+        self.run_dirs     = []
 
     def _root(self, logger: Logger) -> Path | None:
         if self.runs_dir.is_dir():
@@ -86,9 +87,10 @@ class InferenceScheduler:
         with Logger(log_dir=str(self.work_dir), name="inference") as logger:
             logger.section("Inference")
 
-            run_dirs    = self._run_dirs(logger)
-            config_path = self._worker_config()
-            jobs        = self._jobs(run_dirs, config_path)
+            run_dirs      = self._run_dirs(logger)
+            self.run_dirs = run_dirs
+            config_path   = self._worker_config()
+            jobs          = self._jobs(run_dirs, config_path)
 
             logger.kv_table({
                 "Run type"  : self.run_type,

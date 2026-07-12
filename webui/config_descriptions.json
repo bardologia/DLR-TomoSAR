@@ -1540,9 +1540,10 @@
       "fields": {
         "runs_dir": "master runs directory scanned recursively for runs to infer, default is _RUNS_ROOT; every run at any depth (a directory holding a meta/ subdir) is discovered and non-backbone runs are skipped by type; a missing directory is skipped with a log warning rather than erroring",
         "run_filter": "run names relative to runs_dir to restrict to (e.g. backbone/run_x), default empty list processes every run found there; an unmatched name raises FileNotFoundError",
+        "seed_group": "treat the selected runs as seed replicas of one training, default false: every run is inferred as normal under one shared inference stamp, then an extra seed-group report with the across-seed mean ± std of every scalar metric is written to <common parent>/inference/<stamp>; needs at least two runs and skips the aggregate (with an error log) if any seed inference fails",
         "gpus": "GPU device indices the GpuQueue cycles jobs across, default [0]; one run is launched per free GPU concurrently until the queue drains",
         "poll_interval_s": "seconds GpuQueue sleeps between reap/launch cycles while jobs are running or queued, default 5.0",
-        "inference": "InferenceConfig used for every worker run, with run_directory replaced per-run, save_cubes=True, cpu_workers=16 and gif_axes=['elevation','range','azimuth']; all other InferenceConfig fields (split, checkpoint_name, save_plots, etc.) keep their normal defaults"
+        "inference": "InferenceConfig used for every worker run, with run_directory replaced per-run, save_cubes=True, cpu_workers=16 and gif_axes=['elevation','range','azimuth']; its output_subdir is honored when set (seed_group stamps it once for all runs), otherwise each run gets its own timestamped inference directory, and all other InferenceConfig fields (split, checkpoint_name, save_plots, etc.) keep their normal defaults"
       }
     },
     "inference/general::InferencePaths": {

@@ -362,8 +362,16 @@ class LaunchLayout:
         "poll_interval_s",
     ]
 
+    INFER_BACKBONE_ESSENTIALS = [
+        "runs_dir",
+        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+        "seed_group",
+        {"path": "gpus", "widget": GPU_MANY},
+        "poll_interval_s",
+    ]
+
     INFER_BACKBONE_LAYOUT = {
-        "essentials": INFER_ESSENTIALS,
+        "essentials": INFER_BACKBONE_ESSENTIALS,
         "sections": [
             {"key": "backbone", "title": "Backbone", "panels": [
                 {"kind": "fields", "title": "Backbone inference", "template": "inference_full", "at": "inference"},

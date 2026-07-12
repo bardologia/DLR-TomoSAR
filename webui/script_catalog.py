@@ -50,7 +50,7 @@ class ScriptCatalog:
         "infer_backbone": {
             "title"     : "Infer Backbone",
             "category"  : "Inference",
-            "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs.",
+            "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs. With seed_group the selected runs are treated as seed replicas of one training and an extra mean ± std seed-group report is written to their common parent.",
         },
         "infer_profile_autoencoder": {
             "title"     : "Infer Profile AE",
