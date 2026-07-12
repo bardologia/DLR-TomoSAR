@@ -15,16 +15,14 @@ class PlotBase:
     PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
     PHASE_LABELS = [r"$-\pi$", r"$-\pi/2$", r"$0$", r"$\pi/2$", r"$\pi$"]
 
+    FULL_WIDTH : float = 5.5
+    HALF_WIDTH : float = 2.65
+
+    OKABE_ITO = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#F0E442", "#000000"]
+
     SCIENTIFIC_RC: dict = {
         "font.family"         : "serif",
         "font.serif"          : ["Times New Roman", "DejaVu Serif"],
-        "mathtext.fontset"    : "dejavuserif",
-        "font.size"           : 11,
-        "axes.titlesize"      : 12,
-        "axes.labelsize"      : 11,
-        "xtick.labelsize"     : 10,
-        "ytick.labelsize"     : 10,
-        "legend.fontsize"     : 9,
         "axes.linewidth"      : 0.8,
         "xtick.direction"     : "in",
         "ytick.direction"     : "in",
@@ -38,16 +36,67 @@ class PlotBase:
         "ps.fonttype"         : 42,
     }
 
+    REPORT_RC: dict = {
+        "font.size"        : 11,
+        "axes.titlesize"   : 12,
+        "axes.labelsize"   : 11,
+        "xtick.labelsize"  : 10,
+        "ytick.labelsize"  : 10,
+        "legend.fontsize"  : 9,
+        "mathtext.fontset" : "dejavuserif",
+        "lines.linewidth"  : 1.5,
+        "lines.markersize" : 6.0,
+    }
+
+    PAPER_RC: dict = {
+        "font.size"        : 9,
+        "axes.titlesize"   : 9,
+        "axes.labelsize"   : 9,
+        "xtick.labelsize"  : 8,
+        "ytick.labelsize"  : 8,
+        "legend.fontsize"  : 8,
+        "mathtext.fontset" : "stix",
+        "lines.linewidth"  : 1.2,
+        "lines.markersize" : 4.0,
+    }
+
+    STYLE_RC = {"report": REPORT_RC, "paper": PAPER_RC}
+
+    PAPER_DPI : int = 300
+
+    style : str = "report"
+
     fig_dpi  : int = 150
     save_dpi : int = 150
 
+    @classmethod
+    def use_style(cls, style: str) -> None:
+        if style not in PlotBase.STYLE_RC:
+            raise ValueError(f"unknown figure style '{style}', expected one of {sorted(PlotBase.STYLE_RC)}")
+        PlotBase.style = style
+
+    @classmethod
+    def figsize(cls, width: float, aspect: float = 0.62) -> Tuple[float, float]:
+        return (width, width * aspect)
+
     def _apply_style(self) -> None:
         plt.rcParams.update(self.SCIENTIFIC_RC)
-        plt.rcParams["figure.dpi"]  = self.fig_dpi
-        plt.rcParams["savefig.dpi"] = self.save_dpi
+        plt.rcParams.update(self.STYLE_RC[PlotBase.style])
+
+        if PlotBase.style == "paper":
+            plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.OKABE_ITO)
+            plt.rcParams["figure.dpi"]      = self.PAPER_DPI
+            plt.rcParams["savefig.dpi"]     = self.PAPER_DPI
+        else:
+            plt.rcParams["axes.prop_cycle"] = plt.rcParamsDefault["axes.prop_cycle"]
+            plt.rcParams["figure.dpi"]      = self.fig_dpi
+            plt.rcParams["savefig.dpi"]     = self.save_dpi
 
     @staticmethod
     def _save(fig: plt.Figure, path: Path) -> Path:
+        if PlotBase.style == "paper" and path.suffix == ".png" and not any(ax.images for ax in fig.axes):
+            path = path.with_suffix(".pdf")
+
         path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(path)
         plt.close(fig)
@@ -240,40 +289,3 @@ class PlotBase:
             origin         = origin,
             colorbar_label = lambda cm_used: int_label if cm_used == panels[0][2] else "|error|",
         )
-
-
-class PaperPlotBase(PlotBase):
-    FULL_WIDTH : float = 5.5
-    HALF_WIDTH : float = 2.65
-
-    OKABE_ITO = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#F0E442", "#000000"]
-
-    PAPER_RC: dict = {
-        "font.size"        : 9,
-        "axes.titlesize"   : 9,
-        "axes.labelsize"   : 9,
-        "xtick.labelsize"  : 8,
-        "ytick.labelsize"  : 8,
-        "legend.fontsize"  : 8,
-        "mathtext.fontset" : "stix",
-        "lines.linewidth"  : 1.2,
-        "lines.markersize" : 4,
-    }
-
-    fig_dpi  : int = 300
-    save_dpi : int = 300
-
-    def _apply_style(self) -> None:
-        super()._apply_style()
-        plt.rcParams.update(self.PAPER_RC)
-        plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.OKABE_ITO)
-
-    @classmethod
-    def figsize(cls, width: float, aspect: float = 0.62) -> Tuple[float, float]:
-        return (width, width * aspect)
-
-    @staticmethod
-    def _save(fig: plt.Figure, path: Path) -> Path:
-        if path.suffix not in (".pdf", ".png"):
-            raise ValueError(f"paper figures must be saved as .pdf (vector) or .png (raster maps), got '{path.suffix}' for {path}")
-        return PlotBase._save(fig, path)

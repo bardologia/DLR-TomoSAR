@@ -33,8 +33,9 @@ class UnrolledInferenceConfig:
     n_example_profiles : int  = 3
     save_profile_cube  : bool = False
 
-    fig_dpi  : int = 150
-    save_dpi : int = 300
+    fig_dpi      : int = 150
+    save_dpi     : int = 300
+    figure_style : str = "report"
 
     paths : UnrolledInferencePaths = field(default_factory=UnrolledInferencePaths)
 

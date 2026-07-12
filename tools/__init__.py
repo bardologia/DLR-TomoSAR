@@ -1,5 +1,5 @@
 from .monitoring    import Logger, NullLogger, NullTracker, ResourceMonitor, Tracker
-from .reporting     import MarkdownDoc, MarkdownTable, MetricSectionGrouper, PaperPlotBase, PlotBase, ReportAssets
+from .reporting     import MarkdownDoc, MarkdownTable, MetricSectionGrouper, PlotBase, ReportAssets
 from .metrics       import FiniteScalar, MetricOrientation, R2, RelativeImprovement
 from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, ProfileNormalizer, ProfilePreprocessor, SplitRegions
 from .diagnostics   import IssueDetector, LayerReport, StateDictResolver, WeightAnalyzer, WeightXray, XraySummarizer
@@ -37,7 +37,6 @@ __all__ = [
     "ProcessPoolRunner",
     "QueuedInferenceStage",
     "QueuedTrainingStage",
-    "PaperPlotBase",
     "PlotBase",
     "ProfileNormalizer",
     "ProfilePreprocessor",

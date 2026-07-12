@@ -1599,6 +1599,7 @@
         "normalize_intensity": "Whether the Plotter rescales intensity/error figures by the GT-peak value before rendering, instead of using raw intensity units",
         "fig_dpi": "On-screen/report figure resolution in dots per inch",
         "save_dpi": "Saved figure file resolution in dots per inch",
+        "figure_style": "Figure style preset: report for on-screen PNG reports, paper for print-ready NeurIPS figures (9pt fonts, Okabe-Ito colors, 300 DPI, vector PDF for non-image plots)",
         "paths": "InferencePaths sub-config naming the output subdirectories and result filenames under the run's inference output directory"
       }
     },
@@ -1631,6 +1632,7 @@
         "patch_seed": "Random seed controlling both the random-patch selection and the scatter-point subsampling for the diagnostic plots",
         "fig_dpi": "Resolution in DPI applied to on-screen figure rendering (matplotlib figure.dpi)",
         "save_dpi": "Resolution in DPI applied when figures are saved to disk (matplotlib savefig.dpi)",
+        "figure_style": "Figure style preset: report for on-screen PNG reports, paper for print-ready NeurIPS figures (9pt fonts, Okabe-Ito colors, 300 DPI, vector PDF for non-image plots)",
         "paths": "ImageAeInferencePaths sub-config naming the output subdirectories and result filenames for this inference run"
       }
     },
@@ -1675,6 +1677,7 @@
         "curve_seed": "seed for the random generator selecting random example curves and scatter-point subsampling",
         "fig_dpi": "matplotlib figure-creation DPI (rcParams figure.dpi), superseded by save_dpi for the actual saved image",
         "save_dpi": "DPI used when saving figures to figures_subdir (rcParams savefig.dpi)",
+        "figure_style": "Figure style preset: report for on-screen PNG reports, paper for print-ready NeurIPS figures (9pt fonts, Okabe-Ito colors, 300 DPI, vector PDF for non-image plots)",
         "paths": "ProfileAeInferencePaths sub-config setting the figures/logs subdirectory and metrics/report filenames"
       }
     },
@@ -1714,6 +1717,7 @@
         "save_profile_cube": "Whether to persist the full predicted profile cube as profile_cube.npy next to the metrics",
         "fig_dpi": "Resolution in DPI applied to on-screen figure rendering (matplotlib figure.dpi)",
         "save_dpi": "Resolution in DPI applied when figures are saved to disk (matplotlib savefig.dpi)",
+        "figure_style": "Figure style preset: report for on-screen PNG reports, paper for print-ready NeurIPS figures (9pt fonts, Okabe-Ito colors, 300 DPI, vector PDF for non-image plots)",
         "paths": "UnrolledInferencePaths sub-config naming the output subdirectories and result filenames for this inference run"
       }
     },

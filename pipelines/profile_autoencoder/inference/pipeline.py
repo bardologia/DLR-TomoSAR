@@ -12,6 +12,7 @@ from pipelines.profile_autoencoder.inference.predictor   import ProfileAePredict
 from pipelines.profile_autoencoder.inference.report      import ProfileAeReport
 from pipelines.shared.inference.metadata                 import InferenceMetadata
 from tools.monitoring.logger                             import Logger
+from tools.reporting.plotting                            import PlotBase
 
 
 class ProfileAeInferenceMetadata(InferenceMetadata):
@@ -81,6 +82,7 @@ class ProfileAeInferencePipeline:
             return {}
 
         logger.section("[Profile AE Inference: Plots]")
+        PlotBase.use_style(self.config.figure_style)
         plots = ProfileAePlots(fig_dpi=self.config.fig_dpi, save_dpi=self.config.save_dpi)
 
         return plots.compose(result, np.asarray(run.x_axis, dtype=np.float64), metrics_obj.per_curve_mse(), self.config, meta.figures_dir, run.amp_zero_thr)

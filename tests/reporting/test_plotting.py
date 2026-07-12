@@ -9,7 +9,7 @@ import numpy             as np
 import pytest
 from PIL import Image
 
-from tools.reporting.plotting import PaperPlotBase, PlotBase
+from tools.reporting.plotting import PlotBase
 
 
 @pytest.fixture
@@ -332,64 +332,109 @@ def test_shared_clim_real_tomogram_intensity(tomogram_full, small_window):
 
 
 @pytest.fixture
-def paper_plotter():
-    return PaperPlotBase()
+def paper_style():
+    PlotBase.use_style("paper")
+    yield
+    PlotBase.use_style("report")
 
 
-def test_paper_style_sets_print_font_sizes(paper_plotter):
-    paper_plotter._apply_style()
+def test_default_style_is_report():
+    assert PlotBase.style == "report"
+
+
+def test_use_style_rejects_unknown():
+    with pytest.raises(ValueError, match="unknown figure style"):
+        PlotBase.use_style("poster")
+    assert PlotBase.style == "report"
+
+
+def test_paper_style_sets_print_font_sizes(plotter, paper_style):
+    plotter._apply_style()
     assert plt.rcParams["font.size"]       == 9
     assert plt.rcParams["axes.labelsize"]  == 9
     assert plt.rcParams["xtick.labelsize"] == 8
     assert plt.rcParams["legend.fontsize"] == 8
 
 
-def test_paper_style_sets_stix_mathtext(paper_plotter):
-    paper_plotter._apply_style()
+def test_paper_style_sets_stix_mathtext(plotter, paper_style):
+    plotter._apply_style()
     assert plt.rcParams["mathtext.fontset"] == "stix"
 
 
-def test_paper_style_sets_okabe_ito_cycle(paper_plotter):
-    paper_plotter._apply_style()
-    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    assert colors == PaperPlotBase.OKABE_ITO
+def test_paper_style_sets_okabe_ito_cycle(plotter, paper_style):
+    plotter._apply_style()
+    assert plt.rcParams["axes.prop_cycle"].by_key()["color"] == PlotBase.OKABE_ITO
 
 
-def test_paper_style_uses_print_dpi(paper_plotter):
-    paper_plotter._apply_style()
-    assert plt.rcParams["figure.dpi"]  == 300
-    assert plt.rcParams["savefig.dpi"] == 300
+def test_paper_style_overrides_instance_dpi(plotter, paper_style):
+    plotter.fig_dpi  = 150
+    plotter.save_dpi = 150
+    plotter._apply_style()
+    assert plt.rcParams["figure.dpi"]  == PlotBase.PAPER_DPI
+    assert plt.rcParams["savefig.dpi"] == PlotBase.PAPER_DPI
 
 
-def test_paper_style_keeps_scientific_base(paper_plotter):
-    paper_plotter._apply_style()
+def test_paper_style_keeps_scientific_base(plotter, paper_style):
+    plotter._apply_style()
     assert plt.rcParams["pdf.fonttype"] == 42
     assert "serif" in plt.rcParams["font.family"]
 
 
-def test_paper_figsize_full_width():
-    w, h = PaperPlotBase.figsize(PaperPlotBase.FULL_WIDTH)
+def test_report_style_restores_after_paper(plotter):
+    PlotBase.use_style("paper")
+    plotter._apply_style()
+    PlotBase.use_style("report")
+    plotter._apply_style()
+
+    assert plt.rcParams["font.size"]        == 11
+    assert plt.rcParams["mathtext.fontset"] == "dejavuserif"
+    assert plt.rcParams["figure.dpi"]       == plotter.fig_dpi
+    assert plt.rcParams["axes.prop_cycle"]  == plt.rcParamsDefault["axes.prop_cycle"]
+
+
+def test_figsize_full_width():
+    w, h = PlotBase.figsize(PlotBase.FULL_WIDTH)
     assert w == pytest.approx(5.5)
     assert h == pytest.approx(5.5 * 0.62)
 
 
-def test_paper_figsize_custom_aspect():
-    w, h = PaperPlotBase.figsize(PaperPlotBase.HALF_WIDTH, aspect=1.0)
+def test_figsize_custom_aspect():
+    w, h = PlotBase.figsize(PlotBase.HALF_WIDTH, aspect=1.0)
     assert w == pytest.approx(2.65)
     assert h == pytest.approx(2.65)
 
 
-def test_paper_save_writes_pdf(paper_plotter, tmp_path):
+def test_paper_save_upgrades_line_plot_to_pdf(plotter, paper_style, tmp_path):
     fig = plt.figure()
     fig.add_subplot(111).plot([0, 1], [0, 1])
-    out = paper_plotter._save(fig, tmp_path / "fig.pdf")
+    out = plotter._save(fig, tmp_path / "line.png")
 
-    assert out.exists()
+    assert out == tmp_path / "line.pdf"
     assert out.read_bytes()[:5] == b"%PDF-"
 
 
-def test_paper_save_rejects_other_formats(paper_plotter, tmp_path):
+def test_paper_save_keeps_png_for_images(plotter, paper_style, small_field, tmp_path):
     fig = plt.figure()
-    with pytest.raises(ValueError, match="paper figures"):
-        paper_plotter._save(fig, tmp_path / "fig.svg")
-    plt.close(fig)
+    fig.add_subplot(111).imshow(small_field)
+    out = plotter._save(fig, tmp_path / "map.png")
+
+    assert out == tmp_path / "map.png"
+    with Image.open(out) as img:
+        assert img.format == "PNG"
+
+
+def test_paper_save_respects_explicit_pdf(plotter, paper_style, tmp_path):
+    fig = plt.figure()
+    fig.add_subplot(111).plot([0, 1], [0, 1])
+    out = plotter._save(fig, tmp_path / "fig.pdf")
+    assert out.read_bytes()[:5] == b"%PDF-"
+
+
+def test_report_save_keeps_png(plotter, tmp_path):
+    fig = plt.figure()
+    fig.add_subplot(111).plot([0, 1], [0, 1])
+    out = plotter._save(fig, tmp_path / "line.png")
+
+    assert out == tmp_path / "line.png"
+    with Image.open(out) as img:
+        assert img.format == "PNG"

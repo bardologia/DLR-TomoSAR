@@ -17,7 +17,7 @@ Requires `tectonic` (installed via snap). Output lands in `paper/build/`, which 
 
 ## Figures
 
-Paper figures are rendered by plot classes deriving from `PaperPlotBase` (`tools/reporting/plotting.py`) into `paper/figures/` (gitignored, regenerable). The class pins the print style: figures created at final column size (`FULL_WIDTH` 5.5 in, `HALF_WIDTH` 2.65 in via `PaperPlotBase.figsize`), 9pt/8pt fonts, STIX math to match the Times body, Okabe-Ito colorblind-safe cycle, 300 DPI, and `_save` accepts only `.pdf` (vector plots) or `.png` (raster maps). Multi-panel figures are composed in LaTeX with `subcaption` from single-plot files, per the vault plotting rules.
+Every plot class in the repository derives from `PlotBase` (`tools/reporting/plotting.py`), which carries a class-wide figure style switch: `PlotBase.use_style("paper")` flips all subsequent rendering from the report style to the print style (9pt/8pt fonts, STIX math to match the Times body, Okabe-Ito colorblind-safe cycle, 300 DPI, and automatic upgrade of non-image plots from PNG to vector PDF; image maps stay PNG at 300 DPI). The four inference entries expose this as the `figure_style` config field (`report`/`paper`), so any pipeline report can be regenerated print-ready, e.g. `--figure_style paper`. Dedicated paper figures are created at final column size via `PlotBase.figsize(PlotBase.FULL_WIDTH)` (5.5 in, or `HALF_WIDTH` 2.65 in) and rendered into `paper/figures/` (gitignored, regenerable). Multi-panel figures are composed in LaTeX with `subcaption` from single-plot files, per the vault plotting rules.
 
 ## Kit refresh procedure (on 2027 CFP release)
 

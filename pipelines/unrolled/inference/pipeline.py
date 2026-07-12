@@ -14,6 +14,7 @@ from pipelines.unrolled.inference.predictor import UnrolledPrediction, UnrolledP
 from pipelines.unrolled.inference.report    import UnrolledReport
 from tools.data.io                          import FileIO
 from tools.monitoring.logger                import Logger
+from tools.reporting.plotting               import PlotBase
 from tools.runtime.reproducibility          import Reproducibility
 
 
@@ -96,6 +97,7 @@ class UnrolledInferencePipeline:
             return {}
 
         logger.section("[Unrolled Inference: Plots]")
+        PlotBase.use_style(self.config.figure_style)
         plots = UnrolledPlots(fig_dpi=self.config.fig_dpi, save_dpi=self.config.save_dpi)
 
         return plots.compose(prediction, examples, run.x_axis, meta.figures_dir)

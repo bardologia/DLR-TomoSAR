@@ -17,6 +17,7 @@ from pipelines.backbone.inference.predictor   import Predictor
 from pipelines.backbone.inference.reduced     import ReducedTomogramSynthesizer
 from pipelines.backbone.inference.report      import Report, ReportPayloadBuilder
 from tools.monitoring.logger                  import Logger
+from tools.reporting.plotting                 import PlotBase
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,8 @@ class InferencePipeline:
             "Param Space"         : self.components.param_space,
             "Embedding Evaluator" : evaluator.__name__ if evaluator is not None else "none",
         })
+
+        PlotBase.use_style(cfg.figure_style)
 
         plotter = Plotter(
             cmap      = cfg.cmap_intensity,

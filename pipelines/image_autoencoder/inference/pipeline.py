@@ -12,6 +12,7 @@ from pipelines.image_autoencoder.inference.predictor  import ImageAePredictor
 from pipelines.image_autoencoder.inference.report     import ImageAeReport
 from pipelines.shared.inference.metadata              import InferenceMetadata
 from tools.monitoring.logger                          import Logger
+from tools.reporting.plotting                         import PlotBase
 
 
 class ImageAeInferenceMetadata(InferenceMetadata):
@@ -75,6 +76,7 @@ class ImageAeInferencePipeline:
             return {}
 
         logger.section("[Image AE Inference: Plots]")
+        PlotBase.use_style(self.config.figure_style)
         plots = ImageAePlots(fig_dpi=self.config.fig_dpi, save_dpi=self.config.save_dpi)
 
         return plots.compose(result, metrics["channel_mse"], metrics_obj.per_patch_mse(), self.config, meta.figures_dir)

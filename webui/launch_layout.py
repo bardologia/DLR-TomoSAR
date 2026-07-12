@@ -32,6 +32,7 @@ class LaunchLayout:
     CH_AE_MODE      = {"kind": "choice", "options": ["frozen", "finetune"]}
     CH_TRUNK        = {"kind": "choice", "options": ["resunet", "unet_skip", "unet"]}
     CH_PROVIDER     = {"kind": "choice", "options": ["stopgrad", "live"]}
+    CH_FIGSTYLE     = {"kind": "choice", "options": ["report", "paper"]}
     CH_NORM_GLOBAL  = {"kind": "choice", "options": ["per_slot"] + NORM_PRESETS}
     CH_NORM_CHANNEL = {"kind": "choice", "options": ["default"] + NORM_PRESETS}
 
@@ -270,7 +271,7 @@ class LaunchLayout:
             {"title": "Profile picks", "fields": ["n_best_profiles", "n_worst_profiles", "n_random_profiles", {"path": "profile_seed", "widget": NUM_SEED}]},
             {"title": "Slices", "fields": ["n_range_slices", "n_azimuth_slices", "n_elevation_slices"]},
             {"title": "GIFs", "fields": ["gif_axes", "gif_fps", "gif_max_frames", {"path": "gif_dpi", "widget": NUM_DPI}]},
-            {"title": "Figures", "fields": ["cmap_intensity", "cmap_error", "normalize_intensity", {"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
+            {"title": "Figures", "fields": ["cmap_intensity", "cmap_error", "normalize_intensity", {"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}, {"path": "figure_style", "widget": CH_FIGSTYLE}]},
             {"title": "Output layout", "fields": [
                 "paths.figures_subdir",
                 "paths.animations_subdir",
@@ -298,21 +299,21 @@ class LaunchLayout:
             {"title": "Execution", "fields": ["split", "checkpoint_name", {"path": "batch_size", "widget": NUM_BATCH}, {"path": "num_workers", "widget": NUM_WORKERS}]},
             {"title": "Sampling", "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
             {"title": "Report", "fields": ["save_plots", "n_best_curves", "n_worst_curves", "n_random_curves", "n_scatter_points", {"path": "curve_seed", "widget": NUM_SEED}]},
-            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
+            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}, {"path": "figure_style", "widget": CH_FIGSTYLE}]},
             {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
         ],
         "image_inference": [
             {"title": "Run", "fields": ["run_directory", "output_subdir", "device", "log_level", {"path": "seed", "widget": NUM_SEED}]},
             {"title": "Execution", "fields": ["split", "checkpoint_name", {"path": "batch_size", "widget": NUM_BATCH}, {"path": "num_workers", "widget": NUM_WORKERS}]},
             {"title": "Report", "fields": ["save_plots", "n_best_patches", "n_worst_patches", "n_random_patches", "n_scatter_points", {"path": "patch_seed", "widget": NUM_SEED}]},
-            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
+            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}, {"path": "figure_style", "widget": CH_FIGSTYLE}]},
             {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
         ],
         "unrolled_inference": [
             {"title": "Run", "fields": ["run_directory", "output_subdir", "device", "log_level", {"path": "seed", "widget": NUM_SEED}]},
             {"title": "Execution", "fields": ["split", "checkpoint_name", "measurement_noise_std", "chunk_cells"]},
             {"title": "Report", "fields": ["save_plots", "n_example_profiles", "save_profile_cube"]},
-            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}]},
+            {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}, {"path": "figure_style", "widget": CH_FIGSTYLE}]},
             {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
         ],
         "embedding_loss": [

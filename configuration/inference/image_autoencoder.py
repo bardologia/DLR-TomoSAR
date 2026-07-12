@@ -35,8 +35,9 @@ class ImageAeInferenceConfig:
     n_scatter_points : int  = 20000
     patch_seed       : int  = 0
 
-    fig_dpi : int = 150
-    save_dpi: int = 300
+    fig_dpi     : int = 150
+    save_dpi    : int = 300
+    figure_style: str = "report"
 
     paths : ImageAeInferencePaths = field(default_factory=ImageAeInferencePaths)
 

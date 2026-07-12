@@ -1,7 +1,7 @@
 from .markdown  import MarkdownDoc, MarkdownTable, ScalarFormatter
 from .ranges    import RangeFormatter
 from .reporting import MetricSectionGrouper, ReportAssets
-from .plotting  import PaperPlotBase, PlotBase
+from .plotting  import PlotBase
 
 __all__ = [
     "MarkdownDoc",
@@ -10,6 +10,5 @@ __all__ = [
     "RangeFormatter",
     "MetricSectionGrouper",
     "ReportAssets",
-    "PaperPlotBase",
     "PlotBase",
 ]

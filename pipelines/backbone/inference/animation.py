@@ -251,6 +251,7 @@ class Animator:
         full_cube    : np.ndarray | None = None,
     ) -> Path:
         plt.rcParams.update(Plotter.SCIENTIFIC_RC)
+        plt.rcParams.update(Plotter.REPORT_RC)
         plt.rcParams["figure.dpi"]  = self.dpi
         plt.rcParams["savefig.dpi"] = self.dpi
 

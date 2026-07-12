@@ -38,8 +38,9 @@ class ProfileAeInferenceConfig:
     n_scatter_points  : int  = 20000
     curve_seed        : int  = 0
 
-    fig_dpi : int = 150
-    save_dpi: int = 300
+    fig_dpi     : int = 150
+    save_dpi    : int = 300
+    figure_style: str = "report"
 
     paths : ProfileAeInferencePaths = field(default_factory=ProfileAeInferencePaths)
 

@@ -65,5 +65,6 @@ class InferenceConfig:
     normalize_intensity : bool = True
     fig_dpi             : int  = 150
     save_dpi            : int  = 300
+    figure_style        : str  = "report"
 
     paths               : InferencePaths = field(default_factory=InferencePaths)
