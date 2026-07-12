@@ -20,22 +20,18 @@ The label at pixel $x$ is $\ell(x) = \phi\bigl(\hat{\mathbf{R}}(x)\bigr)$, where
 
 \textbf{Exact independence beyond $w$.} If $|\tau_a| \ge w$ or $|\tau_r| \ge w$, then $B(x) \cap B(x+\tau) = \emptyset$, and under A1 the labels $\ell(x)$ and $\ell(x+\tau)$ are functions of disjoint independent sample sets --- independent, not merely uncorrelated. Two disjoint boxcar averages of independent speckle share nothing.
 
-\textbf{Shared and private looks within $w$.} Fix an offset $\tau$ with $|\tau_a|, |\tau_r| < w$ and write $x' = x + \tau$. Each windowed sum splits over the window intersection into a shared part and a private part,
-\begin{equation}
-  w^2\,\hat{\mathbf{R}}(x) \;=\;
-  \underbrace{\sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\textstyle \mathbf{S}(\tau) \text{ --- shared looks}}
-  \;+\; \underbrace{\sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\text{private to } x},
-  \qquad
-  w^2\,\hat{\mathbf{R}}(x') \;=\; \mathbf{S}(\tau)
-  \;+\; \underbrace{\sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}}_{\text{private to } x'},
-  \label{eq:shared_private}
-\end{equation}
-where the shared term collects
+\textbf{Shared and private looks within $w$.} Fix an offset $\tau$ with $|\tau_a|, |\tau_r| < w$ and write $x' = x + \tau$. Each windowed sum splits over the window intersection into a shared part and a private part:
+\begin{align}
+  w^2\,\hat{\mathbf{R}}(x)  &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}},
+  \label{eq:shared_private}\\
+  w^2\,\hat{\mathbf{R}}(x') &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}.
+\end{align}
+The first sum is common to both estimates and collects
 \begin{equation}
   \bigl|B(x) \cap B(x')\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
   \label{eq:shared_count}
 \end{equation}
-looks. Under A1 the two private sums are independent of each other and of $\mathbf{S}(\tau)$, so every statistical link between the two estimates flows through the shared looks, and the correlation between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x')$ is the shared fraction of the window,
+looks; the second sums draw on disjoint pixel sets, private to each window. Under A1 the private sums are independent of each other and of the shared sum, so every statistical link between the two estimates flows through the looks the windows share, and the correlation between corresponding entries of $\hat{\mathbf{R}}(x)$ and $\hat{\mathbf{R}}(x')$ is the shared fraction of the window,
 \begin{equation}
   \rho(\tau) \;=\; \Bigl(1 - \tfrac{|\tau_a|}{w}\Bigr)_{\!+}\Bigl(1 - \tfrac{|\tau_r|}{w}\Bigr)_{\!+},
   \label{eq:triangle}
@@ -64,7 +60,7 @@ the self-convolution of the boxcar --- triangular per axis. The labels inherit i
       \fill[black!50] (4.29,1.79) rectangle ++(0.12,0.12);
       \node[font=\tiny, text=black!60, anchor=west, inner sep=1.5pt] at (4.45,1.85) {$x''$};
       \node[font=\tiny, text=black!60, anchor=south west, inner sep=1.5pt] at (3.62,2.62) {$B(x'')$};
-      \node[font=\tiny, text=oiBlue!80!black, anchor=north west, align=left, inner sep=1.5pt] at (0.80,0.30) {shared looks $\mathbf{S}(\tau)$};
+      \node[font=\tiny, text=oiBlue!80!black, anchor=north west, align=left, inner sep=1.5pt] at (0.80,0.30) {shared looks};
       \draw[oiBlue!70, thin] (1.55,0.32) -- (1.75,1.30);
     \end{tikzpicture}
     \caption{}
