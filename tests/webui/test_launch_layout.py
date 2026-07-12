@@ -19,7 +19,7 @@ from tools.runtime.config_cli import ConfigCli
 from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
-from configuration.diagnostics              import TensorboardExportEntryConfig
+from configuration.diagnostics              import ReportCollectionEntryConfig, TensorboardExportEntryConfig
 from configuration.inference                import BackboneInferenceEntryConfig, DualInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
 from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
@@ -89,6 +89,12 @@ def test_export_tensorboard_plots_layout_claims_every_config_field_exactly_once(
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(TensorboardExportEntryConfig())]
 
     LaunchLayout().build("export_tensorboard_plots", leaves)
+
+
+def test_collect_reports_layout_claims_every_config_field_exactly_once():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(ReportCollectionEntryConfig())]
+
+    LaunchLayout().build("collect_reports", leaves)
 
 
 def test_every_registered_script_is_reachable_from_the_catalog():

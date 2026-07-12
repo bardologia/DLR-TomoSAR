@@ -137,6 +137,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Scan a runs directory for training runs with TensorBoard event logs, select one or more, and export every scalar series as a publication-quality figure inside each run directory, mirroring the tag hierarchy as folders. Train and validation series of the same metric share one figure.",
         },
+        "collect_reports": {
+            "title"     : "Collect Reports",
+            "category"  : "Analysis",
+            "purpose"   : "Scan a runs directory for training runs with inference reports, select one or more, and gather each run's report into a single collector directory, renamed after the run. Image links are rewritten to absolute paths into the original run figures, or embedded to make each report self-contained.",
+        },
     }
 
     GROUPS = {

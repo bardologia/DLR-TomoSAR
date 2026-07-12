@@ -108,6 +108,7 @@ class ProjectPaths:
         "compare_runs"              : "analysis",
         "xray_weights"              : "analysis",
         "export_tensorboard_plots"  : "analysis",
+        "collect_reports"           : "analysis",
     }
 
     def has_script(self, key: str) -> bool:

@@ -2100,6 +2100,29 @@
         "output_subdir": "subdirectory name inside each run directory where that run's exported figures are written, forwarded to each run's TensorboardExportConfig"
       }
     },
+    "diagnostics::ReportCollectionConfig": {
+      "summary": "Per-run report collection: locates the run's inference report(s), rewrites every image link to an absolute path into the original figures (or embeds them as base64 data for a self-contained file), and writes the result into the collector directory renamed after the run",
+      "fields": {
+        "run_directory": "training run directory whose inference outputs hold the report(s) to collect",
+        "collector_dir": "directory that receives the collected report, named <run>.md (latest_only) or <run>_<inference tag>.md",
+        "inference_dirname": "name of the subdirectory inside the run directory that holds the timestamped inference outputs, defaults to inference",
+        "report_filename": "report filename inside each inference output directory, defaults to report.md",
+        "latest_only": "collect only the report of the latest inference output (by directory name); when false every inference report is collected with the inference tag appended to the name",
+        "embed_images": "embed referenced images as base64 data URIs so the collected report is fully self-contained; off by default because reports can reference hundreds of figures, in which case links are rewritten to absolute paths into the original run"
+      }
+    },
+    "diagnostics::ReportCollectionEntryConfig": {
+      "summary": "Batch webui entry selecting training runs with inference reports and building a per-run ReportCollectionConfig via to_config; a missing referenced image or two selected runs sharing a name abort the collection loudly",
+      "fields": {
+        "runs_dir": "parent directory recursively scanned (rglob) by ReportRunSelector for run subdirectories whose inference_dirname holds a report",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to collect; empty triggers interactive selection on a tty, else all runs",
+        "collector_dir": "single directory that receives every collected report, created if missing; re-collection overwrites previous copies",
+        "inference_dirname": "name of the subdirectory inside each run directory that holds the timestamped inference outputs, forwarded to each run's ReportCollectionConfig",
+        "report_filename": "report filename inside each inference output directory, forwarded to each run's ReportCollectionConfig",
+        "latest_only": "collect only each run's latest inference report; when false every inference report is collected with the inference tag appended to the name",
+        "embed_images": "embed referenced images as base64 data URIs so each collected report is fully self-contained instead of linking back to the original run figures"
+      }
+    },
     "training/unrolled::UnrolledEntryConfig": {
       "summary": "Entry configuration for main/training/train_unrolled.py: trains the unrolled physics network on per-pixel coherence measurements synthesised from the ground-truth Gaussian profiles through the exact kz steering operator, isolated from the backbone training stack",
       "fields": {

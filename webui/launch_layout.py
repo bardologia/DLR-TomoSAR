@@ -1051,6 +1051,19 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "collect_reports": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+                        ]},
+                        {"title": "Collection", "fields": ["collector_dir", "inference_dirname", "report_filename", "latest_only", "embed_images"]},
+                    ]},
+                ]},
+            ],
+        },
     }
 
     def _field_entry(self, item, prefix, widgets):
