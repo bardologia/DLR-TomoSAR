@@ -1,6 +1,6 @@
 logs/
 runs/
-results/
+results
 result_storage/
 test_data/
 presentations/
