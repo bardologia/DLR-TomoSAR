@@ -231,7 +231,7 @@ with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the
   \E \norm{f - \ell}^2 \;=\; \E \norm{f - \phi(\mathbf{R})}^2 \;+\; \E \norm{\varepsilon}^2.
   \label{eq:risk_decomp}
 \end{equation}
-Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation. The window geometry then sorts the pixels around $x$ into three regimes. Within $w/2$, the pixel stacks are looks of Eq.~(\ref{eq:label_cov}): they formed the label. Within $w$, the windows overlap and the labels share information through the shared looks, a common component in their covariance estimates (Eq.~\ref{eq:shared_private}). Beyond $w$, every sample is independent of the label, and any contribution rests on a homogeneity prior the label construction neither uses nor certifies. Table~\ref{tab:context_regimes} gives the overview.
+Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation: a patch helps only through looks informative about the pixel's covariance. The window geometry sorts the surrounding pixels into three regimes, summarised in Table~\ref{tab:context_regimes}.
 
 \begin{table}[H]
   \centering
@@ -243,7 +243,7 @@ Only the first term is reducible, and it measures the distance to the statistic,
     \midrule
     $\lVert\tau\rVert_\infty \le w/2$      & pixel inside $B(x)$ & look of Eq.~(\ref{eq:label_cov})  & forms the label \\
     $w/2 < \lVert\tau\rVert_\infty < w$    & windows overlap     & shared looks, $\rho(\tau) > 0$    & averages away $\varepsilon$ \\
-    $\lVert\tau\rVert_\infty \ge w$        & windows disjoint    & independent, $\rho(\tau) = 0$     & none \\
+    $\lVert\tau\rVert_\infty \ge w$        & windows disjoint    & independent, $\rho(\tau) = 0$     & none, uncertified prior only \\
     \bottomrule
   \end{tabular}
 \end{table}
