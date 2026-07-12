@@ -3,7 +3,7 @@
 
 Estimating, at every pixel of a scene, a small unordered collection of physical components --- how many there are, and the continuous parameters of each --- is a recurring structure in scientific imaging. Multibaseline synthetic aperture radar (SAR) tomography is a canonical instance \citep{reigber2000tomography}. A stack of $N$ coherent passes with distinct orthogonal baselines samples, at every pixel, the Fourier spectrum of the elevation power distribution $p(z)$, and inverting those samples resolves the scatterers layered along elevation within a single resolution cell --- the vertical structure of buildings, vegetation, and terrain. In the parametric regime this work targets, $p(z)$ is modelled as a $K$-component Gaussian mixture, and the quantities of interest are the power, elevation, and vertical spread $(a_k, \mu_k, \sigma_k)$ of each scatterer, where the effective number of scatterers varies from pixel to pixel and is itself unknown.
 
-\begin{figure}[t]
+\begin{figure}[H]
   \centering
   \begin{tikzpicture}[font=\scriptsize]
     \begin{scope}[on background layer]

@@ -21,7 +21,7 @@
 \paragraph{Patch-size sweep.}
 One model was trained per (patch side, stack size) cell on the grid $W \in \{16, 24, \ldots, 72\}$ and $n \in \{2, 3, 5, 9, 15\}$, with baseline-ordered even-spread pass selection at each $n$. The backbone is a three-level U-Net, so every grid size is admissible and the ceiling $2w = 40$\,px lies on the grid. The pixel budget per epoch is constant across patch sizes --- larger patches see no more data --- which removes the compute penalty of large patches by construction: the error curves saturate rather than turn upward, the argmin is censored by noise and the grid edge, and the knee is the meaningful statistic. Table~\ref{tab:patch_sweep} reports the held-out test loss; Figure~\ref{fig:patch_sweep} plots the curves.
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{Patch-size sweep: held-out test loss per patch side $W$ and input stack size $n$ (three-level U-Net, even-spread pass selection, constant pixel budget per epoch, single seed). Bold marks each column's minimum. The bottom rows compare the observed knee$_{80}$ --- the smallest patch capturing at least $80\%$ of the column's total loss reduction --- with the predicted ceiling: every column saturates at the window scale.}
   \label{tab:patch_sweep}
@@ -46,7 +46,7 @@ One model was trained per (patch side, stack size) cell on the grid $W \in \{16,
   \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[H]
   \centering
   \begin{tikzpicture}
     \begin{axis}[
