@@ -526,6 +526,63 @@ class AugmentationTrialPlanner:
         return plans
 
 
+class NormalizationTrialPlanner:
+
+    STEPS = (
+        ("pass_mag",  ("pass_mag",)),
+        ("ifg_phase", ("ifg_phase",)),
+        ("outputs",   ("out_amp", "out_sigma")),
+    )
+
+    def __init__(self, trials, preset_names: tuple) -> None:
+        self.trials       = trials
+        self.preset_names = tuple(preset_names)
+
+        self._validate()
+
+    @property
+    def fields(self) -> tuple:
+        return tuple(field for _, step_fields in self.STEPS for field in step_fields)
+
+    def _validate(self) -> None:
+        for prefix in ("initial", "final"):
+            for field in self.fields:
+                value = getattr(self.trials, f"{prefix}_{field}")
+                if value not in self.preset_names:
+                    raise ValueError(f"Unknown normalization_trials.{prefix}_{field} '{value}'; valid presets are {list(self.preset_names)}")
+
+        for label, step_fields in self.STEPS:
+            if all(getattr(self.trials, f"initial_{field}") == getattr(self.trials, f"final_{field}") for field in step_fields):
+                raise ValueError(f"Normalization ladder step '{label}' has identical initial and final strategies for {list(step_fields)}; that rung would train the same configuration twice")
+
+    def summary(self) -> dict:
+        transitions = {field: f"{getattr(self.trials, f'initial_{field}')} -> {getattr(self.trials, f'final_{field}')}" for field in self.fields}
+
+        return {
+            "Ladder"     : "initial -> " + " -> ".join(label for label, _ in self.STEPS),
+            **transitions,
+            "Total runs" : len(self.STEPS) + 1,
+        }
+
+    def _overrides(self, n_final_steps: int) -> dict:
+        finalized = {field for _, step_fields in self.STEPS[:n_final_steps] for field in step_fields}
+
+        overrides = {}
+        for field in self.fields:
+            prefix = "final" if field in finalized else "initial"
+            overrides[f"normalization.{field}"] = getattr(self.trials, f"{prefix}_{field}")
+
+        return overrides
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = [("nrm-0-initial", self._overrides(0))]
+
+        for step, (label, _) in enumerate(self.STEPS, start=1):
+            plans.append((f"nrm-{step}-{label}", self._overrides(step)))
+
+        return plans
+
+
 class PatchSizeTrialPlanner:
     def __init__(self, trials) -> None:
         self.trials = trials

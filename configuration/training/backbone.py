@@ -161,6 +161,19 @@ class HeadMatchingTrialsConfig:
 
 
 @dataclass
+class NormalizationTrialsConfig:
+    initial_pass_mag  : str = "zscore_log1p"
+    initial_ifg_phase : str = "min_max"
+    initial_out_amp   : str = "zscore"
+    initial_out_sigma : str = "zscore"
+
+    final_pass_mag  : str = "robust_iqr_log1p"
+    final_ifg_phase : str = "fixed_div_pi"
+    final_out_amp   : str = "robust_iqr_log1p"
+    final_out_sigma : str = "robust_iqr_log1p"
+
+
+@dataclass
 class LossScaleProbeConfig:
     enabled        : bool       = True
     n_batches      : int        = 10
@@ -228,6 +241,7 @@ class BackboneEntryConfig:
     context_trials   : list                  = field(default_factory=_default_context_trials)
     head_trials      : HeadMatchingTrialsConfig = field(default_factory=HeadMatchingTrialsConfig)
     augmentation_trials : dict               = field(default_factory=_default_augmentation_trials)
+    normalization_trials : NormalizationTrialsConfig = field(default_factory=NormalizationTrialsConfig)
 
     ablation_features     : list = field(default_factory=AblationCatalog.default_features)
     ablation_include_full : bool = True

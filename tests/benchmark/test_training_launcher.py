@@ -169,8 +169,24 @@ def test_augmentation_scheduler_plans_the_on_off_pair(tmp_path):
     assert plans["aug-off"]["augmentation.p_flip_v"] == 0.0
 
 
+def test_normalization_scheduler_plans_the_cumulative_ladder(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "normalization"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    plans = dict(scheduler.planner().plan())
+
+    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-outputs"]
+    assert plans["nrm-0-initial"]["normalization.pass_mag"]  == "zscore_log1p"
+    assert plans["nrm-1-pass_mag"]["normalization.pass_mag"] == "robust_iqr_log1p"
+    assert plans["nrm-3-outputs"]["normalization.out_sigma"] == "robust_iqr_log1p"
+    assert all("normalization.out_mu" not in overrides for overrides in plans.values())
+
+
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "augmentation", "ablation"):
+    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "augmentation", "normalization", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path
         config.trials_mode = mode

@@ -410,6 +410,16 @@ class ExperimentBuilder {
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
     { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
     { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state" },
+    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp+sigma switch from initial to final strategy" },
+  ];
+
+  static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
+
+  static NORM_GROUPS = [
+    { key: "pass_mag",  label: "pass amplitude",   step: 1 },
+    { key: "ifg_phase", label: "ifg phase",        step: 2 },
+    { key: "out_amp",   label: "output amplitude", step: 3 },
+    { key: "out_sigma", label: "output sigma",     step: 3 },
   ];
 
   static HEAD_OPTIONS = [
@@ -481,12 +491,14 @@ class ExperimentBuilder {
     this.physics    = new Map();
     this.pair       = new Map();
     this.headTrials = new Map();
+    this.normTrials = new Map();
     byPath.forEach((leaf) => {
-      if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
-      if (leaf.section === "patch_trials")     this.patch.set(leaf.path.split(".").pop(), leaf);
-      if (leaf.section === "physics_trials")   this.physics.set(leaf.path.split(".").pop(), leaf);
-      if (leaf.section === "pair_trials")      this.pair.set(leaf.path.split(".").pop(), leaf);
-      if (leaf.section === "head_trials")      this.headTrials.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "secondary_trials")     this.secondary.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "patch_trials")         this.patch.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "physics_trials")       this.physics.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "pair_trials")          this.pair.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "head_trials")          this.headTrials.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "normalization_trials") this.normTrials.set(leaf.path.split(".").pop(), leaf);
     });
 
     this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
@@ -496,6 +508,7 @@ class ExperimentBuilder {
     this.physics.forEach((leaf) => this.claimed.push(leaf.path));
     this.pair.forEach((leaf) => this.claimed.push(leaf.path));
     this.headTrials.forEach((leaf) => this.claimed.push(leaf.path));
+    this.normTrials.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.inputTrialsLeaf)      this.claimed.push(this.inputTrialsLeaf.path);
     if (this.contextTrialsLeaf)    this.claimed.push(this.contextTrialsLeaf.path);
@@ -541,6 +554,8 @@ class ExperimentBuilder {
     this.headBackboneEl  = null;
     this.augEl           = null;
     this.augCellsEl      = null;
+    this.normEl          = null;
+    this.normSelects     = new Map();
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -586,6 +601,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
     if (this.modeLeaf && this.headTrials.size)    body.appendChild(this._headPanel());
     if (this.modeLeaf && this.augTrialsLeaf)      body.appendChild(this._augmentationPanel());
+    if (this.modeLeaf && this.normTrials.size)    body.appendChild(this._normalizationPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -620,6 +636,7 @@ class ExperimentBuilder {
     this._paintContext();
     this._paintHead();
     this._paintAugmentation();
+    this._paintNormalization();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -1834,6 +1851,100 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _normValue(key) {
+    const leaf = this.normTrials.get(key);
+    return leaf ? this.view._effective(leaf) : "?";
+  }
+
+  _normalizationPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">normalization ladder</span>`;
+    const reset    = LaunchWidgetDom.mini("reset ladder", () => this._resetNormalization());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Cumulative ladder from the all-initial baseline to the final strategies: rung 1 switches pass amplitude, rung 2 adds ifg phase, rung 3 adds output amplitude and sigma together (out_mu keeps the base config throughout). Every rung sets all four channel strategies explicitly and repeats across the seeds list.";
+
+    const grid     = document.createElement("div");
+    grid.className = "exp-secondary__grid";
+
+    ExperimentBuilder.NORM_GROUPS.forEach((group) => {
+      const initialLeaf = this.normTrials.get(`initial_${group.key}`);
+      const finalLeaf   = this.normTrials.get(`final_${group.key}`);
+      if (!initialLeaf || !finalLeaf) return;
+
+      const row     = document.createElement("div");
+      row.className = "cfg-edit__row";
+
+      const label       = document.createElement("span");
+      label.className   = "cfg-edit__key";
+      label.textContent = `${group.label} (rung ${group.step})`;
+      row.appendChild(label);
+
+      [initialLeaf, finalLeaf].forEach((leaf, index) => {
+        const select     = document.createElement("select");
+        select.className = "run-select exp-secondary__strategy";
+        select.title     = `--${leaf.path}`;
+        ExperimentBuilder.NORM_PRESETS.forEach((preset) => {
+          const opt       = document.createElement("option");
+          opt.value       = preset;
+          opt.textContent = preset;
+          select.appendChild(opt);
+        });
+        select.addEventListener("change", () => {
+          this.view._setValue(leaf, select.value);
+          this._repaintNormalization();
+        });
+        this.normSelects.set(leaf.path, select);
+        this.view.controls[leaf.path] = { leaf, reset: () => this._repaintNormalization() };
+        row.appendChild(select);
+
+        if (index === 0) {
+          const arrow       = document.createElement("span");
+          arrow.className   = "exp-presence__sub";
+          arrow.textContent = "->";
+          row.appendChild(arrow);
+        }
+      });
+
+      grid.appendChild(row);
+    });
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(grid);
+    this.normEl = panel;
+
+    this._paintNormalization();
+    return panel;
+  }
+
+  _paintNormalization() {
+    if (!this.normEl) return;
+
+    this.normSelects.forEach((select, path) => {
+      const leaf = this.normTrials.get(path.split(".").pop());
+      if (leaf && document.activeElement !== select) select.value = this.view._effective(leaf);
+    });
+  }
+
+  _resetNormalization() {
+    this.normTrials.forEach((leaf) => this.view._setValue(leaf, leaf.value));
+    this._repaintNormalization();
+  }
+
+  _repaintNormalization() {
+    this._paintNormalization();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _headList(key) {
     const leaf = this.headTrials.get(key);
     if (!leaf) return [];
@@ -1982,6 +2093,7 @@ class ExperimentBuilder {
     if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
     if (this.headEl)             this.headEl.hidden             = mode !== "head";
     if (this.augEl)              this.augEl.hidden              = mode !== "augmentation";
+    if (this.normEl)             this.normEl.hidden             = mode !== "normalization";
   }
 
   _paintSecondary() {
@@ -2531,6 +2643,11 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "normalization") {
+      this.summaryEl.textContent = `baseline + 3 ladder rungs = 4 trials${this._seedsSuffix(4)}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
   }
 
@@ -2583,6 +2700,8 @@ class ExperimentBuilder {
       });
     } else if (mode === "augmentation") {
       this._augCells().forEach((cell) => names.push(`${model}_aug-${cell}`));
+    } else if (mode === "normalization") {
+      ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-outputs"].forEach((rung) => names.push(`${model}_${rung}`));
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

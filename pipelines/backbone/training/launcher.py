@@ -8,11 +8,12 @@ from pathlib     import Path
 
 import torch
 
+from configuration.normalization import Presets
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, LossScaleProbeConfig, default_curriculum
 from configuration.training.general.loss import ParamMatching
 from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_HEADS
 from pipelines.backbone.inference.pipeline   import InferencePipeline
-from pipelines.backbone.training.experiments import AblationTrialPlanner, AugmentationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, HeadMatchingTrialPlanner, InputTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
+from pipelines.backbone.training.experiments import AblationTrialPlanner, AugmentationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, HeadMatchingTrialPlanner, InputTrialPlanner, NormalizationTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
@@ -111,21 +112,22 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "head_trials", "augmentation_trials", "ablation_features", "ablation_include_full", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "head_trials", "augmentation_trials", "normalization_trials", "ablation_features", "ablation_include_full", "gpus", "poll_interval_s")
 
     MODE_SUBDIRS = {
-        "curriculum"   : "curriculum",
-        "warmup"       : "warmup",
-        "presence"     : "presence",
-        "physics"      : "physics",
-        "pair"         : "pair",
-        "secondary"    : "secondary",
-        "patch"        : "patch",
-        "input"        : "input",
-        "context"      : "context",
-        "head"         : "head",
-        "augmentation" : "augmentation",
-        "ablation"     : "ablation",
+        "curriculum"    : "curriculum",
+        "warmup"        : "warmup",
+        "presence"      : "presence",
+        "physics"       : "physics",
+        "pair"          : "pair",
+        "secondary"     : "secondary",
+        "patch"         : "patch",
+        "input"         : "input",
+        "context"       : "context",
+        "head"          : "head",
+        "augmentation"  : "augmentation",
+        "normalization" : "normalization",
+        "ablation"      : "ablation",
     }
 
     def __init__(self, config, cli_overrides: dict, entry_script: Path) -> None:
@@ -168,10 +170,12 @@ class TrainScheduler:
             return HeadMatchingTrialPlanner(self.config.head_trials, tuple(BACKBONE_CONFIG_REGISTRY), BACKBONE_HEADS, tuple(matching.value for matching in ParamMatching))
         if mode == "augmentation":
             return AugmentationTrialPlanner(self.config.augmentation_trials)
+        if mode == "normalization":
+            return NormalizationTrialPlanner(self.config.normalization_trials, tuple(Presets.names()))
         if mode == "ablation":
             return AblationTrialPlanner(self.config.ablation_features, self.config.ablation_include_full)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'head', 'augmentation' or 'ablation'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'head', 'augmentation', 'normalization' or 'ablation'")
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
         argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name, "logdir": str(self.runs_root)})

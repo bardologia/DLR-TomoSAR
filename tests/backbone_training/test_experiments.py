@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from configuration.normalization import Presets
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import HeadMatchingTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
@@ -13,6 +14,7 @@ from pipelines.backbone.training.experiments import (
     CurriculumTrialPlanner,
     HeadMatchingTrialPlanner,
     InputTrialPlanner,
+    NormalizationTrialPlanner,
     PatchSizeTrialPlanner,
     PairLossTrialPlanner,
     PhysicsLossTrialPlanner,
@@ -396,6 +398,67 @@ def test_augmentation_planner_rejects_empty_trials():
 def test_augmentation_planner_rejects_non_boolean_state():
     with pytest.raises(ValueError, match="booleans"):
         AugmentationTrialPlanner({"on": 0.5})
+
+
+PRESET_NAMES = tuple(Presets.names())
+
+
+def test_normalization_planner_default_walks_the_ladder():
+    planner = NormalizationTrialPlanner(NormalizationTrialsConfig(), PRESET_NAMES)
+
+    plans = dict(planner.plan())
+
+    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-outputs"]
+    assert planner.summary()["Total runs"] == 4
+
+    expected = {
+        "nrm-0-initial"   : ("zscore_log1p",     "min_max",      "zscore",           "zscore"),
+        "nrm-1-pass_mag"  : ("robust_iqr_log1p", "min_max",      "zscore",           "zscore"),
+        "nrm-2-ifg_phase" : ("robust_iqr_log1p", "fixed_div_pi", "zscore",           "zscore"),
+        "nrm-3-outputs"   : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "robust_iqr_log1p"),
+    }
+    for name, (pass_mag, ifg_phase, out_amp, out_sigma) in expected.items():
+        assert plans[name] == {
+            "normalization.pass_mag"  : pass_mag,
+            "normalization.ifg_phase" : ifg_phase,
+            "normalization.out_amp"   : out_amp,
+            "normalization.out_sigma" : out_sigma,
+        }
+        assert "normalization.out_mu" not in plans[name]
+
+
+def test_normalization_planner_paths_are_entry_config_leaves():
+    config = BackboneEntryConfig()
+
+    for _, overrides in NormalizationTrialPlanner(NormalizationTrialsConfig(), PRESET_NAMES).plan():
+        for path in overrides:
+            section, leaf = path.split(".")
+            assert hasattr(getattr(config, section), leaf), path
+
+
+def test_normalization_planner_rejects_unknown_preset():
+    with pytest.raises(ValueError, match="valid presets"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(initial_pass_mag="log_softmax"), PRESET_NAMES)
+
+    with pytest.raises(ValueError, match="valid presets"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_sigma="per_slot"), PRESET_NAMES)
+
+
+def test_normalization_planner_rejects_noop_rung():
+    with pytest.raises(ValueError, match="same configuration twice"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_pass_mag="zscore_log1p"), PRESET_NAMES)
+
+    with pytest.raises(ValueError, match="same configuration twice"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore", final_out_sigma="zscore"), PRESET_NAMES)
+
+
+def test_normalization_planner_allows_partial_output_rung():
+    planner = NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore"), PRESET_NAMES)
+
+    plans = dict(planner.plan())
+
+    assert plans["nrm-3-outputs"]["normalization.out_amp"]   == "zscore"
+    assert plans["nrm-3-outputs"]["normalization.out_sigma"] == "robust_iqr_log1p"
 
 
 def test_input_planner_rejects_empty_trials():
