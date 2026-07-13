@@ -656,6 +656,7 @@ class LaunchLayout:
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
+                "seeds",
             ],
             "sections": [
                 {"key": "model", "title": "Model", "panels": [

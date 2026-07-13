@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run         import TrainingPathsConfig, TrainingQueueConfig
+from configuration.training.general.run         import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.dataset                       import AugmentationConfig, InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
@@ -182,7 +182,7 @@ class BackboneEntryConfig:
     backbone_head   : str        = "conv"
     gpu             : int        = 0
     seed            : int        = 0
-    seeds           : list[int]  = field(default_factory=list)
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 

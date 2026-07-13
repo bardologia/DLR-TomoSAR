@@ -25,6 +25,7 @@ def stage_config(tmp_path: Path, resume: bool = False) -> CrossValidationConfig:
     config.folds              = FoldConfig(n_folds=5, azimuth_start=1000, azimuth_end=2000)
     config.resume             = resume
     config.inference_splits   = ["val", "test"]
+    config.seeds              = []
     return config
 
 
