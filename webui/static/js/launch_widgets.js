@@ -365,17 +365,48 @@ class ModelCardPanel {
 }
 
 
+class SeedAxisNote {
+  static list(view, leaf) {
+    if (!leaf) return [];
+    try {
+      const parsed = PythonLiteral.parse(view._effective(leaf));
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  }
+
+  static suffix(view, leaf, trials) {
+    const n = SeedAxisNote.list(view, leaf).length;
+    if (n <= 1) return "";
+    if (trials === null) return ` x ${n} seeds per trial`;
+
+    const total = trials * n;
+    return ` x ${n} seeds = ${total} run${total === 1 ? "" : "s"}`;
+  }
+
+  static append(namesEl, view, leaf) {
+    const seeds = SeedAxisNote.list(view, leaf);
+    if (seeds.length <= 1) return;
+
+    const note       = document.createElement("span");
+    note.className   = "exp-name exp-name--more";
+    note.textContent = `each trial nests seeds ${seeds.join(", ")} as <trial>/seed<N>`;
+    namesEl.appendChild(note);
+  }
+}
+
+
 class ExperimentBuilder {
 
   static MODES = [
-    { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one training run each" },
+    { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one trial each" },
     { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
-    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one training run per pair plus an optional no-physics baseline" },
-    { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one training run per pair plus an optional base-only baseline" },
-    { key: "secondary",  label: "secondaries", hint: "one training run per secondary-track selection" },
-    { key: "patch",      label: "patch",       hint: "one training run per patch size, same model end to end" },
-    { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one training run per cell" },
-    { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one training run per input variant" },
+    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one trial per pair plus an optional no-physics baseline" },
+    { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one trial per pair plus an optional base-only baseline" },
+    { key: "secondary",  label: "secondaries", hint: "one trial per secondary-track selection" },
+    { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end" },
+    { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one trial per cell" },
+    { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one trial per input variant" },
   ];
 
   static PHYSICS_COMPONENTS = [
@@ -427,6 +458,7 @@ class ExperimentBuilder {
     this.completeLeaf = byPath.get("complete_losses");
     this.modelLeaf    = byPath.get("backbone_name");
     this.gpusLeaf     = byPath.get("gpus");
+    this.seedsLeaf    = byPath.get("seeds");
 
     this.presenceTrialsLeaf = byPath.get("presence_trials");
     this.presenceMatchLeaf  = byPath.get("presence_match_strategies");
@@ -2081,6 +2113,10 @@ class ExperimentBuilder {
     this._emit("warmup");
   }
 
+  _seedsSuffix(trials) {
+    return SeedAxisNote.suffix(this.view, this.seedsLeaf, trials);
+  }
+
   _paintSummary() {
     const nWarm = this.variants.warmup.length;
     const nComp = this.variants.complete.length;
@@ -2097,7 +2133,7 @@ class ExperimentBuilder {
     }
 
     if (mode === "warmup") {
-      this.summaryEl.textContent = `${nWarm} warmup loss${nWarm === 1 ? "" : "es"} = ${nWarm} trial${nWarm === 1 ? "" : "s"}${gpus}`;
+      this.summaryEl.textContent = `${nWarm} warmup loss${nWarm === 1 ? "" : "es"} = ${nWarm} trial${nWarm === 1 ? "" : "s"}${this._seedsSuffix(nWarm)}${gpus}`;
       return;
     }
 
@@ -2105,13 +2141,13 @@ class ExperimentBuilder {
       const strategy = this._strategy();
       const sampled  = strategy === "uniform" || strategy === "gaussian";
       const count    = sampled ? `${this._secondaryEffective("n_trials")} trials` : "trial count set by the stack";
-      this.summaryEl.textContent = `${strategy}, ${this._secondaryEffective("n_secondaries")} secondaries, ${count}${gpus}`;
+      this.summaryEl.textContent = `${strategy}, ${this._secondaryEffective("n_secondaries")} secondaries, ${count}${this._seedsSuffix(null)}${gpus}`;
       return;
     }
 
     if (mode === "patch") {
       const n = this._patchSizes().length;
-      this.summaryEl.textContent = `${n} patch size${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${gpus}`;
+      this.summaryEl.textContent = `${n} patch size${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
       return;
     }
 
@@ -2121,7 +2157,7 @@ class ExperimentBuilder {
       const nCur     = this._physicsCurriculumStates().length;
       const baseline = this._physicsBaselineOn();
       const total    = nComp * nWeight * nCur + (baseline ? nCur : 0);
-      this.summaryEl.textContent = `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"} x ${nCur} curriculum${baseline ? ` + ${nCur} baseline` : ""} = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      this.summaryEl.textContent = `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"} x ${nCur} curriculum${baseline ? ` + ${nCur} baseline` : ""} = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
       return;
     }
 
@@ -2130,7 +2166,7 @@ class ExperimentBuilder {
       const nWeight  = this._pairWeights().length;
       const baseline = this._pairBaselineOn();
       const total    = nCand * nWeight + (baseline ? 1 : 0);
-      this.summaryEl.textContent = `${this._pairBase()} + ${nCand} candidate${nCand === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      this.summaryEl.textContent = `${this._pairBase()} + ${nCand} candidate${nCand === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
       return;
     }
 
@@ -2138,17 +2174,17 @@ class ExperimentBuilder {
       const cells = this._presenceCells().length;
       const strat = this._presenceStrategies().length;
       const total = cells * strat;
-      this.summaryEl.textContent = `${cells} cell${cells === 1 ? "" : "s"} x ${strat} matching = ${total} run${total === 1 ? "" : "s"}${gpus}`;
+      this.summaryEl.textContent = `${cells} cell${cells === 1 ? "" : "s"} x ${strat} matching = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
       return;
     }
 
     if (mode === "input") {
       const n = this._inputCells().length;
-      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}, all tracks${gpus}`;
+      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}, all tracks${this._seedsSuffix(n)}${gpus}`;
       return;
     }
 
-    this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${gpus}`;
+    this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
   }
 
   _paintNames() {
@@ -2166,6 +2202,8 @@ class ExperimentBuilder {
       more.className   = "exp-name exp-name--more";
       more.textContent = "one per selection, labels resolved from the dataset stack";
       this.namesEl.appendChild(more);
+
+      SeedAxisNote.append(this.namesEl, this.view, this.seedsLeaf);
       return;
     }
 
@@ -2213,6 +2251,8 @@ class ExperimentBuilder {
       more.textContent = `+${names.length - limit} more`;
       this.namesEl.appendChild(more);
     }
+
+    SeedAxisNote.append(this.namesEl, this.view, this.seedsLeaf);
   }
 }
 
@@ -2226,6 +2266,7 @@ class AblationBuilder {
     this.modeLeaf     = byPath.get("trials_mode");
     this.modelLeaf    = byPath.get("backbone_name");
     this.gpusLeaf     = byPath.get("gpus");
+    this.seedsLeaf    = byPath.get("seeds");
     this.featuresLeaf = byPath.get("ablation_features");
     this.catalogLeaf  = byPath.get("ablation_catalog");
     this.fullLeaf     = byPath.get("ablation_include_full");
@@ -2928,7 +2969,7 @@ class AblationBuilder {
     if (!this.summaryEl) return;
     const n    = this._features().length;
     const runs = n + (this._full() ? 1 : 0);
-    this.summaryEl.textContent = `${n} feature${n === 1 ? "" : "s"} = ${runs} run${runs === 1 ? "" : "s"} (full to baseline)${this._gpusSuffix()}`;
+    this.summaryEl.textContent = `${n} feature${n === 1 ? "" : "s"} = ${runs} trial${runs === 1 ? "" : "s"} (full to baseline)${SeedAxisNote.suffix(this.view, this.seedsLeaf, runs)}${this._gpusSuffix()}`;
   }
 
   _paintNames() {
@@ -2961,6 +3002,8 @@ class AblationBuilder {
       more.textContent = `+${names.length - limit} more`;
       this.namesEl.appendChild(more);
     }
+
+    SeedAxisNote.append(this.namesEl, this.view, this.seedsLeaf);
   }
 
   _repaint() {
