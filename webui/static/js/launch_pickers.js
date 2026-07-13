@@ -242,6 +242,11 @@ class DatasetPicker {
     head.appendChild(this.filter);
     head.appendChild(window.LaunchWidgetDom.mini("All", () => this._setAll(true)));
     head.appendChild(window.LaunchWidgetDom.mini("None", () => this._setAll(false)));
+    if (this.spec.pendingButton) {
+      const pending = window.LaunchWidgetDom.mini("Pending", () => this._setPending());
+      pending.title = "select runs with a checkpoint and no inference yet";
+      head.appendChild(pending);
+    }
     head.appendChild(window.LaunchWidgetDom.mini("Reload", () => this._loadMulti()));
 
     this.body = document.createElement("div");
@@ -357,6 +362,17 @@ class DatasetPicker {
 
   _setAll(on) {
     this._visibleNames().forEach((n) => (on ? this.selected.add(n) : this.selected.delete(n)));
+    this._renderItems();
+    this._commitMulti();
+  }
+
+  _setPending() {
+    const visible = new Set(this._visibleNames());
+    this.items.forEach((d) => {
+      if (!visible.has(d.name)) return;
+      if (d.has_checkpoint && !d.has_inference) this.selected.add(d.name);
+      else this.selected.delete(d.name);
+    });
     this._renderItems();
     this._commitMulti();
   }
