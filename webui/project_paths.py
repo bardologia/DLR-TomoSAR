@@ -106,6 +106,7 @@ class ProjectPaths:
         "compare_preprocessing_trials"    : "analysis",
         "compare_param_extraction_trials" : "analysis",
         "compare_runs"              : "analysis",
+        "compare_seeds"             : "analysis",
         "xray_weights"              : "analysis",
         "export_tensorboard_plots"  : "analysis",
         "collect_reports"           : "analysis",

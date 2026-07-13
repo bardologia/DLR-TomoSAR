@@ -12,7 +12,7 @@ class BackboneInferenceRunner:
         from pipelines.backbone.inference.pipeline import InferencePipeline
         from pipelines.shared.inference.inference_components import InferenceComponentsResolver
 
-        config     = replace(self.entry.inference, run_directory=Path(run_directory))
+        config     = replace(self.entry.inference, run_directory=Path(run_directory), output_subdir=None)
         components = InferenceComponentsResolver.for_run(Path(run_directory))
 
         InferencePipeline(config, components=components).run()

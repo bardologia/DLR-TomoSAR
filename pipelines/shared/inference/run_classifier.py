@@ -19,6 +19,23 @@ class RunArtifacts:
     DUAL_CONFIG       = "dual_model_config.json"
 
 
+class RunDirectoryWalk:
+
+    MARKER    = "meta"
+    MAX_DEPTH = 6
+
+    @classmethod
+    def walk(cls, root: Path, depth: int = 0):
+        for entry in sorted(Path(root).iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+
+            if (entry / cls.MARKER).is_dir():
+                yield entry
+            elif depth < cls.MAX_DEPTH:
+                yield from cls.walk(entry, depth + 1)
+
+
 class RunClassifier:
 
     TYPE_ARTIFACTS = (

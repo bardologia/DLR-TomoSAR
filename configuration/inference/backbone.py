@@ -13,7 +13,6 @@ _RUNS_ROOT = "/ste/rnd/User/vice_vi/DLR-TomoSAR/runs"
 class BackboneInferenceEntryConfig:
     runs_dir        : str       = _RUNS_ROOT
     run_filter      : List[str] = field(default_factory=list)
-    seed_group      : bool      = False
     gpus            : List[int] = field(default_factory=lambda: [0])
     poll_interval_s : float     = 5.0
 

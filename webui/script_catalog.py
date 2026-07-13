@@ -50,7 +50,7 @@ class ScriptCatalog:
         "infer_backbone": {
             "title"     : "Infer Backbone",
             "category"  : "Inference",
-            "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs. With seed_group the selected runs are treated as seed replicas of one training and an extra mean ± std seed-group report is written to their common parent.",
+            "purpose"   : "Backbone and JEPA inference: sliding-window prediction, stitched cubes, and reports. Sweeps every run root and runs only backbone/JEPA runs.",
         },
         "infer_profile_autoencoder": {
             "title"     : "Infer Profile AE",
@@ -127,6 +127,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Rebuild the benchmark comparison report for an existing benchmark run: seed-aggregated leaderboard against the capacity-matched reference, without re-running training or inference.",
         },
+        "compare_seeds": {
+            "title"     : "Compare Seeds",
+            "category"  : "Analysis",
+            "purpose"   : "Aggregate the existing inference results of the seed runs nested inside a multi-seed training directory into a seed-comparison report: across-seed mean ± std of every scalar metric with per-seed columns and links to each seed's full report. Select one or more group directories and each is compared in isolation, reports generated in sequence — pure report generation from each run's latest (or a chosen) inference, without re-running inference.",
+        },
         "xray_weights": {
             "title"     : "X-Ray Weights",
             "category"  : "Analysis",
@@ -182,12 +187,13 @@ class ScriptCatalog:
         "compare": {
             "title"    : "Compare",
             "category" : "Analysis",
-            "purpose"  : "Compare a family of trials side by side. Pick the stage to compare: preprocessing windows, Gaussian-fit parameter extraction, or inference results across training runs.",
+            "purpose"  : "Compare a family of trials side by side. Pick the stage to compare: preprocessing windows, Gaussian-fit parameter extraction, inference results across training runs, or seed replicas of one training.",
             "members"  : [
                 ("compare_preprocessing_trials",    "Preprocessing"),
                 ("compare_param_extraction_trials", "Param Extraction"),
                 ("compare_trials",                  "Inference Trials"),
                 ("compare_runs",                    "Benchmark Runs"),
+                ("compare_seeds",                   "Seed Runs"),
             ],
         },
     }

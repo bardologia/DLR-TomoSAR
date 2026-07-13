@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib  import Path
 
-from pipelines.shared.inference.run_classifier import RunClassifier
+from pipelines.shared.inference.run_classifier import RunClassifier, RunDirectoryWalk
 from tools.monitoring.logger                   import Logger
 from tools.orchestration.gpu_queue             import GpuJob, GpuJobResult, GpuQueue
 from tools.runtime.config_cli                  import ConfigCli
@@ -12,16 +12,12 @@ from tools.runtime.run_tag                     import RunTag
 
 class InferenceScheduler:
 
-    RUN_MARKER    = "meta"
-    RUN_MAX_DEPTH = 6
-
     def __init__(self, config, entry_script: Path, run_type: str) -> None:
         self.config       = config
         self.entry_script = entry_script
         self.run_type     = run_type
         self.runs_dir     = Path(config.runs_dir)
         self.work_dir     = Path("logs") / "inference" / run_type / RunTag.now()
-        self.run_dirs     = []
 
     def _root(self, logger: Logger) -> Path | None:
         if self.runs_dir.is_dir():
@@ -42,17 +38,7 @@ class InferenceScheduler:
                 raise FileNotFoundError(f"No run directory named {missing} found under {root}")
             return sorted(selected)
 
-        return sorted(self._discover_runs(root, 0))
-
-    def _discover_runs(self, directory: Path, depth: int):
-        for entry in sorted(directory.iterdir()):
-            if not entry.is_dir() or entry.name.startswith("."):
-                continue
-
-            if (entry / self.RUN_MARKER).is_dir():
-                yield entry
-            elif depth < self.RUN_MAX_DEPTH:
-                yield from self._discover_runs(entry, depth + 1)
+        return sorted(RunDirectoryWalk.walk(root))
 
     def _run_dirs(self, logger: Logger) -> list[Path]:
         candidates = self._candidate_dirs(logger)
@@ -87,10 +73,9 @@ class InferenceScheduler:
         with Logger(log_dir=str(self.work_dir), name="inference") as logger:
             logger.section("Inference")
 
-            run_dirs      = self._run_dirs(logger)
-            self.run_dirs = run_dirs
-            config_path   = self._worker_config()
-            jobs          = self._jobs(run_dirs, config_path)
+            run_dirs    = self._run_dirs(logger)
+            config_path = self._worker_config()
+            jobs        = self._jobs(run_dirs, config_path)
 
             logger.kv_table({
                 "Run type"  : self.run_type,

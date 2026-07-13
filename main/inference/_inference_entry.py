@@ -64,14 +64,12 @@ class InferenceEntry:
     def _scheduler(self) -> None:
         EnvironmentPinner.threads()
 
-        from pipelines.backbone.inference.seed_group         import BackboneInferenceScheduler
         from pipelines.shared.inference.inference_scheduler import InferenceScheduler
         from tools.runtime.config_cli            import ConfigCli
 
         config = ConfigCli(self._entry_config(), description=self.DESCRIPTIONS[self.run_type]).apply()
 
-        scheduler_class = BackboneInferenceScheduler if self.run_type == RunType.BACKBONE else InferenceScheduler
-        results         = scheduler_class(config=config, entry_script=self.entry_script, run_type=self.run_type).run()
+        results = InferenceScheduler(config=config, entry_script=self.entry_script, run_type=self.run_type).run()
 
         if any(result.status != "DONE" for result in results):
             sys.exit(1)

@@ -362,16 +362,8 @@ class LaunchLayout:
         "poll_interval_s",
     ]
 
-    INFER_BACKBONE_ESSENTIALS = [
-        "runs_dir",
-        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
-        "seed_group",
-        {"path": "gpus", "widget": GPU_MANY},
-        "poll_interval_s",
-    ]
-
     INFER_BACKBONE_LAYOUT = {
-        "essentials": INFER_BACKBONE_ESSENTIALS,
+        "essentials": INFER_ESSENTIALS,
         "sections": [
             {"key": "backbone", "title": "Backbone", "panels": [
                 {"kind": "fields", "title": "Backbone inference", "template": "inference_full", "at": "inference"},
@@ -997,6 +989,19 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Run", "fields": ["paths.log_base_dir", "run_tag"]},
                         {"title": "Report", "fields": ["reference_model", "embed_images"]},
+                    ]},
+                ]},
+            ],
+        },
+        "compare_seeds": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Seed groups", "fields": [
+                            "runs_dir",
+                            {"path": "group_tags", "widget": {"kind": "dataset", "mode": "run_groups", "multi": True, "baseFrom": "runs_dir"}},
+                        ]},
+                        {"title": "Report", "fields": ["inference_subdir", "output_subdir", "metrics_filename", "report_filename"]},
                     ]},
                 ]},
             ],

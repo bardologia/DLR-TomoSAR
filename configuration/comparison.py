@@ -34,6 +34,18 @@ class PreprocessingComparisonConfig:
 
 
 @dataclass
+class SeedComparisonConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs")
+    group_tags : List[str] = field(default_factory=list)
+
+    inference_subdir : str = ""
+    output_subdir    : str = ""
+
+    metrics_filename : str = "metrics.json"
+    report_filename  : str = "report.md"
+
+
+@dataclass
 class ComparisonPathsConfig:
     log_base_dir : Path = RunPathsConfig.log_base_dir
 

@@ -64,6 +64,29 @@ class DatasetBrowser:
         self.logger.info(f"runs: listed {len(entries)} under {base_label}")
         return {"ok": True, "base": base_label, "runs": entries}
 
+    def run_groups(self, raw_bases: list[str]) -> dict:
+        roots = [resolved for resolved in (self._directory(raw) for raw in raw_bases) if resolved is not None]
+        if not roots:
+            return {"ok": False, "error": f"no run roots: {raw_bases}"}
+
+        entries = []
+        for base in roots:
+            groups: dict[Path, int] = {}
+            for run_dir in self._run_dirs(base):
+                if run_dir.parent != base:
+                    groups[run_dir.parent] = groups.get(run_dir.parent, 0) + 1
+
+            for group_dir, n_runs in sorted(groups.items()):
+                entries.append({
+                    "name"   : str(group_dir.relative_to(base)),
+                    "path"   : str(group_dir),
+                    "n_runs" : n_runs,
+                })
+
+        base_label = ", ".join(str(root) for root in roots)
+        self.logger.info(f"run_groups: listed {len(entries)} under {base_label}")
+        return {"ok": True, "base": base_label, "groups": entries}
+
     def params(self, raw_dataset: str) -> dict:
         dataset = self._directory(raw_dataset)
         if dataset is None:

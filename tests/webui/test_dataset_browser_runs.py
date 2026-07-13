@@ -62,3 +62,20 @@ def test_walk_prunes_at_run_boundary_and_skips_hidden(tmp_path):
     assert names == ["run_top"]
     assert not any("meta" in name.split("/")[-1] for name in names)
     assert not any("inference" in name for name in names)
+
+
+def test_run_groups_lists_parent_dirs_of_runs_with_counts(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "group_a" / "seed0")
+    _make_run(runs / "group_a" / "seed1")
+    _make_run(runs / "group_b" / "seed0")
+    _make_run(runs / "run_top")
+
+    result  = DatasetBrowser(WebLogger()).run_groups([str(runs)])
+    entries = {entry["name"]: entry for entry in result["groups"]}
+
+    assert result["ok"] is True
+    assert sorted(entries) == ["group_a", "group_b"]
+    assert entries["group_a"]["n_runs"] == 2
+    assert entries["group_b"]["n_runs"] == 1
+    assert Path(entries["group_a"]["path"]) == runs / "group_a"
