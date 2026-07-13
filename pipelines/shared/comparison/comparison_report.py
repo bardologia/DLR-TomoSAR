@@ -158,6 +158,8 @@ class ComparisonReport(ComparisonReportBase):
             lines.append("")
 
         lines += ["## Training\n"]
+        if self.has_seed_sweep:
+            lines += ["Seed-swept models aggregate their seed runs: losses and metrics are seed means (± sample std), while the inference figures and report come from one representative seed.\n"]
         lines += self._training_table()
         lines.append("")
 
@@ -186,7 +188,10 @@ class ComparisonReport(ComparisonReportBase):
         return table.render()
 
     def _training_table(self) -> list[str]:
-        table = MarkdownTable(["Model", "Status", "Best epoch", "Best val loss", "Epochs run", "Duration"])
+        headers = ["Model", "Status", "Best epoch", "Best val loss", "Epochs run", "Duration"]
+        if self.has_seed_sweep:
+            headers.insert(1, "Seeds")
+        table = MarkdownTable(headers)
 
         for r in self.records:
             duration_s = r.training_result.get("duration_s")
@@ -194,14 +199,17 @@ class ComparisonReport(ComparisonReportBase):
 
             best_val_loss_std = self.seed_dispersion.get(r.name, {}).get("best_val_loss_std")
 
-            table.add_row(
+            cells = [
                 f"`{r.name}`",
                 r.training_result.get("status", "—"),
                 ScalarFormatter.format_scalar(r.checkpoint.get("best_epoch")),
                 self._seed_annotated(ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")), best_val_loss_std),
                 ScalarFormatter.format_scalar(r.checkpoint.get("n_train_epochs")),
                 duration,
-            )
+            ]
+            if self.has_seed_sweep:
+                cells.insert(1, str(self.seed_dispersion.get(r.name, {}).get("n_seeds", 1)))
+            table.add_row(*cells)
 
         return table.render()
 

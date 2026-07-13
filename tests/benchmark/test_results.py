@@ -333,3 +333,20 @@ def test_write_all_round_trips_summary_json(tmp_path, logger_stub):
     assert names == {"unet", "resunet"}
     assert (out_dir / "benchmark_overview.md").exists()
     assert (out_dir / "metrics_comparison.md").exists()
+
+
+def test_training_table_shows_seed_counts_under_a_sweep(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = ComparisonReport(
+        records         = records,
+        out_dir         = tmp_path,
+        reference_model = "unet",
+        embed_images    = False,
+        logger          = logger_stub,
+        seed_dispersion = {"unet": {"n_seeds": 3, "best_val_loss_std": 0.01, "metrics": {}}},
+    )
+
+    lines = "\n".join(report._training_table())
+
+    assert "Seeds" in lines
+    assert "| 3" in lines.replace("  ", " ")
