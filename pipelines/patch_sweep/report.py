@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import gc
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib     import Path
 
 import matplotlib
@@ -11,7 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from pipelines.patch_sweep.planner import PatchSweepPlanner, SweepUnit
+from pipelines.patch_sweep.planner                import PatchSweepPlanner, SweepUnit
+from pipelines.shared.comparison.trial_collection import SeedAggregation
 from tools.data.io                 import FileIO
 from tools.monitoring.logger       import Logger
 from tools.reporting.markdown      import MarkdownDoc, MarkdownTable, ScalarFormatter
@@ -20,12 +22,16 @@ from tools.reporting.plotting      import PlotBase
 
 @dataclass
 class SweepRecord:
-    unit          : SweepUnit
-    status        : str
-    duration_s    : float | None
-    test_loss     : float | None
-    best_val_loss : float | None
-    best_epoch    : int | None
+    unit              : SweepUnit
+    status            : str
+    duration_s        : float | None
+    test_loss         : float | None
+    best_val_loss     : float | None
+    best_epoch        : float | None
+    n_seeds           : int          = 1
+    test_loss_std     : float | None = None
+    best_val_loss_std : float | None = None
+    seed_runs         : list[dict]   = field(default_factory=list)
 
     @property
     def complete(self) -> bool:
@@ -33,6 +39,9 @@ class SweepRecord:
 
 
 class SweepCollector:
+
+    SEED_DIR_PATTERN = re.compile(r"seed\d+")
+
     def __init__(self, run_dir: Path, planner: PatchSweepPlanner, logger: Logger) -> None:
         self.run_dir      = run_dir
         self.training_dir = run_dir / "training"
@@ -68,28 +77,69 @@ class SweepCollector:
         return (float(best_val_loss) if best_val_loss is not None else None,
                 int(best_epoch)      if best_epoch    is not None else None)
 
+    def _seed_runs(self, unit_dir: Path) -> list[tuple[str | None, Path]]:
+        if unit_dir.is_dir():
+            seed_dirs = sorted(d for d in unit_dir.iterdir() if d.is_dir() and self.SEED_DIR_PATTERN.fullmatch(d.name))
+            if seed_dirs:
+                return [(seed_dir.name, seed_dir) for seed_dir in seed_dirs]
+
+        return [(None, unit_dir)]
+
+    def _collect_seed_run(self, unit: SweepUnit, seed_name: str | None, run_dir: Path, results: dict) -> dict:
+        name   = unit.name if seed_name is None else f"{unit.name}/{seed_name}"
+        result = results.get(name, {})
+
+        test_loss                 = self._test_loss(run_dir)
+        best_val_loss, best_epoch = self._checkpoint_fields(run_dir)
+
+        return {
+            "name"          : name,
+            "status"        : result.get("status", "MISSING"),
+            "duration_s"    : result.get("duration_s"),
+            "test_loss"     : test_loss,
+            "best_val_loss" : best_val_loss,
+            "best_epoch"    : best_epoch,
+        }
+
+    @staticmethod
+    def _status(runs: list[dict]) -> str:
+        statuses = [run["status"] for run in runs]
+
+        if all(status == "DONE" for status in statuses):
+            return "DONE"
+        if any(status == "DONE" for status in statuses):
+            return "PARTIAL"
+        return statuses[0] if len(set(statuses)) == 1 else "MISSING"
+
+    def _aggregate(self, unit: SweepUnit, runs: list[dict]) -> SweepRecord:
+        means, stds = SeedAggregation.aggregate(runs, ["test_loss", "best_val_loss", "best_epoch", "duration_s"])
+
+        return SweepRecord(
+            unit              = unit,
+            status            = self._status(runs),
+            duration_s        = means.get("duration_s"),
+            test_loss         = means.get("test_loss"),
+            best_val_loss     = means.get("best_val_loss"),
+            best_epoch        = means.get("best_epoch"),
+            n_seeds           = len(runs),
+            test_loss_std     = stds.get("test_loss"),
+            best_val_loss_std = stds.get("best_val_loss"),
+            seed_runs         = runs,
+        )
+
     def collect(self) -> list[SweepRecord]:
         results = self._training_results()
 
         records = []
         for unit in self.planner.units():
             unit_dir = self.training_dir / unit.name
-            result   = results.get(unit.name, {})
+            runs     = [self._collect_seed_run(unit, seed_name, run_dir, results) for seed_name, run_dir in self._seed_runs(unit_dir)]
+            record   = self._aggregate(unit, runs)
 
-            test_loss                 = self._test_loss(unit_dir)
-            best_val_loss, best_epoch = self._checkpoint_fields(unit_dir)
-
-            if test_loss is None:
+            if record.test_loss is None:
                 self.logger.warning(f"{unit.name}: no test metrics, excluded from the ranking")
 
-            records.append(SweepRecord(
-                unit          = unit,
-                status        = result.get("status", "MISSING"),
-                duration_s    = result.get("duration_s"),
-                test_loss     = test_loss,
-                best_val_loss = best_val_loss,
-                best_epoch    = best_epoch,
-            ))
+            records.append(record)
 
         return records
 
@@ -102,15 +152,28 @@ class SweepPlots(PlotBase):
 
         self._apply_style()
 
+    def _band(self, ax, records: list[SweepRecord], value_key: str, std_key: str, color: str) -> None:
+        with_std = [record for record in records if getattr(record, std_key) is not None]
+        if len(with_std) < 2:
+            return
+
+        sizes  = np.array([record.unit.patch_size for record in with_std], dtype=np.float64)
+        means  = np.array([getattr(record, value_key) for record in with_std], dtype=np.float64)
+        stds   = np.array([getattr(record, std_key)   for record in with_std], dtype=np.float64)
+
+        ax.fill_between(sizes, means - stds, means + stds, color=color, alpha=0.15, linewidth=0)
+
     def curve(self, track_count: int, records: list[SweepRecord], predicted: float) -> Path:
         complete = [record for record in records if record.complete]
 
         fig, ax = plt.subplots(figsize=(5.2, 3.6))
 
         ax.plot([r.unit.patch_size for r in complete], [r.test_loss for r in complete], marker="o", color="#B03052", label="test loss")
+        self._band(ax, complete, "test_loss", "test_loss_std", "#B03052")
 
         with_val = [record for record in records if record.best_val_loss is not None]
         ax.plot([r.unit.patch_size for r in with_val], [r.best_val_loss for r in with_val], marker="s", color="#787880", label="best validation loss")
+        self._band(ax, with_val, "best_val_loss", "best_val_loss_std", "#787880")
 
         ax.axvline(predicted, color="#1E6E46", linestyle="--", linewidth=1.0, label=rf"predicted $W^{{*}} = {predicted:.1f}$ px")
 
@@ -172,14 +235,18 @@ class PatchSweepReport:
                 "best_patch_size"  : best.unit.patch_size if best else None,
                 "best_test_loss"   : best.test_loss       if best else None,
                 "units"            : [{
-                    "name"          : record.unit.name,
-                    "patch_size"    : record.unit.patch_size,
-                    "patch_stride"  : record.unit.patch_stride,
-                    "batch_size"    : record.unit.batch_size,
-                    "status"        : record.status,
-                    "test_loss"     : record.test_loss,
-                    "best_val_loss" : record.best_val_loss,
-                    "best_epoch"    : record.best_epoch,
+                    "name"              : record.unit.name,
+                    "patch_size"        : record.unit.patch_size,
+                    "patch_stride"      : record.unit.patch_stride,
+                    "batch_size"        : record.unit.batch_size,
+                    "status"            : record.status,
+                    "n_seeds"           : record.n_seeds,
+                    "test_loss"         : record.test_loss,
+                    "test_loss_std"     : record.test_loss_std,
+                    "best_val_loss"     : record.best_val_loss,
+                    "best_val_loss_std" : record.best_val_loss_std,
+                    "best_epoch"        : record.best_epoch,
+                    "seed_runs"         : record.seed_runs,
                 } for record in group],
             }
 
@@ -225,13 +292,21 @@ class PatchSweepReport:
                 f"{predicted:.1f}",
                 best.unit.patch_size,
                 f"{best.unit.patch_size / predicted:.2f}",
-                ScalarFormatter.format_scalar(best.test_loss),
+                self._with_std(best.test_loss, best.test_loss_std),
             )
 
         return table
 
+    @staticmethod
+    def _with_std(value: float | None, std: float | None) -> str | None:
+        if value is None:
+            return None
+
+        rendered = ScalarFormatter.format_scalar(value)
+        return rendered if std is None else f"{rendered} ± {ScalarFormatter.format_scalar(std)}"
+
     def _group_table(self, group: list[SweepRecord], best: SweepRecord | None) -> MarkdownTable:
-        table = MarkdownTable(["Patch (px)", "Stride", "Batch", "Test loss", "Best val loss", "Best epoch", "Status"], align=["right"] * 7)
+        table = MarkdownTable(["Patch (px)", "Stride", "Batch", "Seeds", "Test loss", "Best val loss", "Best epoch", "Status"], align=["right"] * 8)
 
         for record in group:
             patch = f"**{record.unit.patch_size}**" if best is not None and record is best else str(record.unit.patch_size)
@@ -239,9 +314,10 @@ class PatchSweepReport:
                 patch,
                 record.unit.patch_stride,
                 record.unit.batch_size,
-                ScalarFormatter.format_scalar(record.test_loss),
-                ScalarFormatter.format_scalar(record.best_val_loss),
-                record.best_epoch,
+                record.n_seeds,
+                self._with_std(record.test_loss, record.test_loss_std),
+                self._with_std(record.best_val_loss, record.best_val_loss_std),
+                ScalarFormatter.format_scalar(record.best_epoch),
                 record.status,
             )
 
@@ -258,7 +334,8 @@ class PatchSweepReport:
             "Boxcar window w"  : config.boxcar_window,
             "Total tracks N"   : self.planner.total_tracks,
             "Patch step"       : self.planner.patch_step(),
-            "Ranking metric"   : "test avg_loss at the restored best-validation checkpoint",
+            "Seeds"            : config.seeds or [config.seed],
+            "Ranking metric"   : "seed-mean test avg_loss at the restored best-validation checkpoint",
         })
 
         doc.heading("Best patch size per track count", level=2)

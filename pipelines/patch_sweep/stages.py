@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from configuration.patch_sweep     import PatchSweepConfig
-from pipelines.patch_sweep.planner import PatchSweepPlanner
-from pipelines.patch_sweep.report  import PatchSweepReport, SweepCollector
-from tools                         import ExperimentStage, QueuedTrainingStage
-from tools.monitoring.logger       import Logger
-from tools.runtime.run_tag         import RunTag
+from configuration.patch_sweep            import PatchSweepConfig
+from pipelines.patch_sweep.planner        import PatchSweepPlanner
+from pipelines.patch_sweep.report         import PatchSweepReport, SweepCollector
+from pipelines.shared.training.seed_sweep import SeedSet
+from tools                                import ExperimentStage, GpuJob, QueuedTrainingStage
+from tools.monitoring.logger              import Logger
+from tools.runtime.run_tag                import RunTag
 
 
 class SweepTrainingStage(QueuedTrainingStage):
     def __init__(self, config: PatchSweepConfig, entry_script: Path, run_tag: str, planner: PatchSweepPlanner, logger: Logger) -> None:
-        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=[unit.name for unit in planner.units()], logger=logger)
+        units      = SeedSet.units([unit.name for unit in planner.units()], config.seeds)
+        self._unit = {run_name: (unit_name, seed) for unit_name, seed, run_name in units}
+        super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=[run_name for _, _, run_name in units], logger=logger)
         self.planner = planner
 
     def _config_kv(self) -> dict:
@@ -20,14 +24,21 @@ class SweepTrainingStage(QueuedTrainingStage):
             "Model"        : f"{self.config.backbone_name}-{self.config.backbone_head}",
             "Track counts" : sorted(self.config.track_counts),
             "Patch sizes"  : self.planner.patch_sizes(),
+            "Seeds"        : self.config.seeds or "—",
             "Units"        : len(self.items),
             "Epochs"       : self.config.training.epochs,
             "GPUs"         : self.config.gpus,
             "Stage dir"    : str(self.stage_dir),
         }
 
-    def _worker_flag(self) -> str:
-        return "--unit"
+    def _job(self, item: str) -> GpuJob:
+        unit_name, seed = self._unit[item]
+
+        return GpuJob(
+            name     = item,
+            command  = [sys.executable, str(self.entry_script), "--worker", self.worker_action, "--unit", unit_name, *SeedSet.cli_args(seed), "--run-tag", self.run_tag, "--run-dir", str(self.run_dir)],
+            log_path = self.stage_dir / item / self.worker_logname,
+        )
 
     def _has_checkpoint(self, item: str) -> bool:
         if not self.config.resume:

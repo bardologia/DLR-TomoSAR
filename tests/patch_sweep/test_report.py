@@ -139,3 +139,59 @@ def test_markdown_reports_the_ranking_metric_and_prediction(tmp_path, logger):
     assert "W* = w sqrt(N/n)" in text
     assert "48.2" in text
     assert "n = 5 tracks" in text
+
+
+def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int]) -> None:
+    results = []
+    for unit in planner.units():
+        for offset, seed in enumerate(seeds):
+            run_dir = root / "training" / unit.name / f"seed{seed}"
+            loss    = synthetic_loss(planner, unit) + 0.01 * offset
+
+            meta = run_dir / "meta"
+            meta.mkdir(parents=True, exist_ok=True)
+            (meta / "test_metrics.json").write_text(json.dumps({"avg_loss": loss, "num_batches": 4}))
+
+            checkpoints = run_dir / "checkpoints"
+            checkpoints.mkdir(parents=True, exist_ok=True)
+            torch.save({"best_val_loss": loss * 1.05, "best_epoch": 12}, checkpoints / "best_model.pt")
+
+            results.append({"name": f"{unit.name}/seed{seed}", "status": "DONE", "duration_s": 60.0, "gpu": 0, "returncode": 0, "log_file": ""})
+
+    pipeline_dir = root / "pipeline"
+    pipeline_dir.mkdir(parents=True, exist_ok=True)
+    (pipeline_dir / "training_results.json").write_text(json.dumps(results))
+
+
+def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
+    planner = make_planner([5], maximum=16)
+    populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
+
+    records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
+
+    assert all(record.n_seeds == 2 for record in records)
+    assert all(record.status == "DONE" for record in records)
+    assert all(record.test_loss_std is not None for record in records)
+
+    unit     = records[0].unit
+    expected = synthetic_loss(planner, unit) + 0.005
+    assert records[0].test_loss == pytest.approx(expected)
+    assert [run["name"] for run in records[0].seed_runs] == [f"{unit.name}/seed0", f"{unit.name}/seed1"]
+
+
+def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
+    planner = make_planner([5], maximum=16)
+    populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
+
+    records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
+    out_dir = tmp_path / "report"
+    PatchSweepReport(records=records, planner=planner, out_dir=out_dir, logger=logger).write_all()
+
+    markdown = (out_dir / "report.md").read_text()
+    payload  = json.loads((out_dir / "patch_sweep.json").read_text())
+
+    assert "±" in markdown
+    unit_payload = payload["track_counts"]["5"]["units"][0]
+    assert unit_payload["n_seeds"] == 2
+    assert unit_payload["test_loss_std"] is not None
+    assert len(unit_payload["seed_runs"]) == 2

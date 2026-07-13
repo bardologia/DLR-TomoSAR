@@ -26,7 +26,7 @@ def _scheduler() -> None:
     pipeline.run()
 
 
-def _worker(unit: str, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
+def _worker(unit: str, seed: int | None, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
     EnvironmentPinner.gpu(gpu_id)
 
     from configuration.patch_sweep      import PatchSweepConfig
@@ -35,13 +35,14 @@ def _worker(unit: str, gpu_id: int, run_tag: str, run_dir: str | None) -> None:
 
     config = ConfigCli.load_worker_config(PatchSweepConfig(), run_tag, run_dir)
 
-    SweepTrainingWorker(config=config, run_tag=run_tag).run(unit_name=unit)
+    SweepTrainingWorker(config=config, run_tag=run_tag).run(unit_name=unit, seed=seed)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--worker",  type=str, default=None, choices=["train"])
     parser.add_argument("--unit",    type=str, default=None)
+    parser.add_argument("--seed",    type=int, default=None)
     parser.add_argument("--gpu",     type=int, default=0)
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--run-dir", type=str, default=None)
@@ -50,7 +51,7 @@ def main() -> None:
     if args.worker:
         if args.unit is None or args.run_tag is None:
             sys.exit("ERROR: --worker requires --unit and --run-tag")
-        _worker(unit=args.unit, gpu_id=args.gpu, run_tag=args.run_tag, run_dir=args.run_dir)
+        _worker(unit=args.unit, seed=args.seed, gpu_id=args.gpu, run_tag=args.run_tag, run_dir=args.run_dir)
     else:
         _scheduler()
 
