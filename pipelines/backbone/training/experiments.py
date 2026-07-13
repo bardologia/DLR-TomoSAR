@@ -57,12 +57,33 @@ class WarmupTrialPlanner(TrialPlanner):
 
 class SlotPresenceTrialPlanner:
 
+    FLAG_KEYS = ("use_active_normalization", "presence_balance")
+
     def __init__(self, presence_trials: dict) -> None:
         self.presence_trials = presence_trials
 
+        self._validate()
+
+    def _validate(self) -> None:
+        if not self.presence_trials:
+            raise ValueError("presence_trials must list at least one trial")
+
+        for label, spec in self.presence_trials.items():
+            missing = [key for key in self.FLAG_KEYS if key not in spec]
+            if missing:
+                raise ValueError(f"Presence trial '{label}' must set {missing}; every trial defines all of {self.FLAG_KEYS}")
+
+            unknown = [key for key in spec if key not in self.FLAG_KEYS]
+            if unknown:
+                raise ValueError(f"Presence trial '{label}' has unknown keys {unknown}; allowed keys are {self.FLAG_KEYS}")
+
+            non_bool = [key for key in self.FLAG_KEYS if not isinstance(spec[key], bool)]
+            if non_bool:
+                raise ValueError(f"Presence trial '{label}' must set {non_bool} to booleans, got {spec}")
+
     def summary(self) -> dict:
         return {
-            "Presence trials" : len(self.presence_trials),
+            "Presence trials" : list(self.presence_trials),
             "Total runs"      : len(self.presence_trials),
         }
 

@@ -78,13 +78,38 @@ def test_presence_planner_default_matrix():
 
     plans = dict(planner.plan())
 
-    assert len(plans) == 10
-    assert "pr-none" in plans
-    assert plans["pr-none"] == {"curriculum.enabled": False}
+    assert list(plans) == ["pr-none", "pr-A", "pr-B", "pr-AB"]
 
-    for name, overrides in plans.items():
-        if overrides.get("curriculum.warmup.amp_focal_gamma"):
-            assert overrides["curriculum.warmup.amp_focal_gamma"] > 0.0
+    expected = {
+        "pr-none" : (False, False),
+        "pr-A"    : (True,  False),
+        "pr-B"    : (False, True),
+        "pr-AB"   : (True,  True),
+    }
+    for name, (active_norm, balance) in expected.items():
+        assert plans[name]["curriculum.enabled"]                                is False
+        assert plans[name]["curriculum.complete.use_active_normalization"]      is active_norm
+        assert plans[name]["curriculum.complete.presence_balance"]              is balance
+
+
+def test_presence_planner_rejects_missing_flag():
+    with pytest.raises(ValueError, match="must set"):
+        SlotPresenceTrialPlanner({"A": {"use_active_normalization": True}})
+
+
+def test_presence_planner_rejects_unknown_key():
+    with pytest.raises(ValueError, match="unknown keys"):
+        SlotPresenceTrialPlanner({"F": {"use_active_normalization": True, "presence_balance": False, "amp_focal_gamma": 2.0}})
+
+
+def test_presence_planner_rejects_non_boolean_flag():
+    with pytest.raises(ValueError, match="booleans"):
+        SlotPresenceTrialPlanner({"A": {"use_active_normalization": 1.0, "presence_balance": False}})
+
+
+def test_presence_planner_rejects_empty_trials():
+    with pytest.raises(ValueError, match="at least one"):
+        SlotPresenceTrialPlanner({})
 
 
 def test_patch_planner_emits_size_and_stride():

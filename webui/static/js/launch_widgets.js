@@ -405,7 +405,7 @@ class ExperimentBuilder {
     { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one trial per pair plus an optional base-only baseline" },
     { key: "secondary",  label: "secondaries", hint: "one trial per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end" },
-    { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one trial per cell" },
+    { key: "presence",   label: "slot presence", hint: "active-normalization x presence-balance matrix (none, A, B, AB), curriculum disabled, one trial per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
     { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
@@ -442,11 +442,6 @@ class ExperimentBuilder {
     "param_huber", "param_mse", "smoothness_tv", "param_l1",
   ];
 
-  static PRESENCE_MATCHES = [
-    { label: "sort", strategy: "sort_gt_by_mu" },
-    { label: "hung", strategy: "hungarian_active" },
-  ];
-
   static STRATEGIES = [
     { key: "uniform",     note: "each trial samples n_secondaries distinct tracks uniformly, n_trials distinct sets" },
     { key: "gaussian",    note: "indices drawn from Normal(mean, sigma) over the secondary list, mean and sigma required" },
@@ -475,7 +470,6 @@ class ExperimentBuilder {
     this.seedsLeaf    = byPath.get("seeds");
 
     this.presenceTrialsLeaf = byPath.get("presence_trials");
-    this.presenceMatchLeaf  = byPath.get("presence_match_strategies");
 
     this.inputTrialsLeaf   = byPath.get("input_trials");
     this.contextTrialsLeaf = byPath.get("context_trials");
@@ -501,7 +495,6 @@ class ExperimentBuilder {
     this.pair.forEach((leaf) => this.claimed.push(leaf.path));
     this.headTrials.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
-    if (this.presenceMatchLeaf)    this.claimed.push(this.presenceMatchLeaf.path);
     if (this.inputTrialsLeaf)      this.claimed.push(this.inputTrialsLeaf.path);
     if (this.contextTrialsLeaf)    this.claimed.push(this.contextTrialsLeaf.path);
 
@@ -1399,28 +1392,28 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
-  _presenceMatchMap() {
-    if (!this.presenceMatchLeaf) return {};
+  _presenceDefaults() {
+    if (!this.presenceTrialsLeaf) return {};
     try {
-      const raw = PythonLiteral.parse(this.view._effective(this.presenceMatchLeaf));
+      const raw = PythonLiteral.parse(this.presenceTrialsLeaf.value);
       return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     } catch (e) {
       return {};
     }
   }
 
-  _presenceStrategies() {
-    return Object.keys(this._presenceMatchMap());
+  _presenceTrials() {
+    if (!this.presenceTrialsLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
   }
 
   _presenceCells() {
-    if (!this.presenceTrialsLeaf) return [];
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? Object.keys(raw) : [];
-    } catch (e) {
-      return [];
-    }
+    return Object.keys(this._presenceTrials());
   }
 
   _presencePanel() {
@@ -1436,19 +1429,11 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Toggle matching strategies and drop cells to trim the fan-out. Cell weights and adding new cells live in code (_default_presence_trials); use reset matrix to restore the full default.";
-
-    const matchHead       = document.createElement("div");
-    matchHead.className    = "exp-presence__sub";
-    matchHead.textContent  = "matching strategies";
-
-    const strategies          = document.createElement("div");
-    strategies.className      = "exp-builder__names exp-presence__strategies";
-    this.presenceStrategiesEl = strategies;
+    note.textContent = "Toggle cells of the active-normalization x presence-balance matrix; every cell trains with curriculum disabled and repeats across the seeds list. Cell specs live in code (_default_presence_trials); use reset matrix to restore the full 2x2.";
 
     const cellHead       = document.createElement("div");
-    cellHead.className    = "exp-presence__sub";
-    cellHead.textContent  = "loss-term cells";
+    cellHead.className   = "exp-presence__sub";
+    cellHead.textContent = "matrix cells";
 
     const cells          = document.createElement("div");
     cells.className      = "exp-builder__names exp-presence__cells";
@@ -1456,54 +1441,41 @@ class ExperimentBuilder {
 
     panel.appendChild(head);
     panel.appendChild(note);
-    panel.appendChild(matchHead);
-    panel.appendChild(strategies);
     panel.appendChild(cellHead);
     panel.appendChild(cells);
     this.presenceEl = panel;
 
     if (this.presenceTrialsLeaf) this.view.controls[this.presenceTrialsLeaf.path] = { leaf: this.presenceTrialsLeaf, reset: () => this._repaintPresence() };
-    if (this.presenceMatchLeaf)  this.view.controls[this.presenceMatchLeaf.path]  = { leaf: this.presenceMatchLeaf,  reset: () => this._repaintPresence() };
 
     this._paintPresence();
     return panel;
   }
 
-  _paintPresence() {
-    if (this.presenceStrategiesEl) {
-      this.presenceStrategiesEl.innerHTML = "";
-      const active = this._presenceMatchMap();
-      ExperimentBuilder.PRESENCE_MATCHES.forEach(({ label, strategy }) => {
-        const on   = Object.prototype.hasOwnProperty.call(active, label);
-        const chip = document.createElement("button");
-        chip.type        = "button";
-        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-        chip.textContent = `${label} · ${strategy}`;
-        chip.title       = on ? "Click to drop this matching strategy" : "Click to add this matching strategy";
-        chip.addEventListener("click", () => this._toggleStrategy(label));
-        this.presenceStrategiesEl.appendChild(chip);
-      });
-    }
-
-    if (this.presenceCellsEl) {
-      this.presenceCellsEl.innerHTML = "";
-      this._presenceCells().forEach((cell) => this.presenceCellsEl.appendChild(this._presenceCellChip(cell)));
-    }
+  _presenceChipText(cell, spec) {
+    const parts = [];
+    if (spec && spec.use_active_normalization) parts.push("active norm");
+    if (spec && spec.presence_balance)         parts.push("presence balance");
+    return `${cell} · ${parts.join(" + ") || "both off"}`;
   }
 
-  _presenceCellChip(cell) {
-    const chip     = document.createElement("span");
-    chip.className = "exp-name exp-presence__cell";
+  _paintPresence() {
+    if (!this.presenceCellsEl) return;
+    this.presenceCellsEl.innerHTML = "";
 
-    const label       = document.createElement("span");
-    label.textContent = cell;
-    chip.appendChild(label);
+    const active = this._presenceTrials();
+    const cells  = { ...this._presenceDefaults() };
+    Object.entries(active).forEach(([cell, spec]) => { if (!(cell in cells)) cells[cell] = spec; });
 
-    const remove = LaunchWidgetDom.mini("×", () => this._removeCell(cell));
-    remove.classList.add("exp-presence__remove");
-    remove.title = "Remove cell";
-    chip.appendChild(remove);
-    return chip;
+    Object.entries(cells).forEach(([cell, spec]) => {
+      const on   = Object.prototype.hasOwnProperty.call(active, cell);
+      const chip = document.createElement("button");
+      chip.type        = "button";
+      chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+      chip.textContent = this._presenceChipText(cell, spec);
+      chip.title       = on ? "Click to drop this cell" : "Click to add this cell";
+      chip.addEventListener("click", () => this._togglePresenceCell(cell));
+      this.presenceCellsEl.appendChild(chip);
+    });
   }
 
   _emitPresence(leaf, value) {
@@ -1513,42 +1485,28 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
-  _removeCell(cell) {
+  _togglePresenceCell(cell) {
     if (!this.presenceTrialsLeaf) return;
-    let raw;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
-    } catch (e) {
-      return;
-    }
-    if (!raw || typeof raw !== "object" || Object.keys(raw).length <= 1) return;
-    delete raw[cell];
-    this._emitPresence(this.presenceTrialsLeaf, raw);
-  }
+    const trials   = this._presenceTrials();
+    const defaults = this._presenceDefaults();
 
-  _toggleStrategy(label) {
-    if (!this.presenceMatchLeaf) return;
-    let raw;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(this.presenceMatchLeaf));
-    } catch (e) {
-      raw = {};
-    }
-    if (!raw || typeof raw !== "object") raw = {};
-
-    if (Object.prototype.hasOwnProperty.call(raw, label)) {
-      if (Object.keys(raw).length <= 1) return;
-      delete raw[label];
+    if (Object.prototype.hasOwnProperty.call(trials, cell)) {
+      if (Object.keys(trials).length <= 1) return;
+      delete trials[cell];
     } else {
-      const canon = ExperimentBuilder.PRESENCE_MATCHES.find((entry) => entry.label === label);
-      if (canon) raw[label] = canon.strategy;
+      if (!Object.prototype.hasOwnProperty.call(defaults, cell)) return;
+      trials[cell] = defaults[cell];
     }
-    this._emitPresence(this.presenceMatchLeaf, raw);
+
+    const ordered = {};
+    Object.keys(defaults).forEach((key) => { if (Object.prototype.hasOwnProperty.call(trials, key)) ordered[key] = trials[key]; });
+    Object.keys(trials).forEach((key) => { if (!Object.prototype.hasOwnProperty.call(ordered, key)) ordered[key] = trials[key]; });
+
+    this._emitPresence(this.presenceTrialsLeaf, ordered);
   }
 
   _resetPresence() {
     if (this.presenceTrialsLeaf) this.view._setValue(this.presenceTrialsLeaf, this.presenceTrialsLeaf.value);
-    if (this.presenceMatchLeaf)  this.view._setValue(this.presenceMatchLeaf,  this.presenceMatchLeaf.value);
     this._repaintPresence();
   }
 
@@ -2418,9 +2376,7 @@ class ExperimentBuilder {
 
     if (mode === "presence") {
       const cells = this._presenceCells().length;
-      const strat = this._presenceStrategies().length;
-      const total = cells * strat;
-      this.summaryEl.textContent = `${cells} cell${cells === 1 ? "" : "s"} x ${strat} matching = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
+      this.summaryEl.textContent = `${cells} presence cell${cells === 1 ? "" : "s"} = ${cells} trial${cells === 1 ? "" : "s"}${this._seedsSuffix(cells)}${gpus}`;
       return;
     }
 
@@ -2486,9 +2442,7 @@ class ExperimentBuilder {
         this._pairWeights().forEach((weight) => names.push(`${model}_pair-${component}-w${weight}`));
       });
     } else if (mode === "presence") {
-      this._presenceCells().forEach((cell) => {
-        this._presenceStrategies().forEach((strategy) => names.push(`${model}_pr-${cell}-${strategy}`));
-      });
+      this._presenceCells().forEach((cell) => names.push(`${model}_pr-${cell}`));
     } else if (mode === "input") {
       this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
     } else if (mode === "context") {

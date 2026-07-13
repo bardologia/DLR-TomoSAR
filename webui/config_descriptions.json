@@ -1116,7 +1116,7 @@
         "trials_mode": "Sweep dimension the trial scheduler varies: curriculum, warmup, presence, physics, pair, secondary, patch, input, context, head, or ablation",
         "warmup_losses": "Named loss-term override presets: in trials_mode=curriculum applied to the curriculum warmup stage and crossed against every complete_losses preset (one run per pair); in trials_mode=warmup applied instead to the complete stage with curriculum disabled, one run per preset",
         "complete_losses": "Named loss-term override presets applied to the curriculum complete stage, used only by trials_mode=curriculum where each preset is crossed against every warmup_losses preset (one run per pair)",
-        "presence_trials": "Named presets combining active_normalization, presence_balance, and amp_focal_gamma overrides, swept with curriculum disabled",
+        "presence_trials": "Named trials each setting use_active_normalization and presence_balance (both keys required per trial); default is the 2x2 matrix none/A/B/AB, swept with curriculum disabled and every trial repeated across the seeds list",
         "physics_trials": "PhysicsTrialsConfig sub-config for the physics-loss sweep crossing every selected component with every candidate weight and curriculum state on top of the base config",
         "pair_trials": "PairTrialsConfig sub-config for the loss-pair sweep pairing one fixed base component with each candidate second component and weight, curriculum disabled",
         "secondary_trials": "SecondaryTrialsConfig sub-config for the secondary-track selection sweep (strategy, count, sampling seed)",

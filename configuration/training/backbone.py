@@ -89,21 +89,11 @@ def _default_complete_losses() -> dict:
 
 
 def _default_presence_trials() -> dict:
-    active_norm = {"use_active_normalization": True}
-    balance     = {"presence_balance": True}
-    focal       = {"amp_focal_gamma": 2.0}
-
     return {
-        "none"     : {},
-        "A"        : {**active_norm},
-        "B"        : {**balance},
-        "F"        : {**focal},
-        "AB"       : {**active_norm, **balance},
-        "AF"       : {**active_norm, **focal},
-        "BF"       : {**balance, **focal},
-        "ABF"      : {**active_norm, **balance, **focal},
-        "ABF-fg1"  : {**active_norm, **balance, **focal, "amp_focal_gamma": 1.0},
-        "ABF-fg3"  : {**active_norm, **balance, **focal, "amp_focal_gamma": 3.0},
+        "none" : {"use_active_normalization": False, "presence_balance": False},
+        "A"    : {"use_active_normalization": True,  "presence_balance": False},
+        "B"    : {"use_active_normalization": False, "presence_balance": True},
+        "AB"   : {"use_active_normalization": True,  "presence_balance": True},
     }
 
 
