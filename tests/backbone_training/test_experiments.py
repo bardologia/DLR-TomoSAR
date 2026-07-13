@@ -4,10 +4,11 @@ import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import HeadMatchingTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_context_trials, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import HeadMatchingTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
+    AugmentationTrialPlanner,
     ContextTrialPlanner,
     CurriculumTrialPlanner,
     HeadMatchingTrialPlanner,
@@ -354,6 +355,47 @@ def test_head_matching_planner_rejects_empty_and_duplicate_axes():
 
     with pytest.raises(ValueError):
         HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(matchings=["hungarian", "hungarian"]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+
+def test_augmentation_planner_default_plans_the_on_off_pair():
+    planner = AugmentationTrialPlanner(_default_augmentation_trials())
+
+    plans = dict(planner.plan())
+
+    assert list(plans) == ["aug-on", "aug-off"]
+    assert planner.summary() == {"Augmentation trials": {"on": "flips", "off": "off"}, "Total runs": 2}
+
+    assert plans["aug-on"] == {
+        "augmentation.p_flip_h" : 0.5,
+        "augmentation.p_flip_v" : 0.5,
+        "augmentation.p_rot90"  : 0.0,
+        "augmentation.p_noise"  : 0.0,
+    }
+    assert plans["aug-off"] == {
+        "augmentation.p_flip_h" : 0.0,
+        "augmentation.p_flip_v" : 0.0,
+        "augmentation.p_rot90"  : 0.0,
+        "augmentation.p_noise"  : 0.0,
+    }
+
+
+def test_augmentation_planner_paths_are_entry_config_leaves():
+    config = BackboneEntryConfig()
+
+    for _, overrides in AugmentationTrialPlanner(_default_augmentation_trials()).plan():
+        for path, value in overrides.items():
+            section, leaf = path.split(".")
+            assert hasattr(getattr(config, section), leaf), path
+
+
+def test_augmentation_planner_rejects_empty_trials():
+    with pytest.raises(ValueError, match="at least one"):
+        AugmentationTrialPlanner({})
+
+
+def test_augmentation_planner_rejects_non_boolean_state():
+    with pytest.raises(ValueError, match="booleans"):
+        AugmentationTrialPlanner({"on": 0.5})
 
 
 def test_input_planner_rejects_empty_trials():

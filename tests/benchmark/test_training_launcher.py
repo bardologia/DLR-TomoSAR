@@ -152,8 +152,25 @@ def test_head_scheduler_plans_the_head_matching_grid(tmp_path):
     assert plans["hm-set_pred-hungarian"]["curriculum.complete.param_matching"]  == "hungarian"
 
 
+def test_augmentation_scheduler_plans_the_on_off_pair(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "augmentation"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    plans = dict(scheduler.planner().plan())
+
+    assert list(plans) == ["aug-on", "aug-off"]
+    assert plans["aug-on"]["augmentation.p_flip_h"]  == 0.5
+    assert plans["aug-on"]["augmentation.p_flip_v"]  == 0.5
+    assert plans["aug-on"]["augmentation.p_rot90"]   == 0.0
+    assert plans["aug-off"]["augmentation.p_flip_h"] == 0.0
+    assert plans["aug-off"]["augmentation.p_flip_v"] == 0.0
+
+
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "ablation"):
+    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "augmentation", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path
         config.trials_mode = mode

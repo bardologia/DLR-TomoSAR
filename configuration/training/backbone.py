@@ -101,6 +101,10 @@ def _default_context_trials() -> list:
     return ["pixel_mlp", "local_cnn", "unet"]
 
 
+def _default_augmentation_trials() -> dict:
+    return {"on": True, "off": False}
+
+
 def _default_input_trials() -> dict:
     return {
         "amp-allsec-noifg"  : {"tracks": "all",     "use_primary": True,  "use_secondaries": True,  "use_interferograms": False},
@@ -223,6 +227,7 @@ class BackboneEntryConfig:
     input_trials     : dict                  = field(default_factory=_default_input_trials)
     context_trials   : list                  = field(default_factory=_default_context_trials)
     head_trials      : HeadMatchingTrialsConfig = field(default_factory=HeadMatchingTrialsConfig)
+    augmentation_trials : dict               = field(default_factory=_default_augmentation_trials)
 
     ablation_features     : list = field(default_factory=AblationCatalog.default_features)
     ablation_include_full : bool = True

@@ -409,6 +409,7 @@ class ExperimentBuilder {
     { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
     { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
+    { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state" },
   ];
 
   static HEAD_OPTIONS = [
@@ -473,6 +474,7 @@ class ExperimentBuilder {
 
     this.inputTrialsLeaf   = byPath.get("input_trials");
     this.contextTrialsLeaf = byPath.get("context_trials");
+    this.augTrialsLeaf     = byPath.get("augmentation_trials");
 
     this.secondary  = new Map();
     this.patch      = new Map();
@@ -497,6 +499,7 @@ class ExperimentBuilder {
     if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.inputTrialsLeaf)      this.claimed.push(this.inputTrialsLeaf.path);
     if (this.contextTrialsLeaf)    this.claimed.push(this.contextTrialsLeaf.path);
+    if (this.augTrialsLeaf)        this.claimed.push(this.augTrialsLeaf.path);
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -536,6 +539,8 @@ class ExperimentBuilder {
     this.headHeadsEl     = null;
     this.headMatchingsEl = null;
     this.headBackboneEl  = null;
+    this.augEl           = null;
+    this.augCellsEl      = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -580,6 +585,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
     if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
     if (this.modeLeaf && this.headTrials.size)    body.appendChild(this._headPanel());
+    if (this.modeLeaf && this.augTrialsLeaf)      body.appendChild(this._augmentationPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -613,6 +619,7 @@ class ExperimentBuilder {
     this._paintInput();
     this._paintContext();
     this._paintHead();
+    this._paintAugmentation();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -1712,6 +1719,121 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _augDefaults() {
+    if (!this.augTrialsLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.augTrialsLeaf.value);
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _augTrials() {
+    if (!this.augTrialsLeaf) return {};
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.augTrialsLeaf));
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _augCells() {
+    return Object.keys(this._augTrials());
+  }
+
+  _augChipText(cell, enabled) {
+    return `${cell} · ${enabled ? "flips h+v @ 0.5" : "no augmentation"}`;
+  }
+
+  _augmentationPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">augmentation on/off</span>`;
+    const reset    = LaunchWidgetDom.mini("reset states", () => this._resetAugmentation());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Toggle the two augmentation states on the shared base config: on trains with horizontal and vertical flips at probability 0.5 (rot90 and noise forced off), off zeroes every augmentation probability; every state repeats across the seeds list. State specs live in code (_default_augmentation_trials); use reset states to restore the on/off pair.";
+
+    const cellHead       = document.createElement("div");
+    cellHead.className   = "exp-presence__sub";
+    cellHead.textContent = "augmentation states";
+
+    const cells     = document.createElement("div");
+    cells.className = "exp-builder__names exp-presence__cells";
+    this.augCellsEl = cells;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(cellHead);
+    panel.appendChild(cells);
+    this.augEl = panel;
+
+    if (this.augTrialsLeaf) this.view.controls[this.augTrialsLeaf.path] = { leaf: this.augTrialsLeaf, reset: () => this._repaintAugmentation() };
+
+    this._paintAugmentation();
+    return panel;
+  }
+
+  _paintAugmentation() {
+    if (!this.augCellsEl) return;
+    this.augCellsEl.innerHTML = "";
+
+    const active = this._augTrials();
+    const cells  = { ...this._augDefaults() };
+    Object.entries(active).forEach(([cell, enabled]) => { if (!(cell in cells)) cells[cell] = enabled; });
+
+    Object.entries(cells).forEach(([cell, enabled]) => {
+      const on   = Object.prototype.hasOwnProperty.call(active, cell);
+      const chip = document.createElement("button");
+      chip.type        = "button";
+      chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+      chip.textContent = this._augChipText(cell, enabled);
+      chip.title       = on ? "Click to drop this state" : "Click to add this state";
+      chip.addEventListener("click", () => this._toggleAugCell(cell));
+      this.augCellsEl.appendChild(chip);
+    });
+  }
+
+  _toggleAugCell(cell) {
+    if (!this.augTrialsLeaf) return;
+    const trials   = this._augTrials();
+    const defaults = this._augDefaults();
+
+    if (Object.prototype.hasOwnProperty.call(trials, cell)) {
+      if (Object.keys(trials).length <= 1) return;
+      delete trials[cell];
+    } else {
+      if (!Object.prototype.hasOwnProperty.call(defaults, cell)) return;
+      trials[cell] = defaults[cell];
+    }
+
+    const ordered = {};
+    Object.keys(defaults).forEach((key) => { if (Object.prototype.hasOwnProperty.call(trials, key)) ordered[key] = trials[key]; });
+    Object.keys(trials).forEach((key) => { if (!Object.prototype.hasOwnProperty.call(ordered, key)) ordered[key] = trials[key]; });
+
+    this.view._setValue(this.augTrialsLeaf, PythonLiteral.render(ordered));
+    this._repaintAugmentation();
+  }
+
+  _resetAugmentation() {
+    if (this.augTrialsLeaf) this.view._setValue(this.augTrialsLeaf, this.augTrialsLeaf.value);
+    this._repaintAugmentation();
+  }
+
+  _repaintAugmentation() {
+    this._paintAugmentation();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _headList(key) {
     const leaf = this.headTrials.get(key);
     if (!leaf) return [];
@@ -1859,6 +1981,7 @@ class ExperimentBuilder {
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
     if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
     if (this.headEl)             this.headEl.hidden             = mode !== "head";
+    if (this.augEl)              this.augEl.hidden              = mode !== "augmentation";
   }
 
   _paintSecondary() {
@@ -2402,6 +2525,12 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "augmentation") {
+      const n = this._augCells().length;
+      this.summaryEl.textContent = `${n} augmentation state${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
   }
 
@@ -2452,6 +2581,8 @@ class ExperimentBuilder {
       this._headList("heads").forEach((headKey) => {
         this._headList("matchings").forEach((matching) => names.push(`${backbone}_hm-${headKey}-${matching}`));
       });
+    } else if (mode === "augmentation") {
+      this._augCells().forEach((cell) => names.push(`${model}_aug-${cell}`));
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

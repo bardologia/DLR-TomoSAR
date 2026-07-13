@@ -483,6 +483,49 @@ class InputTrialPlanner:
         return plans
 
 
+class AugmentationTrialPlanner:
+
+    FLIP_PROBABILITY = 0.5
+    PROBABILITY_KEYS = ("p_flip_h", "p_flip_v", "p_rot90", "p_noise")
+
+    def __init__(self, augmentation_trials: dict) -> None:
+        self.augmentation_trials = augmentation_trials
+
+        self._validate()
+
+    def _validate(self) -> None:
+        if not self.augmentation_trials:
+            raise ValueError("augmentation_trials must list at least one trial")
+
+        non_bool = [label for label, enabled in self.augmentation_trials.items() if not isinstance(enabled, bool)]
+        if non_bool:
+            raise ValueError(f"augmentation_trials values must be booleans (augmentation on/off), got {[self.augmentation_trials[label] for label in non_bool]} for {non_bool}")
+
+    def summary(self) -> dict:
+        return {
+            "Augmentation trials" : {label: "flips" if enabled else "off" for label, enabled in self.augmentation_trials.items()},
+            "Total runs"          : len(self.augmentation_trials),
+        }
+
+    def _overrides(self, enabled: bool) -> dict:
+        probabilities = {key: 0.0 for key in self.PROBABILITY_KEYS}
+
+        if enabled:
+            probabilities["p_flip_h"] = self.FLIP_PROBABILITY
+            probabilities["p_flip_v"] = self.FLIP_PROBABILITY
+
+        return {f"augmentation.{key}": value for key, value in probabilities.items()}
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for label, enabled in self.augmentation_trials.items():
+            run_name = f"aug-{label}"
+            plans.append((run_name, self._overrides(enabled)))
+
+        return plans
+
+
 class PatchSizeTrialPlanner:
     def __init__(self, trials) -> None:
         self.trials = trials
