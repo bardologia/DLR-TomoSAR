@@ -407,6 +407,7 @@ class ExperimentBuilder {
     { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one trial per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
+    { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
   ];
 
   static PHYSICS_COMPONENTS = [
@@ -463,7 +464,8 @@ class ExperimentBuilder {
     this.presenceTrialsLeaf = byPath.get("presence_trials");
     this.presenceMatchLeaf  = byPath.get("presence_match_strategies");
 
-    this.inputTrialsLeaf = byPath.get("input_trials");
+    this.inputTrialsLeaf   = byPath.get("input_trials");
+    this.contextTrialsLeaf = byPath.get("context_trials");
 
     this.secondary = new Map();
     this.patch     = new Map();
@@ -482,9 +484,10 @@ class ExperimentBuilder {
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
     this.physics.forEach((leaf) => this.claimed.push(leaf.path));
     this.pair.forEach((leaf) => this.claimed.push(leaf.path));
-    if (this.presenceTrialsLeaf) this.claimed.push(this.presenceTrialsLeaf.path);
-    if (this.presenceMatchLeaf)  this.claimed.push(this.presenceMatchLeaf.path);
-    if (this.inputTrialsLeaf)    this.claimed.push(this.inputTrialsLeaf.path);
+    if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
+    if (this.presenceMatchLeaf)    this.claimed.push(this.presenceMatchLeaf.path);
+    if (this.inputTrialsLeaf)      this.claimed.push(this.inputTrialsLeaf.path);
+    if (this.contextTrialsLeaf)    this.claimed.push(this.contextTrialsLeaf.path);
 
     this.terms          = this._termCatalog();
     this.variants       = { warmup: [], complete: [] };
@@ -518,6 +521,8 @@ class ExperimentBuilder {
     this.presenceEl     = null;
     this.inputEl        = null;
     this.inputCellsEl   = null;
+    this.contextEl      = null;
+    this.contextCellsEl = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -560,6 +565,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.pair.size)          body.appendChild(this._pairPanel());
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
+    if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -591,6 +597,7 @@ class ExperimentBuilder {
     this._paintPair();
     this._paintPresence();
     this._paintInput();
+    this._paintContext();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -1640,6 +1647,91 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _contextTrials() {
+    if (!this.contextTrialsLeaf) return [];
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(this.contextTrialsLeaf));
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _contextPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">context ladder</span>`;
+    const reset    = LaunchWidgetDom.mini("reset backbones", () => this._resetContext());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "One training run per backbone architecture on the shared base config, walking the spatial-context ladder (pixel MLP, local CNN, UNet by default). Every name must exist in the backbone registry; add architectures by editing context_trials, use reset backbones to restore the default.";
+
+    const cellHead       = document.createElement("div");
+    cellHead.className    = "exp-presence__sub";
+    cellHead.textContent  = "backbones";
+
+    const cells         = document.createElement("div");
+    cells.className     = "exp-builder__names exp-presence__cells";
+    this.contextCellsEl = cells;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(cellHead);
+    panel.appendChild(cells);
+    this.contextEl = panel;
+
+    if (this.contextTrialsLeaf) this.view.controls[this.contextTrialsLeaf.path] = { leaf: this.contextTrialsLeaf, reset: () => this._repaintContext() };
+
+    this._paintContext();
+    return panel;
+  }
+
+  _paintContext() {
+    if (!this.contextCellsEl) return;
+    this.contextCellsEl.innerHTML = "";
+    this._contextTrials().forEach((name) => this.contextCellsEl.appendChild(this._contextChip(name)));
+  }
+
+  _contextChip(name) {
+    const chip     = document.createElement("span");
+    chip.className = "exp-name exp-presence__cell";
+
+    const label       = document.createElement("span");
+    label.textContent = name;
+    chip.appendChild(label);
+
+    const remove = LaunchWidgetDom.mini("×", () => this._removeContextCell(name));
+    remove.classList.add("exp-presence__remove");
+    remove.title = "Remove backbone";
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _removeContextCell(name) {
+    if (!this.contextTrialsLeaf) return;
+    const raw = this._contextTrials();
+    if (raw.length <= 1) return;
+    this.view._setValue(this.contextTrialsLeaf, PythonLiteral.render(raw.filter((entry) => entry !== name)));
+    this._repaintContext();
+  }
+
+  _resetContext() {
+    if (this.contextTrialsLeaf) this.view._setValue(this.contextTrialsLeaf, this.contextTrialsLeaf.value);
+    this._repaintContext();
+  }
+
+  _repaintContext() {
+    this._paintContext();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -1656,6 +1748,7 @@ class ExperimentBuilder {
     if (this.pairEl)             this.pairEl.hidden             = mode !== "pair";
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
+    if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
   }
 
   _paintSecondary() {
@@ -2187,6 +2280,12 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "context") {
+      const n = this._contextTrials().length;
+      this.summaryEl.textContent = `${n} backbone${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
   }
 
@@ -2232,6 +2331,8 @@ class ExperimentBuilder {
       });
     } else if (mode === "input") {
       this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
+    } else if (mode === "context") {
+      this._contextTrials().forEach((name) => names.push(`${name}_ctx-${name}`));
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

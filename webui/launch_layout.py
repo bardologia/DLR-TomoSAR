@@ -476,7 +476,7 @@ class LaunchLayout:
                 ]},
                 {"key": "experiments", "title": "Experiments", "panels": [
                     {"kind": "special", "panel": "experiment_builder", "fields": [
-                        "trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "input_trials",
+                        "trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "input_trials", "context_trials",
                         "physics_trials.components", "physics_trials.weights", "physics_trials.curriculum_states", "physics_trials.include_baseline",
                         "pair_trials.base_component", "pair_trials.base_weight", "pair_trials.components", "pair_trials.weights", "pair_trials.include_baseline",
                         "secondary_trials.strategy", "secondary_trials.n_secondaries", "secondary_trials.n_trials", "secondary_trials.mean",

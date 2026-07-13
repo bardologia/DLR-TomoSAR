@@ -4,10 +4,11 @@ import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
+    ContextTrialPlanner,
     CurriculumTrialPlanner,
     InputTrialPlanner,
     PatchSizeTrialPlanner,
@@ -251,6 +252,39 @@ def test_input_planner_rejects_missing_or_invalid_track_scope():
 
     with pytest.raises(ValueError):
         InputTrialPlanner({"bad": {"tracks": "some", "use_primary": True}}, CANDIDATES)
+
+
+REGISTRY_NAMES = ("pixel_mlp", "local_cnn", "unet", "resunet")
+
+
+def test_context_planner_default_walks_the_context_ladder():
+    planner = ContextTrialPlanner(_default_context_trials(), REGISTRY_NAMES)
+
+    plans = planner.plan()
+
+    assert plans == [
+        ("ctx-pixel_mlp", {"backbone_name": "pixel_mlp"}),
+        ("ctx-local_cnn", {"backbone_name": "local_cnn"}),
+        ("ctx-unet",      {"backbone_name": "unet"}),
+    ]
+    assert planner.summary() == {"Backbones": ["pixel_mlp", "local_cnn", "unet"], "Total runs": 3}
+
+
+def test_context_default_backbones_are_registered():
+    from models import BACKBONE_CONFIG_REGISTRY
+
+    ContextTrialPlanner(_default_context_trials(), tuple(BACKBONE_CONFIG_REGISTRY))
+
+
+def test_context_planner_rejects_empty_duplicate_and_unknown_backbones():
+    with pytest.raises(ValueError):
+        ContextTrialPlanner([], REGISTRY_NAMES)
+
+    with pytest.raises(ValueError):
+        ContextTrialPlanner(["unet", "unet"], REGISTRY_NAMES)
+
+    with pytest.raises(ValueError):
+        ContextTrialPlanner(["unet", "voxel_gnn"], REGISTRY_NAMES)
 
 
 def test_input_planner_rejects_empty_trials():
