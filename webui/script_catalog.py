@@ -20,7 +20,7 @@ class ScriptCatalog:
         "train_backbone": {
             "title"     : "Train Backbone",
             "category"  : "Training",
-            "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, single-stage losses, physics-loss component and weight sweeps, loss-pair searches, secondary-track selections, or input-channel ablations.",
+            "purpose"   : "Train one supervised backbone end to end, or fan out trials across GPUs: loss-curriculum combinations, single-stage losses, physics-loss component and weight sweeps, loss-pair searches, secondary-track selections, input-channel ablations, or backbone context ladders.",
         },
         "train_profile_autoencoder": {
             "title"     : "Train Profile Autoencoder",

@@ -120,8 +120,24 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
     assert job.log_path        == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
 
 
+def test_context_scheduler_plans_one_trial_per_registered_backbone(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "context"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    plans = scheduler.planner().plan()
+
+    assert plans == [
+        ("ctx-pixel_mlp", {"backbone_name": "pixel_mlp"}),
+        ("ctx-local_cnn", {"backbone_name": "local_cnn"}),
+        ("ctx-unet",      {"backbone_name": "unet"}),
+    ]
+
+
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "ablation"):
+    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path
         config.trials_mode = mode

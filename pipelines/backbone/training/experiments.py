@@ -310,6 +310,36 @@ class AblationTrialPlanner:
         return plans
 
 
+class ContextTrialPlanner:
+
+    def __init__(self, backbones: list, registry_names: tuple) -> None:
+        self.backbones      = list(backbones)
+        self.registry_names = tuple(registry_names)
+
+        self._validate()
+
+    def _validate(self) -> None:
+        if not self.backbones:
+            raise ValueError("context_trials must list at least one backbone")
+
+        duplicates = sorted({name for name in self.backbones if self.backbones.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"context_trials must be unique, duplicated: {duplicates}")
+
+        unknown = [name for name in self.backbones if name not in self.registry_names]
+        if unknown:
+            raise ValueError(f"Unknown context_trials backbones {unknown}; registered backbones are {sorted(self.registry_names)}")
+
+    def summary(self) -> dict:
+        return {
+            "Backbones"  : list(self.backbones),
+            "Total runs" : len(self.backbones),
+        }
+
+    def plan(self) -> list[tuple[str, dict]]:
+        return [(f"ctx-{name}", {"backbone_name": name}) for name in self.backbones]
+
+
 class InputTrialPlanner:
 
     INPUT_KEYS   = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")
