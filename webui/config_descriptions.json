@@ -1155,7 +1155,7 @@
         "param_weights": "Per-parameter weights for amplitude, mean, sigma; length must equal params_per_gaussian",
         "param_matching": "Slot assignment before parameter losses: hungarian (permutes predictions to best GT match) or sorted_gt (positional, GT sorted only)",
         "use_active_normalization": "Normalize parameter loss by summed slot weights instead of plain mean, avoiding dilution by empty slots",
-        "presence_balance": "Auto-balance active/inactive slot weights by inverse frequency, overriding active_weight and inactive_weight",
+        "presence_balance": "Auto-balance active/inactive weights per Gaussian slot by inverse frequency of that slot's batch active fraction (clamped to [1e-3, 1-1e-3]), overriding active_weight and inactive_weight",
         "active_weight": "Loss multiplier for slots with GT amplitude above amp_zero_thr; ignored when presence_balance is on",
         "inactive_weight": "Loss multiplier for slots with GT amplitude at or below amp_zero_thr; ignored when presence_balance is on",
         "amp_focal_gamma": "Focal exponent upweighting hard amplitude errors; 0 disables focal weighting entirely",
