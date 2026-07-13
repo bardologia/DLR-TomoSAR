@@ -844,7 +844,7 @@ class LaunchLayout:
                 ]},
                 {"key": "sweep", "title": "Sweep", "panels": [
                     {"kind": "fields", "groups": [
-                        {"title": "Track counts", "fields": ["track_counts", "boxcar_window"]},
+                        {"title": "Datasets", "fields": ["dataset_paths"]},
                         {"title": "Patch grid", "fields": ["patch.minimum", "patch.maximum", "patch.step", "patch.stride_ratio", "patch.constant_pixel_budget"]},
                     ]},
                 ]},

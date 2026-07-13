@@ -21,14 +21,14 @@ class SweepTrainingStage(QueuedTrainingStage):
 
     def _config_kv(self) -> dict:
         return {
-            "Model"        : f"{self.config.backbone_name}-{self.config.backbone_head}",
-            "Track counts" : sorted(self.config.track_counts),
-            "Patch sizes"  : self.planner.patch_sizes(),
-            "Seeds"        : self.config.seeds or "—",
-            "Units"        : len(self.items),
-            "Epochs"       : self.config.training.epochs,
-            "GPUs"         : self.config.gpus,
-            "Stage dir"    : str(self.stage_dir),
+            "Model"       : f"{self.config.backbone_name}-{self.config.backbone_head}",
+            "Datasets"    : [Path(dataset).name for dataset in self.config.dataset_paths],
+            "Patch sizes" : self.planner.patch_sizes(),
+            "Seeds"       : self.config.seeds or "—",
+            "Units"       : len(self.items),
+            "Epochs"      : self.config.training.epochs,
+            "GPUs"        : self.config.gpus,
+            "Stage dir"   : str(self.stage_dir),
         }
 
     def _job(self, item: str) -> GpuJob:

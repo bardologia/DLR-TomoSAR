@@ -12,15 +12,18 @@ from pipelines.patch_sweep.report import PatchSweepReport, SweepCollector
 from tools.monitoring.logger import Logger
 
 
-def make_planner(track_counts: list[int], maximum: int = 64) -> PatchSweepPlanner:
-    config               = PatchSweepConfig(track_counts=track_counts)
+OPTIMA = {"w20_10": 48, "w20_20": 32}
+
+
+def make_planner(datasets: list[str], maximum: int = 64) -> PatchSweepPlanner:
+    config               = PatchSweepConfig()
+    config.dataset_paths = [Path("/data") / name for name in datasets]
     config.patch.maximum = maximum
-    candidates           = [f"FL01_PS{i:02d}" for i in range(3, 31)]
-    return PatchSweepPlanner(config, candidates)
+    return PatchSweepPlanner(config)
 
 
-def synthetic_loss(planner: PatchSweepPlanner, unit) -> float:
-    optimum = planner.predicted_optimum(unit.track_count)
+def synthetic_loss(unit) -> float:
+    optimum = OPTIMA[unit.dataset]
     return 0.1 + 0.02 * ((unit.patch_size - optimum) / 32) ** 2
 
 
@@ -32,11 +35,11 @@ def populate_runs(root: Path, planner: PatchSweepPlanner, drop_metrics: set[str]
         if unit.name not in drop_metrics:
             meta = run_dir / "meta"
             meta.mkdir(parents=True, exist_ok=True)
-            (meta / "test_metrics.json").write_text(json.dumps({"avg_loss": synthetic_loss(planner, unit), "num_batches": 4}))
+            (meta / "test_metrics.json").write_text(json.dumps({"avg_loss": synthetic_loss(unit), "num_batches": 4}))
 
         checkpoints = run_dir / "checkpoints"
         checkpoints.mkdir(parents=True, exist_ok=True)
-        torch.save({"best_val_loss": synthetic_loss(planner, unit) * 1.05, "best_epoch": 12}, checkpoints / "best_model.pt")
+        torch.save({"best_val_loss": synthetic_loss(unit) * 1.05, "best_epoch": 12}, checkpoints / "best_model.pt")
 
         results.append({"name": unit.name, "status": "DONE", "duration_s": 60.0, "gpu": 0, "returncode": 0, "log_file": ""})
 
@@ -53,7 +56,7 @@ def logger(tmp_path):
 
 
 def test_collector_reads_every_unit(tmp_path, logger):
-    planner = make_planner([5, 9])
+    planner = make_planner(["w20_10", "w20_20"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -64,25 +67,25 @@ def test_collector_reads_every_unit(tmp_path, logger):
 
 
 def test_collector_requires_training_results(tmp_path, logger):
-    planner = make_planner([5])
+    planner = make_planner(["w20_10"])
 
     with pytest.raises(FileNotFoundError, match="training_results.json"):
         SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
 
 
 def test_collector_marks_units_without_metrics_incomplete(tmp_path, logger):
-    planner = make_planner([5])
-    populate_runs(tmp_path, planner, drop_metrics={"n05-p032"})
+    planner = make_planner(["w20_10"])
+    populate_runs(tmp_path, planner, drop_metrics={"w20_10-p032"})
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
     by_name = {record.unit.name: record for record in records}
 
-    assert not by_name["n05-p032"].complete
-    assert by_name["n05-p016"].complete
+    assert not by_name["w20_10-p032"].complete
+    assert by_name["w20_10-p016"].complete
 
 
 def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
-    planner = make_planner([5, 9], maximum=96)
+    planner = make_planner(["w20_10", "w20_20"], maximum=96)
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -91,29 +94,29 @@ def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
 
     payload = json.loads((out_dir / "patch_sweep.json").read_text())
 
-    assert payload["track_counts"]["5"]["best_patch_size"] == 48
-    assert payload["track_counts"]["9"]["best_patch_size"] == 32
-    assert payload["track_counts"]["5"]["predicted_optimum"] == pytest.approx(planner.predicted_optimum(5))
+    assert payload["datasets"]["w20_10"]["best_patch_size"] == 48
+    assert payload["datasets"]["w20_20"]["best_patch_size"] == 32
+    assert payload["datasets"]["w20_10"]["dataset_path"]    == "/data/w20_10"
 
 
-def test_report_writes_one_curve_per_track_count_and_the_summary_figure(tmp_path, logger):
-    planner = make_planner([5, 9])
+def test_report_writes_one_curve_per_dataset_and_the_summary_figure(tmp_path, logger):
+    planner = make_planner(["w20_10", "w20_20"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
     out_dir = tmp_path / "report"
     written = PatchSweepReport(records=records, planner=planner, out_dir=out_dir, logger=logger).write_all()
 
-    assert (out_dir / "curves" / "n05.png").exists()
-    assert (out_dir / "curves" / "n09.png").exists()
-    assert (out_dir / "best_patch_vs_tracks.png").exists()
+    assert (out_dir / "curves" / "w20_10.png").exists()
+    assert (out_dir / "curves" / "w20_20.png").exists()
+    assert (out_dir / "best_patch_vs_dataset.png").exists()
     assert (out_dir / "report.md").exists()
     assert all(path.exists() for path in written)
 
 
-def test_report_survives_a_track_count_with_no_metrics(tmp_path, logger):
-    planner = make_planner([5, 9])
-    populate_runs(tmp_path, planner, drop_metrics={unit.name for unit in planner.units() if unit.track_count == 9})
+def test_report_survives_a_dataset_with_no_metrics(tmp_path, logger):
+    planner = make_planner(["w20_10", "w20_20"])
+    populate_runs(tmp_path, planner, drop_metrics={unit.name for unit in planner.units() if unit.dataset == "w20_20"})
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
     out_dir = tmp_path / "report"
@@ -121,13 +124,13 @@ def test_report_survives_a_track_count_with_no_metrics(tmp_path, logger):
 
     payload = json.loads((out_dir / "patch_sweep.json").read_text())
 
-    assert payload["track_counts"]["9"]["best_patch_size"] is None
-    assert payload["track_counts"]["5"]["best_patch_size"] is not None
-    assert not (out_dir / "best_patch_vs_tracks.png").exists()
+    assert payload["datasets"]["w20_20"]["best_patch_size"] is None
+    assert payload["datasets"]["w20_10"]["best_patch_size"] is not None
+    assert not (out_dir / "best_patch_vs_dataset.png").exists()
 
 
-def test_markdown_reports_the_ranking_metric_and_prediction(tmp_path, logger):
-    planner = make_planner([5])
+def test_markdown_reports_the_ranking_metric_without_the_removed_prediction(tmp_path, logger):
+    planner = make_planner(["w20_10"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -136,9 +139,11 @@ def test_markdown_reports_the_ranking_metric_and_prediction(tmp_path, logger):
 
     text = (out_dir / "report.md").read_text()
 
-    assert "W* = w sqrt(N/n)" in text
-    assert "48.2" in text
-    assert "n = 5 tracks" in text
+    assert "seed-mean test avg_loss" in text
+    assert "Dataset w20_10" in text
+    assert "W*" not in text
+    assert "sqrt(N/n)" not in text
+    assert "predicted" not in text.lower()
 
 
 def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int]) -> None:
@@ -146,7 +151,7 @@ def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int
     for unit in planner.units():
         for offset, seed in enumerate(seeds):
             run_dir = root / "training" / unit.name / f"seed{seed}"
-            loss    = synthetic_loss(planner, unit) + 0.01 * offset
+            loss    = synthetic_loss(unit) + 0.01 * offset
 
             meta = run_dir / "meta"
             meta.mkdir(parents=True, exist_ok=True)
@@ -164,7 +169,7 @@ def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int
 
 
 def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
-    planner = make_planner([5], maximum=16)
+    planner = make_planner(["w20_10"], maximum=16)
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -174,13 +179,13 @@ def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
     assert all(record.test_loss_std is not None for record in records)
 
     unit     = records[0].unit
-    expected = synthetic_loss(planner, unit) + 0.005
+    expected = synthetic_loss(unit) + 0.005
     assert records[0].test_loss == pytest.approx(expected)
     assert [run["name"] for run in records[0].seed_runs] == [f"{unit.name}/seed0", f"{unit.name}/seed1"]
 
 
 def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
-    planner = make_planner([5], maximum=16)
+    planner = make_planner(["w20_10"], maximum=16)
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -191,7 +196,7 @@ def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
     payload  = json.loads((out_dir / "patch_sweep.json").read_text())
 
     assert "±" in markdown
-    unit_payload = payload["track_counts"]["5"]["units"][0]
+    unit_payload = payload["datasets"]["w20_10"]["units"][0]
     assert unit_payload["n_seeds"] == 2
     assert unit_payload["test_loss_std"] is not None
     assert len(unit_payload["seed_runs"]) == 2

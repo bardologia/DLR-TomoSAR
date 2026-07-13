@@ -11,7 +11,8 @@ from pipelines.shared.config.config_factory import ConfigFactory
 
 
 def make_worker(test_data_dir, params_dir, tmp_path: Path, batch_size: int | None = None) -> SweepTrainingWorker:
-    config                    = PatchSweepConfig(track_counts=[5])
+    config                        = PatchSweepConfig()
+    config.dataset_paths          = [test_data_dir]
     config.paths.dataset_path     = test_data_dir
     config.paths.parameters_path  = params_dir / "parameters.npy"
     config.paths.log_base_dir     = tmp_path
@@ -23,14 +24,23 @@ def make_worker(test_data_dir, params_dir, tmp_path: Path, batch_size: int | Non
 
 
 def apply_unit(worker: SweepTrainingWorker, unit_name: str) -> None:
-    unit = PatchSweepPlanner.from_dataset(worker.config).unit(unit_name)
+    unit = PatchSweepPlanner(worker.config).unit(unit_name)
     worker._apply_unit(unit)
+
+
+@pytest.mark.real_data
+def test_unit_reroots_the_dataset_and_parameters(test_data_dir, params_dir, tmp_path):
+    worker = make_worker(test_data_dir, params_dir, tmp_path)
+    apply_unit(worker, f"{test_data_dir.name}-p016")
+
+    assert worker.config.paths.dataset_path    == test_data_dir
+    assert worker.config.paths.parameters_path == params_dir / "parameters.npy"
 
 
 @pytest.mark.real_data
 def test_small_patch_unit_keeps_the_lr_scale_at_one(test_data_dir, params_dir, tmp_path):
     worker = make_worker(test_data_dir, params_dir, tmp_path)
-    apply_unit(worker, "n05-p016")
+    apply_unit(worker, f"{test_data_dir.name}-p016")
 
     assert worker.config.training.batch_size              == 4096
     assert worker.config.training.lr_reference_batch_size == 4096
@@ -43,7 +53,7 @@ def test_small_patch_unit_keeps_the_lr_scale_at_one(test_data_dir, params_dir, t
 @pytest.mark.real_data
 def test_unit_preserves_the_configured_lr_scale_ratio(test_data_dir, params_dir, tmp_path):
     worker = make_worker(test_data_dir, params_dir, tmp_path, batch_size=512)
-    apply_unit(worker, "n05-p016")
+    apply_unit(worker, f"{test_data_dir.name}-p016")
 
     trainer_config = ConfigFactory(worker.config).training_trainer_config(logdir=tmp_path / "run")
 

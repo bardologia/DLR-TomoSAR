@@ -85,7 +85,7 @@ class ScriptCatalog:
         "sweep_patches": {
             "title"     : "Patch-Size Sweep",
             "category"  : "Experiments",
-            "purpose"   : "Validate the context-window prediction W* = w sqrt(N/n): for each selected track count n, train the same backbone across all patch sizes admissible at the architecture's minimum step, then report the best patch size per n against the sample-budget prediction.",
+            "purpose"   : "Sweep the patch size per dataset: on each selected dataset (each preprocessed with its own boxcar window), train the same backbone across all patch sizes admissible at the architecture's minimum step on the traditional reduced stack, then report the best patch size per dataset.",
         },
         "tune": {
             "title"     : "Tune",

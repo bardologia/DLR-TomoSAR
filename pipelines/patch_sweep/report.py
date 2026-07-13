@@ -163,7 +163,7 @@ class SweepPlots(PlotBase):
 
         ax.fill_between(sizes, means - stds, means + stds, color=color, alpha=0.15, linewidth=0)
 
-    def curve(self, track_count: int, records: list[SweepRecord], predicted: float) -> Path:
+    def curve(self, dataset: str, records: list[SweepRecord]) -> Path:
         complete = [record for record in records if record.complete]
 
         fig, ax = plt.subplots(figsize=(5.2, 3.6))
@@ -175,31 +175,27 @@ class SweepPlots(PlotBase):
         ax.plot([r.unit.patch_size for r in with_val], [r.best_val_loss for r in with_val], marker="s", color="#787880", label="best validation loss")
         self._band(ax, with_val, "best_val_loss", "best_val_loss_std", "#787880")
 
-        ax.axvline(predicted, color="#1E6E46", linestyle="--", linewidth=1.0, label=rf"predicted $W^{{*}} = {predicted:.1f}$ px")
-
         ax.set_xlabel("patch size (px)")
         ax.set_ylabel("held-out loss")
-        ax.set_title(f"{track_count} tracks")
+        ax.set_title(dataset)
         ax.legend(frameon=False)
 
-        return self._save(fig, self.out_dir / "curves" / f"n{track_count:02d}.png")
+        return self._save(fig, self.out_dir / "curves" / f"{dataset}.png")
 
-    def best_versus_tracks(self, best: dict[int, int], planner: PatchSweepPlanner) -> Path:
-        counts = sorted(best)
+    def best_versus_datasets(self, best: dict[str, int]) -> Path:
+        names = list(best)
 
         fig, ax = plt.subplots(figsize=(5.2, 3.6))
 
-        n_grid = np.linspace(min(counts), max(counts), 200)
-        ax.plot(n_grid, [planner.predicted_optimum(n) for n in n_grid], color="#1E6E46", linestyle="--", linewidth=1.0, label=r"predicted $W^{*} = w\sqrt{N/n}$")
+        ax.plot(range(len(names)), [best[name] for name in names], marker="o", linestyle="none", color="#B03052")
 
-        ax.plot(counts, [best[n] for n in counts], marker="o", linestyle="none", color="#B03052", label="observed best patch")
-
-        ax.set_xlabel("tracks used $n$")
+        ax.set_xticks(range(len(names)))
+        ax.set_xticklabels(names, rotation=20, ha="right", fontsize=7)
+        ax.set_xlabel("dataset")
         ax.set_ylabel("patch size (px)")
-        ax.set_title("Best patch size versus track count")
-        ax.legend(frameon=False)
+        ax.set_title("Best patch size per dataset")
 
-        return self._save(fig, self.out_dir / "best_patch_vs_tracks.png")
+        return self._save(fig, self.out_dir / "best_patch_vs_dataset.png")
 
 
 class PatchSweepReport:
@@ -210,12 +206,12 @@ class PatchSweepReport:
         self.logger  = logger
         self.plots   = SweepPlots(out_dir)
 
-    def _by_track_count(self) -> dict[int, list[SweepRecord]]:
-        groups: dict[int, list[SweepRecord]] = {}
+    def _by_dataset(self) -> dict[str, list[SweepRecord]]:
+        groups: dict[str, list[SweepRecord]] = {}
         for record in self.records:
-            groups.setdefault(record.unit.track_count, []).append(record)
+            groups.setdefault(record.unit.dataset, []).append(record)
 
-        return {count: sorted(group, key=lambda r: r.unit.patch_size) for count, group in sorted(groups.items())}
+        return {dataset: sorted(group, key=lambda r: r.unit.patch_size) for dataset, group in groups.items()}
 
     def _best(self, group: list[SweepRecord]) -> SweepRecord | None:
         complete = [record for record in group if record.complete]
@@ -224,17 +220,16 @@ class PatchSweepReport:
 
         return min(complete, key=lambda record: record.test_loss)
 
-    def _summary_payload(self, groups: dict[int, list[SweepRecord]]) -> dict:
-        per_count = {}
-        for count, group in groups.items():
+    def _summary_payload(self, groups: dict[str, list[SweepRecord]]) -> dict:
+        per_dataset = {}
+        for dataset, group in groups.items():
             best = self._best(group)
 
-            per_count[str(count)] = {
-                "secondary_labels" : list(group[0].unit.secondary_labels),
-                "predicted_optimum": self.planner.predicted_optimum(count),
-                "best_patch_size"  : best.unit.patch_size if best else None,
-                "best_test_loss"   : best.test_loss       if best else None,
-                "units"            : [{
+            per_dataset[dataset] = {
+                "dataset_path"    : str(group[0].unit.dataset_path),
+                "best_patch_size" : best.unit.patch_size if best else None,
+                "best_test_loss"  : best.test_loss       if best else None,
+                "units"           : [{
                     "name"              : record.unit.name,
                     "patch_size"        : record.unit.patch_size,
                     "patch_stride"      : record.unit.patch_stride,
@@ -251,47 +246,42 @@ class PatchSweepReport:
             }
 
         return {
-            "boxcar_window" : self.planner.config.boxcar_window,
-            "total_tracks"  : self.planner.total_tracks,
-            "patch_step"    : self.planner.patch_step(),
-            "track_counts"  : per_count,
+            "patch_step" : self.planner.patch_step(),
+            "datasets"   : per_dataset,
         }
 
-    def _write_json(self, groups: dict[int, list[SweepRecord]]) -> Path:
+    def _write_json(self, groups: dict[str, list[SweepRecord]]) -> Path:
         path = self.out_dir / "patch_sweep.json"
         FileIO.save_json(self._summary_payload(groups), path, indent=2)
 
         return path
 
-    def _write_curves(self, groups: dict[int, list[SweepRecord]]) -> list[Path]:
-        return [self.plots.curve(count, group, self.planner.predicted_optimum(count)) for count, group in groups.items()]
+    def _write_curves(self, groups: dict[str, list[SweepRecord]]) -> list[Path]:
+        return [self.plots.curve(dataset, group) for dataset, group in groups.items()]
 
-    def _write_best_plot(self, groups: dict[int, list[SweepRecord]]) -> Path | None:
-        best = {count: self._best(group) for count, group in groups.items()}
-        best = {count: record.unit.patch_size for count, record in best.items() if record is not None}
+    def _write_best_plot(self, groups: dict[str, list[SweepRecord]]) -> Path | None:
+        best = {dataset: self._best(group) for dataset, group in groups.items()}
+        best = {dataset: record.unit.patch_size for dataset, record in best.items() if record is not None}
 
         if len(best) < 2:
-            self.logger.warning("Fewer than two track counts have a ranked best patch; the best-versus-tracks figure is skipped")
+            self.logger.warning("Fewer than two datasets have a ranked best patch; the best-versus-datasets figure is skipped")
             return None
 
-        return self.plots.best_versus_tracks(best, self.planner)
+        return self.plots.best_versus_datasets(best)
 
-    def _summary_table(self, groups: dict[int, list[SweepRecord]]) -> MarkdownTable:
-        table = MarkdownTable(["Tracks n", "Predicted W* (px)", "Best patch (px)", "Ratio best/W*", "Test loss at best"], align=["right"] * 5)
+    def _summary_table(self, groups: dict[str, list[SweepRecord]]) -> MarkdownTable:
+        table = MarkdownTable(["Dataset", "Best patch (px)", "Test loss at best"], align=["left", "right", "right"])
 
-        for count, group in groups.items():
-            best      = self._best(group)
-            predicted = self.planner.predicted_optimum(count)
+        for dataset, group in groups.items():
+            best = self._best(group)
 
             if best is None:
-                table.add_row(count, f"{predicted:.1f}", None, None, None)
+                table.add_row(dataset, None, None)
                 continue
 
             table.add_row(
-                count,
-                f"{predicted:.1f}",
+                dataset,
                 best.unit.patch_size,
-                f"{best.unit.patch_size / predicted:.2f}",
                 self._with_std(best.test_loss, best.test_loss_std),
             )
 
@@ -323,35 +313,34 @@ class PatchSweepReport:
 
         return table
 
-    def _write_markdown(self, groups: dict[int, list[SweepRecord]], curve_paths: list[Path], best_plot: Path | None) -> Path:
+    def _write_markdown(self, groups: dict[str, list[SweepRecord]], curve_paths: list[Path], best_plot: Path | None) -> Path:
         config = self.planner.config
         doc    = MarkdownDoc("Patch-size sweep")
 
-        doc.paragraph("Best patch size per track count, against the sample-budget prediction W* = w sqrt(N/n): the ground truth estimates each label from a w x w boxcar covariance over N tracks, so a network reading n tracks must repay the missing samples with receptive-field area.")
+        doc.paragraph("Best patch size per dataset: the same backbone is trained across every admissible patch size on each selected dataset, all on the traditional reduced stack. The datasets differ by the boxcar window used in preprocessing, so the sweep shows how the best receptive field follows the filter footprint.")
         doc.kv_table({
-            "Backbone"         : f"{config.backbone_name}-{config.backbone_head}",
-            "Dataset"          : config.paths.dataset_path,
-            "Boxcar window w"  : config.boxcar_window,
-            "Total tracks N"   : self.planner.total_tracks,
-            "Patch step"       : self.planner.patch_step(),
-            "Seeds"            : config.seeds or [config.seed],
-            "Ranking metric"   : "seed-mean test avg_loss at the restored best-validation checkpoint",
+            "Backbone"       : f"{config.backbone_name}-{config.backbone_head}",
+            "Datasets"       : ", ".join(groups),
+            "Secondaries"    : ", ".join(config.paths.secondary_labels),
+            "Patch step"     : self.planner.patch_step(),
+            "Seeds"          : config.seeds or [config.seed],
+            "Ranking metric" : "seed-mean test avg_loss at the restored best-validation checkpoint",
         })
 
-        doc.heading("Best patch size per track count", level=2)
+        doc.heading("Best patch size per dataset", level=2)
         doc.table(self._summary_table(groups))
 
         if best_plot is not None:
-            doc.image("best patch size versus track count", best_plot.relative_to(self.out_dir))
+            doc.image("best patch size per dataset", best_plot.relative_to(self.out_dir))
 
-        for (count, group), curve_path in zip(groups.items(), curve_paths):
+        for (dataset, group), curve_path in zip(groups.items(), curve_paths):
             best = self._best(group)
 
-            doc.heading(f"n = {count} tracks", level=2)
-            doc.bold_kv("Secondaries", ", ".join(group[0].unit.secondary_labels))
+            doc.heading(f"Dataset {dataset}", level=2)
+            doc.bold_kv("Path", str(group[0].unit.dataset_path))
             doc.blank()
             doc.table(self._group_table(group, best))
-            doc.image(f"loss versus patch size at n = {count}", curve_path.relative_to(self.out_dir))
+            doc.image(f"loss versus patch size on {dataset}", curve_path.relative_to(self.out_dir))
 
         path = self.out_dir / "report.md"
         doc.save(path)
@@ -359,7 +348,7 @@ class PatchSweepReport:
         return path
 
     def write_all(self) -> list[Path]:
-        groups = self._by_track_count()
+        groups = self._by_dataset()
 
         json_path   = self._write_json(groups)
         curve_paths = self._write_curves(groups)

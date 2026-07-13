@@ -12,7 +12,7 @@
     "tuning": "The stage that searches hyperparameter spaces with Optuna to improve a chosen model family. It wires the search budget, pruning, and resources to a nested training configuration and swaps in per-trial hyperparameter samples. The configs here control the Optuna search controls and artifact emission, the entry point binding model type, resources, and data to the search, and the JEPA-specific search space over autoencoder pairing, target strategy, and loss weights.",
     "comparison": "The stage that rebuilds side-by-side comparisons across completed runs and trials without re-running training or inference. It aggregates existing inference or preprocessing outputs into a single report grouped by the varied factor. The configs here control comparison of backbone inference runs, of preprocessing trials differing by multilook window, of Gaussian-fit extraction trials grouped by component count, and the standalone rebuild of an existing benchmark comparison report.",
     "diagnostics": "The stage that inspects completed training runs independently of any data run. The weight-xray diagnostic classifies each checkpoint tensor against numeric thresholds and emits a per-run report and plots; the tensorboard export renders every logged scalar series as a publication-quality figure inside the run directory, pairing train and validation series of the same metric in one shared figure. The configs here control the pathology classification thresholds, the single-run diagnostics and their report and plot outputs, and the batch webui entries that select runs and build a per-run configuration.",
-    "patch_sweep": "The experiment that validates the context-window prediction W* = w sqrt(N/n) derived from the ground truth's covariance estimation. The ground truth estimates each label from a w x w boxcar covariance over the full N-track stack, so a network reading only n tracks must repay the missing samples with receptive-field area. The configs here select the track counts to test, derive the patch-size grid at the architecture's minimum admissible step, fan the training runs out across GPUs, and produce a report ranking the best patch size per track count against the prediction."
+    "patch_sweep": "The experiment that measures the best patch size per dataset. Each selected dataset is preprocessed with its own boxcar covariance window, and the same backbone trains across every admissible patch size on the traditional reduced stack, seeds nested per unit. The configs here select the datasets to sweep, derive the patch-size grid at the architecture's minimum admissible step, fan the training runs out across GPUs, and produce a report ranking the best patch size per dataset on the seed-mean test loss."
   },
   "configs": {
     "sar/gaussian_config::GaussianConfig": {
@@ -2231,26 +2231,25 @@
       }
     },
     "patch_sweep/general::PatchSweepConfig": {
-      "summary": "Top-level config orchestrating the per-track-count patch-size sweep: training fan-out plus the best-patch-per-n report",
+      "summary": "Top-level config orchestrating the per-dataset patch-size sweep: training fan-out plus the best-patch-per-dataset report",
       "fields": {
         "backbone_name": "Backbone architecture identifier resolved via ModelBuilder's registry; also the source of the admissible patch step, e.g. unet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred)",
         "model_overrides": "Dict of architecture-config field overrides applied to the backbone before instantiation, shared across all sweep units; the default narrows the backbone to a three-level feature pyramid so the admissible patch step is 8",
-        "track_counts": "Total track counts n (primary + secondaries) to sweep; for each n the secondaries are picked evenly spaced over the dataset's baseline-ordered track list",
-        "boxcar_window": "Side w of the boxcar covariance window the ground-truth Capon inversion used, in pixels; sets the predicted optimum W* = w sqrt(N/n) drawn in the report",
+        "dataset_paths": "Preprocessed dataset directories to sweep, each with its own boxcar window; every dataset trains the full patch grid on the traditional reduced stack, directory names key the sweep units and must be unique",
         "patch": "PatchGridConfig sub-config defining the swept patch-size grid and the per-size stride and batch rules",
-        "paths": "RunPathsConfig sub-config holding the dataset, extracted parameters, and the sweep run/output directories; secondary_labels is overridden per unit by the planner",
+        "paths": "RunPathsConfig sub-config holding the sweep run/output directories plus the dataset/parameters template: dataset_path and parameters_path define the relative parameters layout the planner re-roots onto every swept dataset, and secondary_labels holds the fixed reduced-stack selection shared by every unit",
         "training": "TrainingQueueConfig sub-config shared by every sweep unit; patch_size, patch_stride, and batch_size act as the reference values the planner rescales per unit",
         "input": "InputConfig sub-config selecting the input channel families (primary, secondaries, interferograms, DEM) fed to every unit",
-        "geometry": "GeometryConfig sub-config resolving acquisition geometry and per-track kz from the dataset's baselines table",
+        "geometry": "GeometryConfig sub-config resolving acquisition geometry and per-track kz from each swept dataset's baselines table",
         "curriculum": "Loss curriculum shared by every sweep unit, inherited from the backbone training defaults unless overridden",
-        "normalization": "NormalizationConfig sub-config with per-channel normalization strategies, refitted per unit because the channel count follows the track count",
+        "normalization": "NormalizationConfig sub-config with per-channel normalization strategies, refitted per dataset",
         "augmentation": "AugmentationConfig sub-config applied identically to every sweep unit",
         "gpus": "GPU ids the training queue fans units out across",
         "run_tag": "Name of the sweep run directory under paths.log_base_dir; empty generates a timestamp",
         "resume": "When true, units whose run directory already holds a best_model.pt checkpoint are reused instead of retrained",
-        "seed": "Seed shared by every sweep unit so the patch size and track count remain the only varied factors",
-        "seeds": "List of seeds swept per (track count, patch size) unit, one training run per seed nested as seed<N> inside the unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field, and the report ranks on the seed-mean test loss",
+        "seed": "Fallback seed when seeds is empty, so the patch size and dataset remain the only varied factors",
+        "seeds": "List of seeds swept per (dataset, patch size) unit, one training run per seed nested as seed<N> inside the unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field, and the report ranks on the seed-mean test loss",
         "poll_interval_s": "Seconds between GPU-queue polls while training runs are in flight"
       }
     }

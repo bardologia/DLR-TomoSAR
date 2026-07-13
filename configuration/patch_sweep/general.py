@@ -26,8 +26,7 @@ class PatchSweepConfig:
     backbone_head   : str  = "conv"
     model_overrides : dict = field(default_factory=lambda: {"features": [64, 128, 256]})
 
-    track_counts  : list[int] = field(default_factory=lambda: [5, 9, 29])
-    boxcar_window : int       = 20
+    dataset_paths : list[Path] = field(default_factory=lambda: [Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")])
 
     patch : PatchGridConfig = field(default_factory=PatchGridConfig)
 

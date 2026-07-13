@@ -13,7 +13,8 @@ class SweepTrainingWorker(WorkerBase):
         super().__init__(config=config, run_tag=run_tag)
 
     def _apply_unit(self, unit: SweepUnit) -> None:
-        self.config.paths.secondary_labels = unit.secondary_labels
+        self.config.paths.dataset_path    = unit.dataset_path
+        self.config.paths.parameters_path = unit.parameters_path
 
         self.config.training.patch_size              = (unit.patch_size, unit.patch_size)
         self.config.training.patch_stride            = unit.patch_stride
@@ -23,7 +24,7 @@ class SweepTrainingWorker(WorkerBase):
     def run(self, unit_name: str, seed: int | None = None) -> None:
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
-        unit = PatchSweepPlanner.from_dataset(self.config).unit(unit_name)
+        unit = PatchSweepPlanner(self.config).unit(unit_name)
         self._apply_unit(unit)
 
         factory      = ConfigFactory(self.config)

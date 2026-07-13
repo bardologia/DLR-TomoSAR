@@ -17,7 +17,7 @@ def _scheduler() -> None:
     from pipelines.patch_sweep.pipeline  import PatchSweepPipeline
     from tools.runtime.config_cli        import ConfigCli
 
-    cli    = ConfigCli(PatchSweepConfig(), description="Patch-size sweep per track count")
+    cli    = ConfigCli(PatchSweepConfig(), description="Patch-size sweep per dataset")
     config = cli.apply()
 
     CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()

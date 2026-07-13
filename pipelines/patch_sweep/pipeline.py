@@ -32,30 +32,30 @@ class PatchSweepPipeline(StagedPipeline):
         return out_dir
 
     def run(self) -> None:
-        planner = PatchSweepPlanner.from_dataset(self.config)
+        planner = PatchSweepPlanner(self.config)
 
         self.logger.section("Patch-size sweep pipeline")
         self.logger.kv_table({
-            "Run tag" : self.run_tag,
-            "Model"   : f"{self.config.backbone_name}-{self.config.backbone_head}",
+            "Run tag"     : self.run_tag,
+            "Model"       : f"{self.config.backbone_name}-{self.config.backbone_head}",
             **planner.summary(),
-            "GPUs"    : self.config.gpus,
-            "Resume"  : self.config.resume,
-            "Run dir" : str(self.run_dir),
+            "Secondaries" : ", ".join(self.config.paths.secondary_labels),
+            "GPUs"        : self.config.gpus,
+            "Resume"      : self.config.resume,
+            "Run dir"     : str(self.run_dir),
         }, title="Configuration")
 
         self.logger.subsection("Sweep plan")
         scaling = self.config.training.scale_lr_with_batch
         rows    = [{
-            "Unit"        : unit.name,
-            "Tracks"      : unit.track_count,
-            "Patch"       : unit.patch_size,
-            "Stride"      : unit.patch_stride,
-            "Batch"       : unit.batch_size,
-            "LR scale"    : f"{unit.batch_size / unit.lr_reference_batch_size if scaling else 1.0:.2f}",
-            "Secondaries" : ", ".join(unit.secondary_labels),
+            "Unit"     : unit.name,
+            "Dataset"  : unit.dataset,
+            "Patch"    : unit.patch_size,
+            "Stride"   : unit.patch_stride,
+            "Batch"    : unit.batch_size,
+            "LR scale" : f"{unit.batch_size / unit.lr_reference_batch_size if scaling else 1.0:.2f}",
         } for unit in planner.units()]
-        self.logger.metrics_table(rows, ["Unit", "Tracks", "Patch", "Stride", "Batch", "LR scale", "Secondaries"])
+        self.logger.metrics_table(rows, ["Unit", "Dataset", "Patch", "Stride", "Batch", "LR scale"])
 
         try:
             training_results = self._run_training(planner)

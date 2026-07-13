@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-import math
+from pathlib import Path
 
 import pytest
 
 from configuration.patch_sweep import PatchSweepConfig
-from configuration.sar.geometry_config import GeometryConfig
-from pipelines.patch_sweep.planner import ArchitecturePatchStep, PatchSweepPlanner, SecondarySpread
-from tools.baselines import TrackBaselines
+from pipelines.patch_sweep.planner import ArchitecturePatchStep, PatchSweepPlanner
 
 
-def make_candidates(n: int = 28) -> list[str]:
-    return [f"FL01_PS{i:02d}" for i in range(3, 3 + n)]
+def make_datasets(names: list[str]) -> list[Path]:
+    return [Path("/data") / name for name in names]
 
 
-def make_planner(track_counts: list[int], **patch_overrides) -> PatchSweepPlanner:
-    config = PatchSweepConfig(track_counts=track_counts)
+def make_planner(datasets: list[str], **patch_overrides) -> PatchSweepPlanner:
+    config               = PatchSweepConfig()
+    config.dataset_paths = make_datasets(datasets)
     for key, value in patch_overrides.items():
         setattr(config.patch, key, value)
-    return PatchSweepPlanner(config, make_candidates())
+    return PatchSweepPlanner(config)
 
 
 def test_step_derives_from_the_resunet_feature_pyramid():
@@ -42,122 +41,79 @@ def test_step_rejects_backbones_outside_the_verified_unet_family():
 
 
 def test_explicit_step_overrides_the_architecture():
-    planner = make_planner([5], step=32, maximum=96)
+    planner = make_planner(["w20_10"], step=32, maximum=96)
 
     assert planner.patch_sizes() == [32, 64, 96]
 
 
 def test_sizes_run_from_one_step_to_maximum():
-    planner = make_planner([5], maximum=128)
+    planner = make_planner(["w20_10"], maximum=128)
 
     assert planner.patch_sizes() == [8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]
 
 
 def test_minimum_must_be_admissible():
-    planner = make_planner([5], minimum=20)
+    planner = make_planner(["w20_10"], minimum=20)
 
     with pytest.raises(ValueError, match="multiple of the admissible step"):
         planner.patch_sizes()
 
 
 def test_single_size_grid_is_rejected():
-    planner = make_planner([5], maximum=8)
+    planner = make_planner(["w20_10"], maximum=8)
 
     with pytest.raises(ValueError, match="at least 2"):
         planner.patch_sizes()
 
 
-def test_track_counts_must_fit_the_dataset():
-    with pytest.raises(ValueError, match=r"\[2, 29\]"):
-        make_planner([5, 30])
+def test_datasets_must_be_present():
+    with pytest.raises(ValueError, match="at least one dataset"):
+        make_planner([])
 
 
-def test_track_counts_must_be_unique():
+def test_dataset_names_must_be_unique():
+    config               = PatchSweepConfig()
+    config.dataset_paths = [Path("/data/a/w20_10"), Path("/data/b/w20_10")]
+
     with pytest.raises(ValueError, match="unique"):
-        make_planner([5, 5])
+        PatchSweepPlanner(config)
 
 
-def make_table() -> TrackBaselines:
-    labels   = ["REF"] + [f"T{i}" for i in range(6)]
-    vertical = [0.0, -0.9, 0.4, -2.1, -0.2, -1.5, 0.1]
+def test_parameters_template_must_live_inside_the_dataset():
+    config                       = PatchSweepConfig()
+    config.dataset_paths         = make_datasets(["w20_10"])
+    config.paths.parameters_path = Path("/elsewhere/parameters.npy")
 
-    return TrackBaselines(
-        labels         = labels,
-        vertical       = vertical,
-        horizontal     = [0.0] * len(labels),
-        vertical_std   = [0.0] * len(labels),
-        horizontal_std = [0.0] * len(labels),
-    )
+    with pytest.raises(ValueError, match="re-roots"):
+        PatchSweepPlanner(config)
 
 
-def test_candidates_are_ordered_by_the_geometry_baseline_component():
-    geometry = GeometryConfig(baseline_component="vertical")
-    ordered  = PatchSweepPlanner.baseline_ordered(geometry, make_table())
+def test_parameters_are_rerooted_onto_every_dataset():
+    planner  = make_planner(["w20_10", "w20_20"], maximum=16)
+    template = planner.parameters_template()
 
-    assert ordered == ["T2", "T4", "T0", "T3", "T5", "T1"]
-
-
-def test_baseline_ordering_never_includes_the_reference():
-    geometry = GeometryConfig(baseline_component="vertical")
-
-    assert "REF" not in PatchSweepPlanner.baseline_ordered(geometry, make_table())
-
-
-@pytest.mark.real_data
-def test_dataset_selection_spans_the_full_baseline_aperture(test_data_dir):
-    config = PatchSweepConfig(track_counts=[5, 9, 29])
-    config.paths.dataset_path = test_data_dir
-
-    planner  = PatchSweepPlanner.from_dataset(config)
-    geometry = config.geometry
-    table    = TrackBaselines.load(geometry.baselines_file(test_data_dir))
-    values   = dict(zip(table.labels, table.baselines(geometry.baseline_component, look_angle_deg=geometry.look_angle_deg)))
-
-    candidate_values = [values[label] for label in planner.candidates]
-
-    assert candidate_values == sorted(candidate_values)
-
-    for track_count, labels in planner.selections().items():
-        selected = [values[label] for label in labels]
-
-        assert min(selected) == min(candidate_values)
-        assert max(selected) == max(candidate_values)
-
-
-def test_even_spread_keeps_the_endpoints():
-    candidates = make_candidates()
-    spread     = SecondarySpread.even(candidates, 4)
-
-    assert spread[0]  == candidates[0]
-    assert spread[-1] == candidates[-1]
-    assert len(set(spread)) == 4
-
-
-def test_even_spread_is_distinct_for_every_count():
-    candidates = make_candidates()
-
-    for n in range(1, len(candidates) + 1):
-        spread = SecondarySpread.even(candidates, n)
-        assert len(set(spread)) == n
-
-
-def test_full_count_selects_every_secondary():
-    planner = make_planner([29])
-
-    assert planner.selections()[29] == tuple(make_candidates())
+    for unit in planner.units():
+        assert unit.parameters_path == unit.dataset_path / template
+        assert str(unit.parameters_path).startswith(str(unit.dataset_path))
 
 
 def test_units_cover_the_full_cross_product():
-    planner = make_planner([5, 9], maximum=64)
+    planner = make_planner(["w20_10", "w20_20"], maximum=64)
     units   = planner.units()
 
     assert len(units) == 2 * 8
-    assert sorted({unit.track_count for unit in units}) == [5, 9]
-    assert {unit.name for unit in units} == {f"n{n:02d}-p{s:03d}" for n in (5, 9) for s in range(8, 65, 8)}
+    assert sorted({unit.dataset for unit in units}) == ["w20_10", "w20_20"]
+    assert {unit.name for unit in units} == {f"{d}-p{s:03d}" for d in ("w20_10", "w20_20") for s in range(8, 65, 8)}
+
+
+def test_units_keep_the_config_dataset_order():
+    planner = make_planner(["w20_20", "w20_10"], maximum=16)
+
+    assert [unit.dataset for unit in planner.units()] == ["w20_20", "w20_20", "w20_10", "w20_10"]
 
 
 def test_constant_pixel_budget_rescales_the_batch():
-    planner = make_planner([5], maximum=128)
+    planner = make_planner(["w20_10"], maximum=128)
     by_size = {unit.patch_size: unit.batch_size for unit in planner.units()}
 
     reference = planner.config.training.batch_size * planner.config.training.patch_size[0] * planner.config.training.patch_size[1]
@@ -168,13 +124,13 @@ def test_constant_pixel_budget_rescales_the_batch():
 
 
 def test_fixed_batch_when_the_budget_is_disabled():
-    planner = make_planner([5], constant_pixel_budget=False)
+    planner = make_planner(["w20_10"], constant_pixel_budget=False)
 
     assert {unit.batch_size for unit in planner.units()} == {planner.config.training.batch_size}
 
 
 def test_constant_pixel_budget_keeps_the_lr_scale_constant():
-    planner    = make_planner([5], maximum=128)
+    planner    = make_planner(["w20_10"], maximum=128)
     configured = planner.config.training.batch_size / planner.config.training.lr_reference_batch_size
 
     for unit in planner.units():
@@ -182,7 +138,7 @@ def test_constant_pixel_budget_keeps_the_lr_scale_constant():
 
 
 def test_lr_reference_rescales_with_the_pixel_budget():
-    planner = make_planner([5], maximum=128)
+    planner = make_planner(["w20_10"], maximum=128)
     by_size = {unit.patch_size: unit.lr_reference_batch_size for unit in planner.units()}
 
     reference = planner.config.training.lr_reference_batch_size * planner.config.training.patch_size[0] * planner.config.training.patch_size[1]
@@ -193,20 +149,22 @@ def test_lr_reference_rescales_with_the_pixel_budget():
 
 
 def test_lr_reference_untouched_when_the_budget_is_disabled():
-    planner = make_planner([5], constant_pixel_budget=False)
+    planner = make_planner(["w20_10"], constant_pixel_budget=False)
 
     assert {unit.lr_reference_batch_size for unit in planner.units()} == {planner.config.training.lr_reference_batch_size}
 
 
-def test_predicted_optimum_matches_the_closed_form():
-    planner = make_planner([5])
+def test_summary_reports_the_seed_axis():
+    planner = make_planner(["w20_10", "w20_20"], maximum=16)
+    summary = planner.summary()
 
-    assert planner.predicted_optimum(5) == pytest.approx(20 * math.sqrt(29 / 5))
-    assert planner.predicted_optimum(29) == pytest.approx(20.0)
+    assert summary["Datasets"] == ["w20_10", "w20_20"]
+    assert summary["Units"]    == 4
+    assert summary["Seeds"]    == [0, 1, 2, 3, 4]
 
 
 def test_unit_lookup_is_loud_for_unknown_names():
-    planner = make_planner([5])
+    planner = make_planner(["w20_10"])
 
-    with pytest.raises(KeyError, match="n99-p016"):
-        planner.unit("n99-p016")
+    with pytest.raises(KeyError, match="w99-p016"):
+        planner.unit("w99-p016")
