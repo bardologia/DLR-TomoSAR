@@ -19,7 +19,7 @@ def main() -> None:
     from pipelines.image_autoencoder.training.pipeline import SingleTrainRunner
     from pipelines.shared.training.training_launcher            import SeedSweepLauncher
 
-    SeedSweepLauncher(ImageAeEntryConfig(), SingleTrainRunner, "Image autoencoder training").run()
+    SeedSweepLauncher(ImageAeEntryConfig(), SingleTrainRunner, "Image autoencoder training", base_attr="ae_model_name").run()
 
 
 if __name__ == "__main__":

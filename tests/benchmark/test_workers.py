@@ -31,9 +31,9 @@ def test_run_name_encodes_model_head_matching_gaussians_aug_presence_component_a
     tag    = RunNaming.benchmark_unit("unet", None, config.loss, 5, config.augmentation)
 
     assert worker._run_name("unet", None, None)       == tag
-    assert worker._run_name("unet", None, 5)          == f"{tag}_seed5"
+    assert worker._run_name("unet", None, 5)          == f"{tag}/seed5"
     assert worker._run_name("unet", "param_l1", None) == "unet-conv-sorted_gt-K_5-hv-A__param_l1"
-    assert worker._run_name("unet", "param_l1", 5)    == "unet-conv-sorted_gt-K_5-hv-A__param_l1_seed5"
+    assert worker._run_name("unet", "param_l1", 5)    == "unet-conv-sorted_gt-K_5-hv-A__param_l1/seed5"
     assert tag.startswith("unet-conv-sorted_gt-K_5-hv-A-param_l1_1")
 
 

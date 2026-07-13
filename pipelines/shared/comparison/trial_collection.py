@@ -142,6 +142,22 @@ class TrialCollector:
 
         return base
 
+    @staticmethod
+    def _seed_dirs(trial_dir: Path) -> list[Path]:
+        return sorted(d for d in trial_dir.iterdir() if d.is_dir() and re.fullmatch(r"seed\d+", d.name))
+
+    def _run_dirs(self) -> list[tuple[str, Path]]:
+        runs = []
+        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
+            seed_dirs = self._seed_dirs(trial_dir)
+
+            if seed_dirs:
+                runs += [(f"{trial_dir.name}/{seed_dir.name}", seed_dir) for seed_dir in seed_dirs]
+            else:
+                runs.append((trial_dir.name, trial_dir))
+
+        return runs
+
     def collect(self) -> list[TrialRecord]:
         size_match, training_results = self._aggregate_sources()
 
@@ -150,13 +166,13 @@ class TrialCollector:
             return []
 
         records = []
-        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
-            record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
+        for name, trial_dir in self._run_dirs():
+            record = TrialRecord(name=name, run_dir=trial_dir)
 
-            record.size_match      = size_match.get(self._model_of(trial_dir.name), {})
+            record.size_match      = size_match.get(self._model_of(name), {})
             record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
             record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
+            record.training_result = training_results[name] if name in training_results else {}
             record.parameters      = self._parse_parameters(trial_dir, record.size_match)
             record.checkpoint      = self._read_checkpoint(trial_dir)
 

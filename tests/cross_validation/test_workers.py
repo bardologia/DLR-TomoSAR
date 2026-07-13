@@ -106,12 +106,12 @@ def test_collector_split_view_empty_when_metrics_absent(tmp_path):
 
 
 def test_collector_aggregates_seeds_per_fold(tmp_path):
-    names     = ["fold_0_seed1", "fold_0_seed2", "fold_1_seed1", "fold_1_seed2"]
+    names     = ["fold_0/seed1", "fold_0/seed2", "fold_1/seed1", "fold_1/seed2"]
     inference = {
-        "fold_0_seed1": {"test": {"curve_rmse_gt": 2.0}},
-        "fold_0_seed2": {"test": {"curve_rmse_gt": 4.0}},
-        "fold_1_seed1": {"test": {"curve_rmse_gt": 1.0}},
-        "fold_1_seed2": {"test": {"curve_rmse_gt": 3.0}},
+        "fold_0/seed1": {"test": {"curve_rmse_gt": 2.0}},
+        "fold_0/seed2": {"test": {"curve_rmse_gt": 4.0}},
+        "fold_1/seed1": {"test": {"curve_rmse_gt": 1.0}},
+        "fold_1/seed2": {"test": {"curve_rmse_gt": 3.0}},
     }
 
     run_dir   = build_run_dir(tmp_path, names, inference)
@@ -268,4 +268,4 @@ def test_backbone_fold_trainer_uses_the_entry_curriculum(test_data_dir, monkeypa
     from pipelines.shared.training.run_naming import RunNaming
 
     run_tag = RunNaming.training_tag(config.backbone_name, config.backbone_head, config.curriculum, 5, config.augmentation)
-    assert captured["run_name"] == f"{run_tag}_fold_1_seed7"
+    assert captured["run_name"] == f"{run_tag}_fold_1/seed7"

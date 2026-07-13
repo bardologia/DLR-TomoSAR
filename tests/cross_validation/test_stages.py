@@ -69,12 +69,12 @@ def test_training_stage_seed_sweep_expands_fold_by_seed(tmp_path):
     config.seeds = [1, 2]
     stage        = FoldTrainingStage(config=config, entry_script=Path("e.py"), run_tag="rt", logger=make_logger(tmp_path))
 
-    assert stage.items == [f"fold_{i}_seed{s}" for i in range(5) for s in (1, 2)]
+    assert stage.items == [f"fold_{i}/seed{s}" for i in range(5) for s in (1, 2)]
 
-    job = stage._job("fold_3_seed2")
+    job = stage._job("fold_3/seed2")
     assert job.command[job.command.index("--fold") + 1] == "3"
     assert job.command[job.command.index("--seed") + 1] == "2"
-    assert job.log_path == stage.stage_dir / "fold_3_seed2" / stage.worker_logname
+    assert job.log_path == stage.stage_dir / "fold_3/seed2" / stage.worker_logname
 
 
 def test_training_stage_subdir_and_results_path(tmp_path):

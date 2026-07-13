@@ -113,4 +113,4 @@ class UnrolledTrainingLauncher:
         cli    = ConfigCli(UnrolledEntryConfig(), description="Train the unrolled physics network on synthesised per-pixel coherence measurements")
         config = cli.apply(argv)
 
-        SeedSweepRunner(config, UnrolledTrainingPipeline).run()
+        SeedSweepRunner(config, UnrolledTrainingPipeline, base_label=config.model_name).run()

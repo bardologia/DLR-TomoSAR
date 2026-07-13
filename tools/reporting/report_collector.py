@@ -68,8 +68,15 @@ class ReportCollection:
         self.config = config
         self.logger = logger
 
+    @staticmethod
+    def run_label(run_dir: Path) -> str:
+        run_dir = Path(run_dir)
+        if re.fullmatch(r"seed\d+", run_dir.name):
+            return f"{run_dir.parent.name}_{run_dir.name}"
+        return run_dir.name
+
     def _output_name(self, report_path: Path) -> str:
-        run_name = Path(self.config.run_directory).name
+        run_name = self.run_label(self.config.run_directory)
         if self.config.latest_only:
             return f"{run_name}.md"
         return f"{run_name}_{report_path.parent.name}.md"
@@ -112,7 +119,7 @@ class ReportCollectionBatch:
         return selector.all()
 
     def _check_collisions(self, run_dirs: list[Path]) -> None:
-        names      = [run_dir.name for run_dir in run_dirs]
+        names      = [ReportCollection.run_label(run_dir) for run_dir in run_dirs]
         duplicates = sorted({name for name in names if names.count(name) > 1})
 
         if duplicates:

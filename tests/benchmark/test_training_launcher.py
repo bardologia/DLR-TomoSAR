@@ -19,7 +19,7 @@ def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
             return resolved
 
     class FakeSweep:
-        def __init__(self, config, runner_class):
+        def __init__(self, config, runner_class, base_label=None):
             captured["sweep"] = (config, runner_class)
         def run(self):
             captured["ran"] = True
