@@ -190,7 +190,7 @@ def test_input_planner_default_catalog_covers_the_stack_grid():
 
     plans = dict(planner.plan())
 
-    assert list(plans) == ["in-amp-allsec-noifg", "in-noamp-allsec-ifg", "in-amp-redsec-ifg", "in-amp-redsec-noifg", "in-noamp-redsec-ifg"]
+    assert list(plans) == ["in-amp-allsec-noifg", "in-noamp-allsec-ifg", "in-amp-allsec-ifg", "in-amp-redsec-ifg", "in-amp-redsec-noifg", "in-noamp-redsec-ifg"]
 
     amp_all = plans["in-amp-allsec-noifg"]
     assert amp_all["input.use_primary"]        is True
@@ -203,6 +203,12 @@ def test_input_planner_default_catalog_covers_the_stack_grid():
     assert ifg_all["input.use_secondaries"]    is False
     assert ifg_all["input.use_interferograms"] is True
     assert ifg_all["paths.secondary_labels"]   == tuple(CANDIDATES)
+
+    full_all = plans["in-amp-allsec-ifg"]
+    assert full_all["input.use_primary"]        is True
+    assert full_all["input.use_secondaries"]    is True
+    assert full_all["input.use_interferograms"] is True
+    assert full_all["paths.secondary_labels"]   == tuple(CANDIDATES)
 
     reduced = plans["in-amp-redsec-ifg"]
     assert reduced["input.use_primary"]        is True
@@ -770,7 +776,7 @@ def test_input_from_dataset_uses_full_stack(test_data_dir):
 
     plans = dict(planner.plan())
 
-    assert len(plans) == 5
+    assert len(plans) == 6
 
     overrides = plans["in-amp-allsec-noifg"]
     assert overrides["input.use_interferograms"] is False
