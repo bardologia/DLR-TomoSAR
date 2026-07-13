@@ -65,34 +65,49 @@ class TrialComparisonReport(ComparisonReportBase):
 
     def __init__(
         self,
-        records        : list[TrialRecord],
-        out_dir        : Path,
-        compare_images : bool,
-        compare_gifs   : bool,
-        embed_images   : bool,
-        logger         : Logger,
+        records         : list[TrialRecord],
+        out_dir         : Path,
+        compare_images  : bool,
+        compare_gifs    : bool,
+        embed_images    : bool,
+        logger          : Logger,
+        seed_dispersion : dict | None = None,
     ) -> None:
-        self.records        = records
-        self.out_dir        = Path(out_dir)
-        self.compare_images = compare_images
-        self.compare_gifs   = compare_gifs
-        self.logger         = logger
-        self.assets         = ReportAssets(base=self.out_dir, embed_images=embed_images)
+        self.records         = records
+        self.out_dir         = Path(out_dir)
+        self.compare_images  = compare_images
+        self.compare_gifs    = compare_gifs
+        self.logger          = logger
+        self.seed_dispersion = seed_dispersion or {}
+        self.has_seed_sweep  = any(entry["n_seeds"] > 1 for entry in self.seed_dispersion.values())
+        self.assets          = ReportAssets(base=self.out_dir, embed_images=embed_images)
+
+    def _n_seeds(self, name: str) -> int:
+        return self.seed_dispersion.get(name, {}).get("n_seeds", 1)
 
     def _write_overview(self) -> Path:
         lines  = self.assets.header("Trial Comparison Overview")
         lines += ["## Runs\n"]
 
-        table = MarkdownTable(("Run", "Inference run", "Checkpoint", "Best val loss", "Epochs", "Report"))
+        if self.has_seed_sweep:
+            lines += ["Seed-swept trials aggregate their seed runs: metrics and losses are seed means (± sample std), while the inference run, figures, and report link come from one representative seed.\n"]
+
+        headers = ["Run", "Seeds", "Inference run", "Checkpoint", "Best val loss", "Epochs", "Report"] if self.has_seed_sweep else ["Run", "Inference run", "Checkpoint", "Best val loss", "Epochs", "Report"]
+        table   = MarkdownTable(tuple(headers))
+
         for r in self.records:
             inference  = f"`{r.inference_dir.name}`" if r.has_inference else "_(no inference)_"
             epoch      = ScalarFormatter.format_scalar(r.checkpoint.get("epoch"))
             best_epoch = ScalarFormatter.format_scalar(r.checkpoint.get("best_epoch"))
-            best_loss  = ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss"))
+            best_std   = self.seed_dispersion.get(r.name, {}).get("best_val_loss_std")
+            best_loss  = self._seed_annotated(ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")), best_std)
             n_epochs   = ScalarFormatter.format_scalar(r.checkpoint.get("n_train_epochs"))
             report_lnk = f"[report.md]({self.assets.rel(r.report_path)})" if r.report_path else "—"
 
-            table.add_row(f"`{r.name}`", inference, f"{epoch} (best {best_epoch})", best_loss, n_epochs, report_lnk)
+            cells = [f"`{r.name}`", inference, f"{epoch} (best {best_epoch})", best_loss, n_epochs, report_lnk]
+            if self.has_seed_sweep:
+                cells.insert(1, str(self._n_seeds(r.name)))
+            table.add_row(*cells)
 
         lines += table.render()
         lines.append("")
@@ -211,7 +226,7 @@ class TrialComparisonReport(ComparisonReportBase):
                 finite = FiniteScalar.coerce(value)
                 if best[key] is not None and finite is not None and finite == best[key]:
                     cell = f"**{cell}**"
-                cells.append(cell)
+                cells.append(self._seed_annotated(cell, self._metric_seed_std(r.name, key)))
             table.add_row(*cells)
 
         return [*table.render(), ""]

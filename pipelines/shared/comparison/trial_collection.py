@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gc
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib     import Path
 
 import numpy as np
@@ -62,6 +62,61 @@ class TrialRecord:
     @property
     def has_inference(self) -> bool:
         return self.inference_dir is not None
+
+
+class SeedRunAggregator:
+    CHECKPOINT_KEYS = ("best_val_loss", "best_epoch", "n_train_epochs")
+
+    def __init__(self) -> None:
+        self.seed_dispersion: dict = {}
+
+    def _group(self, records: list[TrialRecord]) -> list[tuple[str, list[TrialRecord]]]:
+        groups: dict[str, list[TrialRecord]] = {}
+
+        for record in records:
+            groups.setdefault(SeedSet.base(record.name), []).append(record)
+
+        return list(groups.items())
+
+    def _aggregate_group(self, name: str, runs: list[TrialRecord]) -> tuple[TrialRecord, dict]:
+        representative = next((run for run in runs if run.has_inference), runs[0])
+
+        metric_keys              = sorted({key for run in runs for key in run.metrics})
+        metric_means, metric_std = SeedAggregation.aggregate([run.metrics for run in runs], metric_keys)
+        ckpt_means, ckpt_std     = SeedAggregation.aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
+
+        durations = [run.training_result.get("duration_s") for run in runs]
+        durations = [value for value in durations if isinstance(value, (int, float))]
+
+        record                 = replace(representative, name=name, metrics=metric_means)
+        record.checkpoint      = {**representative.checkpoint, **ckpt_means}
+        record.training_result = {
+            "status"     : "DONE" if all(run.training_result.get("status") == "DONE" for run in runs) else "PARTIAL",
+            "duration_s" : float(np.mean(durations)) if durations else None,
+        }
+
+        dispersion = {
+            "n_seeds"           : len(runs),
+            "best_val_loss_std" : ckpt_std.get("best_val_loss"),
+            "metrics"           : metric_std,
+        }
+
+        return record, dispersion
+
+    def aggregate(self, records: list[TrialRecord]) -> list[TrialRecord]:
+        self.seed_dispersion = {}
+        aggregated           = []
+
+        for name, runs in self._group(records):
+            if len(runs) == 1:
+                aggregated.append(runs[0])
+                continue
+
+            record, dispersion = self._aggregate_group(name, runs)
+            aggregated.append(record)
+            self.seed_dispersion[name] = dispersion
+
+        return aggregated
 
 
 class TrialCollector:

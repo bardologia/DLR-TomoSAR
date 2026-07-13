@@ -1971,10 +1971,10 @@
       }
     },
     "comparison::TrialComparisonConfig": {
-      "summary": "Entry config for comparing inference outputs across multiple backbone training runs",
+      "summary": "Entry config for comparing inference outputs across multiple backbone training runs; a trial with nested seed runs is compared as one seed-aggregated entry (metric means with sample-std annotations)",
       "fields": {
         "runs_dir": "Root directory holding the backbone training run subdirectories to compare",
-        "run_tags": "Run subfolder names to compare; the collector only processes the listed tags and does not auto-scan runs_dir, so an empty list yields zero trials",
+        "run_tags": "Run subfolder names to compare; a trial directory name expands to its nested seed<N> runs which aggregate into one seed-mean entry, and the collector only processes the listed tags without auto-scanning runs_dir, so an empty list yields zero trials",
         "compare_images": "Whether to render static side-by-side image comparisons across the collected runs",
         "compare_gifs": "Whether to render animated GIF comparisons across the collected runs",
         "embed_images": "Base64-embed figures inline in the generated markdown report instead of linking external files",

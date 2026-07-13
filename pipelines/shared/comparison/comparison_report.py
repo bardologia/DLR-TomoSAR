@@ -33,6 +33,18 @@ class ComparisonReportBase:
         ("Peak location",         ["pixel_peak_err_units_mean_gt"]),
     ]
 
+    seed_dispersion: dict = {}
+
+    def _seed_annotated(self, cell: str, std: float | None) -> str:
+        if std is None or not math.isfinite(std):
+            return cell
+
+        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
+
+    def _metric_seed_std(self, name: str, key: str) -> float | None:
+        entry = self.seed_dispersion.get(name)
+        return entry["metrics"].get(key) if entry else None
+
     def _ranking(self, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> RankingResult:
         trials = [(r.name, r.metrics) for r in scored]
         return RankingComputer(metrics, trials).compute()
@@ -131,16 +143,6 @@ class ComparisonReport(ComparisonReportBase):
         self.has_seed_sweep  = any(entry["n_seeds"] > 1 for entry in self.seed_dispersion.values())
         self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
         self.timestamp       = self.assets.timestamp
-
-    def _seed_annotated(self, cell: str, std: float | None) -> str:
-        if std is None or not math.isfinite(std):
-            return cell
-
-        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
-
-    def _metric_seed_std(self, name: str, key: str) -> float | None:
-        entry = self.seed_dispersion.get(name)
-        return entry["metrics"].get(key) if entry else None
 
     def _write_overview(self) -> Path:
         if self.rank_models:

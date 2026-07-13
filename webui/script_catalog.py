@@ -110,7 +110,7 @@ class ScriptCatalog:
         "compare_trials": {
             "title"     : "Compare Trials",
             "category"  : "Analysis",
-            "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison.",
+            "purpose"   : "Compare inference results across multiple training runs: metrics leaderboard, side-by-side figures, and optional GIF comparison. A trial with nested seed runs enters the comparison as one entry with seed-mean metrics and sample-std annotations; figures come from a representative seed.",
         },
         "compare_preprocessing_trials": {
             "title"     : "Compare Preprocessing",
