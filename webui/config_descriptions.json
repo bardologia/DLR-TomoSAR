@@ -1113,7 +1113,7 @@
         "pair_trials": "PairTrialsConfig sub-config for the loss-pair sweep pairing one fixed base component with each candidate second component and weight, curriculum disabled",
         "secondary_trials": "SecondaryTrialsConfig sub-config for the secondary-track selection sweep (strategy, count, sampling seed)",
         "patch_trials": "PatchTrialsConfig sub-config for the patch-size and stride sweep",
-        "input_trials": "Named input-channel presets (use_primary/use_secondaries/use_interferograms/use_dem) swept while always keeping the full secondary-track list",
+        "input_trials": "Named input-channel presets (use_primary/use_secondaries/use_interferograms/use_dem) each scoped by a mandatory tracks key: all expands the secondary list to every track in the baselines table, reduced keeps the configured secondary selection; defaults cover pass-amplitude-only, ifg-phase-only and the traditional stack on both scopes",
         "ablation_features": "Ordered list of feature-toggle dicts (label, enable, degrade overrides) forming the cumulative ablation ladder from the full model down to the baseline",
         "ablation_include_full": "Include the full-model variant (all ablation features enabled) as an extra run alongside the ablation ladder",
         "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",

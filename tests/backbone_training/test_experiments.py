@@ -185,35 +185,66 @@ def test_secondary_rejects_too_many_secondaries():
         SecondaryTrialPlanner(trials, CANDIDATES)
 
 
-def test_input_planner_default_variant_drops_interferograms():
+def test_input_planner_default_catalog_covers_the_stack_grid():
     planner = InputTrialPlanner(_default_input_trials(), CANDIDATES)
 
-    plans = planner.plan()
+    plans = dict(planner.plan())
 
-    assert len(plans) == 1
+    assert list(plans) == ["in-amp-allsec-noifg", "in-noamp-allsec-ifg", "in-amp-redsec-ifg", "in-amp-redsec-noifg", "in-noamp-redsec-ifg"]
 
-    name, overrides = plans[0]
-    assert name == "in-amp-allsec-noifg"
-    assert overrides["input.use_primary"]        is True
-    assert overrides["input.use_secondaries"]    is True
-    assert overrides["input.use_interferograms"] is False
-    assert overrides["paths.secondary_labels"]   == tuple(CANDIDATES)
+    amp_all = plans["in-amp-allsec-noifg"]
+    assert amp_all["input.use_primary"]        is True
+    assert amp_all["input.use_secondaries"]    is True
+    assert amp_all["input.use_interferograms"] is False
+    assert amp_all["paths.secondary_labels"]   == tuple(CANDIDATES)
+
+    ifg_all = plans["in-noamp-allsec-ifg"]
+    assert ifg_all["input.use_primary"]        is False
+    assert ifg_all["input.use_secondaries"]    is False
+    assert ifg_all["input.use_interferograms"] is True
+    assert ifg_all["paths.secondary_labels"]   == tuple(CANDIDATES)
+
+    reduced = plans["in-amp-redsec-ifg"]
+    assert reduced["input.use_primary"]        is True
+    assert reduced["input.use_secondaries"]    is True
+    assert reduced["input.use_interferograms"] is True
+
+    amp_reduced = plans["in-amp-redsec-noifg"]
+    assert amp_reduced["input.use_primary"]        is True
+    assert amp_reduced["input.use_secondaries"]    is True
+    assert amp_reduced["input.use_interferograms"] is False
+
+    ifg_reduced = plans["in-noamp-redsec-ifg"]
+    assert ifg_reduced["input.use_primary"]        is False
+    assert ifg_reduced["input.use_secondaries"]    is False
+    assert ifg_reduced["input.use_interferograms"] is True
 
 
-def test_input_planner_uses_all_tracks_per_variant():
-    trials  = {"a": {"use_interferograms": False}, "b": {"use_dem": True}}
+def test_input_planner_scopes_tracks_per_variant():
+    trials  = {"a": {"tracks": "all", "use_interferograms": False}, "b": {"tracks": "reduced", "use_dem": True}}
     planner = InputTrialPlanner(trials, CANDIDATES)
 
     plans = dict(planner.plan())
 
     assert set(plans) == {"in-a", "in-b"}
-    assert all(overrides["paths.secondary_labels"] == tuple(CANDIDATES) for overrides in plans.values())
-    assert planner.summary() == {"Input variants": 2, "Tracks": f"all ({len(CANDIDATES)} secondaries)"}
+    assert plans["in-a"]["paths.secondary_labels"] == tuple(CANDIDATES)
+    assert "paths.secondary_labels" not in plans["in-b"]
+    assert "input.tracks"           not in plans["in-a"]
+    assert "input.tracks"           not in plans["in-b"]
+    assert planner.summary() == {"Input variants": 2, "Tracks": f"1 all ({len(CANDIDATES)} secondaries), 1 reduced (configured selection)"}
 
 
 def test_input_planner_rejects_unknown_keys():
     with pytest.raises(ValueError):
-        InputTrialPlanner({"bad": {"use_phase": True}}, CANDIDATES)
+        InputTrialPlanner({"bad": {"tracks": "all", "use_phase": True}}, CANDIDATES)
+
+
+def test_input_planner_rejects_missing_or_invalid_track_scope():
+    with pytest.raises(ValueError):
+        InputTrialPlanner({"bad": {"use_primary": True}}, CANDIDATES)
+
+    with pytest.raises(ValueError):
+        InputTrialPlanner({"bad": {"tracks": "some", "use_primary": True}}, CANDIDATES)
 
 
 def test_input_planner_rejects_empty_trials():
@@ -737,13 +768,15 @@ def test_ablation_catalog_covers_normalization_and_clamp():
 def test_input_from_dataset_uses_full_stack(test_data_dir):
     planner = InputTrialPlanner.from_dataset(_default_input_trials(), GeometryConfig(), test_data_dir)
 
-    plans = planner.plan()
+    plans = dict(planner.plan())
 
-    assert len(plans) == 1
-    name, overrides = plans[0]
-    assert name == "in-amp-allsec-noifg"
+    assert len(plans) == 5
+
+    overrides = plans["in-amp-allsec-noifg"]
     assert overrides["input.use_interferograms"] is False
     assert len(overrides["paths.secondary_labels"]) == len(planner.candidates) >= 1
+
+    assert "paths.secondary_labels" not in plans["in-amp-redsec-ifg"]
 
 
 @pytest.mark.real_data

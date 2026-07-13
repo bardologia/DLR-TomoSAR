@@ -109,7 +109,11 @@ def _default_presence_trials() -> dict:
 
 def _default_input_trials() -> dict:
     return {
-        "amp-allsec-noifg" : {"use_primary": True, "use_secondaries": True, "use_interferograms": False},
+        "amp-allsec-noifg"  : {"tracks": "all",     "use_primary": True,  "use_secondaries": True,  "use_interferograms": False},
+        "noamp-allsec-ifg"  : {"tracks": "all",     "use_primary": False, "use_secondaries": False, "use_interferograms": True},
+        "amp-redsec-ifg"    : {"tracks": "reduced", "use_primary": True,  "use_secondaries": True,  "use_interferograms": True},
+        "amp-redsec-noifg"  : {"tracks": "reduced", "use_primary": True,  "use_secondaries": True,  "use_interferograms": False},
+        "noamp-redsec-ifg"  : {"tracks": "reduced", "use_primary": False, "use_secondaries": False, "use_interferograms": True},
     }
 
 

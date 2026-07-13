@@ -406,7 +406,7 @@ class ExperimentBuilder {
     { key: "secondary",  label: "secondaries", hint: "one trial per secondary-track selection" },
     { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end" },
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one trial per cell" },
-    { key: "input",      label: "input channels", hint: "input-channel ablation across all tracks, one trial per input variant" },
+    { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
   ];
 
   static PHYSICS_COMPONENTS = [
@@ -1550,6 +1550,7 @@ class ExperimentBuilder {
     if (on("use_secondaries") !== false) amps.push("secondaries");
 
     const parts = [];
+    parts.push(`${spec && spec.tracks} tracks`);
     parts.push(amps.length ? `${amps.join("+")} amp` : "no amplitude");
     parts.push(on("use_interferograms") === false ? "no ifg" : "ifg");
     if (on("use_dem") === true) parts.push("dem");
@@ -1569,7 +1570,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Every variant trains on all tracks; each toggles which input channels feed the model. Drop variants to trim the fan-out. Adding variants and channel representations live in code (_default_input_trials); use reset variants to restore the default.";
+    note.textContent = "Each variant toggles which input channels feed the model and scopes its track list: tracks=all expands the secondaries to every track in the baselines table, tracks=reduced keeps the configured selection. Drop variants to trim the fan-out. Adding variants and channel representations live in code (_default_input_trials); use reset variants to restore the default.";
 
     const cellHead       = document.createElement("div");
     cellHead.className    = "exp-presence__sub";
@@ -2179,8 +2180,10 @@ class ExperimentBuilder {
     }
 
     if (mode === "input") {
-      const n = this._inputCells().length;
-      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}, all tracks${this._seedsSuffix(n)}${gpus}`;
+      const trials = this._inputTrials();
+      const n      = Object.keys(trials).length;
+      const nAll   = Object.values(trials).filter((spec) => spec && spec.tracks === "all").length;
+      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} (${nAll} all tracks, ${n - nAll} reduced)${this._seedsSuffix(n)}${gpus}`;
       return;
     }
 
