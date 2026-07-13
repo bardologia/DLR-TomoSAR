@@ -1019,16 +1019,16 @@
       }
     },
     "training/backbone::NormalizationTrialsConfig": {
-      "summary": "Initial and final per-channel normalization strategies for the cumulative ladder switching pass amplitude, then ifg phase, then output amp and sigma from initial to final (out_mu untouched)",
+      "summary": "Initial and final per-channel normalization strategies for the cumulative ladder switching pass amplitude, then ifg phase, then output amp, then output sigma from initial to final (out_mu untouched)",
       "fields": {
         "initial_pass_mag": "Starting normalization preset for the pass amplitude channels, used until the first ladder rung switches them to the final strategy",
         "initial_ifg_phase": "Starting normalization preset for the interferogram phase channels, used until the second ladder rung switches them to the final strategy",
         "initial_out_amp": "Starting normalization preset for the output Gaussian amplitude parameters, used until the third ladder rung switches them to the final strategy",
-        "initial_out_sigma": "Starting normalization preset for the output Gaussian sigma parameters, switched together with out_amp on the third ladder rung",
+        "initial_out_sigma": "Starting normalization preset for the output Gaussian sigma parameters, used until the fourth ladder rung switches them to the final strategy",
         "final_pass_mag": "Final normalization preset the pass amplitude channels switch to on rung one and keep for every later rung",
         "final_ifg_phase": "Final normalization preset the interferogram phase channels switch to on rung two and keep for every later rung",
-        "final_out_amp": "Final normalization preset the output Gaussian amplitude parameters switch to on rung three",
-        "final_out_sigma": "Final normalization preset the output Gaussian sigma parameters switch to on rung three"
+        "final_out_amp": "Final normalization preset the output Gaussian amplitude parameters switch to on rung three and keep on rung four",
+        "final_out_sigma": "Final normalization preset the output Gaussian sigma parameters switch to on rung four"
       }
     },
     "training/backbone::PhysicsTrialsConfig": {
@@ -1138,7 +1138,7 @@
         "context_trials": "Backbone architectures trained one run each on the shared base config, walking the spatial-context ladder (default pixel_mlp, local_cnn, unet); every name must exist in the backbone registry",
         "head_trials": "HeadMatchingTrialsConfig sub-config for the head-and-matching grid crossing every selected head with every selected parameter-matching strategy on one fixed backbone",
         "augmentation_trials": "Named trials each mapping a label to an augmentation state (boolean): true trains with horizontal and vertical flips at probability 0.5 (rot90 and noise forced off), false trains with all augmentation probabilities at zero; default is the on/off pair, every trial repeated across the seeds list",
-        "normalization_trials": "NormalizationTrialsConfig sub-config for the cumulative normalization ladder walking pass amplitude, then ifg phase, then output amp and sigma from their initial to their final strategies (out_mu untouched), one run per rung plus the all-initial baseline",
+        "normalization_trials": "NormalizationTrialsConfig sub-config for the cumulative normalization ladder walking pass amplitude, then ifg phase, then output amp, then output sigma from their initial to their final strategies (out_mu untouched), one run per rung plus the all-initial baseline",
         "ablation_features": "Ordered list of feature-toggle dicts (label, enable, degrade overrides) forming the cumulative ablation ladder from the full model down to the baseline",
         "ablation_include_full": "Include the full-model variant (all ablation features enabled) as an extra run alongside the ablation ladder",
         "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",

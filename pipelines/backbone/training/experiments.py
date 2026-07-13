@@ -531,7 +531,8 @@ class NormalizationTrialPlanner:
     STEPS = (
         ("pass_mag",  ("pass_mag",)),
         ("ifg_phase", ("ifg_phase",)),
-        ("outputs",   ("out_amp", "out_sigma")),
+        ("out_amp",   ("out_amp",)),
+        ("out_sigma", ("out_sigma",)),
     )
 
     def __init__(self, trials, preset_names: tuple) -> None:

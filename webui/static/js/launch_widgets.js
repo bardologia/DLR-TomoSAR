@@ -410,7 +410,7 @@ class ExperimentBuilder {
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
     { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
     { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state" },
-    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp+sigma switch from initial to final strategy" },
+    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output sigma switch from initial to final strategy" },
   ];
 
   static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
@@ -419,7 +419,7 @@ class ExperimentBuilder {
     { key: "pass_mag",  label: "pass amplitude",   step: 1 },
     { key: "ifg_phase", label: "ifg phase",        step: 2 },
     { key: "out_amp",   label: "output amplitude", step: 3 },
-    { key: "out_sigma", label: "output sigma",     step: 3 },
+    { key: "out_sigma", label: "output sigma",     step: 4 },
   ];
 
   static HEAD_OPTIONS = [
@@ -1869,7 +1869,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Cumulative ladder from the all-initial baseline to the final strategies: rung 1 switches pass amplitude, rung 2 adds ifg phase, rung 3 adds output amplitude and sigma together (out_mu keeps the base config throughout). Every rung sets all four channel strategies explicitly and repeats across the seeds list.";
+    note.textContent = "Cumulative ladder from the all-initial baseline to the final strategies: rung 1 switches pass amplitude, rung 2 adds ifg phase, rung 3 adds output amplitude, rung 4 adds output sigma (out_mu keeps the base config throughout). Every rung sets all four channel strategies explicitly and repeats across the seeds list.";
 
     const grid     = document.createElement("div");
     grid.className = "exp-secondary__grid";
@@ -2644,7 +2644,7 @@ class ExperimentBuilder {
     }
 
     if (mode === "normalization") {
-      this.summaryEl.textContent = `baseline + 3 ladder rungs = 4 trials${this._seedsSuffix(4)}${gpus}`;
+      this.summaryEl.textContent = `baseline + 4 ladder rungs = 5 trials${this._seedsSuffix(5)}${gpus}`;
       return;
     }
 
@@ -2701,7 +2701,7 @@ class ExperimentBuilder {
     } else if (mode === "augmentation") {
       this._augCells().forEach((cell) => names.push(`${model}_aug-${cell}`));
     } else if (mode === "normalization") {
-      ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-outputs"].forEach((rung) => names.push(`${model}_${rung}`));
+      ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"].forEach((rung) => names.push(`${model}_${rung}`));
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {

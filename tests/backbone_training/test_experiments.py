@@ -408,14 +408,15 @@ def test_normalization_planner_default_walks_the_ladder():
 
     plans = dict(planner.plan())
 
-    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-outputs"]
-    assert planner.summary()["Total runs"] == 4
+    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"]
+    assert planner.summary()["Total runs"] == 5
 
     expected = {
         "nrm-0-initial"   : ("zscore_log1p",     "min_max",      "zscore",           "zscore"),
         "nrm-1-pass_mag"  : ("robust_iqr_log1p", "min_max",      "zscore",           "zscore"),
         "nrm-2-ifg_phase" : ("robust_iqr_log1p", "fixed_div_pi", "zscore",           "zscore"),
-        "nrm-3-outputs"   : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "robust_iqr_log1p"),
+        "nrm-3-out_amp"   : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "zscore"),
+        "nrm-4-out_sigma" : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "robust_iqr_log1p"),
     }
     for name, (pass_mag, ifg_phase, out_amp, out_sigma) in expected.items():
         assert plans[name] == {
@@ -449,16 +450,10 @@ def test_normalization_planner_rejects_noop_rung():
         NormalizationTrialPlanner(NormalizationTrialsConfig(final_pass_mag="zscore_log1p"), PRESET_NAMES)
 
     with pytest.raises(ValueError, match="same configuration twice"):
-        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore", final_out_sigma="zscore"), PRESET_NAMES)
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore"), PRESET_NAMES)
 
-
-def test_normalization_planner_allows_partial_output_rung():
-    planner = NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore"), PRESET_NAMES)
-
-    plans = dict(planner.plan())
-
-    assert plans["nrm-3-outputs"]["normalization.out_amp"]   == "zscore"
-    assert plans["nrm-3-outputs"]["normalization.out_sigma"] == "robust_iqr_log1p"
+    with pytest.raises(ValueError, match="same configuration twice"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_sigma="zscore"), PRESET_NAMES)
 
 
 def test_input_planner_rejects_empty_trials():
