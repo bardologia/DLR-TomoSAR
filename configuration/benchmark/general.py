@@ -9,7 +9,7 @@ from configuration.sar.geometry_config          import GeometryConfig
 from configuration.training.backbone            import default_curriculum
 from configuration.training.general.loss        import LossConfig
 from configuration.training.general.pretraining import PretrainConfig
-from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.training.general.runtime     import OverfitCheckConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
@@ -102,7 +102,7 @@ class BenchmarkConfig:
     resume          : bool       = True
     infer_after     : bool       = True
     seed            : int        = 0
-    seeds           : list[int]  = field(default_factory=list)
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     poll_interval_s : float      = 5.0
 
     sweep_loss_components : list[str] = field(default_factory=lambda: ["param_l1"])

@@ -162,3 +162,27 @@ def test_recollection_overwrites_the_previous_copy(run_directory, tmp_path):
     ReportCollectionBatch(entry, RecordingLogger()).run()
 
     assert (collector / "run_demo.md").is_file()
+
+
+def test_seed_run_labels_include_the_trial_directory(tmp_path):
+    _write_report(tmp_path / "trial_a" / "seed0", "20260101_000000")
+    _write_report(tmp_path / "trial_b" / "seed0", "20260101_000000")
+    collector = tmp_path / "collected"
+    entry     = ReportCollectionEntryConfig(runs_dir=tmp_path, run_filter=["trial_a/seed0", "trial_b/seed0"], collector_dir=collector)
+
+    ReportCollectionBatch(entry, RecordingLogger()).run()
+
+    assert (collector / "trial_a_seed0.md").is_file()
+    assert (collector / "trial_b_seed0.md").is_file()
+
+
+def test_trial_name_filter_expands_to_the_seed_runs(tmp_path):
+    _write_report(tmp_path / "trial_a" / "seed0", "20260101_000000")
+    _write_report(tmp_path / "trial_a" / "seed1", "20260101_000000")
+    collector = tmp_path / "collected"
+    entry     = ReportCollectionEntryConfig(runs_dir=tmp_path, run_filter=["trial_a"], collector_dir=collector)
+
+    ReportCollectionBatch(entry, RecordingLogger()).run()
+
+    assert (collector / "trial_a_seed0.md").is_file()
+    assert (collector / "trial_a_seed1.md").is_file()

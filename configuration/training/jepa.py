@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run               import TrainingPathsConfig, TrainingQueueConfig
+from configuration.training.general.run               import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.architectures.profile_autoencoder  import ProfileAutoencoderBaseConfig
 from configuration.dataset                            import AugmentationConfig
 from configuration.normalization.general              import NormalizationConfig
@@ -99,7 +99,7 @@ class JepaEntryConfig:
     backbone_head   : str        = "conv"
     gpu             : int        = 0
     seed            : int        = 0
-    seeds           : list[int]  = field(default_factory=list)
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/jepa")
     model_overrides : dict       = field(default_factory=dict)
 

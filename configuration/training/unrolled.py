@@ -5,7 +5,7 @@ from pathlib     import Path
 
 from configuration.dataset                import AugmentationConfig
 from configuration.normalization.general  import NormalizationConfig
-from configuration.training.general.run   import TrainingPathsConfig
+from configuration.training.general.run   import TrainingPathsConfig, standard_seeds
 from configuration.sar.geometry_config    import GeometryConfig
 
 
@@ -44,6 +44,7 @@ class UnrolledEntryConfig:
     model_name      : str        = "gamma_net"
     gpu             : int        = 0
     seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/unrolled")
     model_overrides : dict       = field(default_factory=dict)
 

@@ -1086,7 +1086,7 @@
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Primary GPU device index on which a single run executes",
         "seed": "Base random seed for a single training run, controlling weight init, shuffling, and augmentation",
-        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested under a single shared run directory as <base>/seed<N> (empty falls back to seed)",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this run's output subdirectory and TensorBoard logs are written",
         "model_overrides": "Dict of architecture-config field overrides applied to the selected backbone before instantiation",
         "paths": "TrainingPathsConfig sub-config holding filesystem locations for the dataset, extracted parameters, and secondary-track labels",
@@ -1113,7 +1113,7 @@
         "pair_trials": "PairTrialsConfig sub-config for the loss-pair sweep pairing one fixed base component with each candidate second component and weight, curriculum disabled",
         "secondary_trials": "SecondaryTrialsConfig sub-config for the secondary-track selection sweep (strategy, count, sampling seed)",
         "patch_trials": "PatchTrialsConfig sub-config for the patch-size and stride sweep",
-        "input_trials": "Named input-channel presets (use_primary/use_secondaries/use_interferograms/use_dem) swept while always keeping the full secondary-track list",
+        "input_trials": "Named input-channel presets (use_primary/use_secondaries/use_interferograms/use_dem) each scoped by a mandatory tracks key: all expands the secondary list to every track in the baselines table, reduced keeps the configured secondary selection; defaults cover the full grid of pass-amplitude-only, ifg-phase-only and the combined stack on both scopes",
         "ablation_features": "Ordered list of feature-toggle dicts (label, enable, degrade overrides) forming the cumulative ablation ladder from the full model down to the baseline",
         "ablation_include_full": "Include the full-model variant (all ablation features enabled) as an extra run alongside the ablation ladder",
         "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
@@ -1393,7 +1393,7 @@
         "run_name": "optional human-readable label for the run directory; None auto-generates a name",
         "gpu": "CUDA device index used for a single training run",
         "seed": "random seed for a single training run, controlling weight init, shuffling, and augmentation",
-        "seeds": "list of seeds for a multi-seed sweep, one full run launched per seed and nested under a single shared run directory as <base>/seed<N>; empty falls back to seed",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "base directory under which this run's output subdirectory and TensorBoard logs are written",
         "ae_model_name": "registry key selecting the image-autoencoder architecture: conv2d_ae, resnet2d_ae, convnext2d_ae, dilated2d_ae, or vit_ae",
         "model_overrides": "dict of architecture-config field overrides applied to the selected autoencoder before instantiation",
@@ -1461,7 +1461,7 @@
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Single GPU device index on which the run executes",
         "seed": "Random seed for a single training run, controlling weight init, shuffling, and augmentation",
-        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested under a single shared run directory as <base>/seed<N> (empty falls back to the single seed field)",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this JEPA run's output subdirectory and TensorBoard logs are written",
         "model_overrides": "Dict of backbone architecture-config field overrides applied to the selected backbone before instantiation",
         "profile_autoencoder_logdir": "Directory containing pretrained profile-autoencoder runs from which the JEPA target encoder checkpoint is loaded",
@@ -1520,7 +1520,7 @@
         "run_name": "Optional human-readable label for the run directory; None auto-generates a name",
         "gpu": "GPU device index the run is launched on, passed through as the script's --gpu argument to pin CUDA_VISIBLE_DEVICES",
         "seed": "Random seed for a single training run, controlling weight init, shuffling, and augmentation",
-        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested under a single shared run directory as <base>/seed<N> (empty falls back to seed)",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this run's timestamped output subdirectory and TensorBoard logs are written",
         "pixel_subsample": "Fraction of populated (Gaussian-active) profile pixels kept when building each split's dataset, 1.0 keeps all of them",
         "keep_empty_frac": "Fraction of empty (all-amplitude-below-threshold) profile pixels retained alongside the populated ones, applied once when each split's dataset is built",
@@ -1844,7 +1844,7 @@
         "resume": "whether to skip stage units whose cached PASS result already exists under the run directory instead of rerunning them",
         "infer_after": "Whether to run the inference stage automatically after training; only applies when training_type is backbone or jepa, and off leaves the comparison report without inference galleries",
         "seed": "base random seed used for the max-batch probe and as the default per-unit seed when seeds is empty",
-        "seeds": "list of seeds expanded across every (model, loss-component) pair, one full run launched per seed",
+        "seeds": "List of seeds expanded across every (model, loss-component) pair, one run per seed nested as seed<N> inside each unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "poll_interval_s": "seconds between polls of queued job status while waiting for GPUs or completed jobs",
         "sweep_loss_components": "loss component names from LossComponentCatalog, one training run launched per component layered onto loss, must be non-empty and valid"
       }
@@ -1895,7 +1895,7 @@
         "run_tag": "Optional label identifying this cross-validation run's output subdirectory; None auto-generates one",
         "resume": "Whether to skip a fold's training job or inference split that already has a matching checkpoint or metrics.json from a prior run, letting an interrupted CV sweep continue without retraining finished folds (distinct from training.resume, which resumes a single run's own training mid-epoch)",
         "seed": "Base random seed used for a fold when no per-seed override is given, controlling weight init, shuffling, and augmentation",
-        "seeds": "List of seeds for a multi-seed sweep, one full set of folds launched per seed; empty falls back to the single seed field",
+        "seeds": "List of seeds for a multi-seed sweep, one run per fold and seed nested as seed<N> inside each fold directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "poll_interval_s": "Seconds between successive polls of the fold job queue while waiting for GPUs or completed jobs"
       }
     },
@@ -1971,10 +1971,10 @@
       }
     },
     "comparison::TrialComparisonConfig": {
-      "summary": "Entry config for comparing inference outputs across multiple backbone training runs",
+      "summary": "Entry config for comparing inference outputs across multiple backbone training runs; a trial with nested seed runs is compared as one seed-aggregated entry (metric means with sample-std annotations)",
       "fields": {
         "runs_dir": "Root directory holding the backbone training run subdirectories to compare",
-        "run_tags": "Run subfolder names to compare; the collector only processes the listed tags and does not auto-scan runs_dir, so an empty list yields zero trials",
+        "run_tags": "Run subfolder names to compare; a trial directory name expands to its nested seed<N> runs which aggregate into one seed-mean entry, and the collector only processes the listed tags without auto-scanning runs_dir, so an empty list yields zero trials",
         "compare_images": "Whether to render static side-by-side image comparisons across the collected runs",
         "compare_gifs": "Whether to render animated GIF comparisons across the collected runs",
         "embed_images": "Base64-embed figures inline in the generated markdown report instead of linking external files",
@@ -2103,10 +2103,10 @@
       }
     },
     "diagnostics::TensorboardExportEntryConfig": {
-      "summary": "Batch webui entry selecting training runs with tensorboard event logs and building a per-run TensorboardExportConfig via to_config",
+      "summary": "Batch webui entry selecting training runs with tensorboard event logs and building a per-run TensorboardExportConfig via to_config; when sibling seed runs of one trial are selected, the trial directory additionally receives seed-overlay figures with every seed's curve per metric",
       "fields": {
         "runs_dir": "parent directory recursively scanned (rglob) by TensorboardRunSelector for run subdirectories whose tensorboard_dirname holds event files",
-        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to export; empty triggers interactive selection on a tty, else all runs",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to export; a trial directory name expands to every seed run nested beneath it, empty triggers interactive selection on a tty, else all runs",
         "tensorboard_dirname": "name of the subdirectory inside each run directory that holds the tensorboard event files, forwarded to each run's TensorboardExportConfig",
         "output_subdir": "subdirectory name inside each run directory where that run's exported figures are written, forwarded to each run's TensorboardExportConfig"
       }
@@ -2123,10 +2123,10 @@
       }
     },
     "diagnostics::ReportCollectionEntryConfig": {
-      "summary": "Batch webui entry selecting training runs with inference reports and building a per-run ReportCollectionConfig via to_config; a missing referenced image or two selected runs sharing a name abort the collection loudly",
+      "summary": "Batch webui entry selecting training runs with inference reports and building a per-run ReportCollectionConfig via to_config; nested seed runs are labelled <trial>_seed<N>, and a missing referenced image or two selected runs sharing a label abort the collection loudly",
       "fields": {
         "runs_dir": "parent directory recursively scanned (rglob) by ReportRunSelector for run subdirectories whose inference_dirname holds a report",
-        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to collect; empty triggers interactive selection on a tty, else all runs",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to collect; a trial directory name expands to every seed run nested beneath it, empty triggers interactive selection on a tty, else all runs",
         "collector_dir": "single directory that receives every collected report, created if missing; re-collection overwrites previous copies",
         "inference_dirname": "name of the subdirectory inside each run directory that holds the timestamped inference outputs, forwarded to each run's ReportCollectionConfig",
         "report_filename": "report filename inside each inference output directory, forwarded to each run's ReportCollectionConfig",
@@ -2141,6 +2141,7 @@
         "model_name": "Key into the unrolled model registry (gamma_net)",
         "gpu": "CUDA device index pinned before torch import",
         "seed": "Global random seed for reproducibility",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory that receives one subdirectory per training run",
         "model_overrides": "Field overrides applied to the model config from the registry (e.g. n_iterations)",
         "paths": "Dataset locations: preprocessing run directory, extracted-parameters file, and secondary track labels",
@@ -2185,7 +2186,7 @@
         "model_name": "Dual-family model key looked up in the dual registry, default dual_resunet",
         "gpu": "Primary GPU device index on which a single run executes",
         "seed": "Base random seed for a single training run, controlling weight init, shuffling, and augmentation",
-        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested under a single shared run directory as <base>/seed<N> (empty falls back to seed)",
+        "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this run's output subdirectory and TensorBoard logs are written",
         "model_overrides": "Dict of architecture-config field overrides applied to the dual model config before instantiation",
         "params_backbone": "Trunk architecture of the full-input parameter branch (resunet, unet_skip, or unet), applied to the model config before instantiation",
@@ -2239,6 +2240,7 @@
         "run_tag": "Name of the sweep run directory under paths.log_base_dir; empty generates a timestamp",
         "resume": "When true, units whose run directory already holds a best_model.pt checkpoint are reused instead of retrained",
         "seed": "Seed shared by every sweep unit so the patch size and track count remain the only varied factors",
+        "seeds": "List of seeds swept per (track count, patch size) unit, one training run per seed nested as seed<N> inside the unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field, and the report ranks on the seed-mean test loss",
         "poll_interval_s": "Seconds between GPU-queue polls while training runs are in flight"
       }
     }

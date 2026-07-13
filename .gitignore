@@ -19,3 +19,4 @@ package-lock.json
 publications/**/build/
 publications/**/figures/
 publications/**/*.pdf
+.claude/

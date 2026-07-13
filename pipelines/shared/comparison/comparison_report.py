@@ -33,6 +33,18 @@ class ComparisonReportBase:
         ("Peak location",         ["pixel_peak_err_units_mean_gt"]),
     ]
 
+    seed_dispersion: dict = {}
+
+    def _seed_annotated(self, cell: str, std: float | None) -> str:
+        if std is None or not math.isfinite(std):
+            return cell
+
+        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
+
+    def _metric_seed_std(self, name: str, key: str) -> float | None:
+        entry = self.seed_dispersion.get(name)
+        return entry["metrics"].get(key) if entry else None
+
     def _ranking(self, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> RankingResult:
         trials = [(r.name, r.metrics) for r in scored]
         return RankingComputer(metrics, trials).compute()
@@ -132,16 +144,6 @@ class ComparisonReport(ComparisonReportBase):
         self.assets          = ReportAssets(base=out_dir, embed_images=embed_images)
         self.timestamp       = self.assets.timestamp
 
-    def _seed_annotated(self, cell: str, std: float | None) -> str:
-        if std is None or not math.isfinite(std):
-            return cell
-
-        return f"{cell} ± {ScalarFormatter.format_scalar(std)}"
-
-    def _metric_seed_std(self, name: str, key: str) -> float | None:
-        entry = self.seed_dispersion.get(name)
-        return entry["metrics"].get(key) if entry else None
-
     def _write_overview(self) -> Path:
         if self.rank_models:
             lines = self.assets.header("Benchmark Overview")
@@ -156,6 +158,8 @@ class ComparisonReport(ComparisonReportBase):
             lines.append("")
 
         lines += ["## Training\n"]
+        if self.has_seed_sweep:
+            lines += ["Seed-swept models aggregate their seed runs: losses and metrics are seed means (± sample std), while the inference figures and report come from one representative seed.\n"]
         lines += self._training_table()
         lines.append("")
 
@@ -184,7 +188,10 @@ class ComparisonReport(ComparisonReportBase):
         return table.render()
 
     def _training_table(self) -> list[str]:
-        table = MarkdownTable(["Model", "Status", "Best epoch", "Best val loss", "Epochs run", "Duration"])
+        headers = ["Model", "Status", "Best epoch", "Best val loss", "Epochs run", "Duration"]
+        if self.has_seed_sweep:
+            headers.insert(1, "Seeds")
+        table = MarkdownTable(headers)
 
         for r in self.records:
             duration_s = r.training_result.get("duration_s")
@@ -192,14 +199,17 @@ class ComparisonReport(ComparisonReportBase):
 
             best_val_loss_std = self.seed_dispersion.get(r.name, {}).get("best_val_loss_std")
 
-            table.add_row(
+            cells = [
                 f"`{r.name}`",
                 r.training_result.get("status", "—"),
                 ScalarFormatter.format_scalar(r.checkpoint.get("best_epoch")),
                 self._seed_annotated(ScalarFormatter.format_scalar(r.checkpoint.get("best_val_loss")), best_val_loss_std),
                 ScalarFormatter.format_scalar(r.checkpoint.get("n_train_epochs")),
                 duration,
-            )
+            ]
+            if self.has_seed_sweep:
+                cells.insert(1, str(self.seed_dispersion.get(r.name, {}).get("n_seeds", 1)))
+            table.add_row(*cells)
 
         return table.render()
 

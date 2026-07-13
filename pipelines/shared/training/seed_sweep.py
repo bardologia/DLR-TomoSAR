@@ -13,15 +13,11 @@ class SeedSet:
 
     @staticmethod
     def run_name(base: str, seed: int) -> str:
-        return f"{base}_seed{seed}"
-
-    @staticmethod
-    def nested_run_name(base: str, seed: int) -> str:
         return f"{base}/seed{seed}"
 
     @staticmethod
     def base(run_name: str) -> str:
-        return run_name.split("_seed")[0]
+        return run_name.split("/seed")[0]
 
     @staticmethod
     def cli_args(seed: int | None) -> list[str]:
@@ -38,21 +34,25 @@ class SeedSet:
 
 
 class SeedSweepRunner:
-    def __init__(self, config, runner_factory: Callable[[object], object]) -> None:
+    def __init__(self, config, runner_factory: Callable[[object], object], base_label: str | None = None) -> None:
         self.config         = config
         self.runner_factory = runner_factory
+        self.base_label     = base_label
 
     def _seeds(self) -> list[int]:
         return SeedSet.resolve(self.config.seeds, self.config.seed)
 
     def _base_run_name(self) -> str:
+        if self.config.run_name:
+            return self.config.run_name
+
         timestamp = RunTag.now()
-        return self.config.run_name or f"run_{timestamp}"
+        return f"{self.base_label}_{timestamp}" if self.base_label else timestamp
 
     def _run_seed(self, base_name: str, seed: int):
         config          = deepcopy(self.config)
         config.seed     = seed
-        config.run_name = SeedSet.nested_run_name(base_name, seed)
+        config.run_name = SeedSet.run_name(base_name, seed)
         return self.runner_factory(config).run()
 
     def run(self):

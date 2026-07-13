@@ -129,12 +129,12 @@ def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
     pipe.mkdir(parents=True)
     _write_json(pipe / "size_match.json", {"unet": {"parameters": 100, "overrides": {}}})
     _write_json(pipe / "training_results.json", [
-        {"name": "unet_seed1", "status": "DONE", "duration_s": 10.0},
-        {"name": "unet_seed2", "status": "DONE", "duration_s": 20.0},
+        {"name": "unet/seed1", "status": "DONE", "duration_s": 10.0},
+        {"name": "unet/seed2", "status": "DONE", "duration_s": 20.0},
     ])
 
     for seed, rmse in ((1, 2.0), (2, 4.0)):
-        inference_dir = tmp_path / "training" / f"unet_seed{seed}" / "inference" / "run_a"
+        inference_dir = tmp_path / "training" / "unet" / f"seed{seed}" / "inference" / "run_a"
         inference_dir.mkdir(parents=True)
         _write_json(inference_dir / "metrics.json", {"curve_rmse_gt": rmse})
 
@@ -154,13 +154,13 @@ def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
 
 
 def test_model_of_strips_head_stem_loss_component_and_seed():
-    assert TrialCollector._model_of("unet-conv-K_3-hv-A__covariance_match_seed3")            == "unet"
+    assert TrialCollector._model_of("unet-conv-K_3-hv-A__covariance_match/seed3")            == "unet"
     assert TrialCollector._model_of("resunet-multihead-K_3-hv-A__mse_curve")                 == "resunet-multihead"
-    assert TrialCollector._model_of("unet-set_pred-K_5-noaug-none__param_l1_seed0")          == "unet-set_pred"
+    assert TrialCollector._model_of("unet-set_pred-K_5-noaug-none__param_l1/seed0")          == "unet-set_pred"
     assert TrialCollector._model_of("convnext_unet-conv-K_3-hv-AB__param_l1")                == "convnext_unet"
     assert TrialCollector._model_of("unet-per_gaussian-K_3-hv-A__param_l1")                  == "unet-per_gaussian"
-    assert TrialCollector._model_of("unet-conv-K_5-hv-A-param_l1_1_cosine_curve_0.05_seed2") == "unet"
-    assert TrialCollector._model_of("unet_seed2")                                            == "unet"
+    assert TrialCollector._model_of("unet-conv-K_5-hv-A-param_l1_1_cosine_curve_0.05/seed2") == "unet"
+    assert TrialCollector._model_of("unet/seed2")                                            == "unet"
     assert TrialCollector._model_of("unet")                                                  == "unet"
 
 
@@ -333,3 +333,20 @@ def test_write_all_round_trips_summary_json(tmp_path, logger_stub):
     assert names == {"unet", "resunet"}
     assert (out_dir / "benchmark_overview.md").exists()
     assert (out_dir / "metrics_comparison.md").exists()
+
+
+def test_training_table_shows_seed_counts_under_a_sweep(tmp_path, logger_stub):
+    records = _records_with_metrics(tmp_path)
+    report  = ComparisonReport(
+        records         = records,
+        out_dir         = tmp_path,
+        reference_model = "unet",
+        embed_images    = False,
+        logger          = logger_stub,
+        seed_dispersion = {"unet": {"n_seeds": 3, "best_val_loss_std": 0.01, "metrics": {}}},
+    )
+
+    lines = "\n".join(report._training_table())
+
+    assert "Seeds" in lines
+    assert "| 3" in lines.replace("  ", " ")

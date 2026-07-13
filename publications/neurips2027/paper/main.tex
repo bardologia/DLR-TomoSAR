@@ -18,6 +18,12 @@
 \usepackage{microtype}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
 
 \input{macros}
 
@@ -32,6 +38,7 @@
 \begin{document}
 
 \maketitle
+\suppressfloats[t]
 
 \begin{abstract}
   \todo{One paragraph: the inverse problem, the gap left by per-pixel iterative estimation, the method in one sentence, the headline quantitative result with numbers, the generality claim.}

@@ -11,6 +11,7 @@ from models.unrolled                            import get_unrolled
 from pipelines.backbone.dataset.pipeline        import DatasetPipeline
 from pipelines.shared.config.config_factory     import ConfigFactory
 from pipelines.shared.config.config_persistence import UnrolledModelConfigIO
+from pipelines.shared.training.seed_sweep       import SeedSweepRunner
 from pipelines.unrolled.training.trainer        import UnrolledTrainer
 from tools.data.gaussians          import GaussianAxis
 from tools.monitoring.logger       import Logger
@@ -112,4 +113,4 @@ class UnrolledTrainingLauncher:
         cli    = ConfigCli(UnrolledEntryConfig(), description="Train the unrolled physics network on synthesised per-pixel coherence measurements")
         config = cli.apply(argv)
 
-        UnrolledTrainingPipeline(config).run()
+        SeedSweepRunner(config, UnrolledTrainingPipeline, base_label=config.model_name).run()

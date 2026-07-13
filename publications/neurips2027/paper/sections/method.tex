@@ -9,7 +9,94 @@
 \subsection{Existence-gated set prediction}
 \label{sec:method_setpred}
 
-\todo{Backbone and heads; permutation handling via Hungarian matching versus sorted ground truth; presence/existence gating; loss composition with weights.}
+\todo{Backbone and heads; permutation handling via Hungarian matching versus sorted ground truth; presence/existence gating; loss composition with weights. Reference Figures~\ref{fig:setperm} and~\ref{fig:head} from the prose.}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize]
+    \node[pbox, minimum height=9mm] (gtl) at (-1.55,2.70) {extracted\\label};
+    \node[pbox, minimum height=9mm] (prl) at (-1.55,0.60) {network\\output};
+    \foreach \cx/\col/\ga/\gm/\gs/\lab in {0.0/oiBlue/0.58/-0.29/0.108/{(a_1, \mu_1, \sigma_1)}, 1.9/oiOrange/0.38/0.07/0.18/{(a_2, \mu_2, \sigma_2)}, 3.8/oiGreen/0.29/0.43/0.108/{(a_3, \mu_3, \sigma_3)}} {
+      \draw[\col!70, thin, rounded corners=2pt, fill=\col!4] (\cx,2.10) rectangle ++(1.6,1.2);
+      \draw[black!25, thin] (\cx+0.10,2.42) -- (\cx+1.50,2.42);
+      \draw[\col, thick, domain=-0.62:0.62, samples=41, smooth, shift={(\cx+0.8,2.42)}]
+        plot (\x,{\ga*exp(-(\x-\gm)*(\x-\gm)/(2*\gs*\gs))});
+      \node[font=\tiny, text=\col] at (\cx+0.8,2.26) {$\lab$};
+    }
+    \foreach \cx/\col/\ga/\gm/\gs/\lab in {0.0/oiOrange/0.38/0.07/0.18/{(a_2, \mu_2, \sigma_2)}, 1.9/oiGreen/0.29/0.43/0.108/{(a_3, \mu_3, \sigma_3)}, 3.8/oiBlue/0.58/-0.29/0.108/{(a_1, \mu_1, \sigma_1)}} {
+      \draw[\col!70, thin, rounded corners=2pt, fill=\col!4] (\cx,0.00) rectangle ++(1.6,1.2);
+      \draw[black!25, thin] (\cx+0.10,0.32) -- (\cx+1.50,0.32);
+      \draw[\col, thick, domain=-0.62:0.62, samples=41, smooth, shift={(\cx+0.8,0.32)}]
+        plot (\x,{\ga*exp(-(\x-\gm)*(\x-\gm)/(2*\gs*\gs))});
+      \node[font=\tiny, text=\col] at (\cx+0.8,0.16) {$\lab$};
+    }
+    \foreach \x/\e in {0.8/{\ell_1}, 2.7/{\ell_2}, 4.6/{\ell_3}} {
+      \draw[oiVermilion!80, densely dashed, {Stealth[length=1.4mm]}-{Stealth[length=1.4mm]}, thin] (\x,2.05) -- (\x,1.25);
+      \node[font=\tiny, text=oiVermilion, fill=white, inner sep=1pt] at (\x,1.65) {$\e$};
+    }
+    \draw[pflow] (gtl.east) -- (-0.05,2.70);
+    \draw[pflow] (prl.east) -- (-0.05,0.60);
+    \node[font=\tiny, text=figsoft, align=center, anchor=west] at (5.55,1.90) {fixed slot-wise loss:};
+    \node[font=\scriptsize, text=oiVermilion, align=center, anchor=west] at (5.55,1.58) {$\ell_1 + \ell_2 + \ell_3 \gg 0$};
+    \node[font=\tiny, text=figsoft, align=center, anchor=west] at (5.55,1.28) {on a perfect answer};
+    \draw[pflow] (5.5,2.70) -- (6.1,2.70);
+    \draw[pflow] (5.5,0.60) -- (6.1,0.60);
+    \foreach \yb in {2.10, 0.00} {
+      \draw[black!40, thin, rounded corners=2pt, fill=black!2] (7.55,\yb) rectangle ++(2.6,1.2);
+      \begin{scope}[shift={(7.70,\yb+0.18)}]
+        \draw[->, black!45, thin] (0,0) -- (2.30,0) node[above left, font=\tiny, inner sep=1pt]{$z$};
+        \draw[oiBlue!60, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.52*exp(-(\x-0.60)^2/(2*0.18*0.18))});
+        \draw[oiOrange!70, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.35*exp(-(\x-1.20)^2/(2*0.30*0.30))});
+        \draw[oiGreen!70, thin, densely dashed, domain=0.05:2.25, samples=50, smooth]
+          plot (\x,{0.26*exp(-(\x-1.80)^2/(2*0.18*0.18))});
+        \draw[figink, semithick, domain=0.05:2.25, samples=110, smooth]
+          plot (\x,{0.52*exp(-(\x-0.60)^2/(2*0.18*0.18)) + 0.35*exp(-(\x-1.20)^2/(2*0.30*0.30)) + 0.26*exp(-(\x-1.80)^2/(2*0.18*0.18))});
+      \end{scope}
+    }
+    \node[font=\normalsize] at (8.85,1.65) {$=$};
+    \node[font=\tiny, text=figink] at (8.85,1.32) {the same profile};
+  \end{tikzpicture}
+  \caption{The output is a set, not a vector. Label and prediction hold the same three components in different slots and compose the same spectrum, yet a fixed slot-wise loss charges each slot against a fixed target: the loss is large on a perfect answer, and its gradient drags every slot toward a different scatterer.}
+  \label{fig:setperm}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[font=\scriptsize,
+      exc/.style={-{Stealth[length=1.5mm]}, oiVermilion!85, semithick, densely dashed}]
+    \node[pbox, minimum height=26mm, minimum width=15mm] (bb) at (0,0) {backbone\\embedding};
+    \node[pbox, minimum height=7mm] (h1) at (2.6,1.4)  {slot head 1};
+    \node[pbox, minimum height=7mm] (h2) at (2.6,0)    {slot head 2};
+    \node[pbox, minimum height=7mm] (h3) at (2.6,-1.4) {slot head $K$};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g1) at (4.9,1.4)  {gate};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g2) at (4.9,0)    {gate};
+    \node[pbox, draw=oiGreen!70, fill=oiGreen!10, minimum height=6mm] (g3) at (4.9,-1.4) {gate};
+    \node[pboxaccent, minimum height=6mm] (o1) at (7.0,1.4)  {$a_1, \mu_1, \sigma_1$};
+    \node[pboxaccent, minimum height=6mm] (o2) at (7.0,0)    {$a_2, \mu_2, \sigma_2$};
+    \node[pboxaccent, minimum height=6mm] (o3) at (7.0,-1.4) {$a_K, \mu_K, \sigma_K$};
+    \node[pbox, minimum height=7mm] (eh) at (2.2,-2.85) {existence head};
+    \node[font=\scriptsize, text=oiVermilion, anchor=west] at (4.80,-2.85) {$g_k = \sigma(e_k)$ per slot};
+    \draw[pflow] (bb.east) -- (h1.west);
+    \draw[pflow] (bb.east) -- (h2.west);
+    \draw[pflow] (bb.east) -- (h3.west);
+    \draw[pflow] (bb.south) |- (eh.west);
+    \draw[pflow] (h1.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_1$} (g1.west);
+    \draw[pflow] (h2.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_2$} (g2.west);
+    \draw[pflow] (h3.east) -- node[midway, above, font=\tiny, text=figsoft]{$\hat a_K$} (g3.west);
+    \draw[pflow] (g1.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_1$} (o1.west);
+    \draw[pflow] (g2.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_2$} (o2.west);
+    \draw[pflow] (g3.east) -- node[midway, above, font=\tiny, text=oiBlue]{$a_K$} (o3.west);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,0.10) -- (4.35,-2.75) -- (4.35,0.70)  -| (g1.south);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,0.00) -- (4.45,-2.85) -- (4.45,-0.70) -| (g2.south);
+    \draw[exc, rounded corners=2pt] (eh.east) ++(0.15,-0.10) -- (4.55,-2.95) -- (4.55,-2.10) -| (g3.south);
+    \node[font=\scriptsize, text=figink, anchor=north] at (3.5,-3.55)
+      {each gate: $a_k = g_k\,\hat a_k + (1 - g_k)\,a_{\mathrm{off},k}$; \; $\mu_k, \sigma_k$ pass through; \; $a_{\mathrm{off},k}$ learned per slot};
+  \end{tikzpicture}
+  \caption{The existence-gated set-prediction head. Each slot regresses a parameter triplet; a shared existence head emits one logit per slot, and the sigmoid gate $g_k = \sigma(e_k)$ blends the regressed amplitude with a learned off state: a closed slot collapses onto the empty target at near-zero loss regardless of its regression, so detection uncertainty flows through the logit instead of dimming amplitudes.}
+  \label{fig:head}
+\end{figure}
 
 \subsection{Slot collapse under ground-truth imbalance}
 \label{sec:method_collapse}
@@ -19,4 +106,158 @@
 \subsection{Context budget and patch size}
 \label{sec:method_patch}
 
-\todo{The patch-size law with stated assumptions; derivation sketch here, full derivation in the appendix.}
+How much spatial context should the network see? The supervision fixes the answer. The label at pixel $x$ is the deterministic spectral scan and mixture fit $\phi$ applied to the sample covariance of the $w \times w$ window $B(x)$ centred on $x$ ($w = 20$\,px in production):
+\begin{equation}
+  \ell(x) \;=\; \phi\bigl(\hat{\mathbf{R}}(x)\bigr),
+  \qquad
+  \hat{\mathbf{R}}(x) \;=\; \frac{1}{w^2} \sum_{x' \in B(x)} \mathbf{y}(x')\,\mathbf{y}(x')^{\mathsf{H}},
+  \label{eq:label_cov}
+\end{equation}
+with $\mathbf{y}$ the full-stack sample vector. Two assumptions, both already made by the labelling pipeline, carry the analysis: speckle decorrelates at the resolution-cell scale, so distinct pixels are independent; and the covariance is locally constant at the window scale, $w$ being the homogeneity scale of the scene.
+
+Write $x' = x + \tau$ for the pixel at offset $\tau = (\tau_a, \tau_r)$. Two consequences are exact. Each label is a function of its own window alone, so disjoint windows yield independent labels:
+\begin{equation}
+  \lVert\tau\rVert_\infty \ge w
+  \;\Longrightarrow\;
+  B(x) \cap B(x') = \emptyset
+  \;\Longrightarrow\;
+  \ell(x) \indep \ell(x').
+  \label{eq:independence}
+\end{equation}
+Overlapping windows split over their intersection into a shared and a private sum:
+\begin{align}
+  w^2\,\hat{\mathbf{R}}(x)  &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x) \setminus B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}},
+  \label{eq:shared_private}\\
+  w^2\,\hat{\mathbf{R}}(x') &= \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \;+ \sum_{p \,\in\, B(x') \setminus B(x)} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}}.
+\end{align}
+The shared sum collects
+\begin{equation}
+  \bigl|B(x) \cap B(x')\bigr| \;=\; (w - |\tau_a|)_+\,(w - |\tau_r|)_+
+  \label{eq:shared_count}
+\end{equation}
+looks, with $(\cdot)_+$ the positive part. The private sums are independent of each other and of the shared one, so every link between two labels flows through the shared looks, and the correlation between corresponding entries of the two estimates is the shared fraction of the window,
+\begin{equation}
+  \rho(\tau) \;=\; \Bigl(1 - \tfrac{|\tau_a|}{w}\Bigr)_{\!+}\Bigl(1 - \tfrac{|\tau_r|}{w}\Bigr)_{\!+},
+  \label{eq:triangle}
+\end{equation}
+the self-convolution of the boxcar, inherited by the labels through the linearisation of $\phi$. The link drains linearly and dies exactly at the window scale,
+\begin{equation}
+  \lVert\tau\rVert_\infty \to w:
+  \qquad
+  \bigl|B(x) \cap B(x')\bigr| \to 0,
+  \qquad
+  \sum_{p \,\in\, B(x) \cap B(x')} \mathbf{y}_p\,\mathbf{y}_p^{\mathsf{H}} \to 0,
+  \qquad
+  \rho(\tau) \to 0,
+  \label{eq:drain}
+\end{equation}
+meeting the independence of Eq.~(\ref{eq:independence}) at the boundary. Figure~\ref{fig:corr_law} traces the mechanism: the overlap is the correlation.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[b]{0.52\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize, scale=0.95]
+      \draw[black!45, thin, fill=black!2] (0,0) rectangle (5.6,3.9);
+      \draw[black!7, step=0.2] (0,0) grid (5.6,3.9);
+      \draw[figink, dashed, thin] (0.55,0.35) rectangle ++(3.0,3.0);
+      \node[font=\tiny, text=figink, anchor=south west, inner sep=1.5pt] at (0.57,3.37) {$W = 2w$};
+      \fill[oiBlue!25] (1.30,1.10) rectangle (2.20,2.15);
+      \draw[oiGreen, dashed, thin] (0.70,0.65) rectangle ++(1.5,1.5);
+      \fill[oiGreen] (1.39,1.34) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiGreen!70!black, anchor=east, inner sep=1.5pt] at (1.35,1.40) {$x'$};
+      \node[font=\tiny, text=oiGreen!70!black, anchor=north west, inner sep=1.5pt] at (0.72,0.63) {$B(x')$};
+      \draw[oiBlue, dashed, thin] (1.30,1.10) rectangle ++(1.5,1.5);
+      \fill[oiBlue] (1.99,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=oiBlue, anchor=west, inner sep=1.5pt] at (2.15,1.85) {$x$};
+      \node[font=\tiny, text=oiBlue, anchor=south west, inner sep=1.5pt] at (1.32,2.62) {$B(x)$};
+      \draw[black!50, dashed, thin] (3.60,1.10) rectangle ++(1.5,1.5);
+      \fill[black!50] (4.29,1.79) rectangle ++(0.12,0.12);
+      \node[font=\tiny, text=black!60, anchor=west, inner sep=1.5pt] at (4.45,1.85) {$x''$};
+      \node[font=\tiny, text=black!60, anchor=south west, inner sep=1.5pt] at (3.62,2.62) {$B(x'')$};
+      \node[font=\tiny, text=oiBlue!80!black, anchor=north west, align=left, inner sep=1.5pt] at (0.80,0.30) {shared looks};
+      \draw[oiBlue!70, thin] (1.55,0.32) -- (1.75,1.30);
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_grid}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.44\textwidth}
+    \centering
+    \begin{tikzpicture}[font=\scriptsize, scale=0.9]
+      \fill[oiBlue!30] (-1.71,2.0) rectangle (-1.29,2.7);
+      \draw[oiBlue, semithick]  (-1.71,2.0) rectangle ++(0.7,0.7);
+      \draw[oiGreen, semithick] (-1.99,2.0) rectangle ++(0.7,0.7);
+      \node[font=\tiny, anchor=south] at (-1.50,2.76) {$\tau = -0.4\,w$};
+      \fill[oiBlue!30] (0.33,2.0) rectangle (0.47,2.7);
+      \draw[oiBlue, semithick]  (-0.23,2.0) rectangle ++(0.7,0.7);
+      \draw[oiGreen, semithick] (0.33,2.0) rectangle ++(0.7,0.7);
+      \node[font=\tiny, anchor=south] at (0.40,2.76) {$\tau = 0.8\,w$};
+      \draw[oiBlue, semithick]  (1.70,2.0) rectangle ++(0.7,0.7);
+      \draw[oiGreen, semithick] (2.61,2.0) rectangle ++(0.7,0.7);
+      \node[font=\tiny, anchor=south] at (2.50,2.76) {$\tau = 1.3\,w$};
+      \draw[black!45, dashed, thin] (-1.50,1.95) -- (-0.88,0.96);
+      \draw[black!45, dashed, thin] (0.40,1.95) -- (1.76,0.32);
+      \draw[black!45, dashed, thin] (2.50,1.95) -- (2.86,0.00);
+      \draw[-{Stealth[length=1.5mm]}, black!60] (-2.9,0) -- (3.6,0) node[right, font=\tiny]{$\tau$};
+      \draw[-{Stealth[length=1.5mm]}, black!60] (0,-0.05) -- (0,1.90) node[left, font=\tiny]{$\rho(\tau)$};
+      \draw[black!35, thin, dashed] (-0.05,1.6) -- (0.05,1.6);
+      \node[font=\tiny, anchor=east] at (-0.08,1.6) {$1$};
+      \draw[oiBlue, thick] (-2.2,0) -- (0,1.6) -- (2.2,0);
+      \draw[black!45, thin] (-2.2,0) -- (-2.2,-0.07);
+      \draw[black!45, thin] (2.2,0) -- (2.2,-0.07);
+      \node[font=\tiny, anchor=north] at (-2.2,-0.09) {$-w$};
+      \node[font=\tiny, anchor=north] at (2.2,-0.09) {$w$};
+      \fill[figink] (-0.88,0.96) circle (0.05);
+      \fill[figink] (1.76,0.32) circle (0.05);
+      \fill[figink] (2.86,0.00) circle (0.05);
+      \draw[|-|, black!70] (-2.2,-0.72) -- (2.2,-0.72);
+      \node[font=\tiny, text=figink, anchor=north] at (0,-0.80) {$W = 2w$};
+      \node[coordinate] at (0,-1.35) {};
+    \end{tikzpicture}
+    \caption{}
+    \label{fig:corr_law_triangle}
+  \end{subfigure}
+  \caption{The label correlation law. (a)~Two labels are linked exactly through the looks their windows share (shaded): the window at $x'$ overlaps $B(x)$, the one at $x''$ is disjoint and its label independent; the centred patch containing every overlapping window spans $W = 2w$. (b)~The overlap is the correlation: each window pair drops onto the triangle of Eq.~(\ref{eq:triangle}) at its offset, reaching zero at the window scale (Eq.~\ref{eq:drain}) and staying zero beyond (Eq.~\ref{eq:independence}); the patch spanning the whole triangle is $2w$.}
+  \label{fig:corr_law}
+\end{figure}
+
+The law follows from the held-out risk. The label is a noisy realisation of the underlying statistic,
+\begin{equation}
+  \ell(x) \;=\; \phi\bigl(\mathbf{R}(x)\bigr) + \varepsilon(x),
+  \label{eq:label_noise}
+\end{equation}
+with $\varepsilon$ the estimation noise of the finite $w^2$-look budget, and the test loss of a predictor $f$ splits accordingly:
+\begin{equation}
+  \E \norm{f - \ell}^2 \;=\; \E \norm{f - \phi(\mathbf{R})}^2 \;+\; \E \norm{\varepsilon}^2.
+  \label{eq:risk_decomp}
+\end{equation}
+Only the first term is reducible, and it measures the distance to the statistic, not to the label realisation: a patch helps only through looks informative about the pixel's covariance. The window geometry sorts the surrounding pixels into three regimes, summarised in Table~\ref{tab:context_regimes}.
+
+\begin{table}[H]
+  \centering
+  \caption{The three offset regimes around pixel $x$: pixel stacks inside the window form the label, overlapping windows share looks and correlate, disjoint windows are independent.}
+  \label{tab:context_regimes}
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    offset from $x$ & geometry & link to $\ell(x)$ & certified role in the patch \\
+    \midrule
+    $\lVert\tau\rVert_\infty \le w/2$      & pixel inside $B(x)$ & look of Eq.~(\ref{eq:label_cov})  & forms the label \\
+    $w/2 < \lVert\tau\rVert_\infty < w$    & windows overlap     & shared looks, $\rho(\tau) > 0$    & averages away $\varepsilon$ \\
+    $\lVert\tau\rVert_\infty \ge w$        & windows disjoint    & independent, $\rho(\tau) = 0$     & none, uncertified prior only \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The certified context is therefore the square of side $2w$ centred on the pixel, of which a patch of side $W$ captures
+\begin{equation}
+  L(W) \;=\; \min(W, 2w)^2
+  \label{eq:ceiling}
+\end{equation}
+looks: quadratic growth up to the ceiling, exactly flat beyond. The floor is immediate, since a patch narrower than the window withholds inputs that generated its own target. The useful patch is the band
+\begin{equation}
+  w \;\le\; W \;\le\; 2w,
+  \label{eq:band}
+\end{equation}
+whose upper end carries the law's sharpest prediction: Eq.~(\ref{eq:ceiling}) contains no property of the input stack, so held-out accuracy must saturate at the window scale for every stack size. The sweep of Section~\ref{sec:experiments_ablations} confirms it (Table~\ref{tab:patch_sweep}, Figure~\ref{fig:patch_sweep}).
+
+Three remarks bound the scope. Organised structure larger than a resolution cell correlates samples across disjoint windows and can only soften the ceiling upward, never create an optimum below it. The law bounds \emph{certified} information: a model may exploit scene regularities beyond the ceiling, they are simply not guaranteed by the label construction. And its only constant is the pipeline's own $w$, so the law transfers to a new scene by re-reading the window from that scene's configuration; whether the observed saturation transfers is untested (Section~\ref{sec:limitations}).

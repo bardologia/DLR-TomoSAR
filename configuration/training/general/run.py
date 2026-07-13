@@ -6,6 +6,10 @@ from pathlib     import Path
 from configuration.training.general.optimization import ClipMode, SchedulerType, WarmupMode
 
 
+def standard_seeds() -> list[int]:
+    return [0, 1, 2, 3, 4]
+
+
 @dataclass
 class TrainingPathsConfig:
     dataset_path     : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")

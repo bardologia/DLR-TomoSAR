@@ -122,7 +122,7 @@ class FoldNaming:
 
     @staticmethod
     def base(name: str) -> str:
-        return name.split("_seed")[0]
+        return name.split("/seed")[0]
 
     @staticmethod
     def index(name: str) -> int:
@@ -130,7 +130,7 @@ class FoldNaming:
 
     @staticmethod
     def seed(name: str) -> int | None:
-        parts = name.split("_seed")
+        parts = name.split("/seed")
         return int(parts[1]) if len(parts) == 2 else None
 
 

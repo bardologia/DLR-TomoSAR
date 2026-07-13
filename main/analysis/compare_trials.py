@@ -39,12 +39,13 @@ def main() -> None:
         records   = collector.collect()
 
         report = TrialComparisonReport(
-            records        = records,
-            out_dir        = out_dir,
-            compare_images = config.compare_images,
-            compare_gifs   = config.compare_gifs,
-            embed_images   = config.embed_images,
-            logger         = logger,
+            records         = records,
+            out_dir         = out_dir,
+            compare_images  = config.compare_images,
+            compare_gifs    = config.compare_gifs,
+            embed_images    = config.embed_images,
+            logger          = logger,
+            seed_dispersion = collector.seed_dispersion,
         )
 
         written = report.write_all()

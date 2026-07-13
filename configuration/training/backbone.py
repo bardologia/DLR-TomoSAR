@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run         import TrainingPathsConfig, TrainingQueueConfig
+from configuration.training.general.run         import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.dataset                       import AugmentationConfig, InputConfig
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
@@ -109,7 +109,12 @@ def _default_presence_trials() -> dict:
 
 def _default_input_trials() -> dict:
     return {
-        "amp-allsec-noifg" : {"use_primary": True, "use_secondaries": True, "use_interferograms": False},
+        "amp-allsec-noifg"  : {"tracks": "all",     "use_primary": True,  "use_secondaries": True,  "use_interferograms": False},
+        "noamp-allsec-ifg"  : {"tracks": "all",     "use_primary": False, "use_secondaries": False, "use_interferograms": True},
+        "amp-allsec-ifg"    : {"tracks": "all",     "use_primary": True,  "use_secondaries": True,  "use_interferograms": True},
+        "amp-redsec-ifg"    : {"tracks": "reduced", "use_primary": True,  "use_secondaries": True,  "use_interferograms": True},
+        "amp-redsec-noifg"  : {"tracks": "reduced", "use_primary": True,  "use_secondaries": True,  "use_interferograms": False},
+        "noamp-redsec-ifg"  : {"tracks": "reduced", "use_primary": False, "use_secondaries": False, "use_interferograms": True},
     }
 
 
@@ -182,7 +187,7 @@ class BackboneEntryConfig:
     backbone_head   : str        = "conv"
     gpu             : int        = 0
     seed            : int        = 0
-    seeds           : list[int]  = field(default_factory=list)
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     model_overrides : dict       = field(default_factory=dict)
 

@@ -357,7 +357,7 @@ class LaunchLayout:
 
     INFER_ESSENTIALS = [
         "runs_dir",
-        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+        {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "pendingButton": True}},
         {"path": "gpus", "widget": GPU_MANY},
         "poll_interval_s",
     ]
@@ -656,6 +656,7 @@ class LaunchLayout:
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
+                "seeds",
             ],
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
@@ -831,6 +832,7 @@ class LaunchLayout:
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
                 {"path": "seed", "widget": NUM_SEED},
+                "seeds",
                 "resume",
                 "poll_interval_s",
             ],

@@ -4,6 +4,7 @@ from configuration.patch_sweep              import PatchSweepConfig
 from pipelines.patch_sweep.planner          import PatchSweepPlanner, SweepUnit
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.model.model_builder   import ModelBuilder
+from pipelines.shared.training.seed_sweep   import SeedSet
 from pipelines.shared.training.worker_base  import WorkerBase
 
 
@@ -19,7 +20,7 @@ class SweepTrainingWorker(WorkerBase):
         self.config.training.batch_size              = unit.batch_size
         self.config.training.lr_reference_batch_size = unit.lr_reference_batch_size
 
-    def run(self, unit_name: str) -> None:
+    def run(self, unit_name: str, seed: int | None = None) -> None:
         from pipelines.backbone.training.pipeline import TrainingPipeline
 
         unit = PatchSweepPlanner.from_dataset(self.config).unit(unit_name)
@@ -40,8 +41,8 @@ class SweepTrainingWorker(WorkerBase):
             dataset_config = dataset_config,
             backbone_name  = self.config.backbone_name,
             model_config   = model_config,
-            seed           = self.config.seed,
-            run_name       = unit_name,
+            seed           = self.config.seed if seed is None else seed,
+            run_name       = unit_name if seed is None else SeedSet.run_name(unit_name, seed),
         )
 
         pipeline.run(probe_config=self._probe_config())

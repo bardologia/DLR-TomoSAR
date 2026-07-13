@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib     import Path
 
 from configuration.dataset.profile_autoencoder       import ProfileAugmentationConfig
-from configuration.training.general.run              import TrainingPathsConfig, TrainingQueueConfig
+from configuration.training.general.run              import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig, MlpAutoencoderConfig
 from configuration.sar.geometry_config               import GeometryConfig
 from configuration.training.general.optimization     import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
@@ -42,7 +42,7 @@ class ProfileAeEntryConfig:
     run_name    : str | None = None
     gpu         : int        = 0
     seed        : int        = 0
-    seeds       : list[int]  = field(default_factory=list)
+    seeds       : list[int]  = field(default_factory=standard_seeds)
     logdir      : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/profile_autoencoder")
 
     pixel_subsample : float = 1.0

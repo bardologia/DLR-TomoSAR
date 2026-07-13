@@ -14,7 +14,7 @@ def main() -> None:
     from tools.runtime.config_cli             import ConfigCli
     from tools.monitoring.logger              import Logger
 
-    entry  = ConfigCli(TensorboardExportEntryConfig(), description="Scan a runs directory for training runs with tensorboard event logs, select one or more, and export every scalar series as a publication-quality figure inside each run directory; train and validation series of the same metric share one figure").apply()
+    entry  = ConfigCli(TensorboardExportEntryConfig(), description="Scan a runs directory for training runs with tensorboard event logs, select one or more, and export every scalar series as a publication-quality figure inside each run directory; train and validation series of the same metric share one figure, and sibling seed runs of one trial additionally get per-metric seed-overlay figures in the trial directory").apply()
 
     logger = Logger(log_dir="logs", name="export_tensorboard_plots")
     TensorboardExportBatch(entry, logger).run()

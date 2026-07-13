@@ -8,7 +8,7 @@ from configuration.normalization.general import NormalizationConfig
 from configuration.sar.geometry_config   import GeometryConfig
 from configuration.training.backbone     import default_curriculum
 from configuration.training.general.loss import LossCurriculumConfig
-from configuration.training.general.run  import RunPathsConfig, TrainingQueueConfig
+from configuration.training.general.run  import RunPathsConfig, TrainingQueueConfig, standard_seeds
 
 
 @dataclass
@@ -43,4 +43,5 @@ class PatchSweepConfig:
     run_tag         : str | None = None
     resume          : bool       = True
     seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=standard_seeds)
     poll_interval_s : float      = 5.0

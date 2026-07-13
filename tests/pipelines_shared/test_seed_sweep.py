@@ -55,7 +55,7 @@ def test_explicit_seeds_run_in_listed_order():
     assert [seed for seed, _ in record] == [3, 0, 17]
 
 
-def test_explicit_seeds_nest_run_names_under_the_base():
+def test_explicit_seeds_nest_run_name_per_seed():
     record = []
 
     SeedSweepRunner(_Config(run_name="exp", seeds=[3, 0, 17]), _factory(record)).run()
@@ -76,6 +76,6 @@ def test_explicit_seeds_without_run_name_group_under_shared_base():
 
     SeedSweepRunner(_Config(seeds=[0, 1]), _factory(record)).run()
 
-    bases = {name.rsplit("/", 1)[0] for _, name in record}
+    bases = {name.rsplit("/seed", 1)[0] for _, name in record}
     assert len(bases) == 1
-    assert sorted(name.rsplit("/", 1)[1] for _, name in record) == ["seed0", "seed1"]
+    assert sorted(name.rsplit("/seed", 1)[1] for _, name in record) == ["0", "1"]

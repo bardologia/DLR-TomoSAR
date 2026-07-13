@@ -312,7 +312,9 @@ class AblationTrialPlanner:
 
 class InputTrialPlanner:
 
-    INPUT_KEYS = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")
+    INPUT_KEYS   = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")
+    TRACKS_KEY   = "tracks"
+    TRACK_SCOPES = ("all", "reduced")
 
     def __init__(self, input_trials: dict, candidates: list[str]) -> None:
         self.input_trials = input_trials
@@ -334,19 +336,27 @@ class InputTrialPlanner:
             raise ValueError("input_trials must list at least one input variant")
 
         for label, spec in self.input_trials.items():
-            unknown = [key for key in spec if key not in self.INPUT_KEYS]
+            if spec.get(self.TRACKS_KEY) not in self.TRACK_SCOPES:
+                raise ValueError(f"Input trial '{label}' must set '{self.TRACKS_KEY}' to one of {self.TRACK_SCOPES}, got {spec.get(self.TRACKS_KEY)!r}")
+
+            unknown = [key for key in spec if key != self.TRACKS_KEY and key not in self.INPUT_KEYS]
             if unknown:
-                raise ValueError(f"Input trial '{label}' has unknown keys {unknown}; allowed keys are {self.INPUT_KEYS}")
+                raise ValueError(f"Input trial '{label}' has unknown keys {unknown}; allowed keys are ('{self.TRACKS_KEY}',) + {self.INPUT_KEYS}")
 
     def summary(self) -> dict:
+        scopes = [spec[self.TRACKS_KEY] for spec in self.input_trials.values()]
+
         return {
             "Input variants" : len(self.input_trials),
-            "Tracks"         : f"all ({len(self.candidates)} secondaries)",
+            "Tracks"         : f"{scopes.count('all')} all ({len(self.candidates)} secondaries), {scopes.count('reduced')} reduced (configured selection)",
         }
 
     def _overrides(self, spec: dict) -> dict:
-        overrides = {f"input.{key}": value for key, value in spec.items()}
-        overrides["paths.secondary_labels"] = tuple(self.candidates)
+        overrides = {f"input.{key}": value for key, value in spec.items() if key != self.TRACKS_KEY}
+
+        if spec[self.TRACKS_KEY] == "all":
+            overrides["paths.secondary_labels"] = tuple(self.candidates)
+
         return overrides
 
     def plan(self) -> list[tuple[str, dict]]:

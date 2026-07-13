@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import gc
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib     import Path
 
+import numpy as np
 import torch
 
 from models                                import BACKBONE_HEADS
 from pipelines.shared.model.model_builder  import ModelBuilder
 from pipelines.shared.training.seed_sweep import SeedSet
 from tools.data.io               import FileIO
+from tools.metrics.scoring       import SeedAggregation
 from tools.monitoring.logger     import Logger
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
@@ -36,6 +38,61 @@ class TrialRecord:
     @property
     def has_inference(self) -> bool:
         return self.inference_dir is not None
+
+
+class SeedRunAggregator:
+    CHECKPOINT_KEYS = ("best_val_loss", "best_epoch", "n_train_epochs")
+
+    def __init__(self) -> None:
+        self.seed_dispersion: dict = {}
+
+    def _group(self, records: list[TrialRecord]) -> list[tuple[str, list[TrialRecord]]]:
+        groups: dict[str, list[TrialRecord]] = {}
+
+        for record in records:
+            groups.setdefault(SeedSet.base(record.name), []).append(record)
+
+        return list(groups.items())
+
+    def _aggregate_group(self, name: str, runs: list[TrialRecord]) -> tuple[TrialRecord, dict]:
+        representative = next((run for run in runs if run.has_inference), runs[0])
+
+        metric_keys              = sorted({key for run in runs for key in run.metrics})
+        metric_means, metric_std = SeedAggregation.aggregate([run.metrics for run in runs], metric_keys)
+        ckpt_means, ckpt_std     = SeedAggregation.aggregate([run.checkpoint for run in runs], list(self.CHECKPOINT_KEYS))
+
+        durations = [run.training_result.get("duration_s") for run in runs]
+        durations = [value for value in durations if isinstance(value, (int, float))]
+
+        record                 = replace(representative, name=name, metrics=metric_means)
+        record.checkpoint      = {**representative.checkpoint, **ckpt_means}
+        record.training_result = {
+            "status"     : "DONE" if all(run.training_result.get("status") == "DONE" for run in runs) else "PARTIAL",
+            "duration_s" : float(np.mean(durations)) if durations else None,
+        }
+
+        dispersion = {
+            "n_seeds"           : len(runs),
+            "best_val_loss_std" : ckpt_std.get("best_val_loss"),
+            "metrics"           : metric_std,
+        }
+
+        return record, dispersion
+
+    def aggregate(self, records: list[TrialRecord]) -> list[TrialRecord]:
+        self.seed_dispersion = {}
+        aggregated           = []
+
+        for name, runs in self._group(records):
+            if len(runs) == 1:
+                aggregated.append(runs[0])
+                continue
+
+            record, dispersion = self._aggregate_group(name, runs)
+            aggregated.append(record)
+            self.seed_dispersion[name] = dispersion
+
+        return aggregated
 
 
 class TrialCollector:
@@ -116,6 +173,22 @@ class TrialCollector:
 
         return base
 
+    @staticmethod
+    def _seed_dirs(trial_dir: Path) -> list[Path]:
+        return sorted(d for d in trial_dir.iterdir() if d.is_dir() and re.fullmatch(r"seed\d+", d.name))
+
+    def _run_dirs(self) -> list[tuple[str, Path]]:
+        runs = []
+        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
+            seed_dirs = self._seed_dirs(trial_dir)
+
+            if seed_dirs:
+                runs += [(f"{trial_dir.name}/{seed_dir.name}", seed_dir) for seed_dir in seed_dirs]
+            else:
+                runs.append((trial_dir.name, trial_dir))
+
+        return runs
+
     def collect(self) -> list[TrialRecord]:
         size_match, training_results = self._aggregate_sources()
 
@@ -124,13 +197,13 @@ class TrialCollector:
             return []
 
         records = []
-        for trial_dir in sorted(d for d in self.training_dir.iterdir() if d.is_dir()):
-            record = TrialRecord(name=trial_dir.name, run_dir=trial_dir)
+        for name, trial_dir in self._run_dirs():
+            record = TrialRecord(name=name, run_dir=trial_dir)
 
-            record.size_match      = size_match.get(self._model_of(trial_dir.name), {})
+            record.size_match      = size_match.get(self._model_of(name), {})
             record.trainer_config  = self._optional_json(trial_dir / "docs" / "trainer_config.json")
             record.run_summary     = self._optional_json(trial_dir / "meta" / "run_summary.json")
-            record.training_result = training_results[trial_dir.name] if trial_dir.name in training_results else {}
+            record.training_result = training_results[name] if name in training_results else {}
             record.parameters      = self._parse_parameters(trial_dir, record.size_match)
             record.checkpoint      = self._read_checkpoint(trial_dir)
 

@@ -219,13 +219,13 @@ def test_training_seed_sweep_job_uses_base_model_and_seed(data_config, logger_st
     stage = TrainingStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
     unit = "unet-conv-sorted_gt-K_5-hv-A__param_l1"
-    assert stage.items == [f"{unit}_seed7"]
+    assert stage.items == [f"{unit}/seed7"]
 
-    job = stage._job(f"{unit}_seed7")
+    job = stage._job(f"{unit}/seed7")
     assert job.command[job.command.index("--model") + 1] == "unet"
     assert job.command[job.command.index("--seed")  + 1] == "7"
     assert job.command[job.command.index("--worker") + 1] == "train"
-    assert job.log_path == stage.stage_dir / f"{unit}_seed7" / "worker.log"
+    assert job.log_path == stage.stage_dir / f"{unit}/seed7" / "worker.log"
 
 
 @pytest.mark.real_data
@@ -234,9 +234,9 @@ def test_inference_seed_sweep_matches_training_run_names(data_config, logger_stu
     stage = InferenceStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
     unit = "unet-conv-sorted_gt-K_5-hv-A__param_l1"
-    assert stage.items == [f"{unit}_seed3", f"{unit}_seed4"]
+    assert stage.items == [f"{unit}/seed3", f"{unit}/seed4"]
 
-    job = stage._job(f"{unit}_seed4")
+    job = stage._job(f"{unit}/seed4")
     assert job.command[job.command.index("--model") + 1] == "unet"
     assert job.command[job.command.index("--seed")  + 1] == "4"
     assert job.command[job.command.index("--worker") + 1] == "infer"

@@ -4,5 +4,22 @@
 \newcommand{\C}{\mathbb{C}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\indep}{\perp\!\!\!\perp}
 
 \newcommand{\method}{\todo{method name}}
+
+\definecolor{oiOrange}{HTML}{E69F00}
+\definecolor{oiSky}{HTML}{56B4E9}
+\definecolor{oiGreen}{HTML}{009E73}
+\definecolor{oiBlue}{HTML}{0072B2}
+\definecolor{oiVermilion}{HTML}{D55E00}
+\definecolor{oiPurple}{HTML}{CC79A7}
+\colorlet{figink}{black!85}
+\colorlet{figsoft}{black!55}
+
+\tikzset{
+  pbox/.style={draw=black!60, rounded corners=2pt, fill=black!4, align=center, font=\scriptsize, inner sep=3pt},
+  pboxaccent/.style={pbox, draw=oiBlue!70, fill=oiBlue!6},
+  pflow/.style={-{Stealth[length=1.6mm]}, black!70, semithick},
+  pflowsoft/.style={-{Stealth[length=1.6mm]}, black!45, thin},
+}

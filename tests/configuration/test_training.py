@@ -272,3 +272,26 @@ def test_profile_ae_entry_training_overrides():
     cfg = ProfileAeEntryConfig()
     assert cfg.training.batch_size == 1024
     assert cfg.ae_model_name == "mlp_ae"
+
+
+def test_every_seeded_entry_defaults_to_the_standard_five_seeds():
+    from configuration.benchmark.general        import BenchmarkConfig
+    from configuration.cross_validation.general import CrossValidationConfig
+    from configuration.training.dual            import DualEntryConfig
+    from configuration.training.general.run     import standard_seeds
+    from configuration.training.unrolled        import UnrolledEntryConfig
+
+    assert standard_seeds() == [0, 1, 2, 3, 4]
+
+    seeded = [
+        BackboneEntryConfig,
+        JepaEntryConfig,
+        ProfileAeEntryConfig,
+        ImageAeEntryConfig,
+        DualEntryConfig,
+        UnrolledEntryConfig,
+        CrossValidationConfig,
+        BenchmarkConfig,
+    ]
+    for config_cls in seeded:
+        assert config_cls().seeds == standard_seeds(), config_cls.__name__
