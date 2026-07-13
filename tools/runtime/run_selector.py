@@ -60,21 +60,39 @@ class RunSelector:
         ordered = sorted(dict.fromkeys(indices))
         return [run_dirs[index - 1] for index in ordered]
 
+    def _nested(self, run_dirs: list[Path], name: str) -> list[Path]:
+        nested = [run_dir for run_dir in run_dirs if run_dir.parent.name == name or str(run_dir.relative_to(self.runs_dir)).startswith(f"{name}/")]
+
+        if nested:
+            self.logger.ok(f"'{name}' expanded to {len(nested)} nested run(s)")
+        return nested
+
     def _lookup(self, run_dirs: list[Path], names: list[str]) -> list[Path]:
-        by_key = {}
+        by_key    = {}
+        ambiguous = set()
         for run_dir in run_dirs:
-            by_key[run_dir.name] = run_dir
-            by_key[str(run_dir.relative_to(self.runs_dir))] = run_dir
+            for key in (run_dir.name, str(run_dir.relative_to(self.runs_dir))):
+                if key in by_key and by_key[key] != run_dir:
+                    ambiguous.add(key)
+                by_key[key] = run_dir
+
+        for key in ambiguous:
+            del by_key[key]
 
         selection = []
         for name in names:
             run_dir = by_key.get(name)
-            if run_dir is None:
-                raise FileNotFoundError(f"No run '{name}' with '{self.marker}' under {self.runs_dir}")
-            selection.append(run_dir)
+            if run_dir is not None:
+                selection.append(run_dir)
+                continue
+
+            nested = self._nested(run_dirs, name)
+            if not nested:
+                raise FileNotFoundError(f"No run '{name}' with '{self.marker}' under {self.runs_dir}, and no nested runs beneath a directory of that name")
+            selection.extend(nested)
 
         ordered = list(dict.fromkeys(selection))
-        self.logger.ok(f"Selected {len(ordered)} run(s): {', '.join(run_dir.name for run_dir in ordered)}")
+        self.logger.ok(f"Selected {len(ordered)} run(s): {', '.join(str(run_dir.relative_to(self.runs_dir)) for run_dir in ordered)}")
         return ordered
 
     def select(self) -> list[Path]:

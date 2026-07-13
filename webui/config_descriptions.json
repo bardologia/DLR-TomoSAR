@@ -2092,10 +2092,10 @@
       }
     },
     "diagnostics::TensorboardExportEntryConfig": {
-      "summary": "Batch webui entry selecting training runs with tensorboard event logs and building a per-run TensorboardExportConfig via to_config",
+      "summary": "Batch webui entry selecting training runs with tensorboard event logs and building a per-run TensorboardExportConfig via to_config; when sibling seed runs of one trial are selected, the trial directory additionally receives seed-overlay figures with every seed's curve per metric",
       "fields": {
         "runs_dir": "parent directory recursively scanned (rglob) by TensorboardRunSelector for run subdirectories whose tensorboard_dirname holds event files",
-        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to export; empty triggers interactive selection on a tty, else all runs",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to export; a trial directory name expands to every seed run nested beneath it, empty triggers interactive selection on a tty, else all runs",
         "tensorboard_dirname": "name of the subdirectory inside each run directory that holds the tensorboard event files, forwarded to each run's TensorboardExportConfig",
         "output_subdir": "subdirectory name inside each run directory where that run's exported figures are written, forwarded to each run's TensorboardExportConfig"
       }
@@ -2112,10 +2112,10 @@
       }
     },
     "diagnostics::ReportCollectionEntryConfig": {
-      "summary": "Batch webui entry selecting training runs with inference reports and building a per-run ReportCollectionConfig via to_config; a missing referenced image or two selected runs sharing a name abort the collection loudly",
+      "summary": "Batch webui entry selecting training runs with inference reports and building a per-run ReportCollectionConfig via to_config; nested seed runs are labelled <trial>_seed<N>, and a missing referenced image or two selected runs sharing a label abort the collection loudly",
       "fields": {
         "runs_dir": "parent directory recursively scanned (rglob) by ReportRunSelector for run subdirectories whose inference_dirname holds a report",
-        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to collect; empty triggers interactive selection on a tty, else all runs",
+        "run_filter": "exact run names or run-dir relative paths selecting which runs under runs_dir to collect; a trial directory name expands to every seed run nested beneath it, empty triggers interactive selection on a tty, else all runs",
         "collector_dir": "single directory that receives every collected report, created if missing; re-collection overwrites previous copies",
         "inference_dirname": "name of the subdirectory inside each run directory that holds the timestamped inference outputs, forwarded to each run's ReportCollectionConfig",
         "report_filename": "report filename inside each inference output directory, forwarded to each run's ReportCollectionConfig",

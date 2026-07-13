@@ -151,13 +151,30 @@ class ScalarCurvePlots(PlotBase):
     def __init__(self) -> None:
         self.labeler = CurveLabeler()
 
-    def _log_scaled(self, group: CurveGroup) -> bool:
-        values = np.concatenate([values for _label, _steps, values in group.series])
+    def _log_scaled(self, value_arrays) -> bool:
+        values = np.concatenate(list(value_arrays))
         values = values[np.isfinite(values)]
 
         if values.size == 0 or values.min() <= 0:
             return False
         return bool(values.max() / values.min() >= self.LOG_SPAN)
+
+    def _decorate(self, fig, ax, title: str, value_arrays, n_series: int) -> None:
+        if self._log_scaled(value_arrays):
+            ax.set_yscale("log")
+
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.grid(which="major", linewidth=0.5, alpha=0.3)
+        ax.set_axisbelow(True)
+
+        ax.set_title(self.labeler.title(title))
+        ax.set_xlabel("Step")
+        ax.set_ylabel(self.labeler.y_label(title))
+
+        if n_series > 1:
+            ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+
+        fig.tight_layout()
 
     def render(self, group: CurveGroup, path: Path) -> Path:
         self._apply_style()
@@ -168,21 +185,52 @@ class ScalarCurvePlots(PlotBase):
             marker = "o" if steps.size <= self.SPARSE_POINTS else None
             ax.plot(steps, values, lw=1.4, color=self.SERIES_COLORS[label], label=label, marker=marker, markersize=3.0)
 
-        if self._log_scaled(group):
-            ax.set_yscale("log")
+        self._decorate(fig, ax, group.title, [values for _label, _steps, values in group.series], len(group.series))
+        return self._save(fig, path)
 
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.grid(which="major", linewidth=0.5, alpha=0.3)
-        ax.set_axisbelow(True)
 
-        ax.set_title(self.labeler.title(group.title))
-        ax.set_xlabel("Step")
-        ax.set_ylabel(self.labeler.y_label(group.title))
+@dataclass
+class SeedCurveGroup:
+    stem   : str
+    title  : str
+    series : List[Tuple[str, Optional[str], np.ndarray, np.ndarray]]
 
-        if len(group.series) > 1:
-            ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
 
-        fig.tight_layout()
+class SeedScalarMerger:
+    def merge(self, groups_by_seed: Dict[str, List[CurveGroup]]) -> List[SeedCurveGroup]:
+        merged: Dict[str, SeedCurveGroup] = {}
+
+        for seed in sorted(groups_by_seed):
+            for group in groups_by_seed[seed]:
+                entry = merged.setdefault(group.stem, SeedCurveGroup(stem=group.stem, title=group.title, series=[]))
+                for role, steps, values in group.series:
+                    entry.series.append((seed, role, steps, values))
+
+        return sorted(merged.values(), key=lambda group: group.stem)
+
+
+class SeedOverlayPlots(ScalarCurvePlots):
+    PALETTE = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+
+    ROLE_STYLES = {"Training": "-", "Validation": "--", None: "-"}
+
+    @staticmethod
+    def _series_label(seed: str, role: Optional[str]) -> str:
+        if role is None:
+            return seed
+        return f"{seed} {'train' if role == 'Training' else 'val'}"
+
+    def render(self, group: SeedCurveGroup, path: Path) -> Path:
+        self._apply_style()
+
+        fig, ax = plt.subplots(figsize=(6.2, 3.9))
+
+        seeds = sorted({seed for seed, _role, _steps, _values in group.series})
+        for seed, role, steps, values in group.series:
+            color = self.PALETTE[seeds.index(seed) % len(self.PALETTE)]
+            ax.plot(steps, values, lw=1.2, color=color, linestyle=self.ROLE_STYLES[role], label=self._series_label(seed, role))
+
+        self._decorate(fig, ax, group.title, [values for _seed, _role, _steps, values in group.series], len(group.series))
         return self._save(fig, path)
 
 
@@ -225,6 +273,52 @@ class TensorboardExport:
         }
 
 
+class SeedRunGrouper:
+    SEED_DIR_PATTERN = re.compile(r"seed\d+")
+
+    @classmethod
+    def trials(cls, run_dirs: list[Path]) -> Dict[Path, list[Path]]:
+        groups: Dict[Path, list[Path]] = {}
+
+        for run_dir in run_dirs:
+            if cls.SEED_DIR_PATTERN.fullmatch(run_dir.name):
+                groups.setdefault(run_dir.parent, []).append(run_dir)
+
+        return {trial_dir: sorted(seed_dirs) for trial_dir, seed_dirs in sorted(groups.items()) if len(seed_dirs) > 1}
+
+
+class SeedOverlayExport:
+    def __init__(self, trial_dir: Path, seed_dirs: list[Path], entry_config: TensorboardExportEntryConfig, logger) -> None:
+        self.trial_dir    = Path(trial_dir)
+        self.seed_dirs    = seed_dirs
+        self.entry_config = entry_config
+        self.logger       = logger
+
+    def _read_seed(self, seed_dir: Path) -> List[CurveGroup]:
+        config = self.entry_config.to_config(seed_dir)
+        return ScalarTagGrouper().group(TensorboardScalarReader(config).read())
+
+    def run(self) -> dict:
+        self.logger.subsection(f"Seed overlay export: {self.trial_dir.name} ({len(self.seed_dirs)} seeds)")
+
+        groups_by_seed = {seed_dir.name: self._read_seed(seed_dir) for seed_dir in self.seed_dirs}
+        merged         = SeedScalarMerger().merge(groups_by_seed)
+
+        plots_directory = self.trial_dir / self.entry_config.output_subdir
+        renderer        = SeedOverlayPlots()
+        paths           = [renderer.render(group, plots_directory / f"{group.stem}.png") for group in merged]
+
+        self.logger.ok(f"{self.trial_dir.name}: {len(paths)} seed-overlay plots -> {plots_directory}")
+
+        return {
+            "trial_directory" : str(self.trial_dir),
+            "plots_directory" : str(plots_directory),
+            "n_seeds"         : len(self.seed_dirs),
+            "n_plots"         : len(paths),
+            "plot_paths"      : paths,
+        }
+
+
 class TensorboardExportBatch:
     def __init__(self, entry_config: TensorboardExportEntryConfig, logger) -> None:
         self.entry_config = entry_config
@@ -246,6 +340,11 @@ class TensorboardExportBatch:
         self.logger.ok(f"{run_dir.name}: {result['n_plots']} plots -> {config.plots_directory}")
         return result
 
+    def _export_seed_overlays(self, run_dirs: list[Path]) -> list[dict]:
+        return [SeedOverlayExport(trial_dir, seed_dirs, self.entry_config, self.logger).run() for trial_dir, seed_dirs in SeedRunGrouper.trials(run_dirs).items()]
+
     def run(self) -> list[dict]:
         run_dirs = self._select_runs()
-        return [self._export_run(run_dir) for run_dir in run_dirs]
+        results  = [self._export_run(run_dir) for run_dir in run_dirs]
+
+        return results + self._export_seed_overlays(run_dirs)

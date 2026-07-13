@@ -6,7 +6,7 @@ import pytest
 from torch.utils.tensorboard import SummaryWriter
 
 from configuration.diagnostics            import TensorboardExportConfig, TensorboardExportEntryConfig
-from tools.diagnostics.tensorboard_export import CurveGroup, CurveLabeler, ScalarCurvePlots, ScalarTagGrouper, TensorboardExport, TensorboardExportBatch, TensorboardScalarReader
+from tools.diagnostics.tensorboard_export import CurveGroup, CurveLabeler, ScalarCurvePlots, ScalarTagGrouper, SeedRunGrouper, SeedScalarMerger, TensorboardExport, TensorboardExportBatch, TensorboardScalarReader
 
 
 class RecordingLogger:
@@ -98,19 +98,18 @@ def test_long_titles_wrap_instead_of_overflowing():
     assert all(len(line) <= CurveLabeler.WRAP_WIDTH for line in title.split("\n"))
 
 
-def _group_of_values(values):
-    array = np.asarray(values, dtype=np.float64)
-    return CurveGroup(stem="g", title="g", series=[(None, np.arange(array.size, dtype=np.int64), array)])
+def _value_arrays(values):
+    return [np.asarray(values, dtype=np.float64)]
 
 
 def test_wide_positive_ranges_render_on_a_log_axis():
-    assert ScalarCurvePlots()._log_scaled(_group_of_values([1e-6, 1e-4, 1e-2])) is True
+    assert ScalarCurvePlots()._log_scaled(_value_arrays([1e-6, 1e-4, 1e-2])) is True
 
 
 def test_narrow_or_signed_ranges_stay_linear():
-    assert ScalarCurvePlots()._log_scaled(_group_of_values([0.1, 0.4]))        is False
-    assert ScalarCurvePlots()._log_scaled(_group_of_values([-1e-6, 1e-2]))     is False
-    assert ScalarCurvePlots()._log_scaled(_group_of_values([0.0, 1e-2, 1e4]))  is False
+    assert ScalarCurvePlots()._log_scaled(_value_arrays([0.1, 0.4]))        is False
+    assert ScalarCurvePlots()._log_scaled(_value_arrays([-1e-6, 1e-2]))     is False
+    assert ScalarCurvePlots()._log_scaled(_value_arrays([0.0, 1e-2, 1e4]))  is False
 
 
 @pytest.fixture
@@ -160,3 +159,70 @@ def test_batch_exports_filtered_runs(run_directory, tmp_path):
     assert len(results) == 1
     assert results[0]["run_directory"] == str(run_directory)
     assert (run_directory / "tensorboard_plots" / "loss.png").is_file()
+
+
+def _seed_run(root, trial, seed, tags=("loss/train", "loss/val")):
+    run_dir = root / trial / f"seed{seed}"
+    writer  = SummaryWriter(log_dir=str(run_dir / "tensorboard"))
+
+    for step in range(4):
+        for tag in tags:
+            writer.add_scalar(tag, (seed + 1.0) / (step + 1), step)
+
+    writer.flush()
+    writer.close()
+    return run_dir
+
+
+def test_merger_combines_seed_groups_per_stem():
+    steps, values = np.arange(3, dtype=np.int64), np.linspace(0.0, 1.0, 3)
+    group         = CurveGroup(stem="loss", title="loss", series=[("Training", steps, values), ("Validation", steps, values)])
+
+    merged = SeedScalarMerger().merge({"seed1": [group], "seed0": [group]})
+
+    assert len(merged) == 1
+    assert merged[0].stem == "loss"
+    assert [(seed, role) for seed, role, _s, _v in merged[0].series] == [("seed0", "Training"), ("seed0", "Validation"), ("seed1", "Training"), ("seed1", "Validation")]
+
+
+def test_grouper_collects_sibling_seed_runs_only(tmp_path):
+    seed_dirs = [tmp_path / "trial_a" / "seed0", tmp_path / "trial_a" / "seed1", tmp_path / "trial_b" / "seed0", tmp_path / "flat_run"]
+
+    trials = SeedRunGrouper.trials(seed_dirs)
+
+    assert list(trials) == [tmp_path / "trial_a"]
+    assert trials[tmp_path / "trial_a"] == [tmp_path / "trial_a" / "seed0", tmp_path / "trial_a" / "seed1"]
+
+
+def test_batch_writes_seed_overlays_into_the_trial_directory(tmp_path):
+    for seed in (0, 1):
+        _seed_run(tmp_path, "trial_a", seed)
+
+    entry   = TensorboardExportEntryConfig(runs_dir=tmp_path, run_filter=["trial_a/seed0", "trial_a/seed1"])
+    results = TensorboardExportBatch(entry, RecordingLogger()).run()
+
+    assert len(results) == 3
+    assert results[-1]["n_seeds"] == 2
+    assert (tmp_path / "trial_a" / "seed0" / "tensorboard_plots" / "loss.png").is_file()
+    assert (tmp_path / "trial_a" / "tensorboard_plots" / "loss.png").is_file()
+
+
+def test_trial_name_filter_expands_to_the_seed_runs(tmp_path):
+    for seed in (0, 1):
+        _seed_run(tmp_path, "trial_a", seed)
+
+    entry   = TensorboardExportEntryConfig(runs_dir=tmp_path, run_filter=["trial_a"])
+    results = TensorboardExportBatch(entry, RecordingLogger()).run()
+
+    assert len(results) == 3
+    assert (tmp_path / "trial_a" / "tensorboard_plots" / "loss.png").is_file()
+
+
+def test_ambiguous_bare_seed_name_raises(tmp_path):
+    for trial in ("trial_a", "trial_b"):
+        _seed_run(tmp_path, trial, 0)
+
+    entry = TensorboardExportEntryConfig(runs_dir=tmp_path, run_filter=["seed0"])
+
+    with pytest.raises(FileNotFoundError, match="seed0"):
+        TensorboardExportBatch(entry, RecordingLogger()).run()
