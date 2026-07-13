@@ -9,9 +9,10 @@ from pathlib     import Path
 import torch
 
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, LossScaleProbeConfig, default_curriculum
-from models import BACKBONE_CONFIG_REGISTRY
+from configuration.training.general.loss import ParamMatching
+from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_HEADS
 from pipelines.backbone.inference.pipeline   import InferencePipeline
-from pipelines.backbone.training.experiments import AblationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, InputTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
+from pipelines.backbone.training.experiments import AblationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, HeadMatchingTrialPlanner, InputTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
@@ -110,7 +111,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "ablation_features", "ablation_include_full", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "head_trials", "ablation_features", "ablation_include_full", "gpus", "poll_interval_s")
 
     MODE_SUBDIRS = {
         "curriculum" : "curriculum",
@@ -122,6 +123,7 @@ class TrainScheduler:
         "patch"      : "patch",
         "input"      : "input",
         "context"    : "context",
+        "head"       : "head",
         "ablation"   : "ablation",
     }
 
@@ -161,10 +163,12 @@ class TrainScheduler:
             return InputTrialPlanner.from_dataset(self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "context":
             return ContextTrialPlanner(self.config.context_trials, tuple(BACKBONE_CONFIG_REGISTRY))
+        if mode == "head":
+            return HeadMatchingTrialPlanner(self.config.head_trials, tuple(BACKBONE_CONFIG_REGISTRY), BACKBONE_HEADS, tuple(matching.value for matching in ParamMatching))
         if mode == "ablation":
             return AblationTrialPlanner(self.config.ablation_features, self.config.ablation_include_full)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context' or 'ablation'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'head' or 'ablation'")
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
         argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name, "logdir": str(self.runs_root)})

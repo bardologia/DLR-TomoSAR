@@ -340,6 +340,69 @@ class ContextTrialPlanner:
         return [(f"ctx-{name}", {"backbone_name": name}) for name in self.backbones]
 
 
+class HeadMatchingTrialPlanner:
+
+    def __init__(self, trials, registry_names: tuple, head_names: tuple, matching_names: tuple) -> None:
+        self.trials         = trials
+        self.registry_names = tuple(registry_names)
+        self.head_names     = tuple(head_names)
+        self.matching_names = tuple(matching_names)
+
+        self._validate()
+
+    def _validate(self) -> None:
+        t = self.trials
+
+        if t.backbone not in self.registry_names:
+            raise ValueError(f"Unknown head_trials.backbone '{t.backbone}'; registered backbones are {sorted(self.registry_names)}")
+
+        if not t.heads:
+            raise ValueError("head_trials.heads must list at least one head")
+
+        unknown = [head for head in t.heads if head not in self.head_names]
+        if unknown:
+            raise ValueError(f"Unknown head_trials.heads {unknown}; registered heads are {self.head_names}")
+
+        duplicates = sorted({head for head in t.heads if t.heads.count(head) > 1})
+        if duplicates:
+            raise ValueError(f"head_trials.heads must be unique, duplicated: {duplicates}")
+
+        if not t.matchings:
+            raise ValueError("head_trials.matchings must list at least one matching strategy")
+
+        unknown = [matching for matching in t.matchings if matching not in self.matching_names]
+        if unknown:
+            raise ValueError(f"Unknown head_trials.matchings {unknown}; allowed matchings are {self.matching_names}")
+
+        duplicates = sorted({matching for matching in t.matchings if t.matchings.count(matching) > 1})
+        if duplicates:
+            raise ValueError(f"head_trials.matchings must be unique, duplicated: {duplicates}")
+
+    def summary(self) -> dict:
+        return {
+            "Backbone"   : self.trials.backbone,
+            "Heads"      : list(self.trials.heads),
+            "Matchings"  : list(self.trials.matchings),
+            "Total runs" : len(self.trials.heads) * len(self.trials.matchings),
+        }
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for head in self.trials.heads:
+            for matching in self.trials.matchings:
+                run_name  = f"hm-{head}-{matching}"
+                overrides = {
+                    "backbone_name"                      : self.trials.backbone,
+                    "backbone_head"                      : head,
+                    "curriculum.warmup.param_matching"   : matching,
+                    "curriculum.complete.param_matching" : matching,
+                }
+                plans.append((run_name, overrides))
+
+        return plans
+
+
 class InputTrialPlanner:
 
     INPUT_KEYS   = ("use_primary", "use_secondaries", "use_interferograms", "use_dem")

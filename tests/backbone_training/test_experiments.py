@@ -4,12 +4,13 @@ import pytest
 
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_context_trials, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import HeadMatchingTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
     ContextTrialPlanner,
     CurriculumTrialPlanner,
+    HeadMatchingTrialPlanner,
     InputTrialPlanner,
     PatchSizeTrialPlanner,
     PairLossTrialPlanner,
@@ -285,6 +286,49 @@ def test_context_planner_rejects_empty_duplicate_and_unknown_backbones():
 
     with pytest.raises(ValueError):
         ContextTrialPlanner(["unet", "voxel_gnn"], REGISTRY_NAMES)
+
+
+HEAD_NAMES     = ("conv", "multihead", "per_gaussian", "set_pred")
+MATCHING_NAMES = ("hungarian", "sorted_gt")
+
+
+def test_head_matching_planner_default_crosses_heads_and_matchings():
+    planner = HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    plans = planner.plan()
+
+    assert plans == [
+        ("hm-conv-sorted_gt",     {"backbone_name": "unet", "backbone_head": "conv",     "curriculum.warmup.param_matching": "sorted_gt", "curriculum.complete.param_matching": "sorted_gt"}),
+        ("hm-conv-hungarian",     {"backbone_name": "unet", "backbone_head": "conv",     "curriculum.warmup.param_matching": "hungarian", "curriculum.complete.param_matching": "hungarian"}),
+        ("hm-set_pred-sorted_gt", {"backbone_name": "unet", "backbone_head": "set_pred", "curriculum.warmup.param_matching": "sorted_gt", "curriculum.complete.param_matching": "sorted_gt"}),
+        ("hm-set_pred-hungarian", {"backbone_name": "unet", "backbone_head": "set_pred", "curriculum.warmup.param_matching": "hungarian", "curriculum.complete.param_matching": "hungarian"}),
+    ]
+    assert planner.summary() == {"Backbone": "unet", "Heads": ["conv", "set_pred"], "Matchings": ["sorted_gt", "hungarian"], "Total runs": 4}
+
+
+def test_head_matching_planner_rejects_unknown_axes():
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(backbone="voxel_gnn"), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(heads=["conv", "cone"]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(matchings=["sorted_gt", "greedy"]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+
+def test_head_matching_planner_rejects_empty_and_duplicate_axes():
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(heads=[]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(matchings=[]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(heads=["conv", "conv"]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
+
+    with pytest.raises(ValueError):
+        HeadMatchingTrialPlanner(HeadMatchingTrialsConfig(matchings=["hungarian", "hungarian"]), REGISTRY_NAMES, HEAD_NAMES, MATCHING_NAMES)
 
 
 def test_input_planner_rejects_empty_trials():

@@ -136,8 +136,24 @@ def test_context_scheduler_plans_one_trial_per_registered_backbone(tmp_path):
     ]
 
 
+def test_head_scheduler_plans_the_head_matching_grid(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "head"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    plans = dict(scheduler.planner().plan())
+
+    assert list(plans) == ["hm-conv-sorted_gt", "hm-conv-hungarian", "hm-set_pred-sorted_gt", "hm-set_pred-hungarian"]
+    assert all(overrides["backbone_name"] == "unet" for overrides in plans.values())
+    assert plans["hm-set_pred-hungarian"]["backbone_head"]                       == "set_pred"
+    assert plans["hm-set_pred-hungarian"]["curriculum.warmup.param_matching"]    == "hungarian"
+    assert plans["hm-set_pred-hungarian"]["curriculum.complete.param_matching"]  == "hungarian"
+
+
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
-    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "ablation"):
+    for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "ablation"):
         config             = BackboneEntryConfig()
         config.logdir      = tmp_path
         config.trials_mode = mode

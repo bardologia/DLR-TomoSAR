@@ -160,6 +160,13 @@ class SecondaryTrialsConfig:
 
 
 @dataclass
+class HeadMatchingTrialsConfig:
+    backbone  : str       = "unet"
+    heads     : list[str] = field(default_factory=lambda: ["conv", "set_pred"])
+    matchings : list[str] = field(default_factory=lambda: ["sorted_gt", "hungarian"])
+
+
+@dataclass
 class LossScaleProbeConfig:
     enabled        : bool       = True
     n_batches      : int        = 10
@@ -225,6 +232,7 @@ class BackboneEntryConfig:
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     input_trials     : dict                  = field(default_factory=_default_input_trials)
     context_trials   : list                  = field(default_factory=_default_context_trials)
+    head_trials      : HeadMatchingTrialsConfig = field(default_factory=HeadMatchingTrialsConfig)
 
     ablation_features     : list = field(default_factory=AblationCatalog.default_features)
     ablation_include_full : bool = True

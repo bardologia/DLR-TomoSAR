@@ -408,6 +408,19 @@ class ExperimentBuilder {
     { key: "presence",   label: "slot presence", hint: "slot-presence loss ablation crossed with both matching strategies, one trial per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
+    { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
+  ];
+
+  static HEAD_OPTIONS = [
+    { key: "conv",         label: "conv" },
+    { key: "multihead",    label: "multihead" },
+    { key: "per_gaussian", label: "per gaussian" },
+    { key: "set_pred",     label: "set pred" },
+  ];
+
+  static MATCHING_OPTIONS = [
+    { key: "sorted_gt", label: "sorted gt" },
+    { key: "hungarian", label: "hungarian" },
   ];
 
   static PHYSICS_COMPONENTS = [
@@ -467,15 +480,17 @@ class ExperimentBuilder {
     this.inputTrialsLeaf   = byPath.get("input_trials");
     this.contextTrialsLeaf = byPath.get("context_trials");
 
-    this.secondary = new Map();
-    this.patch     = new Map();
-    this.physics   = new Map();
-    this.pair      = new Map();
+    this.secondary  = new Map();
+    this.patch      = new Map();
+    this.physics    = new Map();
+    this.pair       = new Map();
+    this.headTrials = new Map();
     byPath.forEach((leaf) => {
       if (leaf.section === "secondary_trials") this.secondary.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "patch_trials")     this.patch.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "physics_trials")   this.physics.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "pair_trials")      this.pair.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "head_trials")      this.headTrials.set(leaf.path.split(".").pop(), leaf);
     });
 
     this.claimed = ["trials_enabled", "warmup_losses", "complete_losses"];
@@ -484,6 +499,7 @@ class ExperimentBuilder {
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
     this.physics.forEach((leaf) => this.claimed.push(leaf.path));
     this.pair.forEach((leaf) => this.claimed.push(leaf.path));
+    this.headTrials.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
     if (this.presenceMatchLeaf)    this.claimed.push(this.presenceMatchLeaf.path);
     if (this.inputTrialsLeaf)      this.claimed.push(this.inputTrialsLeaf.path);
@@ -523,6 +539,10 @@ class ExperimentBuilder {
     this.inputCellsEl   = null;
     this.contextEl      = null;
     this.contextCellsEl = null;
+    this.headEl          = null;
+    this.headHeadsEl     = null;
+    this.headMatchingsEl = null;
+    this.headBackboneEl  = null;
     this.modeButtons    = new Map();
     this.modeEl         = null;
     this._paintSwitch   = null;
@@ -566,6 +586,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
     if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
+    if (this.modeLeaf && this.headTrials.size)    body.appendChild(this._headPanel());
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -598,6 +619,7 @@ class ExperimentBuilder {
     this._paintPresence();
     this._paintInput();
     this._paintContext();
+    this._paintHead();
     this._paintWarmupCatalog();
     this._paintSummary();
     this._paintNames();
@@ -1732,6 +1754,135 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _headList(key) {
+    const leaf = this.headTrials.get(key);
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+  }
+
+  _headBackbone() {
+    const leaf = this.headTrials.get("backbone");
+    return leaf ? this.view._effective(leaf) : "unet";
+  }
+
+  _emitHeadList(key, values) {
+    const leaf = this.headTrials.get(key);
+    if (!leaf) return;
+
+    this.view._setValue(leaf, PythonLiteral.render(values));
+    this._repaintHead();
+  }
+
+  _toggleHeadOption(key, option, catalog) {
+    const current = this._headList(key);
+
+    if (current.includes(option)) {
+      if (current.length <= 1) return;
+      this._emitHeadList(key, current.filter((value) => value !== option));
+    } else {
+      const order = catalog.map((entry) => entry.key);
+      this._emitHeadList(key, order.filter((value) => current.includes(value) || value === option));
+    }
+  }
+
+  _headPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">head x matching grid</span>`;
+
+    const backboneLeaf = this.headTrials.get("backbone");
+    if (backboneLeaf) {
+      const input      = document.createElement("input");
+      input.className  = "cfg-edit__input exp-secondary__strategy";
+      input.spellcheck = false;
+      input.title      = `--${backboneLeaf.path} · backbone trained in every grid cell`;
+      input.addEventListener("change", () => {
+        this.view._setValue(backboneLeaf, input.value.trim());
+        this._repaintHead();
+      });
+      this.headBackboneEl = input;
+      head.appendChild(input);
+      this.view.controls[backboneLeaf.path] = { leaf: backboneLeaf, reset: () => this._repaintHead() };
+    }
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "One training run per checked head x matching pair, all on the one backbone named in the corner field. The matching strategy is applied to both curriculum stages; everything else comes from the base config.";
+
+    const headsHead       = document.createElement("div");
+    headsHead.className   = "exp-presence__sub";
+    headsHead.textContent = "heads";
+
+    const heads         = document.createElement("div");
+    heads.className     = "exp-builder__names exp-presence__strategies";
+    this.headHeadsEl    = heads;
+
+    const matchingsHead       = document.createElement("div");
+    matchingsHead.className   = "exp-presence__sub";
+    matchingsHead.textContent = "matchings";
+
+    const matchings         = document.createElement("div");
+    matchings.className     = "exp-builder__names exp-presence__strategies";
+    this.headMatchingsEl    = matchings;
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(headsHead);
+    panel.appendChild(heads);
+    panel.appendChild(matchingsHead);
+    panel.appendChild(matchings);
+    this.headEl = panel;
+
+    const headsLeaf = this.headTrials.get("heads");
+    if (headsLeaf) this.view.controls[headsLeaf.path] = { leaf: headsLeaf, reset: () => this._repaintHead() };
+
+    const matchingsLeaf = this.headTrials.get("matchings");
+    if (matchingsLeaf) this.view.controls[matchingsLeaf.path] = { leaf: matchingsLeaf, reset: () => this._repaintHead() };
+
+    this._paintHead();
+    return panel;
+  }
+
+  _paintHead() {
+    if (!this.headEl) return;
+
+    if (this.headBackboneEl && document.activeElement !== this.headBackboneEl) this.headBackboneEl.value = this._headBackbone();
+
+    const paintToggles = (el, key, catalog) => {
+      el.innerHTML = "";
+      const active = this._headList(key);
+      catalog.forEach(({ key: option, label }) => {
+        const on   = active.includes(option);
+        const chip = document.createElement("button");
+        chip.type        = "button";
+        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+        chip.textContent = label;
+        chip.title       = on ? "Click to drop this option from the grid" : "Click to add this option to the grid";
+        chip.addEventListener("click", () => this._toggleHeadOption(key, option, catalog));
+        el.appendChild(chip);
+      });
+    };
+
+    if (this.headHeadsEl)     paintToggles(this.headHeadsEl,     "heads",     ExperimentBuilder.HEAD_OPTIONS);
+    if (this.headMatchingsEl) paintToggles(this.headMatchingsEl, "matchings", ExperimentBuilder.MATCHING_OPTIONS);
+  }
+
+  _repaintHead() {
+    this._paintHead();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _paintMode() {
     const mode = this._mode();
 
@@ -1749,6 +1900,7 @@ class ExperimentBuilder {
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
     if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
+    if (this.headEl)             this.headEl.hidden             = mode !== "head";
   }
 
   _paintSecondary() {
@@ -2286,6 +2438,14 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "head") {
+      const nHeads     = this._headList("heads").length;
+      const nMatchings = this._headList("matchings").length;
+      const total      = nHeads * nMatchings;
+      this.summaryEl.textContent = `${nHeads} head${nHeads === 1 ? "" : "s"} x ${nMatchings} matching${nMatchings === 1 ? "" : "s"} = ${total} trial${total === 1 ? "" : "s"} on ${this._headBackbone()}${this._seedsSuffix(total)}${gpus}`;
+      return;
+    }
+
     this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
   }
 
@@ -2333,6 +2493,11 @@ class ExperimentBuilder {
       this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
     } else if (mode === "context") {
       this._contextTrials().forEach((name) => names.push(`${name}_ctx-${name}`));
+    } else if (mode === "head") {
+      const backbone = this._headBackbone();
+      this._headList("heads").forEach((headKey) => {
+        this._headList("matchings").forEach((matching) => names.push(`${backbone}_hm-${headKey}-${matching}`));
+      });
     } else if (mode === "warmup") {
       this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
     } else {
