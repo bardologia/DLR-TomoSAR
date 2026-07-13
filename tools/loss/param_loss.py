@@ -87,13 +87,14 @@ class ParamMatcher:
 
 class ParamLoss:
     DENOM_FLOOR = 1e-6
+    FRAC_CLAMP  = 1e-3
 
     @staticmethod
     def presence_scale(active: torch.Tensor, balance: bool, active_weight: float, inactive_weight: float) -> torch.Tensor:
         if balance:
-            frac            = active.mean()
-            active_weight   = 0.5 / (frac + ParamLoss.DENOM_FLOOR)
-            inactive_weight = 0.5 / (1.0 - frac + ParamLoss.DENOM_FLOOR)
+            frac            = active.mean(dim=(0, 2, 3, 4), keepdim=True).clamp(ParamLoss.FRAC_CLAMP, 1.0 - ParamLoss.FRAC_CLAMP)
+            active_weight   = 0.5 / frac
+            inactive_weight = 0.5 / (1.0 - frac)
 
         return active * active_weight + (1.0 - active) * inactive_weight
 

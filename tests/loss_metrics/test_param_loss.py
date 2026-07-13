@@ -200,15 +200,44 @@ def test_sorted_gt_pushes_inactive_gt_last():
     assert sorted_phys[0, -1, 0, 0, 0].item() == 0.0
 
 
-def test_presence_scale_inverse_frequency_upweights_rare_active():
-    b, g, h, w = 2, 3, 4, 4
+def test_presence_scale_balances_within_each_slot():
+    b, g, h, w = 2, 2, 4, 4
+    active = torch.zeros(b, g, 1, h, w, dtype=torch.float64)
+    active[:, 0]           = 1.0
+    active[:, 1, :, :1, :] = 1.0
+
+    scale          = ParamLoss.presence_scale(active, balance=True, active_weight=1.0, inactive_weight=1.0)
+    slot1_active   = scale[:, 1][active[:, 1].bool()]
+    slot1_inactive = scale[:, 1][active[:, 1] == 0]
+
+    assert slot1_active[0].item()    == pytest.approx(0.5 / 0.25)
+    assert slot1_inactive[0].item()  == pytest.approx(0.5 / 0.75)
+    assert slot1_active.sum().item() == pytest.approx(slot1_inactive.sum().item())
+
+
+def test_presence_scale_fraction_is_independent_per_slot():
+    b, g, h, w = 2, 2, 4, 4
+    active = torch.zeros(b, g, 1, h, w, dtype=torch.float64)
+    active[:, 0]           = 1.0
+    active[:, 1, :, :1, :] = 1.0
+
+    scale = ParamLoss.presence_scale(active, balance=True, active_weight=1.0, inactive_weight=1.0)
+    slot0 = scale[:, 0]
+
+    assert torch.allclose(slot0, torch.full_like(slot0, 0.5 / (1.0 - ParamLoss.FRAC_CLAMP)))
+
+
+def test_presence_scale_clamps_degenerate_fractions():
+    b, g, h, w = 1, 2, 4, 4
     active = torch.zeros(b, g, 1, h, w, dtype=torch.float64)
     active[:, 0] = 1.0
 
-    scale  = ParamLoss.presence_scale(active, balance=True, active_weight=1.0, inactive_weight=1.0)
-    w_act  = scale[active.bool().expand_as(scale)][0].item()
-    w_inact = scale[(active == 0).expand_as(scale)][0].item()
-    assert w_act > w_inact
+    scale = ParamLoss.presence_scale(active, balance=True, active_weight=1.0, inactive_weight=1.0)
+
+    assert torch.isfinite(scale).all()
+    assert scale.max().item() <= 0.5 / ParamLoss.FRAC_CLAMP
+    assert scale[:, 0].max().item() == pytest.approx(0.5 / (1.0 - ParamLoss.FRAC_CLAMP))
+    assert scale[:, 1].max().item() == pytest.approx(0.5 / (1.0 - ParamLoss.FRAC_CLAMP))
 
 
 def test_presence_scale_default_is_identity():
