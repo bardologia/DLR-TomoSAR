@@ -168,8 +168,8 @@ class OutputConfig:
    
 @dataclass
 class PatchConfig:
-    size                  : Tuple[int, int] = (32, 16)
-    stride                : Tuple[int, int] = (16, 8)
+    size                  : Tuple[int, int] = (64, 32)
+    stride                : Tuple[int, int] = (32, 16)
     use_symmetric_padding : bool            = True
 
 
