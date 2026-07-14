@@ -12,7 +12,7 @@
     "tuning": "The stage that searches hyperparameter spaces with Optuna to improve a chosen model family. It wires the search budget, pruning, and resources to a nested training configuration and swaps in per-trial hyperparameter samples. The configs here control the Optuna search controls and artifact emission, the entry point binding model type, resources, and data to the search, and the JEPA-specific search space over autoencoder pairing, target strategy, and loss weights.",
     "comparison": "The stage that rebuilds side-by-side comparisons across completed runs and trials without re-running training or inference. It aggregates existing inference or preprocessing outputs into a single report grouped by the varied factor. The configs here control comparison of backbone inference runs, of preprocessing trials differing by multilook window, of Gaussian-fit extraction trials grouped by component count, and the standalone rebuild of an existing benchmark comparison report.",
     "diagnostics": "The stage that inspects completed training runs independently of any data run. The weight-xray diagnostic classifies each checkpoint tensor against numeric thresholds and emits a per-run report and plots; the tensorboard export renders every logged scalar series as a publication-quality figure inside the run directory, pairing train and validation series of the same metric in one shared figure. The configs here control the pathology classification thresholds, the single-run diagnostics and their report and plot outputs, and the batch webui entries that select runs and build a per-run configuration.",
-    "patch_sweep": "The experiment that measures the best patch size per dataset. Each selected dataset is preprocessed with its own boxcar covariance window, and the same backbone trains across every admissible patch size on the traditional reduced stack, seeds nested per unit. The configs here select the datasets to sweep, derive the patch-size grid at the architecture's minimum admissible step, fan the training runs out across GPUs, and produce a report ranking the best patch size per dataset on the seed-mean test loss."
+    "patch_sweep": "The experiment that measures the best patch lengths per dataset. Each selected dataset is preprocessed with its own boxcar covariance window, and the same backbone trains across every admissible combination of azimuth and range patch lengths on the traditional reduced stack, seeds nested per unit. The configs here select the datasets to sweep, derive the per-axis patch grids at the architecture's minimum admissible step, fan the training runs out across GPUs, and produce a report ranking the best patch lengths per dataset on the seed-mean test loss."
   },
   "configs": {
     "sar/gaussian_config::GaussianConfig": {
@@ -2249,24 +2249,24 @@
       }
     },
     "patch_sweep/general::PatchGridConfig": {
-      "summary": "Patch-size grid swept for every selected dataset, spaced at the architecture's minimum admissible step",
+      "summary": "Per-axis (azimuth, range) patch-length grids swept as a cross product for every selected dataset, spaced at the architecture's minimum admissible step",
       "fields": {
-        "minimum": "Smallest patch size in the grid; 0 derives it as one admissible step (e.g. 16 for a four-stage U-Net), explicit values must be a multiple of the step",
-        "maximum": "Largest patch size in the grid, inclusive; the grid runs from minimum to maximum in steps of the admissible step",
+        "minimum": "Smallest patch length per axis as an (azimuth, range) tuple; 0 derives that axis's start as one admissible step, explicit values must be a multiple of the step",
+        "maximum": "Largest patch length per axis as an (azimuth, range) tuple, inclusive; each axis runs from its minimum to its maximum in steps of the admissible step and the sweep trains every azimuth x range combination",
         "step": "Spacing between swept patch sizes; 0 derives 2^n_stages from the backbone's encoder feature pyramid, the minimum step that keeps every size pyramid-admissible",
-        "stride_ratio": "Patch stride as a fraction of the patch size, mirroring the training-time overlap convention (0.5 halves the stride)",
-        "constant_pixel_budget": "When true, each run's batch size is rescaled so batch x patch^2 matches the reference training.batch_size x training.patch_size^2, keeping pixels per step and activation memory comparable across patch sizes"
+        "stride_ratio": "Patch stride as a fraction of each patch length, applied per axis, mirroring the training-time overlap convention (0.5 halves both strides)",
+        "constant_pixel_budget": "When true, each run's batch size is rescaled so batch x azimuth x range matches the reference training.batch_size x training.patch_size pixels, keeping pixels per step and activation memory comparable across patch shapes"
       }
     },
     "patch_sweep/general::PatchSweepConfig": {
-      "summary": "Top-level config orchestrating the per-dataset patch-size sweep: training fan-out plus the best-patch-per-dataset report",
+      "summary": "Top-level config orchestrating the per-dataset patch-length sweep: training fan-out plus the best-patch-per-dataset report",
       "fields": {
         "backbone_name": "Backbone architecture identifier resolved via ModelBuilder's registry; also the source of the admissible patch step, e.g. unet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred)",
         "model_overrides": "Dict of architecture-config field overrides applied to the backbone before instantiation, shared across all sweep units; the default narrows the backbone to a three-level feature pyramid so the admissible patch step is 8",
         "dataset_base_path": "Root directory holding the preprocessed dataset directories available to the sweep; dataset_filter is resolved against this base and every resolved dataset must hold a data/ folder",
         "dataset_filter": "Names of the dataset directories under dataset_base_path selected for the sweep, each preprocessed with its own boxcar window; empty sweeps every dataset under the base, every dataset trains the full patch grid on the traditional reduced stack, and directory names key the sweep units",
-        "patch": "PatchGridConfig sub-config defining the swept patch-size grid and the per-size stride and batch rules",
+        "patch": "PatchGridConfig sub-config defining the swept per-axis patch grids and the per-unit stride and batch rules",
         "paths": "RunPathsConfig sub-config holding the sweep run/output directories plus the dataset/parameters template: dataset_path and parameters_path define the relative parameters layout the planner re-roots onto every swept dataset, and secondary_labels holds the fixed reduced-stack selection shared by every unit",
         "training": "TrainingQueueConfig sub-config shared by every sweep unit; patch_size, patch_stride, and batch_size act as the reference values the planner rescales per unit",
         "input": "InputConfig sub-config selecting the input channel families (primary, secondaries, interferograms, DEM) fed to every unit",

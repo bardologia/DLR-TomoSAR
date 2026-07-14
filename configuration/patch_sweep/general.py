@@ -13,11 +13,11 @@ from configuration.training.general.run  import RunPathsConfig, TrainingQueueCon
 
 @dataclass
 class PatchGridConfig:
-    minimum               : int   = 0
-    maximum               : int   = 128
-    step                  : int   = 0
-    stride_ratio          : float = 0.5
-    constant_pixel_budget : bool  = True
+    minimum               : tuple[int, int] = (0, 0)
+    maximum               : tuple[int, int] = (96, 48)
+    step                  : int             = 0
+    stride_ratio          : float           = 0.5
+    constant_pixel_budget : bool            = True
 
 
 @dataclass

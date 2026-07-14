@@ -12,10 +12,10 @@ from pipelines.patch_sweep.report import PatchSweepReport, SweepCollector
 from tools.monitoring.logger import Logger
 
 
-OPTIMA = {"w20_10": 48, "w20_20": 32}
+OPTIMA = {"w20_10": (24, 16), "w20_20": (16, 8)}
 
 
-def make_planner(tmp_path: Path, datasets: list[str], maximum: int = 64) -> PatchSweepPlanner:
+def make_planner(tmp_path: Path, datasets: list[str], maximum: tuple[int, int] = (32, 16)) -> PatchSweepPlanner:
     base = tmp_path / "datasets"
     for name in datasets:
         (base / name / "data").mkdir(parents=True)
@@ -28,8 +28,9 @@ def make_planner(tmp_path: Path, datasets: list[str], maximum: int = 64) -> Patc
 
 
 def synthetic_loss(unit) -> float:
-    optimum = OPTIMA[unit.dataset]
-    return 0.1 + 0.02 * ((unit.patch_size - optimum) / 32) ** 2
+    azimuth_opt, range_opt = OPTIMA[unit.dataset]
+    azimuth,     range_len = unit.patch_size
+    return 0.1 + 0.02 * ((azimuth - azimuth_opt) / 32) ** 2 + 0.02 * ((range_len - range_opt) / 32) ** 2
 
 
 def populate_runs(root: Path, planner: PatchSweepPlanner, drop_metrics: set[str] = frozenset()) -> None:
@@ -80,17 +81,17 @@ def test_collector_requires_training_results(tmp_path, logger):
 
 def test_collector_marks_units_without_metrics_incomplete(tmp_path, logger):
     planner = make_planner(tmp_path, ["w20_10"])
-    populate_runs(tmp_path, planner, drop_metrics={"w20_10-p032"})
+    populate_runs(tmp_path, planner, drop_metrics={"w20_10-p016x008"})
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
     by_name = {record.unit.name: record for record in records}
 
-    assert not by_name["w20_10-p032"].complete
-    assert by_name["w20_10-p016"].complete
+    assert not by_name["w20_10-p016x008"].complete
+    assert by_name["w20_10-p008x008"].complete
 
 
-def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
-    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=96)
+def test_report_ranks_the_synthetic_optimum_on_both_axes(tmp_path, logger):
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=(32, 16))
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -99,12 +100,14 @@ def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
 
     payload = json.loads((out_dir / "patch_sweep.json").read_text())
 
-    assert payload["datasets"]["w20_10"]["best_patch_size"] == 48
-    assert payload["datasets"]["w20_20"]["best_patch_size"] == 32
+    assert payload["datasets"]["w20_10"]["best_patch_size"] == [24, 16]
+    assert payload["datasets"]["w20_20"]["best_patch_size"] == [16, 8]
+    assert payload["azimuth_sizes"]                         == [8, 16, 24, 32]
+    assert payload["range_sizes"]                           == [8, 16]
     assert payload["datasets"]["w20_10"]["dataset_path"]    == str(tmp_path / "datasets" / "w20_10")
 
 
-def test_report_writes_one_curve_per_dataset_and_the_summary_figure(tmp_path, logger):
+def test_report_writes_one_heatmap_per_dataset_and_the_summary_figure(tmp_path, logger):
     planner = make_planner(tmp_path, ["w20_10", "w20_20"])
     populate_runs(tmp_path, planner)
 
@@ -112,11 +115,23 @@ def test_report_writes_one_curve_per_dataset_and_the_summary_figure(tmp_path, lo
     out_dir = tmp_path / "report"
     written = PatchSweepReport(records=records, planner=planner, out_dir=out_dir, logger=logger).write_all()
 
-    assert (out_dir / "curves" / "w20_10.png").exists()
-    assert (out_dir / "curves" / "w20_20.png").exists()
+    assert (out_dir / "heatmaps" / "w20_10.png").exists()
+    assert (out_dir / "heatmaps" / "w20_20.png").exists()
     assert (out_dir / "best_patch_vs_dataset.png").exists()
     assert (out_dir / "report.md").exists()
     assert all(path.exists() for path in written)
+
+
+def test_report_falls_back_to_a_curve_when_only_one_axis_varies(tmp_path, logger):
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(32, 8))
+    populate_runs(tmp_path, planner)
+
+    records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
+    out_dir = tmp_path / "report"
+    PatchSweepReport(records=records, planner=planner, out_dir=out_dir, logger=logger).write_all()
+
+    assert (out_dir / "curves" / "w20_10.png").exists()
+    assert not (out_dir / "heatmaps" / "w20_10.png").exists()
 
 
 def test_report_survives_a_dataset_with_no_metrics(tmp_path, logger):
@@ -174,7 +189,7 @@ def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int
 
 
 def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=16)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(16, 16))
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -190,7 +205,7 @@ def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
 
 
 def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=16)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(16, 16))
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()

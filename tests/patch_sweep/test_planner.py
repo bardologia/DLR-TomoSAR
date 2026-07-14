@@ -46,29 +46,45 @@ def test_step_rejects_backbones_outside_the_verified_unet_family():
 
 
 def test_explicit_step_overrides_the_architecture(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], step=32, maximum=96)
+    planner = make_planner(tmp_path, ["w20_10"], step=32, maximum=(96, 64))
 
-    assert planner.patch_sizes() == [32, 64, 96]
-
-
-def test_sizes_run_from_one_step_to_maximum(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=128)
-
-    assert planner.patch_sizes() == [8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]
+    assert planner.patch_sizes() == ([32, 64, 96], [32, 64])
 
 
-def test_minimum_must_be_admissible(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], minimum=20)
+def test_sizes_run_from_one_step_to_maximum_per_axis(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(128, 64))
 
-    with pytest.raises(ValueError, match="multiple of the admissible step"):
+    azimuth_sizes, range_sizes = planner.patch_sizes()
+
+    assert azimuth_sizes == [8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]
+    assert range_sizes   == [8, 16, 24, 32, 40, 48, 56, 64]
+
+
+def test_minimum_must_be_admissible_on_the_azimuth_axis(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10"], minimum=(20, 0))
+
+    with pytest.raises(ValueError, match="azimuth=20 is not a multiple"):
         planner.patch_sizes()
 
 
-def test_single_size_grid_is_rejected(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=8)
+def test_minimum_must_be_admissible_on_the_range_axis(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10"], minimum=(0, 20))
+
+    with pytest.raises(ValueError, match="range=20 is not a multiple"):
+        planner.patch_sizes()
+
+
+def test_single_combination_grid_is_rejected(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(8, 8))
 
     with pytest.raises(ValueError, match="at least 2"):
         planner.patch_sizes()
+
+
+def test_single_axis_sweep_is_admissible(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(8, 16))
+
+    assert planner.patch_sizes() == ([8], [8, 16])
 
 
 def test_datasets_must_be_present(tmp_path):
@@ -110,7 +126,7 @@ def test_parameters_template_must_live_inside_the_dataset(tmp_path):
 
 
 def test_parameters_are_rerooted_onto_every_dataset(tmp_path):
-    planner  = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=16)
+    planner  = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=(16, 16))
     template = planner.parameters_template()
 
     for unit in planner.units():
@@ -119,29 +135,29 @@ def test_parameters_are_rerooted_onto_every_dataset(tmp_path):
 
 
 def test_units_cover_the_full_cross_product(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=64)
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=(64, 16))
     units   = planner.units()
 
-    assert len(units) == 2 * 8
+    assert len(units) == 2 * 8 * 2
     assert sorted({unit.dataset for unit in units}) == ["w20_10", "w20_20"]
-    assert {unit.name for unit in units} == {f"{d}-p{s:03d}" for d in ("w20_10", "w20_20") for s in range(8, 65, 8)}
+    assert {unit.name for unit in units} == {f"{d}-p{a:03d}x{r:03d}" for d in ("w20_10", "w20_20") for a in range(8, 65, 8) for r in (8, 16)}
 
 
 def test_units_follow_the_sorted_dataset_names(tmp_path):
-    planner = make_planner(tmp_path, ["w20_20", "w20_10"], maximum=16)
+    planner = make_planner(tmp_path, ["w20_20", "w20_10"], maximum=(16, 16))
 
-    assert [unit.dataset for unit in planner.units()] == ["w20_10", "w20_10", "w20_20", "w20_20"]
+    assert [unit.dataset for unit in planner.units()] == ["w20_10"] * 4 + ["w20_20"] * 4
 
 
 def test_constant_pixel_budget_rescales_the_batch(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=128)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(128, 64))
     by_size = {unit.patch_size: unit.batch_size for unit in planner.units()}
 
     reference = planner.config.training.batch_size * planner.config.training.patch_size[0] * planner.config.training.patch_size[1]
 
-    assert by_size[16]  == reference // (16 * 16)
-    assert by_size[128] == reference // (128 * 128)
-    assert all(batch == max(1, reference // (size * size)) for size, batch in by_size.items())
+    assert by_size[(16, 16)]  == reference // (16 * 16)
+    assert by_size[(128, 64)] == reference // (128 * 64)
+    assert all(batch == max(1, reference // (size[0] * size[1])) for size, batch in by_size.items())
 
 
 def test_fixed_batch_when_the_budget_is_disabled(tmp_path):
@@ -151,7 +167,7 @@ def test_fixed_batch_when_the_budget_is_disabled(tmp_path):
 
 
 def test_constant_pixel_budget_keeps_the_lr_scale_constant(tmp_path):
-    planner    = make_planner(tmp_path, ["w20_10"], maximum=128)
+    planner    = make_planner(tmp_path, ["w20_10"], maximum=(128, 64))
     configured = planner.config.training.batch_size / planner.config.training.lr_reference_batch_size
 
     for unit in planner.units():
@@ -159,14 +175,14 @@ def test_constant_pixel_budget_keeps_the_lr_scale_constant(tmp_path):
 
 
 def test_lr_reference_rescales_with_the_pixel_budget(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10"], maximum=128)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(128, 64))
     by_size = {unit.patch_size: unit.lr_reference_batch_size for unit in planner.units()}
 
     reference = planner.config.training.lr_reference_batch_size * planner.config.training.patch_size[0] * planner.config.training.patch_size[1]
 
-    assert by_size[16]  == reference // (16 * 16)
-    assert by_size[128] == reference // (128 * 128)
-    assert all(lr_reference == max(1, reference // (size * size)) for size, lr_reference in by_size.items())
+    assert by_size[(16, 16)]  == reference // (16 * 16)
+    assert by_size[(128, 64)] == reference // (128 * 64)
+    assert all(lr_reference == max(1, reference // (size[0] * size[1])) for size, lr_reference in by_size.items())
 
 
 def test_lr_reference_untouched_when_the_budget_is_disabled(tmp_path):
@@ -175,17 +191,19 @@ def test_lr_reference_untouched_when_the_budget_is_disabled(tmp_path):
     assert {unit.lr_reference_batch_size for unit in planner.units()} == {planner.config.training.lr_reference_batch_size}
 
 
-def test_summary_reports_the_seed_axis(tmp_path):
-    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=16)
+def test_summary_reports_the_seed_axis_and_both_grids(tmp_path):
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=(16, 16))
     summary = planner.summary()
 
-    assert summary["Datasets"] == ["w20_10", "w20_20"]
-    assert summary["Units"]    == 4
-    assert summary["Seeds"]    == [0, 1, 2, 3, 4]
+    assert summary["Datasets"]      == ["w20_10", "w20_20"]
+    assert summary["Azimuth sizes"] == [8, 16]
+    assert summary["Range sizes"]   == [8, 16]
+    assert summary["Units"]         == 8
+    assert summary["Seeds"]         == [0, 1, 2, 3, 4]
 
 
 def test_unit_lookup_is_loud_for_unknown_names(tmp_path):
     planner = make_planner(tmp_path, ["w20_10"])
 
-    with pytest.raises(KeyError, match="w99-p016"):
-        planner.unit("w99-p016")
+    with pytest.raises(KeyError, match="w99-p016x016"):
+        planner.unit("w99-p016x016")

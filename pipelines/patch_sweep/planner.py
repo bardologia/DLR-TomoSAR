@@ -12,8 +12,8 @@ from pipelines.shared.model.model_builder    import ModelBuilder
 class SweepUnit:
     dataset_path            : Path
     parameters_path         : Path
-    patch_size              : int
-    patch_stride            : int
+    patch_size              : tuple[int, int]
+    patch_stride            : tuple[int, int]
     batch_size              : int
     lr_reference_batch_size : int
 
@@ -23,7 +23,7 @@ class SweepUnit:
 
     @property
     def name(self) -> str:
-        return f"{self.dataset}-p{self.patch_size:03d}"
+        return f"{self.dataset}-p{self.patch_size[0]:03d}x{self.patch_size[1]:03d}"
 
 
 class ArchitecturePatchStep:
@@ -84,30 +84,35 @@ class PatchSweepPlanner:
 
         return ArchitecturePatchStep(self.config.backbone_name, self.config.backbone_head, self.config.model_overrides).resolve()
 
-    def patch_sizes(self) -> list[int]:
+    def _axis_sizes(self, axis: int, label: str) -> list[int]:
         grid  = self.config.patch
         step  = self.patch_step()
-        start = grid.minimum if grid.minimum > 0 else step
+        start = grid.minimum[axis] if grid.minimum[axis] > 0 else step
 
         if start % step != 0:
-            raise ValueError(f"patch.minimum={start} is not a multiple of the admissible step {step}")
-        if grid.maximum < start:
-            raise ValueError(f"patch.maximum={grid.maximum} is below the first admissible size {start}")
+            raise ValueError(f"patch.minimum {label}={start} is not a multiple of the admissible step {step}")
+        if grid.maximum[axis] < start:
+            raise ValueError(f"patch.maximum {label}={grid.maximum[axis]} is below the first admissible size {start}")
 
-        sizes = list(range(start, grid.maximum + 1, step))
-        if len(sizes) < 2:
-            raise ValueError(f"The grid [{start}, {grid.maximum}] with step {step} yields {len(sizes)} patch size; a sweep needs at least 2")
+        return list(range(start, grid.maximum[axis] + 1, step))
 
-        return sizes
+    def patch_sizes(self) -> tuple[list[int], list[int]]:
+        azimuth_sizes = self._axis_sizes(0, "azimuth")
+        range_sizes   = self._axis_sizes(1, "range")
 
-    def _pixel_rescaled(self, base: int, patch_size: int) -> int:
+        if len(azimuth_sizes) * len(range_sizes) < 2:
+            raise ValueError(f"The grid azimuth {azimuth_sizes} x range {range_sizes} yields {len(azimuth_sizes) * len(range_sizes)} patch size; a sweep needs at least 2")
+
+        return azimuth_sizes, range_sizes
+
+    def _pixel_rescaled(self, base: int, patch_size: tuple[int, int]) -> int:
         if not self.config.patch.constant_pixel_budget:
             return base
 
         reference    = self.config.training.patch_size
         pixel_budget = base * reference[0] * reference[1]
 
-        return max(1, pixel_budget // (patch_size * patch_size))
+        return max(1, pixel_budget // (patch_size[0] * patch_size[1]))
 
     def unit(self, name: str) -> SweepUnit:
         by_name = {unit.name: unit for unit in self.units()}
@@ -117,31 +122,34 @@ class PatchSweepPlanner:
         return by_name[name]
 
     def summary(self) -> dict:
-        sizes = self.patch_sizes()
+        azimuth_sizes, range_sizes = self.patch_sizes()
 
         return {
-            "Datasets"    : [dataset.name for dataset in self.datasets],
-            "Patch step"  : self.patch_step(),
-            "Patch sizes" : sizes,
-            "Units"       : len(self.datasets) * len(sizes),
-            "Seeds"       : list(self.config.seeds) or [self.config.seed],
+            "Datasets"      : [dataset.name for dataset in self.datasets],
+            "Patch step"    : self.patch_step(),
+            "Azimuth sizes" : azimuth_sizes,
+            "Range sizes"   : range_sizes,
+            "Units"         : len(self.datasets) * len(azimuth_sizes) * len(range_sizes),
+            "Seeds"         : list(self.config.seeds) or [self.config.seed],
         }
 
     def units(self) -> list[SweepUnit]:
-        stride_ratio = self.config.patch.stride_ratio
-        sizes        = self.patch_sizes()
-        template     = self.parameters_template()
+        stride_ratio               = self.config.patch.stride_ratio
+        azimuth_sizes, range_sizes = self.patch_sizes()
+        template                   = self.parameters_template()
 
         plans = []
         for dataset in self.datasets:
-            for size in sizes:
-                plans.append(SweepUnit(
-                    dataset_path            = dataset,
-                    parameters_path         = dataset / template,
-                    patch_size              = size,
-                    patch_stride            = max(1, int(round(size * stride_ratio))),
-                    batch_size              = self._pixel_rescaled(self.config.training.batch_size, size),
-                    lr_reference_batch_size = self._pixel_rescaled(self.config.training.lr_reference_batch_size, size),
-                ))
+            for azimuth in azimuth_sizes:
+                for range_size in range_sizes:
+                    size = (azimuth, range_size)
+                    plans.append(SweepUnit(
+                        dataset_path            = dataset,
+                        parameters_path         = dataset / template,
+                        patch_size              = size,
+                        patch_stride            = tuple(max(1, int(round(edge * stride_ratio))) for edge in size),
+                        batch_size              = self._pixel_rescaled(self.config.training.batch_size, size),
+                        lr_reference_batch_size = self._pixel_rescaled(self.config.training.lr_reference_batch_size, size),
+                    ))
 
         return plans

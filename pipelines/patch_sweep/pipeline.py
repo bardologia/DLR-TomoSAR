@@ -50,8 +50,8 @@ class PatchSweepPipeline(StagedPipeline):
         rows    = [{
             "Unit"     : unit.name,
             "Dataset"  : unit.dataset,
-            "Patch"    : unit.patch_size,
-            "Stride"   : unit.patch_stride,
+            "Patch"    : f"{unit.patch_size[0]}x{unit.patch_size[1]}",
+            "Stride"   : f"{unit.patch_stride[0]}x{unit.patch_stride[1]}",
             "Batch"    : unit.batch_size,
             "LR scale" : f"{unit.batch_size / unit.lr_reference_batch_size if scaling else 1.0:.2f}",
         } for unit in planner.units()]
