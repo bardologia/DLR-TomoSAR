@@ -3608,12 +3608,14 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .lb-table th.lb-th {
   position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none; text-align: left;
-  padding: 9px 12px; font: 600 0.6rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 9px 7px; font: 600 0.6rem/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--ink-faint); background: var(--surface-2); border-bottom: 1px solid var(--line-strong); white-space: nowrap;
 }
+.lb-table th.lb-th:first-child { padding-left: 12px; }
 .lb-table th.lb-th:hover { color: var(--ink); }
 .lb-table th.lb-th.is-sorted { color: var(--accent); }
-.lb-table td { padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--ink-dim); white-space: nowrap; }
+.lb-table td { padding: 8px 7px; border-bottom: 1px solid var(--line); color: var(--ink-dim); white-space: nowrap; }
+.lb-table td:first-child { padding-left: 12px; }
 .lb-table tbody tr:last-child td { border-bottom: none; }
 .lb-row { cursor: pointer; transition: background 0.15s var(--ease); }
 .lb-row:hover { background: var(--surface-2); }
@@ -3622,7 +3624,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-run__name { display: block; font: 600 0.72rem/1.35 var(--mono); color: var(--ink); word-break: break-all; white-space: normal; max-width: 34ch; }
 .lb-run__stamp { display: block; font: 500 0.62rem/1.4 var(--mono); color: var(--ink-faint); }
 .lb-axis { font: 500 0.72rem/1 var(--mono); }
-.lb-val { position: relative; font: 500 0.74rem/1 var(--mono); min-width: 84px; }
+.lb-val { position: relative; font: 500 0.74rem/1 var(--mono); min-width: 62px; }
 .lb-val span { position: relative; z-index: 1; }
 .lb-val.is-best span { color: var(--accent-2); font-weight: 700; }
 .lb-val--none { color: var(--ink-faint); }
