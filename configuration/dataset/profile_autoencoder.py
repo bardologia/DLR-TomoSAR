@@ -30,7 +30,7 @@ class ProfileDatasetConfig:
 
     pixel_subsample : float = 1.0
     keep_empty_frac : float = 0.05
-    amp_zero_thr    : float = 1e-3
+    amp_zero_thr    : float = 1e-4
 
     batch_size      : int  = 1024
     num_workers     : int  = 32
