@@ -16,7 +16,7 @@ class Transformer1dEncoder(nn.Module):
             nhead           = config.num_heads,
             dim_feedforward = config.hidden_dim * 2,
             dropout         = config.dropout,
-            activation      = config.activation if config.activation in ("relu", "gelu") else "gelu",
+            activation      = config.activation,
             batch_first     = True,
         )
         self.encoder = nn.TransformerEncoder(layer, num_layers=max(1, config.depth))
@@ -39,7 +39,7 @@ class Transformer1dDecoder(nn.Module):
             nhead           = config.num_heads,
             dim_feedforward = config.hidden_dim * 2,
             dropout         = config.dropout,
-            activation      = config.activation if config.activation in ("relu", "gelu") else "gelu",
+            activation      = config.activation,
             batch_first     = True,
         )
         self.decoder = nn.TransformerEncoder(layer, num_layers=max(1, config.depth))
@@ -56,4 +56,7 @@ class Transformer1dDecoder(nn.Module):
 class Transformer1dAutoencoder(ProfileAutoencoderBase):
     def __init__(self, config: Transformer1dAutoencoderConfig | None = None) -> None:
         config = config if config is not None else Transformer1dAutoencoderConfig()
+        if config.activation not in ("relu", "gelu"):
+            raise ValueError(f"transformer1d_ae supports activations relu and gelu only (nn.TransformerEncoderLayer constraint); got '{config.activation}'.")
+
         super().__init__(config, Transformer1dEncoder(config), Transformer1dDecoder(config))

@@ -940,7 +940,7 @@
         "profile_length": "number of samples along the normalized height axis each encoder/decoder reconstructs",
         "embedding_dim": "width of the per-pixel latent code between encoder and decoder, tuned categorical over 16/24/32/48; also sets the JEPA backbone's target channel count",
         "embedding_norm": "normalization applied to the latent embedding: none, l2, or layernorm (via ChannelLayerNorm)",
-        "activation": "nonlinearity used by the encoder/decoder layers: relu, leaky_relu, gelu, silu, or elu; ignored by GRU, and silently coerced to gelu for non-relu/gelu choices in Transformer1d",
+        "activation": "nonlinearity used by the encoder/decoder layers: relu, leaky_relu, gelu, silu, or elu; ignored by GRU (fixed gate nonlinearities), and restricted to relu/gelu by Transformer1d, which rejects other values loudly",
         "init_mode": "weight initialization scheme for conv/linear/norm layers: default (no-op, keeps PyTorch's built-in init), kaiming, or xavier",
         "encoder_lr": "learning rate for the encoder parameter group, tuned log-uniform over 1e-5..1e-2",
         "decoder_lr": "learning rate for the decoder parameter group, tuned log-uniform over 1e-5..1e-2",
