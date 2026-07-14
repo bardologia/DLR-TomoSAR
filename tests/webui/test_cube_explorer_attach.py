@@ -151,6 +151,54 @@ def test_ssim_covers_predb(tmp_path):
     assert "diff" not in result["range"]
 
 
+def test_transect_png_samples_line(tmp_path):
+    explorer, cube_a, _ = _loaded(tmp_path)
+
+    png = explorer.transect_png(cube_a, "pred", az0=0, rg0=0, az1=N_AZ - 1, rg1=N_RG - 1)
+    assert png and png[:4] == b"\x89PNG"
+
+    normalized = explorer.transect_png(cube_a, "pred", az0=2, rg0=1, az1=2, rg1=4, space="normalized")
+    assert normalized and normalized[:4] == b"\x89PNG"
+
+    assert explorer.transect_png(cube_a, "banana", 0, 0, 1, 1) is None
+    assert explorer.transect_png("wrong", "pred", 0, 0, 1, 1) is None
+
+
+def test_transect_cut_geometry(tmp_path):
+    explorer, cube_a, _ = _loaded(tmp_path)
+
+    entry = explorer._entry(cube_a, "pred")
+    data, heights, vmin, vmax = explorer._transect_cut(entry, 0, 0, N_AZ - 1, N_RG - 1, "physical")
+
+    assert data.shape == (N_ELEV, max(N_AZ, N_RG))
+    assert heights[0] == -10.0 and heights[-1] == 30.0
+    assert vmin == entry["vmin"] and vmax == entry["vmax"]
+
+    cube = entry["cube"]
+    assert np.allclose(data[:, 0], cube[:, 0, 0])
+
+
+def test_save_transect_writes_figures(tmp_path):
+    explorer, cube_a, _ = _loaded(tmp_path)
+
+    result = explorer.save_transect(cube_a, az0=0, rg0=0, az1=4, rg1=5)
+    assert result["ok"], result
+
+    out_dir = Path(result["dir"])
+    assert result["rel"] == "figures/cube_transects/az0000_rg0000_to_az0004_rg0005"
+
+    expected = {f"transect_{source}_physical.png" for source in ("pred", "gt")}
+    assert set(result["files"]) == expected
+    assert all((out_dir / name).stat().st_size > 0 for name in expected)
+
+
+def test_save_transect_rejects_bad_space_and_unloaded(tmp_path):
+    explorer, cube_a, _ = _loaded(tmp_path)
+
+    assert not explorer.save_transect(cube_a, 0, 0, 1, 1, space="banana")["ok"]
+    assert not explorer.save_transect(str(tmp_path / "nowhere"), 0, 0, 1, 1)["ok"]
+
+
 def test_save_slices_includes_comparison_sources(tmp_path):
     explorer, cube_a, cube_b = _loaded(tmp_path)
     explorer.attach_second(cube_a, cube_b)

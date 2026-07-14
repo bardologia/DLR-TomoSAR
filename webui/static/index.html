@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260714d" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260714e" />
 </head>
 <body>
 
@@ -263,6 +263,7 @@
         <button type="button" class="cube-mode" data-view="range">Range sweep</button>
         <button type="button" class="cube-mode" data-view="params">Parameters</button>
         <button type="button" class="cube-mode" data-view="metrics">Metric maps</button>
+        <button type="button" class="cube-mode" data-view="transect">Transect</button>
       </div>
 
       <div class="cube-view" data-view="explorer">
@@ -459,6 +460,36 @@
               <div class="cube-pside__table" id="cube-param-table"></div>
               <button type="button" class="btn btn--mini" id="cube-param-open" hidden>Open cuts at this pixel</button>
             </aside>
+          </div>
+        </div>
+      </div>
+
+      <div class="cube-view" data-view="transect" hidden>
+        <div class="cube-pview">
+          <div class="cube-pview__bar">
+            <span class="cube-elev__at" id="cube-transect-at">Click a start point on the map, then an end point, to cut every tomogram along that line.</span>
+            <button type="button" class="btn btn--mini" id="cube-transect-clear" hidden>Clear line</button>
+            <button type="button" class="btn btn--mini" id="cube-transect-print" hidden title="Save the transect as paper-style figures under the run directory">Print</button>
+            <div class="cube-spaces" role="group" aria-label="Value space">
+              <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+              <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+            </div>
+          </div>
+          <div class="cube-tview">
+            <figure class="cube-pmap cube-pmap--transect">
+              <div class="cube-pmap__media">
+                <img id="cube-transect-map" alt="Primary SLC amplitude" />
+                <svg id="cube-transect-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+              </div>
+            </figure>
+            <div class="cube-elev__grid cube-elev__grid--transect" id="cube-transect-grid">
+              <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+              <figure class="cube-eplane" data-source="predb"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span></div></figure>
+              <figure class="cube-eplane" data-source="diff"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span></div></figure>
+              <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
+              <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
+              <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
+            </div>
           </div>
         </div>
       </div>
@@ -821,9 +852,9 @@
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/leaderboard.js?v=20260714b"></script>
-<script src="/static/js/tomogram.js?v=20260714c"></script>
+<script src="/static/js/tomogram.js?v=20260714d"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260714b"></script>
+<script src="/static/js/app.js?v=20260714c"></script>
 </body>
 </html>

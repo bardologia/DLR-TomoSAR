@@ -56,6 +56,30 @@ class SliceFigureArchiver(PlotBase):
         finally:
             PlotBase.use_style(previous)
 
+    def render_transect(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, start: tuple, end: tuple, space: str, path: Path, cmap: str = "jet") -> Path:
+        cbar   = "intensity (per-column normalised)" if space == "normalized" else "intensity"
+        extent = [0, int(data.shape[1]), float(heights[0]), float(heights[-1])]
+
+        previous = PlotBase.style
+        PlotBase.use_style("paper")
+        try:
+            return self._imshow_figure(
+                data,
+                x_label        = "sample along transect",
+                y_label        = "elevation bin" if source == "full" else "elevation [m]",
+                title          = f"{self.LABELS[source]} — transect az{start[0]},rg{start[1]} to az{end[0]},rg{end[1]}",
+                cmap           = cmap,
+                vmin           = vmin,
+                vmax           = vmax,
+                extent         = extent,
+                origin         = "lower",
+                colorbar_label = cbar,
+                figsize        = self.figsize(self.FULL_WIDTH),
+                path           = path,
+            )
+        finally:
+            PlotBase.use_style(previous)
+
 
 class CubeExplorer:
 
@@ -507,6 +531,70 @@ class CubeExplorer:
             return None
         return data, primary
 
+    def transect_png(self, cube_id: str, source: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical") -> bytes | None:
+        entry = self._entry(cube_id, source)
+        if entry is None:
+            return None
+
+        data, heights, vmin, vmax = self._transect_cut(entry, az0, rg0, az1, rg1, space)
+
+        buf = io.BytesIO()
+        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
+        return buf.getvalue()
+
+    def save_transect(self, cube_id: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical") -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+            entries = self.loaded["entries"]
+            meta    = self.loaded["meta"]
+
+        stamp_dir = self._stamp_dir(cube_id)
+        if stamp_dir is None:
+            return {"ok": False, "error": f"unknown cube id: {cube_id}"}
+        if space not in ("physical", "normalized"):
+            return {"ok": False, "error": f"unknown space: {space}"}
+
+        az0 = int(np.clip(az0, 0, meta["n_az"] - 1))
+        az1 = int(np.clip(az1, 0, meta["n_az"] - 1))
+        rg0 = int(np.clip(rg0, 0, meta["n_rg"] - 1))
+        rg1 = int(np.clip(rg1, 0, meta["n_rg"] - 1))
+
+        run_dir = stamp_dir.parent.parent
+        rel     = Path("figures") / "cube_transects" / f"az{az0:04d}_rg{rg0:04d}_to_az{az1:04d}_rg{rg1:04d}"
+        out_dir = run_dir / rel
+
+        files = []
+        for source in meta["sources"]:
+            entry = entries[source]
+            data, heights, vmin, vmax = self._transect_cut(entry, az0, rg0, az1, rg1, space)
+            saved = self.archiver.render_transect(data, heights, vmin, vmax, source, (az0, rg0), (az1, rg1), space, out_dir / f"transect_{source}_{space}.png", cmap=self._entry_cmap(entry))
+            files.append(saved.name)
+
+        self.logger.ok(f"saved {len(files)} transect figures to {out_dir}")
+        return {"ok": True, "dir": str(out_dir), "rel": str(rel), "files": files}
+
+    @classmethod
+    def _transect_cut(cls, entry: dict, az0: int, rg0: int, az1: int, rg1: int, space: str) -> tuple[np.ndarray, np.ndarray, float, float]:
+        cube               = entry["cube"]
+        n_elev, n_az, n_rg = cube.shape
+
+        az0 = int(np.clip(az0, 0, n_az - 1))
+        az1 = int(np.clip(az1, 0, n_az - 1))
+        rg0 = int(np.clip(rg0, 0, n_rg - 1))
+        rg1 = int(np.clip(rg1, 0, n_rg - 1))
+
+        samples = int(max(abs(az1 - az0), abs(rg1 - rg0))) + 1
+        az_idx  = np.round(np.linspace(az0, az1, samples)).astype(int)
+        rg_idx  = np.round(np.linspace(rg0, rg1, samples)).astype(int)
+        data    = cube[:, az_idx, rg_idx]
+
+        data, vmin, vmax = cls._normalize_cut(entry, data, space)
+
+        order   = np.argsort(entry["x_axis"])
+        heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
+        return data[order], heights, float(vmin), float(vmax)
+
     def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
@@ -537,22 +625,27 @@ class CubeExplorer:
         self.logger.ok(f"saved {len(files)} slice figures to {out_dir}")
         return {"ok": True, "dir": str(out_dir), "rel": str(rel), "az": az, "rg": rg, "files": files}
 
-    @staticmethod
-    def _cut(entry: dict, axis: str, az: int, rg: int, space: str) -> tuple[np.ndarray, np.ndarray, float, float]:
+    @classmethod
+    def _cut(cls, entry: dict, axis: str, az: int, rg: int, space: str) -> tuple[np.ndarray, np.ndarray, float, float]:
         cube = entry["cube"]
         data = cube[:, :, rg] if axis == "range" else cube[:, az, :]
 
-        if space == "normalized":
-            peak = np.abs(data).max(axis=0, keepdims=True) if entry.get("diverging") else data.max(axis=0, keepdims=True)
-            safe = np.where(peak > 1e-12, peak, 1.0)
-            data = (data / safe).astype(np.float32)
-            vmin, vmax = (-1.0, 1.0) if entry.get("diverging") else (0.0, 1.0)
-        else:
-            vmin, vmax = entry["vmin"], entry["vmax"]
+        data, vmin, vmax = cls._normalize_cut(entry, data, space)
 
         order   = np.argsort(entry["x_axis"])
         heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
         return data[order], heights, float(vmin), float(vmax)
+
+    @staticmethod
+    def _normalize_cut(entry: dict, data: np.ndarray, space: str) -> tuple[np.ndarray, float, float]:
+        if space != "normalized":
+            return data, entry["vmin"], entry["vmax"]
+
+        peak = np.abs(data).max(axis=0, keepdims=True) if entry.get("diverging") else data.max(axis=0, keepdims=True)
+        safe = np.where(peak > 1e-12, peak, 1.0)
+        data = (data / safe).astype(np.float32)
+        vmin, vmax = (-1.0, 1.0) if entry.get("diverging") else (0.0, 1.0)
+        return data, vmin, vmax
 
     @staticmethod
     def _entry_cmap(entry: dict) -> str:

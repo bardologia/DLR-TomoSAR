@@ -212,6 +212,19 @@ class RequestRouter:
             )
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/cubes/transect":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.transect_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                az0     = int((query.get("az0") or ["0"])[0]),
+                rg0     = int((query.get("rg0") or ["0"])[0]),
+                az1     = int((query.get("az1") or ["0"])[0]),
+                rg1     = int((query.get("rg1") or ["0"])[0]),
+                space   = (query.get("space") or ["physical"])[0],
+            )
+            self._send_png(handler, png)
+            return
         if path == "/api/cubes/param_map":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.param_map_png(
@@ -426,6 +439,18 @@ class RequestRouter:
 
         if path == "/api/cubes/detach":
             result = self.cubes.detach_second(body.get("id", ""))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/cubes/save_transect":
+            result = self.cubes.save_transect(
+                cube_id = body.get("id", ""),
+                az0     = int(body.get("az0", 0)),
+                rg0     = int(body.get("rg0", 0)),
+                az1     = int(body.get("az1", 0)),
+                rg1     = int(body.get("rg1", 0)),
+                space   = body.get("space", "physical"),
+            )
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
