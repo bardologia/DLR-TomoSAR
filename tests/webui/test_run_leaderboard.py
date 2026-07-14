@@ -218,6 +218,26 @@ def _make_seed_run(base: Path, experiment: str, unit: str, seed: int, stamp: str
     return stamp_dir
 
 
+def test_table_seed_runs_inherit_unit_axes(tmp_path):
+    unit = "resunet-conv-sorted_gt-K_5-hvn-none-param_l1_1"
+    _make_seed_run(tmp_path, "exp", unit, 3, "20260701_000000", {"curve_mse_gt": 0.5})
+
+    board = RunLeaderboard(WebLogger())
+    rows  = board.table(str(tmp_path))["rows"]
+
+    row = next(r for r in rows if r["run"] == "seed3")
+    assert row["axes"]["model"] == "resunet"
+    assert row["axes"]["k"]     == 5
+    assert row["axes"]["loss"]  == "param_l1_1"
+
+
+def test_columns_include_ssim_components():
+    keys = [c["key"] for c in RunLeaderboard.COLUMNS]
+    assert "ssim_gt_azimuth_mean" in keys
+    assert "ssim_gt_elev_mean" in keys
+    assert "ssim_gt_range_mean" in keys
+
+
 def test_trials_aggregates_seeds(tmp_path):
     _make_seed_run(tmp_path, "presence_matrix", "unit-A", 0, "20260701_000000", {"curve_mse_gt": 1.0, "overall_r2_gt": 0.5})
     _make_seed_run(tmp_path, "presence_matrix", "unit-A", 1, "20260701_000000", {"curve_mse_gt": 3.0, "overall_r2_gt": 0.7})

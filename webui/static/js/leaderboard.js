@@ -29,7 +29,8 @@ class LeaderboardView {
     this.diffSeries  = false;
     this.diffChanged = false;
 
-    this.visible = this._loadVisible();
+    this.storedCols = this._loadVisible();
+    this.visible    = [];
 
     this.trialsData   = null;
     this.trialsMetric = localStorage.getItem("leaderboard-trials-metric") || "curve_mse_gt";
@@ -62,7 +63,7 @@ class LeaderboardView {
 
     this.data     = data;
     this.selected = this.selected.filter((id) => data.rows.some((row) => row.id === id));
-    if (this.visible === null) this.visible = data.columns.filter((c) => c.default).map((c) => c.key);
+    this.visible  = this._reconcileVisible(data.columns);
 
     this._render();
   }
@@ -606,7 +607,7 @@ class LeaderboardView {
       box.addEventListener("change", () => {
         if (box.checked) this.visible = [...this.visible, box.dataset.col];
         else             this.visible = this.visible.filter((k) => k !== box.dataset.col);
-        localStorage.setItem("leaderboard-cols", JSON.stringify(this.visible));
+        this._saveVisible();
         this._render();
         const menu = this.root.querySelector(".lb-cols");
         if (menu) menu.open = true;
@@ -848,11 +849,27 @@ class LeaderboardView {
 
   _loadVisible() {
     try {
-      const raw = localStorage.getItem("leaderboard-cols");
+      const raw = localStorage.getItem("leaderboard-cols-v2");
       return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
     }
+  }
+
+  _reconcileVisible(columns) {
+    const stored = this.storedCols;
+    if (!stored) return columns.filter((col) => col.default).map((col) => col.key);
+
+    const known = new Set(stored.known || []);
+    const vis   = new Set(stored.visible || []);
+    columns.forEach((col) => { if (!known.has(col.key) && col.default) vis.add(col.key); });
+    return columns.map((col) => col.key).filter((key) => vis.has(key));
+  }
+
+  _saveVisible() {
+    this.storedCols = { visible: this.visible, known: this.data.columns.map((col) => col.key) };
+    localStorage.setItem("leaderboard-cols-v2", JSON.stringify(this.storedCols));
+    localStorage.removeItem("leaderboard-cols");
   }
 
   _runsBase() {

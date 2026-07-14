@@ -71,6 +71,9 @@ class RunLeaderboard:
         {"key": "pixel_cosine_gt_median",          "label": "px cos med",     "direction": 1,  "default": True},
         {"key": "pixel_mse_gt_median",             "label": "px MSE med",     "direction": -1, "default": False},
         {"key": "pixel_peak_err_units_median_gt",  "label": "peak err med",   "direction": -1, "default": True},
+        {"key": "ssim_gt_azimuth_mean",            "label": "SSIM az",        "direction": 1,  "default": True},
+        {"key": "ssim_gt_elev_mean",               "label": "SSIM elev",      "direction": 1,  "default": True},
+        {"key": "ssim_gt_range_mean",              "label": "SSIM rg",        "direction": 1,  "default": True},
         {"key": "fraction_pred_beats_reduced",     "label": "beats capon",    "direction": 1,  "default": True},
         {"key": "relative_mse_reduction",          "label": "MSE reduction",  "direction": 1,  "default": False},
         {"key": "improvement_pixel_mse_mean",      "label": "improv mean",    "direction": 1,  "default": False},
@@ -120,7 +123,7 @@ class RunLeaderboard:
                 "group"   : str(run_dir.relative_to(root).parent),
                 "stamp"   : stamp_dir.name,
                 "mtime"   : stamp_dir.stat().st_mtime,
-                "axes"    : RunAxes.parse(run_dir.name),
+                "axes"    : self._run_axes(run_dir),
                 "metrics" : values,
             })
 
@@ -128,6 +131,12 @@ class RunLeaderboard:
         self.logger.info(f"leaderboard: {len(rows)} inference results under {root}")
 
         return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "rows": rows, "errors": errors}
+
+    def _run_axes(self, run_dir: Path) -> dict | None:
+        axes = RunAxes.parse(run_dir.name)
+        if axes is None and self.SEED_DIR.match(run_dir.name):
+            axes = RunAxes.parse(run_dir.parent.name)
+        return axes
 
     def trials(self, base: str) -> dict:
         root, error = self._catalog_root(base)
