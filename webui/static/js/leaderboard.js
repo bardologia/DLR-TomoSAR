@@ -29,10 +29,14 @@ class LeaderboardView {
     this.diffChanged = false;
 
     this.visible = this._loadVisible();
+
+    this.trialsData   = null;
+    this.trialsMetric = localStorage.getItem("leaderboard-trials-metric") || "curve_mse_gt";
   }
 
   enter() {
-    this.load();
+    if (this.view === "trials") this.loadTrials();
+    else this.load();
   }
 
   async load() {
@@ -51,6 +55,23 @@ class LeaderboardView {
     this.selected = this.selected.filter((id) => data.rows.some((row) => row.id === id));
     if (this.visible === null) this.visible = data.columns.filter((c) => c.default).map((c) => c.key);
 
+    this._render();
+  }
+
+  async loadTrials() {
+    this.root.innerHTML = `<div class="res-empty">Aggregating seeded trials&hellip;</div>`;
+
+    const base = this._runsBase();
+    const data = await window.apiGet(`/api/leaderboard/trials?base=${encodeURIComponent(base)}`);
+
+    if (!data || !data.ok) {
+      this.trialsData = null;
+      this.root.innerHTML = `<div class="res-empty">${this._esc((data && data.error) || "Could not scan the runs directory.")}</div>`;
+      return;
+    }
+
+    this.trialsData = data;
+    this.view       = "trials";
     this._render();
   }
 
@@ -76,9 +97,32 @@ class LeaderboardView {
       this._bindDiff();
       return;
     }
+    if (this.view === "trials" && this.trialsData) {
+      this.root.innerHTML = this._trialsHtml();
+      this._bindTrials();
+      return;
+    }
 
     this.root.innerHTML = this._tableHtml();
     this._bindTable();
+  }
+
+  _modeToggleHtml() {
+    return (
+      `<div class="res-views" role="group" aria-label="Leaderboard mode">` +
+      `<button type="button" data-lbview="table" class="${this.view !== "trials" ? "is-active" : ""}">Runs</button>` +
+      `<button type="button" data-lbview="trials" class="${this.view === "trials" ? "is-active" : ""}">Trials</button>` +
+      `</div>`
+    );
+  }
+
+  _bindModeToggle() {
+    this.root.querySelectorAll("[data-lbview]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.lbview === "trials") this.loadTrials();
+        else { this.view = "table"; this.load(); }
+      });
+    });
   }
 
   _rows() {
@@ -180,6 +224,7 @@ class LeaderboardView {
     const count = shown === total ? `${total}` : `${shown} of ${total}`;
 
     let html = `<div class="lb-bar-top">`;
+    html += this._modeToggleHtml();
     html += `<span class="lb-count">${count} inference result${total === 1 ? "" : "s"}</span>`;
     html += `<input type="search" class="res-filter" id="lb-filter" placeholder="Filter by run name" value="${this._esc(this.filter)}" spellcheck="false" />`;
 
@@ -227,7 +272,121 @@ class LeaderboardView {
     return direction > 0 ? norm : 1 - norm;
   }
 
+  _trialsHtml() {
+    const experiments = this.trialsData.experiments;
+    const columns     = this.trialsData.columns;
+    const metric      = columns.find((c) => c.key === this.trialsMetric) || columns[0];
+
+    let html = `<div class="lb-bar-top">`;
+    html += this._modeToggleHtml();
+    html += `<span class="lb-count">${experiments.reduce((n, e) => n + e.units.length, 0)} seeded units in ${experiments.length} experiment${experiments.length === 1 ? "" : "s"}</span>`;
+    html += `<select class="lb-select" id="lb-trials-metric" aria-label="Chart metric">`;
+    columns.forEach((col) => { html += `<option value="${col.key}"${col.key === metric.key ? " selected" : ""}>${this._esc(col.label)}</option>`; });
+    html += `</select>`;
+    html += `</div>`;
+
+    if (!experiments.length) {
+      return html + `<div class="res-empty">No seeded trial runs found. Trials appear here once runs are laid out as <code>&lt;unit&gt;/seed&lt;N&gt;/</code> with saved inference metrics.</div>`;
+    }
+
+    experiments.forEach((experiment, index) => {
+      html += `<section class="lb-diff__section">`;
+      html += `<h4 class="res-section__cap">${this._esc(experiment.key === "." ? "runs root" : experiment.key)} <span>${experiment.units.length} units</span></h4>`;
+      html += this._trialsChartHtml(experiment, metric);
+      html += this._trialsTableHtml(experiment, columns, index);
+      html += `</section>`;
+    });
+
+    return html;
+  }
+
+  _trialsChartHtml(experiment, metric) {
+    const rows = experiment.units
+      .map((unit) => ({ unit: unit.unit, agg: unit.metrics[metric.key] }))
+      .filter((row) => row.agg);
+
+    if (!rows.length) {
+      return `<div class="res-empty res-empty--tight">No unit reports the metric "${this._esc(metric.label)}".</div>`;
+    }
+
+    rows.sort((a, b) => metric.direction >= 0 ? b.agg.mean - a.agg.mean : a.agg.mean - b.agg.mean);
+
+    let lo = 0;
+    let hi = 0;
+    rows.forEach(({ agg }) => {
+      lo = Math.min(lo, agg.mean - agg.std);
+      hi = Math.max(hi, agg.mean + agg.std);
+    });
+    if (hi === lo) hi = lo + 1;
+
+    const labelW = 260;
+    const chartW = 640;
+    const rowH = 26;
+    const width = labelW + chartW + 90;
+    const height = rows.length * rowH + 14;
+    const xAt = (v) => labelW + ((v - lo) / (hi - lo)) * chartW;
+
+    let svg = `<svg class="lb-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Seed-averaged ${this._esc(metric.label)} per unit">`;
+    svg += `<line x1="${xAt(0)}" y1="4" x2="${xAt(0)}" y2="${height - 4}" class="lb-chart__zero" />`;
+
+    rows.forEach((row, i) => {
+      const y = i * rowH + 10;
+      const mid = y + 7;
+      const x0 = xAt(Math.min(0, row.agg.mean));
+      const x1 = xAt(Math.max(0, row.agg.mean));
+      const best = i === 0;
+
+      svg += `<text x="${labelW - 10}" y="${mid + 4}" class="lb-chart__label" text-anchor="end">${this._esc(row.unit)}</text>`;
+      svg += `<rect x="${x0}" y="${y}" width="${Math.max(1, x1 - x0)}" height="14" class="lb-chart__bar${best ? " is-best" : ""}" />`;
+      if (row.agg.std > 0) {
+        const e0 = xAt(row.agg.mean - row.agg.std);
+        const e1 = xAt(row.agg.mean + row.agg.std);
+        svg += `<line x1="${e0}" y1="${mid}" x2="${e1}" y2="${mid}" class="lb-chart__err" />`;
+        svg += `<line x1="${e0}" y1="${mid - 4}" x2="${e0}" y2="${mid + 4}" class="lb-chart__err" />`;
+        svg += `<line x1="${e1}" y1="${mid - 4}" x2="${e1}" y2="${mid + 4}" class="lb-chart__err" />`;
+      }
+      svg += `<text x="${xAt(hi) + 8}" y="${mid + 4}" class="lb-chart__value">${this._fmt(row.agg.mean)} ± ${this._fmt(row.agg.std)} (n=${row.agg.n})</text>`;
+    });
+
+    svg += `</svg>`;
+    return `<div class="lb-chart__wrap">${svg}</div>`;
+  }
+
+  _trialsTableHtml(experiment, columns, index) {
+    const present = columns.filter((col) => experiment.units.some((unit) => unit.metrics[col.key]));
+
+    let html = `<details class="lb-trials-table"><summary>mean ± std across all headline metrics</summary>`;
+    html += `<div class="lb-scroll"><table class="lb-table lb-table--diff"><thead><tr><th class="lb-th">unit</th><th class="lb-th">seeds</th>`;
+    present.forEach((col) => { html += `<th class="lb-th">${this._esc(col.label)}</th>`; });
+    html += `</tr></thead><tbody>`;
+
+    experiment.units.forEach((unit) => {
+      html += `<tr><td class="lb-key">${this._esc(unit.unit)}</td><td>${unit.seeds.join(", ")}</td>`;
+      present.forEach((col) => {
+        const agg = unit.metrics[col.key];
+        html += `<td>${agg ? `${this._fmt(agg.mean)} ± ${this._fmt(agg.std)}` : "&ndash;"}</td>`;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div></details>`;
+    return html;
+  }
+
+  _bindTrials() {
+    this._bindModeToggle();
+
+    const metric = this.root.querySelector("#lb-trials-metric");
+    if (metric) metric.addEventListener("change", () => {
+      this.trialsMetric = metric.value;
+      localStorage.setItem("leaderboard-trials-metric", this.trialsMetric);
+      this._render();
+    });
+  }
+
   _bindTable() {
+    this._bindModeToggle();
+
     const filter = this.root.querySelector("#lb-filter");
     if (filter) filter.addEventListener("input", () => {
       this.filter = filter.value.trim();

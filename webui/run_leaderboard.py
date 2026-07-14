@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import statistics
 from pathlib import Path
 
 from web_logger import WebLogger
@@ -85,6 +86,8 @@ class RunLeaderboard:
         ("model",   Path("meta") / "model_config.json"),
     )
 
+    SEED_DIR = re.compile(r"^seed(\d+)$")
+
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
         self.roots  = set()
@@ -123,6 +126,66 @@ class RunLeaderboard:
         self.logger.info(f"leaderboard: {len(rows)} inference results under {root}")
 
         return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "rows": rows, "errors": errors}
+
+    def trials(self, base: str) -> dict:
+        root, error = self._catalog_root(base)
+        if error:
+            return {"ok": False, "error": error, "experiments": []}
+
+        self.roots.add(str(root))
+
+        latest = {}
+        for metrics_path in sorted(root.rglob("inference/*/metrics.json")):
+            stamp_dir = metrics_path.parent
+            run_dir   = stamp_dir.parent.parent
+
+            seed_match = self.SEED_DIR.match(run_dir.name)
+            if seed_match is None:
+                continue
+
+            unit_dir = run_dir.parent
+            key      = (str(unit_dir), int(seed_match.group(1)))
+            mtime    = stamp_dir.stat().st_mtime
+            if key not in latest or mtime > latest[key][1]:
+                latest[key] = (metrics_path, mtime)
+
+        units = {}
+        for (unit_dir, seed), (metrics_path, _) in latest.items():
+            try:
+                metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+
+            values = {c["key"]: metrics[c["key"]] for c in self.COLUMNS if self._is_number(metrics.get(c["key"]))}
+            units.setdefault(unit_dir, []).append((seed, values))
+
+        experiments = {}
+        for unit_dir, seed_rows in sorted(units.items()):
+            unit_path  = Path(unit_dir)
+            experiment = str(unit_path.parent.relative_to(root)) if unit_path.parent != root else "."
+
+            aggregated = {}
+            for column in self.COLUMNS:
+                samples = [values[column["key"]] for _, values in seed_rows if column["key"] in values]
+                if not samples:
+                    continue
+                aggregated[column["key"]] = {
+                    "mean" : statistics.fmean(samples),
+                    "std"  : statistics.stdev(samples) if len(samples) > 1 else 0.0,
+                    "n"    : len(samples),
+                }
+
+            experiments.setdefault(experiment, []).append({
+                "unit"    : unit_path.name,
+                "path"    : unit_dir,
+                "seeds"   : sorted(seed for seed, _ in seed_rows),
+                "metrics" : aggregated,
+            })
+
+        payload = [{"key": name, "units": units_list} for name, units_list in sorted(experiments.items())]
+        self.logger.info(f"leaderboard trials: {sum(len(e['units']) for e in payload)} units in {len(payload)} experiments under {root}")
+
+        return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "experiments": payload}
 
     def diff(self, a: str, b: str) -> dict:
         side_a = self._side(a)

@@ -186,6 +186,61 @@ def test_diff_rejects_paths_outside_root(tmp_path):
     assert not board.diff(str(stamp_in), str(stamp_out))["ok"]
 
 
+def _make_seed_run(base: Path, experiment: str, unit: str, seed: int, stamp: str, metrics: dict) -> Path:
+    stamp_dir = base / experiment / unit / f"seed{seed}" / "inference" / stamp
+    stamp_dir.mkdir(parents=True)
+    (stamp_dir / "metrics.json").write_text(json.dumps(metrics))
+    return stamp_dir
+
+
+def test_trials_aggregates_seeds(tmp_path):
+    _make_seed_run(tmp_path, "presence_matrix", "unit-A", 0, "20260701_000000", {"curve_mse_gt": 1.0, "overall_r2_gt": 0.5})
+    _make_seed_run(tmp_path, "presence_matrix", "unit-A", 1, "20260701_000000", {"curve_mse_gt": 3.0, "overall_r2_gt": 0.7})
+    _make_seed_run(tmp_path, "presence_matrix", "unit-B", 0, "20260701_000000", {"curve_mse_gt": 2.0})
+    _make_run(tmp_path, STANDARD_NAME)
+
+    board  = RunLeaderboard(WebLogger())
+    result = board.trials(str(tmp_path))
+
+    assert result["ok"] and len(result["experiments"]) == 1
+
+    experiment = result["experiments"][0]
+    assert experiment["key"] == "presence_matrix"
+    assert [u["unit"] for u in experiment["units"]] == ["unit-A", "unit-B"]
+
+    unit_a = experiment["units"][0]
+    assert unit_a["seeds"] == [0, 1]
+    assert unit_a["metrics"]["curve_mse_gt"]["mean"] == 2.0
+    assert abs(unit_a["metrics"]["curve_mse_gt"]["std"] - 1.4142135623730951) < 1e-12
+    assert unit_a["metrics"]["curve_mse_gt"]["n"] == 2
+    assert unit_a["metrics"]["overall_r2_gt"]["n"] == 2
+
+    unit_b = experiment["units"][1]
+    assert unit_b["metrics"]["curve_mse_gt"] == {"mean": 2.0, "std": 0.0, "n": 1}
+    assert "overall_r2_gt" not in unit_b["metrics"]
+
+
+def test_trials_uses_latest_stamp_per_seed(tmp_path):
+    older = _make_seed_run(tmp_path, "exp", "unit", 0, "20260701_000000", {"curve_mse_gt": 9.0})
+    newer = _make_seed_run(tmp_path, "exp", "unit", 0, "20260702_000000", {"curve_mse_gt": 1.0})
+
+    os.utime(older, (1000, 1000))
+    os.utime(newer, (2000, 2000))
+
+    result = RunLeaderboard(WebLogger()).trials(str(tmp_path))
+
+    unit = result["experiments"][0]["units"][0]
+    assert unit["metrics"]["curve_mse_gt"] == {"mean": 1.0, "std": 0.0, "n": 1}
+
+
+def test_trials_ignores_unseeded_runs(tmp_path):
+    _make_run(tmp_path, STANDARD_NAME)
+
+    result = RunLeaderboard(WebLogger()).trials(str(tmp_path))
+
+    assert result["ok"] and result["experiments"] == []
+
+
 def test_direction_heuristic():
     assert RunLeaderboard._direction("pixel_r2_gt_mean")            == 1
     assert RunLeaderboard._direction("relative_mse_reduction")      == 1

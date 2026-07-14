@@ -134,6 +134,11 @@ class RequestRouter:
             result = self.leaderboard.table((query.get("base") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
+        if path == "/api/leaderboard/trials":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.leaderboard.trials((query.get("base") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/leaderboard/diff":
             query  = parse_qs(urlparse(handler.path).query)
             result = self.leaderboard.diff((query.get("a") or [""])[0], (query.get("b") or [""])[0])
