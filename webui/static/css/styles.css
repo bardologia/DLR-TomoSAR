@@ -414,7 +414,7 @@ main { margin-left: var(--navw); }
 .ptable { font-family: var(--mono); font-size: 11.5px; }
 .ptable__row {
   display: grid;
-  grid-template-columns: 62px 56px 60px 56px 22px minmax(0, 1fr);
+  grid-template-columns: 62px 56px 60px 56px 40px 22px minmax(0, 1fr);
   gap: 12px;
   align-items: baseline;
   padding: 4px 8px;
@@ -436,6 +436,7 @@ main { margin-left: var(--navw); }
 .ptable__cpu.is-mid { color: var(--dk-ink); }
 .ptable__cpu.is-hot { color: var(--dk-warn); }
 .ptable__body .ptable__gpu { color: var(--dk-acc2); }
+.ptable__thr { color: var(--dk-dim); }
 .ptable__state { color: var(--dk-faint); }
 .ptable__cmd { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dk-ink); }
 
@@ -2138,7 +2139,7 @@ main { margin-left: var(--navw); }
 @media (max-width: 640px) {
   .sboard--cpu, .sboard--mem, .sboard--disk, .sboard--procs, .sboard--jobs { grid-column: 1 / -1; }
   .cpu__grid { grid-template-columns: repeat(auto-fill, minmax(13px, 1fr)); }
-  .ptable__row { grid-template-columns: 52px 50px 54px 20px minmax(0, 1fr); }
+  .ptable__row { grid-template-columns: 52px 50px 54px 34px 20px minmax(0, 1fr); }
   .ptable__row .ptable__gpu { display: none; }
 }
 

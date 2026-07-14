@@ -90,12 +90,13 @@ class SystemMonitor:
                 continue
 
             try:
-                close  = stat.rindex(")")
-                comm   = stat[stat.index("(") + 1 : close]
-                fields = stat[close + 2 :].split()
-                state  = fields[0]
-                jiff   = int(fields[11]) + int(fields[12])
-                rss    = int(fields[21]) * self.page
+                close   = stat.rindex(")")
+                comm    = stat[stat.index("(") + 1 : close]
+                fields  = stat[close + 2 :].split()
+                state   = fields[0]
+                jiff    = int(fields[11]) + int(fields[12])
+                threads = int(fields[17])
+                rss     = int(fields[21]) * self.page
             except (ValueError, IndexError):
                 continue
 
@@ -109,12 +110,13 @@ class SystemMonitor:
             cmd = self._pid_cmd(pid)
 
             rows.append({
-                "pid"   : pid,
-                "state" : state,
-                "cpu"   : cpu,
-                "rss"   : rss,
-                "gpu"   : gpu_mem.get(pid, 0),
-                "cmd"   : (cmd or comm)[:200],
+                "pid"     : pid,
+                "state"   : state,
+                "cpu"     : cpu,
+                "rss"     : rss,
+                "threads" : threads,
+                "gpu"     : gpu_mem.get(pid, 0),
+                "cmd"     : (cmd or comm)[:200],
             })
 
         self.prev_proc_t = now
