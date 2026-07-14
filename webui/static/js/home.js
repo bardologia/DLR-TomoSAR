@@ -12,7 +12,7 @@ class StatusBoard {
 
   start() {
     this._poll();
-    setInterval(() => { if (!document.hidden) this._poll(); }, 2500);
+    setInterval(() => { if (!document.hidden) this._poll(); }, 250);
     this._pollJobs();
     setInterval(() => { if (!document.hidden) this._pollJobs(); }, 5000);
     this._pollGuardHistory();
