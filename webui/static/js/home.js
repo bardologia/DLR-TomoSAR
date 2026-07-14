@@ -7,7 +7,7 @@ class StatusBoard {
     this.gpuEls = [];
     this.coreEls = [];
     this.histMax = 144;
-    this.hist = { cpu: [], ram: [], gpus: [] };
+    this.gpuCount = 0;
   }
 
   start() {
@@ -42,7 +42,7 @@ class StatusBoard {
     }
 
     if (!sys || sys.error) return;
-    if (!this.built || (sys.gpus || []).length > this.hist.gpus.length) this._build(sys);
+    if (!this.built || (sys.gpus || []).length > this.gpuCount) this._build(sys);
     this._update(sys);
   }
 
@@ -60,7 +60,7 @@ class StatusBoard {
     this.built = true;
     const gpus = sys.gpus || [];
     const cores = (sys.cpu && sys.cpu.cores) || [];
-    this.hist.gpus = gpus.map(() => ({ u: [], m: [] }));
+    this.gpuCount = gpus.length;
 
     const gpuCards = gpus.length
       ? gpus.map((g, i) =>
@@ -400,6 +400,9 @@ class StatusBoard {
     const mem = sys.mem || {};
     const disk = sys.disk || {};
     const gpus = sys.gpus || [];
+    const hist = sys.history || {};
+    const gpuHist = hist.gpus || {};
+    this.histMax = hist.max_samples || this.histMax;
 
     if (this.els.host) this.els.host.textContent = sys.host || "server";
     if (this.els.sum) {
@@ -411,17 +414,12 @@ class StatusBoard {
       this.els.sum.textContent = bits.join(" · ");
     }
 
-    this._push(this.hist.cpu, cpu.total || 0);
-    if (mem.total) this._push(this.hist.ram, (100 * (mem.total - mem.available)) / mem.total);
-
     gpus.forEach((g, i) => {
       const el = this.gpuEls[i];
-      const h = this.hist.gpus[i];
-      if (!el || !h) return;
+      const h = gpuHist[String(i)] || { util: [], mem: [] };
+      if (!el) return;
       const util = g.util != null ? g.util : 0;
       const memPct = g.mem_total ? (100 * g.mem_used) / g.mem_total : 0;
-      this._push(h.u, util);
-      this._push(h.m, memPct);
 
       el.dialU.set(util);
       el.meterT.set(g.temp);
@@ -445,8 +443,8 @@ class StatusBoard {
       }
       el.power.textContent = g.power != null ? `${Math.round(g.power)}${g.power_limit ? ` / ${Math.round(g.power_limit)}` : ""} W` : "--";
       this._spark(el.graph, [
-        { data: h.m, color: "45, 212, 191", fill: 0.08 },
-        { data: h.u, color: "111, 155, 255", fill: 0.14 },
+        { data: h.mem, color: "45, 212, 191", fill: 0.08 },
+        { data: h.util, color: "111, 155, 255", fill: 0.14 },
       ]);
     });
 
@@ -473,7 +471,7 @@ class StatusBoard {
       this._txt("sb-cpu-avg", `<b>${avg.toFixed(1)}</b> %`);
       this._txt("sb-cpu-active", `<b>${active}</b> / ${cores.length} dispatched`);
     }
-    this._spark(document.getElementById("sb-cpu-graph"), [{ data: this.hist.cpu, color: "111, 155, 255", fill: 0.14 }]);
+    this._spark(document.getElementById("sb-cpu-graph"), [{ data: hist.cpu || [], color: "111, 155, 255", fill: 0.14 }]);
 
     if (mem.total) {
       const used = mem.total - mem.available;
@@ -483,7 +481,7 @@ class StatusBoard {
       const swapUsed = (mem.swap_total || 0) - (mem.swap_free || 0);
       this.swapTank.set(mem.swap_total ? swapUsed / mem.swap_total : 0);
       this._txt("sb-swap-txt", mem.swap_total ? `<b>${this._gb(swapUsed)}</b> / ${this._gb(mem.swap_total)} GB` : "none");
-      this._spark(document.getElementById("sb-mem-graph"), [{ data: this.hist.ram, color: "45, 212, 191", fill: 0.10 }]);
+      this._spark(document.getElementById("sb-mem-graph"), [{ data: hist.ram || [], color: "45, 212, 191", fill: 0.10 }]);
     }
 
     if (disk.total) {
@@ -891,11 +889,6 @@ class StatusBoard {
       const next = followers.get(j.job_id);
       return row(j, false) + (next ? row(next, true) : "");
     }).join("");
-  }
-
-  _push(arr, v) {
-    arr.push(Math.max(0, Math.min(100, v)));
-    if (arr.length > this.histMax) arr.shift();
   }
 
   _spark(cv, series) {

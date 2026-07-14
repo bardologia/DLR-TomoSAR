@@ -7,6 +7,7 @@ import socket
 import subprocess
 import threading
 import time
+from collections import deque
 
 from proc_stats import ProcStats
 
@@ -29,27 +30,34 @@ class SystemMonitor:
         self.page        = os.sysconf("SC_PAGE_SIZE")
         self.user_root   = self._user_root()
         self.du_usage    = {"user": None, "repo": None}
+        self.history     = SystemHistory(self)
 
         threading.Thread(target=self._du_loop, daemon=True).start()
+        threading.Thread(target=self.history.sample_loop, daemon=True).start()
 
-    def _cpu_percents(self) -> tuple[list[float], float]:
-        cores = []
-        total = 0.0
-
+    @staticmethod
+    def _cpu_counters() -> dict:
+        counters = {}
         try:
             lines = open("/proc/stat").read().splitlines()
         except OSError:
-            return cores, total
+            return counters
 
         for line in lines:
             if not line.startswith("cpu"):
                 continue
             parts = line.split()
-            key   = parts[0]
             vals  = [int(v) for v in parts[1:9]]
             busy  = sum(vals) - vals[3] - vals[4]
-            whole = sum(vals)
+            counters[parts[0]] = (busy, sum(vals))
 
+        return counters
+
+    def _cpu_percents(self) -> tuple[list[float], float]:
+        cores = []
+        total = 0.0
+
+        for key, (busy, whole) in self._cpu_counters().items():
             prev = self.prev_cpu.get(key)
             self.prev_cpu[key] = (busy, whole)
 
@@ -340,12 +348,72 @@ class SystemMonitor:
             procs        = self._procs(gpu_mem)
 
         return {
-            "host"   : socket.gethostname(),
-            "user"   : self.user,
-            "uptime" : self._uptime(),
-            "cpu"    : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
-            "mem"    : self._memory(),
-            "disk"   : self._disk(),
-            "gpus"   : self._gpu_cards(occupancy),
-            "procs"  : procs,
+            "host"    : socket.gethostname(),
+            "user"    : self.user,
+            "uptime"  : self._uptime(),
+            "cpu"     : {"count": os.cpu_count() or len(cores), "total": total, "cores": cores, "load": list(os.getloadavg())},
+            "mem"     : self._memory(),
+            "disk"    : self._disk(),
+            "gpus"    : self._gpu_cards(occupancy),
+            "procs"   : procs,
+            "history" : self.history.state(),
         }
+
+
+class SystemHistory:
+
+    SAMPLE_PERIOD_S = 0.5
+    MAX_SAMPLES     = 144
+
+    def __init__(self, monitor: SystemMonitor) -> None:
+        self.monitor = monitor
+        self.lock    = threading.Lock()
+        self.prev    = None
+        self.cpu     = deque(maxlen=self.MAX_SAMPLES)
+        self.ram     = deque(maxlen=self.MAX_SAMPLES)
+        self.gpus    = {}
+
+    def _cpu_percent(self) -> float:
+        current   = self.monitor._cpu_counters().get("cpu")
+        prev      = self.prev
+        self.prev = current
+
+        if current is None or prev is None or current[1] <= prev[1]:
+            return 0.0
+        return round(100.0 * (current[0] - prev[0]) / (current[1] - prev[1]), 1)
+
+    def _ram_percent(self) -> float:
+        mem = self.monitor._memory()
+        if not mem.get("total"):
+            return 0.0
+        return round(100.0 * (mem["total"] - mem["available"]) / mem["total"], 1)
+
+    def sample(self) -> None:
+        cpu     = self._cpu_percent()
+        ram     = self._ram_percent()
+        devices = self.monitor._gpu_devices()
+
+        with self.lock:
+            self.cpu.append(cpu)
+            self.ram.append(ram)
+            for position, device in enumerate(devices):
+                track = self.gpus.setdefault(str(position), {"util": deque(maxlen=self.MAX_SAMPLES), "mem": deque(maxlen=self.MAX_SAMPLES)})
+                util  = device["util"] if device["util"] is not None else 0.0
+                mpct  = round(100.0 * device["mem_used"] / device["mem_total"], 1) if device["mem_total"] else 0.0
+                track["util"].append(util)
+                track["mem"].append(mpct)
+
+    def state(self) -> dict:
+        with self.lock:
+            return {
+                "period_s"    : self.SAMPLE_PERIOD_S,
+                "max_samples" : self.MAX_SAMPLES,
+                "cpu"         : list(self.cpu),
+                "ram"         : list(self.ram),
+                "gpus"        : {key: {"util": list(track["util"]), "mem": list(track["mem"])} for key, track in self.gpus.items()},
+            }
+
+    def sample_loop(self) -> None:
+        while True:
+            self.sample()
+            time.sleep(self.SAMPLE_PERIOD_S)
