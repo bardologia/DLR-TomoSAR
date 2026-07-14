@@ -1,6 +1,7 @@
 "use strict";
 
 class LeaderboardView {
+  static DIFF_TAGS = ["A", "B", "C", "D", "E", "F"];
   static AXIS_COLS = [
     { key: "model",    label: "model" },
     { key: "head",     label: "head" },
@@ -125,10 +126,10 @@ class LeaderboardView {
   }
 
   async showDiff() {
-    if (this.selected.length !== 2) return;
+    if (this.selected.length < 2) return;
 
-    const [a, b] = this.selected;
-    const data   = await window.apiGet(`/api/leaderboard/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+    const runsQuery = this.selected.map((id) => `run=${encodeURIComponent(id)}`).join("&");
+    const data      = await window.apiGet(`/api/leaderboard/diff?${runsQuery}`);
 
     if (!data || !data.ok) {
       window.toast((data && data.error) || "Could not load the comparison.", "warn");
@@ -303,7 +304,7 @@ class LeaderboardView {
     });
     html += `</div></details>`;
 
-    html += `<button type="button" class="btn btn--mini" id="lb-compare" ${this.selected.length === 2 ? "" : "disabled"}>Compare ${this.selected.length}/2</button>`;
+    html += `<button type="button" class="btn btn--mini" id="lb-compare" ${this.selected.length >= 2 ? "" : "disabled"}>Compare (${this.selected.length})</button>`;
     html += `</div>`;
     return html;
   }
@@ -638,25 +639,27 @@ class LeaderboardView {
 
   _toggleSelect(id) {
     if (this.selected.includes(id)) this.selected = this.selected.filter((s) => s !== id);
-    else this.selected = [...this.selected, id].slice(-2);
+    else this.selected = [...this.selected, id].slice(-LeaderboardView.DIFF_TAGS.length);
     this._render();
   }
 
   _diffHtml() {
-    const { a, b, directions, sections } = this.diffData;
+    const { sides, directions, sections } = this.diffData;
+    const tags = LeaderboardView.DIFF_TAGS;
+    const pair = sides.length === 2;
 
     let html = `<div class="lb-bar-top">`;
     html += `<button type="button" class="btn btn--mini" id="lb-back">&larr; Back to table</button>`;
-    html += `<span class="lb-count">Comparing two inference results</span>`;
+    html += `<span class="lb-count">Comparing ${sides.length} inference results</span>`;
     html += `</div>`;
 
     html += `<div class="lb-diff__heads">`;
-    [["A", a], ["B", b]].forEach(([tag, side]) => {
-      html += `<div class="lb-diff__head"><span class="lb-diff__tag">${tag}</span><span class="lb-run__name">${this._esc(side.run)}</span><span class="lb-run__stamp">${this._esc(side.stamp)}</span></div>`;
+    sides.forEach((side, i) => {
+      html += `<div class="lb-diff__head"><span class="lb-diff__tag">${tags[i]}</span><span class="lb-run__name">${this._esc(side.run)}</span><span class="lb-run__stamp">${this._esc(side.stamp)}</span></div>`;
     });
     html += `</div>`;
 
-    const all    = [...new Set([...Object.keys(a.metrics), ...Object.keys(b.metrics)])];
+    const all    = [...new Set(sides.flatMap((side) => Object.keys(side.metrics)))];
     const needle = this.diffFilter.toLowerCase();
 
     const stems = {};
@@ -671,11 +674,15 @@ class LeaderboardView {
     const passes = (key) => {
       if (!this.diffSeries && isSeries(key)) return false;
       if (needle && !key.toLowerCase().includes(needle)) return false;
-      if (this.diffChanged && a.metrics[key] === b.metrics[key]) return false;
+      if (this.diffChanged && new Set(sides.map((side) => side.metrics[key])).size < 2) return false;
       return true;
     };
 
-    const kept = all.filter(passes);
+    const kept   = all.filter(passes);
+    const hotCut = this._hotCutoff(kept, sides);
+    const index  = [];
+
+    html += `<div class="lb-diff__layout"><div class="lb-diff__main">`;
 
     html += `<section class="lb-diff__section"><h4 class="res-section__cap">Metrics <span>${kept.length} of ${all.length}</span></h4>`;
     html += `<div class="lb-diff__controls">`;
@@ -685,13 +692,17 @@ class LeaderboardView {
     html += `</div>`;
 
     html += `<article class="res-md lb-diff__report">`;
-    sections.forEach((section) => {
+    sections.forEach((section, si) => {
       const keys = section.keys.filter(passes);
       if (!keys.length) return;
 
-      html += `<h2>${this._esc(section.title)} <span>${keys.length}</span></h2>`;
-      html += `<table><thead><tr><th>metric</th><th>A</th><th>B</th><th>&Delta; (B&minus;A)</th><th>&Delta;%</th></tr></thead><tbody>`;
-      keys.forEach((key) => { html += this._diffRowHtml(key, a.metrics[key], b.metrics[key], directions[key]); });
+      index.push({ id: `lb-diff-sec-${si}`, title: section.title, count: keys.length });
+      html += `<h2 id="lb-diff-sec-${si}">${this._esc(section.title)} <span>${keys.length}</span></h2>`;
+      html += `<table><thead><tr><th>metric</th>`;
+      sides.forEach((_, i) => { html += `<th>${tags[i]}</th>`; });
+      html += pair ? `<th>&Delta; (B&minus;A)</th><th>&Delta;%</th>` : `<th>spread%</th>`;
+      html += `</tr></thead><tbody>`;
+      keys.forEach((key) => { html += this._diffRowHtml(key, sides, directions[key], hotCut); });
       html += `</tbody></table>`;
     });
     html += `</article>`;
@@ -699,30 +710,77 @@ class LeaderboardView {
     if (!kept.length) html += `<div class="res-empty res-empty--tight">No metric matches the current filters.</div>`;
     html += `</section>`;
 
-    html += this._configDiffHtml(a.config, b.config);
+    html += this._configDiffHtml(sides, tags, index);
+
+    html += `</div>`;
+    html += `<nav class="res-index lb-diff__index" aria-label="Comparison index">`;
+    index.forEach((entry) => {
+      html += `<button type="button" class="res-index__link" data-target="${entry.id}">${this._esc(entry.title)}<span>${entry.count}</span></button>`;
+    });
+    html += `</nav></div>`;
     return html;
   }
 
-  _diffRowHtml(key, va, vb, direction) {
-    let cells;
+  _rowSpread(values) {
+    const nums = values.filter((v) => v !== undefined && isFinite(v));
+    if (nums.length < 2) return null;
 
-    if (va === undefined || vb === undefined) {
-      cells = `<td>${va === undefined ? "&ndash;" : this._fmt(va)}</td><td>${vb === undefined ? "&ndash;" : this._fmt(vb)}</td><td>&ndash;</td><td>&ndash;</td>`;
-    } else {
-      const delta = vb - va;
-      const pct   = va !== 0 ? (delta / Math.abs(va)) * 100 : null;
-      const cls   = this._deltaClass(delta, direction);
-      cells = `<td>${this._fmt(va)}</td><td>${this._fmt(vb)}</td><td class="${cls}">${delta === 0 ? "=" : this._fmt(delta)}</td><td class="${cls}">${pct === null || delta === 0 ? "&ndash;" : (pct > 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>`;
-    }
+    const max = Math.max(...nums);
+    const min = Math.min(...nums);
+    if (max === min) return 0;
 
-    return `<tr><td><code>${this._esc(key)}</code></td>${cells}</tr>`;
+    const scale = Math.max(Math.abs(max), Math.abs(min));
+    return scale > 0 ? ((max - min) / scale) * 100 : null;
   }
 
-  _configDiffHtml(ca, cb) {
-    const keys    = [...new Set([...Object.keys(ca), ...Object.keys(cb)])].sort();
-    const differs = keys.filter((key) => String(ca[key]) !== String(cb[key]));
+  _hotCutoff(keys, sides) {
+    const mags = keys.map((key) => this._rowSpread(sides.map((side) => side.metrics[key]))).filter((m) => m !== null && m > 0).sort((x, y) => x - y);
+    if (!mags.length) return null;
+    return Math.max(mags[Math.floor(mags.length * 0.9)], 1);
+  }
 
-    let html = `<section class="lb-diff__section"><h4 class="res-section__cap">Config differences <span>${differs.length} of ${keys.length}</span></h4>`;
+  _diffRowHtml(key, sides, direction, hotCut) {
+    const values = sides.map((side) => side.metrics[key]);
+    const nums   = values.filter((v) => v !== undefined && isFinite(v));
+    const spread = this._rowSpread(values);
+    const hot    = hotCut !== null && spread !== null && spread >= hotCut;
+
+    const best  = direction && nums.length >= 2 ? (direction > 0 ? Math.max(...nums) : Math.min(...nums)) : null;
+    const worst = direction && nums.length >= 2 ? (direction > 0 ? Math.min(...nums) : Math.max(...nums)) : null;
+
+    let cells = "";
+    values.forEach((v) => {
+      let cls = "";
+      if (sides.length > 2 && best !== null && best !== worst && v !== undefined) {
+        if (v === best) cls = ` class="lb-delta lb-delta--good"`;
+        else if (v === worst) cls = ` class="lb-delta lb-delta--bad"`;
+      }
+      cells += `<td${cls}>${v === undefined ? "&ndash;" : this._fmt(v)}</td>`;
+    });
+
+    if (sides.length === 2) {
+      const [va, vb] = values;
+      if (va === undefined || vb === undefined) {
+        cells += `<td>&ndash;</td><td>&ndash;</td>`;
+      } else {
+        const delta = vb - va;
+        const pct   = va !== 0 ? (delta / Math.abs(va)) * 100 : null;
+        const cls   = this._deltaClass(delta, direction);
+        cells += `<td class="${cls}">${delta === 0 ? "=" : this._fmt(delta)}</td><td class="${cls}">${pct === null || delta === 0 ? "&ndash;" : (pct > 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>`;
+      }
+    } else {
+      cells += `<td>${spread === null ? "&ndash;" : spread === 0 ? "=" : spread.toFixed(1) + "%"}</td>`;
+    }
+
+    return `<tr${hot ? ` class="lb-hot"` : ""}><td><code>${this._esc(key)}</code></td>${cells}</tr>`;
+  }
+
+  _configDiffHtml(sides, tags, index) {
+    const keys    = [...new Set(sides.flatMap((side) => Object.keys(side.config)))].sort();
+    const differs = keys.filter((key) => new Set(sides.map((side) => String(side.config[key]))).size > 1);
+
+    let html = `<section class="lb-diff__section" id="lb-diff-config"><h4 class="res-section__cap">Config differences <span>${differs.length} of ${keys.length}</span></h4>`;
+    index.push({ id: "lb-diff-config", title: "Config differences", count: differs.length });
 
     if (!keys.length) {
       return html + `<div class="res-empty res-empty--tight">No resolved config files were found for these runs.</div></section>`;
@@ -732,11 +790,15 @@ class LeaderboardView {
     }
 
     html += `<article class="res-md lb-diff__report">`;
-    html += `<table><thead><tr><th>field</th><th>A</th><th>B</th></tr></thead><tbody>`;
+    html += `<table><thead><tr><th>field</th>`;
+    sides.forEach((_, i) => { html += `<th>${tags[i]}</th>`; });
+    html += `</tr></thead><tbody>`;
     differs.forEach((key) => {
-      const va = ca[key] === undefined ? "&ndash;" : this._esc(String(ca[key]));
-      const vb = cb[key] === undefined ? "&ndash;" : this._esc(String(cb[key]));
-      html += `<tr><td><code>${this._esc(key)}</code></td><td>${va}</td><td>${vb}</td></tr>`;
+      html += `<tr><td><code>${this._esc(key)}</code></td>`;
+      sides.forEach((side) => {
+        html += `<td>${side.config[key] === undefined ? "&ndash;" : this._esc(String(side.config[key]))}</td>`;
+      });
+      html += `</tr>`;
     });
     html += `</tbody></table></article></section>`;
     return html;
@@ -774,6 +836,13 @@ class LeaderboardView {
     if (series) series.addEventListener("change", () => {
       this.diffSeries = series.checked;
       this._render();
+    });
+
+    this.root.querySelectorAll(".lb-diff__index [data-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = this.root.querySelector(`#${btn.dataset.target}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     });
   }
 

@@ -153,7 +153,7 @@ class RequestRouter:
             return
         if path == "/api/leaderboard/diff":
             query  = parse_qs(urlparse(handler.path).query)
-            result = self.leaderboard.diff((query.get("a") or [""])[0], (query.get("b") or [""])[0])
+            result = self.leaderboard.diff(query.get("run") or [])
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
         if path == "/api/cubes":

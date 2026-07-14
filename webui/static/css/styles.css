@@ -3628,7 +3628,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-val--none { color: var(--ink-faint); }
 .lb-bar { position: absolute; left: 0; bottom: 0; top: auto; height: 3px; background: rgba(15, 118, 110, 0.35); pointer-events: none; }
 .lb-when { font: 500 0.68rem/1 var(--mono); color: var(--ink-faint); }
-.lb-diff__heads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.lb-diff__heads { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .lb-diff__head {
   display: flex; align-items: baseline; gap: 10px; padding: 12px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
@@ -3641,11 +3641,21 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-diff__section { margin-bottom: 26px; }
 .lb-diff__section .res-section__cap { margin-bottom: 10px; }
 .lb-table--diff td { white-space: normal; }
-.lb-diff__report table { max-width: 920px; }
+.lb-diff__layout { display: flex; gap: 18px; align-items: flex-start; }
+.lb-diff__main { flex: 1 1 auto; min-width: 0; }
+.lb-diff__index { flex: 0 0 232px; width: 232px; top: 84px; }
+@media (max-width: 1180px) { .lb-diff__index { display: none; } }
+.lb-diff__report table { width: auto; max-width: 100%; }
+.lb-diff__report th, .lb-diff__report td { padding-right: 26px; }
+.lb-diff__report h2 { scroll-margin-top: 20px; }
 .lb-diff__report h2 span { color: var(--ink-faint); letter-spacing: 0; }
-.lb-diff__report td { white-space: nowrap; }
+.lb-diff__report td { white-space: nowrap; color: var(--ink); }
 .lb-diff__report td:first-child { white-space: normal; word-break: break-word; max-width: 46ch; }
-.lb-diff__report td:nth-child(3) { color: var(--ink); }
+.lb-diff__report td.lb-delta--good { color: var(--accent-2); }
+.lb-diff__report td.lb-delta--bad { color: var(--danger); }
+.lb-diff__report tr.lb-hot td { background: rgba(161, 98, 7, 0.06); }
+.lb-diff__report tr.lb-hot td:first-child { box-shadow: inset 2px 0 0 var(--warn); }
+.lb-diff__section { scroll-margin-top: 20px; }
 .lb-key { font: 500 0.7rem/1.4 var(--mono); color: var(--ink); word-break: break-all; max-width: 44ch; }
 .lb-delta { font-weight: 600; }
 .lb-delta--good { color: var(--accent-2); }

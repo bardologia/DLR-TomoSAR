@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT  = Path(__file__).resolve().parents[2]
 WEBUI_ROOT = REPO_ROOT / "webui"
 
@@ -150,27 +152,48 @@ def test_diff_returns_metrics_configs_and_directions(tmp_path):
     board = RunLeaderboard(WebLogger())
     assert board.table(str(tmp_path))["ok"]
 
-    result = board.diff(str(a), str(b))
+    result = board.diff([str(a), str(b)])
     assert result["ok"]
 
-    assert result["a"]["metrics"]["curve_mse_gt"] == 0.5
-    assert result["b"]["metrics"]["curve_mse_gt"] == 0.4
+    assert result["sides"][0]["metrics"]["curve_mse_gt"] == 0.5
+    assert result["sides"][1]["metrics"]["curve_mse_gt"] == 0.4
     assert result["directions"]["curve_mse_gt"]  == -1
     assert result["directions"]["overall_r2_gt"] == 1
 
-    assert result["a"]["config"]["trainer.optimizer.lr"] == 0.001
-    assert result["b"]["config"]["trainer.optimizer.lr"] == 0.01
-    assert result["a"]["config"]["summary.model_name"]   == "resunet"
-    assert result["a"]["config"]["trainer.epochs"]       == 10
+    assert result["sides"][0]["config"]["trainer.optimizer.lr"] == 0.001
+    assert result["sides"][1]["config"]["trainer.optimizer.lr"] == 0.01
+    assert result["sides"][0]["config"]["summary.model_name"]   == "resunet"
+    assert result["sides"][0]["config"]["trainer.epochs"]       == 10
 
     assert result["sections"] == [{"title": "Curve-Level", "keys": ["curve_mse_gt", "overall_r2_gt"]}]
+
+
+def test_diff_compares_many_runs_and_bounds_count(tmp_path):
+    stamps = [
+        _make_run(tmp_path, name, metrics={"curve_mse_gt": 0.1 * (i + 1)})
+        for i, name in enumerate([
+            "unet-conv-sorted_gt-K_5-hvn-none-param_l1_1_20260618_210314",
+            "unet-conv-sorted_gt-K_5-hvn-none-param_l1_1_20260618_210315",
+            "unet-conv-sorted_gt-K_5-hvn-none-param_l1_1_20260618_210316",
+        ])
+    ]
+
+    board = RunLeaderboard(WebLogger())
+    assert board.table(str(tmp_path))["ok"]
+
+    result = board.diff([str(s) for s in stamps])
+    assert result["ok"]
+    assert [side["metrics"]["curve_mse_gt"] for side in result["sides"]] == [pytest.approx(0.1), pytest.approx(0.2), pytest.approx(0.3)]
+
+    assert not board.diff([str(stamps[0])])["ok"]
+    assert not board.diff([str(stamps[0])] * 7)["ok"]
 
 
 def test_diff_requires_scanned_root(tmp_path):
     stamp = _make_run(tmp_path, STANDARD_NAME)
 
     board  = RunLeaderboard(WebLogger())
-    result = board.diff(str(stamp), str(stamp))
+    result = board.diff([str(stamp), str(stamp)])
 
     assert not result["ok"]
 
@@ -184,8 +207,8 @@ def test_diff_rejects_paths_outside_root(tmp_path):
     board = RunLeaderboard(WebLogger())
     assert board.table(str(inside))["ok"]
 
-    assert board.diff(str(stamp_in), str(stamp_in))["ok"]
-    assert not board.diff(str(stamp_in), str(stamp_out))["ok"]
+    assert board.diff([str(stamp_in), str(stamp_in)])["ok"]
+    assert not board.diff([str(stamp_in), str(stamp_out)])["ok"]
 
 
 def _make_seed_run(base: Path, experiment: str, unit: str, seed: int, stamp: str, metrics: dict) -> Path:

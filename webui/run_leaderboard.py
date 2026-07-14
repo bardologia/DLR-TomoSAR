@@ -189,20 +189,26 @@ class RunLeaderboard:
 
         return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "experiments": payload}
 
-    def diff(self, a: str, b: str) -> dict:
-        side_a = self._side(a)
-        if "error" in side_a:
-            return {"ok": False, "error": side_a["error"]}
+    MAX_DIFF_RUNS = 6
 
-        side_b = self._side(b)
-        if "error" in side_b:
-            return {"ok": False, "error": side_b["error"]}
+    def diff(self, runs: list[str]) -> dict:
+        if len(runs) < 2:
+            return {"ok": False, "error": "select at least two runs to compare"}
+        if len(runs) > self.MAX_DIFF_RUNS:
+            return {"ok": False, "error": f"comparison supports at most {self.MAX_DIFF_RUNS} runs"}
 
-        keys       = set(side_a["metrics"]) | set(side_b["metrics"])
+        sides = []
+        for raw in runs:
+            side = self._side(raw)
+            if "error" in side:
+                return {"ok": False, "error": side["error"]}
+            sides.append(side)
+
+        keys       = set().union(*(set(side["metrics"]) for side in sides))
         directions = {key: self._direction(key) for key in keys}
         sections   = [{"title": title, "keys": section_keys} for title, section_keys in MetricSectionGrouper().group(sorted(keys))]
 
-        return {"ok": True, "a": side_a, "b": side_b, "directions": directions, "sections": sections}
+        return {"ok": True, "sides": sides, "directions": directions, "sections": sections}
 
     def _side(self, raw: str) -> dict:
         stamp_dir = self._stamp_dir(raw)
