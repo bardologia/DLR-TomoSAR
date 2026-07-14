@@ -833,6 +833,265 @@ class TomogramTransect {
   }
 }
 
+class TomogramCloud {
+  static VIRIDIS = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
+
+  constructor(refs, host) {
+    this.host = host;
+    this.sourceEl = refs.source;
+    this.colorEl = refs.color;
+    this.thrEl = refs.thr;
+    this.thrValEl = refs.thrVal;
+    this.maxEl = refs.max;
+    this.demWrap = refs.demWrap;
+    this.demEl = refs.dem;
+    this.atEl = refs.at;
+    this.canvas = refs.canvas;
+
+    this.source = "pred";
+    this.colorBy = "mu";
+    this.points = null;
+    this.total = 0;
+    this.demPoints = null;
+    this.debounceTimer = null;
+
+    this.yaw = 0.7;
+    this.pitch = 0.9;
+    this.zoom = 1.0;
+    this.dragging = null;
+
+    this.sourceEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.addEventListener("click", () => this._setSource(btn.dataset.source));
+    });
+    this.colorEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.addEventListener("click", () => this._setColor(btn.dataset.color));
+    });
+    this.thrEl.addEventListener("input", () => this._onThreshold());
+    this.maxEl.addEventListener("change", () => this._fetch());
+    this.demEl.addEventListener("change", () => this._onDem());
+
+    this.canvas.addEventListener("mousedown", (ev) => { this.dragging = { x: ev.clientX, y: ev.clientY }; });
+    window.addEventListener("mousemove", (ev) => this._onDrag(ev));
+    window.addEventListener("mouseup", () => { this.dragging = null; });
+    this.canvas.addEventListener("wheel", (ev) => this._onWheel(ev), { passive: false });
+    this.canvas.addEventListener("dblclick", () => this._resetView());
+  }
+
+  configure(meta) {
+    this.available = !!meta.params && meta.params.sources.includes("pred");
+    this.points = null;
+    this.demPoints = null;
+    this.demWrap.hidden = !meta.dem;
+    this.demEl.checked = false;
+    this._resetView(false);
+    this._syncThresholdLabel();
+  }
+
+  render() {
+    this._syncBtns();
+    if (!this.points) this._fetch();
+    else this._draw();
+  }
+
+  _setSource(source) {
+    if (source === this.source) return;
+    if (source === "gt" && !this.host.meta.params.sources.includes("gt")) {
+      window.toast("This run has no ground-truth parameter cube.", "warn");
+      return;
+    }
+    this.source = source;
+    this._syncBtns();
+    this._fetch();
+  }
+
+  _setColor(colorBy) {
+    if (colorBy === this.colorBy) return;
+    this.colorBy = colorBy;
+    this._syncBtns();
+    this._draw();
+  }
+
+  _onThreshold() {
+    this._syncThresholdLabel();
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this._fetch(), 250);
+  }
+
+  async _onDem() {
+    if (this.demEl.checked && !this.demPoints) {
+      this.demPoints = await this._fetchBinary(`/api/cubes/dem_points?id=${encodeURIComponent(this.host.selectedId)}&stride=4`);
+    }
+    this._draw();
+  }
+
+  _ampMin() {
+    const params = this.host.meta.params;
+    const thr = params.threshold;
+    const top = Math.max(params.ranges.amp[1], thr * 10);
+    const frac = Number(this.thrEl.value) / 100;
+    return thr * Math.pow(top / thr, frac);
+  }
+
+  _syncThresholdLabel() {
+    if (!this.host.meta || !this.host.meta.params) return;
+    this.thrValEl.textContent = this.host._fmt(this._ampMin());
+  }
+
+  _syncBtns() {
+    this.sourceEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.source === this.source);
+      if (btn.dataset.source === "gt") btn.disabled = !this.host.meta.params.sources.includes("gt");
+    });
+    this.colorEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.color === this.colorBy);
+    });
+  }
+
+  async _fetchBinary(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const raw = new Float32Array(await res.arrayBuffer());
+      return { header: raw.subarray(0, 4), rows: raw.subarray(4) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async _fetch() {
+    if (!this.available) return;
+
+    const url = `/api/cubes/points?id=${encodeURIComponent(this.host.selectedId)}&source=${this.source}` +
+      `&amp_min=${this._ampMin()}&max=${this.maxEl.value}`;
+
+    const data = await this._fetchBinary(url);
+    if (!data) return;
+
+    this.points = data.rows;
+    this.total = data.header[1];
+    this.muRange = this._sampleRange(data.rows, 2);
+    this._draw();
+  }
+
+  _sampleRange(rows, offset) {
+    const values = [];
+    const stride = Math.max(1, Math.floor(rows.length / 4 / 4096)) * 4;
+    for (let i = offset; i < rows.length; i += stride) values.push(rows[i]);
+    if (!values.length) return [0, 1];
+
+    values.sort((a, b) => a - b);
+    const lo = values[Math.floor(values.length * 0.02)];
+    const hi = values[Math.floor(values.length * 0.98)];
+    return hi > lo ? [lo, hi] : [lo, lo + 1];
+  }
+
+  _resetView(draw = true) {
+    this.yaw = 0.7;
+    this.pitch = 0.9;
+    this.zoom = 1.0;
+    if (draw) this._draw();
+  }
+
+  _onDrag(ev) {
+    if (!this.dragging) return;
+    this.yaw += (ev.clientX - this.dragging.x) * 0.008;
+    this.pitch = Math.min(1.55, Math.max(0.05, this.pitch + (ev.clientY - this.dragging.y) * 0.006));
+    this.dragging = { x: ev.clientX, y: ev.clientY };
+    this._draw();
+  }
+
+  _onWheel(ev) {
+    ev.preventDefault();
+    this.zoom = Math.min(8, Math.max(0.3, this.zoom * (ev.deltaY > 0 ? 0.9 : 1.11)));
+    this._draw();
+  }
+
+  _palette(t) {
+    const stops = TomogramCloud.VIRIDIS;
+    const x = Math.min(0.9999, Math.max(0, t)) * (stops.length - 1);
+    const i = Math.floor(x);
+    const f = x - i;
+    return [
+      Math.round(stops[i][0] + (stops[i + 1][0] - stops[i][0]) * f),
+      Math.round(stops[i][1] + (stops[i + 1][1] - stops[i][1]) * f),
+      Math.round(stops[i][2] + (stops[i + 1][2] - stops[i][2]) * f),
+    ];
+  }
+
+  _draw() {
+    if (!this.points || this.host.view !== "cloud") return;
+
+    const meta = this.host.meta;
+    const stage = this.canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(320, stage.clientWidth);
+    const h = Math.max(320, Math.round(window.innerHeight * 0.62));
+
+    if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) {
+      this.canvas.width = Math.round(w * dpr);
+      this.canvas.height = Math.round(h * dpr);
+      this.canvas.style.height = `${h}px`;
+    }
+
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const ctx = this.canvas.getContext("2d");
+    const image = ctx.createImageData(W, H);
+    const buf = new Uint32Array(image.data.buffer);
+    buf.fill(0xff1a1510);
+
+    const cx = meta.n_rg / 2;
+    const cy = meta.n_az / 2;
+    const [muLo, muHi] = this.muRange || [meta.x_min, meta.x_max];
+    const zMid = (muLo + muHi) / 2;
+    const zSpan = (muHi - muLo) || 1;
+    const zScale = (Math.max(meta.n_az, meta.n_rg) * 0.35) / (zSpan / 2);
+
+    const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
+    const sinP = Math.sin(this.pitch), cosP = Math.cos(this.pitch);
+    const fit = (Math.min(W, H) / (Math.max(meta.n_az, meta.n_rg) * 1.9)) * this.zoom;
+
+    const plot = (x, y, z, rgb) => {
+      const rx = x * cosY - y * sinY;
+      const ry = x * sinY + y * cosY;
+      const sx = Math.round(W / 2 + rx * fit);
+      const sy = Math.round(H / 2 + (ry * cosP - z * sinP) * fit);
+      if (sx < 0 || sy < 0 || sx >= W - 1 || sy >= H - 1) return;
+      const color = 0xff000000 | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0];
+      buf[sy * W + sx] = color;
+      buf[sy * W + sx + 1] = color;
+      buf[(sy + 1) * W + sx] = color;
+      buf[(sy + 1) * W + sx + 1] = color;
+    };
+
+    if (this.demEl.checked && this.demPoints) {
+      const dem = this.demPoints.rows;
+      for (let i = 0; i < dem.length; i += 4) {
+        plot(dem[i + 1] - cx, dem[i] - cy, dem[i + 2] * zScale, [110, 116, 122]);
+      }
+    }
+
+    const rows = this.points;
+    const params = meta.params;
+    const ampLo = Math.log(Math.max(params.threshold, 1e-6));
+    const ampHi = Math.log(Math.max(params.ranges.amp[1], params.threshold * 10));
+
+    for (let i = 0; i < rows.length; i += 4) {
+      const mu = rows[i + 2];
+      const amp = rows[i + 3];
+      const t = this.colorBy === "amp"
+        ? (Math.log(Math.max(amp, 1e-6)) - ampLo) / Math.max(ampHi - ampLo, 1e-6)
+        : (mu - muLo) / zSpan;
+      plot(rows[i + 1] - cx, rows[i] - cy, (mu - zMid) * zScale, this._palette(t));
+    }
+
+    ctx.putImageData(image, 0, 0);
+
+    const shown = rows.length / 4;
+    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers · drag to orbit · wheel to zoom · double-click to reset`;
+  }
+}
+
 class TomogramView {
   static LABELS = { pred: "pred", predb: "pred B", diff: "A − B", gt: "gt", reduced: "capon reduced", full: "capon full" };
   static HOLD_SAVE_MS = 4000;
@@ -903,6 +1162,7 @@ class TomogramView {
     this.params = refs.params ? new TomogramParams(refs.params, this) : null;
     this.metrics = refs.metrics ? new TomogramMetrics(refs.metrics, this) : null;
     this.transect = refs.transect ? new TomogramTransect(refs.transect, this) : null;
+    this.cloud = refs.cloud ? new TomogramCloud(refs.cloud, this) : null;
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -1218,6 +1478,13 @@ class TomogramView {
 
     if (this.transect) this.transect.configure();
 
+    if (this.cloud) {
+      this.cloud.configure(meta);
+      const cloudBtn = this.modeBtns.find((btn) => btn.dataset.view === "cloud");
+      if (cloudBtn) cloudBtn.hidden = !this.cloud.available;
+      if (!this.cloud.available && this.view === "cloud") this._setView("explorer");
+    }
+
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
 
     const sweep = this._sweepFor(this.view);
@@ -1280,7 +1547,7 @@ class TomogramView {
   }
 
   _setView(view) {
-    if (!["explorer", "elevation", "azimuth", "range", "params", "metrics", "transect"].includes(view) || view === this.view) return;
+    if (!["explorer", "elevation", "azimuth", "range", "params", "metrics", "transect", "cloud"].includes(view) || view === this.view) return;
 
     this._stopSweeps();
     this.view = view;
@@ -1298,6 +1565,10 @@ class TomogramView {
     }
     if (view === "transect" && this.transect && this.meta) {
       this.transect.render();
+      return;
+    }
+    if (view === "cloud" && this.cloud && this.meta) {
+      this.cloud.render();
       return;
     }
 

@@ -212,6 +212,24 @@ class RequestRouter:
             )
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/cubes/points":
+            query = parse_qs(urlparse(handler.path).query)
+            blob  = self.cubes.points_bin(
+                cube_id    = (query.get("id") or [""])[0],
+                source     = (query.get("source") or ["pred"])[0],
+                amp_min    = float((query.get("amp_min") or ["0.001"])[0]),
+                max_points = int((query.get("max") or ["60000"])[0]),
+            )
+            self._send_bytes(handler, blob)
+            return
+        if path == "/api/cubes/dem_points":
+            query = parse_qs(urlparse(handler.path).query)
+            blob  = self.cubes.dem_points_bin(
+                cube_id = (query.get("id") or [""])[0],
+                stride  = int((query.get("stride") or ["4"])[0]),
+            )
+            self._send_bytes(handler, blob)
+            return
         if path == "/api/cubes/transect":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.transect_png(
@@ -640,6 +658,18 @@ class RequestRouter:
         handler.send_header("Access-Control-Allow-Origin", "*")
         handler.end_headers()
         handler.wfile.write(payload)
+
+    def _send_bytes(self, handler, blob: bytes | None) -> None:
+        if blob is None:
+            self._send_json(handler, {"error": "not found"}, 404)
+            return
+
+        handler.send_response(200)
+        handler.send_header("Content-Type", "application/octet-stream")
+        handler.send_header("Content-Length", str(len(blob)))
+        handler.send_header("Cache-Control", "no-cache")
+        handler.end_headers()
+        handler.wfile.write(blob)
 
     def _send_png(self, handler, png: bytes | None) -> None:
         if png is None:

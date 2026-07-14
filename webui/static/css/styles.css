@@ -3715,3 +3715,9 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 @media (max-width: 1100px) {
   .cube-tview { grid-template-columns: 1fr; }
 }
+
+/* ==== Cube point cloud ==== */
+.cube-cloud__stage { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; background: #10151a; }
+.cube-cloud__stage canvas { width: 100%; display: block; cursor: grab; }
+.cube-cloud__stage canvas:active { cursor: grabbing; }
+#cube-cloud-dem-wrap[hidden] { display: none; }

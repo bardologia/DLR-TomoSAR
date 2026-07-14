@@ -161,6 +161,69 @@ def test_param_map_slot_clipped(tmp_path):
     assert explorer.param_map_png(cube_id, "pred", "amp", slot=-3) is not None
 
 
+def test_points_bin_thresholds_and_subsamples(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path)
+
+    blob = explorer.points_bin(cube_id, "pred", amp_min=1e-3, max_points=100000)
+    raw  = np.frombuffer(blob, dtype=np.float32)
+
+    n_sent, total = int(raw[0]), int(raw[1])
+    rows          = raw[4:].reshape(n_sent, 4)
+
+    stamp = Path(cube_id)
+    pred  = np.load(stamp / "cubes" / "params_pred.npy")
+    amps  = pred[0::3]
+    mus   = pred[1::3]
+    mask  = np.isfinite(amps) & (amps >= 1e-3) & np.isfinite(mus)
+
+    assert total == int(mask.sum())
+    assert n_sent == total
+    assert rows[:, 3].min() >= 1e-3
+    assert rows[:, 0].max() < N_AZ and rows[:, 1].max() < N_RG
+
+    capped = np.frombuffer(explorer.points_bin(cube_id, "pred", amp_min=1e-3, max_points=5), dtype=np.float32)
+    assert int(capped[0]) == 5 and int(capped[1]) == total
+
+    assert explorer.points_bin(cube_id, "banana", 1e-3, 100) is None
+    assert explorer.points_bin("wrong", "pred", 1e-3, 100) is None
+
+
+def test_dem_points_absent_without_artifact(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path)
+
+    assert explorer.load_status()["cube"]["dem"] is False
+    assert explorer.dem_points_bin(cube_id, stride=2) is None
+
+
+def test_dem_points_with_artifact(tmp_path):
+    stamp   = _make_cube_run(tmp_path)
+    preproc = tmp_path / "preproc"
+    layout  = json.loads((preproc / "data" / "dataset.json").read_text())
+
+    dem = np.linspace(600.0, 700.0, N_AZ * N_RG).reshape(N_AZ, N_RG).astype(np.float32)
+    np.save(preproc / "data" / "dem.npy", dem)
+    layout["artifacts"]["dem_full"] = "dem.npy"
+    (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
+
+    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    cube_id  = explorer.list_cubes(str(tmp_path))["cubes"][0]["id"]
+    explorer.start_load(cube_id)
+
+    deadline = time.time() + 30.0
+    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
+        time.sleep(0.05)
+    assert explorer.load_status()["state"] == "ready"
+    assert explorer.load_status()["cube"]["dem"] is True
+
+    raw = np.frombuffer(explorer.dem_points_bin(cube_id, stride=2), dtype=np.float32)
+    n_sent, median = int(raw[0]), float(raw[1])
+    rows           = raw[4:].reshape(n_sent, 4)
+
+    assert n_sent == len(range(0, N_AZ, 2)) * len(range(0, N_RG, 2))
+    assert abs(median - float(np.median(dem[::2, ::2]))) < 1e-3
+    assert abs(float(rows[:, 2].mean())) < 30.0
+
+
 def test_params_with_nan_survive_load_and_lookup(tmp_path):
     stamp = _make_cube_run(tmp_path)
     pred  = np.load(stamp / "cubes" / "params_pred.npy")

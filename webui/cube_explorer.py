@@ -485,6 +485,67 @@ class CubeExplorer:
             return "coolwarm" if field == "count" else "inferno"
         return None
 
+    def points_bin(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
+        resolved = self._param_state(cube_id)
+        if resolved is None or source not in self.PARAM_SOURCES:
+            return None
+
+        params, _ = resolved
+        block     = params.get(source)
+        if block is None:
+            return None
+
+        amps = block[0::3]
+        mus  = block[1::3]
+        mask = np.isfinite(amps) & (amps >= amp_min) & np.isfinite(mus)
+
+        k_idx, az_idx, rg_idx = np.nonzero(mask)
+        total                 = int(k_idx.size)
+
+        if total > max_points > 0:
+            keep   = np.linspace(0, total - 1, max_points).astype(int)
+            k_idx  = k_idx[keep]
+            az_idx = az_idx[keep]
+            rg_idx = rg_idx[keep]
+
+        rows = np.stack([
+            az_idx.astype(np.float32),
+            rg_idx.astype(np.float32),
+            mus[k_idx, az_idx, rg_idx].astype(np.float32),
+            amps[k_idx, az_idx, rg_idx].astype(np.float32),
+        ], axis=1)
+
+        header = np.array([rows.shape[0], total, 0.0, 0.0], dtype=np.float32)
+        return header.tobytes() + np.ascontiguousarray(rows).tobytes()
+
+    def dem_points_bin(self, cube_id: str, stride: int) -> bytes | None:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            dem = self.loaded["dem"]
+
+        if dem is None:
+            return None
+
+        stride = max(1, int(stride))
+        az     = np.arange(0, dem.shape[0], stride)
+        rg     = np.arange(0, dem.shape[1], stride)
+        grid   = dem[np.ix_(az, rg)]
+
+        az_mesh, rg_mesh = np.meshgrid(az, rg, indexing="ij")
+        finite           = np.isfinite(grid)
+        median           = float(np.median(grid[finite])) if finite.any() else 0.0
+
+        rows = np.stack([
+            az_mesh[finite].astype(np.float32),
+            rg_mesh[finite].astype(np.float32),
+            (grid[finite] - median).astype(np.float32),
+            np.zeros(int(finite.sum()), dtype=np.float32),
+        ], axis=1)
+
+        header = np.array([rows.shape[0], median, 0.0, 0.0], dtype=np.float32)
+        return header.tobytes() + np.ascontiguousarray(rows).tobytes()
+
     def metric_overlay_png(self, cube_id: str, key: str, vmin: float, vmax: float, keep_min: float, keep_max: float, alpha: float) -> bytes | None:
         resolved = self._metric_state(cube_id, key)
         if resolved is None:
@@ -685,10 +746,10 @@ class CubeExplorer:
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            entries, meta, primary, params, metric_maps = self._load_all(stamp_dir)
+            entries, meta, primary, params, metric_maps, dem = self._load_all(stamp_dir)
 
             with self.lock:
-                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params, "metric_maps": metric_maps}
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params, "metric_maps": metric_maps, "dem": dem}
                 self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
 
             self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
@@ -699,7 +760,7 @@ class CubeExplorer:
 
             self.logger.error(f"cube load failed: {cube_id}: {exc}")
 
-    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict, dict]:
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict, dict, np.ndarray | None]:
         cubes_dir = stamp_dir / "cubes"
         pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
         if pred_raw.ndim != 3:
@@ -736,6 +797,7 @@ class CubeExplorer:
         primary     = self._primary_db(stamp_dir, n_az, n_rg)
         params      = self._load_params(cubes_dir, n_az, n_rg)
         metric_maps = self._load_metric_maps(cubes_dir, n_az, n_rg)
+        dem         = self._load_dem(stamp_dir, n_az, n_rg)
 
         meta = {
             "sources"     : [s for s in self.SOURCES if s in entries],
@@ -747,8 +809,32 @@ class CubeExplorer:
             "params"      : self._params_meta(params, curve_axis),
             "metric_maps" : self._metric_maps_meta(metric_maps),
             "attached"    : None,
+            "dem"         : dem is not None,
         }
-        return entries, meta, primary, params, metric_maps
+        return entries, meta, primary, params, metric_maps, dem
+
+    def _load_dem(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
+        resolved = self._preproc_layout(stamp_dir)
+        if resolved is None:
+            return None
+
+        preproc_dir, layout = resolved
+
+        dem_name = layout["artifacts"].get("dem_full")
+        if not dem_name:
+            return None
+
+        dem_path = preproc_dir / "data" / dem_name
+        if not dem_path.is_file():
+            return None
+
+        az_lo, az_hi, rg_lo, rg_hi = self._crop_bounds(stamp_dir, layout, n_az, n_rg)
+
+        raw = np.load(dem_path, mmap_mode="r")
+        if raw.ndim != 2 or az_hi > raw.shape[0] or rg_hi > raw.shape[1] or az_lo < 0 or rg_lo < 0:
+            raise ValueError(f"dem_full shape {raw.shape} does not cover the cube region az[{az_lo}:{az_hi}] rg[{rg_lo}:{rg_hi}]")
+
+        return np.asarray(raw[az_lo:az_hi, rg_lo:rg_hi], dtype=np.float32)
 
     def _load_metric_maps(self, cubes_dir: Path, n_az: int, n_rg: int) -> dict:
         maps = {}
