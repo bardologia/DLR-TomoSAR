@@ -685,6 +685,23 @@ main { margin-left: var(--navw); }
   .wd__nuke.is-firing { animation: pulse 0.6s var(--ease) infinite; }
 }
 
+/* job notifications */
+.sboard--ntf { gap: 14px; }
+.ntf__field { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ntf__key { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dk-faint); white-space: nowrap; }
+.ntf__input {
+  font-family: var(--mono); font-size: 11.5px; color: var(--dk-ink);
+  background: rgba(6, 10, 14, 0.55); border: 1px solid var(--dk-line2); border-radius: 2px;
+  padding: 6px 9px; width: 170px; min-width: 0;
+  transition: border-color 0.2s var(--ease);
+}
+.ntf__input:focus { outline: none; border-color: var(--dk-dim); }
+.ntf__input--server { width: 140px; }
+.ntf__input--num { width: 58px; text-align: right; appearance: textfield; -moz-appearance: textfield; }
+.ntf__input--num::-webkit-outer-spin-button, .ntf__input--num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ntf__hint { font-family: var(--mono); font-size: 10.5px; color: var(--dk-faint); line-height: 1.5; min-width: 0; }
+@media (max-width: 1280px) { .ntf__hint { display: none; } }
+
 /* neighbour impact */
 .impact__light { width: 9px; height: 9px; border-radius: 50%; background: var(--dk-faint); flex: 0 0 auto; }
 .impact__light.is-clear  { background: var(--dk-acc2); box-shadow: 0 0 8px rgba(45, 212, 191, 0.6); }

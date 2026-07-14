@@ -13,6 +13,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
+from notifier        import JobNotifier
 from process_manager import ProcessManager
 from web_logger      import WebLogger
 
@@ -25,12 +26,15 @@ class StubPaths:
     def __init__(self, root: Path) -> None:
         self.repo_root = root
         self.main_dir  = root / "main"
+        self.logs_dir  = root / "logs"
 
 
 @pytest.fixture
 def manager(tmp_path):
     (tmp_path / "main" / "analysis").mkdir(parents=True)
-    instance                  = ProcessManager(StubPaths(tmp_path), WebLogger())
+    paths                     = StubPaths(tmp_path)
+    logger                    = WebLogger()
+    instance                  = ProcessManager(paths, logger, JobNotifier(paths, logger))
     instance.ORPHAN_MIN_AGE_S = 0.0
     instance.ORPHAN_RESCAN_S  = 0.0
     return instance

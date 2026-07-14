@@ -115,6 +115,21 @@ class StatusBoard {
       `</div>` +
       `</section>` +
 
+      `<section class="sboard sboard--strip sboard--ntf" aria-label="Job notifications">` +
+      `<div class="strip__seg">` +
+      `<i class="wd__light" id="sb-ntf-light" aria-hidden="true"></i><span class="wd__label">notify</span><span class="wd__mode" id="sb-ntf-mode">--</span></div>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<label class="ntf__field"><span class="ntf__key">ntfy topic</span><input class="ntf__input" id="sb-ntf-topic" type="text" placeholder="pick-a-secret-topic" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">server</span><input class="ntf__input ntf__input--server" id="sb-ntf-server" type="text" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">min minutes</span><input class="ntf__input ntf__input--num" id="sb-ntf-min" type="number" min="0" step="1"></label>` +
+      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Failed jobs always notify; successful jobs only when they ran at least the minimum runtime. Jobs you stop yourself stay silent.">push to your phone when a job ends</span>` +
+      `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-ntf-test" title="Send a test notification to the topic now">test</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-save" title="Save topic, server and minimum runtime">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-toggle" title="Toggle job-completion notifications">notify: --</button>` +
+      `</div>` +
+      `</section>` +
+
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
       `<div class="sboard__gputop">` +
       `<div class="gpudeck">` +
@@ -219,6 +234,7 @@ class StatusBoard {
     this._wireNuke();
     this._wireImpactArm();
     this._wireDetach();
+    this._wireNotify();
 
     if (!window.REDUCED_MOTION && window.gsap) {
       gsap.from(this.els.board.querySelectorAll(".sboard"), { opacity: 0, y: 16, duration: 0.7, stagger: 0.08, ease: "expo.out" });
@@ -282,6 +298,76 @@ class StatusBoard {
     if (srv.detached) btn.title = `backend detached (pid ${srv.pid}) — output continues in ${srv.log_path}`;
   }
 
+  _wireNotify() {
+    const save   = document.getElementById("sb-ntf-save");
+    const toggle = document.getElementById("sb-ntf-toggle");
+    const test   = document.getElementById("sb-ntf-test");
+    if (!save || !toggle || !test) return;
+
+    const submit = async (enabled) => {
+      const topic = document.getElementById("sb-ntf-topic");
+      const server = document.getElementById("sb-ntf-server");
+      const min = document.getElementById("sb-ntf-min");
+      const payload = {
+        enabled,
+        topic: topic ? topic.value.trim() : "",
+        server: server ? server.value.trim() : "",
+        min_runtime_s: Math.max(0, parseFloat(min && min.value) || 0) * 60,
+      };
+      const res = await window.apiPost("/api/notify/config", payload);
+      if (res && res.ok) {
+        this._ntfSeeded = false;
+        this._renderNotify(res);
+        window.toast(`notifications ${res.enabled ? "on" : "off"} — settings saved`, "ok");
+      } else {
+        window.toast(`notify settings rejected: ${(res && res.error) || "network error"}`, "error");
+      }
+    };
+
+    save.addEventListener("click", () => submit(!!(this._ntfState || {}).enabled));
+    toggle.addEventListener("click", () => submit(!(this._ntfState || {}).enabled));
+
+    test.addEventListener("click", async () => {
+      test.disabled = true;
+      try {
+        const res = await window.apiPost("/api/notify/test");
+        if (res && res.ok) window.toast("test notification sent — check your device", "ok");
+        else window.toast(`test failed: ${(res && res.error) || "network error"}`, "error");
+      } finally {
+        test.disabled = false;
+      }
+    });
+  }
+
+  _renderNotify(ntf) {
+    if (!ntf) return;
+    this._ntfState = ntf;
+
+    const light  = document.getElementById("sb-ntf-light");
+    const mode   = document.getElementById("sb-ntf-mode");
+    const toggle = document.getElementById("sb-ntf-toggle");
+    const on     = !!ntf.enabled;
+    if (light) light.classList.toggle("is-armed", on);
+    if (mode) {
+      mode.textContent = on ? "armed" : "off";
+      mode.classList.toggle("is-off", !on);
+    }
+    if (toggle) {
+      toggle.textContent = on ? "notify: ON" : "notify: off";
+      toggle.classList.toggle("is-safe", on);
+    }
+
+    if (!this._ntfSeeded) {
+      this._ntfSeeded = true;
+      const topic = document.getElementById("sb-ntf-topic");
+      const server = document.getElementById("sb-ntf-server");
+      const min = document.getElementById("sb-ntf-min");
+      if (topic) topic.value = ntf.topic || "";
+      if (server) server.value = ntf.server || "";
+      if (min) min.value = String(Math.round(((ntf.min_runtime_s || 0) / 60) * 10) / 10);
+    }
+  }
+
   _wireImpactArm() {
     const btn = document.getElementById("sb-impact-arm");
     if (!btn) return;
@@ -314,6 +400,7 @@ class StatusBoard {
     this._renderImpact(sys.impact || {});
     this._renderGpuGuard(sys.gpu_guard || {});
     this._renderDetach(sys.server);
+    this._renderNotify(sys.notify);
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
     const disk = sys.disk || {};

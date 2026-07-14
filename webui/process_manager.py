@@ -15,6 +15,7 @@ from collections import deque
 from datetime    import datetime, timedelta
 from pathlib     import Path
 
+from notifier      import JobNotifier
 from proc_stats    import ProcStats
 from project_paths import ProjectPaths
 from web_logger    import WebLogger
@@ -57,9 +58,10 @@ class ProcessManager:
     ORPHAN_MIN_AGE_S = 15.0
     ORPHAN_RESCAN_S  = 3.0
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, notifier: JobNotifier) -> None:
         self.paths         = paths
         self.logger        = logger
+        self.notifier      = notifier
         self.jobs          = {}
         self.streams       = {}
         self.lock          = threading.Lock()
@@ -192,9 +194,11 @@ class ProcessManager:
                 return
             with self.lock:
                 record["status"] = "failed"
+                snapshot         = dict(record)
             stream.publish({"type": "status", "status": "failed", "code": None, "verdict": "error"})
             stream.publish({"type": "end"})
             self.logger.error(f"scheduled job {follow_id} failed to start: {error}")
+            self.notifier.job_finished(snapshot)
             return
 
         with self.lock:
@@ -258,6 +262,7 @@ class ProcessManager:
                 record["status"]    = "finished" if code == 0 else "failed"
                 record["exit_code"] = code
             follow_id = record["follow_up"] if record else None
+            snapshot  = dict(record) if record else None
 
         if follow_id:
             self._resolve_follow_up(follow_id, code)
@@ -266,6 +271,9 @@ class ProcessManager:
         self.logger.muted(f"job {job_id} exited with code {code}")
         stream.publish({"type": "status", "status": record["status"], "code": code, "verdict": verdict})
         stream.publish({"type": "end"})
+
+        if snapshot is not None:
+            self.notifier.job_finished(snapshot)
 
     def _parse_detached_pid(self, text: str) -> int | None:
         match = self.DETACHED_PID.search(text)
@@ -301,10 +309,13 @@ class ProcessManager:
                 return
             record["status"]    = "finished"
             record["exit_code"] = None
+            snapshot            = dict(record)
 
         self.logger.muted(f"detached job {job_id} (pid {pid}) exited, exit status unknown")
         stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
+
+        self.notifier.job_finished(snapshot)
 
     def adopt_orphans(self) -> int:
         now = time.monotonic()

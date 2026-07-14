@@ -18,6 +18,7 @@ from pipeline_library                   import PipelineLibrary
 from repomap_library                    import RepoMapLibrary
 from profile_autoencoder_model_library  import ProfileAutoencoderModelLibrary
 from jepa_model_library                 import JepaModelLibrary
+from notifier                           import JobNotifier
 from process_manager                    import ProcessManager, ProcessNuke, ServerDetacher
 from project_paths                      import ProjectPaths
 from request_router                     import RequestRouter
@@ -74,7 +75,8 @@ class WebUIServer:
         self.jepa_models       = JepaModelLibrary()
         self.pipelines         = PipelineLibrary()
         self.repomap           = RepoMapLibrary()
-        self.processes         = ProcessManager(self.paths, self.logger)
+        self.notifier          = JobNotifier(self.paths, self.logger)
+        self.processes         = ProcessManager(self.paths, self.logger, self.notifier)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)
@@ -105,6 +107,7 @@ class WebUIServer:
             pipelines         = self.pipelines,
             repomap           = self.repomap,
             processes         = self.processes,
+            notifier          = self.notifier,
             nuke              = self.nuke,
             detacher          = self.detacher,
             system            = self.system,

@@ -22,6 +22,7 @@ from pipeline_library       import PipelineLibrary
 from repomap_library        import RepoMapLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from jepa_model_library               import JepaModelLibrary
+from notifier               import JobNotifier
 from physics_loss_library   import PhysicsLossLibrary
 from process_manager        import ProcessManager, ProcessNuke, ServerDetacher
 from project_paths          import ProjectPaths
@@ -46,7 +47,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -63,6 +64,7 @@ class RequestRouter:
         self.pipelines   = pipelines
         self.repomap     = repomap
         self.processes   = processes
+        self.notifier    = notifier
         self.nuke        = nuke
         self.detacher    = detacher
         self.system      = system
@@ -418,6 +420,7 @@ class RequestRouter:
             payload["impact"]    = self.contention.state()
             payload["gpu_guard"] = self.gpu_guard.state()
             payload["server"]    = self.detacher.state()
+            payload["notify"]    = self.notifier.state()
             self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):
@@ -466,6 +469,16 @@ class RequestRouter:
         if path == "/api/impact/arm":
             result = self.contention.arm(bool(body.get("armed")))
             self._send_json(handler, result)
+            return
+
+        if path == "/api/notify/config":
+            result = self.notifier.configure(body or {})
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/notify/test":
+            result = self.notifier.test()
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
         if path == "/api/cubes/load":
