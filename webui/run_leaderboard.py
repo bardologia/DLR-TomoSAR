@@ -74,7 +74,6 @@ class RunLeaderboard:
         {"key": "ssim_gt_azimuth_mean",            "label": "SSIM az",        "direction": 1,  "default": True},
         {"key": "ssim_gt_elev_mean",               "label": "SSIM elev",      "direction": 1,  "default": True},
         {"key": "ssim_gt_range_mean",              "label": "SSIM rg",        "direction": 1,  "default": True},
-        {"key": "fraction_pred_beats_reduced",     "label": "beats capon",    "direction": 1,  "default": True},
         {"key": "relative_mse_reduction",          "label": "MSE reduction",  "direction": 1,  "default": False},
         {"key": "improvement_pixel_mse_mean",      "label": "improv mean",    "direction": 1,  "default": False},
         {"key": "physics_coherence_error_mean",    "label": "phys coh err",   "direction": -1, "default": False},
@@ -123,7 +122,7 @@ class RunLeaderboard:
                 "group"   : str(run_dir.relative_to(root).parent),
                 "stamp"   : stamp_dir.name,
                 "mtime"   : stamp_dir.stat().st_mtime,
-                "axes"    : self._run_axes(run_dir),
+                "axes"    : self._run_axes(run_dir, root),
                 "metrics" : values,
             })
 
@@ -132,11 +131,14 @@ class RunLeaderboard:
 
         return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "rows": rows, "errors": errors}
 
-    def _run_axes(self, run_dir: Path) -> dict | None:
-        axes = RunAxes.parse(run_dir.name)
-        if axes is None and self.SEED_DIR.match(run_dir.name):
-            axes = RunAxes.parse(run_dir.parent.name)
-        return axes
+    def _run_axes(self, run_dir: Path, root: Path) -> dict | None:
+        node = run_dir
+        while node != root:
+            axes = RunAxes.parse(node.name)
+            if axes is not None:
+                return axes
+            node = node.parent
+        return None
 
     def trials(self, base: str) -> dict:
         root, error = self._catalog_root(base)

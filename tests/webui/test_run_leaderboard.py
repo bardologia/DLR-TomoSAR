@@ -100,6 +100,7 @@ def test_table_lists_runs_with_axes_and_metrics(tmp_path):
     assert standard["metrics"]["curve_mse_gt"] == 0.5
     assert "data_consistency_status" not in standard["metrics"]
     assert "n_pixels" not in standard["metrics"]
+    assert "fraction_pred_beats_reduced" not in standard["metrics"]
 
     assert by_run["oddly_named_run"]["axes"] is None
 
@@ -218,17 +219,22 @@ def _make_seed_run(base: Path, experiment: str, unit: str, seed: int, stamp: str
     return stamp_dir
 
 
-def test_table_seed_runs_inherit_unit_axes(tmp_path):
+def test_table_axes_fall_back_to_ancestor_names(tmp_path):
     unit = "resunet-conv-sorted_gt-K_5-hvn-none-param_l1_1"
     _make_seed_run(tmp_path, "exp", unit, 3, "20260701_000000", {"curve_mse_gt": 0.5})
+
+    nested = tmp_path / "exp2" / unit / "arm_a" / "warm" / "inference" / "20260701_000000"
+    nested.mkdir(parents=True)
+    (nested / "metrics.json").write_text(json.dumps({"curve_mse_gt": 0.4}))
 
     board = RunLeaderboard(WebLogger())
     rows  = board.table(str(tmp_path))["rows"]
 
-    row = next(r for r in rows if r["run"] == "seed3")
-    assert row["axes"]["model"] == "resunet"
-    assert row["axes"]["k"]     == 5
-    assert row["axes"]["loss"]  == "param_l1_1"
+    for run_name in ("seed3", "warm"):
+        row = next(r for r in rows if r["run"] == run_name)
+        assert row["axes"]["model"] == "resunet"
+        assert row["axes"]["k"]     == 5
+        assert row["axes"]["loss"]  == "param_l1_1"
 
 
 def test_columns_include_ssim_components():
