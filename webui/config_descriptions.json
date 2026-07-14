@@ -2173,7 +2173,7 @@
         "training": "Training-loop knobs (epochs, cosine schedule, LR warmup, EMA weight averaging, VRAM reservation, early stopping, batch/loader settings, patch tiling, azimuth splits); a slim UnrolledTrainingConfig containing exactly the fields the trainer reads",
         "geometry": "Tomographic geometry configuration resolved against the dataset; supplies the height-axis convention and enables the per-pixel kz field the operator requires",
         "normalization": "Per-channel normalization recipes used by the dataset pipeline; output denormalization recovers physical Gaussian parameters before profile rendering",
-        "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches",
+        "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches. Input-noise fields (p_noise, noise_std) are inert for this family because the input stack is discarded in favour of synthesised measurements; use measurement_noise_std instead",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "curve_loss": "Profile reconstruction loss over the elevation axis: l1 or mse, masked to pixels with ground-truth power",
         "measurement_noise_std": "Standard deviation of complex Gaussian noise added to the synthesised coherence measurements; 0 trains on exact forward-model measurements",

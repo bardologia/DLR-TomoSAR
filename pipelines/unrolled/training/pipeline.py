@@ -91,6 +91,10 @@ class UnrolledTrainingPipeline:
 
         return run_directory
 
+    def _warn_inert_augmentation(self, logger) -> None:
+        if self.config.augmentation.p_noise > 0.0:
+            logger.warning("augmentation.p_noise > 0 has no effect for unrolled training: the input stack is discarded and measurements are synthesised from the ground truth; use measurement_noise_std for measurement-space noise.")
+
     def _build_dataset_pipeline(self, run_directory: Path, logger, gaussian_cfg) -> tuple:
         dataset_config             = self.factory.training_dataset_config()
         dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
@@ -127,6 +131,8 @@ class UnrolledTrainingPipeline:
         logger.section("[Unrolled Training Pipeline Execution]")
 
         ConfigCli.save_resolved(self.config, run_directory / "docs" / "resolved_entry_config.json")
+
+        self._warn_inert_augmentation(logger)
 
         gaussian_cfg = GaussianConfig.from_dataset(self.config.paths.dataset_path, self.config.paths.parameters_path)
 

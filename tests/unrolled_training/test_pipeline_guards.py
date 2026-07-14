@@ -7,7 +7,7 @@ import torch
 
 from configuration.training               import UnrolledEntryConfig
 from models.unrolled                      import get_unrolled
-from pipelines.unrolled.training.pipeline import UnrolledOverfitGate
+from pipelines.unrolled.training.pipeline import UnrolledOverfitGate, UnrolledTrainingPipeline
 
 from tests.backbone_training._helpers import identity_normalizer, x_axis_numpy
 
@@ -33,6 +33,14 @@ class _StubDataset:
 
     def __getitem__(self, index):
         return self.items[index]
+
+
+class _RecordingLogger:
+    def __init__(self):
+        self.warnings = []
+
+    def warning(self, message):
+        self.warnings.append(message)
 
 
 def _dataset(n: int = 4) -> _StubDataset:
@@ -110,3 +118,22 @@ def test_failing_gate_aborts_and_cleans_workdir(tmp_path, force_cpu):
 
     assert report["passed"] is False
     assert not (tmp_path / "overfit_check").exists()
+
+
+def test_pipeline_warns_when_inert_input_noise_is_requested(force_cpu):
+    config = UnrolledEntryConfig()
+    config.augmentation.p_noise = 0.5
+
+    logger = _RecordingLogger()
+    UnrolledTrainingPipeline(config)._warn_inert_augmentation(logger)
+
+    assert len(logger.warnings) == 1
+    assert "p_noise" in logger.warnings[0]
+    assert "measurement_noise_std" in logger.warnings[0]
+
+
+def test_pipeline_stays_silent_without_input_noise(force_cpu):
+    logger = _RecordingLogger()
+    UnrolledTrainingPipeline(UnrolledEntryConfig())._warn_inert_augmentation(logger)
+
+    assert logger.warnings == []
