@@ -257,7 +257,7 @@ class ResultsView {
   }
 
   _renderNode(node, depth) {
-    const total   = node.counts.markdown + node.counts.images + node.counts.animations + node.counts.configs;
+    const total   = node.counts.markdown + node.counts.images + node.counts.animations + node.counts.configs + (node.counts.logs || 0);
     const isOpen  = this.expanded.has(node.rel);
     const hasKids = node.children.length > 0;
 
@@ -309,6 +309,7 @@ class ResultsView {
     if (this.view === "folder") {
       this._fillMarkdown(body);
       this._fillConfigs(body);
+      this._fillLogs(body);
     }
 
     if (this.view !== "compare") this._buildIndex(body);
@@ -589,6 +590,17 @@ class ResultsView {
       html += `</section>`;
     }
 
+    if (data.logs.length) {
+      html += `<section class="res-section"><h4 class="res-section__cap">Logs <span>${data.logs.length}</span></h4>`;
+      data.logs.forEach((log, index) => {
+        html += `<details class="res-cfg res-cfg--log"${data.logs.length === 1 ? " open" : ""}>`;
+        html += `<summary>${this._esc(log.name)} <span class="res-cfg__size">${this._size(log.size)}</span></summary>`;
+        html += `<pre class="res-log"><code data-log="${index}"></code></pre>`;
+        html += `</details>`;
+      });
+      html += `</section>`;
+    }
+
     if (data.other.length) {
       html += `<section class="res-section"><h4 class="res-section__cap">Other files <span>${data.other.length}</span></h4><ul class="res-files">`;
       data.other.forEach((file) => {
@@ -597,7 +609,7 @@ class ResultsView {
       html += `</ul></section>`;
     }
 
-    if (!data.markdown.length && !data.images.length && !data.animations.length && !data.configs.length && !data.other.length) {
+    if (!data.markdown.length && !data.images.length && !data.animations.length && !data.configs.length && !data.logs.length && !data.other.length) {
       html += `<div class="res-empty">This folder holds no files. Pick a subfolder on the left.</div>`;
     }
 
@@ -715,6 +727,12 @@ class ResultsView {
     body.querySelectorAll("code[data-cfg]").forEach((code) => {
       const cfg = this.folderData.configs[Number(code.dataset.cfg)];
       code.textContent = cfg.kind === "json" ? this._prettyJson(cfg.text) : cfg.text;
+    });
+  }
+
+  _fillLogs(body) {
+    body.querySelectorAll("code[data-log]").forEach((code) => {
+      code.textContent = this.folderData.logs[Number(code.dataset.log)].text;
     });
   }
 

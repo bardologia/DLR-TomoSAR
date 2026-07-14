@@ -13,6 +13,7 @@ class ResultsBrowser:
     ANIMATION_SUFFIXES = {".gif"}
     CONFIG_SUFFIXES    = {".json", ".yaml", ".yml", ".toml", ".ini"}
     MARKDOWN_SUFFIXES  = {".md"}
+    LOG_SUFFIXES       = {".log", ".txt"}
 
     SKIPPED_DIRS   = {"__pycache__", ".git", ".ipynb_checkpoints"}
     MAX_DEPTH      = 10
@@ -58,7 +59,7 @@ class ResultsBrowser:
         if not folder.is_relative_to(raw_root) or not folder.is_dir():
             return {"ok": False, "error": "unknown folder"}
 
-        markdown, images, animations, configs, other = [], [], [], [], []
+        markdown, images, animations, configs, logs, other = [], [], [], [], [], []
 
         for entry in sorted(folder.iterdir()):
             if not entry.is_file():
@@ -74,6 +75,8 @@ class ResultsBrowser:
                 animations.append({"name": entry.stem, "url": self._url(entry)})
             elif suffix in self.CONFIG_SUFFIXES:
                 configs.append({"name": entry.name, "kind": suffix.lstrip("."), "text": self._read_text(entry)})
+            elif suffix in self.LOG_SUFFIXES:
+                logs.append({"name": entry.name, "size": entry.stat().st_size, "text": self._read_tail(entry)})
             else:
                 other.append({"name": entry.name, "size": entry.stat().st_size})
 
@@ -86,6 +89,7 @@ class ResultsBrowser:
             "images"     : images,
             "animations" : animations,
             "configs"    : configs,
+            "logs"       : logs,
             "other"      : other,
         }
 
@@ -187,7 +191,7 @@ class ResultsBrowser:
                 self._collect_gallery(entry, root, depth + 1, groups)
 
     def _node(self, directory: Path, root: Path, depth: int) -> dict:
-        counts   = {"markdown": 0, "images": 0, "animations": 0, "configs": 0, "other": 0}
+        counts   = {"markdown": 0, "images": 0, "animations": 0, "configs": 0, "logs": 0, "other": 0}
         children = []
 
         try:
@@ -213,6 +217,8 @@ class ResultsBrowser:
                 counts["animations"] += 1
             elif suffix in self.CONFIG_SUFFIXES:
                 counts["configs"] += 1
+            elif suffix in self.LOG_SUFFIXES:
+                counts["logs"] += 1
             else:
                 counts["other"] += 1
 
@@ -241,6 +247,18 @@ class ResultsBrowser:
         if len(raw) > self.MAX_TEXT_BYTES:
             text += "\n\n[truncated]"
         return text
+
+    def _read_tail(self, target: Path) -> str:
+        try:
+            raw = target.read_bytes()
+        except OSError:
+            return ""
+
+        if len(raw) <= self.MAX_TEXT_BYTES:
+            return raw.decode("utf-8", errors="replace")
+
+        tail = raw[-self.MAX_TEXT_BYTES :].decode("utf-8", errors="replace")
+        return "[showing the tail of the file]\n\n" + tail
 
     def _url(self, target: Path) -> str:
         return "/resultsmedia?path=" + quote(str(target))
