@@ -47,9 +47,32 @@ def test_tree_counts_logs(tmp_path):
     (tmp_path / "a.log").write_text("a")
     (tmp_path / "b.txt").write_text("b")
     (tmp_path / "c.json").write_text("{}")
+    (tmp_path / "d.out").write_text("d")
 
     tree = _browser(tmp_path).tree(str(tmp_path))["tree"]
 
-    assert tree["counts"]["logs"] == 2
+    assert tree["counts"]["logs"] == 3
     assert tree["counts"]["configs"] == 1
     assert tree["counts"]["other"] == 0
+
+
+def test_ansi_escapes_are_stripped(tmp_path):
+    raw = "\x1b[36m────\x1b[0m \x1b[1;36minference\x1b[0m\n  \x1b[1;35mStarted\x1b[0m  : \x1b[97m2026-07-04\x1b[0m\n\x1b]0;title\x07plain\n"
+    (tmp_path / "console.out").write_text(raw)
+
+    payload = _browser(tmp_path).folder(str(tmp_path), "")
+
+    text = payload["logs"][0]["text"]
+    assert "\x1b" not in text
+    assert text == "──── inference\n  Started  : 2026-07-04\nplain\n"
+
+
+def test_carriage_return_overwrites_keep_last_frame(tmp_path):
+    raw = "start\nprogress 10%\rprogress 50%\rprogress 100%\nwindows line\r\ndone\x07\n"
+    (tmp_path / "train.log").write_text(raw)
+
+    payload = _browser(tmp_path).folder(str(tmp_path), "")
+
+    text = payload["logs"][0]["text"]
+    assert "\r" not in text and "\x07" not in text
+    assert text == "start\nprogress 100%\nwindows line\ndone\n"

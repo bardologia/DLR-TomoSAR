@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib      import Path
 from urllib.parse import quote
 
@@ -13,7 +14,9 @@ class ResultsBrowser:
     ANIMATION_SUFFIXES = {".gif"}
     CONFIG_SUFFIXES    = {".json", ".yaml", ".yml", ".toml", ".ini"}
     MARKDOWN_SUFFIXES  = {".md"}
-    LOG_SUFFIXES       = {".log", ".txt"}
+    LOG_SUFFIXES       = {".log", ".txt", ".out"}
+
+    ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;:?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
 
     SKIPPED_DIRS   = {"__pycache__", ".git", ".ipynb_checkpoints"}
     MAX_DEPTH      = 10
@@ -255,10 +258,18 @@ class ResultsBrowser:
             return ""
 
         if len(raw) <= self.MAX_TEXT_BYTES:
-            return raw.decode("utf-8", errors="replace")
+            return self._clean_log(raw.decode("utf-8", errors="replace"))
 
-        tail = raw[-self.MAX_TEXT_BYTES :].decode("utf-8", errors="replace")
+        tail = self._clean_log(raw[-self.MAX_TEXT_BYTES :].decode("utf-8", errors="replace"))
         return "[showing the tail of the file]\n\n" + tail
+
+    def _clean_log(self, text: str) -> str:
+        text = self.ANSI_ESCAPES.sub("", text.replace("\r\n", "\n"))
+
+        lines = [line.rsplit("\r", 1)[-1] if "\r" in line else line for line in text.split("\n")]
+        text  = "\n".join(lines)
+
+        return "".join(ch for ch in text if ch in ("\n", "\t") or ord(ch) >= 32)
 
     def _url(self, target: Path) -> str:
         return "/resultsmedia?path=" + quote(str(target))
