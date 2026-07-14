@@ -910,7 +910,7 @@
     "architectures/image_autoencoder::ConvNeXt2dImageAutoencoderConfig": {
       "summary": "ConvNeXt-block 2D image autoencoder variant using channel-wise layernorm and inverted-bottleneck FFN blocks",
       "fields": {
-        "normalization": "declared override (default layernorm) but never read by the model: ChannelLayerNorm before each downsampling stage and the LayerNorm inside every ConvNeXtBlock are hardcoded regardless of this value; not part of this variant's architecture search space",
+        "normalization": "fixed at layernorm for this variant: ChannelLayerNorm before each downsampling stage and the LayerNorm inside every ConvNeXtBlock are hardcoded, and the model rejects any other value loudly at construction",
         "downsample_factor": "spatial downsampling ratio before the bottleneck (power of two, stage count = log2); defaults to 2 here (one strided downsampling stage) and is tuned over {2,4,8} when architecture search is enabled",
         "upsample_mode": "decoder upsampling operator: convtranspose (learned) or bilinear (fixed interpolation)"
       }
@@ -926,7 +926,7 @@
       "summary": "Vision-transformer 2D image autoencoder variant tokenizing the input into patches for encoder/decoder transformer blocks",
       "fields": {
         "activation": "activation used inside the feed-forward sublayer of each TransformerBlock (not the attention itself): relu, leaky_relu, gelu, elu, or silu; fixed at gelu by default and not part of this variant's tunable_arch_params search space",
-        "normalization": "declared field inherited from the base config but never read by the ViT model: LayerNorm is hardcoded after the patch-embedding projection and after each transformer block stack in both encoder and decoder regardless of this value",
+        "normalization": "fixed at layernorm for this variant: LayerNorm is hardcoded after the patch-embedding projection and after each transformer block stack in both encoder and decoder, and the model rejects any other value loudly at construction",
         "patch_size": "square patch edge in pixels for the ViT patch-embedding Conv2d (kernel=stride=patch_size) and the matching decoder ConvTranspose2d unpatch kernel/stride, tuned over {4,8,16}",
         "hidden_dim": "transformer token embedding dimensionality shared by the encoder and decoder blocks and by the to_embedding/from_embedding 1x1 convs, tuned over {96,192,384}",
         "depth": "number of stacked TransformerBlock layers built independently for the encoder and for the decoder (so total blocks across encode+decode is double this value), tuned over {2,4,6}",

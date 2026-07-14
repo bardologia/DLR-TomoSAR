@@ -77,7 +77,10 @@ class ConvNeXt2dImageDecoder(nn.Module):
 
 class ConvNeXt2dImageAutoencoder(ImageAutoencoderBase):
     def __init__(self, config: ConvNeXt2dImageAutoencoderConfig | None = None) -> None:
-        config  = config if config is not None else ConvNeXt2dImageAutoencoderConfig()
+        config = config if config is not None else ConvNeXt2dImageAutoencoderConfig()
+        if config.normalization != "layernorm":
+            raise ValueError(f"convnext2d_ae hardcodes LayerNorm and does not honor normalization='{config.normalization}'; leave the field at 'layernorm'.")
+
         encoder = ConvNeXt2dImageEncoder(config)
         decoder = ConvNeXt2dImageDecoder(config, encoder.bottleneck_channels)
         super().__init__(config, encoder, decoder)

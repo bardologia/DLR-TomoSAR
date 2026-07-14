@@ -64,4 +64,7 @@ class ViTImageDecoder(nn.Module):
 class ViTImageAutoencoder(ImageAutoencoderBase):
     def __init__(self, config: ViTImageAutoencoderConfig | None = None) -> None:
         config = config if config is not None else ViTImageAutoencoderConfig()
+        if config.normalization != "layernorm":
+            raise ValueError(f"vit_ae hardcodes LayerNorm and does not honor normalization='{config.normalization}'; leave the field at 'layernorm'.")
+
         super().__init__(config, ViTImageEncoder(config), ViTImageDecoder(config))

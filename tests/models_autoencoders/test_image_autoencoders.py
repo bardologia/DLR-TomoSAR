@@ -160,3 +160,12 @@ def test_vit_rejects_input_not_divisible_by_patch_size():
     with pytest.raises(ValueError, match="patch_size"):
         with torch.no_grad():
             model.reconstruct(torch.randn(1, IN_CHANNELS, PATCH - 1, PATCH))
+
+
+@pytest.mark.parametrize("name", ["convnext2d_ae", "vit_ae"])
+def test_layernorm_models_reject_normalization_override(name):
+    cfg               = _tiny_config(name)
+    cfg.normalization = "batch"
+
+    with pytest.raises(ValueError, match="normalization"):
+        get_image_autoencoder(name, cfg)
