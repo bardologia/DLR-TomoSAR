@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib     import Path
 
-from configuration.patch_sweep             import PatchSweepConfig
-from pipelines.shared.model.model_builder  import ModelBuilder
+from configuration.patch_sweep               import PatchSweepConfig
+from pipelines.shared.dataset.dataset_queue  import DatasetQueueResolver
+from pipelines.shared.model.model_builder    import ModelBuilder
 
 
 @dataclass(frozen=True)
@@ -49,20 +50,19 @@ class ArchitecturePatchStep:
 
 class PatchSweepPlanner:
     def __init__(self, config: PatchSweepConfig) -> None:
-        self.config = config
+        self.config   = config
+        self.datasets = DatasetQueueResolver(config.dataset_base_path, config.dataset_filter).resolve()
 
         self._validate()
 
     def _validate(self) -> None:
-        datasets = self.config.dataset_paths
+        if not self.datasets:
+            raise ValueError(f"No datasets to sweep under {self.config.dataset_base_path}; select at least one in dataset_filter or add dataset directories to the base")
 
-        if not datasets:
-            raise ValueError("dataset_paths must list at least one dataset to sweep")
-
-        names      = [Path(dataset).name for dataset in datasets]
+        names      = [dataset.name for dataset in self.datasets]
         duplicates = sorted({name for name in names if names.count(name) > 1})
         if duplicates:
-            raise ValueError(f"dataset_paths must have unique directory names (they key the sweep units), duplicated: {duplicates}")
+            raise ValueError(f"dataset_filter must select unique directory names (they key the sweep units), duplicated: {duplicates}")
 
         if not 0 < self.config.patch.stride_ratio <= 1:
             raise ValueError(f"patch.stride_ratio={self.config.patch.stride_ratio} must be in (0, 1]")
@@ -120,10 +120,10 @@ class PatchSweepPlanner:
         sizes = self.patch_sizes()
 
         return {
-            "Datasets"    : [Path(dataset).name for dataset in self.config.dataset_paths],
+            "Datasets"    : [dataset.name for dataset in self.datasets],
             "Patch step"  : self.patch_step(),
             "Patch sizes" : sizes,
-            "Units"       : len(self.config.dataset_paths) * len(sizes),
+            "Units"       : len(self.datasets) * len(sizes),
             "Seeds"       : list(self.config.seeds) or [self.config.seed],
         }
 
@@ -133,8 +133,7 @@ class PatchSweepPlanner:
         template     = self.parameters_template()
 
         plans = []
-        for dataset in self.config.dataset_paths:
-            dataset = Path(dataset)
+        for dataset in self.datasets:
             for size in sizes:
                 plans.append(SweepUnit(
                     dataset_path            = dataset,

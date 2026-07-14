@@ -2249,7 +2249,7 @@
       }
     },
     "patch_sweep/general::PatchGridConfig": {
-      "summary": "Patch-size grid swept for every selected track count, spaced at the architecture's minimum admissible step",
+      "summary": "Patch-size grid swept for every selected dataset, spaced at the architecture's minimum admissible step",
       "fields": {
         "minimum": "Smallest patch size in the grid; 0 derives it as one admissible step (e.g. 16 for a four-stage U-Net), explicit values must be a multiple of the step",
         "maximum": "Largest patch size in the grid, inclusive; the grid runs from minimum to maximum in steps of the admissible step",
@@ -2264,7 +2264,8 @@
         "backbone_name": "Backbone architecture identifier resolved via ModelBuilder's registry; also the source of the admissible patch step, e.g. unet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred)",
         "model_overrides": "Dict of architecture-config field overrides applied to the backbone before instantiation, shared across all sweep units; the default narrows the backbone to a three-level feature pyramid so the admissible patch step is 8",
-        "dataset_paths": "Preprocessed dataset directories to sweep, each with its own boxcar window; every dataset trains the full patch grid on the traditional reduced stack, directory names key the sweep units and must be unique",
+        "dataset_base_path": "Root directory holding the preprocessed dataset directories available to the sweep; dataset_filter is resolved against this base and every resolved dataset must hold a data/ folder",
+        "dataset_filter": "Names of the dataset directories under dataset_base_path selected for the sweep, each preprocessed with its own boxcar window; empty sweeps every dataset under the base, every dataset trains the full patch grid on the traditional reduced stack, and directory names key the sweep units",
         "patch": "PatchGridConfig sub-config defining the swept patch-size grid and the per-size stride and batch rules",
         "paths": "RunPathsConfig sub-config holding the sweep run/output directories plus the dataset/parameters template: dataset_path and parameters_path define the relative parameters layout the planner re-roots onto every swept dataset, and secondary_labels holds the fixed reduced-stack selection shared by every unit",
         "training": "TrainingQueueConfig sub-config shared by every sweep unit; patch_size, patch_stride, and batch_size act as the reference values the planner rescales per unit",

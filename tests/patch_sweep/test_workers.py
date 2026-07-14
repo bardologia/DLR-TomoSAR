@@ -12,7 +12,8 @@ from pipelines.shared.config.config_factory import ConfigFactory
 
 def make_worker(test_data_dir, params_dir, tmp_path: Path, batch_size: int | None = None) -> SweepTrainingWorker:
     config                        = PatchSweepConfig()
-    config.dataset_paths          = [test_data_dir]
+    config.dataset_base_path      = test_data_dir.parent
+    config.dataset_filter         = [test_data_dir.name]
     config.paths.dataset_path     = test_data_dir
     config.paths.parameters_path  = params_dir / "parameters.npy"
     config.paths.log_base_dir     = tmp_path
@@ -39,11 +40,13 @@ def test_unit_reroots_the_dataset_and_parameters(test_data_dir, params_dir, tmp_
 
 @pytest.mark.real_data
 def test_small_patch_unit_keeps_the_lr_scale_at_one(test_data_dir, params_dir, tmp_path):
-    worker = make_worker(test_data_dir, params_dir, tmp_path)
+    worker    = make_worker(test_data_dir, params_dir, tmp_path)
+    training  = worker.config.training
+    reference = training.batch_size * training.patch_size[0] * training.patch_size[1]
     apply_unit(worker, f"{test_data_dir.name}-p016")
 
-    assert worker.config.training.batch_size              == 4096
-    assert worker.config.training.lr_reference_batch_size == 4096
+    assert worker.config.training.batch_size              == reference // (16 * 16)
+    assert worker.config.training.lr_reference_batch_size == worker.config.training.batch_size
 
     trainer_config = ConfigFactory(worker.config).training_trainer_config(logdir=tmp_path / "run")
 

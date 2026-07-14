@@ -26,7 +26,8 @@ class PatchSweepConfig:
     backbone_head   : str  = "conv"
     model_overrides : dict = field(default_factory=lambda: {"features": [64, 128, 256]})
 
-    dataset_paths : list[Path] = field(default_factory=lambda: [Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")])
+    dataset_base_path : Path = Path("/ste/rnd/User/vice_vi/Dataset")
+    dataset_filter    : list = field(default_factory=lambda: ["base_dataset_w20_10"])
 
     patch : PatchGridConfig = field(default_factory=PatchGridConfig)
 

@@ -14,9 +14,17 @@ def make_logger(tmp_path: Path) -> Logger:
     return Logger(log_dir=str(tmp_path / "logs"), name="stages_test")
 
 
+def make_base(tmp_path: Path, names: list[str]) -> Path:
+    base = tmp_path / "datasets"
+    for name in names:
+        (base / name / "data").mkdir(parents=True)
+    return base
+
+
 def make_stage(tmp_path: Path, resume: bool = False, seeds: list[int] | None = None) -> SweepTrainingStage:
     config                    = PatchSweepConfig()
-    config.dataset_paths      = [Path("/data/w20_10"), Path("/data/w20_20")]
+    config.dataset_base_path  = make_base(tmp_path, ["w20_10", "w20_20"])
+    config.dataset_filter     = []
     config.patch.maximum      = 64
     config.paths.log_base_dir = tmp_path
     config.resume             = resume

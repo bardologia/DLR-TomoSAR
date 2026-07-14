@@ -15,10 +15,15 @@ from tools.monitoring.logger import Logger
 OPTIMA = {"w20_10": 48, "w20_20": 32}
 
 
-def make_planner(datasets: list[str], maximum: int = 64) -> PatchSweepPlanner:
-    config               = PatchSweepConfig()
-    config.dataset_paths = [Path("/data") / name for name in datasets]
-    config.patch.maximum = maximum
+def make_planner(tmp_path: Path, datasets: list[str], maximum: int = 64) -> PatchSweepPlanner:
+    base = tmp_path / "datasets"
+    for name in datasets:
+        (base / name / "data").mkdir(parents=True)
+
+    config                   = PatchSweepConfig()
+    config.dataset_base_path = base
+    config.dataset_filter    = []
+    config.patch.maximum     = maximum
     return PatchSweepPlanner(config)
 
 
@@ -56,7 +61,7 @@ def logger(tmp_path):
 
 
 def test_collector_reads_every_unit(tmp_path, logger):
-    planner = make_planner(["w20_10", "w20_20"])
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -67,14 +72,14 @@ def test_collector_reads_every_unit(tmp_path, logger):
 
 
 def test_collector_requires_training_results(tmp_path, logger):
-    planner = make_planner(["w20_10"])
+    planner = make_planner(tmp_path, ["w20_10"])
 
     with pytest.raises(FileNotFoundError, match="training_results.json"):
         SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
 
 
 def test_collector_marks_units_without_metrics_incomplete(tmp_path, logger):
-    planner = make_planner(["w20_10"])
+    planner = make_planner(tmp_path, ["w20_10"])
     populate_runs(tmp_path, planner, drop_metrics={"w20_10-p032"})
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -85,7 +90,7 @@ def test_collector_marks_units_without_metrics_incomplete(tmp_path, logger):
 
 
 def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
-    planner = make_planner(["w20_10", "w20_20"], maximum=96)
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"], maximum=96)
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -96,11 +101,11 @@ def test_report_ranks_the_synthetic_optimum(tmp_path, logger):
 
     assert payload["datasets"]["w20_10"]["best_patch_size"] == 48
     assert payload["datasets"]["w20_20"]["best_patch_size"] == 32
-    assert payload["datasets"]["w20_10"]["dataset_path"]    == "/data/w20_10"
+    assert payload["datasets"]["w20_10"]["dataset_path"]    == str(tmp_path / "datasets" / "w20_10")
 
 
 def test_report_writes_one_curve_per_dataset_and_the_summary_figure(tmp_path, logger):
-    planner = make_planner(["w20_10", "w20_20"])
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -115,7 +120,7 @@ def test_report_writes_one_curve_per_dataset_and_the_summary_figure(tmp_path, lo
 
 
 def test_report_survives_a_dataset_with_no_metrics(tmp_path, logger):
-    planner = make_planner(["w20_10", "w20_20"])
+    planner = make_planner(tmp_path, ["w20_10", "w20_20"])
     populate_runs(tmp_path, planner, drop_metrics={unit.name for unit in planner.units() if unit.dataset == "w20_20"})
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -130,7 +135,7 @@ def test_report_survives_a_dataset_with_no_metrics(tmp_path, logger):
 
 
 def test_markdown_reports_the_ranking_metric_without_the_removed_prediction(tmp_path, logger):
-    planner = make_planner(["w20_10"])
+    planner = make_planner(tmp_path, ["w20_10"])
     populate_runs(tmp_path, planner)
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -169,7 +174,7 @@ def populate_seeded_runs(root: Path, planner: PatchSweepPlanner, seeds: list[int
 
 
 def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
-    planner = make_planner(["w20_10"], maximum=16)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=16)
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
@@ -185,7 +190,7 @@ def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
 
 
 def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
-    planner = make_planner(["w20_10"], maximum=16)
+    planner = make_planner(tmp_path, ["w20_10"], maximum=16)
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
 
     records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()

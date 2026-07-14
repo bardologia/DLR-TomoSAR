@@ -36,8 +36,9 @@ class LaunchLayout:
     CH_NORM_GLOBAL  = {"kind": "choice", "options": ["per_slot"] + NORM_PRESETS}
     CH_NORM_CHANNEL = {"kind": "choice", "options": ["default"] + NORM_PRESETS}
 
-    PICK_DATASET = {"kind": "dataset", "mode": "datasets", "baseFromParent": True, "validOnly": True}
-    PICK_PARAMS  = {"kind": "dataset", "mode": "params", "datasetFrom": "paths.dataset_path"}
+    PICK_DATASET  = {"kind": "dataset", "mode": "datasets", "baseFromParent": True, "validOnly": True}
+    PICK_PARAMS   = {"kind": "dataset", "mode": "params", "datasetFrom": "paths.dataset_path"}
+    PICK_DATASETS = {"kind": "dataset", "mode": "datasets", "multi": True, "baseFrom": "dataset_base_path", "validOnly": True}
 
     MULTI_K      = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add K, Enter", "empty": "select at least one K"}
     MULTI_LAMBDA = {"kind": "multi", "numeric": True, "placeholder": "add lambda, Enter", "empty": "select at least one lambda"}
@@ -427,7 +428,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Datasets", "fields": [
                             "dataset_base_path",
-                            {"path": "dataset_filter", "widget": {"kind": "dataset", "mode": "datasets", "multi": True, "baseFrom": "dataset_base_path", "validOnly": True}},
+                            {"path": "dataset_filter", "widget": PICK_DATASETS},
                             "pyrat_directory",
                         ]},
                         {"title": "Output", "fields": ["output_prefix", "output_suffix", "height_range"]},
@@ -859,7 +860,7 @@ class LaunchLayout:
                 ]},
                 {"key": "sweep", "title": "Sweep", "panels": [
                     {"kind": "fields", "groups": [
-                        {"title": "Datasets", "fields": ["dataset_paths"]},
+                        {"title": "Datasets", "fields": ["dataset_base_path", {"path": "dataset_filter", "widget": PICK_DATASETS}]},
                         {"title": "Patch grid", "fields": ["patch.minimum", "patch.maximum", "patch.step", "patch.stride_ratio", "patch.constant_pixel_budget"]},
                     ]},
                 ]},
