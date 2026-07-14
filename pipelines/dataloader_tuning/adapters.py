@@ -256,7 +256,7 @@ class BackboneFeedAdapter:
         return datasets["train"], dataset_config, gaussian_cfg
 
     def _model(self, dataset, dataset_config, gaussian_cfg):
-        from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+        from models import BACKBONE_CONFIG_REGISTRY, get_backbone
         from pipelines.shared.model.model_builder import ModelBuilder
 
         name, head   = ModelBuilder.split_key(self.model_name)
@@ -264,8 +264,7 @@ class BackboneFeedAdapter:
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels, "head": head}
-        if name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = dataset_config.patch.size[0]
+        overrides.update(ModelBuilder.image_size_override(name, dataset_config.patch.size))
 
         model, _ = get_backbone(name, config=BACKBONE_CONFIG_REGISTRY[name](), **overrides)
         return model, in_channels

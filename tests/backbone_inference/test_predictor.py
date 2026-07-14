@@ -46,7 +46,7 @@ class _IdentityNormalizer:
 
 def _build_run(n_az: int, n_rg: int, in_channels: int = 4):
     region = CropRegion(azimuth_start=0, azimuth_end=n_az, range_start=0, range_end=n_rg)
-    patch  = Patcher.build(spatial_size=(n_az, n_rg), patch_size=(PATCH, PATCH), stride=PATCH, use_symmetric_padding=True)
+    patch  = Patcher.build(spatial_size=(n_az, n_rg), patch_size=(PATCH, PATCH), stride=(PATCH, PATCH), use_symmetric_padding=True)
     grid   = patch.grid
 
     torch.manual_seed(0)
@@ -118,7 +118,7 @@ def test_make_patch_window_unknown_raises():
 
 
 def test_cube_stitcher_single_patch_reconstructs():
-    patch = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_symmetric_padding=False)
+    patch = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=(8, 8), use_symmetric_padding=False)
     grid  = patch.grid
 
     stitcher = CubeStitcher(grid, n_channels=3, window_kind="uniform")
@@ -132,7 +132,7 @@ def test_cube_stitcher_single_patch_reconstructs():
 
 
 def test_select_stitcher_takes_nearest_patch_centre():
-    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_symmetric_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=(4, 4), use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=1)
@@ -147,7 +147,7 @@ def test_select_stitcher_takes_nearest_patch_centre():
 
 
 def test_select_stitcher_single_patch_is_exact():
-    patcher = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=8, use_symmetric_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 8), patch_size=(8, 8), stride=(8, 8), use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=3)
@@ -159,8 +159,40 @@ def test_select_stitcher_single_patch_is_exact():
     assert np.allclose(cube, data)
 
 
+def test_cube_stitcher_rectangular_patches_reconstruct():
+    patcher = Patcher.build(spatial_size=(8, 24), patch_size=(8, 12), stride=(8, 6), use_symmetric_padding=False)
+    grid    = patcher.grid
+
+    data     = np.arange(2 * 8 * 24, dtype=np.float32).reshape(2, 8, 24)
+    stitcher = CubeStitcher(grid, n_channels=2, window_kind="hann")
+
+    for idx in range(grid.number_of_patches):
+        stitcher.add_patch(idx, patcher.extract(data, idx))
+
+    cube = stitcher.finalize_cube()
+
+    assert cube.shape == (2, 8, 24)
+    assert np.allclose(cube, data, atol=1e-4)
+
+
+def test_select_stitcher_rectangular_patches_reconstruct():
+    patcher = Patcher.build(spatial_size=(12, 8), patch_size=(6, 8), stride=(3, 8), use_symmetric_padding=False)
+    grid    = patcher.grid
+
+    data     = np.arange(1 * 12 * 8, dtype=np.float32).reshape(1, 12, 8)
+    stitcher = SelectStitcher(grid, n_channels=1)
+
+    for idx in range(grid.number_of_patches):
+        stitcher.add_patch(idx, patcher.extract(data, idx))
+
+    cube = stitcher.finalize_cube()
+
+    assert cube.shape == (1, 12, 8)
+    assert np.allclose(cube, data)
+
+
 def test_select_stitcher_raises_on_uncovered_pixels():
-    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=4, use_symmetric_padding=False)
+    patcher = Patcher.build(spatial_size=(8, 12), patch_size=(8, 8), stride=(4, 4), use_symmetric_padding=False)
     grid    = patcher.grid
 
     stitcher = SelectStitcher(grid, n_channels=1)

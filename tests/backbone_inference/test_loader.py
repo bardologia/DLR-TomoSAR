@@ -149,7 +149,7 @@ def test_build_model_reconstructs_every_registry_backbone(name, tmp_path):
     torch.save({"params": trained.state_dict(), "x_axis": x_axis, "epoch": 1, "best_val_loss": 0.1, "best_epoch": 1}, str(ckpt_path))
 
     loader  = RunLoader(tmp_path, logger=None)
-    rebuilt = loader._build_model(name, in_channels, out_channels, WINDOW)
+    rebuilt = loader._build_model(name, in_channels, out_channels, (WINDOW, WINDOW))
 
     ckpt, _, _ = loader._load_checkpoint(ckpt_path, "cpu")
     rebuilt.load_state_dict(ckpt["params"])

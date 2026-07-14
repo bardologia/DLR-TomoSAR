@@ -6,7 +6,7 @@ import numpy as np
 
 from configuration.dataset  import DatasetConfig
 from configuration.training import BackboneTrainerConfig, OverfitCheckConfig
-from models                 import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models                 import get_backbone
 from pipelines.backbone.dataset.pipeline     import DatasetPipeline
 from pipelines.backbone.training.loss_terms  import LossComponentCatalog
 from pipelines.backbone.training.trainer     import Trainer
@@ -34,13 +34,11 @@ class TrainingPipeline:
         overfit_check  : OverfitCheckConfig | None = None,
     ) -> None:
 
-        patch_height, patch_width = dataset_config.patch.size
-
         self.trainer_config = trainer_config
         self.dataset_config = dataset_config
         self.backbone_name  = backbone_name
         self.model_config   = model_config
-        self.image_size     = patch_height
+        self.patch_size     = dataset_config.patch.size
         self.seed           = seed
         self.run_name       = run_name
         self.overfit_check  = overfit_check if overfit_check is not None else OverfitCheckConfig()
@@ -122,8 +120,7 @@ class TrainingPipeline:
 
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = self.image_size
+        overrides.update(ModelBuilder.image_size_override(self.backbone_name, self.patch_size))
 
         return overrides
 

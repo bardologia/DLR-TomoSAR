@@ -66,7 +66,7 @@ def _global_metrics():
 
 def _run_stub():
     region = CropRegion(azimuth_start=0, azimuth_end=H, range_start=0, range_end=W)
-    grid   = types.SimpleNamespace(number_of_patches=4, patch_size=(6, 6), stride=6)
+    grid   = types.SimpleNamespace(number_of_patches=4, patch_size=(6, 6), stride=(6, 6))
     ds_cfg = types.SimpleNamespace(
         preprocessing_run_directory = "/pp/run",
         input_config                = types.SimpleNamespace(as_dict=lambda: {"use_amplitude": True}),

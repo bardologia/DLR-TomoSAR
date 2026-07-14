@@ -28,7 +28,7 @@ def _backbone_dataset(interferograms, parameters, split_name="train", n_ifg=3):
     inputs  = np.concatenate([primary, ifg], axis=0)
     params  = np.ascontiguousarray(np.asarray(parameters[:, :24, :24]))
 
-    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=8)
+    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=(8, 8))
     ic      = InputConfig(use_primary=True, primary_representation=Representation.MAG_ONLY,
                           use_secondaries=False,
                           use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY)
@@ -114,7 +114,7 @@ def test_patchdataset_layer_mismatch_raises(interferograms, parameters):
     ifg     = np.ascontiguousarray(np.asarray(interferograms[:3, :16, :16]))
     inputs  = np.concatenate([ifg[:1], ifg], axis=0)
     params  = np.ascontiguousarray(np.asarray(parameters[:, :16, :16]))
-    patcher = Patcher.build(spatial_size=(16, 16), patch_size=(8, 8), stride=8)
+    patcher = Patcher.build(spatial_size=(16, 16), patch_size=(8, 8), stride=(8, 8))
 
     with pytest.raises(ValueError):
         PatchDataset(
@@ -129,7 +129,7 @@ def test_patchdataset_use_dem_without_dem_raises(interferograms, parameters):
     ifg     = np.ascontiguousarray(np.asarray(interferograms[:3, :16, :16]))
     inputs  = np.concatenate([ifg[:1], ifg], axis=0)
     params  = np.ascontiguousarray(np.asarray(parameters[:, :16, :16]))
-    patcher = Patcher.build(spatial_size=(16, 16), patch_size=(8, 8), stride=8)
+    patcher = Patcher.build(spatial_size=(16, 16), patch_size=(8, 8), stride=(8, 8))
     ic      = InputConfig(use_dem=True)
 
     with pytest.raises(ValueError, match="DEM"):
@@ -146,7 +146,7 @@ def test_patchdataset_dem_fills_last_channel(interferograms, parameters):
     inputs  = np.concatenate([ifg[:1], ifg], axis=0)
     params  = np.ascontiguousarray(np.asarray(parameters[:, :24, :24]))
     dem     = np.random.default_rng(1).standard_normal((24, 24)).astype(np.float32)
-    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=8)
+    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=(8, 8))
     ic      = InputConfig(use_primary=True, primary_representation=Representation.MAG_ONLY,
                           use_secondaries=False,
                           use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,

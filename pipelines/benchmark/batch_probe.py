@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from configuration.benchmark            import BenchmarkConfig
-from models                             import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models                             import BACKBONE_CONFIG_REGISTRY, get_backbone
 from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.backbone.dataset.pipeline import DatasetPipeline
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
@@ -76,8 +76,7 @@ class MaxBatchProbe:
         out_channels = GaussianHead.total_channels(gaussian_cfg.params_per_gaussian, gaussian_cfg.n_default_gaussians)
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = dataset_config.patch.size[0]
+        overrides.update(ModelBuilder.image_size_override(name, dataset_config.patch.size))
 
         return get_backbone(name, config=model_config, **overrides)
 

@@ -35,7 +35,7 @@ def _entry_config(test_data_dir, params_dir, tmp_path) -> UnrolledEntryConfig:
     entry.training.val_azimuth   = (1400, 1500)
     entry.training.test_azimuth  = (1500, 1600)
     entry.training.patch_size    = (64, 64)
-    entry.training.patch_stride  = 64
+    entry.training.patch_stride  = (64, 64)
 
     entry.model_overrides = {"n_iterations": 2, "prox_hidden": 4}
 

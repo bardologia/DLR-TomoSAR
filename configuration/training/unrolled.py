@@ -33,7 +33,7 @@ class UnrolledTrainingConfig:
     prefetch_factor : int = 2
 
     patch_size    : tuple[int, int] = (64, 64)
-    patch_stride  : int             = 32
+    patch_stride  : tuple[int, int] = (32, 32)
     train_azimuth : tuple[int, int] = (1000, 13000)
     val_azimuth   : tuple[int, int] = (13064, 14500)
     test_azimuth  : tuple[int, int] = (14564, 16000)

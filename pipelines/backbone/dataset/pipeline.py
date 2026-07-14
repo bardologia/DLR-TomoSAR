@@ -43,6 +43,9 @@ class DatasetPipeline:
         if self.geometry_field is not None and config.augmentation.p_rot90 > 0.0:
             self.logger.warning("augmentation.p_rot90 > 0 has no effect: 90-degree rotations are skipped while a per-pixel geometry field is active.")
 
+        if config.patch.size[0] != config.patch.size[1] and config.augmentation.p_rot90 > 0.0:
+            raise ValueError(f"augmentation.p_rot90 > 0 is incompatible with a rectangular patch {tuple(config.patch.size)}: a 90-degree rotation swaps the patch axes and the rotated patch no longer matches the batch shape. Disable rot90 or use a square patch.")
+
         ic = config.input_config
         oc = config.output_config
 

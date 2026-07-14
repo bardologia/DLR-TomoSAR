@@ -50,7 +50,7 @@ def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
         parameters_path             = params_dir / "parameters.npy",
         split_regions               = splits,
         secondary_labels            = SECONDARY_LABELS,
-        patch                       = PatchConfig(size=(32, 32), stride=32),
+        patch                       = PatchConfig(size=(32, 32), stride=(32, 32)),
         input_config                = input_config,
         batch_size                  = 4,
         num_workers                 = 0,

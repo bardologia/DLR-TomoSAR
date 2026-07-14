@@ -6,7 +6,7 @@ from pipelines.shared.config.config_persistence import DualModelConfigIO
 
 
 class DualRunLoader(RunLoader):
-    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
+    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, patch_size):
         model_config, _ = DualModelConfigIO.load(self.meta_directory)
         self.model_head = model_config.head
 

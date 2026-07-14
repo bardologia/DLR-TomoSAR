@@ -125,9 +125,9 @@ def test_patch_planner_emits_size_and_stride():
     name, overrides = plans[0]
     assert name == "p-32"
     assert overrides["training.patch_size"]   == (32, 32)
-    assert overrides["training.patch_stride"] == 16
+    assert overrides["training.patch_stride"] == (16, 16)
 
-    assert plans[1][1]["training.patch_stride"] == 32
+    assert plans[1][1]["training.patch_stride"] == (32, 32)
 
 
 def test_patch_planner_probes_max_batch_and_scales_lr_by_default():

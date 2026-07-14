@@ -98,7 +98,7 @@ def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, pa
     inputs  = np.concatenate([primary, ifg], axis=0)
     params  = np.ascontiguousarray(np.asarray(parameters[:, :24, :24]))
 
-    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=8)
+    patcher = Patcher.build(spatial_size=(24, 24), patch_size=(8, 8), stride=(8, 8))
     ic      = InputConfig(use_primary=True, primary_representation=Representation.MAG_ONLY,
                           use_secondaries=False,
                           use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY)

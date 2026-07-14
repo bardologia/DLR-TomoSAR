@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib     import Path
+from typing      import Tuple
 
 from torch.utils.data import DataLoader
 
@@ -25,7 +26,7 @@ class ImageAeRun:
     loader                      : DataLoader
     split_name                  : str
     n_patches                   : int
-    patch_size                  : int
+    patch_size                  : Tuple[int, int]
     checkpoint_meta             : dict
     preprocessing_run_directory : Path
     split_region                : CropRegion
@@ -93,7 +94,7 @@ class ImageAeRunLoader(RunLoader):
             "Checkpoint"    : ckpt_path,
             "Embedding dim" : embedding_dim,
             "In channels"   : dataset.input_channels,
-            "Patch size"    : dataset_config.patch.size[0],
+            "Patch size"    : tuple(dataset_config.patch.size),
             "Patches"       : grid.grid.number_of_patches,
             "Split"         : config.split,
         })
@@ -108,7 +109,7 @@ class ImageAeRunLoader(RunLoader):
             loader                      = loader,
             split_name                  = config.split,
             n_patches                   = grid.grid.number_of_patches,
-            patch_size                  = int(dataset_config.patch.size[0]),
+            patch_size                  = tuple(dataset_config.patch.size),
             checkpoint_meta             = ckpt_meta,
             preprocessing_run_directory = Path(dataset_config.preprocessing_run_directory),
             split_region                = region,

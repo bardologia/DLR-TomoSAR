@@ -616,7 +616,7 @@ class PatchSizeTrialPlanner:
             run_name  = f"p-{size}"
             overrides = {
                 "training.patch_size"          : (size, size),
-                "training.patch_stride"        : stride,
+                "training.patch_stride"        : (stride, stride),
                 "pretrain.find_batch_size"     : self.trials.find_max_batch,
                 "training.scale_lr_with_batch" : self.trials.scale_lr,
             }

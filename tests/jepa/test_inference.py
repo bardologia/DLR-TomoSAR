@@ -72,7 +72,7 @@ def test_jepa_param_run_loader_builds_image_frontend_module(tmp_path):
     BackboneModelConfigIO.save(backbone_cfg, "unet", meta_dir)
 
     loader = JepaParamRunLoader(tmp_path, logger=FakeLogger())
-    module = loader._build_model("unet", in_channels=2, out_channels=6, image_size=8)
+    module = loader._build_model("unet", in_channels=2, out_channels=6, patch_size=(8, 8))
     module.eval()
 
     assert isinstance(module, JepaModule)
@@ -182,7 +182,7 @@ def build_fake_run(model_fn, n_gaussians, n_elev, spatial):
         pad_left     = 0,
         pad_right    = 0,
         patch_size   = (spatial, spatial),
-        stride       = spatial,
+        stride       = (spatial, spatial),
         spatial_size = (spatial, spatial),
     )
 
@@ -261,7 +261,7 @@ def test_jepa_curve_predictor_zero_error_on_identical_output(tmp_path):
 
     grid = GridInfo(
         n_v=1, n_h=1, pad_top=0, pad_bot=0, pad_left=0, pad_right=0,
-        patch_size=(spatial, spatial), stride=spatial, spatial_size=(spatial, spatial),
+        patch_size=(spatial, spatial), stride=(spatial, spatial), spatial_size=(spatial, spatial),
     )
 
     class FakeNormalizer:

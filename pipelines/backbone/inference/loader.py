@@ -10,8 +10,9 @@ from torch.utils.data import DataLoader
 
 from configuration.dataset                      import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
 from tools.data.regions                         import CropRegion
-from models                                     import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models                                     import get_backbone
 from pipelines.backbone.dataset.datasets        import PatchDataset
+from pipelines.shared.model.model_builder       import ModelBuilder
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
 from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
@@ -71,9 +72,12 @@ class RunLoader:
             test  = self._parse_split_payload(splits["test"]),
         )
 
+        if not isinstance(payload["patch"]["stride"], list):
+            raise ValueError(f"dataset_creation_config.json stores patch stride {payload['patch']['stride']!r} from before per-axis strides; patch it to a [vertical, horizontal] list (e.g. [32, 32]) to run inference on this run.")
+
         patch = PatchConfig(
             size                  = tuple(payload["patch"]["size"]),
-            stride                = int(payload["patch"]["stride"]),
+            stride                = tuple(payload["patch"]["stride"]),
             use_symmetric_padding = bool(payload["patch"]["use_symmetric_padding"]),
         )
 
@@ -94,14 +98,12 @@ class RunLoader:
             n_gaussians                 = int(payload["n_gaussians"]),
         )
 
-    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, image_size: int):
+    def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, patch_size: Tuple[int, int]):
         model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
         self.model_head = model_config.head
 
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-
-        if backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = image_size
+        overrides.update(ModelBuilder.image_size_override(backbone_name, patch_size))
 
         model, _ = get_backbone(backbone_name, config=model_config, **overrides)
 
@@ -213,7 +215,7 @@ class RunLoader:
         out_channels       = 3 * n_gaussians
 
         ckpt_path = self.run_directory / checkpoint_name
-        model     = self._build_model(backbone_name, in_channels, out_channels_total, dataset_config.patch.size[0])
+        model     = self._build_model(backbone_name, in_channels, out_channels_total, dataset_config.patch.size)
         model     = model.to(device)
 
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)

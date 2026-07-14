@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from models import BACKBONE_CONFIG_REGISTRY
+from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS
 
 
 class ModelBuilder:
     @staticmethod
     def model_key(model_name: str, head: str) -> str:
         return model_name if head == "conv" else f"{model_name}-{head}"
+
+    @staticmethod
+    def image_size_override(model_name: str, patch_size) -> dict:
+        if model_name not in BACKBONE_IMAGE_SIZE_MODELS:
+            return {}
+
+        height, width = patch_size
+        if height != width:
+            raise ValueError(f"Backbone '{model_name}' tokenizes from a single square image_size and cannot run on rectangular patches; got patch_size={tuple(patch_size)}. Use a square patch or a fully-convolutional backbone.")
+
+        return {"image_size": int(height)}
 
     @staticmethod
     def split_key(model_key: str) -> tuple[str, str]:

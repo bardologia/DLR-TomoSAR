@@ -127,7 +127,7 @@ class GridInfo:
     pad_left              : int
     pad_right             : int
     patch_size            : Tuple[int, int]
-    stride                : int
+    stride                : Tuple[int, int]
     spatial_size          : Tuple[int, int]
     use_symmetric_padding : bool = True
 
@@ -157,7 +157,7 @@ class GridInfo:
             "pad_left"              : self.pad_left,
             "pad_right"             : self.pad_right,
             "patch_size"            : list(self.patch_size),
-            "stride"                : self.stride,
+            "stride"                : list(self.stride),
             "spatial_size"          : list(self.spatial_size),
             "use_symmetric_padding" : self.use_symmetric_padding,
             "number_of_patches"     : self.number_of_patches,
@@ -170,15 +170,16 @@ class Patcher:
         self._patch_coords = patch_coords
 
     @classmethod
-    def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : int, use_symmetric_padding : bool = True) -> "Patcher":
+    def build(cls, spatial_size : Tuple[int, int], patch_size : Tuple[int, int], stride : Tuple[int, int], use_symmetric_padding : bool = True) -> "Patcher":
         ph, pw = patch_size
+        sv, sh = stride
         H, W   = spatial_size
 
-        n_v = 1 if H <= ph else math.ceil((H - ph) / stride) + 1
-        n_h = 1 if W <= pw else math.ceil((W - pw) / stride) + 1
+        n_v = 1 if H <= ph else math.ceil((H - ph) / sv) + 1
+        n_h = 1 if W <= pw else math.ceil((W - pw) / sh) + 1
 
-        pad_v = (ph + (n_v - 1) * stride) - H
-        pad_h = (pw + (n_h - 1) * stride) - W
+        pad_v = (ph + (n_v - 1) * sv) - H
+        pad_h = (pw + (n_h - 1) * sh) - W
 
         pad_top, pad_bot    = pad_v // 2, pad_v - pad_v // 2
         pad_left, pad_right = pad_h // 2, pad_h - pad_h // 2
@@ -191,7 +192,7 @@ class Patcher:
             pad_left              = pad_left,
             pad_right             = pad_right,
             patch_size            = (ph, pw),
-            stride                = stride,
+            stride                = (sv, sh),
             spatial_size          = (H, W),
             use_symmetric_padding = use_symmetric_padding,
         )
@@ -201,8 +202,8 @@ class Patcher:
 
         for iv in range(n_v):
             for ih in range(n_h):
-                v0 = iv * stride - pad_top
-                h0 = ih * stride - pad_left
+                v0 = iv * sv - pad_top
+                h0 = ih * sh - pad_left
                 v1 = v0 + ph
                 h1 = h0 + pw
 

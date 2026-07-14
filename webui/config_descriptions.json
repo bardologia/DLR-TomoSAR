@@ -245,8 +245,8 @@
     "dataset/general/dataset::PatchConfig": {
       "summary": "Tiling of cropped scenes into overlapping training/inference patches",
       "fields": {
-        "size": "patch height and width in pixels as a (H, W) tuple",
-        "stride": "pixel step between adjacent patch origins along both axes, smaller than size gives overlapping patches",
+        "size": "patch height and width in pixels as a (H, W) tuple; the two dimensions may differ for rectangular patches",
+        "stride": "pixel step between adjacent patch origins as a per-axis (vertical, horizontal) tuple, entries smaller than the matching size give overlapping patches",
         "use_symmetric_padding": "pad scene borders with numpy symmetric (mirror, edge-duplicating) padding instead of zero (constant) padding so edge patches are still fully covered"
       }
     },
@@ -474,7 +474,7 @@
         "out_channels": "number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
         "head": "Output head attached to the backbone embedding: conv (single conv projection), multihead (3 PixelMLP heads, one per parameter type), per_gaussian (K PixelMLP heads, one per slot), or set_pred (per-slot heads plus a sigmoid existence gate)",
-        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size but not consumed anywhere in this model (the token grid comes from the input tensor's shape at forward time and the relative-position bias depends only on window_size)",
+        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size (which must be square for this model) but not consumed anywhere in this model (the token grid comes from the input tensor's shape at forward time and the relative-position bias depends only on window_size)",
         "patch_size": "transformer tokenization patch edge in pixels consumed by the stride-patch_size patch-embedding convolution",
         "embedding_dim": "channel width of the first Swin stage; must be divisible by that stage's num_heads entry, doubles at each subsequent stage",
         "depths": "number of Swin transformer blocks per encoder stage, one entry per resolution level",
@@ -502,7 +502,7 @@
         "out_channels": "number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
         "head": "Output head attached to the backbone embedding: conv (single conv projection), multihead (3 PixelMLP heads, one per parameter type), per_gaussian (K PixelMLP heads, one per slot), or set_pred (per-slot heads plus a sigmoid existence gate)",
-        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size, must divide evenly by the CNN downsampling factor and patch_size",
+        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size (which must be square for this model), must divide evenly by the CNN downsampling factor and patch_size",
         "cnn_features": "per-stage CNN encoder channel widths as an ascending list, feeding the transformer bottleneck and mirrored by the decoder",
         "bottleneck_factor": "channel-width multiplier applied to the last CNN feature width before the transformer bottleneck; a fixed value, not exposed to the architecture tuner",
         "transformer_layers": "number of stacked transformer encoder layers in the bottleneck; categorical over 2, 4, 6, 8",
@@ -534,7 +534,7 @@
         "out_channels": "number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
         "head": "Output head attached to the backbone embedding: conv (single conv projection), multihead (3 PixelMLP heads, one per parameter type), per_gaussian (K PixelMLP heads, one per slot), or set_pred (per-slot heads plus a sigmoid existence gate)",
-        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size, must be exactly divisible by patch_size",
+        "image_size": "input patch side length in pixels, overridden at build time from the dataset's patch size (which must be square for this model), must be exactly divisible by patch_size",
         "patch_size": "transformer tokenization patch edge in pixels; the token grid is image_size/patch_size per side and sizes the learned positional embedding",
         "embedding_dim": "token embedding width of the ViT encoder shared by every transformer layer and skip-projection",
         "transformer_layers": "number of stacked ViT encoder layers; categorical over 4, 6, 8, 12",
@@ -1324,8 +1324,8 @@
         "clip_adaptive_window": "number of recent step norms kept to compute the adaptive clip threshold",
         "clip_adaptive_percentile": "percentile of the recent-norm window used as the clip bound when clip_mode is adaptive_percentile",
         "clip_adaptive_mean_std_k": "std-dev multiplier k in mean + k*std used as the clip bound when clip_mode is adaptive_mean_std",
-        "patch_size": "height and width in pixels of training patches cropped from the SAR stack",
-        "patch_stride": "pixel stride between overlapping extracted patches",
+        "patch_size": "height and width in pixels of training patches cropped from the SAR stack, (H, W) may be rectangular for fully-convolutional backbones",
+        "patch_stride": "per-axis (vertical, horizontal) pixel stride between overlapping extracted patches",
         "train_azimuth": "azimuth line range (start, end) assigned to the training split, paired with the dataset's full range extent",
         "val_azimuth": "azimuth line range (start, end) assigned to the validation split, paired with the dataset's full range extent",
         "test_azimuth": "azimuth line range (start, end) assigned to the test split, paired with the dataset's full range extent"
@@ -2197,8 +2197,8 @@
         "batch_size": "Patches per training batch",
         "num_workers": "Dataloader worker processes",
         "prefetch_factor": "Batches prefetched per dataloader worker",
-        "patch_size": "Spatial patch size (height, width) tiled from the scene",
-        "patch_stride": "Stride between neighbouring patches during tiling",
+        "patch_size": "Spatial patch size (height, width) tiled from the scene, the two dimensions may differ",
+        "patch_stride": "Per-axis (vertical, horizontal) stride between neighbouring patches during tiling",
         "train_azimuth": "Azimuth pixel range of the training split",
         "val_azimuth": "Azimuth pixel range of the validation split",
         "test_azimuth": "Azimuth pixel range of the test split"

@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from configuration.training                              import JepaTrainerConfig
-from models                                              import BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models                                              import get_backbone
 from models.profile_autoencoder                          import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
@@ -146,7 +146,7 @@ class TrainingPipeline:
         else:
             backbone_out = self._gaussian_out_channels()
 
-        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, self.dataset_config.patch.size[0], config=backbone_config)
+        backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, self.dataset_config.patch.size, config=backbone_config)
         module                 = JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)
 
         self._log_module(logger, module, backbone, dataset_in_channels, backbone_in, backbone_out)
@@ -182,10 +182,9 @@ class TrainingPipeline:
         logger.section("[JEPA Module Built]")
         logger.kv_table(info)
 
-    def _build_backbone(self, in_channels: int, out_channels: int, image_size: int, config=None):
+    def _build_backbone(self, in_channels: int, out_channels: int, patch_size, config=None):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
-        if self.backbone_name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = image_size
+        overrides.update(ModelBuilder.image_size_override(self.backbone_name, patch_size))
         if config is None:
             overrides["head"] = self.entry.backbone_head
             for k, v in self.entry.model_overrides.items():

@@ -20,7 +20,7 @@ def _factory(test_data_dir, params_dir, **overrides) -> ConfigFactory:
     cfg.training.val_azimuth   = (1400, 1700)
     cfg.training.test_azimuth  = (1700, 2000)
     cfg.training.patch_size    = (32, 32)
-    cfg.training.patch_stride  = 16
+    cfg.training.patch_stride  = (16, 16)
     cfg.training.batch_size    = 8
 
     for k, v in overrides.items():
@@ -87,7 +87,7 @@ def test_training_dataset_config_paths_and_patch(test_data_dir, params_dir):
     assert cfg.parameters_path             == params_dir / "parameters.npy"
     assert cfg.secondary_labels            == ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
     assert cfg.patch.size                  == (32, 32)
-    assert cfg.patch.stride                == 16
+    assert cfg.patch.stride                == (16, 16)
     assert cfg.batch_size                  == 8
     assert cfg.shuffle_train is True
 

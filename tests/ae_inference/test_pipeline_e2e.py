@@ -40,7 +40,7 @@ def _entry_config(test_data_dir, params_dir, tmp_path) -> ImageAeEntryConfig:
     entry.training.val_azimuth          = (1400, 1500)
     entry.training.test_azimuth         = (1500, 1600)
     entry.training.patch_size           = (64, 64)
-    entry.training.patch_stride         = 64
+    entry.training.patch_stride         = (64, 64)
 
     entry.model_overrides = {"base_channels": 8, "depth": 1, "embedding_dim": 8}
 
@@ -57,7 +57,7 @@ def test_build_dataset_config_reads_n_gaussians(tmp_path):
             "val"   : {"azimuth_start": 10, "azimuth_end": 20, "range_start": 0, "range_end": 10},
             "test"  : {"azimuth_start": 20, "azimuth_end": 30, "range_start": 0, "range_end": 10},
         },
-        "patch"            : {"size": [8, 8], "stride": 8, "use_symmetric_padding": True},
+        "patch"            : {"size": [8, 8], "stride": [8, 8], "use_symmetric_padding": True},
         "secondary_labels" : None,
         "input_config"     : {
             "use_primary": True,  "primary_representation": "mag_only",

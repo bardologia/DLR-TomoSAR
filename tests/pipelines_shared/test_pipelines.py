@@ -33,7 +33,7 @@ def _backbone_config(test_data_dir, params_dir) -> DatasetConfig:
         parameters_path             = params_dir / "parameters.npy",
         split_regions               = splits,
         secondary_labels            = ("FL01_PS04", "FL01_PS06"),
-        patch                       = PatchConfig(size=(8, 8), stride=8),
+        patch                       = PatchConfig(size=(8, 8), stride=(8, 8)),
         input_config                = ic,
         batch_size                  = 2,
         num_workers                 = 0,
@@ -79,6 +79,31 @@ def test_backbone_pipeline_train_order_reproducible(test_data_dir, params_dir, t
     b = _first_batch(tmp_path / "b")
 
     np.testing.assert_allclose(a, b, atol=1e-5)
+
+
+@pytest.mark.real_data
+@pytest.mark.slow
+def test_backbone_pipeline_rectangular_patches_yield_rectangular_batches(test_data_dir, params_dir, tmp_path):
+    config       = _backbone_config(test_data_dir, params_dir)
+    config.patch = PatchConfig(size=(8, 16), stride=(4, 8))
+
+    pipeline = DatasetPipeline(config, tmp_path, logger=_logger(tmp_path, "bb_rect"), seed=0)
+
+    train_loader, _val_loader, _test_loader, _datasets = pipeline.run()
+    x, y = next(iter(train_loader))
+
+    assert tuple(x.shape[-2:]) == (8, 16)
+    assert tuple(y.shape[-2:]) == (8, 16)
+
+
+@pytest.mark.real_data
+def test_backbone_pipeline_rejects_rot90_with_rectangular_patch(test_data_dir, params_dir, tmp_path):
+    config                      = _backbone_config(test_data_dir, params_dir)
+    config.patch                = PatchConfig(size=(8, 16), stride=(4, 8))
+    config.augmentation.p_rot90 = 0.5
+
+    with pytest.raises(ValueError, match="rectangular patch"):
+        DatasetPipeline(config, tmp_path, logger=_logger(tmp_path, "bb_rot90"), seed=0)
 
 
 @pytest.mark.real_data

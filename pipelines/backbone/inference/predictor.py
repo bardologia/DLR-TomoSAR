@@ -69,9 +69,10 @@ class CubeStitcher:
 
     def add_patch(self, idx: int, patch: np.ndarray) -> None:
         ph, pw = self.grid.patch_size
+        sv, sh = self.grid.stride
         iv, ih = divmod(idx, self.grid.n_h)
-        v0 = iv * self.grid.stride
-        h0 = ih * self.grid.stride
+        v0 = iv * sv
+        h0 = ih * sh
         w  = self.window
 
         self._accum[:, v0:v0 + ph, h0:h0 + pw] += (patch * w[None, :, :]).astype(self.dtype, copy=False)
@@ -117,9 +118,10 @@ class SelectStitcher:
 
     def add_patch(self, idx: int, patch: np.ndarray) -> None:
         ph, pw = self.grid.patch_size
+        sv, sh = self.grid.stride
         iv, ih = divmod(idx, self.grid.n_h)
-        v0 = iv * self.grid.stride
-        h0 = ih * self.grid.stride
+        v0 = iv * sv
+        h0 = ih * sh
 
         best   = self._best[v0:v0 + ph, h0:h0 + pw]
         values = self._values[:, v0:v0 + ph, h0:h0 + pw]

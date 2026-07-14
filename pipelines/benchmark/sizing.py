@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from configuration.benchmark import BenchmarkConfig
 from configuration.sar.gaussian_config          import GaussianConfig
-from models                                     import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS, get_backbone
+from models                                     import BACKBONE_CONFIG_REGISTRY, get_backbone
 from pipelines.shared.model.model_builder       import ModelBuilder
 from tools.data.gaussians                       import GaussianHead
 from tools.monitoring.logger                    import Logger
@@ -156,7 +156,7 @@ class SizeMatcher:
         self.logger      = logger
         self.scaler      = WidthScaler(locked=config.size_match.locked_params)
         self.auditor     = DegeneracyAuditor(config=config.size_match, scaler=self.scaler)
-        self.image_size  = config.training.patch_size[0]
+        self.patch_size  = config.training.patch_size
         self.in_channels = config.size_match.in_channels
 
         self._validate_in_channels()
@@ -234,8 +234,7 @@ class SizeMatcher:
         name, _head = ModelBuilder.split_key(model_key)
 
         overrides = {"in_channels": self.in_channels, "out_channels": self.out_channels}
-        if name in BACKBONE_IMAGE_SIZE_MODELS:
-            overrides["image_size"] = self.image_size
+        overrides.update(ModelBuilder.image_size_override(name, self.patch_size))
 
         model, _   = get_backbone(name, config=model_config, **overrides)
         parameters = sum(p.numel() for p in model.parameters())

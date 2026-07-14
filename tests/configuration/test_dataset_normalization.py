@@ -134,8 +134,9 @@ def test_clamp_payload_missing_knobs_breaks_loudly():
 def test_patch_config_defaults():
     cfg = PatchConfig()
     assert cfg.size[0] > 0 and cfg.size[1] > 0
-    assert cfg.stride > 0
+    assert cfg.stride[0] > 0 and cfg.stride[1] > 0
     assert isinstance(cfg.size, tuple)
+    assert isinstance(cfg.stride, tuple)
 
 
 def test_augmentation_config_probabilities_in_range():
