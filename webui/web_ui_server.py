@@ -22,6 +22,7 @@ from request_router                     import RequestRouter
 from resource_watchdog                  import ResourceWatchdog
 from contention_monitor                 import ContentionMonitor
 from results_browser                    import ResultsBrowser
+from run_leaderboard                    import RunLeaderboard
 from script_catalog                     import ScriptCatalog
 from script_config_resolver             import ScriptConfigResolver
 from system_monitor                     import SystemMonitor
@@ -74,6 +75,7 @@ class WebUIServer:
         self.results           = ResultsBrowser(self.logger)
         self.cubes             = CubeExplorer(self.paths, self.logger)
         self.datasets          = DatasetBrowser(self.logger)
+        self.leaderboard       = RunLeaderboard(self.logger)
 
         self.router    = RequestRouter(
             paths             = self.paths,
@@ -101,6 +103,7 @@ class WebUIServer:
             results           = self.results,
             cubes             = self.cubes,
             datasets          = self.datasets,
+            leaderboard       = self.leaderboard,
         )
 
     def serve(self) -> None:

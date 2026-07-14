@@ -31,6 +31,7 @@ CDN, so a network connection is needed for equation typesetting and syntax highl
 | Launch | `/api/scripts/<key>/config` | Full-screen launch control per script: config sections grouped by dataclass, typed controls, override manifest, command preview, interpreter, launch. |
 | Configuration | `/api/configs` | Every configuration dataclass, field, type, and default, parsed live from `configuration/*.py`. |
 | Console | `/api/jobs/<id>/stream` | Real-time stdout of launched jobs over SSE, with stop control. |
+| Leaderboard | `/api/leaderboard` | Every saved inference `metrics.json` under the runs directory as one sortable, filterable table; run-name axes parsed into filter dropdowns; selecting two rows opens a metric-by-metric diff plus the resolved-config differences. |
 
 ## How launching works
 

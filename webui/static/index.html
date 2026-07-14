@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260705c" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260714a" />
 </head>
 <body>
 
@@ -35,6 +35,7 @@
     <a href="#/console" data-route="console">Console</a>
     <a href="#/results" data-route="results">Results</a>
     <a href="#/cube" data-route="cube">Cube</a>
+    <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
     <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
     <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
   </nav>
@@ -446,6 +447,19 @@
     </div>
   </section>
 
+  <!-- LEADERBOARD -->
+  <section class="page page--pad" data-page="leaderboard">
+    <div class="page__head">
+      <h2 class="page__title">Leaderboard</h2>
+      <p class="page__lead">
+        Every saved inference result in the runs directory as one sortable table &mdash; run-name
+        axes parsed into filters, headline metrics side by side. Select two rows to read a full
+        metric-by-metric comparison plus the resolved-config differences between the runs.
+      </p>
+    </div>
+    <div class="lb" id="leaderboard-root"></div>
+  </section>
+
   <!-- FEED TUNER -->
   <section class="page page--pad page--feedtuner" data-page="feedtuner">
     <div class="page__head">
@@ -709,6 +723,7 @@
 <script src="/static/js/ablation.js?v=20260625e"></script>
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
+<script src="/static/js/leaderboard.js?v=20260714a"></script>
 <script src="/static/js/tomogram.js?v=20260702b"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>

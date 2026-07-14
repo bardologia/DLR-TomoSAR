@@ -26,6 +26,7 @@ from process_manager        import ProcessManager, ProcessNuke
 from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
 from results_browser        import ResultsBrowser
+from run_leaderboard        import RunLeaderboard
 from script_catalog         import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor         import SystemMonitor
@@ -43,7 +44,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -69,6 +70,7 @@ class RequestRouter:
         self.results     = results
         self.cubes       = cubes
         self.datasets    = datasets
+        self.leaderboard = leaderboard
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -125,6 +127,16 @@ class RequestRouter:
             query  = parse_qs(urlparse(handler.path).query)
             result = self.datasets.params((query.get("dataset") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+        if path == "/api/leaderboard":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.leaderboard.table((query.get("base") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+        if path == "/api/leaderboard/diff":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.leaderboard.diff((query.get("a") or [""])[0], (query.get("b") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
         if path == "/api/cubes":
             query = parse_qs(urlparse(handler.path).query)

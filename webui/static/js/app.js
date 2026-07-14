@@ -208,6 +208,8 @@ class App {
       document.getElementById("results-detail")
     );
 
+    this.leaderboardView = new window.LeaderboardView(document.getElementById("leaderboard-root"));
+
     this.tomogramView = new window.TomogramView({
       strip         : document.getElementById("cube-strip"),
       stage         : document.getElementById("cube-stage"),
@@ -318,6 +320,7 @@ class App {
     if (route === "tensorboard") this.tensorboardView.enter();
     else this.tensorboardView.leave();
     if (route === "results") this.resultsView.enter();
+    if (route === "leaderboard") this.leaderboardView.enter();
     if (route === "feedtuner") this.feedTuner.enter();
     if (route === "cube") this.tomogramView.enter();
     else this.tomogramView.leave();
