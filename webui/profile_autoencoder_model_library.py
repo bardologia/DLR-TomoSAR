@@ -102,7 +102,7 @@ class ProfileAutoencoderModelLibrary:
         for key, class_name in self.CONFIG_CLASSES.items():
             config        = getattr(module, class_name)()
             activation    = getattr(config, "activation", self.FALLBACK_ACTIVATION)
-            normalization = getattr(config, "normalization", self.FALLBACK_NORMALIZATION)
+            normalization = getattr(config, "embedding_norm", self.FALLBACK_NORMALIZATION)
             resolved[key] = (str(activation).lower(), str(normalization).lower())
 
         return resolved
@@ -126,37 +126,37 @@ class ProfileAutoencoderModelLibrary:
                 "models" : [
                     {
                         "key": "mlp_ae", "name": "MLP Autoencoder", "skip": "Symmetric MLP",
-                        "head": "Dense to embedding", "params": "~105.2K", "recommended": True,
+                        "head": "Dense to embedding", "params": "~1.86M", "recommended": True,
                         "when": "The default starting point. Treats the profile as a flat vector; a symmetric dense encoder and decoder compress it to the embedding and reconstruct it. Cheapest and strongest baseline.",
                     },
                     {
                         "key": "conv1d_ae", "name": "Conv1D Autoencoder", "skip": "1D convolutions",
-                        "head": "Conv stack to embedding", "params": "~216.2K", "recommended": False,
+                        "head": "Conv stack to embedding", "params": "~1.60M", "recommended": False,
                         "when": "Exploits the local smoothness of the elevation profile. Stacked 1D convolutions over the range axis capture neighbouring-bin correlations before pooling to the embedding.",
                     },
                     {
                         "key": "transformer1d_ae", "name": "Transformer1D Autoencoder", "skip": "Self-attention",
-                        "head": "Transformer to embedding", "params": "~602.1K", "recommended": False,
+                        "head": "Transformer to embedding", "params": "~1.89M", "recommended": False,
                         "when": "Long-range dependencies along the profile. A self-attention encoder and decoder model interactions between distant elevation bins, at a higher parameter cost.",
                     },
                     {
                         "key": "resmlp_ae", "name": "ResMLP Autoencoder", "skip": "Residual MLP",
-                        "head": "Dense to embedding", "params": "~271.9K", "recommended": False,
+                        "head": "Dense to embedding", "params": "~1.99M", "recommended": False,
                         "when": "A deeper dense alternative to the MLP baseline. Pre-norm residual blocks let the encoder and decoder go deeper without optimisation trouble, trading parameters for capacity while keeping the flat-vector treatment of the profile.",
                     },
                     {
                         "key": "tcn_ae", "name": "TCN Autoencoder", "skip": "Dilated 1D conv",
-                        "head": "Dilated conv to embedding", "params": "~243.1K", "recommended": False,
+                        "head": "Dilated conv to embedding", "params": "~1.61M", "recommended": False,
                         "when": "Multi-scale local structure. Stacked dilated residual convolutions grow the receptive field exponentially over the range axis, capturing both narrow and broad elevation features without the cost of attention.",
                     },
                     {
                         "key": "gru_ae", "name": "GRU Autoencoder", "skip": "Recurrent",
-                        "head": "BiGRU to embedding", "params": "~55.4K", "recommended": False,
+                        "head": "BiGRU to embedding", "params": "~1.83M", "recommended": False,
                         "when": "A compact recurrent option. A bidirectional GRU sweeps the profile sequentially and a GRU decoder unrolls the embedding back into the curve; the cheapest model that still models ordering explicitly.",
                     },
                     {
                         "key": "cnn_attn_ae", "name": "Conv-Attention Autoencoder", "skip": "Conv tokens + attention",
-                        "head": "Tokenized transformer to embedding", "params": "~907.5K", "recommended": False,
+                        "head": "Tokenized transformer to embedding", "params": "~1.92M", "recommended": False,
                         "when": "The most expressive profile model. A convolutional tokenizer splits the profile into patches that a real multi-token self-attention stack relates to one another, combining local convolution with global attention at the highest parameter cost.",
                     },
                 ],

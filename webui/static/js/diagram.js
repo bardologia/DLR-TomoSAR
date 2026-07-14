@@ -65,7 +65,7 @@ class ModelDiagram {
     if (over) { skipKind = over.skipKind; type = over.type; gated = !!over.gated; }
 
     const actMap = { relu: "ReLU", leaky_relu: "LeakyReLU", gelu: "GELU", silu: "SiLU", simplegate: "SimpleGate" };
-    const normMap = { batch: "BatchNorm", instance: "InstanceNorm", group: "GroupNorm", layer: "LayerNorm", none: null };
+    const normMap = { batch: "BatchNorm", instance: "InstanceNorm", group: "GroupNorm", layer: "LayerNorm", layernorm: "LayerNorm", l2: "L2 Norm", none: null };
     const act = (model.activation || "relu").toLowerCase();
     const norm = (model.normalization || "batch").toLowerCase();
     return { skipKind, heads, type, gated, key: model.key, act: actMap[act] || "ReLU", norm: normMap[norm] !== undefined ? normMap[norm] : "BatchNorm" };
