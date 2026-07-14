@@ -23,6 +23,26 @@ def dual_curriculum() -> LossCurriculumConfig:
     return curriculum
 
 
+def _half_resunet_features() -> list[int]:
+    return [32, 64, 128, 256]
+
+
+def _default_dual_input_trials() -> dict:
+    return {
+        "red-red" : {"params": ["pass", "ifg", "dem"], "existence": ["pass", "ifg", "dem"]},
+        "red-ifg" : {"params": ["pass", "ifg", "dem"], "existence": ["ifg"]},
+        "amp-ifg" : {"params": ["pass"],               "existence": ["ifg"]},
+        "amp-red" : {"params": ["pass"],               "existence": ["pass", "ifg", "dem"]},
+    }
+
+
+@dataclass
+class DualInputTrialsConfig:
+    params_features    : list[int] = field(default_factory=_half_resunet_features)
+    existence_features : list[int] = field(default_factory=_half_resunet_features)
+    trials             : dict      = field(default_factory=_default_dual_input_trials)
+
+
 @dataclass
 class DualEntryConfig:
     run_name        : str | None = None
@@ -56,3 +76,10 @@ class DualEntryConfig:
 
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
+
+    trials_enabled : bool                  = False
+    trials_mode    : str                   = "input"
+    input_trials   : DualInputTrialsConfig = field(default_factory=DualInputTrialsConfig)
+
+    gpus             : list[int] = field(default_factory=lambda: [0, 1, 3])
+    poll_interval_s  : float     = 5.0

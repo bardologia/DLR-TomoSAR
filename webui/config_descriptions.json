@@ -2233,7 +2233,20 @@
         "probe_exit_after": "Exit the run after the probe report instead of continuing into full training",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "infer_after": "Run the shared inference pipeline with the dual components automatically on the trained checkpoint once training completes",
-        "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after is set"
+        "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after is set",
+        "trials_enabled": "Enable the multi-trial GPU sweep (DualTrainScheduler) that fans one training run per trunk-input trial out across GPUs instead of launching a single run",
+        "trials_mode": "Sweep dimension the dual trial scheduler varies; input is the only mode and trains one run per trunk-input assignment under logdir/input",
+        "input_trials": "DualInputTrialsConfig sub-config defining the trunk-input experiment: the fixed trunk feature ladders shared by every trial and the named params/existence channel-group assignments",
+        "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
+        "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed trial jobs"
+      }
+    },
+    "training/dual::DualInputTrialsConfig": {
+      "summary": "Trunk-input trial catalog for the dual model: a fixed pair of trunk feature ladders applied to every trial, and named trials assigning input channel groups to the parameter and existence trunks",
+      "fields": {
+        "params_features": "Encoder feature widths of the parameter trunk used for every trial; defaults to the four-level half-width ladder 32-64-128-256, half the standard four-level resunet widths",
+        "existence_features": "Encoder feature widths of the existence trunk used for every trial; defaults to the same four-level half-width ladder 32-64-128-256",
+        "trials": "Named trunk-input assignments, each mapping a label to the channel groups (pass, ifg, dem) fed to the params and existence trunks; both keys are required in every spec. Defaults cover the 2x2 grid reduced/reduced, reduced/ifg-only (the production baseline), amplitude-only/ifg-only, and amplitude-only/reduced, run as di-<label>"
       }
     },
     "patch_sweep/general::PatchGridConfig": {

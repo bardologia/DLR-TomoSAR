@@ -48,5 +48,6 @@ from configuration.training.unrolled import (
 )
 from configuration.training.dual import (
     DualEntryConfig,
+    DualInputTrialsConfig,
     dual_curriculum,
 )

@@ -645,6 +645,18 @@ class LaunchLayout:
                 {"key": "geometry", "title": "Geometry", "panels": [
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
+                {"key": "experiments", "title": "Experiments", "panels": [
+                    {"kind": "fields", "title": "Trunk-input trials", "groups": [
+                        {"title": None, "fields": [{"gate": "trials_enabled", "fields": [
+                            "trials_mode",
+                            "input_trials.params_features", "input_trials.existence_features",
+                            "input_trials.trials",
+                        ]}]},
+                    ]},
+                    {"kind": "fields", "groups": [
+                        {"title": "Fan-out execution", "fields": [{"path": "gpus", "widget": GPU_MANY}, "poll_interval_s"]},
+                    ]},
+                ]},
                 {"key": "inference", "title": "Inference", "panels": [
                     {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},

@@ -45,7 +45,7 @@ class ScriptCatalog:
         "train_dual": {
             "title"     : "Train Dual",
             "category"  : "Training",
-            "purpose"   : "Train the dual-input ResUNet set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate. Shares the backbone dataset, loss curriculum, and trainer.",
+            "purpose"   : "Train the dual-input ResUNet set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate. Shares the backbone dataset, loss curriculum, and trainer. Optionally fans out trunk-input trials across GPUs, one run per params/existence channel-group assignment on fixed half-width four-level trunks.",
         },
         "infer_backbone": {
             "title"     : "Infer Backbone",
