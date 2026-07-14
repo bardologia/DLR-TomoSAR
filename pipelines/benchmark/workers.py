@@ -120,23 +120,19 @@ class MaxBatchWorker(BenchmarkWorker):
 
 
 class TrainingWorker(BenchmarkWorker):
-    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
-        run_name = self._run_name(model_name, loss_component, seed)
+    def _run_profile_autoencoder(self, model_name: str, run_name: str, seed: int | None) -> None:
+        from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
 
-        if self.config.training_type == "profile_autoencoder":
-            from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline
+        entry = self._ae_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
+        TrainingPipeline(entry).run()
 
-            entry = self._ae_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
-            TrainingPipeline(entry).run()
-            return
+    def _run_jepa(self, model_name: str, run_name: str, seed: int | None) -> None:
+        from pipelines.jepa.training.pipeline import TrainingPipeline
 
-        if self.config.training_type == "jepa":
-            from pipelines.jepa.training.pipeline      import TrainingPipeline
+        entry = self._jepa_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
+        TrainingPipeline(entry).run()
 
-            entry = self._jepa_entry_config(model_name, self.run_dir / "training", run_name=run_name, seed=seed)
-            TrainingPipeline(entry).run()
-            return
-
+    def _run_backbone(self, model_name: str, run_name: str, seed: int | None, loss_component: str | None) -> None:
         from models                               import BACKBONE_CONFIG_REGISTRY
         from pipelines.backbone.training.pipeline import TrainingPipeline
         from pipelines.shared.model.model_builder import ModelBuilder
@@ -171,6 +167,23 @@ class TrainingWorker(BenchmarkWorker):
         )
 
         pipeline.run(probe_config=self._probe_config())
+
+    def run(self, model_name: str, seed: int | None = None, loss_component: str | None = None) -> None:
+        training_type = self.config.training_type
+        if training_type not in ("backbone", "jepa", "profile_autoencoder"):
+            raise ValueError(f"Unknown training_type '{training_type}', expected one of ['backbone', 'jepa', 'profile_autoencoder']")
+
+        run_name = self._run_name(model_name, loss_component, seed)
+
+        if training_type == "profile_autoencoder":
+            self._run_profile_autoencoder(model_name, run_name, seed)
+            return
+
+        if training_type == "jepa":
+            self._run_jepa(model_name, run_name, seed)
+            return
+
+        self._run_backbone(model_name, run_name, seed, loss_component)
 
 
 class InferenceWorker(BenchmarkWorker):

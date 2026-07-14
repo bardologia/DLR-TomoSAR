@@ -11,7 +11,8 @@ from pipelines.benchmark.stages import ComparisonStage, InferenceStage, MaxBatch
 
 
 class BenchmarkPipeline(StagedPipeline):
-    LOGGER_NAME = "benchmark_pipeline"
+    LOGGER_NAME     = "benchmark_pipeline"
+    SUPPORTED_TYPES = ("backbone", "jepa", "profile_autoencoder")
 
     def __init__(self, config: BenchmarkConfig, entry_script: Path) -> None:
         super().__init__(config, entry_script)
@@ -29,6 +30,9 @@ class BenchmarkPipeline(StagedPipeline):
         return [ModelBuilder.model_key(name, head) for name in self._registry() for head in self.config.heads]
 
     def _validate_sweep(self) -> None:
+        if self.config.training_type not in self.SUPPORTED_TYPES:
+            raise SystemExit(f"benchmark does not support training_type '{self.config.training_type}'; supported: {', '.join(self.SUPPORTED_TYPES)}")
+
         SeedExpandedStage.components(self.config)
 
         unknown = [head for head in self.config.heads if head not in BACKBONE_HEADS]

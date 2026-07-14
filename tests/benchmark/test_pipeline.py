@@ -104,3 +104,10 @@ def test_run_skips_size_match_and_maxbatch_for_autoencoder(tmp_path, monkeypatch
     assert "inference" not in order
     assert "training" in order
     assert "comparison" in order
+
+
+def test_run_rejects_unsupported_training_type(tmp_path):
+    pipeline = BenchmarkPipeline(_config(tmp_path, training_type="unrolled"), entry_script=ENTRY)
+
+    with pytest.raises(SystemExit, match="unrolled"):
+        pipeline.run()

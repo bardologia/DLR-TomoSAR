@@ -183,3 +183,13 @@ def test_training_entry_configs_carry_the_overfit_check(config):
     assert ae_entry.overfit_check   is config.overfit_check
     assert jepa_entry.overfit_check is config.overfit_check
     assert ae_entry.overfit_check.enabled is True
+
+
+def test_training_worker_rejects_unsupported_training_type(config):
+    from pipelines.benchmark.workers import TrainingWorker
+
+    config.training_type = "unrolled"
+    worker = TrainingWorker(config, "tag")
+
+    with pytest.raises(ValueError, match="unrolled"):
+        worker.run("gamma_net")
