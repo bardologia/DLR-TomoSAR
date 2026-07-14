@@ -215,3 +215,23 @@ def test_tune_model_skips_dispatch_when_target_reached(tmp_path, monkeypatch):
 
     assert called["dispatch"] is False
     assert (orch.run_dir / "unet" / "best_config.json").exists()
+
+
+def test_schedule_rejects_unsupported_training_type(tmp_path):
+    cfg               = _make_config(tmp_path)
+    cfg.training_type = "unrolled"
+    orch              = TuningScheduler("testtag", cfg, entry_script=tmp_path / "entry.py")
+
+    with pytest.raises(SystemExit, match="unrolled"):
+        orch.schedule()
+
+
+def test_worker_rejects_unsupported_training_type(tmp_path):
+    from pipelines.tuning.workers import TuningWorker
+
+    cfg               = _make_config(tmp_path)
+    cfg.training_type = "unrolled"
+    worker            = TuningWorker("testtag", cfg)
+
+    with pytest.raises(ValueError, match="unrolled"):
+        worker._build_tuner("gamma_net", cfg.tuning, StubLogger())

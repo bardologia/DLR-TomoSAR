@@ -70,39 +70,39 @@ class TuningWorker:
 
         return trainer_config, dataset_config
 
-    def _build_tuner(self, model_name: str, tune_cfg, logger: Logger):
-        if self.config.training_type == "profile_autoencoder":
-            return AeTuner(
-                model_name         = model_name,
-                config_cls         = PROFILE_AE_CONFIG_REGISTRY[model_name],
-                entry_template     = self._ae_entry_template(),
-                trial_pipeline_cls = TrialProfileAePipeline,
-                tune_cfg           = tune_cfg,
-                log_dir            = str(self.run_dir / model_name),
-                logger             = logger,
-            )
+    def _profile_ae_tuner(self, model_name: str, tune_cfg, logger: Logger):
+        return AeTuner(
+            model_name         = model_name,
+            config_cls         = PROFILE_AE_CONFIG_REGISTRY[model_name],
+            entry_template     = self._ae_entry_template(),
+            trial_pipeline_cls = TrialProfileAePipeline,
+            tune_cfg           = tune_cfg,
+            log_dir            = str(self.run_dir / model_name),
+            logger             = logger,
+        )
 
-        if self.config.training_type == "image_autoencoder":
-            return AeTuner(
-                model_name         = model_name,
-                config_cls         = IMAGE_AE_CONFIG_REGISTRY[model_name],
-                entry_template     = self._image_ae_entry_template(),
-                trial_pipeline_cls = TrialImageAePipeline,
-                tune_cfg           = tune_cfg,
-                log_dir            = str(self.run_dir / model_name),
-                logger             = logger,
-            )
+    def _image_ae_tuner(self, model_name: str, tune_cfg, logger: Logger):
+        return AeTuner(
+            model_name         = model_name,
+            config_cls         = IMAGE_AE_CONFIG_REGISTRY[model_name],
+            entry_template     = self._image_ae_entry_template(),
+            trial_pipeline_cls = TrialImageAePipeline,
+            tune_cfg           = tune_cfg,
+            log_dir            = str(self.run_dir / model_name),
+            logger             = logger,
+        )
 
-        if self.config.training_type == "jepa":
-            return JepaTuner(
-                model_name       = model_name,
-                model_config_cls = BACKBONE_CONFIG_REGISTRY[ModelBuilder.split_key(model_name)[0]],
-                entry_template   = self._jepa_entry_template(),
-                tune_cfg         = tune_cfg,
-                log_dir          = str(self.run_dir / model_name),
-                logger           = logger,
-            )
+    def _jepa_tuner(self, model_name: str, tune_cfg, logger: Logger):
+        return JepaTuner(
+            model_name       = model_name,
+            model_config_cls = BACKBONE_CONFIG_REGISTRY[ModelBuilder.split_key(model_name)[0]],
+            entry_template   = self._jepa_entry_template(),
+            tune_cfg         = tune_cfg,
+            log_dir          = str(self.run_dir / model_name),
+            logger           = logger,
+        )
 
+    def _backbone_tuner(self, model_name: str, tune_cfg, logger: Logger):
         trainer_cfg, dataset_cfg = self._build_base_configs()
 
         return Tuner(
@@ -115,6 +115,20 @@ class TuningWorker:
             logger              = logger,
             emit_trial_docs     = tune_cfg.emit_trial_docs,
         )
+
+    def _build_tuner(self, model_name: str, tune_cfg, logger: Logger):
+        dispatch = {
+            "backbone"            : self._backbone_tuner,
+            "image_autoencoder"   : self._image_ae_tuner,
+            "jepa"                : self._jepa_tuner,
+            "profile_autoencoder" : self._profile_ae_tuner,
+        }
+
+        training_type = self.config.training_type
+        if training_type not in dispatch:
+            raise ValueError(f"Unknown training_type '{training_type}', expected one of {sorted(dispatch)}")
+
+        return dispatch[training_type](model_name, tune_cfg, logger)
 
     def run_worker(self, model_name: str, gpu_id: int, n_trials: int, study_name: str, storage_url: str) -> None:
         tune_cfg      = self.config.tuning

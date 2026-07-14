@@ -19,6 +19,8 @@ from tools.runtime.config_cli import ConfigCli
 
 
 class TuningScheduler:
+    SUPPORTED_TYPES = ("backbone", "image_autoencoder", "jepa", "profile_autoencoder")
+
     def __init__(self, tag: str, config, entry_script: Path) -> None:
         self.tag          = tag
         self.config       = config
@@ -173,6 +175,9 @@ class TuningScheduler:
         self._save_results()
 
     def schedule(self, target_model: str | None = None, resume: bool = False) -> None:
+        if self.config.training_type not in self.SUPPORTED_TYPES:
+            sys.exit(f"ERROR: tuning does not support training_type '{self.config.training_type}'; supported: {', '.join(self.SUPPORTED_TYPES)}")
+
         if resume and not self.db_path.exists():
             sys.exit(f"ERROR: --resume given but no study found at {self.db_path}")
         if not resume and self.db_path.exists():
