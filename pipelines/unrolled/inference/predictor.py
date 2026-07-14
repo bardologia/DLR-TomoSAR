@@ -41,12 +41,21 @@ class UnrolledPredictor:
 
         return max(1, min(height, int(self.config.chunk_cells) // max(1, n_bins * width)))
 
+    def _noise_generator(self, row_start: int) -> Optional[torch.Generator]:
+        if self.run.noise_std <= 0.0:
+            return None
+
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(row_start)
+
+        return generator
+
     @torch.no_grad()
     def _predict_rows(self, row_start: int, row_end: int) -> tuple:
         gt = torch.from_numpy(np.ascontiguousarray(self.run.gt_parameters[:, row_start:row_end])).unsqueeze(0).to(self.device)
         kz = torch.from_numpy(np.ascontiguousarray(self.run.kz_field[:, row_start:row_end])).unsqueeze(0).to(self.device)
 
-        measurements, target, mask = self.synthesiser.synthesise(gt, kz)
+        measurements, target, mask = self.synthesiser.synthesise(gt, kz, self._noise_generator(row_start))
         pred                       = self.run.model(measurements, kz, self.x_axis)
 
         return pred[0], target[0], mask[0]
@@ -98,11 +107,18 @@ class UnrolledPredictor:
 
     @torch.no_grad()
     def profile_pair(self, azimuth: int, range_index: int) -> dict:
-        pred, target, _mask = self._predict_rows(azimuth, azimuth + 1)
+        _, height, _ = self.run.gt_parameters.shape
+
+        rows        = self._chunk_rows()
+        chunk_start = (int(azimuth) // rows) * rows
+        chunk_end   = min(chunk_start + rows, height)
+        chunk_row   = int(azimuth) - chunk_start
+
+        pred, target, _mask = self._predict_rows(chunk_start, chunk_end)
 
         return {
             "azimuth" : int(azimuth),
             "range"   : int(range_index),
-            "gt"      : target[:, 0, range_index].cpu().numpy(),
-            "pred"    : pred[:, 0, range_index].cpu().numpy(),
+            "gt"      : target[:, chunk_row, range_index].cpu().numpy(),
+            "pred"    : pred[:, chunk_row, range_index].cpu().numpy(),
         }

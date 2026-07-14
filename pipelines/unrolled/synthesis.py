@@ -15,7 +15,7 @@ class MeasurementSynthesiser:
         self.dx          = float(x_axis[1] - x_axis[0])
 
     @torch.no_grad()
-    def synthesise(self, gt_phys: torch.Tensor, kz_map: torch.Tensor) -> tuple:
+    def synthesise(self, gt_phys: torch.Tensor, kz_map: torch.Tensor, generator: torch.Generator | None = None) -> tuple:
         curves = GaussianCurve.reconstruct(gt_phys, self.x_axis, self.ppg).float()
 
         power = curves.sum(dim=1) * self.dx
@@ -25,7 +25,10 @@ class MeasurementSynthesiser:
         measurements = TomoOperator.forward(target, kz_map, self.x_axis, self.dx)
 
         if self.noise_std > 0.0:
-            noise        = torch.randn_like(measurements.real) + 1j * torch.randn_like(measurements.real)
+            shape        = measurements.real.shape
+            device       = measurements.device
+            dtype        = measurements.real.dtype
+            noise        = torch.randn(shape, generator=generator, device=device, dtype=dtype) + 1j * torch.randn(shape, generator=generator, device=device, dtype=dtype)
             measurements = measurements + self.noise_std / (2.0 ** 0.5) * noise
 
         return measurements, target, mask
