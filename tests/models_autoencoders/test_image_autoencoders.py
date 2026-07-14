@@ -151,3 +151,12 @@ def test_constant_input_finite(name):
 
     assert x_hat.shape == x.shape
     assert _finite(x_hat)
+
+
+def test_vit_rejects_input_not_divisible_by_patch_size():
+    model, _ = _build("vit_ae")
+    model.eval()
+
+    with pytest.raises(ValueError, match="patch_size"):
+        with torch.no_grad():
+            model.reconstruct(torch.randn(1, IN_CHANNELS, PATCH - 1, PATCH))

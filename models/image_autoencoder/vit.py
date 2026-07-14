@@ -11,6 +11,7 @@ from models.blocks                                       import PatchEmbedding, 
 class ViTImageEncoder(nn.Module):
     def __init__(self, config: ViTImageAutoencoderConfig) -> None:
         super().__init__()
+        self.patch_size   = config.patch_size
         self.patch_embed  = PatchEmbedding(config.in_channels, config.hidden_dim, config.patch_size)
         self.pos_conv     = nn.Conv2d(config.hidden_dim, config.hidden_dim, kernel_size=3, padding=1, groups=config.hidden_dim)
         self.blocks       = nn.ModuleList([
@@ -21,6 +22,10 @@ class ViTImageEncoder(nn.Module):
         self.to_embedding = nn.Conv2d(config.hidden_dim, config.embedding_dim, kernel_size=1)
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
+        height, width = image.shape[-2], image.shape[-1]
+        if height % self.patch_size != 0 or width % self.patch_size != 0:
+            raise ValueError(f"ViT autoencoder input {height}x{width} is not divisible by patch_size={self.patch_size}; the patch embedding would silently drop border rows and columns.")
+
         tokens, gh, gw = self.patch_embed(image)
         tokens = tokens + self.pos_conv(tokens_to_feature_map(tokens, gh, gw)).flatten(2).transpose(1, 2)
 
