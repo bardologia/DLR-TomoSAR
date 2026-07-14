@@ -1643,7 +1643,6 @@
         "run_directory": "Path to the training run directory holding the checkpoint and receiving inference outputs",
         "output_subdir": "Optional fixed subdirectory name under run_directory/inference/image_ae for this call's outputs, None auto-generates a timestamped subdirectory",
         "device": "Torch device string for inference, e.g. cuda or cpu",
-        "seed": "Random seed field carried for reproducibility, not consumed by any step in this inference pipeline (patch and scatter sampling use patch_seed instead)",
         "log_level": "Logging verbosity threshold, e.g. INFO or DEBUG",
         "split": "Dataset split to run inference on: train, val, or test",
         "checkpoint_name": "Filename of the checkpoint to load for inference, defaulting to best_model.pt",

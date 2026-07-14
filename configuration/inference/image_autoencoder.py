@@ -20,7 +20,6 @@ class ImageAeInferenceConfig:
     run_directory   : Path
     output_subdir   : Optional[str] = None
     device          : str           = "cuda"
-    seed            : int           = 0
     log_level       : str           = "INFO"
 
     split           : str           = "test"
