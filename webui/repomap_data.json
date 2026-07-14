@@ -522,7 +522,7 @@
               "label": "Queue + Plan Resolvers",
               "module": "pipelines/processing/param_extraction/queue.py",
               "role": "transform",
-              "fn": "DatasetQueueResolver lists valid dataset directories under the base path and ExtractionPlanResolver expands the K x lambda x fit-mode grid into a list of ExtractionConfig plans.",
+              "fn": "The shared DatasetQueueResolver (pipelines/shared/dataset/dataset_queue.py) lists valid dataset directories under the base path and ExtractionPlanResolver expands the K x lambda x fit-mode grid into a list of ExtractionConfig plans.",
               "col": 1,
               "reads": [],
               "writes": [],
