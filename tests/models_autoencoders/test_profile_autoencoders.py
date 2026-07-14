@@ -176,3 +176,23 @@ def test_collapsed_embedding_backward_finite(name):
     grads = [p.grad for p in model.parameters() if p.grad is not None]
     assert _finite(loss)
     assert all(_finite(g) for g in grads)
+
+
+def test_transformer1d_rejects_unsupported_activation():
+    cfg            = _tiny_config("transformer1d_ae")
+    cfg.activation = "silu"
+
+    with pytest.raises(ValueError, match="activation"):
+        get_profile_autoencoder("transformer1d_ae", cfg)
+
+
+@pytest.mark.parametrize("name", ["conv1d_ae", "tcn_ae", "cnn_attn_ae"])
+def test_xavier_init_reaches_conv1d_layers(name):
+    cfg           = _tiny_config(name)
+    cfg.init_mode = "xavier"
+    model, _      = get_profile_autoencoder(name, cfg)
+
+    conv_biases = [m.bias for m in model.modules() if isinstance(m, torch.nn.Conv1d) and m.bias is not None]
+
+    assert conv_biases
+    assert all(torch.all(bias == 0.0) for bias in conv_biases)
