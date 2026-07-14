@@ -208,3 +208,19 @@ def test_save_slices_includes_comparison_sources(tmp_path):
 
     expected = {f"{axis}_{source}_physical.png" for source in ("pred", "predb", "diff", "gt") for axis in ("range", "azimuth")}
     assert set(result["files"]) == expected
+
+
+def test_cmap_selection_and_diverging_override(tmp_path):
+    explorer, cube_a, cube_b = _loaded(tmp_path)
+    explorer.attach_second(cube_a, cube_b)
+
+    pred = explorer._entry(cube_a, "pred")
+    diff = explorer._entry(cube_a, "diff")
+
+    assert explorer._entry_cmap(pred, "viridis") == "viridis"
+    assert explorer._entry_cmap(pred, "banana") == "jet"
+    assert explorer._entry_cmap(diff, "viridis") == "coolwarm"
+
+    assert explorer.slice_png(cube_a, "pred", "range", az=0, rg=0, cmap="viridis")[:4] == b"\x89PNG"
+    assert explorer.plane_png(cube_a, "pred", frac=0.5, cmap="gray")[:4] == b"\x89PNG"
+    assert explorer.transect_png(cube_a, "pred", 0, 0, 2, 2, cmap="inferno")[:4] == b"\x89PNG"

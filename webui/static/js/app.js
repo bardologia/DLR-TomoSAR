@@ -288,6 +288,7 @@ class App {
         at      : document.getElementById("cube-cloud-at"),
         canvas  : document.getElementById("cube-cloud-canvas"),
       },
+      cmapSel       : document.getElementById("cube-cmap"),
       jumpAz        : document.getElementById("cube-jump-az"),
       jumpRg        : document.getElementById("cube-jump-rg"),
       jumpGo        : document.getElementById("cube-jump-go"),

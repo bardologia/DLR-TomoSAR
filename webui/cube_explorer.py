@@ -88,6 +88,8 @@ class CubeExplorer:
     PARAM_FIELDS  = {"amp": 0, "mu": 1, "sigma": 2}
     PARAM_BAD     = "#10151a"
 
+    CMAPS = ("jet", "viridis", "inferno", "turbo", "gray")
+
     METRIC_EXCLUDED = ("_curves", "params_")
     METRIC_LABELS   = {
         "pixel_mse"               : "MSE",
@@ -308,7 +310,7 @@ class CubeExplorer:
         value = float(ssim(ref, cur, data_range=data_range, win_size=win_size))
         return value if np.isfinite(value) else None
 
-    def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical") -> bytes | None:
+    def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical", cmap: str = "jet") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None or axis not in ("range", "azimuth"):
             return None
@@ -320,10 +322,10 @@ class CubeExplorer:
         data, heights, vmin, vmax = self._cut(entry, axis, az, rg, space)
 
         buf = io.BytesIO()
-        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry, cmap), vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
-    def plane_png(self, cube_id: str, source: str, frac: float, space: str = "physical") -> bytes | None:
+    def plane_png(self, cube_id: str, source: str, frac: float, space: str = "physical", cmap: str = "jet") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None:
             return None
@@ -349,7 +351,7 @@ class CubeExplorer:
             vmin, vmax = entry["vmin"], entry["vmax"]
 
         buf = io.BytesIO()
-        plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap=self._entry_cmap(entry, cmap), vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
     def param_map_png(self, cube_id: str, source: str, field: str, slot: int) -> bytes | None:
@@ -592,7 +594,7 @@ class CubeExplorer:
             return None
         return data, primary
 
-    def transect_png(self, cube_id: str, source: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical") -> bytes | None:
+    def transect_png(self, cube_id: str, source: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical", cmap: str = "jet") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None:
             return None
@@ -600,10 +602,10 @@ class CubeExplorer:
         data, heights, vmin, vmax = self._transect_cut(entry, az0, rg0, az1, rg1, space)
 
         buf = io.BytesIO()
-        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry, cmap), vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
-    def save_transect(self, cube_id: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical") -> dict:
+    def save_transect(self, cube_id: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical", cmap: str = "jet") -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
                 return {"ok": False, "error": "cube not loaded"}
@@ -629,7 +631,7 @@ class CubeExplorer:
         for source in meta["sources"]:
             entry = entries[source]
             data, heights, vmin, vmax = self._transect_cut(entry, az0, rg0, az1, rg1, space)
-            saved = self.archiver.render_transect(data, heights, vmin, vmax, source, (az0, rg0), (az1, rg1), space, out_dir / f"transect_{source}_{space}.png", cmap=self._entry_cmap(entry))
+            saved = self.archiver.render_transect(data, heights, vmin, vmax, source, (az0, rg0), (az1, rg1), space, out_dir / f"transect_{source}_{space}.png", cmap=self._entry_cmap(entry, cmap))
             files.append(saved.name)
 
         self.logger.ok(f"saved {len(files)} transect figures to {out_dir}")
@@ -656,7 +658,7 @@ class CubeExplorer:
         heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
         return data[order], heights, float(vmin), float(vmax)
 
-    def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
+    def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical", cmap: str = "jet") -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
                 return {"ok": False, "error": "cube not loaded"}
@@ -680,7 +682,7 @@ class CubeExplorer:
         for source in meta["sources"]:
             for axis in ("range", "azimuth"):
                 data, heights, vmin, vmax = self._cut(entries[source], axis, az, rg, space)
-                saved = self.archiver.render(data, heights, vmin, vmax, source, axis, az, rg, space, out_dir / f"{axis}_{source}_{space}.png", cmap=self._entry_cmap(entries[source]))
+                saved = self.archiver.render(data, heights, vmin, vmax, source, axis, az, rg, space, out_dir / f"{axis}_{source}_{space}.png", cmap=self._entry_cmap(entries[source], cmap))
                 files.append(saved.name)
 
         self.logger.ok(f"saved {len(files)} slice figures to {out_dir}")
@@ -708,9 +710,11 @@ class CubeExplorer:
         vmin, vmax = (-1.0, 1.0) if entry.get("diverging") else (0.0, 1.0)
         return data, vmin, vmax
 
-    @staticmethod
-    def _entry_cmap(entry: dict) -> str:
-        return "coolwarm" if entry.get("diverging") else "jet"
+    @classmethod
+    def _entry_cmap(cls, entry: dict, cmap: str = "jet") -> str:
+        if entry.get("diverging"):
+            return "coolwarm"
+        return cmap if cmap in cls.CMAPS else "jet"
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
         with self.lock:

@@ -194,6 +194,7 @@ class RequestRouter:
                 source  = (query.get("source") or ["pred"])[0],
                 frac    = float((query.get("frac") or ["0"])[0]),
                 space   = (query.get("space") or ["physical"])[0],
+                cmap    = (query.get("cmap") or ["jet"])[0],
             )
             self._send_png(handler, png)
             return
@@ -252,6 +253,7 @@ class RequestRouter:
                 az1     = int((query.get("az1") or ["0"])[0]),
                 rg1     = int((query.get("rg1") or ["0"])[0]),
                 space   = (query.get("space") or ["physical"])[0],
+                cmap    = (query.get("cmap") or ["jet"])[0],
             )
             self._send_png(handler, png)
             return
@@ -292,6 +294,7 @@ class RequestRouter:
                 az      = int((query.get("az") or ["0"])[0]),
                 rg      = int((query.get("rg") or ["0"])[0]),
                 space   = (query.get("space") or ["physical"])[0],
+                cmap    = (query.get("cmap") or ["jet"])[0],
             )
             self._send_png(handler, png)
             return
@@ -480,6 +483,7 @@ class RequestRouter:
                 az1     = int(body.get("az1", 0)),
                 rg1     = int(body.get("rg1", 0)),
                 space   = body.get("space", "physical"),
+                cmap    = body.get("cmap", "jet"),
             )
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
@@ -490,6 +494,7 @@ class RequestRouter:
                 az      = int(body.get("az", 0)),
                 rg      = int(body.get("rg", 0)),
                 space   = body.get("space", "physical"),
+                cmap    = body.get("cmap", "jet"),
             )
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
