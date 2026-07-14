@@ -415,6 +415,259 @@ class TomogramParams {
   }
 }
 
+class TomogramMetrics {
+  constructor(refs, host) {
+    this.host = host;
+    this.layerEl = refs.layer;
+    this.vminEl = refs.vmin;
+    this.vmaxEl = refs.vmax;
+    this.resetEl = refs.reset;
+    this.modeEl = refs.mode;
+    this.thrEl = refs.thr;
+    this.thrValEl = refs.thrVal;
+    this.alphaEl = refs.alpha;
+    this.img = refs.img;
+    this.cross = refs.cross;
+    this.cbar = refs.cbar;
+    this.minEl = refs.min;
+    this.maxEl = refs.max;
+    this.coordsEl = refs.coords;
+    this.readoutEl = refs.readout;
+    this.openBtn = refs.open;
+
+    this.layers = [];
+    this.layer = null;
+    this.mode = "all";
+    this.alpha = 0.75;
+    this.picked = null;
+    this.debounceTimer = null;
+    this.hoverQueued = null;
+    this.hoverFetching = false;
+
+    this.vminEl.addEventListener("change", () => this._refresh());
+    this.vmaxEl.addEventListener("change", () => this._refresh());
+    this.resetEl.addEventListener("click", () => this._resetRange());
+    this.modeEl.addEventListener("change", () => this._setMode(this.modeEl.value));
+    this.thrEl.addEventListener("input", () => this._onThreshold());
+    this.alphaEl.addEventListener("input", () => this._onAlpha());
+    this.img.addEventListener("mousemove", (ev) => this._onHover(ev));
+    this.img.addEventListener("click", (ev) => this._onClick(ev));
+    this.openBtn.addEventListener("click", () => this._openCuts());
+  }
+
+  configure(meta) {
+    this.layers = meta.metric_maps || [];
+    this.picked = null;
+    this.cross.hidden = true;
+    this.openBtn.hidden = true;
+    this.readoutEl.innerHTML = "";
+    this.coordsEl.textContent = "Hover the map to read the value under the cursor; click to lock a pixel and read every layer.";
+
+    if (!this.layers.length) {
+      this.layer = null;
+      return;
+    }
+
+    if (!this.layer || !this.layers.some((l) => l.key === this.layer.key)) this.layer = this.layers[0];
+    else this.layer = this.layers.find((l) => l.key === this.layer.key);
+
+    this._renderLayerBtns();
+    this._resetControls();
+  }
+
+  render() {
+    if (!this.layer) return;
+    this._syncBtns();
+    this._refresh();
+  }
+
+  _setLayer(key) {
+    if (this.layer && key === this.layer.key) return;
+    this.layer = this.layers.find((l) => l.key === key);
+    this._resetControls();
+    this.render();
+  }
+
+  _setMode(mode) {
+    this.mode = mode;
+    this.thrEl.disabled = mode === "all";
+    this._syncThresholdLabel();
+    this._refresh();
+  }
+
+  _resetControls() {
+    this.vminEl.value = this._round(this.layer.vmin);
+    this.vmaxEl.value = this._round(this.layer.vmax);
+    this.mode = "all";
+    this.modeEl.value = "all";
+    this.thrEl.disabled = true;
+    this.thrEl.value = 500;
+    this._syncThresholdLabel();
+  }
+
+  _resetRange() {
+    this.vminEl.value = this._round(this.layer.vmin);
+    this.vmaxEl.value = this._round(this.layer.vmax);
+    this._refresh();
+  }
+
+  _onThreshold() {
+    this._syncThresholdLabel();
+    this._refresh();
+  }
+
+  _onAlpha() {
+    this.alpha = Number(this.alphaEl.value) / 100;
+    this._refresh();
+  }
+
+  _threshold() {
+    const frac = Number(this.thrEl.value) / 1000;
+    return this.layer.vmin + frac * (this.layer.vmax - this.layer.vmin);
+  }
+
+  _syncThresholdLabel() {
+    if (this.mode === "all") {
+      this.thrValEl.textContent = "";
+      return;
+    }
+    this.thrValEl.textContent = `${this.mode} ${this.host._fmt(this._threshold())}`;
+  }
+
+  _keepWindow() {
+    if (this.mode === "below") return { keep_min: "-inf", keep_max: this._threshold() };
+    if (this.mode === "above") return { keep_min: this._threshold(), keep_max: "inf" };
+    return { keep_min: "-inf", keep_max: "inf" };
+  }
+
+  _renderLayerBtns() {
+    this.layerEl.innerHTML = "";
+    this.layers.forEach((layer) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-space";
+      btn.dataset.key = layer.key;
+      btn.textContent = layer.label;
+      btn.title = layer.key;
+      btn.addEventListener("click", () => this._setLayer(layer.key));
+      this.layerEl.appendChild(btn);
+    });
+  }
+
+  _syncBtns() {
+    this.layerEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", this.layer && btn.dataset.key === this.layer.key);
+    });
+  }
+
+  _refresh() {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this._draw(), 160);
+  }
+
+  _draw() {
+    if (!this.layer) return;
+
+    const { keep_min, keep_max } = this._keepWindow();
+    const vmin = Number(this.vminEl.value);
+    const vmax = Number(this.vmaxEl.value);
+
+    const query = `id=${encodeURIComponent(this.host.selectedId)}&key=${encodeURIComponent(this.layer.key)}` +
+      `&vmin=${vmin}&vmax=${vmax}&keep_min=${keep_min}&keep_max=${keep_max}&alpha=${this.alpha}`;
+    this.img.src = `/api/cubes/metric_map?${query}`;
+
+    this.cbar.src = `/api/cubes/cbar?cmap=viridis`;
+    this.minEl.textContent = this.host._fmt(vmin);
+    this.maxEl.textContent = this.host._fmt(vmax);
+  }
+
+  _pointFromEvent(ev) {
+    const rect = this.img.getBoundingClientRect();
+    const fx = (ev.clientX - rect.left) / rect.width;
+    const fy = (ev.clientY - rect.top) / rect.height;
+    return {
+      az: Math.min(this.host.meta.n_az - 1, Math.max(0, Math.floor(fy * this.host.meta.n_az))),
+      rg: Math.min(this.host.meta.n_rg - 1, Math.max(0, Math.floor(fx * this.host.meta.n_rg))),
+      fx,
+      fy,
+    };
+  }
+
+  _onHover(ev) {
+    if (!this.layer || !this.host.meta || this.picked) return;
+    const point = this._pointFromEvent(ev);
+    this.hoverQueued = point;
+    this._hoverPump();
+  }
+
+  async _hoverPump() {
+    if (this.hoverFetching) return;
+    this.hoverFetching = true;
+
+    while (this.hoverQueued) {
+      const { az, rg } = this.hoverQueued;
+      this.hoverQueued = null;
+      const data = await window.apiGet(`/api/cubes/metric_at?id=${encodeURIComponent(this.host.selectedId)}&key=${encodeURIComponent(this.layer.key)}&az=${az}&rg=${rg}`);
+      if (data && data.ok && !this.picked) {
+        this.coordsEl.textContent = `az = ${data.az} · rg = ${data.rg} · ${this.layer.label} = ${data.value === null ? "–" : this.host._fmt(data.value)}`;
+      }
+    }
+
+    this.hoverFetching = false;
+  }
+
+  _onClick(ev) {
+    if (!this.layer || !this.host.meta) return;
+
+    if (this.picked) {
+      this.picked = null;
+      this.cross.hidden = true;
+      this.openBtn.hidden = true;
+      this.readoutEl.innerHTML = "";
+      this.coordsEl.textContent = "Hover the map to read the value under the cursor; click to lock a pixel and read every layer.";
+      return;
+    }
+
+    const point = this._pointFromEvent(ev);
+    this.picked = point;
+    this.cross.hidden = false;
+    this.cross.style.left = `${point.fx * 100}%`;
+    this.cross.style.top = `${point.fy * 100}%`;
+    this.coordsEl.textContent = `locked at az = ${point.az} · rg = ${point.rg} · click again to unlock`;
+    this.openBtn.hidden = false;
+
+    this._fetchReadout(point.az, point.rg);
+  }
+
+  async _fetchReadout(az, rg) {
+    const jobs = this.layers.map((layer) =>
+      window.apiGet(`/api/cubes/metric_at?id=${encodeURIComponent(this.host.selectedId)}&key=${encodeURIComponent(layer.key)}&az=${az}&rg=${rg}`)
+    );
+    const results = await Promise.all(jobs);
+
+    let html = `<table class="cube-metrics cube-metrics--params"><tbody>`;
+    this.layers.forEach((layer, i) => {
+      const data = results[i];
+      const value = data && data.ok && data.value !== null ? this.host._fmt(data.value) : "–";
+      html += `<tr><th scope="row">${this.host._esc(layer.label)}</th><td>${value}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+
+    this.readoutEl.innerHTML = html;
+  }
+
+  _openCuts() {
+    if (!this.picked) return;
+    this.host._setView("explorer");
+    this.host._follow(this.picked, true);
+    this.host._enterSlices(this.picked);
+  }
+
+  _round(value) {
+    return Number(Number(value).toPrecision(5));
+  }
+}
+
 class TomogramView {
   static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
   static HOLD_SAVE_MS = 4000;
@@ -483,6 +736,7 @@ class TomogramView {
 
     this.sweeps = (refs.sweeps || []).map((sweep) => new TomogramSweep(sweep, this));
     this.params = refs.params ? new TomogramParams(refs.params, this) : null;
+    this.metrics = refs.metrics ? new TomogramMetrics(refs.metrics, this) : null;
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -771,6 +1025,14 @@ class TomogramView {
       if (!meta.params && this.view === "params") this._setView("explorer");
     }
 
+    if (this.metrics) {
+      this.metrics.configure(meta);
+      const hasMaps = (meta.metric_maps || []).length > 0;
+      const metricsBtn = this.modeBtns.find((btn) => btn.dataset.view === "metrics");
+      if (metricsBtn) metricsBtn.hidden = !hasMaps;
+      if (!hasMaps && this.view === "metrics") this._setView("explorer");
+    }
+
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
 
     const sweep = this._sweepFor(this.view);
@@ -789,7 +1051,7 @@ class TomogramView {
   }
 
   _setView(view) {
-    if (!["explorer", "elevation", "azimuth", "range", "params"].includes(view) || view === this.view) return;
+    if (!["explorer", "elevation", "azimuth", "range", "params", "metrics"].includes(view) || view === this.view) return;
 
     this._stopSweeps();
     this.view = view;
@@ -799,6 +1061,10 @@ class TomogramView {
 
     if (view === "params" && this.params && this.meta) {
       this.params.render();
+      return;
+    }
+    if (view === "metrics" && this.metrics && this.meta) {
+      this.metrics.render();
       return;
     }
 

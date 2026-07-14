@@ -3662,3 +3662,15 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
   .cube-pview__deck { grid-template-columns: 1fr; }
 }
 .cube-pside .btn[hidden] { display: none; }
+
+/* ==== Cube metric maps ==== */
+.cube-mctl { display: flex; align-items: center; gap: 8px; font: 500 0.7rem/1 var(--mono); color: var(--ink-dim); }
+.cube-mctl label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.62rem; }
+.cube-mctl input[type="range"] { width: 130px; accent-color: var(--accent); }
+.cube-mctl__val { min-width: 90px; }
+.cube-mselect {
+  font: 500 0.7rem/1 var(--mono); color: var(--ink-dim); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-input); padding: 6px 7px;
+}
+.cube-jump__input--wide { width: 76px; }
+.cube-pmap__media img { width: 100%; height: auto; display: block; cursor: crosshair; image-rendering: pixelated; }

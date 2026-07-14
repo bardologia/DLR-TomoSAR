@@ -62,6 +62,18 @@ class CubeExplorer:
     PARAM_FIELDS  = {"amp": 0, "mu": 1, "sigma": 2}
     PARAM_BAD     = "#10151a"
 
+    METRIC_EXCLUDED = ("_curves", "params_")
+    METRIC_LABELS   = {
+        "pixel_mse"               : "MSE",
+        "pixel_mae"               : "MAE",
+        "pixel_r2"                : "R2",
+        "pixel_cos"               : "cosine",
+        "pixel_peak"              : "peak shift",
+        "physics_coherence_error" : "coherence err",
+        "physics_covariance_error": "covariance err",
+        "physics_valid_mask"      : "valid mask",
+    }
+
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths    = paths
         self.logger   = logger
@@ -272,6 +284,12 @@ class CubeExplorer:
         if cmap is None:
             return None
 
+        return self.cbar_png(cmap)
+
+    def cbar_png(self, cmap: str) -> bytes | None:
+        if cmap not in ("viridis", "inferno", "coolwarm", "jet", "gray"):
+            return None
+
         ramp = np.tile(np.linspace(0.0, 1.0, 256), (12, 1))
 
         buf = io.BytesIO()
@@ -363,6 +381,52 @@ class CubeExplorer:
             return "coolwarm" if field == "count" else "inferno"
         return None
 
+    def metric_overlay_png(self, cube_id: str, key: str, vmin: float, vmax: float, keep_min: float, keep_max: float, alpha: float) -> bytes | None:
+        resolved = self._metric_state(cube_id, key)
+        if resolved is None:
+            return None
+
+        data, primary = resolved
+
+        if not vmax > vmin:
+            vmin, vmax = self._metric_range(data)
+        alpha = float(np.clip(alpha, 0.0, 1.0))
+
+        p_lo, p_hi = np.percentile(primary, [1.0, 99.0])
+        base       = (np.clip((primary - p_lo) / max(p_hi - p_lo, 1e-12), 0.0, 1.0))[..., None].repeat(3, axis=2)
+
+        norm    = np.clip((data - vmin) / max(vmax - vmin, 1e-12), 0.0, 1.0)
+        colored = plt.get_cmap("viridis")(norm)[..., :3]
+        keep    = np.isfinite(data) & (data >= keep_min) & (data <= keep_max)
+        blend   = np.where(keep[..., None], base * (1.0 - alpha) + colored * alpha, base)
+
+        buf = io.BytesIO()
+        plt.imsave(buf, blend.astype(np.float32), format="png")
+        return buf.getvalue()
+
+    def metric_value_at(self, cube_id: str, key: str, az: int, rg: int) -> dict:
+        resolved = self._metric_state(cube_id, key)
+        if resolved is None:
+            return {"ok": False, "error": f"unknown metric map: {key}"}
+
+        data, _ = resolved
+        az = int(np.clip(az, 0, data.shape[0] - 1))
+        rg = int(np.clip(rg, 0, data.shape[1] - 1))
+
+        value = float(data[az, rg])
+        return {"ok": True, "az": az, "rg": rg, "key": key, "value": value if np.isfinite(value) else None}
+
+    def _metric_state(self, cube_id: str, key: str) -> tuple[np.ndarray, np.ndarray] | None:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            data    = self.loaded["metric_maps"].get(key)
+            primary = self.loaded["primary"]
+
+        if data is None:
+            return None
+        return data, primary
+
     def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
@@ -444,10 +508,10 @@ class CubeExplorer:
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            entries, meta, primary, params = self._load_all(stamp_dir)
+            entries, meta, primary, params, metric_maps = self._load_all(stamp_dir)
 
             with self.lock:
-                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params}
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params, "metric_maps": metric_maps}
                 self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
 
             self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
@@ -458,7 +522,7 @@ class CubeExplorer:
 
             self.logger.error(f"cube load failed: {cube_id}: {exc}")
 
-    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict]:
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict, dict]:
         cubes_dir = stamp_dir / "cubes"
         pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
         if pred_raw.ndim != 3:
@@ -492,19 +556,60 @@ class CubeExplorer:
                 raise ValueError(f"source '{source}' spatial shape {raw.shape[1:]} does not match pred {(n_az, n_rg)}")
             entries[source] = self._ingest(raw, x_axis, lambda s=source: advance(s))
 
-        primary = self._primary_db(stamp_dir, n_az, n_rg)
-        params  = self._load_params(cubes_dir, n_az, n_rg)
+        primary     = self._primary_db(stamp_dir, n_az, n_rg)
+        params      = self._load_params(cubes_dir, n_az, n_rg)
+        metric_maps = self._load_metric_maps(cubes_dir, n_az, n_rg)
 
         meta = {
-            "sources" : [s for s in self.SOURCES if s in entries],
-            "n_az"    : n_az,
-            "n_rg"    : n_rg,
-            "n_elev"  : {s: int(entries[s]["cube"].shape[0]) for s in entries},
-            "x_min"   : float(curve_axis[0]),
-            "x_max"   : float(curve_axis[-1]),
-            "params"  : self._params_meta(params, curve_axis),
+            "sources"     : [s for s in self.SOURCES if s in entries],
+            "n_az"        : n_az,
+            "n_rg"        : n_rg,
+            "n_elev"      : {s: int(entries[s]["cube"].shape[0]) for s in entries},
+            "x_min"       : float(curve_axis[0]),
+            "x_max"       : float(curve_axis[-1]),
+            "params"      : self._params_meta(params, curve_axis),
+            "metric_maps" : self._metric_maps_meta(metric_maps),
         }
-        return entries, meta, primary, params
+        return entries, meta, primary, params, metric_maps
+
+    def _load_metric_maps(self, cubes_dir: Path, n_az: int, n_rg: int) -> dict:
+        maps = {}
+        for path in sorted(cubes_dir.glob("*.npy")):
+            if any(marker in path.name for marker in self.METRIC_EXCLUDED):
+                continue
+
+            raw = np.load(path, mmap_mode="r")
+            if raw.ndim != 2 or raw.shape != (n_az, n_rg):
+                continue
+
+            maps[path.stem] = np.asarray(raw, dtype=np.float32)
+
+        return maps
+
+    def _metric_maps_meta(self, metric_maps: dict) -> list:
+        layers = []
+        for key, data in metric_maps.items():
+            vmin, vmax = self._metric_range(data)
+            layers.append({
+                "key"   : key,
+                "label" : self.METRIC_LABELS.get(key, key),
+                "vmin"  : vmin,
+                "vmax"  : vmax,
+            })
+        return layers
+
+    @staticmethod
+    def _metric_range(data: np.ndarray) -> tuple[float, float]:
+        finite = data[np.isfinite(data)]
+        if not finite.size:
+            return 0.0, 1.0
+
+        vmin, vmax = (float(v) for v in np.percentile(finite, [1.0, 99.0]))
+        if not vmax > vmin:
+            vmin, vmax = float(finite.min()), float(finite.max())
+        if not vmax > vmin:
+            vmax = vmin + 1.0
+        return vmin, vmax
 
     def _load_params(self, cubes_dir: Path, n_az: int, n_rg: int) -> dict:
         params = {}

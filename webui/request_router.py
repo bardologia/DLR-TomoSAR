@@ -180,6 +180,33 @@ class RequestRouter:
             )
             self._send_png(handler, png)
             return
+        if path == "/api/cubes/cbar":
+            query = parse_qs(urlparse(handler.path).query)
+            self._send_png(handler, self.cubes.cbar_png((query.get("cmap") or ["viridis"])[0]))
+            return
+        if path == "/api/cubes/metric_map":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.metric_overlay_png(
+                cube_id  = (query.get("id") or [""])[0],
+                key      = (query.get("key") or [""])[0],
+                vmin     = float((query.get("vmin") or ["0"])[0]),
+                vmax     = float((query.get("vmax") or ["0"])[0]),
+                keep_min = float((query.get("keep_min") or ["-inf"])[0]),
+                keep_max = float((query.get("keep_max") or ["inf"])[0]),
+                alpha    = float((query.get("alpha") or ["0.75"])[0]),
+            )
+            self._send_png(handler, png)
+            return
+        if path == "/api/cubes/metric_at":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.cubes.metric_value_at(
+                cube_id = (query.get("id") or [""])[0],
+                key     = (query.get("key") or [""])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
+            return
         if path == "/api/cubes/param_map":
             query = parse_qs(urlparse(handler.path).query)
             png   = self.cubes.param_map_png(
