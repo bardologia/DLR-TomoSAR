@@ -2831,6 +2831,9 @@ main { margin-left: var(--navw); }
 .cube-elev__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 @media (max-width: 1040px) { .cube-elev__grid { grid-template-columns: 1fr; } }
 
+.cube-elev__grid--strip { grid-template-columns: 1fr; gap: 12px; }
+.cube-elev__grid--strip .cube-eplane canvas { height: clamp(140px, calc((100vh - 320px) / var(--cube-rows, 4) - 24px), 560px); image-rendering: auto; }
+
 .cube-eplane {
   margin: 0; min-width: 0;
   background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--line-strong);

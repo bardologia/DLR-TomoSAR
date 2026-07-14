@@ -16,7 +16,7 @@ class TomogramSweep {
     this.steps = 1;
     this.playing = false;
     this.token = 0;
-    this.frameMs = 130;
+    this.frameMs = 70;
 
     if (this.grid)    this.grid.addEventListener("wheel", (ev) => this._onWheel(ev), { passive: false });
     if (this.input)   this.input.addEventListener("change", () => this._onManual());
@@ -40,6 +40,7 @@ class TomogramSweep {
       panel.bitmap = null;
     });
 
+    this._syncRows();
     this.stop();
   }
 
@@ -47,7 +48,15 @@ class TomogramSweep {
     this.panels.forEach((panel) => {
       panel.root.hidden = !this.host.visible.has(panel.source);
     });
+
+    this._syncRows();
     if (this.host.meta && !this.playing && this.host.view === this.axis) this._renderFrame();
+  }
+
+  _syncRows() {
+    if (!this.grid) return;
+    const shown = this.panels.filter((panel) => !panel.root.hidden).length;
+    this.grid.style.setProperty("--cube-rows", String(Math.max(1, shown)));
   }
 
   syncSpace() {
@@ -78,12 +87,19 @@ class TomogramSweep {
 
   async _loop() {
     while (this.playing && this.host.meta && this.host.selectedId) {
-      await this._renderFrame();
+      const frame = this._renderFrame();
+      const next  = (this.idx + 1) % this.steps;
+
+      this._prefetch(next);
+      await Promise.all([frame, this._sleep(this.frameMs)]);
       if (!this.playing) break;
-      await this._sleep(this.frameMs);
-      if (!this.playing) break;
-      this.idx = (this.idx + 1) % this.steps;
+
+      this.idx = next;
     }
+  }
+
+  _prefetch(idx) {
+    this.panels.filter((panel) => !panel.root.hidden).forEach((panel) => this.host.cacheBitmap(this._url(panel.source, idx)));
   }
 
   _onWheel(ev) {
@@ -130,15 +146,11 @@ class TomogramSweep {
     const skeletonTimer = panel.bitmap ? null : setTimeout(() => panel.root.classList.add("is-loading"), 120);
 
     try {
-      const res = await fetch(url);
-      if (!res.ok) return;
-
-      const bitmap = await createImageBitmap(await res.blob());
-      if (token !== this.token) { if (bitmap.close) bitmap.close(); return; }
+      const bitmap = await this.host.cacheBitmap(url);
+      if (!bitmap || token !== this.token) return;
 
       panel.bitmap = bitmap;
       this._paint(panel);
-    } catch (e) {
     } finally {
       if (skeletonTimer) clearTimeout(skeletonTimer);
       panel.root.classList.remove("is-loading");
@@ -1099,6 +1111,7 @@ class TomogramView {
   static LABELS = { pred: "pred", predb: "pred B", diff: "A − B", gt: "gt", reduced: "capon reduced", full: "capon full" };
   static HOLD_SAVE_MS = 4000;
   static HOLD_HINT_MS = 800;
+  static SWEEP_CACHE_BYTES = 192 * 1024 * 1024;
 
   constructor(refs) {
     this.strip = refs.strip;
@@ -1161,6 +1174,8 @@ class TomogramView {
     this.colors = {};
     this.visible = new Set();
     this.cmap = localStorage.getItem("cube-cmap") || "jet";
+    this.bitmapCache = new Map();
+    this.bitmapBytes = 0;
 
     this.sweeps = (refs.sweeps || []).map((sweep) => new TomogramSweep(sweep, this));
     this.params = refs.params ? new TomogramParams(refs.params, this) : null;
@@ -1442,6 +1457,7 @@ class TomogramView {
   _display(meta) {
     this.meta = meta;
     this.progress.hidden = true;
+    this._clearBitmapCache();
 
     const css = getComputedStyle(this.stage);
     this.colors = {
@@ -1521,6 +1537,7 @@ class TomogramView {
 
   _refreshSources(meta) {
     this.meta = meta;
+    this._clearBitmapCache();
 
     const kept = meta.sources.filter((s) => this.visible.has(s));
     this.visible = new Set(kept.length ? kept : meta.sources);
@@ -1611,6 +1628,49 @@ class TomogramView {
 
   _stopSweeps() {
     this.sweeps.forEach((sweep) => sweep.stop());
+  }
+
+  cacheBitmap(url) {
+    const hit = this.bitmapCache.get(url);
+    if (hit) {
+      this.bitmapCache.delete(url);
+      this.bitmapCache.set(url, hit);
+      return hit.promise;
+    }
+
+    const entry = { promise: null, bytes: 0 };
+    entry.promise = this._loadBitmap(url, entry);
+    this.bitmapCache.set(url, entry);
+    return entry.promise;
+  }
+
+  async _loadBitmap(url, entry) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { this.bitmapCache.delete(url); return null; }
+
+      const bitmap = await createImageBitmap(await res.blob());
+      entry.bytes = bitmap.width * bitmap.height * 4;
+      this.bitmapBytes += entry.bytes;
+      this._trimBitmapCache();
+      return bitmap;
+    } catch (e) {
+      this.bitmapCache.delete(url);
+      return null;
+    }
+  }
+
+  _trimBitmapCache() {
+    while (this.bitmapBytes > TomogramView.SWEEP_CACHE_BYTES && this.bitmapCache.size > 1) {
+      const oldest = this.bitmapCache.keys().next().value;
+      this.bitmapBytes -= this.bitmapCache.get(oldest).bytes;
+      this.bitmapCache.delete(oldest);
+    }
+  }
+
+  _clearBitmapCache() {
+    this.bitmapCache.clear();
+    this.bitmapBytes = 0;
   }
 
   _setProfMode(mode) {
