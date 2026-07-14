@@ -13,6 +13,7 @@ import uuid
 from collections import deque
 from datetime    import datetime
 
+from proc_stats    import ProcStats
 from project_paths import ProjectPaths
 from web_logger    import WebLogger
 
@@ -338,6 +339,8 @@ class ProcessManager:
         if record["status"] != "running":
             return {"ok": False, "error": "job is not running"}
 
+        with self.lock:
+            self.jobs[job_id]["stopped"] = True
         self._signal_group(record["pid"], signal.SIGTERM)
         self.logger.warning(f"stop requested for job {job_id}")
         return {"ok": True}
@@ -350,6 +353,8 @@ class ProcessManager:
             return 0
 
         for record in running:
+            with self.lock:
+                self.jobs[record["job_id"]]["stopped"] = True
             self._signal_group(record["pid"], signal.SIGTERM)
             self.logger.warning(f"watchdog stop for job {record['job_id']} (pid {record['pid']})")
 
@@ -382,6 +387,32 @@ class ProcessManager:
         except (ProcessLookupError, PermissionError):
             pass
 
+    def job_for_pid(self, pid: int) -> str | None:
+        with self.lock:
+            running = {record["pid"]: record["job_id"] for record in self.jobs.values() if record["status"] == "running" and record["pid"] is not None}
+
+        hops = 0
+        while pid > 1 and hops < 16:
+            if pid in running:
+                return running[pid]
+            pid   = ProcStats.ppid(pid)
+            hops += 1
+        return None
+
+    def job_fate(self, job_id: str, pid: int) -> str:
+        with self.lock:
+            record = dict(self.jobs.get(job_id) or {})
+
+        if not record:
+            return "unknown"
+        if record["status"] == "running":
+            return "pending" if record["pid"] == pid else "released"
+        if record["status"] == "failed":
+            return "stopped" if record.get("stopped") else "crashed"
+        if record["status"] == "finished":
+            return "finished" if record["exit_code"] == 0 else "unknown"
+        return "unknown"
+
     def list_jobs(self) -> list[dict]:
         with self.lock:
             return sorted(self.jobs.values(), key=lambda r: r["started"], reverse=True)
@@ -403,17 +434,9 @@ class ProcessNuke:
 
         while pid > 1:
             spared.add(pid)
-            pid = self._ppid(pid)
+            pid = ProcStats.ppid(pid)
 
         return spared
-
-    def _ppid(self, pid: int) -> int:
-        try:
-            stat   = open(f"/proc/{pid}/stat").read()
-            fields = stat[stat.rindex(")") + 2 :].split()
-            return int(fields[1])
-        except (OSError, ValueError, IndexError):
-            return 0
 
     def _targets(self, spared: set[int]) -> list[int]:
         return [pid for pid in self._user_pids() if pid not in spared]

@@ -12,3 +12,12 @@ class ProcStats:
         except (OSError, ValueError, IndexError):
             return None
         return None
+
+    @staticmethod
+    def ppid(pid: int) -> int:
+        try:
+            stat   = open(f"/proc/{pid}/stat").read()
+            fields = stat[stat.rindex(")") + 2 :].split()
+            return int(fields[1])
+        except (OSError, ValueError, IndexError):
+            return 0

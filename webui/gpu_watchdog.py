@@ -7,9 +7,10 @@ import time
 from collections import deque
 from datetime    import datetime
 
-from project_paths  import ProjectPaths
-from system_monitor import SystemMonitor
-from web_logger     import WebLogger
+from process_manager import ProcessManager
+from project_paths   import ProjectPaths
+from system_monitor  import SystemMonitor
+from web_logger      import WebLogger
 
 
 class GpuWatchdog:
@@ -20,14 +21,16 @@ class GpuWatchdog:
     EVENT_LIMIT       = 50
     LOG_NAME          = "intrusions.jsonl"
 
-    def __init__(self, system: SystemMonitor, paths: ProjectPaths, logger: WebLogger) -> None:
+    def __init__(self, system: SystemMonitor, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager) -> None:
         self.system    = system
         self.paths     = paths
         self.logger    = logger
+        self.processes = processes
         self.host      = socket.gethostname()
         self.lock      = threading.Lock()
         self.armed     = False
         self.incidents = {}
+        self.residents = {}
         self.gpus      = []
         self.events    = deque(maxlen=self.EVENT_LIMIT)
         self.count     = 0
@@ -106,18 +109,38 @@ class GpuWatchdog:
         return summary
 
     def _detect(self, occupancy: list[dict]) -> dict:
+        now = time.monotonic()
+        self._remember(occupancy, now)
+
         intruders = {}
         for device in occupancy:
             mine = [proc for proc in device["procs"] if proc["owner"] == self.system.user]
             if not mine:
                 continue
 
+            mine_first = min(self.residents[(device["uuid"], proc["pid"])]["first"] for proc in mine)
             for proc in device["procs"]:
                 owner = proc["owner"]
                 if owner is None or owner == self.system.user:
                     continue
+                if self.residents[(device["uuid"], proc["pid"])]["first"] <= mine_first:
+                    continue
                 intruders[(device["uuid"], proc["pid"])] = self._intrusion(device, proc, mine)
         return intruders
+
+    def _remember(self, occupancy: list[dict], now: float) -> None:
+        for device in occupancy:
+            for proc in device["procs"]:
+                key      = (device["uuid"], proc["pid"])
+                resident = self.residents.get(key)
+                if resident is None:
+                    self.residents[key] = {"first": now, "last": now}
+                else:
+                    resident["last"] = now
+
+        stale = [key for key, resident in self.residents.items() if now - resident["last"] > self.GRACE_S]
+        for key in stale:
+            del self.residents[key]
 
     def _intrusion(self, device: dict, proc: dict, mine: list[dict]) -> dict:
         return {
@@ -145,7 +168,8 @@ class GpuWatchdog:
             for key, record in intruders.items():
                 incident = self.incidents.get(key)
                 if incident is None:
-                    self.incidents[key] = {"record": record, "mine_pids": list(record["mine_pids"]), "status": "active", "started": now, "last_seen": now}
+                    jobs                = {pid: self.processes.job_for_pid(pid) for pid in record["mine_pids"]}
+                    self.incidents[key] = {"record": record, "mine_pids": list(record["mine_pids"]), "jobs": jobs, "status": "active", "started": now, "last_seen": now}
                     fresh.append(record)
                 else:
                     incident["last_seen"] = now
@@ -161,26 +185,36 @@ class GpuWatchdog:
             snapshot = [(key, incident) for key, incident in self.incidents.items() if incident["status"] == "active"]
 
         for key, incident in snapshot:
-            dead = [pid for pid in incident["mine_pids"] if self.system.pid_owner(pid) != self.system.user]
+            gone  = [pid for pid in incident["mine_pids"] if self.system.pid_owner(pid) != self.system.user]
+            fates = {pid: self._fate(incident, pid) for pid in gone}
+            gone  = [pid for pid in gone if fates[pid] != "pending"]
 
-            if dead and now - incident["started"] <= self.CRITICAL_WINDOW_S:
-                self._flag_critical(incident, dead, server_gpus)
-            elif dead:
-                self._retire(incident, dead)
+            crashed = [pid for pid in gone if fates[pid] == "crashed"]
+            if crashed and now - incident["started"] <= self.CRITICAL_WINDOW_S:
+                self._flag_critical(incident, crashed, server_gpus)
+            elif gone:
+                self._retire(incident, gone, fates)
             elif key not in intruders and now - incident["last_seen"] > self.GRACE_S:
                 with self.lock:
                     incident["status"]           = "survived"
                     incident["record"]["status"] = "survived"
 
-    def _retire(self, incident: dict, dead: list[int]) -> None:
+    def _fate(self, incident: dict, pid: int) -> str:
+        job_id = incident["jobs"].get(pid)
+        if job_id is None:
+            return "unknown"
+        return self.processes.job_fate(job_id, pid)
+
+    def _retire(self, incident: dict, gone: list[int], fates: dict) -> None:
         with self.lock:
-            incident["mine_pids"] = [pid for pid in incident["mine_pids"] if pid not in dead]
+            incident["mine_pids"] = [pid for pid in incident["mine_pids"] if pid not in gone]
             if not incident["mine_pids"]:
                 incident["status"]           = "ended"
                 incident["record"]["status"] = "ended"
 
+        detail = ", ".join(f"{pid} {fates[pid]}" for pid in gone)
         if incident["status"] == "ended":
-            self.logger.muted(f"gpu incident on gpu {incident['record']['gpu_index']} ended, own pid(s) {dead} exited outside the critical window")
+            self.logger.muted(f"gpu incident on gpu {incident['record']['gpu_index']} ended, own pid(s) exited ({detail})")
 
     def _flag_critical(self, incident: dict, dead: list[int], server_gpus: list[dict]) -> None:
         with self.lock:
