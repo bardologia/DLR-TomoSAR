@@ -30,6 +30,12 @@ from tensorboard_manager                import TensorboardManager
 from web_logger                         import WebLogger
 
 
+class _Server(ThreadingHTTPServer):
+
+    request_queue_size = 64
+    daemon_threads     = True
+
+
 class _Handler(BaseHTTPRequestHandler):
 
     protocol_version = "HTTP/1.1"
@@ -112,9 +118,8 @@ class WebUIServer:
         self.contention.start()
         self.gpu_guard.start()
 
-        server        = ThreadingHTTPServer((self.host, self.port), _Handler)
+        server        = _Server((self.host, self.port), _Handler)
         server.router = self.router
-        server.daemon_threads = True
 
         try:
             server.serve_forever()

@@ -122,6 +122,19 @@ def test_table_reports_unreadable_metrics(tmp_path):
     assert len(result["errors"]) == 1
 
 
+def test_table_drops_non_finite_metrics(tmp_path):
+    run       = tmp_path / STANDARD_NAME
+    stamp_dir = run / "inference" / "20260701_000000"
+    stamp_dir.mkdir(parents=True)
+    (stamp_dir / "metrics.json").write_text('{"curve_mse_gt": NaN, "overall_r2_gt": 0.8}')
+
+    result = RunLeaderboard(WebLogger()).table(str(tmp_path))
+
+    assert result["ok"]
+    assert "curve_mse_gt" not in result["rows"][0]["metrics"]
+    assert result["rows"][0]["metrics"]["overall_r2_gt"] == 0.8
+
+
 def test_table_rejects_bad_base(tmp_path):
     board = RunLeaderboard(WebLogger())
 

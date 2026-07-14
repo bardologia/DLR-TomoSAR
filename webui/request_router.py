@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import math
 import mimetypes
 import queue
 import threading
@@ -178,6 +179,34 @@ class RequestRouter:
                 space   = (query.get("space") or ["physical"])[0],
             )
             self._send_png(handler, png)
+            return
+        if path == "/api/cubes/param_map":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.param_map_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                field   = (query.get("field") or ["amp"])[0],
+                slot    = int((query.get("slot") or ["0"])[0]),
+            )
+            self._send_png(handler, png)
+            return
+        if path == "/api/cubes/param_cbar":
+            query = parse_qs(urlparse(handler.path).query)
+            png   = self.cubes.param_cbar_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                field   = (query.get("field") or ["amp"])[0],
+            )
+            self._send_png(handler, png)
+            return
+        if path == "/api/cubes/params_at":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.cubes.params_at(
+                cube_id = (query.get("id") or [""])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
         if path == "/api/cubes/slice":
             query = parse_qs(urlparse(handler.path).query)
@@ -526,8 +555,18 @@ class RequestRouter:
         except (ValueError, UnicodeDecodeError):
             return {}
 
+    @classmethod
+    def _jsonsafe(cls, value):
+        if isinstance(value, dict):
+            return {key: cls._jsonsafe(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [cls._jsonsafe(child) for child in value]
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
+        return value
+
     def _send_json(self, handler, obj: dict, status: int = 200) -> None:
-        payload = json.dumps(obj).encode("utf-8")
+        payload = json.dumps(self._jsonsafe(obj)).encode("utf-8")
         handler.send_response(status)
         handler.send_header("Content-Type", "application/json")
         handler.send_header("Content-Length", str(len(payload)))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 
@@ -192,7 +193,7 @@ class RunLeaderboard:
 
     @staticmethod
     def _is_number(value) -> bool:
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
     @staticmethod
     def _catalog_root(raw: str) -> tuple[Path | None, str]:
