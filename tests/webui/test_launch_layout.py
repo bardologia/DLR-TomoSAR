@@ -79,6 +79,17 @@ def test_pair_components_in_experiment_builder_match_the_catalog():
     assert names == set(LossComponentCatalog.names())
 
 
+def test_follow_infer_map_covers_every_standalone_inference_family():
+    js    = (WEBUI_ROOT / "static" / "js" / "launch.js").read_text()
+    block = js.split("static FOLLOW_INFER = {", 1)[1].split("};", 1)[0]
+    pairs = dict(re.findall(r'([a-z0-9_]+):\s*"([a-z0-9_]+)"', block))
+
+    layouts  = set(LaunchLayout.LAYOUTS)
+    expected = {key: key.replace("train_", "infer_") for key in layouts if key.startswith("train_") and key.replace("train_", "infer_") in layouts}
+
+    assert pairs == expected
+
+
 def test_compare_runs_layout_claims_every_config_field_exactly_once():
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(ComparisonEntryConfig())]
 

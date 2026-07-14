@@ -6,6 +6,7 @@ class LaunchView extends ConfigForm {
     train_backbone:             "infer_backbone",
     train_profile_autoencoder:  "infer_profile_autoencoder",
     train_image_autoencoder:    "infer_image_autoencoder",
+    train_unrolled:             "infer_unrolled",
     train_dual:                 "infer_dual",
   };
 
