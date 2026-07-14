@@ -114,7 +114,7 @@ class TrainingPipeline:
         gate_trainer_config.param_loss.use_active_normalization = False
         check.record("param_loss.use_active_normalization", False)
 
-        base_backbone_config = ModelBuilder.config_from_registry(self.backbone_name, self.entry.model_overrides)
+        base_backbone_config = ModelBuilder.config_from_registry(self.backbone_name, self.entry.model_overrides, head=self.entry.backbone_head)
         gate_backbone_config = check.sanitized_model_config(base_backbone_config)
 
         gate_module, gate_backbone_cfg = self._build_module(datasets, x_len, logger, backbone_config=gate_backbone_config)

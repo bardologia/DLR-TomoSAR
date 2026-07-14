@@ -46,3 +46,38 @@ def test_training_pipeline_one_epoch_produces_checkpoint():
         "exercised here. Coupling, loss, trainer step, and checkpoint round-trip are covered "
         "by the unit tests."
     )
+
+
+class _GateStop(Exception):
+    pass
+
+
+def test_overfit_gate_backbone_config_carries_entry_head(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from configuration.training                  import JepaEntryConfig, OverfitCheckConfig
+    from pipelines.shared.training.overfit_check import OverfitCheck
+
+    captured = {}
+
+    def fake_sanitized_trainer_config(self, trainer_config):
+        return SimpleNamespace(param_loss=SimpleNamespace(use_active_normalization=True))
+
+    def fake_build_module(self, datasets, x_len, logger, backbone_config=None):
+        captured["config"] = backbone_config
+        raise _GateStop()
+
+    monkeypatch.setattr(OverfitCheck, "sanitized_trainer_config", fake_sanitized_trainer_config)
+    monkeypatch.setattr(TrainingPipeline, "_build_module", fake_build_module)
+
+    pipe                = TrainingPipeline.__new__(TrainingPipeline)
+    pipe.entry          = JepaEntryConfig(backbone_head="set_pred", overfit_check=OverfitCheckConfig(enabled=True))
+    pipe.backbone_name  = pipe.entry.backbone_name
+    pipe.trainer_config = SimpleNamespace()
+
+    run_meta = SimpleNamespace(run_directory=tmp_path)
+
+    with pytest.raises(_GateStop):
+        pipe._run_overfit_check(run_meta, None, {"train": None}, 128, None)
+
+    assert captured["config"].head == "set_pred"
