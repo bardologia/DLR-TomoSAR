@@ -789,7 +789,7 @@ class LeaderboardView {
       return html + `<div class="res-empty res-empty--tight">The resolved configs are identical.</div></section>`;
     }
 
-    html += `<article class="res-md lb-diff__report">`;
+    html += `<article class="res-md lb-diff__report lb-diff__report--config">`;
     html += `<table><thead><tr><th>field</th>`;
     sides.forEach((_, i) => { html += `<th>${tags[i]}</th>`; });
     html += `</tr></thead><tbody>`;

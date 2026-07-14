@@ -3650,7 +3650,8 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-diff__report h2 { scroll-margin-top: 20px; }
 .lb-diff__report h2 span { color: var(--ink-faint); letter-spacing: 0; }
 .lb-diff__report td { white-space: nowrap; color: var(--ink); }
-.lb-diff__report td:first-child { white-space: normal; word-break: break-word; max-width: 46ch; }
+.lb-diff__report td:first-child { white-space: normal; word-break: break-word; max-width: 46ch; min-width: 26ch; }
+.lb-diff__report--config td { white-space: normal; overflow-wrap: anywhere; max-width: 52ch; }
 .lb-diff__report td.lb-delta--good { color: var(--accent-2); }
 .lb-diff__report td.lb-delta--bad { color: var(--danger); }
 .lb-diff__report tr.lb-hot td { background: rgba(161, 98, 7, 0.06); }
