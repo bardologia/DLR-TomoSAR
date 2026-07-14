@@ -93,6 +93,36 @@ def test_backward_reaches_all_parameter_groups():
     assert {g["name"] for g in groups} == {"steps", "prox"}
 
 
+def test_sixty_step_overfit_drives_peak_error_below_half_metre():
+    kz           = _kz_map()
+    profiles     = _gaussian_profiles(mu=12.0)
+    measurements = TomoOperator.forward(profiles, kz, X_AXIS, DX)
+
+    torch.manual_seed(3)
+    model, config = get_unrolled("gamma_net", n_iterations=2, prox_hidden=4)
+    optimizer     = torch.optim.AdamW(config.get_param_groups(model))
+
+    model.train()
+    initial_loss = None
+
+    for _ in range(60):
+        optimizer.zero_grad(set_to_none=True)
+        loss = (model(measurements, kz, X_AXIS) - profiles).abs().mean()
+        loss.backward()
+        optimizer.step()
+
+        initial_loss = float(loss.detach()) if initial_loss is None else initial_loss
+
+    model.eval()
+    with torch.no_grad():
+        prediction = model(measurements, kz, X_AXIS)
+
+    peak_error = (X_AXIS[prediction.argmax(dim=1)] - X_AXIS[profiles.argmax(dim=1)]).abs().max()
+
+    assert float(loss.detach()) < 0.1 * initial_loss
+    assert float(peak_error) < 0.5
+
+
 def test_rejects_real_measurements():
     model = get_unrolled("gamma_net", n_iterations=1)[0]
 
