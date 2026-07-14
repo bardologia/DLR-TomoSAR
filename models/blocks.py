@@ -105,7 +105,7 @@ def initialize_weights(module: nn.Module, mode: str) -> None:
     if mode == "default":
         return
     for m in module.modules():
-        if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+        if isinstance(m, (nn.Conv1d, nn.Conv2d, nn.ConvTranspose1d, nn.ConvTranspose2d)):
             if mode == "kaiming":
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif mode == "xavier":
@@ -119,7 +119,7 @@ def initialize_weights(module: nn.Module, mode: str) -> None:
                 nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
-        elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.InstanceNorm2d, nn.LayerNorm)):
+        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm, nn.InstanceNorm1d, nn.InstanceNorm2d, nn.LayerNorm)):
             if hasattr(m, "weight") and m.weight is not None:
                 nn.init.ones_(m.weight)
             if hasattr(m, "bias") and m.bias is not None:
