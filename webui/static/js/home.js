@@ -121,12 +121,11 @@ class StatusBoard {
       `<i class="strip__div" aria-hidden="true"></i>` +
       `<label class="ntf__field"><span class="ntf__key">ntfy topic</span><input class="ntf__input" id="sb-ntf-topic" type="text" placeholder="pick-a-secret-topic" spellcheck="false" autocomplete="off"></label>` +
       `<label class="ntf__field"><span class="ntf__key">server</span><input class="ntf__input ntf__input--server" id="sb-ntf-server" type="text" spellcheck="false" autocomplete="off"></label>` +
-      `<label class="ntf__field"><span class="ntf__key">min minutes</span><input class="ntf__input ntf__input--num" id="sb-ntf-min" type="number" min="0" step="1"></label>` +
-      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Failed jobs always notify; successful jobs only when they ran at least the minimum runtime. Jobs you stop yourself stay silent.">push to your phone when a job ends</span>` +
+      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Every job notifies when it starts and when it ends — direct launches, queued runs and follow-ups alike. Failures arrive high-priority.">push to your phone when a job starts and ends</span>` +
       `<div class="strip__actions">` +
       `<button type="button" class="impact__arm" id="sb-ntf-test" title="Send a test notification to the topic now">test</button>` +
-      `<button type="button" class="impact__arm" id="sb-ntf-save" title="Save topic, server and minimum runtime">save</button>` +
-      `<button type="button" class="impact__arm" id="sb-ntf-toggle" title="Toggle job-completion notifications">notify: --</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-save" title="Save topic and server">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-toggle" title="Toggle job start/end notifications">notify: --</button>` +
       `</div>` +
       `</section>` +
 
@@ -307,12 +306,10 @@ class StatusBoard {
     const submit = async (enabled) => {
       const topic = document.getElementById("sb-ntf-topic");
       const server = document.getElementById("sb-ntf-server");
-      const min = document.getElementById("sb-ntf-min");
       const payload = {
         enabled,
         topic: topic ? topic.value.trim() : "",
         server: server ? server.value.trim() : "",
-        min_runtime_s: Math.max(0, parseFloat(min && min.value) || 0) * 60,
       };
       const res = await window.apiPost("/api/notify/config", payload);
       if (res && res.ok) {
@@ -361,10 +358,8 @@ class StatusBoard {
       this._ntfSeeded = true;
       const topic = document.getElementById("sb-ntf-topic");
       const server = document.getElementById("sb-ntf-server");
-      const min = document.getElementById("sb-ntf-min");
       if (topic) topic.value = ntf.topic || "";
       if (server) server.value = ntf.server || "";
-      if (min) min.value = String(Math.round(((ntf.min_runtime_s || 0) / 60) * 10) / 10);
     }
   }
 

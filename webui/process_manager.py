@@ -194,9 +194,11 @@ class ProcessManager:
             record["status"]  = "running"
             record["pid"]     = process.pid
             record["started"] = datetime.now().isoformat(timespec="seconds")
+            snapshot          = dict(record)
 
         self.logger.ok(f"launched {record['script']} as job {record['job_id']} (pid {process.pid})")
         stream.publish({"type": "status", "status": "running", "pid": process.pid})
+        self.notifier.job_started(snapshot)
 
         worker = threading.Thread(target=self._pump, args=(record["job_id"], process, stream), daemon=True)
         worker.start()
@@ -335,10 +337,10 @@ class ProcessManager:
         stream.publish({"type": "status", "status": record["status"], "code": code, "verdict": verdict})
         stream.publish({"type": "end"})
 
-        self._advance_queue()
-
         if snapshot is not None:
             self.notifier.job_finished(snapshot)
+
+        self._advance_queue()
 
     def _parse_detached_pid(self, text: str) -> int | None:
         match = self.DETACHED_PID.search(text)
@@ -380,9 +382,9 @@ class ProcessManager:
         stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
 
-        self._advance_queue()
-
         self.notifier.job_finished(snapshot)
+
+        self._advance_queue()
 
     def adopt_orphans(self) -> int:
         now = time.monotonic()

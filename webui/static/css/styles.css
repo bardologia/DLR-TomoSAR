@@ -697,8 +697,6 @@ main { margin-left: var(--navw); }
 }
 .ntf__input:focus { outline: none; border-color: var(--dk-dim); }
 .ntf__input--server { width: 140px; }
-.ntf__input--num { width: 58px; text-align: right; appearance: textfield; -moz-appearance: textfield; }
-.ntf__input--num::-webkit-outer-spin-button, .ntf__input--num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ntf__hint { font-family: var(--mono); font-size: 10.5px; color: var(--dk-faint); line-height: 1.5; min-width: 0; }
 @media (max-width: 1280px) { .ntf__hint { display: none; } }
 

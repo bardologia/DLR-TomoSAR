@@ -158,3 +158,15 @@ def test_queue_respects_follow_up_chain(manager, tmp_path):
 def test_enqueue_rejects_missing_script(manager):
     result = manager.enqueue("missing", sys.executable)
     assert result == {"ok": False, "error": "script not found"}
+
+
+def test_notifications_fire_on_start_and_finish_for_direct_and_queued(manager):
+    events = []
+    manager.notifier.job_started  = lambda record: events.append(("started", record["script"]))
+    manager.notifier.job_finished = lambda record: events.append(("finished", record["script"]))
+
+    manager.launch("sleep_ok", sys.executable)
+    queued = manager.enqueue("writer_a", sys.executable)
+
+    assert _wait_status(manager, queued["job_id"], "finished")
+    assert events == [("started", "sleep_ok"), ("finished", "sleep_ok"), ("started", "writer_a"), ("finished", "writer_a")]

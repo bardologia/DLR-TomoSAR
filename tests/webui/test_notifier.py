@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from datetime    import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib     import Path
@@ -67,16 +68,25 @@ def capture_server():
     server.server_close()
 
 
+def _drain(calls: list, count: int, timeout: float = 5.0) -> list:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if len(calls) >= count:
+            return calls
+        time.sleep(0.02)
+    return calls
+
+
 def _record(status: str = "finished", exit_code: int | None = 0, ago_s: float = 3600.0, stopped: bool = False) -> dict:
     started = (datetime.now() - timedelta(seconds=ago_s)).isoformat(timespec="seconds")
-    record  = {"job_id": "abc123def456", "script": "train_backbone", "status": status, "exit_code": exit_code, "started": started}
+    record  = {"job_id": "abc123def456", "script": "train_backbone", "status": status, "exit_code": exit_code, "started": started, "pid": 4242}
     if stopped:
         record["stopped"] = True
     return record
 
 
-def _arm(notifier, min_runtime_s: float = 60.0) -> None:
-    result = notifier.configure({"enabled": True, "topic": "unit-test-topic", "server": "http://127.0.0.1:9", "min_runtime_s": min_runtime_s})
+def _arm(notifier) -> None:
+    result = notifier.configure({"enabled": True, "topic": "unit-test-topic", "server": "http://127.0.0.1:9"})
     assert result["ok"]
 
 
@@ -88,13 +98,12 @@ def test_defaults_are_disabled(notifier):
 
 
 def test_configure_persists_across_instances(notifier, tmp_path):
-    _arm(notifier, min_runtime_s=300.0)
+    _arm(notifier)
 
     reloaded = JobNotifier(StubPaths(tmp_path), WebLogger())
     state    = reloaded.state()
-    assert state["enabled"]       is True
-    assert state["topic"]         == "unit-test-topic"
-    assert state["min_runtime_s"] == 300.0
+    assert state["enabled"] is True
+    assert state["topic"]   == "unit-test-topic"
 
 
 def test_configure_rejects_invalid_topic(notifier):
@@ -113,21 +122,37 @@ def test_configure_rejects_invalid_server(notifier):
 
 
 def test_disabled_notifier_sends_nothing(notifier, sent):
+    notifier.job_started(_record(status="running"))
     notifier.job_finished(_record())
+    time.sleep(0.2)
     assert sent == []
 
 
-def test_short_success_is_skipped(notifier, sent):
-    _arm(notifier, min_runtime_s=60.0)
+def test_start_notifies(notifier, sent):
+    _arm(notifier)
+    notifier.job_started(_record(status="running"))
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, priority = sent[0]
+    assert title    == "train_backbone started"
+    assert priority == "default"
+    assert "abc123def456" in body
+    assert "4242" in body
+
+
+def test_quick_success_notifies(notifier, sent):
+    _arm(notifier)
     notifier.job_finished(_record(ago_s=5.0))
-    assert sent == []
+
+    assert len(_drain(sent, 1)) == 1
+    assert sent[0][0] == "train_backbone finished"
 
 
 def test_long_success_notifies(notifier, sent):
-    _arm(notifier, min_runtime_s=60.0)
+    _arm(notifier)
     notifier.job_finished(_record(ago_s=7500.0))
 
-    assert len(sent) == 1
+    assert len(_drain(sent, 1)) == 1
     title, body, priority = sent[0]
     assert title    == "train_backbone finished"
     assert priority == "default"
@@ -135,43 +160,55 @@ def test_long_success_notifies(notifier, sent):
     assert "abc123def456" in body
 
 
-def test_failure_notifies_regardless_of_runtime(notifier, sent):
-    _arm(notifier, min_runtime_s=60.0)
+def test_failure_notifies(notifier, sent):
+    _arm(notifier)
     notifier.job_finished(_record(status="failed", exit_code=1, ago_s=5.0))
 
-    assert len(sent) == 1
+    assert len(_drain(sent, 1)) == 1
     title, body, priority = sent[0]
     assert title    == "train_backbone FAILED (exit 1)"
     assert priority == "high"
 
 
-def test_stopped_job_stays_silent(notifier, sent):
+def test_stopped_job_notifies_as_stopped(notifier, sent):
     _arm(notifier)
     notifier.job_finished(_record(status="failed", exit_code=-15, stopped=True))
-    notifier.job_finished(_record(status="finished", exit_code=None, stopped=True))
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, priority = sent[0]
+    assert title    == "train_backbone stopped (exit -15)"
+    assert priority == "default"
+
+
+def test_queued_cancellation_stays_silent(notifier, sent):
+    _arm(notifier)
+    notifier.job_finished(_record(status="cancelled", exit_code=None))
+    time.sleep(0.2)
     assert sent == []
 
 
 def test_unknown_exit_is_labelled(notifier, sent):
-    _arm(notifier, min_runtime_s=60.0)
+    _arm(notifier)
     notifier.job_finished(_record(exit_code=None, ago_s=600.0))
 
-    assert len(sent) == 1
+    assert len(_drain(sent, 1)) == 1
     assert sent[0][0] == "train_backbone finished (exit status unknown)"
 
 
 def test_delivery_over_http(notifier, capture_server):
-    result = notifier.configure({"enabled": True, "topic": "unit-test-topic", "server": capture_server, "min_runtime_s": 60.0})
+    result = notifier.configure({"enabled": True, "topic": "unit-test-topic", "server": capture_server})
     assert result["ok"]
 
+    notifier.job_started(_record(status="running"))
     notifier.job_finished(_record(ago_s=600.0))
 
-    assert len(CaptureHandler.requests) == 1
-    request = CaptureHandler.requests[0]
-    assert request["path"]     == "/unit-test-topic"
-    assert request["title"]    == "train_backbone finished"
-    assert request["priority"] == "default"
-    assert "10m 00s" in request["body"]
+    requests = _drain(CaptureHandler.requests, 2)
+    assert len(requests) == 2
+    titles = {request["title"] for request in requests}
+    assert titles == {"train_backbone started", "train_backbone finished"}
+    assert all(request["path"] == "/unit-test-topic" for request in requests)
+    finished = next(request for request in requests if request["title"] == "train_backbone finished")
+    assert "10m 00s" in finished["body"]
 
 
 def test_test_message_requires_topic(notifier):
@@ -179,7 +216,7 @@ def test_test_message_requires_topic(notifier):
 
 
 def test_test_message_is_delivered(notifier, capture_server):
-    result = notifier.configure({"enabled": False, "topic": "unit-test-topic", "server": capture_server, "min_runtime_s": 60.0})
+    result = notifier.configure({"enabled": False, "topic": "unit-test-topic", "server": capture_server})
     assert result["ok"]
 
     assert notifier.test()["ok"]

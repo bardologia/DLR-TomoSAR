@@ -16,7 +16,7 @@ class JobNotifier:
     SETTINGS_NAME  = "notifier.json"
     TOPIC_PATTERN  = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
     SEND_TIMEOUT_S = 10.0
-    DEFAULTS       = {"enabled": False, "topic": "", "server": "https://ntfy.sh", "min_runtime_s": 60.0}
+    DEFAULTS       = {"enabled": False, "topic": "", "server": "https://ntfy.sh"}
 
     def __init__(self, paths, logger: WebLogger) -> None:
         self.paths    = paths
@@ -36,10 +36,9 @@ class JobNotifier:
             return {**self.settings, "settings_path": str(self.path)}
 
     def configure(self, payload: dict) -> dict:
-        enabled       = bool(payload.get("enabled", False))
-        topic         = str(payload.get("topic", "")).strip()
-        server        = str(payload.get("server", self.DEFAULTS["server"])).strip().rstrip("/")
-        min_runtime_s = float(payload.get("min_runtime_s", self.DEFAULTS["min_runtime_s"]))
+        enabled = bool(payload.get("enabled", False))
+        topic   = str(payload.get("topic", "")).strip()
+        server  = str(payload.get("server", self.DEFAULTS["server"])).strip().rstrip("/")
 
         if topic and not self.TOPIC_PATTERN.match(topic):
             return {"ok": False, "error": "topic may only contain letters, digits, '-' and '_' (max 64 chars)"}
@@ -47,14 +46,12 @@ class JobNotifier:
             return {"ok": False, "error": "set a topic before enabling notifications"}
         if not server.startswith(("http://", "https://")):
             return {"ok": False, "error": "server must be an http(s) URL"}
-        if min_runtime_s < 0:
-            return {"ok": False, "error": "min runtime must be non-negative"}
 
         with self.lock:
-            self.settings = {"enabled": enabled, "topic": topic, "server": server, "min_runtime_s": min_runtime_s}
+            self.settings = {"enabled": enabled, "topic": topic, "server": server}
             self._persist()
 
-        self.logger.ok(f"notifications {'enabled' if enabled else 'disabled'} (topic '{topic}', min runtime {min_runtime_s:.0f}s)")
+        self.logger.ok(f"notifications {'enabled' if enabled else 'disabled'} (topic '{topic}')")
         return {"ok": True, **self.state()}
 
     def _persist(self) -> None:
@@ -88,7 +85,10 @@ class JobNotifier:
         script = record.get("script") or "job"
         code   = record.get("exit_code")
 
-        if record["status"] == "failed":
+        if record.get("stopped"):
+            title    = f"{script} stopped" + (f" (exit {code})" if code is not None else "")
+            priority = "default"
+        elif record["status"] == "failed":
             title    = f"{script} FAILED" + (f" (exit {code})" if code is not None else "")
             priority = "high"
         else:
@@ -113,23 +113,32 @@ class JobNotifier:
         except (urllib.error.URLError, OSError) as exc:
             return str(exc)
 
-    def job_finished(self, record: dict) -> None:
-        with self.lock:
-            enabled       = self.settings["enabled"] and bool(self.settings["topic"])
-            min_runtime_s = self.settings["min_runtime_s"]
+    def _deliver(self, title: str, body: str, priority: str) -> None:
+        error = self._send(title, body, priority)
+        if error is not None:
+            self.logger.error(f"notification '{title}' failed: {error}")
 
-        if not enabled:
+    def _dispatch(self, title: str, body: str, priority: str) -> None:
+        threading.Thread(target=self._deliver, args=(title, body, priority), daemon=True).start()
+
+    def _enabled(self) -> bool:
+        with self.lock:
+            return self.settings["enabled"] and bool(self.settings["topic"])
+
+    def job_started(self, record: dict) -> None:
+        if not self._enabled():
             return
-        if record.get("stopped"):
+
+        script = record.get("script") or "job"
+        body   = f"running on {socket.gethostname()} (job {record['job_id']}, pid {record.get('pid')})"
+        self._dispatch(f"{script} started", body, "default")
+
+    def job_finished(self, record: dict) -> None:
+        if not self._enabled():
             return
         if record["status"] not in ("failed", "finished"):
             return
 
-        runtime_s = self._runtime_s(record)
-        if record["status"] == "finished" and runtime_s < min_runtime_s:
-            return
-
+        runtime_s             = self._runtime_s(record)
         title, body, priority = self._describe(record, runtime_s)
-        error = self._send(title, body, priority)
-        if error is not None:
-            self.logger.error(f"notification for job {record['job_id']} failed: {error}")
+        self._dispatch(title, body, priority)
