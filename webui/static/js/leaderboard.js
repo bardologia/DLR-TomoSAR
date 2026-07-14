@@ -643,7 +643,7 @@ class LeaderboardView {
   }
 
   _diffHtml() {
-    const { a, b, directions } = this.diffData;
+    const { a, b, directions, sections } = this.diffData;
 
     let html = `<div class="lb-bar-top">`;
     html += `<button type="button" class="btn btn--mini" id="lb-back">&larr; Back to table</button>`;
@@ -656,7 +656,7 @@ class LeaderboardView {
     });
     html += `</div>`;
 
-    const all    = [...new Set([...Object.keys(a.metrics), ...Object.keys(b.metrics)])].sort();
+    const all    = [...new Set([...Object.keys(a.metrics), ...Object.keys(b.metrics)])];
     const needle = this.diffFilter.toLowerCase();
 
     const stems = {};
@@ -668,44 +668,54 @@ class LeaderboardView {
       const stem = key.replace(/\d+$/, "");
       return stem !== key && stems[stem] >= 10;
     };
-
-    const keys = all.filter((key) => {
+    const passes = (key) => {
       if (!this.diffSeries && isSeries(key)) return false;
       if (needle && !key.toLowerCase().includes(needle)) return false;
       if (this.diffChanged && a.metrics[key] === b.metrics[key]) return false;
       return true;
-    });
+    };
 
-    html += `<section class="lb-diff__section"><h4 class="res-section__cap">Metrics <span>${keys.length} of ${all.length}</span></h4>`;
+    const kept = all.filter(passes);
+
+    html += `<section class="lb-diff__section"><h4 class="res-section__cap">Metrics <span>${kept.length} of ${all.length}</span></h4>`;
     html += `<div class="lb-diff__controls">`;
     html += `<input type="search" class="res-filter" id="lb-diff-filter" placeholder="Filter metrics by name" value="${this._esc(this.diffFilter)}" spellcheck="false" />`;
     html += `<label class="lb-check"><input type="checkbox" id="lb-diff-changed"${this.diffChanged ? " checked" : ""} /> differing only</label>`;
     html += `<label class="lb-check"><input type="checkbox" id="lb-diff-series"${this.diffSeries ? " checked" : ""} /> per-index series</label>`;
     html += `</div>`;
-    html += `<div class="lb-scroll"><table class="lb-table lb-table--diff"><thead><tr><th class="lb-th">metric</th><th class="lb-th">A</th><th class="lb-th">B</th><th class="lb-th">&Delta; (B&minus;A)</th><th class="lb-th">&Delta;%</th></tr></thead><tbody>`;
 
-    keys.forEach((key) => {
-      const va = a.metrics[key];
-      const vb = b.metrics[key];
-      let cells;
+    html += `<article class="res-md lb-diff__report">`;
+    sections.forEach((section) => {
+      const keys = section.keys.filter(passes);
+      if (!keys.length) return;
 
-      if (va === undefined || vb === undefined) {
-        cells = `<td>${va === undefined ? "&ndash;" : this._fmt(va)}</td><td>${vb === undefined ? "&ndash;" : this._fmt(vb)}</td><td>&ndash;</td><td>&ndash;</td>`;
-      } else {
-        const delta = vb - va;
-        const pct   = va !== 0 ? (delta / Math.abs(va)) * 100 : null;
-        const cls   = this._deltaClass(delta, directions[key]);
-        cells = `<td>${this._fmt(va)}</td><td>${this._fmt(vb)}</td><td class="${cls}">${delta === 0 ? "=" : this._fmt(delta)}</td><td class="${cls}">${pct === null || delta === 0 ? "&ndash;" : (pct > 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>`;
-      }
-
-      html += `<tr><td class="lb-key">${this._esc(key)}</td>${cells}</tr>`;
+      html += `<h2>${this._esc(section.title)} <span>${keys.length}</span></h2>`;
+      html += `<table><thead><tr><th>metric</th><th>A</th><th>B</th><th>&Delta; (B&minus;A)</th><th>&Delta;%</th></tr></thead><tbody>`;
+      keys.forEach((key) => { html += this._diffRowHtml(key, a.metrics[key], b.metrics[key], directions[key]); });
+      html += `</tbody></table>`;
     });
-    html += `</tbody></table></div>`;
-    if (!keys.length) html += `<div class="res-empty res-empty--tight">No metric matches the current filters.</div>`;
+    html += `</article>`;
+
+    if (!kept.length) html += `<div class="res-empty res-empty--tight">No metric matches the current filters.</div>`;
     html += `</section>`;
 
     html += this._configDiffHtml(a.config, b.config);
     return html;
+  }
+
+  _diffRowHtml(key, va, vb, direction) {
+    let cells;
+
+    if (va === undefined || vb === undefined) {
+      cells = `<td>${va === undefined ? "&ndash;" : this._fmt(va)}</td><td>${vb === undefined ? "&ndash;" : this._fmt(vb)}</td><td>&ndash;</td><td>&ndash;</td>`;
+    } else {
+      const delta = vb - va;
+      const pct   = va !== 0 ? (delta / Math.abs(va)) * 100 : null;
+      const cls   = this._deltaClass(delta, direction);
+      cells = `<td>${this._fmt(va)}</td><td>${this._fmt(vb)}</td><td class="${cls}">${delta === 0 ? "=" : this._fmt(delta)}</td><td class="${cls}">${pct === null || delta === 0 ? "&ndash;" : (pct > 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>`;
+    }
+
+    return `<tr><td class="lb-key">${this._esc(key)}</td>${cells}</tr>`;
   }
 
   _configDiffHtml(ca, cb) {
@@ -721,13 +731,14 @@ class LeaderboardView {
       return html + `<div class="res-empty res-empty--tight">The resolved configs are identical.</div></section>`;
     }
 
-    html += `<div class="lb-scroll"><table class="lb-table lb-table--diff"><thead><tr><th class="lb-th">field</th><th class="lb-th">A</th><th class="lb-th">B</th></tr></thead><tbody>`;
+    html += `<article class="res-md lb-diff__report">`;
+    html += `<table><thead><tr><th>field</th><th>A</th><th>B</th></tr></thead><tbody>`;
     differs.forEach((key) => {
       const va = ca[key] === undefined ? "&ndash;" : this._esc(String(ca[key]));
       const vb = cb[key] === undefined ? "&ndash;" : this._esc(String(cb[key]));
       html += `<tr><td class="lb-key">${this._esc(key)}</td><td>${va}</td><td>${vb}</td></tr>`;
     });
-    html += `</tbody></table></div></section>`;
+    html += `</tbody></table></article></section>`;
     return html;
   }
 

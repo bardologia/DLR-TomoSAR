@@ -163,6 +163,8 @@ def test_diff_returns_metrics_configs_and_directions(tmp_path):
     assert result["a"]["config"]["summary.model_name"]   == "resunet"
     assert result["a"]["config"]["trainer.epochs"]       == 10
 
+    assert result["sections"] == [{"title": "Curve-Level", "keys": ["curve_mse_gt", "overall_r2_gt"]}]
+
 
 def test_diff_requires_scanned_root(tmp_path):
     stamp = _make_run(tmp_path, STANDARD_NAME)

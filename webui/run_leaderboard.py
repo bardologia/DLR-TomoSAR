@@ -8,6 +8,8 @@ from pathlib import Path
 
 from web_logger import WebLogger
 
+from tools.reporting.reporting import MetricSectionGrouper
+
 
 class RunAxes:
 
@@ -198,8 +200,9 @@ class RunLeaderboard:
 
         keys       = set(side_a["metrics"]) | set(side_b["metrics"])
         directions = {key: self._direction(key) for key in keys}
+        sections   = [{"title": title, "keys": section_keys} for title, section_keys in MetricSectionGrouper().group(sorted(keys))]
 
-        return {"ok": True, "a": side_a, "b": side_b, "directions": directions}
+        return {"ok": True, "a": side_a, "b": side_b, "directions": directions, "sections": sections}
 
     def _side(self, raw: str) -> dict:
         stamp_dir = self._stamp_dir(raw)
