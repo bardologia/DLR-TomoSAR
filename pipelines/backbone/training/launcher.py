@@ -186,13 +186,16 @@ class TrainScheduler:
             log_path = self.log_dir / f"{run_name}.log",
         )
 
+    def _model_key(self) -> str:
+        return ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
+
     def run(self) -> None:
         planner     = self.planner()
         experiments = planner.plan()
 
         self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
-            "Model"         : ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head),
+            "Model"         : self._model_key(),
             "Mode"          : self.config.trials_mode,
             **planner.summary(),
             "Trials"        : len(experiments),
