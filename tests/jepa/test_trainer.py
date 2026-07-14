@@ -206,3 +206,19 @@ def test_checkpoint_state_dict_round_trip(tmp_path):
 
     with torch.no_grad():
         assert torch.allclose(module(images), restored(images))
+
+
+def test_validate_coupling_live_rejects_zero_curve_recon_weight():
+    finetune = CouplingMode("finetune", "profile autoencoder")
+    cfg      = EmbeddingLossConfig(use_curve_recon=True, weight_curve_recon=0.0)
+
+    with pytest.raises(ValueError, match="weight_curve_recon"):
+        Trainer.validate_coupling(finetune, "live", cfg, make_autoencoder("none"))
+
+
+def test_validate_coupling_finetune_layernorm_rejects_zero_curve_recon_weight():
+    finetune = CouplingMode("finetune", "profile autoencoder")
+    cfg      = EmbeddingLossConfig(use_curve_recon=True, weight_curve_recon=0.0)
+
+    with pytest.raises(ValueError, match="weight_curve_recon"):
+        Trainer.validate_coupling(finetune, "stopgrad", cfg, make_autoencoder("layernorm"))

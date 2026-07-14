@@ -1442,8 +1442,8 @@
         "use_embedding_smoothl1": "Enable the smooth-L1 (Huber) term on embedding differences",
         "weight_embedding_smoothl1": "Scalar weight applied to the embedding smooth-L1 term",
         "smoothl1_beta": "Transition threshold between quadratic and linear regimes of the smooth-L1 embedding term",
-        "use_curve_recon": "Enable the reconstruction loss on the decoded profile curve, required to anchor the embedding when target_provider is live",
-        "weight_curve_recon": "Scalar weight applied to the curve reconstruction term",
+        "use_curve_recon": "Enable the reconstruction loss on the decoded profile curve, required (with a positive weight_curve_recon) to anchor the embedding when target_provider is live or a LayerNorm-normalized embedding is finetuned",
+        "weight_curve_recon": "Scalar weight applied to the curve reconstruction term; must be positive whenever use_curve_recon is relied on to anchor the embedding (target_provider live or finetuned LayerNorm embedding)",
         "curve_kind": "Curve reconstruction loss metric: mse, l1, huber, or charbonnier",
         "huber_delta": "Transition threshold of the Huber curve loss between quadratic and linear regimes, used when curve_kind is huber",
         "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier curve loss near zero residual, used when curve_kind is charbonnier"
@@ -1456,7 +1456,7 @@
         "autoencoder": "ProfileAutoencoderBaseConfig of the pretrained profile autoencoder supplying the JEPA target embedding space, None if unused",
         "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
         "profile_autoencoder_mode": "How the pretrained profile autoencoder is coupled into JEPA training: frozen or finetune",
-        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon with a positive weight_curve_recon to keep the target from collapsing)",
         "profile_autoencoder_checkpoint": "Resolved filesystem path to the pretrained profile-autoencoder checkpoint loaded at model build time",
         "ae_finetune_lr": "Learning rate for the profile-autoencoder parameter group, applied only when profile_autoencoder_mode is finetune",
         "ae_finetune_wd": "Weight decay for the profile-autoencoder parameter group, applied only when profile_autoencoder_mode is finetune",
@@ -1492,7 +1492,7 @@
         "profile_autoencoder_logdir": "Directory containing pretrained profile-autoencoder runs from which the JEPA target encoder checkpoint is loaded",
         "profile_autoencoder_run": "Name of the specific pretrained profile-autoencoder run to load; None selects the latest",
         "profile_autoencoder_mode": "How the pretrained profile autoencoder is coupled into JEPA training: frozen or finetune",
-        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon with a positive weight_curve_recon to keep the target from collapsing)",
         "ae_finetune_lr": "Learning rate of the profile-autoencoder optimiser group, applied only when profile_autoencoder_mode is finetune",
         "ae_finetune_wd": "Weight decay of the profile-autoencoder optimiser group, applied only when profile_autoencoder_mode is finetune",
         "image_autoencoder_logdir": "Directory containing pretrained image-autoencoder runs from which the JEPA image encoder checkpoint is loaded",
@@ -1883,7 +1883,7 @@
         "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
         "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
         "image_autoencoder_mode": "coupling of the loaded image-autoencoder encoder, frozen or finetune; joint from-scratch training is not supported",
-        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon with a positive weight_curve_recon to keep the target from collapsing)",
         "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
         "param_loss": "LossConfig for direct Gaussian-parameter regression on the backbone output, used only when profile_autoencoder_run is unset (no embedding-matching branch); defaults to param_l1 with sorted-GT matching, active normalization on, presence_balance off"
       }
@@ -1933,7 +1933,7 @@
         "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
         "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
         "image_autoencoder_mode": "coupling of the loaded image-autoencoder encoder, frozen or finetune; joint from-scratch training is not supported",
-        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon with a positive weight_curve_recon to keep the target from collapsing)",
         "embedding_loss": "EmbeddingLossConfig weighting the JEPA latent-prediction terms (embedding MSE/cosine/smooth-L1) and optional curve reconstruction",
         "param_loss": "LossConfig for direct Gaussian-parameter regression on the backbone output, used only when profile_autoencoder_run is unset (no embedding-matching branch); defaults to param_l1 with sorted-GT matching, active normalization on, presence_balance off"
       }
@@ -1990,7 +1990,7 @@
         "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
         "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
         "image_autoencoder_mode": "coupling of the loaded image-autoencoder encoder, frozen or finetune; joint from-scratch training is not supported",
-        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon to keep the target from collapsing)",
+        "target_provider": "Source of JEPA prediction targets: stopgrad (default, no-grad pass through the profile encoder) or live (differentiable encoder target; requires profile_autoencoder_mode finetune and embedding_loss.use_curve_recon with a positive weight_curve_recon to keep the target from collapsing)",
         "embedding_loss": "EmbeddingLossConfig weighting the embedding-matching loss (MSE/cosine/smooth-L1 terms) plus an on-by-default curve-reconstruction term anchoring the target branch; only used when profile_autoencoder_run is set",
         "param_loss": "LossConfig for direct Gaussian-parameter regression on the backbone output, used only when profile_autoencoder_run is unset (no embedding-matching branch); defaults to param_l1 with sorted-GT matching, active normalization on, presence_balance off"
       }
