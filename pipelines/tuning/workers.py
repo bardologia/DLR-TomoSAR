@@ -35,10 +35,12 @@ class TuningWorker:
 
     def _image_ae_entry_template(self):
         return ImageAeEntryConfig(
-            seed        = self.config.tuning.base_seed,
-            ae_loss     = self.config.image_ae_loss,
-            paths       = self.config.paths,
-            training    = self.config.training,
+            seed          = self.config.tuning.base_seed,
+            ae_loss       = self.config.image_ae_loss,
+            paths         = self.config.paths,
+            training      = self.config.training,
+            normalization = self.config.normalization,
+            augmentation  = self.config.augmentation,
         )
 
     def _jepa_entry_template(self):

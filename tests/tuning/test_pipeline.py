@@ -235,3 +235,23 @@ def test_worker_rejects_unsupported_training_type(tmp_path):
 
     with pytest.raises(ValueError, match="unrolled"):
         worker._build_tuner("gamma_net", cfg.tuning, StubLogger())
+
+
+def test_image_ae_entry_template_forwards_normalization_and_augmentation(tmp_path):
+    from configuration.dataset              import AugmentationConfig
+    from configuration.normalization.general import NormalizationConfig
+    from configuration.training             import ImageAeLossConfig
+    from pipelines.tuning.workers           import TuningWorker
+
+    cfg               = _make_config(tmp_path)
+    cfg.image_ae_loss = ImageAeLossConfig()
+    cfg.training      = SimpleNamespace()
+    cfg.normalization = NormalizationConfig()
+    cfg.augmentation  = AugmentationConfig()
+
+    worker = TuningWorker("testtag", cfg)
+    entry  = worker._image_ae_entry_template()
+
+    assert entry.normalization is cfg.normalization
+    assert entry.augmentation  is cfg.augmentation
+    assert entry.ae_loss       is cfg.image_ae_loss
