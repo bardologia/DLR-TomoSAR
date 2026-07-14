@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from configuration.training                              import JepaTrainerConfig
@@ -117,14 +118,14 @@ class TrainingPipeline:
         base_backbone_config = ModelBuilder.config_from_registry(self.backbone_name, self.entry.model_overrides, head=self.entry.backbone_head)
         gate_backbone_config = check.sanitized_model_config(base_backbone_config)
 
-        gate_module, gate_backbone_cfg = self._build_module(datasets, x_len, logger, backbone_config=gate_backbone_config)
+        gate_module, gate_backbone_cfg = self._build_module(datasets, x_len, x_axis, logger, backbone_config=gate_backbone_config)
         profile_normalizer             = self._profile_normalizer(run_meta.metadata_directory, logger)
 
         gate_trainer = Trainer(gate_module, gate_backbone_cfg, x_axis, gate_trainer_config, check.work_directory, logger, datasets["train"].normalizer, profile_normalizer)
 
         check.run(gate_trainer, datasets["train"])
 
-    def _build_module(self, datasets, x_len: int, logger, backbone_config=None):
+    def _build_module(self, datasets, x_len: int, x_axis, logger, backbone_config=None):
         dataset_in_channels = datasets["train"].input_channels
 
         image_autoencoder = None
@@ -141,7 +142,7 @@ class TrainingPipeline:
                 raise ValueError(f"Profile autoencoder was trained with profile_length={self.autoencoder_cfg.profile_length} but the JEPA dataset produces curves of length {x_len}; retrain the profile autoencoder on this dataset's elevation axis before coupling it.")
 
             backbone_out        = self.autoencoder_cfg.embedding_dim
-            profile_autoencoder = self._load_profile_autoencoder()
+            profile_autoencoder = self._load_profile_autoencoder(x_axis)
         else:
             backbone_out = self._gaussian_out_channels()
 
@@ -191,14 +192,20 @@ class TrainingPipeline:
                 overrides[k] = v
         return get_backbone(self.backbone_name, config=config, **overrides)
 
-    def _load_profile_autoencoder(self):
+    def _load_profile_autoencoder(self, x_axis):
         autoencoder, _ = get_profile_autoencoder(self.ae_model_name, self.autoencoder_cfg)
         ckpt_path      = self.trainer_config.profile_autoencoder_checkpoint
         self.validate_checkpoint(ckpt_path, "profile")
 
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        self._validate_profile_axis(np.asarray(ckpt["x_axis"], dtype=np.float32), np.asarray(x_axis, dtype=np.float32), ckpt_path)
         autoencoder.load_state_dict(ckpt["params"])
         return autoencoder
+
+    @staticmethod
+    def _validate_profile_axis(ae_axis, jepa_axis, ckpt_path) -> None:
+        if ae_axis.shape != jepa_axis.shape or not np.allclose(ae_axis, jepa_axis, rtol=1e-5, atol=1e-5):
+            raise ValueError(f"Profile autoencoder checkpoint '{ckpt_path}' was trained on elevation axis [{ae_axis[0]:.3f}, {ae_axis[-1]:.3f}] with {ae_axis.size} bins, but the JEPA dataset produces axis [{jepa_axis[0]:.3f}, {jepa_axis[-1]:.3f}] with {jepa_axis.size} bins; retrain the profile autoencoder on this dataset's elevation axis before coupling it.")
 
     def _load_image_autoencoder(self):
         autoencoder, _ = get_image_autoencoder(self.image_ae_model_name, self.image_ae_cfg)
@@ -256,7 +263,7 @@ class TrainingPipeline:
 
         loaders, datasets, x_axis, x_len = self._prepare_datasets(work_dir, logger, self.entry.seed)
 
-        model, backbone_cfg = self._build_module(datasets, x_len, logger)
+        model, backbone_cfg = self._build_module(datasets, x_len, x_axis, logger)
         profile_normalizer  = self._profile_normalizer(work_dir / "meta", logger)
 
         trainer = self._make_trainer(model, backbone_cfg, x_axis, work_dir, logger, datasets["train"].normalizer, profile_normalizer)
@@ -269,7 +276,7 @@ class TrainingPipeline:
 
         loaders, datasets, x_axis, x_len = self._prepare_datasets(run_meta.run_directory, logger, self.entry.seed)
 
-        model, backbone_cfg = self._build_module(datasets, x_len, logger)
+        model, backbone_cfg = self._build_module(datasets, x_len, x_axis, logger)
 
         self._save_metadata(run_meta, backbone_cfg, datasets, x_len)
 
