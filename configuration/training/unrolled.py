@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.dataset                import AugmentationConfig
-from configuration.normalization.general  import NormalizationConfig
-from configuration.training.general.run   import TrainingPathsConfig, standard_seeds
-from configuration.sar.geometry_config    import GeometryConfig
+from configuration.dataset                  import AugmentationConfig
+from configuration.normalization.general    import NormalizationConfig
+from configuration.training.general.run     import TrainingPathsConfig, standard_seeds
+from configuration.training.general.runtime import OverfitCheckConfig
+from configuration.sar.geometry_config      import GeometryConfig
 
 
 @dataclass
@@ -53,6 +54,7 @@ class UnrolledEntryConfig:
     geometry      : GeometryConfig         = field(default_factory=GeometryConfig)
     normalization : NormalizationConfig    = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig     = field(default_factory=AugmentationConfig)
+    overfit_check : OverfitCheckConfig     = field(default_factory=OverfitCheckConfig)
 
     curve_loss            : str   = "l1"
     measurement_noise_std : float = 0.0

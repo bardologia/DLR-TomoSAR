@@ -2174,6 +2174,7 @@
         "geometry": "Tomographic geometry configuration resolved against the dataset; supplies the height-axis convention and enables the per-pixel kz field the operator requires",
         "normalization": "Per-channel normalization recipes used by the dataset pipeline; output denormalization recovers physical Gaussian parameters before profile rendering",
         "augmentation": "Dataset augmentation configuration; kz-consistent flips only, since the geometry field must stay aligned with the patches",
+        "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "curve_loss": "Profile reconstruction loss over the elevation axis: l1 or mse, masked to pixels with ground-truth power",
         "measurement_noise_std": "Standard deviation of complex Gaussian noise added to the synthesised coherence measurements; 0 trains on exact forward-model measurements",
         "power_floor": "Minimum integrated ground-truth profile power for a pixel to enter the loss and the coherence normalization"

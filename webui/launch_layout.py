@@ -672,6 +672,7 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_unrolled", "at": "training"},
+                    {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "physics", "title": "Physics", "panels": [
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
