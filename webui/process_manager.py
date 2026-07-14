@@ -7,6 +7,7 @@ import re
 import shlex
 import signal
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -610,3 +611,50 @@ class ProcessNuke:
         self.logger.error(f"NUKE: SIGKILL sent to {killed} surviving processes")
 
         return {"ok": True, "signalled": signalled, "killed": killed}
+
+
+class ServerDetacher:
+
+    APPLY_TIMEOUT_S = 5.0
+    LOG_NAME        = "webui_server.log"
+
+    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
+        self.paths     = paths
+        self.logger    = logger
+        self.log_path  = paths.logs_dir / self.LOG_NAME
+        self.requested = threading.Event()
+        self.applied   = threading.Event()
+
+    def state(self) -> dict:
+        return {"detached": self.applied.is_set(), "pid": os.getpid(), "log_path": str(self.log_path)}
+
+    def detach(self) -> dict:
+        if not self.applied.is_set():
+            self.requested.set()
+            if not self.applied.wait(self.APPLY_TIMEOUT_S):
+                return {"ok": False, "error": "detach was not applied by the main thread"}
+        return {"ok": True, **self.state()}
+
+    def _apply(self) -> None:
+        self.paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        handle = open(self.log_path, "ab", buffering=0)
+
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        os.dup2(handle.fileno(), sys.stdout.fileno())
+        os.dup2(handle.fileno(), sys.stderr.fileno())
+        handle.close()
+
+        devnull = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(devnull, sys.stdin.fileno())
+        os.close(devnull)
+
+        self.logger.enabled = False
+
+    def wait_loop(self) -> None:
+        while True:
+            self.requested.wait()
+            self.requested.clear()
+            if not self.applied.is_set():
+                self._apply()
+                self.applied.set()
+                self.logger.warning(f"server detached from the terminal (pid {os.getpid()}), output continues in {self.log_path}")

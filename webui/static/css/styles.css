@@ -704,6 +704,8 @@ main { margin-left: var(--navw); }
 }
 .impact__arm:hover { border-color: var(--dk-dim); color: var(--dk-ink); }
 .impact__arm.is-armed { color: #fff; background: #b91c1c; border-color: #7f1010; font-weight: 700; }
+.impact__arm.is-safe { color: #fff; background: #15803d; border-color: #14532d; font-weight: 700; }
+.impact__arm.is-safe:disabled { opacity: 1; cursor: default; }
 .impact__arm:disabled { opacity: 0.5; cursor: default; }
 
 .impact__grid { display: flex; flex-direction: column; gap: 14px; }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config_registry                    import ConfigRegistry
@@ -16,7 +18,7 @@ from pipeline_library                   import PipelineLibrary
 from repomap_library                    import RepoMapLibrary
 from profile_autoencoder_model_library  import ProfileAutoencoderModelLibrary
 from jepa_model_library                 import JepaModelLibrary
-from process_manager                    import ProcessManager, ProcessNuke
+from process_manager                    import ProcessManager, ProcessNuke, ServerDetacher
 from project_paths                      import ProjectPaths
 from request_router                     import RequestRouter
 from resource_watchdog                  import ResourceWatchdog
@@ -74,6 +76,7 @@ class WebUIServer:
         self.repomap           = RepoMapLibrary()
         self.processes         = ProcessManager(self.paths, self.logger)
         self.nuke              = ProcessNuke(self.logger)
+        self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
@@ -103,6 +106,7 @@ class WebUIServer:
             repomap           = self.repomap,
             processes         = self.processes,
             nuke              = self.nuke,
+            detacher          = self.detacher,
             system            = self.system,
             watchdog          = self.watchdog,
             contention        = self.contention,
@@ -124,12 +128,16 @@ class WebUIServer:
         server        = _Server((self.host, self.port), _Handler)
         server.router = self.router
 
+        worker = threading.Thread(target=server.serve_forever, name="HttpServer", daemon=True)
+        worker.start()
+
         try:
-            server.serve_forever()
+            self.detacher.wait_loop()
         except KeyboardInterrupt:
             self.logger.warning("shutting down")
         finally:
             self.tensorboard.stop_all()
+            server.shutdown()
             server.server_close()
 
     def _report_ready(self) -> None:

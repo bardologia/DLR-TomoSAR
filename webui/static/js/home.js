@@ -107,6 +107,7 @@ class StatusBoard {
       `<i class="strip__div" aria-hidden="true"></i>` +
       `<dl class="wd__limits">${limitCells}</dl>` +
       `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-detach" title="Detach the backend from your terminal (retroactive nohup): RAM protection and all monitors survive SSH logout">keep-alive: --</button>` +
       `<button type="button" class="impact__arm" id="sb-impact-arm" title="When armed, auto-nukes all your processes if you slow other users too much">auto-nuke: --</button>` +
       `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
       `<span class="wd__nuke-sym" aria-hidden="true">&#9762;</span><span class="wd__nuke-txt">NUKE</span>` +
@@ -217,6 +218,7 @@ class StatusBoard {
 
     this._wireNuke();
     this._wireImpactArm();
+    this._wireDetach();
 
     if (!window.REDUCED_MOTION && window.gsap) {
       gsap.from(this.els.board.querySelectorAll(".sboard"), { opacity: 0, y: 16, duration: 0.7, stagger: 0.08, ease: "expo.out" });
@@ -247,6 +249,37 @@ class StatusBoard {
         btn.classList.remove("is-firing");
       }
     });
+  }
+
+  _wireDetach() {
+    const btn = document.getElementById("sb-detach");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const res = await window.apiPost("/api/system/detach");
+        if (res && res.ok) {
+          window.toast(`backend detached from the terminal (pid ${res.pid}) — protection survives SSH logout, log: ${res.log_path}`, "ok");
+          this._renderDetach({ detached: true, pid: res.pid, log_path: res.log_path });
+        } else {
+          window.toast(`detach failed: ${(res && res.error) || "unknown error"}`, "error");
+          btn.disabled = false;
+        }
+      } catch (e) {
+        window.toast("detach failed: network error", "error");
+        btn.disabled = false;
+      }
+    });
+  }
+
+  _renderDetach(srv) {
+    const btn = document.getElementById("sb-detach");
+    if (!btn || !srv) return;
+    btn.textContent = srv.detached ? "keep-alive: ON" : "keep-alive: off";
+    btn.classList.toggle("is-safe", !!srv.detached);
+    btn.disabled = !!srv.detached;
+    if (srv.detached) btn.title = `backend detached (pid ${srv.pid}) — output continues in ${srv.log_path}`;
   }
 
   _wireImpactArm() {
@@ -280,6 +313,7 @@ class StatusBoard {
     this._renderAlerts(sys.alerts || {});
     this._renderImpact(sys.impact || {});
     this._renderGpuGuard(sys.gpu_guard || {});
+    this._renderDetach(sys.server);
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
     const disk = sys.disk || {};
