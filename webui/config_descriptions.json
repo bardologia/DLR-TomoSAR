@@ -1927,7 +1927,7 @@
       "summary": "Selects the pretrained profile autoencoder and JEPA target scheme for cross-validation fold training",
       "fields": {
         "profile_autoencoder_logdir": "base directory of pretrained profile-autoencoder runs, joined with profile_autoencoder_run to load that run's best_model.pt as the JEPA profile autoencoder",
-        "profile_autoencoder_run": "name of the pretrained profile-autoencoder run under profile_autoencoder_logdir to load; default None makes JEPA fold training raise ValueError since this config has no image-autoencoder alternative to fall back on",
+        "profile_autoencoder_run": "name of the pretrained profile-autoencoder run under profile_autoencoder_logdir to load; None disables the profile-autoencoder branch, and fold training aborts only if image_autoencoder_run is also unset",
         "profile_autoencoder_mode": "frozen (default) keeps the loaded profile autoencoder's weights fixed, finetune makes them trainable; target_provider live requires finetune, raising ValueError otherwise",
         "image_autoencoder_logdir": "base directory searched for the image_autoencoder_run subdirectory holding the pretrained image-autoencoder checkpoint",
         "image_autoencoder_run": "subdirectory name to load; None (or empty) means no image-feature preprocessing branch is used before the backbone",
