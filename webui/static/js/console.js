@@ -101,6 +101,9 @@ class ConsoleTile {
         this.setStatus("running");
       } else if (data.status === "scheduled") {
         this._note(`scheduled to run after ${data.after || "the current job"}`, "33");
+      } else if (data.status === "queued") {
+        this._note(`queued at position ${data.position} — starts when the previous job ends`, "33");
+        this.setStatus("queued");
       } else if (data.status === "cancelled") {
         this._note("cancelled before start", "33");
         this.setStatus("cancelled");
@@ -123,8 +126,8 @@ class ConsoleTile {
     this.job.status = status;
     this.badgeEl.className = `badge badge--${status}`;
     this.badgeEl.textContent = status;
-    this.stopBtn.textContent = status === "scheduled" ? "Cancel" : "Stop";
-    this.stopBtn.disabled = status !== "running" && status !== "scheduled";
+    this.stopBtn.textContent = status === "scheduled" || status === "queued" ? "Cancel" : "Stop";
+    this.stopBtn.disabled = status !== "running" && status !== "scheduled" && status !== "queued";
   }
 
   fit() {
@@ -181,13 +184,13 @@ class RunConsole {
     this._renderList();
   }
 
-  async launch(scriptKey, interpreter, label, overrides, followUp, detach) {
-    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {}, follow_up: followUp || null, detach: !!detach });
+  async launch(scriptKey, interpreter, label, overrides, followUp, detach, queue) {
+    const res = await window.apiPost("/api/run", { script_key: scriptKey, interpreter, overrides: overrides || {}, follow_up: followUp || null, detach: !!detach, queue: !!queue });
     if (!res.ok) {
-      window.toast(res.error || "Launch failed", "error");
+      window.toast(res.error || (queue ? "Schedule failed" : "Launch failed"), "error");
       return null;
     }
-    window.toast(`Launched ${label || scriptKey}`, "ok");
+    window.toast(res.queued ? `Scheduled ${label || scriptKey} to run after the current job` : `Launched ${label || scriptKey}`, "ok");
     if (window.router) window.router.go("console");
     await this.refresh();
     this.open(res.job_id);
@@ -266,7 +269,7 @@ class RunConsole {
       item.innerHTML =
         `<div class="job-item__top"><span class="job-item__name">${job.script}</span>` +
         `<span class="badge badge--${job.status}">${job.status}</span></div>` +
-        `<div class="job-item__meta">${job.started.replace("T", " ")} · pid ${job.pid}</div>`;
+        `<div class="job-item__meta">${job.started.replace("T", " ")}${job.pid ? ` · pid ${job.pid}` : ""}</div>`;
       item.addEventListener("click", () => this.toggle(job.job_id));
 
       const next = followers.get(job.job_id);

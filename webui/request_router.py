@@ -442,7 +442,12 @@ class RequestRouter:
             overrides   = body.get("overrides", {})
             follow_up   = body.get("follow_up") or None
             detach      = bool(body.get("detach"))
-            result      = self.processes.launch(key, interpreter, overrides, follow_up, detach)
+            queue       = bool(body.get("queue"))
+
+            if queue:
+                result = self.processes.enqueue(key, interpreter, overrides, follow_up, detach)
+            else:
+                result = self.processes.launch(key, interpreter, overrides, follow_up, detach)
 
             if result.get("ok") and self.tensorboard.logdir_keys(key):
                 threading.Thread(target=self._autostart_tensorboard, args=(key, overrides, interpreter), daemon=True).start()
@@ -457,6 +462,7 @@ class RequestRouter:
             return
 
         if path == "/api/system/nuke":
+            self.processes.clear_queue()
             result = self.nuke.nuke()
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return

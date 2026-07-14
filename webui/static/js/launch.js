@@ -144,6 +144,7 @@ class LaunchView extends ConfigForm {
     this.cmdEl = null;
     this.manifestEl = null;
     this.launchBtn = null;
+    this.scheduleBtn = null;
     this.active = false;
     this.loadSeq = 0;
     this._wireTabs();
@@ -693,9 +694,16 @@ class LaunchView extends ConfigForm {
     actions.className = "rail-block rail-block--actions";
     const launch = document.createElement("button");
     launch.className = "btn btn--primary rail-launch";
-    launch.addEventListener("click", () => this._launch());
+    launch.addEventListener("click", () => this._launch(false));
     this.launchBtn = launch;
     actions.appendChild(launch);
+
+    const schedule = document.createElement("button");
+    schedule.className = "btn btn--ghost rail-schedule";
+    schedule.title = "Queue this exact configuration to launch when the currently running job (and any earlier queued runs) end";
+    schedule.addEventListener("click", () => this._launch(true));
+    this.scheduleBtn = schedule;
+    actions.appendChild(schedule);
 
     host.appendChild(interp);
     if (follow) host.appendChild(follow);
@@ -784,6 +792,13 @@ class LaunchView extends ConfigForm {
         : `&#9654;&nbsp; Launch run <small>all defaults</small>`;
     }
 
+    if (this.scheduleBtn) {
+      this.scheduleBtn.classList.toggle("is-armed", n > 0);
+      this.scheduleBtn.innerHTML = n
+        ? `&#8627;&nbsp; Schedule after current <small>${n} override${n > 1 ? "s" : ""}</small>`
+        : `&#8627;&nbsp; Schedule after current <small>all defaults</small>`;
+    }
+
     if (this.manifestEl) this._renderManifest();
     if (this.builder) this.builder.refreshFromView();
     this._refreshBadges();
@@ -818,7 +833,7 @@ class LaunchView extends ConfigForm {
     });
   }
 
-  async _launch() {
+  async _launch(queue) {
     if (!this.detail || this.launching) return;
     const interp = document.getElementById("launch-interpreter").value;
     const followEl = document.getElementById("launch-follow");
@@ -826,11 +841,13 @@ class LaunchView extends ConfigForm {
 
     this.launching = true;
     if (this.launchBtn) this.launchBtn.disabled = true;
+    if (this.scheduleBtn) this.scheduleBtn.disabled = true;
     try {
-      await this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, follow, this.detach);
+      await this.runConsole.launch(this.detail.key, interp, this.detail.title, { ...this.dirty }, follow, this.detach, queue);
     } finally {
       this.launching = false;
       if (this.launchBtn) this.launchBtn.disabled = false;
+      if (this.scheduleBtn) this.scheduleBtn.disabled = false;
     }
   }
 

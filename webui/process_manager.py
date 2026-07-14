@@ -64,6 +64,7 @@ class ProcessManager:
         self.notifier      = notifier
         self.jobs          = {}
         self.streams       = {}
+        self.launch_queue  = deque()
         self.lock          = threading.Lock()
         self.uid           = os.getuid()
         self.clk           = os.sysconf("SC_CLK_TCK")
@@ -101,6 +102,40 @@ class ProcessManager:
 
         return {"ok": True, "job_id": record["job_id"]}
 
+    def enqueue(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None, detach: bool = False) -> dict:
+        script = self.paths.script_entry(key)["path"]
+        if not script.exists():
+            return {"ok": False, "error": "script not found"}
+
+        if follow_up and detach:
+            self.logger.warning(f"follow-up {follow_up} ignored, {key} queued detached")
+            follow_up = None
+        elif follow_up:
+            if not self.paths.has_script(follow_up):
+                return {"ok": False, "error": f"unknown follow-up script '{follow_up}'"}
+            if not self.paths.script_entry(follow_up)["path"].exists():
+                return {"ok": False, "error": f"follow-up script '{follow_up}' not found"}
+
+        record                 = self._make_record(key, interpreter, self._clean_overrides(overrides), detach)
+        record["status"]       = "queued"
+        record["queue_follow"] = follow_up
+        stream                 = JobStream()
+
+        with self.lock:
+            self.jobs[record["job_id"]]    = record
+            self.streams[record["job_id"]] = stream
+            self.launch_queue.append(record["job_id"])
+            position = len(self.launch_queue)
+
+        stream.publish({"type": "status", "status": "queued", "position": position})
+        self.logger.muted(f"queued {key} as job {record['job_id']} at position {position}")
+
+        self._advance_queue()
+
+        with self.lock:
+            still_queued = record["status"] == "queued"
+        return {"ok": True, "job_id": record["job_id"], "queued": still_queued}
+
     def _make_record(self, key: str, interpreter: str, overrides: dict, detach: bool = False) -> dict:
         return {
             "job_id"      : uuid.uuid4().hex[:12],
@@ -115,6 +150,7 @@ class ProcessManager:
             "exit_code"   : None,
             "follow_of"   : None,
             "follow_up"   : None,
+            "queue_follow": None,
         }
 
     def _runtime_env(self, interpreter: str) -> dict:
@@ -207,6 +243,33 @@ class ProcessManager:
         stream.publish({"type": "end"})
         self.logger.warning(f"scheduled job {follow_id} cancelled, parent exited with code {code}")
 
+    def _advance_queue(self) -> None:
+        while True:
+            with self.lock:
+                busy = any(r["status"] in ("pending", "running") for r in self.jobs.values())
+                if busy or not self.launch_queue:
+                    return
+                job_id = self.launch_queue.popleft()
+                record = self.jobs.get(job_id)
+                stream = self.streams.get(job_id)
+                if record is None or stream is None or record["status"] != "queued":
+                    continue
+                record["status"] = "pending"
+
+            error = self._start(record, stream)
+            if error is None:
+                if record["queue_follow"]:
+                    self._schedule(record, record["queue_follow"])
+                return
+
+            with self.lock:
+                record["status"] = "failed"
+                snapshot         = dict(record)
+            stream.publish({"type": "status", "status": "failed", "code": None, "verdict": "error"})
+            stream.publish({"type": "end"})
+            self.logger.error(f"queued job {job_id} failed to start: {error}")
+            self.notifier.job_finished(snapshot)
+
     def _clean_overrides(self, overrides: dict | None) -> dict:
         cleaned = {}
         for path, value in (overrides or {}).items():
@@ -272,6 +335,8 @@ class ProcessManager:
         stream.publish({"type": "status", "status": record["status"], "code": code, "verdict": verdict})
         stream.publish({"type": "end"})
 
+        self._advance_queue()
+
         if snapshot is not None:
             self.notifier.job_finished(snapshot)
 
@@ -314,6 +379,8 @@ class ProcessManager:
         self.logger.muted(f"detached job {job_id} (pid {pid}) exited, exit status unknown")
         stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
+
+        self._advance_queue()
 
         self.notifier.job_finished(snapshot)
 
@@ -460,6 +527,17 @@ class ProcessManager:
         if record is None:
             return {"ok": False, "error": "unknown job"}
 
+        if record["status"] == "queued":
+            with self.lock:
+                record["status"] = "cancelled"
+                if job_id in self.launch_queue:
+                    self.launch_queue.remove(job_id)
+            if stream is not None:
+                stream.publish({"type": "status", "status": "cancelled", "code": None})
+                stream.publish({"type": "end"})
+            self.logger.warning(f"queued job {job_id} cancelled by user")
+            return {"ok": True}
+
         if record["status"] == "scheduled":
             with self.lock:
                 record["status"] = "cancelled"
@@ -478,7 +556,25 @@ class ProcessManager:
         self.logger.warning(f"stop requested for job {job_id}")
         return {"ok": True}
 
+    def clear_queue(self) -> int:
+        with self.lock:
+            pending = [self.jobs[job_id] for job_id in self.launch_queue if job_id in self.jobs]
+            streams = [self.streams.get(record["job_id"]) for record in pending]
+            self.launch_queue.clear()
+            for record in pending:
+                record["status"] = "cancelled"
+
+        for record, stream in zip(pending, streams):
+            if stream is not None:
+                stream.publish({"type": "status", "status": "cancelled", "code": None})
+                stream.publish({"type": "end"})
+            self.logger.warning(f"queued job {record['job_id']} cancelled, launch queue cleared")
+
+        return len(pending)
+
     def stop_all(self, grace: float = 8.0) -> int:
+        self.clear_queue()
+
         with self.lock:
             running = [dict(r) for r in self.jobs.values() if r["status"] == "running"]
 

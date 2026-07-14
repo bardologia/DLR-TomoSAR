@@ -886,7 +886,7 @@ class StatusBoard {
       const cls =
         j.status === "running" ? "is-run" :
         j.status === "failed" ? "is-fail" :
-        j.status === "scheduled" ? "is-sched" :
+        j.status === "scheduled" || j.status === "queued" ? "is-sched" :
         j.status === "cancelled" ? "is-cancel" : "is-done";
       const mark = follow ? `<span class="sboard__jarrow" aria-hidden="true">&#8627;</span>` : "";
       return `<li class="sboard__job ${cls}${follow ? " sboard__job--follow" : ""}">${mark}<span class="sboard__jdot" aria-hidden="true"></span><span class="sboard__jname">${name}</span><span class="sboard__jstate">${this._esc(j.status)}</span></li>`;

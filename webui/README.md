@@ -51,6 +51,13 @@ contract:
 - **Launch run** executes the script from the repository root with the selected
   interpreter and streams its output. Exit codes are reported honestly; nothing is
   faked.
+- **Schedule run** captures the exact same command (script, interpreter, overrides,
+  detach) but places it in a sequential launch queue instead of starting it. Each
+  queued run starts when every running job and every earlier queued run has ended,
+  regardless of exit code — queued experiments are independent, unlike the follow-up
+  inference chain, which is cancelled when its parent fails. Queued runs appear in the
+  console with a `queued` badge and can be cancelled before they start; an emergency
+  stop (watchdog RAM kill or nuke) clears the whole queue.
 
 Scripts expect the F-SAR dataset paths and GPUs referenced in the configuration
 defaults. On a machine without those, a launched job will stream its real traceback to
