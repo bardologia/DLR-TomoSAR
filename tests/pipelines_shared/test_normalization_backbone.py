@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from configuration.dataset                    import InputConfig, OutputConfig, Representation
-from configuration.normalization.general      import ChannelStats, ChannelStrategy, NormMethod
+from configuration.normalization.general      import ChannelStats, ChannelStrategy, NormMethod, OutputClampConfig
 from pipelines.backbone.dataset.datasets      import PatchDataset
 from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.spatial       import Patcher
@@ -20,6 +20,7 @@ def _zscore_stats() -> Stats:
         scale      = [3.0, 0.5, 2.0],
         names      = ["pass/phase", "pass/phase", "ifg/phase"],
         strategies = [ChannelStrategy(NormMethod.ZSCORE)] * 3,
+        clampable  = [False] * 3,
     )
 
     return Stats(input_stats=input_stats, output_stats=None)
@@ -31,6 +32,7 @@ def _log1p_stats() -> Stats:
         scale      = [0.8, 1.5],
         names      = ["pass/mag", "ifg/mag"],
         strategies = [ChannelStrategy(NormMethod.ZSCORE, apply_log1p=True)] * 2,
+        clampable  = [False] * 2,
     )
 
     return Stats(input_stats=input_stats, output_stats=None)
@@ -88,6 +90,100 @@ def test_missing_output_stats_raises():
 
     with pytest.raises(ValueError):
         norm.normalize_output(np.zeros((1, 2, 2), dtype=np.float32))
+
+
+def _mixed_output_stats(clamp: OutputClampConfig | None = None) -> Stats:
+    log1p  = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=True)
+    zscore = ChannelStrategy(NormMethod.ZSCORE)
+
+    output_stats = ChannelStats(
+        loc        = [2.0, 10.0, 1.0],
+        scale      = [1.5,  8.0, 0.7],
+        names      = ["G1_amp", "G1_mu", "G1_sigma"],
+        strategies = [zscore, zscore, log1p],
+        clampable  = [True, False, True],
+    )
+    return Stats(input_stats=None, output_stats=output_stats, clamp=clamp if clamp is not None else OutputClampConfig())
+
+
+def test_nonlog_clampable_channel_is_bounded_for_extreme_outputs():
+    norm = Normalizer(_mixed_output_stats())
+
+    x       = torch.zeros(1, 3, 2, 2)
+    x[:, 0] = 1e20
+
+    phys = norm.denormalize_output(x, leaky_slope=0.1)
+
+    assert torch.isfinite(phys).all()
+    assert phys[:, 0].max().item() < 1e6
+
+
+def test_nonlog_clampable_channel_is_identity_in_range():
+    norm = Normalizer(_mixed_output_stats())
+
+    x       = torch.zeros(1, 3, 2, 2)
+    x[:, 0] = 40.0
+
+    phys     = norm.denormalize_output(x, leaky_slope=0.1)
+    expected = 40.0 * 1.5 + 2.0
+
+    assert phys[:, 0].max().item() == pytest.approx(expected, rel=1e-5)
+
+
+def test_mu_channel_bypasses_the_output_clamp():
+    norm = Normalizer(_mixed_output_stats())
+
+    x        = torch.zeros(1, 3, 2, 2)
+    x[:, 1]  = -5.0
+
+    phys = norm.denormalize_output(x, leaky_slope=0.1)
+
+    assert phys[:, 1].max().item() == pytest.approx(10.0 + 8.0 * -5.0, rel=1e-5)
+
+    x[:, 1] = 1e6
+    phys    = norm.denormalize_output(x, leaky_slope=0.1)
+
+    assert phys[:, 1].max().item() == pytest.approx(10.0 + 8.0 * 1e6, rel=1e-5)
+
+
+def test_clamp_disabled_leaves_nonlog_channels_affine():
+    norm = Normalizer(_mixed_output_stats(clamp=OutputClampConfig(enabled=False)))
+
+    x       = torch.zeros(1, 3, 2, 2)
+    x[:, 0] = 1e4
+
+    phys = norm.denormalize_output(x, leaky_slope=0.1)
+
+    assert phys[:, 0].max().item() == pytest.approx(1e4 * 1.5 + 2.0, rel=1e-5)
+
+
+def test_extreme_out_of_range_values_backpropagate_finite_gradients():
+    norm = Normalizer(_mixed_output_stats())
+
+    x       = torch.zeros(1, 3, 2, 2)
+    x[:, 0] = 1e20
+    x[:, 1] = 1e6
+    x[:, 2] = 60.0
+    x.requires_grad_(True)
+
+    norm.denormalize_output(x, leaky_slope=0.1).sum().backward()
+
+    assert torch.isfinite(x.grad).all()
+    assert (x.grad != 0.0).all()
+
+
+def test_output_denormalization_torch_and_numpy_agree():
+    norm = Normalizer(_mixed_output_stats())
+
+    x           = np.zeros((1, 3, 2, 2), dtype=np.float32)
+    x[:, 0]     = 1e10
+    x[:, 1]     = -3.0
+    x[:, 2]     = 25.0
+
+    out_np    = norm.denormalize_output(x, leaky_slope=0.1)
+    out_torch = norm.denormalize_output(torch.from_numpy(x), leaky_slope=0.1)
+
+    np.testing.assert_allclose(out_np, out_torch.numpy(), rtol=1e-5)
 
 
 @pytest.mark.real_data

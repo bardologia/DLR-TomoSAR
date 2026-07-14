@@ -42,6 +42,7 @@ def _channel_stats(slot_keys, pools):
         scale      = [f[1] for f in fits],
         names      = list(slot_keys),
         strategies = strategies,
+        clampable  = [k in ("out/amp", "out/sigma") for k in slot_keys],
     )
 
 

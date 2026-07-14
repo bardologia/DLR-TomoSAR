@@ -36,6 +36,7 @@ def identity_normalizer(n_channels: int) -> Normalizer:
         scale      = [1.0] * n_channels,
         names      = [f"c{i}" for i in range(n_channels)],
         strategies = [strategy] * n_channels,
+        clampable  = [False] * n_channels,
     )
     return Normalizer(Stats(input_stats=None, output_stats=stats))
 
@@ -49,6 +50,20 @@ def log1p_normalizer(n_gaussians: int) -> Normalizer:
         scale      = [1.5,  8.0, 0.7] * n_gaussians,
         names      = [f"G{g + 1}_{role}" for g in range(n_gaussians) for role in ("amp", "mu", "sigma")],
         strategies = [log1p, zscore, log1p] * n_gaussians,
+        clampable  = [True, False, True] * n_gaussians,
+    )
+    return Normalizer(Stats(input_stats=None, output_stats=stats))
+
+
+def zscore_normalizer(n_gaussians: int) -> Normalizer:
+    zscore = ChannelStrategy(NormMethod.ZSCORE, apply_log1p=False)
+
+    stats = ChannelStats(
+        loc        = [2.0, 10.0, 1.0] * n_gaussians,
+        scale      = [1.5,  8.0, 0.7] * n_gaussians,
+        names      = [f"G{g + 1}_{role}" for g in range(n_gaussians) for role in ("amp", "mu", "sigma")],
+        strategies = [zscore] * (3 * n_gaussians),
+        clampable  = [True, False, True] * n_gaussians,
     )
     return Normalizer(Stats(input_stats=None, output_stats=stats))
 

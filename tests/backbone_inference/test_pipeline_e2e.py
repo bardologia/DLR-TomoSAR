@@ -58,12 +58,14 @@ def _persist_stats(meta_dir, in_channels: int) -> None:
             scale      = [1.0] * in_channels,
             names      = [f"in/{i}" for i in range(in_channels)],
             strategies = [zscore] * in_channels,
+            clampable  = [False] * in_channels,
         ),
         output_stats = ChannelStats(
             loc        = [0.0] * (3 * N_GAUSSIANS),
             scale      = [1.0] * (3 * N_GAUSSIANS),
             names      = [f"out/{i}" for i in range(3 * N_GAUSSIANS)],
             strategies = [zscore] * (3 * N_GAUSSIANS),
+            clampable  = [True, False, True] * N_GAUSSIANS,
         ),
         clamp        = OutputClampConfig(),
     )

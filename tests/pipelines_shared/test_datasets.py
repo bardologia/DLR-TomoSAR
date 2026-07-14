@@ -15,7 +15,7 @@ from tools.monitoring.logger                     import Logger
 
 def _identity_channel_stats(n: int) -> ChannelStats:
     strategy = ChannelStrategy(NormMethod.ZSCORE)
-    return ChannelStats(loc=[0.0] * n, scale=[1.0] * n, names=[f"c{i}" for i in range(n)], strategies=[strategy] * n)
+    return ChannelStats(loc=[0.0] * n, scale=[1.0] * n, names=[f"c{i}" for i in range(n)], strategies=[strategy] * n, clampable=[False] * n)
 
 
 def _identity_normalizer(n_inputs: int, n_outputs: int) -> Normalizer:

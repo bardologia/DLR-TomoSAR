@@ -218,7 +218,8 @@
         "loc": "Per-channel offset subtracted during normalization: a low percentile, the median, the mean, or 0.0, depending on the fitted norm_method",
         "scale": "Per-channel divisor (std, IQR, range, or pi) applied during normalization",
         "names": "Optional per-channel slot labels aligned with loc/scale entries",
-        "strategies": "Optional per-channel ChannelStrategy recording the fitting method (norm_method, apply_log1p) used"
+        "strategies": "Optional per-channel ChannelStrategy recording the fitting method (norm_method, apply_log1p) used",
+        "clampable": "Per-channel flag marking physical values bounded by the output clamp on denormalization; true for out/amp and out/sigma, false for out/mu and all input channels"
       }
     },
     "dataset/general/dataset::InputConfig": {

@@ -208,12 +208,31 @@ def test_channel_stats_round_trips():
         scale      = [1.0, 2.0],
         names      = ["c0", "c1"],
         strategies = [Presets.ZSCORE, Presets.ROBUST_IQR],
+        clampable  = [True, False],
     )
     rebuilt = ChannelStats.from_dict(stats.as_dict())
     assert rebuilt.n_channels == stats.n_channels
     assert rebuilt.loc == stats.loc
     assert rebuilt.scale == stats.scale
     assert rebuilt.names == stats.names
+    assert rebuilt.clampable == stats.clampable
+
+
+def test_channel_stats_serialization_requires_clampable():
+    import pytest
+
+    stats = ChannelStats(
+        loc        = [0.0],
+        scale      = [1.0],
+        names      = ["c0"],
+        strategies = [Presets.ZSCORE],
+    )
+
+    with pytest.raises(ValueError, match="clampable"):
+        stats.as_dict()
+
+    with pytest.raises(KeyError):
+        ChannelStats.from_dict({"channels": [{"name": "c0", "loc": 0.0, "scale": 1.0, "norm_method": "zscore", "apply_log1p": False}]})
 
 
 def test_factory_output_config_honors_out_slot_overrides():

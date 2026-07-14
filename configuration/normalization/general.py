@@ -191,15 +191,19 @@ class ChannelStats:
     scale      : list[float]
     names      : Optional[list[str]]             = None
     strategies : Optional[list[ChannelStrategy]] = None
+    clampable  : Optional[list[bool]]            = None
 
     @property
     def n_channels(self) -> int:
         return len(self.loc)
 
     def as_dict(self) -> dict:
+        if self.clampable is None:
+            raise ValueError("ChannelStats is missing per-channel clampable flags; cannot serialize.")
+
         entries = []
         for i, (m, s) in enumerate(zip(self.loc, self.scale)):
-            entry: dict = {"name": self.names[i], "loc": m, "scale": s}
+            entry: dict = {"name": self.names[i], "loc": m, "scale": s, "clampable": bool(self.clampable[i])}
             if self.strategies and i < len(self.strategies):
                 entry.update(self.strategies[i].as_dict())
 
@@ -217,4 +221,5 @@ class ChannelStats:
             scale      = [e["scale"] for e in entries],
             names      = [e["name"]  for e in entries],
             strategies = strategies,
+            clampable  = [bool(e["clampable"]) for e in entries],
         )

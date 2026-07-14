@@ -27,17 +27,21 @@ class Normalizer:
 
         if stats.strategies is None:
             raise ValueError("ChannelStats is missing per-channel strategies; cannot build normalization vectors.")
+        if stats.clampable is None:
+            raise ValueError("ChannelStats is missing per-channel clampable flags; cannot build normalization vectors.")
 
-        loc       = np.asarray(stats.loc,   dtype=np.float32)
-        scale     = np.asarray(stats.scale, dtype=np.float32)
+        loc       = np.asarray(stats.loc,       dtype=np.float32)
+        scale     = np.asarray(stats.scale,     dtype=np.float32)
         log1p     = np.asarray([strat.apply_log1p for strat in stats.strategies], dtype=bool)
+        clampable = np.asarray(stats.clampable, dtype=bool)
         inv_scale = (1.0 / scale).astype(np.float32)
 
         vectors = {
-            "loc"       : loc,
-            "scale"     : scale,
-            "inv_scale" : inv_scale,
-            "log1p"     : log1p,
+            "loc"         : loc,
+            "scale"       : scale,
+            "inv_scale"   : inv_scale,
+            "log_idx"     : np.flatnonzero(log1p),
+            "barrier_idx" : np.flatnonzero(clampable & ~log1p),
         }
         self._vectors[key] = vectors
 
@@ -48,36 +52,56 @@ class Normalizer:
         vectors  = self._channel_vectors(stats)
         clamp    = self.stats.clamp
 
-        shape    = (1, -1, 1, 1) if tensor.ndim == 4 else (-1, 1, 1)
+        shape       = (1, -1, 1, 1) if tensor.ndim == 4 else (-1, 1, 1)
+        log_idx     = vectors["log_idx"]
+        barrier_idx = vectors["barrier_idx"]
+
+        def _select(idx):
+            return (slice(None), idx) if tensor.ndim == 4 else (idx,)
 
         if is_torch:
             device    = tensor.device
             loc       = torch.as_tensor(vectors["loc"],       device=device).reshape(shape)
             scale     = torch.as_tensor(vectors["scale"],     device=device).reshape(shape)
             inv_scale = torch.as_tensor(vectors["inv_scale"], device=device).reshape(shape)
-            log1p     = torch.as_tensor(vectors["log1p"],     device=device).reshape(shape)
 
             if not inverse:
-                x   = torch.where(log1p, Log1pTransform.compress(tensor, leaky_slope), tensor)
-                out = (x - loc) * inv_scale
-            else:
-                x   = tensor * scale + loc
-                out = torch.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled, leaky_slope), x)
+                x = tensor.clone()
+                if log_idx.size:
+                    sel    = _select(torch.as_tensor(log_idx, device=device))
+                    x[sel] = Log1pTransform.compress(tensor[sel], leaky_slope)
+                return (x - loc) * inv_scale
 
+            x   = tensor * scale + loc
+            out = x.clone()
+            if log_idx.size:
+                sel      = _select(torch.as_tensor(log_idx, device=device))
+                out[sel] = Log1pTransform.decompress(x[sel], clamp.floor, clamp.ceil, clamp.enabled, leaky_slope)
+            if clamp.enabled and barrier_idx.size:
+                sel      = _select(torch.as_tensor(barrier_idx, device=device))
+                out[sel] = Log1pTransform.decompress(Log1pTransform.compress(x[sel], leaky_slope), clamp.floor, clamp.ceil, clamp.enabled, leaky_slope)
             return out
 
         loc       = vectors["loc"].reshape(shape)
         scale     = vectors["scale"].reshape(shape)
         inv_scale = vectors["inv_scale"].reshape(shape)
-        log1p     = vectors["log1p"].reshape(shape)
 
         if not inverse:
-            x   = np.where(log1p, Log1pTransform.compress(tensor, leaky_slope), tensor)
+            x = np.array(tensor, copy=True)
+            if log_idx.size:
+                sel    = _select(log_idx)
+                x[sel] = Log1pTransform.compress(np.asarray(tensor)[sel], leaky_slope)
             out = (x - loc) * inv_scale
-        else:
-            x   = tensor * scale + loc
-            out = np.where(log1p, Log1pTransform.decompress(x, clamp.floor, clamp.ceil, clamp.enabled, leaky_slope), x)
+            return np.ascontiguousarray(out, dtype=np.float32)
 
+        x   = np.asarray(tensor) * scale + loc
+        out = np.array(x, copy=True)
+        if log_idx.size:
+            sel      = _select(log_idx)
+            out[sel] = Log1pTransform.decompress(x[sel], clamp.floor, clamp.ceil, clamp.enabled, leaky_slope)
+        if clamp.enabled and barrier_idx.size:
+            sel      = _select(barrier_idx)
+            out[sel] = Log1pTransform.decompress(Log1pTransform.compress(x[sel], leaky_slope), clamp.floor, clamp.ceil, clamp.enabled, leaky_slope)
         return np.ascontiguousarray(out, dtype=np.float32)
 
     @staticmethod

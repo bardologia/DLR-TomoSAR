@@ -136,6 +136,7 @@ class StatsComputer:
             scale      = scales,
             names      = group_keys,
             strategies = strategies,
+            clampable  = [False] * n,
         )
 
     @staticmethod
@@ -200,13 +201,15 @@ class StatsComputer:
         role_fit   : dict[str, tuple[float, float]] = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
         role_strat : dict[str, ChannelStrategy]     = {key: output_config.strategy_for(key) for key in role_pools}
 
-        selected       = output_config.selected_indices(n_gaussians)
-        _local_to_role = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
+        selected        = output_config.selected_indices(n_gaussians)
+        _local_to_role  = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
+        _role_clampable = {"out/amp": True, "out/mu": False, "out/sigma": True}
 
         locs       : list[float]           = []
         scales     : list[float]           = []
         names      : list[str]             = []
         strategies : list[ChannelStrategy] = []
+        clampable  : list[bool]            = []
 
         for out_ch, full_ch in enumerate(selected):
             g        = full_ch // 3
@@ -216,6 +219,7 @@ class StatsComputer:
             scales.append(s)
             names.append(f"G{g+1}_{role_key.split('/')[1]}")
             strategies.append(role_strat[role_key])
+            clampable.append(_role_clampable[role_key])
 
         if logger is not None:
             logger.section("[Output stats from params]")
@@ -228,8 +232,9 @@ class StatsComputer:
                     "scale":    f"{s:.5f}",
                     "Method":    strat.norm_method.value,
                     "log1p":    str(strat.apply_log1p),
+                    "clamped":  str(_role_clampable[key]),
                 })
-            logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p"])
+            logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p", "clamped"])
 
             degenerate = [key for key, (_m, s) in role_fit.items() if s <= 1e-8]
             if degenerate:
@@ -240,6 +245,7 @@ class StatsComputer:
             scale      = scales,
             names      = names,
             strategies = strategies,
+            clampable  = clampable,
         )
 
     @staticmethod

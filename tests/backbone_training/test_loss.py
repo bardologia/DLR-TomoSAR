@@ -9,7 +9,7 @@ from configuration.training.general.loss import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
-from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor
+from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor, zscore_normalizer
 import tools
 
 
@@ -237,6 +237,36 @@ def test_prepare_param_clamp_slope_acts_independently():
     _, pred_phys, _, _, _ = loss._prepare(raw, torch.zeros_like(raw))
 
     assert pred_phys[0, 0, 0, 0].item() == pytest.approx(2.0 + 0.5 * (50.0 - 2.0), abs=1e-4)
+
+
+def test_nonlog_normalization_arm_keeps_loss_finite_for_wild_predictions():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0, use_mse_curve=True, weight_mse_curve=1.0)
+    loss = build_loss(n_gaussians=2, loss_cfg=cfg, norm_stats=zscore_normalizer(2))
+
+    gt   = loss.norm_stats.normalize_output(valid_param_tensor(1, 2, 4, 4, seed=41))
+    pred = (param_tensor(1, 2, 4, 4, seed=42) * 1e18).requires_grad_(True)
+
+    out = loss(pred, gt)
+
+    assert torch.isfinite(out["total_loss"]).item()
+
+    out["total_loss"].backward()
+
+    assert torch.isfinite(pred.grad).all().item()
+
+
+def test_nonlog_normalization_arm_clamps_amp_before_curve_reconstruction():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    loss = build_loss(n_gaussians=1, loss_cfg=cfg, norm_stats=zscore_normalizer(1))
+
+    raw       = torch.zeros((1, 3, 2, 2))
+    raw[:, 0] = 1e18
+
+    _, pred_phys, _, pred_curves, _ = loss._prepare(raw, torch.zeros_like(raw))
+
+    assert torch.isfinite(pred_phys).all()
+    assert torch.isfinite(pred_curves).all()
+    assert pred_phys[:, 0].max().item() < 1e6
 
 
 def test_single_term_total_equals_component_after_normalisation():
