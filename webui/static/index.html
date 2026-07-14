@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260714a" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260714b" />
 </head>
 <body>
 
@@ -261,6 +261,7 @@
         <button type="button" class="cube-mode" data-view="elevation">Elevation sweep</button>
         <button type="button" class="cube-mode" data-view="azimuth">Azimuth sweep</button>
         <button type="button" class="cube-mode" data-view="range">Range sweep</button>
+        <button type="button" class="cube-mode" data-view="params">Parameters</button>
       </div>
 
       <div class="cube-view" data-view="explorer">
@@ -412,6 +413,41 @@
             <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
             <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
             <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
+          </div>
+        </div>
+      </div>
+
+      <div class="cube-view" data-view="params" hidden>
+        <div class="cube-pview">
+          <div class="cube-pview__bar">
+            <div class="cube-spaces" id="cube-param-source" role="group" aria-label="Parameter source"></div>
+            <div class="cube-spaces" id="cube-param-field" role="group" aria-label="Parameter field">
+              <button type="button" class="cube-space is-active" data-field="amp">Amplitude</button>
+              <button type="button" class="cube-space" data-field="mu">Mu</button>
+              <button type="button" class="cube-space" data-field="sigma">Sigma</button>
+              <button type="button" class="cube-space" data-field="count">Active count</button>
+            </div>
+            <div class="cube-spaces" id="cube-param-slot" role="group" aria-label="Gaussian slot"></div>
+            <span class="cube-elev__at" id="cube-param-at">Pick a source, field and slot to map the Gaussian parameters.</span>
+          </div>
+          <div class="cube-pview__deck">
+            <figure class="cube-pmap">
+              <div class="cube-pmap__media">
+                <canvas id="cube-param-canvas"></canvas>
+                <i class="cube-cross" id="cube-param-cross" hidden></i>
+              </div>
+              <figcaption class="cube-pmap__legend">
+                <span class="cube-pmap__bound" id="cube-param-min"></span>
+                <img class="cube-pmap__cbar" id="cube-param-cbar" alt="colour scale" />
+                <span class="cube-pmap__bound" id="cube-param-max"></span>
+              </figcaption>
+            </figure>
+            <aside class="cube-pside">
+              <h3 class="cube-panel-title">Pixel parameters</h3>
+              <p class="cube-coords" id="cube-param-coords">Click the map to read every Gaussian slot at that pixel.</p>
+              <div class="cube-pside__table" id="cube-param-table"></div>
+              <button type="button" class="btn btn--mini" id="cube-param-open" hidden>Open cuts at this pixel</button>
+            </aside>
           </div>
         </div>
       </div>
@@ -724,9 +760,9 @@
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/leaderboard.js?v=20260714a"></script>
-<script src="/static/js/tomogram.js?v=20260702b"></script>
+<script src="/static/js/tomogram.js?v=20260714a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260624d"></script>
+<script src="/static/js/app.js?v=20260714a"></script>
 </body>
 </html>

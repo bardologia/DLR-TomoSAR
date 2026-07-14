@@ -204,6 +204,217 @@ class TomogramSweep {
   }
 }
 
+class TomogramParams {
+  static SOURCE_LABELS = { pred: "pred", gt: "gt", error: "|pred − gt|" };
+  static FIELD_LABELS  = { amp: "amplitude", mu: "mu [m]", sigma: "sigma [m]", count: "active slots" };
+
+  constructor(refs, host) {
+    this.host = host;
+    this.sourceEl = refs.source;
+    this.fieldEl = refs.field;
+    this.slotEl = refs.slot;
+    this.atEl = refs.at;
+    this.canvas = refs.canvas;
+    this.cross = refs.cross;
+    this.cbar = refs.cbar;
+    this.minEl = refs.min;
+    this.maxEl = refs.max;
+    this.coordsEl = refs.coords;
+    this.tableEl = refs.table;
+    this.openBtn = refs.open;
+
+    this.meta = null;
+    this.source = "pred";
+    this.field = "amp";
+    this.slot = 0;
+    this.token = 0;
+    this.picked = null;
+
+    this.fieldEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.addEventListener("click", () => this._setField(btn.dataset.field));
+    });
+
+    this.canvas.addEventListener("click", (ev) => this._onClick(ev));
+    this.openBtn.addEventListener("click", () => this._openCuts());
+  }
+
+  configure(meta) {
+    this.meta = meta.params || null;
+    this.picked = null;
+    this.cross.hidden = true;
+    this.openBtn.hidden = true;
+    this.tableEl.innerHTML = "";
+    this.coordsEl.textContent = "Click the map to read every Gaussian slot at that pixel.";
+
+    if (!this.meta) return;
+
+    const sources = [...this.meta.sources, ...(this.meta.error ? ["error"] : [])];
+    if (!sources.includes(this.source)) this.source = sources[0];
+    this.slot = Math.min(this.slot, this.meta.n_slots - 1);
+
+    this._renderSourceBtns(sources);
+    this._renderSlotBtns();
+  }
+
+  render() {
+    if (!this.meta) return;
+    this._syncBtns();
+    this._fetchMap();
+    this._updateLegend();
+    if (this.picked) this._fetchPixel(this.picked.az, this.picked.rg);
+  }
+
+  _setSource(source) {
+    if (source === this.source) return;
+    this.source = source;
+    this.render();
+  }
+
+  _setField(field) {
+    if (field === this.field) return;
+    this.field = field;
+    this.render();
+  }
+
+  _setSlot(slot) {
+    if (slot === this.slot) return;
+    this.slot = slot;
+    this.render();
+  }
+
+  _renderSourceBtns(sources) {
+    this.sourceEl.innerHTML = "";
+    sources.forEach((source) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-space";
+      btn.dataset.source = source;
+      btn.textContent = TomogramParams.SOURCE_LABELS[source] || source;
+      btn.addEventListener("click", () => this._setSource(source));
+      this.sourceEl.appendChild(btn);
+    });
+  }
+
+  _renderSlotBtns() {
+    this.slotEl.innerHTML = "";
+    for (let k = 0; k < this.meta.n_slots; k++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-space";
+      btn.dataset.slot = String(k);
+      btn.textContent = `slot ${k}`;
+      btn.addEventListener("click", () => this._setSlot(k));
+      this.slotEl.appendChild(btn);
+    }
+  }
+
+  _syncBtns() {
+    this.sourceEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.source === this.source);
+    });
+    this.fieldEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.field === this.field);
+    });
+    this.slotEl.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.classList.toggle("is-active", Number(btn.dataset.slot) === this.slot);
+      btn.disabled = this.field === "count";
+    });
+
+    const slotText = this.field === "count" ? "all slots" : `slot ${this.slot}`;
+    this.atEl.textContent = `${TomogramParams.SOURCE_LABELS[this.source]} · ${TomogramParams.FIELD_LABELS[this.field]} · ${slotText}`;
+  }
+
+  async _fetchMap() {
+    this.token += 1;
+    const token = this.token;
+    const url = `/api/cubes/param_map?id=${encodeURIComponent(this.host.selectedId)}&source=${this.source}&field=${this.field}&slot=${this.slot}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok || token !== this.token) return;
+
+      const bitmap = await createImageBitmap(await res.blob());
+      if (token !== this.token) { if (bitmap.close) bitmap.close(); return; }
+
+      if (this.canvas.width !== bitmap.width || this.canvas.height !== bitmap.height) {
+        this.canvas.width = bitmap.width;
+        this.canvas.height = bitmap.height;
+      }
+      this.canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    } catch (e) {
+    }
+  }
+
+  _updateLegend() {
+    const key = this.source === "error" ? `error_${this.field}` : this.field;
+    const range = this.meta.ranges[key];
+    if (!range) return;
+
+    this.cbar.src = `/api/cubes/param_cbar?id=${encodeURIComponent(this.host.selectedId)}&source=${this.source}&field=${this.field}`;
+    this.minEl.textContent = this.host._fmt(range[0]);
+    this.maxEl.textContent = this.host._fmt(range[1]);
+  }
+
+  _onClick(ev) {
+    if (!this.meta || !this.host.meta) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const fx = (ev.clientX - rect.left) / rect.width;
+    const fy = (ev.clientY - rect.top) / rect.height;
+    const az = Math.min(this.host.meta.n_az - 1, Math.max(0, Math.floor(fy * this.host.meta.n_az)));
+    const rg = Math.min(this.host.meta.n_rg - 1, Math.max(0, Math.floor(fx * this.host.meta.n_rg)));
+
+    this.picked = { az, rg, fx, fy };
+    this.cross.hidden = false;
+    this.cross.style.left = `${fx * 100}%`;
+    this.cross.style.top = `${fy * 100}%`;
+
+    this._fetchPixel(az, rg);
+  }
+
+  async _fetchPixel(az, rg) {
+    const data = await window.apiGet(`/api/cubes/params_at?id=${encodeURIComponent(this.host.selectedId)}&az=${az}&rg=${rg}`);
+    if (!data || !data.ok) return;
+
+    this.coordsEl.textContent = `az = ${data.az} · rg = ${data.rg} · threshold ${data.threshold}`;
+    this.openBtn.hidden = false;
+    this._renderTable(data);
+  }
+
+  _renderTable(data) {
+    const sources = Object.keys(data.sources);
+
+    let html = `<table class="cube-metrics cube-metrics--params"><thead><tr><th scope="col">slot</th>`;
+    sources.forEach((source) => { html += `<th scope="col" colspan="3">${this.host._esc(source)}</th>`; });
+    html += `</tr><tr><th></th>`;
+    sources.forEach(() => { html += `<th>amp</th><th>mu</th><th>sigma</th>`; });
+    html += `</tr></thead><tbody>`;
+
+    for (let k = 0; k < data.n_slots; k++) {
+      html += `<tr><th scope="row">${k}</th>`;
+      sources.forEach((source) => {
+        const slot = data.sources[source][k];
+        const cls = slot.active ? "" : ` class="is-inactive"`;
+        const amp = slot.amp === null ? "–" : this.host._fmt(slot.amp);
+        const mu = slot.active && slot.mu !== null ? this.host._fmt(slot.mu) : "–";
+        const sigma = slot.active && slot.sigma !== null ? this.host._fmt(slot.sigma) : "–";
+        html += `<td${cls}>${amp}</td><td${cls}>${mu}</td><td${cls}>${sigma}</td>`;
+      });
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
+    this.tableEl.innerHTML = html;
+  }
+
+  _openCuts() {
+    if (!this.picked) return;
+    this.host._setView("explorer");
+    this.host._follow(this.picked, true);
+    this.host._enterSlices(this.picked);
+  }
+}
+
 class TomogramView {
   static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
   static HOLD_SAVE_MS = 4000;
@@ -271,6 +482,7 @@ class TomogramView {
     this.visible = new Set();
 
     this.sweeps = (refs.sweeps || []).map((sweep) => new TomogramSweep(sweep, this));
+    this.params = refs.params ? new TomogramParams(refs.params, this) : null;
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -552,6 +764,13 @@ class TomogramView {
     this._initCutBounds();
     this.sweeps.forEach((sweep) => sweep.configure());
 
+    if (this.params) {
+      this.params.configure(meta);
+      const paramsBtn = this.modeBtns.find((btn) => btn.dataset.view === "params");
+      if (paramsBtn) paramsBtn.hidden = !meta.params;
+      if (!meta.params && this.view === "params") this._setView("explorer");
+    }
+
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
 
     const sweep = this._sweepFor(this.view);
@@ -570,13 +789,18 @@ class TomogramView {
   }
 
   _setView(view) {
-    if (!["explorer", "elevation", "azimuth", "range"].includes(view) || view === this.view) return;
+    if (!["explorer", "elevation", "azimuth", "range", "params"].includes(view) || view === this.view) return;
 
     this._stopSweeps();
     this.view = view;
 
     this.modeBtns.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
     this.viewEls.forEach((el) => { el.hidden = el.dataset.view !== view; });
+
+    if (view === "params" && this.params && this.meta) {
+      this.params.render();
+      return;
+    }
 
     const sweep = this._sweepFor(view);
     if (sweep && this.meta) sweep.play();

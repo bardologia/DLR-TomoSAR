@@ -13,6 +13,7 @@ import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
 from project_paths            import ProjectPaths
+from tools.loss.param_loss    import ParamMatcher
 from tools.reporting.plotting import PlotBase
 from web_logger               import WebLogger
 
@@ -56,7 +57,10 @@ class SliceFigureArchiver(PlotBase):
 
 class CubeExplorer:
 
-    SOURCES = ("pred", "gt", "reduced", "full")
+    SOURCES       = ("pred", "gt", "reduced", "full")
+    PARAM_SOURCES = ("pred", "gt")
+    PARAM_FIELDS  = {"amp": 0, "mu": 1, "sigma": 2}
+    PARAM_BAD     = "#10151a"
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths    = paths
@@ -232,6 +236,133 @@ class CubeExplorer:
         plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap="jet", vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
+    def param_map_png(self, cube_id: str, source: str, field: str, slot: int) -> bytes | None:
+        resolved = self._param_state(cube_id)
+        if resolved is None or field not in (*self.PARAM_FIELDS, "count"):
+            return None
+
+        params, meta = resolved
+
+        if source in self.PARAM_SOURCES:
+            block = params.get(source)
+            if block is None:
+                return None
+            data, vmin, vmax, cmap = self._param_source_map(block, meta, field, slot)
+        elif source == "error":
+            if not meta["error"]:
+                return None
+            data, vmin, vmax, cmap = self._param_error_map(params, meta, field, slot)
+        else:
+            return None
+
+        palette = plt.get_cmap(cmap).copy()
+        palette.set_bad(color=self.PARAM_BAD)
+
+        buf = io.BytesIO()
+        plt.imsave(buf, data, cmap=palette, vmin=vmin, vmax=vmax, format="png")
+        return buf.getvalue()
+
+    def param_cbar_png(self, cube_id: str, source: str, field: str) -> bytes | None:
+        resolved = self._param_state(cube_id)
+        if resolved is None or field not in (*self.PARAM_FIELDS, "count"):
+            return None
+
+        _, meta = resolved
+        cmap    = self._param_cmap(source, field, meta)
+        if cmap is None:
+            return None
+
+        ramp = np.tile(np.linspace(0.0, 1.0, 256), (12, 1))
+
+        buf = io.BytesIO()
+        plt.imsave(buf, ramp, cmap=cmap, vmin=0.0, vmax=1.0, format="png")
+        return buf.getvalue()
+
+    def params_at(self, cube_id: str, az: int, rg: int) -> dict:
+        resolved = self._param_state(cube_id)
+        if resolved is None:
+            return {"ok": False, "error": "no parameter cubes are loaded"}
+
+        params, meta = resolved
+        n_slots      = meta["n_slots"]
+        threshold    = meta["threshold"]
+
+        az = int(np.clip(az, 0, next(iter(params.values())).shape[1] - 1))
+        rg = int(np.clip(rg, 0, next(iter(params.values())).shape[2] - 1))
+
+        sources = {}
+        for source, block in params.items():
+            slots = []
+            for k in range(n_slots):
+                amp   = float(block[3 * k,     az, rg])
+                mu    = float(block[3 * k + 1, az, rg])
+                sigma = float(block[3 * k + 2, az, rg])
+                slots.append({"amp": amp, "mu": mu, "sigma": sigma, "active": bool(amp >= threshold)})
+            sources[source] = slots
+
+        return {"ok": True, "az": az, "rg": rg, "n_slots": n_slots, "threshold": threshold, "sources": sources}
+
+    def _param_state(self, cube_id: str) -> tuple[dict, dict] | None:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            params = self.loaded["params"]
+            meta   = self.loaded["meta"]["params"]
+
+        if meta is None or not params:
+            return None
+        return params, meta
+
+    def _param_source_map(self, block: np.ndarray, meta: dict, field: str, slot: int) -> tuple[np.ndarray, float, float, str]:
+        threshold = meta["threshold"]
+        n_slots   = meta["n_slots"]
+
+        if field == "count":
+            amps = block[0::3]
+            data = (amps >= threshold).sum(axis=0).astype(np.float32)
+            vmin, vmax = meta["ranges"]["count"]
+            return data, vmin, vmax, "viridis"
+
+        slot    = int(np.clip(slot, 0, n_slots - 1))
+        channel = np.asarray(block[3 * slot + self.PARAM_FIELDS[field]], dtype=np.float32)
+
+        if field in ("mu", "sigma"):
+            active  = block[3 * slot] >= threshold
+            channel = np.where(active, channel, np.nan)
+
+        vmin, vmax = meta["ranges"][field]
+        return channel, vmin, vmax, "viridis"
+
+    def _param_error_map(self, params: dict, meta: dict, field: str, slot: int) -> tuple[np.ndarray, float, float, str]:
+        threshold = meta["threshold"]
+        n_slots   = meta["n_slots"]
+        pred      = params["pred"]
+        gt        = params["gt"]
+
+        if field == "count":
+            count_pred = (pred[0::3] >= threshold).sum(axis=0).astype(np.float32)
+            count_gt   = (gt[0::3]   >= threshold).sum(axis=0).astype(np.float32)
+            vmin, vmax = meta["ranges"]["error_count"]
+            return count_pred - count_gt, vmin, vmax, "coolwarm"
+
+        slot   = int(np.clip(slot, 0, n_slots - 1))
+        offset = 3 * slot + self.PARAM_FIELDS[field]
+        diff   = np.abs(np.asarray(pred[offset], dtype=np.float32) - np.asarray(gt[offset], dtype=np.float32))
+
+        if field in ("mu", "sigma"):
+            active = (pred[3 * slot] >= threshold) & (gt[3 * slot] >= threshold)
+            diff   = np.where(active, diff, np.nan)
+
+        vmin, vmax = meta["ranges"][f"error_{field}"]
+        return diff, vmin, vmax, "inferno"
+
+    def _param_cmap(self, source: str, field: str, meta: dict):
+        if source in self.PARAM_SOURCES:
+            return "viridis"
+        if source == "error" and meta["error"]:
+            return "coolwarm" if field == "count" else "inferno"
+        return None
+
     def save_slices(self, cube_id: str, az: int, rg: int, space: str = "physical") -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
@@ -313,10 +444,10 @@ class CubeExplorer:
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            entries, meta, primary = self._load_all(stamp_dir)
+            entries, meta, primary, params = self._load_all(stamp_dir)
 
             with self.lock:
-                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary}
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params}
                 self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
 
             self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
@@ -327,7 +458,7 @@ class CubeExplorer:
 
             self.logger.error(f"cube load failed: {cube_id}: {exc}")
 
-    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray]:
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict]:
         cubes_dir = stamp_dir / "cubes"
         pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
         if pred_raw.ndim != 3:
@@ -362,6 +493,7 @@ class CubeExplorer:
             entries[source] = self._ingest(raw, x_axis, lambda s=source: advance(s))
 
         primary = self._primary_db(stamp_dir, n_az, n_rg)
+        params  = self._load_params(cubes_dir, n_az, n_rg)
 
         meta = {
             "sources" : [s for s in self.SOURCES if s in entries],
@@ -370,8 +502,65 @@ class CubeExplorer:
             "n_elev"  : {s: int(entries[s]["cube"].shape[0]) for s in entries},
             "x_min"   : float(curve_axis[0]),
             "x_max"   : float(curve_axis[-1]),
+            "params"  : self._params_meta(params, curve_axis),
         }
-        return entries, meta, primary
+        return entries, meta, primary, params
+
+    def _load_params(self, cubes_dir: Path, n_az: int, n_rg: int) -> dict:
+        params = {}
+        for source in self.PARAM_SOURCES:
+            path = cubes_dir / f"params_{source}.npy"
+            if not path.is_file():
+                continue
+
+            raw = np.asarray(np.load(path), dtype=np.float32)
+            if raw.ndim != 3 or raw.shape[0] % 3 != 0 or raw.shape[0] == 0:
+                raise ValueError(f"params_{source}.npy is not a (3K, az, rg) cube: shape={raw.shape}")
+            if raw.shape[1:] != (n_az, n_rg):
+                raise ValueError(f"params_{source}.npy spatial shape {raw.shape[1:]} does not match the {n_az}x{n_rg} cube")
+
+            params[source] = raw
+
+        return params
+
+    def _params_meta(self, params: dict, curve_axis: np.ndarray) -> dict | None:
+        if not params:
+            return None
+
+        n_slots   = next(iter(params.values())).shape[0] // 3
+        threshold = ParamMatcher.ACTIVE_AMP_THR
+        has_error = "pred" in params and "gt" in params
+
+        ranges = {
+            "amp"   : [0.0, self._field_ceiling(params, 0)],
+            "mu"    : [float(curve_axis[0]), float(curve_axis[-1])],
+            "sigma" : [0.0, self._field_ceiling(params, 2)],
+            "count" : [0.0, float(n_slots)],
+        }
+
+        if has_error:
+            for field, offset in self.PARAM_FIELDS.items():
+                diff = np.abs(params["pred"][offset::3] - params["gt"][offset::3])
+                high = float(np.nanpercentile(diff, 99.0)) if diff.size else 1.0
+                ranges[f"error_{field}"] = [0.0, high if high > 0.0 else 1.0]
+            ranges["error_count"] = [-float(n_slots), float(n_slots)]
+
+        return {
+            "sources"   : [s for s in self.PARAM_SOURCES if s in params],
+            "n_slots"   : n_slots,
+            "threshold" : threshold,
+            "error"     : has_error,
+            "ranges"    : ranges,
+        }
+
+    @staticmethod
+    def _field_ceiling(params: dict, offset: int) -> float:
+        high = 0.0
+        for block in params.values():
+            channels = block[offset::3]
+            if channels.size:
+                high = max(high, float(np.nanpercentile(channels, 99.0)))
+        return high if high > 0.0 else 1.0
 
     def _ingest(self, raw: np.ndarray, x_axis: np.ndarray, advance) -> dict:
         cube = np.empty(raw.shape, dtype=np.float32)
