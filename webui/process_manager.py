@@ -11,7 +11,8 @@ import threading
 import time
 import uuid
 from collections import deque
-from datetime    import datetime
+from datetime    import datetime, timedelta
+from pathlib     import Path
 
 from proc_stats    import ProcStats
 from project_paths import ProjectPaths
@@ -50,15 +51,20 @@ class JobStream:
 
 class ProcessManager:
 
-    OVERRIDE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
-    DETACHED_PID  = re.compile(r"detached .* as pid (\d+)")
+    OVERRIDE_NAME    = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
+    DETACHED_PID     = re.compile(r"detached .* as pid (\d+)")
+    ORPHAN_MIN_AGE_S = 15.0
+    ORPHAN_RESCAN_S  = 3.0
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths   = paths
-        self.logger  = logger
-        self.jobs    = {}
-        self.streams = {}
-        self.lock    = threading.Lock()
+        self.paths         = paths
+        self.logger        = logger
+        self.jobs          = {}
+        self.streams       = {}
+        self.lock          = threading.Lock()
+        self.uid           = os.getuid()
+        self.clk           = os.sysconf("SC_CLK_TCK")
+        self.orphan_scan_t = 0.0
 
     def launch(self, key: str, interpreter: str, overrides: dict | None = None, follow_up: str | None = None, detach: bool = False) -> dict:
         script = self.paths.script_entry(key)["path"]
@@ -298,6 +304,121 @@ class ProcessManager:
         self.logger.muted(f"detached job {job_id} (pid {pid}) exited, exit status unknown")
         stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
+
+    def adopt_orphans(self) -> int:
+        now = time.monotonic()
+        with self.lock:
+            if now - self.orphan_scan_t < self.ORPHAN_RESCAN_S:
+                return 0
+            self.orphan_scan_t = now
+
+        orphans = self._orphan_candidates()
+        for pid, info in orphans.items():
+            self._adopt_orphan(pid, info)
+        return len(orphans)
+
+    def _orphan_candidates(self) -> dict:
+        found = {}
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            if pid == os.getpid():
+                continue
+
+            try:
+                if os.stat(f"/proc/{pid}").st_uid != self.uid:
+                    continue
+                raw = open(f"/proc/{pid}/cmdline", "rb").read()
+            except OSError:
+                continue
+
+            tokens = [token.decode(errors="replace") for token in raw.split(b"\x00") if token]
+            if not tokens or not os.path.basename(tokens[0]).startswith("python"):
+                continue
+
+            script = self._orphan_script(pid, tokens)
+            if script is None:
+                continue
+
+            age = self._pid_age_s(pid)
+            if age is None or age < self.ORPHAN_MIN_AGE_S:
+                continue
+            if self.job_for_pid(pid) is not None:
+                continue
+
+            found[pid] = {"script": script, "cmd": " ".join(tokens), "interpreter": tokens[0], "age_s": age}
+
+        return {pid: info for pid, info in found.items() if self._orphan_ancestor(pid, set(found)) is None}
+
+    def _orphan_script(self, pid: int, tokens: list[str]) -> str | None:
+        for token in tokens[1:]:
+            if not token.endswith(".py"):
+                continue
+
+            path = Path(token)
+            if not path.is_absolute():
+                try:
+                    path = Path(os.readlink(f"/proc/{pid}/cwd")) / path
+                except OSError:
+                    return None
+
+            try:
+                path = path.resolve()
+            except OSError:
+                return None
+            return path.stem if path.is_relative_to(self.paths.main_dir) else None
+        return None
+
+    def _pid_age_s(self, pid: int) -> float | None:
+        try:
+            stat   = open(f"/proc/{pid}/stat").read()
+            fields = stat[stat.rindex(")") + 2 :].split()
+            uptime = float(open("/proc/uptime").read().split()[0])
+            return uptime - int(fields[19]) / self.clk
+        except (OSError, ValueError, IndexError):
+            return None
+
+    def _orphan_ancestor(self, pid: int, known: set) -> int | None:
+        parent = ProcStats.ppid(pid)
+        hops   = 0
+        while parent > 1 and hops < 16:
+            if parent in known:
+                return parent
+            parent = ProcStats.ppid(parent)
+            hops  += 1
+        return None
+
+    def _adopt_orphan(self, pid: int, info: dict) -> None:
+        record = {
+            "job_id"           : uuid.uuid4().hex[:12],
+            "script"           : info["script"],
+            "command"          : info["cmd"],
+            "interpreter"      : info["interpreter"],
+            "overrides"        : {},
+            "detach"           : False,
+            "status"           : "running",
+            "pid"              : pid,
+            "started"          : (datetime.now() - timedelta(seconds=info["age_s"])).isoformat(timespec="seconds"),
+            "exit_code"        : None,
+            "follow_of"        : None,
+            "follow_up"        : None,
+            "adopted"          : True,
+            "detached_running" : True,
+        }
+
+        stream = JobStream()
+        stream.publish({"type": "status", "status": "running", "pid": pid, "adopted": True})
+
+        with self.lock:
+            self.jobs[record["job_id"]]    = record
+            self.streams[record["job_id"]] = stream
+
+        self.logger.warning(f"adopted untracked process {info['script']} (pid {pid}) into the console")
+
+        token   = self._pid_start_token(pid)
+        watcher = threading.Thread(target=self._watch_detached, args=(record["job_id"], pid, token, stream), daemon=True)
+        watcher.start()
 
     def _pid_alive(self, pid: int) -> bool:
         try:

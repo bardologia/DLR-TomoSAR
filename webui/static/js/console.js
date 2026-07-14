@@ -95,8 +95,9 @@ class ConsoleTile {
       this.term.writeln(data.text);
     } else if (data.type === "status") {
       if (data.status === "running") {
-        this._note(data.detached ? `running detached (pid ${data.pid}) — stop still kills it` : `process started (pid ${data.pid})`, "36");
-        this.metaEl.textContent = data.detached ? `pid ${data.pid} · detached` : `pid ${data.pid}`;
+        if (data.adopted) this._note(`adopted process already running under your user (pid ${data.pid}) — output is not captured, stop still kills it`, "33");
+        else this._note(data.detached ? `running detached (pid ${data.pid}) — stop still kills it` : `process started (pid ${data.pid})`, "36");
+        this.metaEl.textContent = data.adopted ? `pid ${data.pid} · adopted` : data.detached ? `pid ${data.pid} · detached` : `pid ${data.pid}`;
         this.setStatus("running");
       } else if (data.status === "scheduled") {
         this._note(`scheduled to run after ${data.after || "the current job"}`, "33");

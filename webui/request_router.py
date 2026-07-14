@@ -391,6 +391,7 @@ class RequestRouter:
             self._send_json(handler, {"groups": self.configs.collect()})
             return
         if path == "/api/jobs":
+            self.processes.adopt_orphans()
             self._send_json(handler, {"jobs": self.processes.list_jobs()})
             return
         if path == "/api/tensorboard":
