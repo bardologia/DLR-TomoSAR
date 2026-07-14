@@ -715,7 +715,7 @@ class LeaderboardView {
       cells = `<td>${this._fmt(va)}</td><td>${this._fmt(vb)}</td><td class="${cls}">${delta === 0 ? "=" : this._fmt(delta)}</td><td class="${cls}">${pct === null || delta === 0 ? "&ndash;" : (pct > 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>`;
     }
 
-    return `<tr><td class="lb-key">${this._esc(key)}</td>${cells}</tr>`;
+    return `<tr><td><code>${this._esc(key)}</code></td>${cells}</tr>`;
   }
 
   _configDiffHtml(ca, cb) {
@@ -736,7 +736,7 @@ class LeaderboardView {
     differs.forEach((key) => {
       const va = ca[key] === undefined ? "&ndash;" : this._esc(String(ca[key]));
       const vb = cb[key] === undefined ? "&ndash;" : this._esc(String(cb[key]));
-      html += `<tr><td class="lb-key">${this._esc(key)}</td><td>${va}</td><td>${vb}</td></tr>`;
+      html += `<tr><td><code>${this._esc(key)}</code></td><td>${va}</td><td>${vb}</td></tr>`;
     });
     html += `</tbody></table></article></section>`;
     return html;

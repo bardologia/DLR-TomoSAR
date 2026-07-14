@@ -3644,7 +3644,8 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-diff__report table { max-width: 920px; }
 .lb-diff__report h2 span { color: var(--ink-faint); letter-spacing: 0; }
 .lb-diff__report td { white-space: nowrap; }
-.lb-diff__report td.lb-key { white-space: normal; }
+.lb-diff__report td:first-child { white-space: normal; word-break: break-word; max-width: 46ch; }
+.lb-diff__report td:nth-child(3) { color: var(--ink); }
 .lb-key { font: 500 0.7rem/1.4 var(--mono); color: var(--ink); word-break: break-all; max-width: 44ch; }
 .lb-delta { font-weight: 600; }
 .lb-delta--good { color: var(--accent-2); }
