@@ -419,6 +419,16 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
+        if path == "/api/cubes/attach":
+            result = self.cubes.attach_second(body.get("id", ""), body.get("other", ""))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/cubes/detach":
+            result = self.cubes.detach_second(body.get("id", ""))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
         if path == "/api/cubes/save_slices":
             result = self.cubes.save_slices(
                 cube_id = body.get("id", ""),

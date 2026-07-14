@@ -669,7 +669,7 @@ class TomogramMetrics {
 }
 
 class TomogramView {
-  static LABELS = { pred: "pred", gt: "gt", reduced: "capon reduced", full: "capon full" };
+  static LABELS = { pred: "pred", predb: "pred B", diff: "A − B", gt: "gt", reduced: "capon reduced", full: "capon full" };
   static HOLD_SAVE_MS = 4000;
   static HOLD_HINT_MS = 800;
 
@@ -871,6 +871,21 @@ class TomogramView {
           `<span class="cube-run__name">${this._esc(cube.run)}</span>` +
           `<span class="cube-run__stamp">${this._esc(cube.stamp)}</span>`;
         row.addEventListener("click", () => this.select(cube.id));
+
+        if (this.meta && cube.id !== this.selectedId) {
+          const attached = this.meta.attached && this.meta.attached.id === cube.id;
+          const vs = document.createElement("span");
+          vs.className = "cube-run__vs" + (attached ? " is-on" : "");
+          vs.setAttribute("role", "button");
+          vs.title = attached ? "Detach this comparison" : "Compare against the loaded cube";
+          vs.textContent = attached ? "detach" : "vs";
+          vs.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._toggleAttach(cube.id);
+          });
+          row.appendChild(vs);
+        }
+
         body.appendChild(row);
       });
       card.appendChild(body);
@@ -995,6 +1010,8 @@ class TomogramView {
     const css = getComputedStyle(this.stage);
     this.colors = {
       pred    : css.getPropertyValue("--src-pred").trim(),
+      predb   : css.getPropertyValue("--src-predb").trim(),
+      diff    : css.getPropertyValue("--src-diff").trim(),
       gt      : css.getPropertyValue("--src-gt").trim(),
       reduced : css.getPropertyValue("--src-reduced").trim(),
       full    : css.getPropertyValue("--src-full").trim(),
@@ -1037,6 +1054,49 @@ class TomogramView {
 
     const sweep = this._sweepFor(this.view);
     if (sweep) sweep.play();
+  }
+
+  async _toggleAttach(otherId) {
+    if (!this.meta || !this.selectedId) return;
+
+    const attached = this.meta.attached && this.meta.attached.id === otherId;
+    const res = attached
+      ? await window.apiPost("/api/cubes/detach", { id: this.selectedId })
+      : await window.apiPost("/api/cubes/attach", { id: this.selectedId, other: otherId });
+
+    if (!res || !res.ok) {
+      window.toast((res && res.error) || "Comparison attach failed.", "error");
+      return;
+    }
+
+    this._refreshSources(res.cube);
+    this._renderStrip();
+    window.toast(attached ? "Comparison detached." : "Comparison attached — pred B and A − B sources enabled.", "ok");
+  }
+
+  _refreshSources(meta) {
+    this.meta = meta;
+
+    const kept = meta.sources.filter((s) => this.visible.has(s));
+    this.visible = new Set(kept.length ? kept : meta.sources);
+    ["predb", "diff"].forEach((source) => {
+      if (meta.sources.includes(source)) this.visible.add(source);
+    });
+
+    this.panels.forEach((panel) => {
+      panel.bitmap = null;
+      panel.key = null;
+      panel.drawnSpace = null;
+    });
+
+    this._renderSourceToggles();
+    this._applyVisibility();
+    this.sweeps.forEach((sweep) => sweep.configure());
+
+    const sweep = this._sweepFor(this.view);
+    if (sweep) sweep.render();
+    if (this.point) this._drawSlices(this.point.az, this.point.rg);
+    if (this.locked) this._queueProfiles(this.locked.az, this.locked.rg);
   }
 
   _setSpace(space) {
@@ -1555,7 +1615,7 @@ class TomogramView {
 
     const gt = this.profData && this.profData.sources.gt;
 
-    ["pred", "reduced"].forEach((source) => {
+    ["pred", "predb", "reduced"].forEach((source) => {
       const row = this.profMetricsEl.querySelector(`tr[data-source="${source}"]`);
       if (!row) return;
 

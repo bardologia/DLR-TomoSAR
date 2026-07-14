@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260714c" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260714d" />
 </head>
 <body>
 
@@ -313,6 +313,8 @@
             </h3>
             <div class="cube-cutgroup__stack">
               <figure class="cube-slice" data-axis="range" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="range" data-source="predb"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="range" data-source="diff"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="range" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="range" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="range" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
@@ -325,6 +327,8 @@
             </h3>
             <div class="cube-cutgroup__stack">
               <figure class="cube-slice" data-axis="azimuth" data-source="pred"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="predb"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
+              <figure class="cube-slice" data-axis="azimuth" data-source="diff"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="azimuth" data-source="gt"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="azimuth" data-source="reduced"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
               <figure class="cube-slice" data-axis="azimuth" data-source="full"><div class="cube-slice__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span><i class="cube-ref" hidden></i></div><figcaption class="cube-slice__metric"></figcaption></figure>
@@ -343,6 +347,7 @@
           <p class="cube-coords" id="cube-prof-at">Hover a slice to read the profiles at that position.</p>
           <div class="cube-profiles__grid">
             <figure class="cube-prof" data-source="pred"><header class="cube-slice__head"><i class="cube-dot" data-source="pred"></i><span class="cube-slice__src">pred</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
+            <figure class="cube-prof" data-source="predb"><header class="cube-slice__head"><i class="cube-dot" data-source="predb"></i><span class="cube-slice__src">pred B</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
             <figure class="cube-prof" data-source="gt"><header class="cube-slice__head"><i class="cube-dot" data-source="gt"></i><span class="cube-slice__src">gt</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
             <figure class="cube-prof" data-source="reduced"><header class="cube-slice__head"><i class="cube-dot" data-source="reduced"></i><span class="cube-slice__src">capon reduced</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
             <figure class="cube-prof" data-source="full"><header class="cube-slice__head"><i class="cube-dot" data-source="full"></i><span class="cube-slice__src">capon full</span></header><div class="cube-prof__media"><canvas></canvas></div></figure>
@@ -353,6 +358,7 @@
             </thead>
             <tbody>
               <tr data-source="pred"><th scope="row"><i class="cube-dot" data-source="pred"></i>pred</th><td data-k="mae">&ndash;</td><td data-k="mse">&ndash;</td><td data-k="r2">&ndash;</td></tr>
+              <tr data-source="predb"><th scope="row"><i class="cube-dot" data-source="predb"></i>pred B</th><td data-k="mae">&ndash;</td><td data-k="mse">&ndash;</td><td data-k="r2">&ndash;</td></tr>
               <tr data-source="reduced"><th scope="row"><i class="cube-dot" data-source="reduced"></i>capon reduced</th><td data-k="mae">&ndash;</td><td data-k="mse">&ndash;</td><td data-k="r2">&ndash;</td></tr>
             </tbody>
           </table>
@@ -382,6 +388,8 @@
           <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-elevation-fill"></i></div>
           <div class="cube-elev__grid" id="cube-elevation-grid">
             <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="predb"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span></div></figure>
+            <figure class="cube-eplane" data-source="diff"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span></div></figure>
             <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
             <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
             <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
@@ -411,6 +419,8 @@
           <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-azimuth-fill"></i></div>
           <div class="cube-elev__grid" id="cube-azimuth-grid">
             <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="predb"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span></div></figure>
+            <figure class="cube-eplane" data-source="diff"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span></div></figure>
             <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
             <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
             <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
@@ -523,6 +533,8 @@
           <div class="cube-elev__track"><i class="cube-elev__fill" id="cube-range-fill"></i></div>
           <div class="cube-elev__grid" id="cube-range-grid">
             <figure class="cube-eplane" data-source="pred"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="pred"></i>pred</span></div></figure>
+            <figure class="cube-eplane" data-source="predb"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="predb"></i>pred B</span></div></figure>
+            <figure class="cube-eplane" data-source="diff"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="diff"></i>A &minus; B</span></div></figure>
             <figure class="cube-eplane" data-source="gt"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="gt"></i>gt</span></div></figure>
             <figure class="cube-eplane" data-source="reduced"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="reduced"></i>capon reduced</span></div></figure>
             <figure class="cube-eplane" data-source="full"><div class="cube-eplane__media"><canvas></canvas><span class="cube-slice__tag"><i class="cube-dot" data-source="full"></i>capon full</span></div></figure>
@@ -809,7 +821,7 @@
 <script src="/static/js/console.js?v=20260613b"></script>
 <script src="/static/js/results.js?v=20260616b"></script>
 <script src="/static/js/leaderboard.js?v=20260714b"></script>
-<script src="/static/js/tomogram.js?v=20260714b"></script>
+<script src="/static/js/tomogram.js?v=20260714c"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260714b"></script>

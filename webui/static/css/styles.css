@@ -2515,6 +2515,8 @@ main { margin-left: var(--navw); }
 /* ---------- Tomogram explorer ---------- */
 .page[data-page="cube"] {
   --src-pred:    var(--accent);
+  --src-predb:   #db2777;
+  --src-diff:    #52525b;
   --src-gt:      var(--accent-2);
   --src-reduced: #b45309;
   --src-full:    #7c3aed;
@@ -2524,6 +2526,8 @@ main { margin-left: var(--navw); }
 
 .cube-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); display: inline-block; flex: none; }
 .cube-dot[data-source="pred"]    { background: var(--src-pred); }
+.cube-dot[data-source="predb"]   { background: var(--src-predb); }
+.cube-dot[data-source="diff"]    { background: var(--src-diff); }
 .cube-dot[data-source="gt"]      { background: var(--src-gt); }
 .cube-dot[data-source="reduced"] { background: var(--src-reduced); }
 .cube-dot[data-source="full"]    { background: var(--src-full); }
@@ -3687,3 +3691,15 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-trials-table { margin-bottom: 6px; }
 .lb-trials-table summary { cursor: pointer; font: 500 0.7rem/1 var(--mono); color: var(--ink-faint); padding: 6px 0; }
 .lb-trials-table[open] summary { color: var(--ink-dim); }
+
+/* ==== Cube comparison attach ==== */
+.cube-run { position: relative; }
+.cube-run__vs {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font: 600 0.56rem/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-faint); border: 1px solid var(--line); border-radius: 2px;
+  padding: 3px 6px; background: var(--surface); opacity: 0; transition: opacity 0.15s var(--ease);
+}
+.cube-run:hover .cube-run__vs { opacity: 1; }
+.cube-run__vs:hover { color: var(--accent); border-color: var(--accent); }
+.cube-run__vs.is-on { opacity: 1; color: var(--accent-2); border-color: var(--accent-2); }

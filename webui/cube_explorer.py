@@ -22,12 +22,14 @@ class SliceFigureArchiver(PlotBase):
 
     LABELS = {
         "pred"    : "Prediction",
+        "predb"   : "Prediction B",
+        "diff"    : "Prediction A − B",
         "gt"      : "GT (Gaussian)",
         "reduced" : "Capon reduced",
         "full"    : "Capon full (raw)",
     }
 
-    def render(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, axis: str, az: int, rg: int, space: str, path: Path) -> Path:
+    def render(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, axis: str, az: int, rg: int, space: str, path: Path, cmap: str = "jet") -> Path:
         x_label   = "azimuth index" if axis == "range" else "range index"
         title_pos = f"range = {rg}" if axis == "range" else f"azimuth = {az}"
         y_label   = "elevation bin" if source == "full" else "elevation [m]"
@@ -42,7 +44,7 @@ class SliceFigureArchiver(PlotBase):
                 x_label        = x_label,
                 y_label        = y_label,
                 title          = f"{self.LABELS[source]} — {title_pos}",
-                cmap           = "jet",
+                cmap           = cmap,
                 vmin           = vmin,
                 vmax           = vmax,
                 extent         = extent,
@@ -57,7 +59,7 @@ class SliceFigureArchiver(PlotBase):
 
 class CubeExplorer:
 
-    SOURCES       = ("pred", "gt", "reduced", "full")
+    SOURCES       = ("pred", "predb", "diff", "gt", "reduced", "full")
     PARAM_SOURCES = ("pred", "gt")
     PARAM_FIELDS  = {"amp": 0, "mu": 1, "sigma": 2}
     PARAM_BAD     = "#10151a"
@@ -141,6 +143,79 @@ class CubeExplorer:
         plt.imsave(buf, primary, cmap="gray", vmin=float(vmin), vmax=float(vmax), format="png")
         return buf.getvalue()
 
+    def attach_second(self, cube_id: str, other_id: str) -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+            pred = self.loaded["entries"]["pred"]
+
+        other_dir = self._stamp_dir(other_id)
+        if other_dir is None:
+            return {"ok": False, "error": f"unknown cube id: {other_id}"}
+        if other_id == cube_id:
+            return {"ok": False, "error": "pick a different inference result to compare against"}
+
+        raw = np.load(other_dir / "cubes" / "pred_curves.npy", mmap_mode="r")
+        if raw.shape != pred["cube"].shape:
+            return {"ok": False, "error": f"comparison cube shape {tuple(raw.shape)} does not match {tuple(pred['cube'].shape)}"}
+
+        other_axis = self._curve_axis(other_dir, raw.shape[0])
+        if not np.allclose(other_axis, pred["x_axis"]):
+            return {"ok": False, "error": "comparison cube covers a different elevation axis"}
+
+        predb = self._ingest(raw, pred["x_axis"], lambda: None)
+        diff  = self._diff_entry(pred, predb)
+
+        run_dir = other_dir.parent.parent
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+
+            self.loaded["entries"]["predb"] = predb
+            self.loaded["entries"]["diff"]  = diff
+
+            meta = dict(self.loaded["meta"])
+            meta["sources"]  = [s for s in self.SOURCES if s in self.loaded["entries"]]
+            meta["n_elev"]   = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
+            meta["attached"] = {"id": other_id, "run": run_dir.name, "stamp": other_dir.name}
+            self.loaded["meta"] = meta
+
+        self.logger.ok(f"attached comparison cube: {other_id}")
+        return {"ok": True, "cube": meta}
+
+    def detach_second(self, cube_id: str) -> dict:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube not loaded"}
+
+            self.loaded["entries"].pop("predb", None)
+            self.loaded["entries"].pop("diff", None)
+
+            meta = dict(self.loaded["meta"])
+            meta["sources"]  = [s for s in self.SOURCES if s in self.loaded["entries"]]
+            meta["n_elev"]   = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
+            meta["attached"] = None
+            self.loaded["meta"] = meta
+
+        return {"ok": True, "cube": meta}
+
+    @staticmethod
+    def _diff_entry(pred: dict, predb: dict) -> dict:
+        cube = pred["cube"] - predb["cube"]
+
+        sample = cube[:, :: max(1, cube.shape[1] // 256), :: max(1, cube.shape[2] // 256)]
+        sample = np.abs(sample[np.isfinite(sample)])
+        peak   = float(np.percentile(sample, 99.0)) if sample.size else 1.0
+        peak   = peak if peak > 0.0 else 1.0
+
+        return {
+            "cube"      : cube,
+            "x_axis"    : pred["x_axis"],
+            "vmin"      : -peak,
+            "vmax"      : peak,
+            "diverging" : True,
+        }
+
     def profiles(self, cube_id: str, az: int, rg: int) -> dict:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
@@ -177,7 +252,7 @@ class CubeExplorer:
         gt_cube = gt["cube"]
         out     = {"range": {}, "azimuth": {}}
 
-        for source in ("pred", "reduced", "full"):
+        for source in ("pred", "predb", "reduced", "full"):
             entry = entries.get(source)
             if entry is None or entry["cube"].shape != gt_cube.shape:
                 continue
@@ -221,7 +296,7 @@ class CubeExplorer:
         data, heights, vmin, vmax = self._cut(entry, axis, az, rg, space)
 
         buf = io.BytesIO()
-        plt.imsave(buf, np.flipud(data), cmap="jet", vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.flipud(data), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
     def plane_png(self, cube_id: str, source: str, frac: float, space: str = "physical") -> bytes | None:
@@ -238,14 +313,19 @@ class CubeExplorer:
         data = np.asarray(cube[elev], dtype=np.float32)
 
         if space == "normalized":
-            peak = float(np.nanmax(data)) if np.isfinite(data).any() else 0.0
-            data = data / (peak if peak > 1e-12 else 1.0)
-            vmin, vmax = 0.0, 1.0
+            if entry.get("diverging"):
+                peak = float(np.nanmax(np.abs(data))) if np.isfinite(data).any() else 0.0
+                data = data / (peak if peak > 1e-12 else 1.0)
+                vmin, vmax = -1.0, 1.0
+            else:
+                peak = float(np.nanmax(data)) if np.isfinite(data).any() else 0.0
+                data = data / (peak if peak > 1e-12 else 1.0)
+                vmin, vmax = 0.0, 1.0
         else:
             vmin, vmax = entry["vmin"], entry["vmax"]
 
         buf = io.BytesIO()
-        plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap="jet", vmin=vmin, vmax=vmax, format="png")
+        plt.imsave(buf, np.nan_to_num(data, nan=vmin), cmap=self._entry_cmap(entry), vmin=vmin, vmax=vmax, format="png")
         return buf.getvalue()
 
     def param_map_png(self, cube_id: str, source: str, field: str, slot: int) -> bytes | None:
@@ -451,7 +531,7 @@ class CubeExplorer:
         for source in meta["sources"]:
             for axis in ("range", "azimuth"):
                 data, heights, vmin, vmax = self._cut(entries[source], axis, az, rg, space)
-                saved = self.archiver.render(data, heights, vmin, vmax, source, axis, az, rg, space, out_dir / f"{axis}_{source}_{space}.png")
+                saved = self.archiver.render(data, heights, vmin, vmax, source, axis, az, rg, space, out_dir / f"{axis}_{source}_{space}.png", cmap=self._entry_cmap(entries[source]))
                 files.append(saved.name)
 
         self.logger.ok(f"saved {len(files)} slice figures to {out_dir}")
@@ -463,16 +543,20 @@ class CubeExplorer:
         data = cube[:, :, rg] if axis == "range" else cube[:, az, :]
 
         if space == "normalized":
-            peak = data.max(axis=0, keepdims=True)
+            peak = np.abs(data).max(axis=0, keepdims=True) if entry.get("diverging") else data.max(axis=0, keepdims=True)
             safe = np.where(peak > 1e-12, peak, 1.0)
             data = (data / safe).astype(np.float32)
-            vmin, vmax = 0.0, 1.0
+            vmin, vmax = (-1.0, 1.0) if entry.get("diverging") else (0.0, 1.0)
         else:
             vmin, vmax = entry["vmin"], entry["vmax"]
 
         order   = np.argsort(entry["x_axis"])
         heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
         return data[order], heights, float(vmin), float(vmax)
+
+    @staticmethod
+    def _entry_cmap(entry: dict) -> str:
+        return "coolwarm" if entry.get("diverging") else "jet"
 
     def _entry(self, cube_id: str, source: str) -> dict | None:
         with self.lock:
@@ -569,6 +653,7 @@ class CubeExplorer:
             "x_max"       : float(curve_axis[-1]),
             "params"      : self._params_meta(params, curve_axis),
             "metric_maps" : self._metric_maps_meta(metric_maps),
+            "attached"    : None,
         }
         return entries, meta, primary, params, metric_maps
 
