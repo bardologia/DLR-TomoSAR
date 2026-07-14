@@ -3721,3 +3721,29 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .cube-cloud__stage canvas { width: 100%; display: block; cursor: grab; }
 .cube-cloud__stage canvas:active { cursor: grabbing; }
 #cube-cloud-dem-wrap[hidden] { display: none; }
+
+/* ==== Leaderboard curves ==== */
+.lb-curves { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
+.lb-curves__list {
+  display: flex; flex-direction: column; gap: 4px; max-height: 560px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px;
+}
+.lb-curves__list .res-filter { margin-bottom: 6px; }
+.lb-curves__run {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 7px;
+  font: 500 0.68rem/1.35 var(--mono); color: var(--ink-dim); border-radius: 2px; word-break: break-all;
+}
+.lb-curves__run:hover { background: var(--surface-2); }
+.lb-curves__run.is-on { color: var(--ink); }
+.lb-curves__run input { flex: none; }
+.lb-curves__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
+.lb-curves__chart { min-height: 300px; }
+.lb-linechart { width: 100%; height: auto; display: block; }
+.lb-linechart__grid { stroke: var(--line); stroke-width: 1; }
+.lb-linechart__tick { font: 500 10.5px var(--mono); fill: var(--ink-faint); }
+.lb-linechart__line { fill: none; stroke-width: 1.7; }
+.lb-curves__legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
+.lb-curves__key { display: flex; align-items: center; gap: 7px; font: 500 0.68rem/1.3 var(--mono); color: var(--ink-dim); }
+@media (max-width: 1000px) {
+  .lb-curves { grid-template-columns: 1fr; }
+}

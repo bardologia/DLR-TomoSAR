@@ -33,6 +33,7 @@ from script_config_resolver import ScriptConfigResolver
 from system_monitor         import SystemMonitor
 from contention_monitor      import ContentionMonitor
 from tensorboard_manager    import TensorboardManager
+from training_curves        import TrainingCurves
 from web_logger             import WebLogger
 
 
@@ -45,7 +46,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, nuke: ProcessNuke, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -72,6 +73,7 @@ class RequestRouter:
         self.cubes       = cubes
         self.datasets    = datasets
         self.leaderboard = leaderboard
+        self.curves      = curves
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -137,6 +139,16 @@ class RequestRouter:
         if path == "/api/leaderboard/trials":
             query  = parse_qs(urlparse(handler.path).query)
             result = self.leaderboard.trials((query.get("base") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+        if path == "/api/curves/runs":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.curves.runs((query.get("base") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+        if path == "/api/curves":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.curves.curves(query.get("run") or [], (query.get("tag") or [""])[0])
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path == "/api/leaderboard/diff":

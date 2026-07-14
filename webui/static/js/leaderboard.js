@@ -32,10 +32,18 @@ class LeaderboardView {
 
     this.trialsData   = null;
     this.trialsMetric = localStorage.getItem("leaderboard-trials-metric") || "curve_mse_gt";
+
+    this.curveRuns     = null;
+    this.curveSelected = new Set();
+    this.curveFilter   = "";
+    this.curveTag      = localStorage.getItem("leaderboard-curve-tag") || "";
+    this.curveLog      = false;
+    this.curveData     = null;
   }
 
   enter() {
     if (this.view === "trials") this.loadTrials();
+    else if (this.view === "curves") this.loadCurveRuns();
     else this.load();
   }
 
@@ -75,6 +83,47 @@ class LeaderboardView {
     this._render();
   }
 
+  async loadCurveRuns() {
+    this.root.innerHTML = `<div class="res-empty">Scanning training runs&hellip;</div>`;
+
+    const base = this._runsBase();
+    const data = await window.apiGet(`/api/curves/runs?base=${encodeURIComponent(base)}`);
+
+    if (!data || !data.ok) {
+      this.curveRuns = null;
+      this.root.innerHTML = `<div class="res-empty">${this._esc((data && data.error) || "Could not scan the runs directory.")}</div>`;
+      return;
+    }
+
+    this.curveRuns = data.runs;
+    this.curveSelected = new Set([...this.curveSelected].filter((id) => data.runs.some((run) => run.id === id)));
+    this.view = "curves";
+    this._render();
+
+    if (this.curveSelected.size) this.loadCurves();
+  }
+
+  async loadCurves() {
+    if (!this.curveSelected.size) {
+      this.curveData = null;
+      this._render();
+      return;
+    }
+
+    const runsQuery = [...this.curveSelected].map((id) => `run=${encodeURIComponent(id)}`).join("&");
+    const data = await window.apiGet(`/api/curves?${runsQuery}&tag=${encodeURIComponent(this.curveTag)}`);
+
+    if (!data || !data.ok) {
+      window.toast((data && data.error) || "Could not load the training curves.", "warn");
+      return;
+    }
+
+    this.curveData = data;
+    this.curveTag = data.tag;
+    localStorage.setItem("leaderboard-curve-tag", this.curveTag);
+    this._render();
+  }
+
   async showDiff() {
     if (this.selected.length !== 2) return;
 
@@ -102,16 +151,23 @@ class LeaderboardView {
       this._bindTrials();
       return;
     }
+    if (this.view === "curves" && this.curveRuns) {
+      this.root.innerHTML = this._curvesHtml();
+      this._bindCurves();
+      return;
+    }
 
     this.root.innerHTML = this._tableHtml();
     this._bindTable();
   }
 
   _modeToggleHtml() {
+    const mode = this.view === "trials" || this.view === "curves" ? this.view : "table";
     return (
       `<div class="res-views" role="group" aria-label="Leaderboard mode">` +
-      `<button type="button" data-lbview="table" class="${this.view !== "trials" ? "is-active" : ""}">Runs</button>` +
-      `<button type="button" data-lbview="trials" class="${this.view === "trials" ? "is-active" : ""}">Trials</button>` +
+      `<button type="button" data-lbview="table" class="${mode === "table" ? "is-active" : ""}">Runs</button>` +
+      `<button type="button" data-lbview="trials" class="${mode === "trials" ? "is-active" : ""}">Trials</button>` +
+      `<button type="button" data-lbview="curves" class="${mode === "curves" ? "is-active" : ""}">Curves</button>` +
       `</div>`
     );
   }
@@ -120,6 +176,7 @@ class LeaderboardView {
     this.root.querySelectorAll("[data-lbview]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (btn.dataset.lbview === "trials") this.loadTrials();
+        else if (btn.dataset.lbview === "curves") this.loadCurveRuns();
         else { this.view = "table"; this.load(); }
       });
     });
@@ -380,6 +437,150 @@ class LeaderboardView {
     if (metric) metric.addEventListener("change", () => {
       this.trialsMetric = metric.value;
       localStorage.setItem("leaderboard-trials-metric", this.trialsMetric);
+      this._render();
+    });
+  }
+
+  static CURVE_COLORS = ["#1d4fd8", "#0f766e", "#b45309", "#7c3aed", "#db2777", "#0891b2", "#4d7c0f", "#b91c1c"];
+
+  _curvesHtml() {
+    const needle = this.curveFilter.toLowerCase();
+    const runs   = needle ? this.curveRuns.filter((run) => run.name.toLowerCase().includes(needle)) : this.curveRuns;
+
+    let html = `<div class="lb-bar-top">`;
+    html += this._modeToggleHtml();
+    html += `<span class="lb-count">${this.curveRuns.length} training run${this.curveRuns.length === 1 ? "" : "s"} · ${this.curveSelected.size} selected</span>`;
+
+    if (this.curveData && this.curveData.tags.length) {
+      html += `<select class="lb-select" id="lb-curve-tag" aria-label="Scalar tag">`;
+      this.curveData.tags.forEach((tag) => {
+        html += `<option value="${this._esc(tag)}"${tag === this.curveTag ? " selected" : ""}>${this._esc(tag)}</option>`;
+      });
+      html += `</select>`;
+      html += `<label class="lb-check"><input type="checkbox" id="lb-curve-log"${this.curveLog ? " checked" : ""} /> log scale</label>`;
+    }
+    html += `</div>`;
+
+    html += `<div class="lb-curves">`;
+    html += `<aside class="lb-curves__list">`;
+    html += `<input type="search" class="res-filter" id="lb-curve-filter" placeholder="Filter runs" value="${this._esc(this.curveFilter)}" spellcheck="false" />`;
+
+    if (!runs.length) {
+      html += `<div class="res-empty res-empty--tight">${this.curveRuns.length ? "No run matches the filter." : "No training runs with tensorboard logs found."}</div>`;
+    }
+    runs.forEach((run, index) => {
+      const on = this.curveSelected.has(run.id);
+      const colorAt = [...this.curveSelected].indexOf(run.id);
+      const dot = on ? `<i class="lb-curves__dot" style="background:${LeaderboardView.CURVE_COLORS[colorAt % 8]}"></i>` : `<i class="lb-curves__dot"></i>`;
+      html += `<label class="lb-curves__run${on ? " is-on" : ""}" title="${this._esc(run.id)}">`;
+      html += `<input type="checkbox" data-run="${this._esc(run.id)}"${on ? " checked" : ""} />${dot}<span>${this._esc(run.name)}</span>`;
+      html += `</label>`;
+    });
+    html += `</aside>`;
+
+    html += `<div class="lb-curves__chart">`;
+    if (!this.curveSelected.size) {
+      html += `<div class="res-empty">Tick training runs on the left to overlay their curves.</div>`;
+    } else if (this.curveData && this.curveData.series.length) {
+      html += this._curveChartSvg();
+      html += `<div class="lb-curves__legend">`;
+      this.curveData.series.forEach((series, index) => {
+        html += `<span class="lb-curves__key"><i class="lb-curves__dot" style="background:${LeaderboardView.CURVE_COLORS[index % 8]}"></i>${this._esc(series.name)}</span>`;
+      });
+      html += `</div>`;
+    } else if (this.curveData) {
+      html += `<div class="res-empty">None of the selected runs logs the tag "${this._esc(this.curveTag)}".</div>`;
+    } else {
+      html += `<div class="res-empty">Loading curves&hellip;</div>`;
+    }
+    html += `</div></div>`;
+    return html;
+  }
+
+  _curveChartSvg() {
+    const series = this.curveData.series;
+    const log    = this.curveLog;
+
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    series.forEach((s) => {
+      s.steps.forEach((step) => { xMin = Math.min(xMin, step); xMax = Math.max(xMax, step); });
+      s.values.forEach((v) => {
+        if (v === null || !isFinite(v) || (log && v <= 0)) return;
+        yMin = Math.min(yMin, v);
+        yMax = Math.max(yMax, v);
+      });
+    });
+    if (!isFinite(yMin)) { yMin = 0; yMax = 1; }
+    if (xMax === xMin) xMax = xMin + 1;
+    if (yMax === yMin) yMax = yMin + (Math.abs(yMin) || 1) * 0.1;
+
+    const ty = (v) => (log ? Math.log10(v) : v);
+    const yLo = ty(yMin), yHi = ty(yMax);
+
+    const W = 920, H = 420, mL = 68, mR = 16, mT = 14, mB = 34;
+    const xAt = (step) => mL + ((step - xMin) / (xMax - xMin)) * (W - mL - mR);
+    const yAt = (v) => mT + (1 - (ty(v) - yLo) / (yHi - yLo || 1)) * (H - mT - mB);
+
+    let svg = `<svg class="lb-linechart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Training curves">`;
+
+    for (let i = 0; i <= 4; i++) {
+      const vt = yLo + (i / 4) * (yHi - yLo);
+      const v = log ? Math.pow(10, vt) : vt;
+      const y = mT + (1 - i / 4) * (H - mT - mB);
+      svg += `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" class="lb-linechart__grid" />`;
+      svg += `<text x="${mL - 8}" y="${y + 4}" class="lb-linechart__tick" text-anchor="end">${this._fmt(v)}</text>`;
+    }
+    for (let i = 0; i <= 4; i++) {
+      const step = xMin + (i / 4) * (xMax - xMin);
+      const x = mL + (i / 4) * (W - mL - mR);
+      svg += `<text x="${x}" y="${H - 12}" class="lb-linechart__tick" text-anchor="middle">${Math.round(step)}</text>`;
+    }
+
+    series.forEach((s, index) => {
+      let d = "";
+      let pen = false;
+      for (let i = 0; i < s.steps.length; i++) {
+        const v = s.values[i];
+        if (v === null || !isFinite(v) || (log && v <= 0)) { pen = false; continue; }
+        d += `${pen ? "L" : "M"}${xAt(s.steps[i]).toFixed(1)} ${yAt(v).toFixed(1)} `;
+        pen = true;
+      }
+      svg += `<path d="${d.trim()}" class="lb-linechart__line" style="stroke:${LeaderboardView.CURVE_COLORS[index % 8]}" />`;
+    });
+
+    svg += `</svg>`;
+    return `<div class="lb-chart__wrap">${svg}</div>`;
+  }
+
+  _bindCurves() {
+    this._bindModeToggle();
+
+    const filter = this.root.querySelector("#lb-curve-filter");
+    if (filter) filter.addEventListener("input", () => {
+      this.curveFilter = filter.value.trim();
+      const at = filter.selectionStart;
+      this._render();
+      const next = this.root.querySelector("#lb-curve-filter");
+      if (next) { next.focus(); next.setSelectionRange(at, at); }
+    });
+
+    this.root.querySelectorAll(".lb-curves__run input[type=checkbox]").forEach((box) => {
+      box.addEventListener("change", () => {
+        if (box.checked) this.curveSelected.add(box.dataset.run);
+        else this.curveSelected.delete(box.dataset.run);
+        this.loadCurves();
+      });
+    });
+
+    const tag = this.root.querySelector("#lb-curve-tag");
+    if (tag) tag.addEventListener("change", () => {
+      this.curveTag = tag.value;
+      this.loadCurves();
+    });
+
+    const log = this.root.querySelector("#lb-curve-log");
+    if (log) log.addEventListener("change", () => {
+      this.curveLog = log.checked;
       this._render();
     });
   }

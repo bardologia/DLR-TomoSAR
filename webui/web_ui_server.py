@@ -27,6 +27,7 @@ from script_catalog                     import ScriptCatalog
 from script_config_resolver             import ScriptConfigResolver
 from system_monitor                     import SystemMonitor
 from tensorboard_manager                import TensorboardManager
+from training_curves                    import TrainingCurves
 from web_logger                         import WebLogger
 
 
@@ -82,6 +83,7 @@ class WebUIServer:
         self.cubes             = CubeExplorer(self.paths, self.logger)
         self.datasets          = DatasetBrowser(self.logger)
         self.leaderboard       = RunLeaderboard(self.logger)
+        self.curves            = TrainingCurves(self.logger)
 
         self.router    = RequestRouter(
             paths             = self.paths,
@@ -110,6 +112,7 @@ class WebUIServer:
             cubes             = self.cubes,
             datasets          = self.datasets,
             leaderboard       = self.leaderboard,
+            curves            = self.curves,
         )
 
     def serve(self) -> None:
