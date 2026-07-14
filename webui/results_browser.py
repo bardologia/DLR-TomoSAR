@@ -79,7 +79,7 @@ class ResultsBrowser:
             elif suffix in self.CONFIG_SUFFIXES:
                 configs.append({"name": entry.name, "kind": suffix.lstrip("."), "text": self._read_text(entry)})
             elif suffix in self.LOG_SUFFIXES:
-                logs.append({"name": entry.name, "size": entry.stat().st_size, "text": self._read_tail(entry)})
+                logs.append({"name": entry.name, "size": entry.stat().st_size, "text": self._read_log(entry)})
             else:
                 other.append({"name": entry.name, "size": entry.stat().st_size})
 
@@ -251,7 +251,7 @@ class ResultsBrowser:
             text += "\n\n[truncated]"
         return text
 
-    def _read_tail(self, target: Path) -> str:
+    def _read_log(self, target: Path) -> str:
         try:
             raw = target.read_bytes()
         except OSError:
@@ -260,8 +260,8 @@ class ResultsBrowser:
         if len(raw) <= self.MAX_TEXT_BYTES:
             return self._clean_log(raw.decode("utf-8", errors="replace"))
 
-        tail = self._clean_log(raw[-self.MAX_TEXT_BYTES :].decode("utf-8", errors="replace"))
-        return "[showing the tail of the file]\n\n" + tail
+        head = self._clean_log(raw[: self.MAX_TEXT_BYTES].decode("utf-8", errors="replace"))
+        return head + f"\n\n[truncated: showing the first {self.MAX_TEXT_BYTES // 1024} KB of {len(raw) // 1024} KB]"
 
     def _clean_log(self, text: str) -> str:
         text = self.ANSI_ESCAPES.sub("", text.replace("\r\n", "\n"))

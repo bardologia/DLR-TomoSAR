@@ -32,14 +32,14 @@ def test_folder_buckets_log_files_with_content(tmp_path):
     assert [entry["name"] for entry in payload["other"]] == ["weights.bin"]
 
 
-def test_large_log_serves_tail(tmp_path):
-    (tmp_path / "big.log").write_bytes(b"x" * 300000 + b"THE_END")
+def test_large_log_serves_head(tmp_path):
+    (tmp_path / "big.log").write_bytes(b"THE_START" + b"x" * 300000)
 
     payload = _browser(tmp_path).folder(str(tmp_path), "")
 
     text = payload["logs"][0]["text"]
-    assert text.startswith("[showing the tail of the file]")
-    assert text.endswith("THE_END")
+    assert text.startswith("THE_START")
+    assert text.endswith("[truncated: showing the first 256 KB of 292 KB]")
     assert len(text) < 300000
 
 
