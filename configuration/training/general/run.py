@@ -65,8 +65,8 @@ class TrainingQueueConfig:
     clip_adaptive_percentile : float    = 95.0
     clip_adaptive_mean_std_k : float    = 2.0
 
-    patch_size           : tuple[int, int] = (64, 64)
-    patch_stride         : tuple[int, int] = (32, 32)
+    patch_size           : tuple[int, int] = (48, 24)
+    patch_stride         : tuple[int, int] = (24, 12)
     train_azimuth        : tuple[int, int] = (1000, 13000)
     val_azimuth          : tuple[int, int] = (13064, 14500)
     test_azimuth         : tuple[int, int] = (14564, 16000)
