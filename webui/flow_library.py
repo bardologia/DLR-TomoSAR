@@ -466,10 +466,10 @@ class FlowLibrary:
             },
             {
                 "id": "denorm", "title": "Denormalisation (inverse)", "phase": "Inverse",
-                "note": "The same per-channel statistics invert normalisation at loss and inference time; for log1p slots the log-domain argument is clipped to [log(1+floor), log(1+ceil)] with floor=0 and ceil=1000 before expm1, bounding the recovered physical value to [0, 1000].",
+                "note": "The same per-channel statistics invert normalisation at loss and inference time; for log1p slots the log-domain argument is clipped to [log(1+floor), log(1+ceil)] with floor=0 and ceil=200 before expm1, bounding the recovered physical value to [0, 200]. Non-log1p slots flagged clampable in normalization_stats.json (out/amp, out/sigma; never out/mu) pass their affine result through the same leaky log-space barrier via compress then decompress, so the bound holds identically in every normalisation arm; each channel group is transformed by indexed selection, never by evaluating both branches of a where.",
                 "inputs": ["xhat", "stats"], "outputs": ["xrec"],
                 "lines": [
-                    [{"id": "xrec", "tex": r"\tilde{\mathbf{x}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname{expm1}\!\big(\operatorname{clip}(\hat{x}_c s_c + \mu_c,\ \log(1{+}f),\ \log(1{+}c))\big)\ \ \text{(log1p)},\ \ \text{else } \hat{x}_c s_c + \mu_c,\quad (f,c)=(0,1000)"}],
+                    [{"id": "xrec", "tex": r"\tilde{\mathbf{x}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\operatorname{expm1}\!\big(\operatorname{clip}(\hat{x}_c s_c + \mu_c,\ \log(1{+}f),\ \log(1{+}c))\big)\ \ \text{(log1p)},\ \ \text{else } \hat{x}_c s_c + \mu_c,\quad (f,c)=(0,200)"}],
                 ],
             },
         ]
@@ -510,7 +510,7 @@ class FlowLibrary:
             },
             {
                 "id": "tdenorm", "title": "Denormalise predictions", "phase": "Reconstruction",
-                "note": "Each log1p-encoded output channel (out/amp, out/sigma) is inverted with expm1 after its pre-exponent value is clamped into [log(1+floor), log(1+ceil)] with a leaky slope of 0.1, holding the physical value inside [0, 1000] while keeping a gradient outside; the z-scored out/mu channel is inverted linearly.",
+                "note": "Each log1p-encoded output channel (out/amp, out/sigma) is inverted with expm1 after its pre-exponent value is clamped into [log(1+floor), log(1+ceil)] with a leaky slope of 0.1, holding the physical value inside [0, 200] while keeping a gradient outside; when a normalisation arm encodes out/amp or out/sigma without log1p, the affine result passes through the same leaky log-space barrier (compress then decompress, gated per channel by the clampable flag in normalization_stats.json). The z-scored out/mu channel is always inverted linearly.",
                 "inputs": ["thn"], "outputs": ["thp"],
                 "lines": [
                     [{"id": "thp", "tex": r"\hat{\theta}", "role": "calculated"}, {"tex": "="}, {"tex": r"\mathrm{expm1}\!\big(\mathrm{clamp}_{0.1}(\hat{\theta}_{\mathrm{n}}\,s + \ell,\ [\,0,\ \log(1{+}c_{\max})\,])\big)\ \ \text{(log1p)},\ \ \text{else } \hat{\theta}_{\mathrm{n}}\,s + \ell"}],
@@ -522,7 +522,7 @@ class FlowLibrary:
                 "inputs": ["thp"], "outputs": ["thp"],
                 "lines": [
                     [{"id": "thp", "tex": r"\hat{a}_k \in [0,a_{\max}],\ \ \hat{\mu}_k \in [x_{\min},x_{\max}],\ \ \hat{\sigma}_k \in \big[\tfrac{\Delta x}{2},\tfrac{x_{\max}-x_{\min}}{2}\big]", "role": "calculated"}],
-                    [{"tex": r"\mathrm{clamp}_{\mathrm{leaky}}(x) = \mathrm{clip}(x) + 0.1\,\big(x - \mathrm{clip}(x)\big),\qquad a_{\max}=1000"}],
+                    [{"tex": r"\mathrm{clamp}_{\mathrm{leaky}}(x) = \mathrm{clip}(x) + 0.1\,\big(x - \mathrm{clip}(x)\big),\qquad a_{\max}=200"}],
                 ],
             },
             {

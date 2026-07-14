@@ -671,7 +671,7 @@ class EquationLibrary:
                 {
                     "title" : "Inverse normalisation",
                     "tex"   : r"x_c = \exp\!\big(\hat{x}_c\,s_c + \mu_c\big) - 1\ \ \text{(log1p)}, \qquad x_c = \hat{x}_c\,s_c + \mu_c\ \ \text{(otherwise)}",
-                    "note"  : "Used to recover physical units during loss computation and inference; the recovered value is clamped to the configured physical bounds (default [0, 1000], applied as [log1p(floor), log1p(ceil)] on the exponent argument, transforms.py Log1pTransform).",
+                    "note"  : "Used to recover physical units during loss computation and inference; the recovered value is clamped to the configured physical bounds (default [0, 200]). For log1p channels the clamp acts as [log1p(floor), log1p(ceil)] on the exponent argument (transforms.py Log1pTransform); channels normalised without log1p but flagged clampable in normalization_stats.json (amplitude and sigma, never mu) pass through the same leaky log-space barrier via compress then decompress, so out-of-range excursions are compressed logarithmically instead of escaping the bound. Each channel group is transformed by indexed selection (normalizer.py), never by evaluating both branches of a where.",
                     "vars"  : [
                         {"sym": r"x_c",        "desc": "recovered physical-space value"},
                         {"sym": r"\hat{x}_c",  "desc": "normalised value of channel c"},
