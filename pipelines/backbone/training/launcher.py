@@ -144,7 +144,7 @@ class TrainScheduler:
         self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
 
         self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
-        self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root, pool_file=Path(config.gpus_file) if config.gpus_file else None)
+        self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root)
 
     def planner(self):
         mode = self.config.trials_mode

@@ -4,7 +4,7 @@ from .metrics       import FiniteScalar, MetricOrientation, R2, RelativeImprovem
 from .data          import CropRegion, FileIO, GaussianClamp, GaussianMixture, GaussianReconstructor, ProfileNormalizer, ProfilePreprocessor, SplitRegions
 from .diagnostics   import IssueDetector, LayerReport, StateDictResolver, WeightAnalyzer, WeightXray, XraySummarizer
 from .training      import BaseTrainer, Checkpoint, EarlyStopping, GradientClipper, MetricAggregator, Scheduler, Warmup
-from .orchestration import ExperimentStage, GpuJob, GpuJobResult, GpuQueue, ProcessPoolRunner, QueuedInferenceStage, QueuedTrainingStage
+from .orchestration import ExperimentStage, GpuJob, GpuJobResult, GpuPoolFile, GpuQueue, ProcessPoolRunner, QueuedInferenceStage, QueuedTrainingStage
 from .runtime       import CondaEnv, CondaJobDispatcher, Reproducibility, WorkerInitializer
 from .sar           import InterferogramLauncher, TomogramLauncher
 
@@ -33,6 +33,7 @@ __all__ = [
     "ExperimentStage",
     "GpuJob",
     "GpuJobResult",
+    "GpuPoolFile",
     "GpuQueue",
     "ProcessPoolRunner",
     "QueuedInferenceStage",

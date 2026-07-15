@@ -40,6 +40,7 @@ class PatchSweepConfig:
     augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
 
     gpus            : list[int]  = field(default_factory=lambda: [2, 3])
+    gpus_file       : str        = ""
     run_tag         : str | None = None
     resume          : bool       = True
     seed            : int        = 0

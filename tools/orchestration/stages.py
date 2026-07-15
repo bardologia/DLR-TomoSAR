@@ -7,7 +7,7 @@ from pathlib     import Path
 from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
-from tools.orchestration.gpu_queue import GpuJob, GpuQueue
+from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuQueue
 
 
 class ExperimentStage:
@@ -17,7 +17,7 @@ class ExperimentStage:
         self.run_tag      = run_tag
         self.logger       = logger
         self.run_dir      = Path(run_dir) if run_dir is not None else Path(config.paths.log_base_dir) / run_tag
-        self.pool_file    = Path(pool_file) if pool_file is not None else self.run_dir / "gpu_pool.json"
+        self.pool_file    = Path(pool_file) if pool_file is not None else GpuPoolFile.resolve(config.gpus_file, self.run_dir)
 
     def _run_queue(self, jobs: list[GpuJob]) -> list[dict]:
         queue = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s, pool_file=self.pool_file)

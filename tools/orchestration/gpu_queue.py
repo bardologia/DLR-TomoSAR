@@ -31,10 +31,16 @@ class GpuJobResult:
 
 class GpuPoolFile:
 
+    FILE_NAME = "gpu_pool.json"
+
     def __init__(self, path: Path, logger: Logger) -> None:
         self.path   = Path(path)
         self.logger = logger
         self.stamp  : int | None = None
+
+    @classmethod
+    def resolve(cls, configured: str, run_dir: Path) -> Path:
+        return Path(configured) if configured else Path(run_dir) / cls.FILE_NAME
 
     def _stamp(self) -> int | None:
         return self.path.stat().st_mtime_ns if self.path.exists() else None

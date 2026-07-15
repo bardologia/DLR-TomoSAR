@@ -26,6 +26,7 @@ def logger():
 def _config(tmp_path: Path, resume: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
         gpus            = [0, 1],
+        gpus_file       = "",
         poll_interval_s = 0.0,
         resume          = resume,
         paths           = SimpleNamespace(log_base_dir=str(tmp_path / "runs")),

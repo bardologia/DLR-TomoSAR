@@ -13,6 +13,7 @@ from pipelines.tuning.plots   import StudyPlotter
 from pipelines.tuning.tuners  import BestConfigWriter
 from tools                    import FileIO
 from tools                    import GpuJob
+from tools                    import GpuPoolFile
 from tools                    import GpuQueue
 from tools.monitoring.logger  import Logger
 from tools.runtime.config_cli import ConfigCli
@@ -89,7 +90,7 @@ class TuningScheduler:
 
             jobs.append(self._worker_job(model_name, n_trials, worker_index))
 
-        queue   = GpuQueue(gpus=self.config.gpus, logger=self.logger)
+        queue   = GpuQueue(gpus=self.config.gpus, logger=self.logger, pool_file=GpuPoolFile.resolve(self.config.gpus_file, self.run_dir))
         results = queue.run(jobs)
 
         return all(result.status == "DONE" for result in results)

@@ -715,6 +715,7 @@ class LaunchLayout:
             ],
             "sections": [
                 {"key": "sweep", "title": "Sweep", "panels": [
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
                     {"kind": "fields", "groups": [
                         {"title": "Output heads",    "fields": [{"path": "heads", "widget": MULTI_HEADS}]},
@@ -793,6 +794,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "folds", "title": "Folds", "panels": [
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "fields", "groups": [
                         {"title": "Fold layout", "fields": ["folds.n_folds", "folds.azimuth_start", "folds.azimuth_end", "folds.guard"]},
                     ]},
@@ -860,6 +862,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                 ]},
                 {"key": "sweep", "title": "Sweep", "panels": [
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "fields", "groups": [
                         {"title": "Datasets", "fields": ["dataset_base_path", {"path": "dataset_filter", "widget": PICK_DATASETS}]},
                         {"title": "Patch grid", "fields": ["patch.minimum", "patch.maximum", "patch.step", "patch.stride_ratio", "patch.constant_pixel_budget"]},
@@ -893,6 +896,7 @@ class LaunchLayout:
             ],
             "sections": [
                 {"key": "search", "title": "Search", "panels": [
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
                     {"kind": "fields", "title": "Optuna search", "groups": [
                         {"title": "Output heads", "fields": [{"path": "heads", "widget": MULTI_HEADS}]},

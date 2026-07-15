@@ -45,6 +45,7 @@ def _make_config(tmp_path: Path, n_trials: int = 10):
         tuning        = tuning,
         training_type = "backbone",
         gpus          = [0, 1, 2],
+        gpus_file     = "",
         skip_models   = [],
     )
 
