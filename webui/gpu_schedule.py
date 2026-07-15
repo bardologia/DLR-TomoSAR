@@ -12,20 +12,14 @@ from project_paths   import ProjectPaths
 from web_logger      import WebLogger
 
 
-class WeekWindow:
+class Window:
 
-    DAYS         = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-    DAY_MINUTES  = 24 * 60
-    BOUNDS       = {"start_day": 6, "start_hour": 23, "end_day": 6, "end_hour": 23}
-
-    def __init__(self, start_day: int, start_hour: int, end_day: int, end_hour: int) -> None:
-        self.start_day  = start_day
-        self.start_hour = start_hour
-        self.end_day    = end_day
-        self.end_hour   = end_hour
+    DAY_MINUTES = 24 * 60
+    BOUNDS      = {}
+    SAME_MOMENT = ""
 
     @classmethod
-    def validate(cls, payload: dict) -> "WeekWindow":
+    def validate(cls, payload: dict) -> "Window":
         values = {}
 
         for key, maximum in cls.BOUNDS.items():
@@ -36,18 +30,12 @@ class WeekWindow:
 
         window = cls(**values)
         if window.start_minute() == window.end_minute():
-            raise ValueError("the weekend window starts and ends at the same moment, so it would never switch")
+            raise ValueError(cls.SAME_MOMENT)
 
         return window
 
-    def start_minute(self) -> int:
-        return self.start_day * self.DAY_MINUTES + self.start_hour * 60
-
-    def end_minute(self) -> int:
-        return self.end_day * self.DAY_MINUTES + self.end_hour * 60
-
     def contains(self, moment: datetime) -> bool:
-        now   = moment.weekday() * self.DAY_MINUTES + moment.hour * 60 + moment.minute
+        now   = self.minute_of(moment)
         start = self.start_minute()
         end   = self.end_minute()
 
@@ -56,6 +44,28 @@ class WeekWindow:
 
         return now >= start or now < end
 
+
+class WeekWindow(Window):
+
+    DAYS        = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+    BOUNDS      = {"start_day": 6, "start_hour": 23, "end_day": 6, "end_hour": 23}
+    SAME_MOMENT = "the weekend window starts and ends at the same moment, so it would never switch"
+
+    def __init__(self, start_day: int, start_hour: int, end_day: int, end_hour: int) -> None:
+        self.start_day  = start_day
+        self.start_hour = start_hour
+        self.end_day    = end_day
+        self.end_hour   = end_hour
+
+    def minute_of(self, moment: datetime) -> int:
+        return moment.weekday() * self.DAY_MINUTES + moment.hour * 60 + moment.minute
+
+    def start_minute(self) -> int:
+        return self.start_day * self.DAY_MINUTES + self.start_hour * 60
+
+    def end_minute(self) -> int:
+        return self.end_day * self.DAY_MINUTES + self.end_hour * 60
+
     def label(self) -> str:
         return f"{self.DAYS[self.start_day]} {self.start_hour:02d}:00 to {self.DAYS[self.end_day]} {self.end_hour:02d}:00"
 
@@ -63,20 +73,48 @@ class WeekWindow:
         return {"start_day": self.start_day, "start_hour": self.start_hour, "end_day": self.end_day, "end_hour": self.end_hour}
 
 
+class NightWindow(Window):
+
+    BOUNDS      = {"night_start_hour": 23, "night_end_hour": 23}
+    SAME_MOMENT = "the night window starts and ends at the same hour, so it would never switch"
+
+    def __init__(self, night_start_hour: int, night_end_hour: int) -> None:
+        self.night_start_hour = night_start_hour
+        self.night_end_hour   = night_end_hour
+
+    def minute_of(self, moment: datetime) -> int:
+        return moment.hour * 60 + moment.minute
+
+    def start_minute(self) -> int:
+        return self.night_start_hour * 60
+
+    def end_minute(self) -> int:
+        return self.night_end_hour * 60
+
+    def label(self) -> str:
+        return f"{self.night_start_hour:02d}:00 to {self.night_end_hour:02d}:00 every day"
+
+    def as_dict(self) -> dict:
+        return {"night_start_hour": self.night_start_hour, "night_end_hour": self.night_end_hour}
+
+
 class GpuSchedule:
 
     INTERVAL  = 30.0
     FILE_NAME = "gpu_schedule.json"
-    GPU_KEYS  = ("weekday_gpus", "weekend_gpus")
+    GPU_KEYS  = ("weekday_gpus", "night_gpus", "weekend_gpus")
 
     DEFAULTS = {
-        "enabled"      : False,
-        "weekday_gpus" : [0],
-        "weekend_gpus" : [0, 1, 2, 3],
-        "start_day"    : 4,
-        "start_hour"   : 18,
-        "end_day"      : 0,
-        "end_hour"     : 8,
+        "enabled"          : False,
+        "weekday_gpus"     : [2, 3],
+        "night_gpus"       : [0, 1, 2, 3],
+        "weekend_gpus"     : [0, 1, 2, 3],
+        "start_day"        : 4,
+        "start_hour"       : 18,
+        "end_day"          : 0,
+        "end_hour"         : 8,
+        "night_start_hour" : 20,
+        "night_end_hour"   : 8,
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager) -> None:
@@ -112,7 +150,7 @@ class GpuSchedule:
         if not isinstance(payload["enabled"], bool):
             raise ValueError(f"'enabled' must be true or false, got {payload['enabled']!r}")
 
-        settings = {"enabled": payload["enabled"], **WeekWindow.validate(payload).as_dict()}
+        settings = {"enabled": payload["enabled"], **WeekWindow.validate(payload).as_dict(), **NightWindow.validate(payload).as_dict()}
 
         for key in cls.GPU_KEYS:
             gpus = GpuPoolFile.validate({"gpus": payload[key]})
@@ -122,12 +160,22 @@ class GpuSchedule:
 
         return settings
 
-    def window(self) -> WeekWindow:
+    def week_window(self) -> WeekWindow:
         with self.lock:
             return WeekWindow(self.settings["start_day"], self.settings["start_hour"], self.settings["end_day"], self.settings["end_hour"])
 
+    def night_window(self) -> NightWindow:
+        with self.lock:
+            return NightWindow(self.settings["night_start_hour"], self.settings["night_end_hour"])
+
     def phase(self, moment: datetime) -> str:
-        return "weekend" if self.window().contains(moment) else "weekday"
+        if self.week_window().contains(moment):
+            return "weekend"
+
+        if self.night_window().contains(moment):
+            return "night"
+
+        return "weekday"
 
     def gpus_for(self, phase: str) -> list[int]:
         with self.lock:
@@ -188,11 +236,12 @@ class GpuSchedule:
 
         return {
             **settings,
-            "phase"     : phase,
-            "gpus_now"  : list(settings[f"{phase}_gpus"]),
-            "window"    : self.window().label(),
-            "last_tick" : last,
-            "path"      : str(self.path),
+            "phase"        : phase,
+            "gpus_now"     : list(settings[f"{phase}_gpus"]),
+            "window"       : self.week_window().label(),
+            "night_window" : self.night_window().label(),
+            "last_tick"    : last,
+            "path"         : str(self.path),
         }
 
     def update(self, payload) -> dict:
@@ -207,6 +256,6 @@ class GpuSchedule:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
 
-        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, weekday {settings['weekday_gpus']}, weekend {settings['weekend_gpus']}")
+        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, weekday {settings['weekday_gpus']}, night {settings['night_gpus']}, weekend {settings['weekend_gpus']}")
 
         return {"ok": True, **self.state()}

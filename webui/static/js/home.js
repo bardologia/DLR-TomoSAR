@@ -46,11 +46,14 @@ class GpuWeekPanel {
     const payload = {
       enabled: !!enabled,
       weekday_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekday")),
+      night_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-night")),
       weekend_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekend")),
       start_day: this._value("sb-sch-startday"),
       start_hour: this._value("sb-sch-starthour"),
       end_day: this._value("sb-sch-endday"),
       end_hour: this._value("sb-sch-endhour"),
+      night_start_hour: this._value("sb-sch-nightstart"),
+      night_end_hour: this._value("sb-sch-nightend"),
     };
 
     const res = await window.apiPost("/api/gpu-schedule", payload);
@@ -85,8 +88,8 @@ class GpuWeekPanel {
     }
     if (hint) {
       hint.textContent = on
-        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")} · weekend is ${state.window}`
-        : `off — weekend would be ${state.window}`;
+        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")} · night ${state.night_window} · weekend ${state.window}`
+        : `off — night would be ${state.night_window}, weekend ${state.window}`;
     }
 
     if (this.seeded) return;
@@ -98,11 +101,14 @@ class GpuWeekPanel {
     };
 
     set("sb-sch-weekday", (state.weekday_gpus || []).join(","));
+    set("sb-sch-night", (state.night_gpus || []).join(","));
     set("sb-sch-weekend", (state.weekend_gpus || []).join(","));
     set("sb-sch-startday", state.start_day);
     set("sb-sch-starthour", state.start_hour);
     set("sb-sch-endday", state.end_day);
     set("sb-sch-endhour", state.end_hour);
+    set("sb-sch-nightstart", state.night_start_hour);
+    set("sb-sch-nightend", state.night_end_hour);
   }
 }
 
@@ -239,14 +245,17 @@ class StatusBoard {
       `<div class="strip__seg">` +
       `<i class="wd__light" id="sb-sch-light" aria-hidden="true"></i><span class="wd__label">gpu week</span><span class="wd__mode" id="sb-sch-mode">--</span></div>` +
       `<i class="strip__div" aria-hidden="true"></i>` +
-      `<label class="ntf__field"><span class="ntf__key">weekday</span><input class="ntf__input ntf__input--gpus" id="sb-sch-weekday" type="text" placeholder="0" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">weekday</span><input class="ntf__input ntf__input--gpus" id="sb-sch-weekday" type="text" placeholder="2,3" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">night</span><input class="ntf__input ntf__input--gpus" id="sb-sch-night" type="text" placeholder="0,1,2,3" spellcheck="false" autocomplete="off"></label>` +
       `<label class="ntf__field"><span class="ntf__key">weekend</span><input class="ntf__input ntf__input--gpus" id="sb-sch-weekend" type="text" placeholder="0,1,2,3" spellcheck="false" autocomplete="off"></label>` +
-      `<label class="ntf__field"><span class="ntf__key">from</span><select class="ntf__input ntf__input--day" id="sb-sch-startday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-starthour">${GpuWeekPanel.hourOptions()}</select></label>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<label class="ntf__field"><span class="ntf__key">night from</span><select class="ntf__input ntf__input--hour" id="sb-sch-nightstart">${GpuWeekPanel.hourOptions()}</select><span class="ntf__key">to</span><select class="ntf__input ntf__input--hour" id="sb-sch-nightend">${GpuWeekPanel.hourOptions()}</select></label>` +
+      `<label class="ntf__field"><span class="ntf__key">weekend from</span><select class="ntf__input ntf__input--day" id="sb-sch-startday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-starthour">${GpuWeekPanel.hourOptions()}</select></label>` +
       `<label class="ntf__field"><span class="ntf__key">to</span><select class="ntf__input ntf__input--day" id="sb-sch-endday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-endhour">${GpuWeekPanel.hourOptions()}</select></label>` +
-      `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the weekend pool when the window opens and back onto the weekday pool when it closes. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
+      `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the pool of the phase they cross into: the weekend window wins, otherwise the night pool applies between the night hours and the weekday pool covers the rest. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
       `<div class="strip__actions">` +
-      `<button type="button" class="impact__arm" id="sb-sch-save" title="Save the weekday and weekend GPU pools">save</button>` +
-      `<button type="button" class="impact__arm" id="sb-sch-toggle" title="Toggle the automatic weekday/weekend GPU switch">schedule: --</button>` +
+      `<button type="button" class="impact__arm" id="sb-sch-save" title="Save the weekday, night and weekend GPU pools">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-sch-toggle" title="Toggle the automatic weekday/night/weekend GPU switch">schedule: --</button>` +
       `</div>` +
       `</section>` +
 

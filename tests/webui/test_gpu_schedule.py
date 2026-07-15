@@ -13,7 +13,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from gpu_schedule import GpuSchedule, WeekWindow
+from gpu_schedule import GpuSchedule, NightWindow, WeekWindow
 from web_logger   import WebLogger
 
 FRIDAY_MORNING   = datetime(2026, 7, 17, 9, 0)
@@ -23,6 +23,9 @@ SUNDAY_NIGHT     = datetime(2026, 7, 19, 23, 30)
 MONDAY_EARLY     = datetime(2026, 7, 20, 7, 30)
 MONDAY_WORKDAY   = datetime(2026, 7, 20, 9, 0)
 WEDNESDAY        = datetime(2026, 7, 22, 15, 0)
+WEDNESDAY_NIGHT  = datetime(2026, 7, 22, 21, 0)
+THURSDAY_EARLY   = datetime(2026, 7, 23, 2, 0)
+THURSDAY_WORKDAY = datetime(2026, 7, 23, 9, 0)
 
 
 class StubPaths:
@@ -90,11 +93,45 @@ def test_window_boundaries_are_inclusive_at_the_start_and_exclusive_at_the_end()
     assert window.contains(datetime(2026, 7, 20, 8, 0))  is False
 
 
+def test_default_night_window_spans_the_evening_to_the_next_morning():
+    window = NightWindow(**{key: GpuSchedule.DEFAULTS[key] for key in ("night_start_hour", "night_end_hour")})
+
+    assert window.contains(WEDNESDAY_NIGHT)   is True
+    assert window.contains(THURSDAY_EARLY)    is True
+    assert window.contains(datetime(2026, 7, 22, 20, 0)) is True
+
+    assert window.contains(WEDNESDAY)         is False
+    assert window.contains(THURSDAY_WORKDAY)  is False
+    assert window.contains(datetime(2026, 7, 22, 19, 59)) is False
+    assert window.contains(datetime(2026, 7, 23, 8, 0))   is False
+
+
 def test_phase_names_follow_the_window(schedule):
     scheduler, _processes = schedule
 
-    assert scheduler.phase(SATURDAY)       == "weekend"
-    assert scheduler.phase(MONDAY_WORKDAY) == "weekday"
+    assert scheduler.phase(SATURDAY)         == "weekend"
+    assert scheduler.phase(MONDAY_WORKDAY)   == "weekday"
+    assert scheduler.phase(WEDNESDAY_NIGHT)  == "night"
+    assert scheduler.phase(THURSDAY_EARLY)   == "night"
+
+
+def test_the_weekend_window_outranks_the_night_window(schedule):
+    scheduler, _processes = schedule
+
+    assert scheduler.phase(SUNDAY_NIGHT)   == "weekend"
+    assert scheduler.phase(FRIDAY_EVENING) == "weekend"
+
+
+def test_transition_into_the_night_grows_the_pool_and_the_morning_shrinks_it(schedule):
+    scheduler, processes = schedule
+    processes.add_running_fan_out("job1")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    scheduler.tick(THURSDAY_EARLY)
+    scheduler.tick(THURSDAY_WORKDAY)
+
+    assert processes.writes == [("job1", [0, 1, 2, 3]), ("job1", [2, 3])]
 
 
 def test_first_tick_records_the_phase_without_touching_the_launch_selection(schedule):
@@ -124,7 +161,7 @@ def test_transition_back_to_the_week_shrinks_the_pool(schedule):
     scheduler.tick(SATURDAY)
     scheduler.tick(MONDAY_WORKDAY)
 
-    assert processes.writes == [("job1", [0])]
+    assert processes.writes == [("job1", [2, 3])]
 
 
 def test_ticks_inside_one_phase_never_rewrite_the_pool(schedule):
@@ -149,7 +186,7 @@ def test_a_manual_resize_survives_until_the_next_transition(schedule):
     assert processes.writes == []
 
     scheduler.tick(MONDAY_WORKDAY)
-    assert processes.writes == [("job1", [0])]
+    assert processes.writes == [("job1", [2, 3])]
 
 
 def test_a_disabled_schedule_tracks_phases_without_writing(schedule):
@@ -190,7 +227,7 @@ def test_finished_jobs_are_forgotten(schedule):
 
 def test_update_persists_and_reloads(tmp_path):
     processes = StubProcesses()
-    payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "weekday_gpus": [1], "weekend_gpus": [0, 1, 2]}
+    payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "weekday_gpus": [1], "night_gpus": [1, 2], "weekend_gpus": [0, 1, 2]}
 
     scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes)
     result    = scheduler.update(payload)
@@ -202,6 +239,7 @@ def test_update_persists_and_reloads(tmp_path):
 
     assert reloaded.settings["enabled"]      is True
     assert reloaded.settings["weekday_gpus"] == [1]
+    assert reloaded.settings["night_gpus"]   == [1, 2]
     assert reloaded.settings["weekend_gpus"] == [0, 1, 2]
 
 
@@ -210,9 +248,10 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
 
     state = scheduler.state()
 
-    assert state["phase"] in ("weekday", "weekend")
+    assert state["phase"] in ("weekday", "night", "weekend")
     assert state["gpus_now"] == state[f"{state['phase']}_gpus"]
     assert "friday 18:00 to monday 08:00" == state["window"]
+    assert "20:00 to 08:00 every day"     == state["night_window"]
 
 
 @pytest.mark.parametrize("payload, reason", [
@@ -222,7 +261,10 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
     ({"weekday_gpus": [-1]},                "non-negative"),
     ({"start_day": 9},                      "[0, 6]"),
     ({"start_hour": 24},                    "[0, 23]"),
+    ({"night_gpus": []},                    "at least one GPU"),
+    ({"night_start_hour": 24},              "[0, 23]"),
     ({"start_day": 4, "start_hour": 18, "end_day": 4, "end_hour": 18}, "never switch"),
+    ({"night_start_hour": 20, "night_end_hour": 20}, "never switch"),
 ])
 def test_update_rejects_an_invalid_schedule(tmp_path, payload, reason):
     scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses())
