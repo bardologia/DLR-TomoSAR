@@ -210,6 +210,7 @@ class TrainScheduler:
             "Seeds"         : seeds,
             "GPU jobs"      : len(units),
             "GPUs"          : self.config.gpus,
+            "GPU pool file" : str(self.stage.pool_file),
             "Infer after"   : self.config.infer_after,
             "CLI overrides" : self.forward_overrides or "—",
             "Log dir"       : str(self.log_dir),

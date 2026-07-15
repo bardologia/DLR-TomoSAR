@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
+import os
 import signal
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
-from tools.orchestration.gpu_queue import GpuJob, GpuQueue, GpuJobResult
+from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuQueue, GpuJobResult
 
 
 class NullLogger:
@@ -16,6 +20,17 @@ class NullLogger:
     def warning(self, *a, **k):    pass
     def error(self, *a, **k):      pass
     def kv_table(self, *a, **k):   pass
+
+
+class RecordingLogger(NullLogger):
+    def __init__(self) -> None:
+        self.errors   = []
+        self.warnings = []
+        self.infos    = []
+
+    def info(self, message, *a, **k):    self.infos.append(str(message))
+    def warning(self, message, *a, **k): self.warnings.append(str(message))
+    def error(self, message, *a, **k):   self.errors.append(str(message))
 
 
 @pytest.fixture
@@ -187,6 +202,227 @@ def test_mixed_success_and_failure(tmp_path, logger):
     assert by_name["good"].status == "DONE"
     assert by_name["bad"].status  == "FAILED"
     assert by_name["bad"].returncode == 3
+
+
+def _write_pool(path: Path, payload) -> None:
+    path.write_text(payload if isinstance(payload, str) else json.dumps({"gpus": payload}))
+
+    stamp = path.stat().st_mtime_ns + 1_000_000
+    os.utime(path, ns=(stamp, stamp))
+
+
+def _pool_queue(tmp_path: Path, gpus: list[int], logger=None, poll_interval_s: float = 0.0):
+    pool  = tmp_path / "gpu_pool.json"
+    queue = GpuQueue(gpus=gpus, logger=logger or NullLogger(), poll_interval_s=poll_interval_s, handle_signals=False, pool_file=pool)
+
+    return queue, pool
+
+
+class _DoneProcess:
+    returncode = 0
+
+    def poll(self) -> int:
+        return 0
+
+
+class _NullHandle:
+    def close(self) -> None:
+        pass
+
+
+def test_run_seeds_the_pool_file_with_the_launch_selection(tmp_path, logger):
+    queue, pool = _pool_queue(tmp_path, [0, 1])
+    queue.run([_job(tmp_path, "a", _ok_command())])
+
+    assert json.loads(pool.read_text()) == {"gpus": [0, 1]}
+
+
+def test_queue_without_pool_file_writes_no_control_file(tmp_path, logger):
+    queue = GpuQueue(gpus=[0], logger=logger, poll_interval_s=0.0, handle_signals=False)
+    queue.run([_job(tmp_path, "a", _ok_command())])
+
+    assert not (tmp_path / "gpu_pool.json").exists()
+
+
+def test_reconcile_adds_requested_gpus_to_the_idle_pool(tmp_path):
+    queue, pool = _pool_queue(tmp_path, [0])
+    gpu_pool    = [0]
+
+    _write_pool(pool, [0, 1, 2])
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool      == [0, 1, 2]
+    assert queue.retiring == set()
+
+
+def test_reconcile_drops_an_idle_gpu_immediately(tmp_path):
+    queue, pool = _pool_queue(tmp_path, [0, 1])
+    gpu_pool    = [0, 1]
+
+    _write_pool(pool, [0])
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool       == [0]
+    assert queue.retiring == set()
+
+
+def test_reconcile_retires_a_busy_gpu_instead_of_killing_its_job(tmp_path):
+    queue, pool   = _pool_queue(tmp_path, [0, 1])
+    queue.running = [{"gpu": 1}]
+    gpu_pool      = [0]
+
+    _write_pool(pool, [0])
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool       == [0]
+    assert queue.retiring == {1}
+
+
+def test_reaped_retiring_gpu_is_not_returned_to_the_pool(tmp_path, logger):
+    queue, _pool = _pool_queue(tmp_path, [0, 1])
+    record       = {"job": _job(tmp_path, "a", _ok_command()), "gpu": 1, "process": _DoneProcess(), "log_fh": _NullHandle(), "started": time.monotonic()}
+
+    queue.running  = [record]
+    queue.retiring = {1}
+    gpu_pool       = [0]
+    results        = []
+
+    queue._reap(queue.running, gpu_pool, results)
+
+    assert gpu_pool          == [0]
+    assert queue.retiring    == set()
+    assert results[0].status == "DONE"
+    assert results[0].gpu    == 1
+
+
+def test_re_adding_a_retiring_gpu_cancels_the_drain(tmp_path):
+    queue, pool   = _pool_queue(tmp_path, [0, 1])
+    queue.running = [{"gpu": 1}]
+    gpu_pool      = [0]
+
+    _write_pool(pool, [0])
+    queue._reconcile(gpu_pool, [])
+    assert queue.retiring == {1}
+
+    _write_pool(pool, [0, 1])
+    queue._reconcile(gpu_pool, [])
+
+    assert queue.retiring == set()
+    assert gpu_pool       == [0]
+
+
+def test_unchanged_pool_file_is_not_re_read(tmp_path):
+    queue, pool = _pool_queue(tmp_path, [0])
+    gpu_pool    = [0]
+
+    _write_pool(pool, [0, 1])
+    queue._reconcile(gpu_pool, [])
+    assert gpu_pool == [0, 1]
+
+    gpu_pool.remove(1)
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool == [0]
+
+
+@pytest.mark.parametrize("payload", [
+    "not json at all",
+    '{"gpus": 3}',
+    '{"gpus": [0, "one"]}',
+    '{"gpus": [0, -1]}',
+    '{"gpus": [0, 0]}',
+    '{"gpus": [0, true]}',
+    '[0, 1]',
+    '{"devices": [0, 1]}',
+])
+def test_invalid_pool_edit_is_rejected_loudly_and_leaves_the_pool_unchanged(tmp_path, payload):
+    recorder    = RecordingLogger()
+    queue, pool = _pool_queue(tmp_path, [0], recorder)
+    gpu_pool    = [0]
+
+    _write_pool(pool, payload)
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool == [0]
+    assert recorder.errors
+    assert "unchanged" in recorder.errors[0]
+
+
+def test_pool_edit_is_applied_after_an_invalid_edit_is_fixed(tmp_path):
+    recorder    = RecordingLogger()
+    queue, pool = _pool_queue(tmp_path, [0], recorder)
+    gpu_pool    = [0]
+
+    _write_pool(pool, "{oops")
+    queue._reconcile(gpu_pool, [])
+    assert gpu_pool == [0]
+
+    _write_pool(pool, [0, 1])
+    queue._reconcile(gpu_pool, [])
+
+    assert gpu_pool == [0, 1]
+
+
+def test_empty_pool_parks_the_queue_and_warns(tmp_path):
+    recorder    = RecordingLogger()
+    queue, pool = _pool_queue(tmp_path, [0], recorder)
+    gpu_pool    = [0]
+
+    _write_pool(pool, [])
+    queue._reconcile(gpu_pool, [_job(tmp_path, "waiting", _ok_command())])
+
+    assert gpu_pool == []
+    assert any("parked" in warning for warning in recorder.warnings)
+
+
+def _sleeper_command(capture: Path, seconds: float) -> list[str]:
+    body = f"import sys, time; open(r'{capture}','a').write(sys.argv[-1]+'\\n'); time.sleep({seconds})"
+    return [sys.executable, "-c", body]
+
+
+def test_pool_growth_mid_run_dispatches_queued_jobs_to_the_new_gpus(tmp_path):
+    capture = tmp_path / "gpu_seen.txt"
+    command = _sleeper_command(capture, 0.8)
+    jobs    = [_job(tmp_path, f"j{i}", [*command]) for i in range(4)]
+
+    queue, pool = _pool_queue(tmp_path, [0], poll_interval_s=0.02)
+
+    def grow() -> None:
+        time.sleep(0.25)
+        _write_pool(pool, [0, 1, 2])
+
+    thread = threading.Thread(target=grow, daemon=True)
+    thread.start()
+    results = queue.run(jobs)
+    thread.join()
+
+    assert len(results) == 4
+    assert all(result.status == "DONE" for result in results)
+    assert {1, 2} <= {result.gpu for result in results}
+
+
+def test_pool_shrink_mid_run_stops_dispatching_to_the_removed_gpu(tmp_path):
+    capture = tmp_path / "gpu_seen.txt"
+    command = _sleeper_command(capture, 0.5)
+    jobs    = [_job(tmp_path, f"j{i}", [*command]) for i in range(4)]
+
+    queue, pool = _pool_queue(tmp_path, [0, 1], poll_interval_s=0.02)
+
+    def shrink() -> None:
+        time.sleep(0.2)
+        _write_pool(pool, [0])
+
+    thread = threading.Thread(target=shrink, daemon=True)
+    thread.start()
+    results = queue.run(jobs)
+    thread.join()
+
+    by_name = {result.name: result for result in results}
+
+    assert len(results) == 4
+    assert all(result.status == "DONE" for result in results)
+    assert by_name["j2"].gpu == 0
+    assert by_name["j3"].gpu == 0
 
 
 def test_signal_handlers_restored_after_run(tmp_path):

@@ -11,15 +11,16 @@ from tools.orchestration.gpu_queue import GpuJob, GpuQueue
 
 
 class ExperimentStage:
-    def __init__(self, config, run_tag: str, logger: Logger, entry_script: Path | None = None, run_dir: Path | None = None) -> None:
+    def __init__(self, config, run_tag: str, logger: Logger, entry_script: Path | None = None, run_dir: Path | None = None, pool_file: Path | None = None) -> None:
         self.config       = config
         self.entry_script = entry_script
         self.run_tag      = run_tag
         self.logger       = logger
         self.run_dir      = Path(run_dir) if run_dir is not None else Path(config.paths.log_base_dir) / run_tag
+        self.pool_file    = Path(pool_file) if pool_file is not None else self.run_dir / "gpu_pool.json"
 
     def _run_queue(self, jobs: list[GpuJob]) -> list[dict]:
-        queue = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s)
+        queue = GpuQueue(gpus=self.config.gpus, logger=self.logger, poll_interval_s=self.config.poll_interval_s, pool_file=self.pool_file)
         return [asdict(result) for result in queue.run(jobs)]
 
     def _order_results(self, results: list[dict], names: list[str]) -> list[dict]:
