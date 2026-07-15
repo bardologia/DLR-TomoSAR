@@ -18,7 +18,7 @@ from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.run_naming      import RunNaming
-from pipelines.shared.training.seed_sweep      import SeedSweepRunner
+from pipelines.shared.training.seed_sweep      import SeedSet, SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
 from tools.orchestration      import ExperimentStage, GpuJob
 from tools.monitoring.logger  import Logger
@@ -177,6 +177,12 @@ class TrainScheduler:
 
         raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'head', 'augmentation', 'normalization' or 'ablation'")
 
+    def _seed_units(self, experiments: list[tuple[str, dict]], seeds: list[int]) -> list[tuple[str, dict]]:
+        if len(seeds) == 1:
+            return list(experiments)
+
+        return [(SeedSet.run_name(base, seed), {**overrides, "seed": seed, "seeds": (seed,)}) for base, overrides in experiments for seed in seeds]
+
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
         argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name, "logdir": str(self.runs_root)})
 
@@ -192,6 +198,8 @@ class TrainScheduler:
     def run(self) -> None:
         planner     = self.planner()
         experiments = planner.plan()
+        seeds       = SeedSet.resolve(self.config.seeds, self.config.seed)
+        units       = self._seed_units(experiments, seeds)
 
         self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
@@ -199,14 +207,16 @@ class TrainScheduler:
             "Mode"          : self.config.trials_mode,
             **planner.summary(),
             "Trials"        : len(experiments),
+            "Seeds"         : seeds,
+            "GPU jobs"      : len(units),
             "GPUs"          : self.config.gpus,
             "Infer after"   : self.config.infer_after,
             "CLI overrides" : self.forward_overrides or "—",
             "Log dir"       : str(self.log_dir),
         }, title="Configuration")
 
-        jobs    = [self._job(run_name, overrides) for run_name, overrides in experiments]
-        names   = [run_name for run_name, overrides in experiments]
+        jobs    = [self._job(run_name, overrides) for run_name, overrides in units]
+        names   = [run_name for run_name, overrides in units]
         results = self.stage._order_results(self.stage._run_queue(jobs), names)
 
         self.stage._write_results(results, self.results_path)

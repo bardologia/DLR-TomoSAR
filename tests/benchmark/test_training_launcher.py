@@ -187,6 +187,66 @@ def test_normalization_scheduler_plans_the_cumulative_ladder(tmp_path):
     assert all("normalization.out_mu" not in overrides for overrides in plans.values())
 
 
+def test_scheduler_fans_out_one_gpu_job_per_trial_seed(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "augmentation"
+    config.seeds       = [0, 1]
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={"seeds": [0, 1]}, entry_script=Path("/entry/train_backbone.py"))
+
+    units = scheduler._seed_units(scheduler.planner().plan(), [0, 1])
+
+    assert [name for name, _ in units]              == ["aug-on/seed0", "aug-on/seed1", "aug-off/seed0", "aug-off/seed1"]
+    assert [overrides["seed"] for _, overrides in units]  == [0, 1, 0, 1]
+    assert [overrides["seeds"] for _, overrides in units] == [(0,), (1,), (0,), (1,)]
+
+    job  = scheduler._job(*units[1])
+    argv = job.command
+
+    assert argv[argv.index("--seed") + 1]  == "1"
+    assert argv[argv.index("--seeds") + 1] == "[1]"
+    assert argv.count("--seeds")           == 1
+    assert job.log_path                    == tmp_path / "augmentation" / "batch_train_logs" / "aug-on" / "seed1.log"
+
+
+def test_scheduler_keeps_single_seed_trials_unexpanded(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "augmentation"
+    config.seeds       = [7]
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    plans = scheduler.planner().plan()
+    units = scheduler._seed_units(plans, [7])
+
+    assert units == plans
+    assert all("seed" not in overrides and "seeds" not in overrides for _, overrides in units)
+
+
+def test_scheduler_run_dispatches_per_seed_jobs(tmp_path, monkeypatch):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "augmentation"
+    config.seeds       = [0, 1]
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    captured = {}
+
+    def fake_run_queue(jobs):
+        captured["jobs"] = jobs
+        return [{"name": job.name, "gpu": 0, "status": "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    monkeypatch.setattr(scheduler.stage, "_run_queue", fake_run_queue)
+
+    scheduler.run()
+
+    assert [job.name for job in captured["jobs"]] == ["aug-on/seed0", "aug-on/seed1", "aug-off/seed0", "aug-off/seed1"]
+    assert scheduler.results_path.is_file()
+
+
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):
     for mode in ("curriculum", "warmup", "presence", "physics", "pair", "secondary", "patch", "input", "context", "head", "augmentation", "normalization", "ablation"):
         config             = BackboneEntryConfig()
