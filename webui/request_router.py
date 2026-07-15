@@ -14,7 +14,8 @@ from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
 from equation_library       import EquationLibrary
 from flow_library           import FlowLibrary
-from gpu_watchdog            import GpuWatchdog
+from gpu_schedule           import GpuSchedule
+from gpu_watchdog           import GpuWatchdog
 from launch_layout           import LaunchLayout, LayoutError
 from backbone_model_library          import BackboneModelLibrary
 from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
@@ -47,7 +48,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -70,7 +71,8 @@ class RequestRouter:
         self.system      = system
         self.watchdog    = watchdog
         self.contention  = contention
-        self.gpu_guard   = gpu_guard
+        self.gpu_guard    = gpu_guard
+        self.gpu_schedule = gpu_schedule
         self.tensorboard = tensorboard
         self.results     = results
         self.cubes       = cubes
@@ -423,7 +425,8 @@ class RequestRouter:
             payload              = self.system.snapshot()
             payload["alerts"]    = self.watchdog.state()
             payload["impact"]    = self.contention.state()
-            payload["gpu_guard"] = self.gpu_guard.state()
+            payload["gpu_guard"]    = self.gpu_guard.state()
+            payload["gpu_schedule"] = self.gpu_schedule.state()
             payload["server"]    = self.detacher.state()
             payload["notify"]    = self.notifier.state()
             self._send_json(handler, payload)
@@ -469,6 +472,11 @@ class RequestRouter:
         if path.startswith("/api/jobs/") and path.endswith("/gpus"):
             job_id = path[len("/api/jobs/"):-len("/gpus")]
             result = self.processes.set_gpus(job_id, body.get("gpus"), park=bool(body.get("park")))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/gpu-schedule":
+            result = self.gpu_schedule.update(body)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

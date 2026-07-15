@@ -701,6 +701,13 @@ main { margin-left: var(--navw); }
 .ntf__hint { font-family: var(--mono); font-size: 10.5px; color: var(--dk-faint); line-height: 1.5; min-width: 0; }
 @media (max-width: 1280px) { .ntf__hint { display: none; } }
 
+/* gpu week schedule */
+.sboard--sched { gap: 14px; }
+.ntf__input--gpus { width: 84px; }
+.ntf__input--day { width: 62px; padding: 6px 4px; }
+.ntf__input--hour { width: 74px; padding: 6px 4px; }
+.sboard--sched .ntf__field { gap: 6px; }
+
 /* neighbour impact */
 .impact__light { width: 9px; height: 9px; border-radius: 50%; background: var(--dk-faint); flex: 0 0 auto; }
 .impact__light.is-clear  { background: var(--dk-acc2); box-shadow: 0 0 8px rgba(45, 212, 191, 0.6); }

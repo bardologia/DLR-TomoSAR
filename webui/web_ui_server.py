@@ -9,6 +9,7 @@ from cube_explorer                      import CubeExplorer
 from dataset_browser                    import DatasetBrowser
 from equation_library                   import EquationLibrary
 from flow_library                       import FlowLibrary
+from gpu_schedule                       import GpuSchedule
 from gpu_watchdog                       import GpuWatchdog
 from job_describer                      import JobDescriber
 from launch_layout                      import LaunchLayout
@@ -85,6 +86,7 @@ class WebUIServer:
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard         = GpuWatchdog(self.system, self.paths, self.logger, self.processes)
+        self.gpu_schedule      = GpuSchedule(self.paths, self.logger, self.processes)
         self.tensorboard       = TensorboardManager(self.paths, self.logger)
         self.results           = ResultsBrowser(self.logger)
         self.cubes             = CubeExplorer(self.paths, self.logger)
@@ -116,6 +118,7 @@ class WebUIServer:
             watchdog          = self.watchdog,
             contention        = self.contention,
             gpu_guard         = self.gpu_guard,
+            gpu_schedule      = self.gpu_schedule,
             tensorboard       = self.tensorboard,
             results           = self.results,
             cubes             = self.cubes,
@@ -129,6 +132,7 @@ class WebUIServer:
         self.watchdog.start()
         self.contention.start()
         self.gpu_guard.start()
+        self.gpu_schedule.start()
 
         server        = _Server((self.host, self.port), _Handler)
         server.router = self.router

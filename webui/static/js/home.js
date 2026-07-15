@@ -1,5 +1,111 @@
 "use strict";
 
+class GpuWeekPanel {
+  static DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+  static dayOptions() {
+    return GpuWeekPanel.DAYS.map((day, index) => `<option value="${index}">${day.slice(0, 3)}</option>`).join("");
+  }
+
+  static hourOptions() {
+    return Array.from({ length: 24 }, (_, hour) => `<option value="${hour}">${String(hour).padStart(2, "0")}:00</option>`).join("");
+  }
+
+  static parseGpus(raw) {
+    return String(raw || "")
+      .split(/[\s,]+/)
+      .filter((token) => token.length)
+      .map(Number);
+  }
+
+  constructor() {
+    this.state = null;
+    this.seeded = false;
+  }
+
+  wire() {
+    const save = document.getElementById("sb-sch-save");
+    const toggle = document.getElementById("sb-sch-toggle");
+    if (!save || !toggle) return;
+
+    save.addEventListener("click", () => this._submit((this.state || {}).enabled));
+    toggle.addEventListener("click", () => this._submit(!(this.state || {}).enabled));
+  }
+
+  _value(id) {
+    const el = document.getElementById(id);
+    return el ? Number(el.value) : 0;
+  }
+
+  _raw(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : "";
+  }
+
+  async _submit(enabled) {
+    const payload = {
+      enabled: !!enabled,
+      weekday_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekday")),
+      weekend_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekend")),
+      start_day: this._value("sb-sch-startday"),
+      start_hour: this._value("sb-sch-starthour"),
+      end_day: this._value("sb-sch-endday"),
+      end_hour: this._value("sb-sch-endhour"),
+    };
+
+    const res = await window.apiPost("/api/gpu-schedule", payload);
+    if (!res || !res.ok) {
+      window.toast(`schedule rejected: ${(res && res.error) || "network error"}`, "error");
+      return;
+    }
+
+    this.seeded = false;
+    this.render(res);
+    window.toast(res.enabled ? `GPU week schedule on — ${res.phase} pool ${res.gpus_now.join(",")} applies now` : "GPU week schedule off", res.enabled ? "ok" : "warn");
+  }
+
+  render(state) {
+    if (!state) return;
+    this.state = state;
+
+    const light = document.getElementById("sb-sch-light");
+    const mode = document.getElementById("sb-sch-mode");
+    const toggle = document.getElementById("sb-sch-toggle");
+    const hint = document.getElementById("sb-sch-hint");
+    const on = !!state.enabled;
+
+    if (light) light.classList.toggle("is-armed", on);
+    if (mode) {
+      mode.textContent = on ? state.phase : "off";
+      mode.classList.toggle("is-off", !on);
+    }
+    if (toggle) {
+      toggle.textContent = on ? "schedule: ON" : "schedule: off";
+      toggle.classList.toggle("is-safe", on);
+    }
+    if (hint) {
+      hint.textContent = on
+        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")} · weekend is ${state.window}`
+        : `off — weekend would be ${state.window}`;
+    }
+
+    if (this.seeded) return;
+    this.seeded = true;
+
+    const set = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value;
+    };
+
+    set("sb-sch-weekday", (state.weekday_gpus || []).join(","));
+    set("sb-sch-weekend", (state.weekend_gpus || []).join(","));
+    set("sb-sch-startday", state.start_day);
+    set("sb-sch-starthour", state.start_hour);
+    set("sb-sch-endday", state.end_day);
+    set("sb-sch-endhour", state.end_hour);
+  }
+}
+
 class StatusBoard {
   constructor(els) {
     this.els = els;
@@ -129,6 +235,21 @@ class StatusBoard {
       `</div>` +
       `</section>` +
 
+      `<section class="sboard sboard--strip sboard--sched" aria-label="GPU week schedule">` +
+      `<div class="strip__seg">` +
+      `<i class="wd__light" id="sb-sch-light" aria-hidden="true"></i><span class="wd__label">gpu week</span><span class="wd__mode" id="sb-sch-mode">--</span></div>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<label class="ntf__field"><span class="ntf__key">weekday</span><input class="ntf__input ntf__input--gpus" id="sb-sch-weekday" type="text" placeholder="0" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">weekend</span><input class="ntf__input ntf__input--gpus" id="sb-sch-weekend" type="text" placeholder="0,1,2,3" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">from</span><select class="ntf__input ntf__input--day" id="sb-sch-startday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-starthour">${GpuWeekPanel.hourOptions()}</select></label>` +
+      `<label class="ntf__field"><span class="ntf__key">to</span><select class="ntf__input ntf__input--day" id="sb-sch-endday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-endhour">${GpuWeekPanel.hourOptions()}</select></label>` +
+      `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the weekend pool when the window opens and back onto the weekday pool when it closes. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
+      `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-sch-save" title="Save the weekday and weekend GPU pools">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-sch-toggle" title="Toggle the automatic weekday/weekend GPU switch">schedule: --</button>` +
+      `</div>` +
+      `</section>` +
+
       `<section class="sboard sboard--gpus" aria-label="CUDA devices">` +
       `<div class="sboard__gputop">` +
       `<div class="gpudeck">` +
@@ -234,6 +355,9 @@ class StatusBoard {
     this._wireImpactArm();
     this._wireDetach();
     this._wireNotify();
+
+    this.schedule = new GpuWeekPanel();
+    this.schedule.wire();
 
     if (!window.REDUCED_MOTION && window.gsap) {
       gsap.from(this.els.board.querySelectorAll(".sboard"), { opacity: 0, y: 16, duration: 0.7, stagger: 0.08, ease: "expo.out" });
@@ -396,6 +520,7 @@ class StatusBoard {
     this._renderGpuGuard(sys.gpu_guard || {});
     this._renderDetach(sys.server);
     this._renderNotify(sys.notify);
+    if (this.schedule) this.schedule.render(sys.gpu_schedule);
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};
     const disk = sys.disk || {};
