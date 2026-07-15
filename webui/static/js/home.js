@@ -26,10 +26,12 @@ class GpuWeekPanel {
   wire() {
     const save = document.getElementById("sb-sch-save");
     const toggle = document.getElementById("sb-sch-toggle");
-    if (!save || !toggle) return;
+    const greedy = document.getElementById("sb-sch-greedy");
+    if (!save || !toggle || !greedy) return;
 
-    save.addEventListener("click", () => this._submit((this.state || {}).enabled));
-    toggle.addEventListener("click", () => this._submit(!(this.state || {}).enabled));
+    save.addEventListener("click", () => this._submit((this.state || {}).enabled, (this.state || {}).greedy));
+    toggle.addEventListener("click", () => this._submit(!(this.state || {}).enabled, (this.state || {}).greedy));
+    greedy.addEventListener("click", () => this._submit((this.state || {}).enabled, !(this.state || {}).greedy));
   }
 
   _value(id) {
@@ -42,9 +44,10 @@ class GpuWeekPanel {
     return el ? el.value : "";
   }
 
-  async _submit(enabled) {
+  async _submit(enabled, greedy) {
     const payload = {
       enabled: !!enabled,
+      greedy: !!greedy,
       weekday_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekday")),
       night_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-night")),
       weekend_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekend")),
@@ -74,8 +77,10 @@ class GpuWeekPanel {
     const light = document.getElementById("sb-sch-light");
     const mode = document.getElementById("sb-sch-mode");
     const toggle = document.getElementById("sb-sch-toggle");
+    const greedy = document.getElementById("sb-sch-greedy");
     const hint = document.getElementById("sb-sch-hint");
     const on = !!state.enabled;
+    const waiting = state.waiting || [];
 
     if (light) light.classList.toggle("is-armed", on);
     if (mode) {
@@ -86,9 +91,19 @@ class GpuWeekPanel {
       toggle.textContent = on ? "schedule: ON" : "schedule: off";
       toggle.classList.toggle("is-safe", on);
     }
+    if (greedy) {
+      greedy.textContent = state.greedy ? "greedy: ON" : "greedy: off";
+      greedy.classList.toggle("is-safe", !!state.greedy && on);
+      greedy.disabled = !on;
+    }
     if (hint) {
+      const chase = waiting.length
+        ? state.greedy
+          ? ` · ${waiting.join(",")} busy elsewhere, retrying every 10 min`
+          : ` · ${waiting.join(",")} were busy at the switch, greedy off so they stay out`
+        : "";
       hint.textContent = on
-        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")} · night ${state.night_window} · weekend ${state.window}`
+        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")}${chase} · night ${state.night_window} · weekend ${state.window}`
         : `off — night would be ${state.night_window}, weekend ${state.window}`;
     }
 
@@ -252,8 +267,9 @@ class StatusBoard {
       `<label class="ntf__field"><span class="ntf__key">night from</span><select class="ntf__input ntf__input--hour" id="sb-sch-nightstart">${GpuWeekPanel.hourOptions()}</select><span class="ntf__key">to</span><select class="ntf__input ntf__input--hour" id="sb-sch-nightend">${GpuWeekPanel.hourOptions()}</select></label>` +
       `<label class="ntf__field"><span class="ntf__key">weekend from</span><select class="ntf__input ntf__input--day" id="sb-sch-startday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-starthour">${GpuWeekPanel.hourOptions()}</select></label>` +
       `<label class="ntf__field"><span class="ntf__key">to</span><select class="ntf__input ntf__input--day" id="sb-sch-endday">${GpuWeekPanel.dayOptions()}</select><select class="ntf__input ntf__input--hour" id="sb-sch-endhour">${GpuWeekPanel.hourOptions()}</select></label>` +
-      `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the pool of the phase they cross into: the weekend window wins, otherwise the night pool applies between the night hours and the weekday pool covers the rest. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
+      `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the pool of the phase they cross into: the weekend window wins, otherwise the night pool applies between the night hours and the weekday pool covers the rest. A GPU another user is computing on is never taken. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
       `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-sch-greedy" title="Greedy mode: a GPU held by someone else at the switch is re-checked every 10 minutes and picked up once it frees, until the phase pool is whole. Off, the switch takes whatever is free at that moment and nothing changes it afterwards but you.">greedy: --</button>` +
       `<button type="button" class="impact__arm" id="sb-sch-save" title="Save the weekday, night and weekend GPU pools">save</button>` +
       `<button type="button" class="impact__arm" id="sb-sch-toggle" title="Toggle the automatic weekday/night/weekend GPU switch">schedule: --</button>` +
       `</div>` +

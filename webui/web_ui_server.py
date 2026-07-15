@@ -86,7 +86,7 @@ class WebUIServer:
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard         = GpuWatchdog(self.system, self.paths, self.logger, self.processes)
-        self.gpu_schedule      = GpuSchedule(self.paths, self.logger, self.processes)
+        self.gpu_schedule      = GpuSchedule(self.paths, self.logger, self.processes, self.system)
         self.tensorboard       = TensorboardManager(self.paths, self.logger)
         self.results           = ResultsBrowser(self.logger)
         self.cubes             = CubeExplorer(self.paths, self.logger)

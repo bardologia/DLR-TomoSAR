@@ -9,6 +9,7 @@ from tools.orchestration.gpu_queue import GpuPoolFile
 
 from process_manager import ProcessManager
 from project_paths   import ProjectPaths
+from system_monitor  import SystemMonitor
 from web_logger      import WebLogger
 
 
@@ -98,14 +99,36 @@ class NightWindow(Window):
         return {"night_start_hour": self.night_start_hour, "night_end_hour": self.night_end_hour}
 
 
+class GpuAvailability:
+
+    def __init__(self, system: SystemMonitor) -> None:
+        self.system = system
+
+    def busy(self) -> set[int]:
+        held = set()
+
+        for device in self.system.gpu_occupancy():
+            owners = {proc["owner"] for proc in device["procs"] if proc["owner"]}
+            if owners - {self.system.user}:
+                held.add(device["index"])
+
+        return held
+
+    def grant(self, target: list[int]) -> list[int]:
+        busy = self.busy()
+        return [gpu for gpu in target if gpu not in busy]
+
+
 class GpuSchedule:
 
-    INTERVAL  = 30.0
+    INTERVAL        = 30.0
+    SWEEP_INTERVAL  = 600.0
     FILE_NAME = "gpu_schedule.json"
     GPU_KEYS  = ("weekday_gpus", "night_gpus", "weekend_gpus")
 
     DEFAULTS = {
         "enabled"          : False,
+        "greedy"           : True,
         "weekday_gpus"     : [2, 3],
         "night_gpus"       : [0, 1, 2, 3],
         "weekend_gpus"     : [0, 1, 2, 3],
@@ -117,15 +140,18 @@ class GpuSchedule:
         "night_end_hour"   : 8,
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager) -> None:
-        self.paths     = paths
-        self.logger    = logger
-        self.processes = processes
-        self.lock      = threading.Lock()
-        self.path      = self.paths.logs_dir / self.FILE_NAME
-        self.applied   = {}
-        self.settings  = dict(self.DEFAULTS)
-        self.last_tick = None
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager, system: SystemMonitor) -> None:
+        self.paths        = paths
+        self.logger       = logger
+        self.processes    = processes
+        self.availability = GpuAvailability(system)
+        self.lock         = threading.Lock()
+        self.path         = self.paths.logs_dir / self.FILE_NAME
+        self.applied      = {}
+        self.settings     = dict(self.DEFAULTS)
+        self.last_tick    = None
+        self.last_sweep   = None
+        self.swept_at     = None
 
         self._load()
 
@@ -147,10 +173,11 @@ class GpuSchedule:
         if missing:
             raise ValueError(f"the schedule must define {missing}")
 
-        if not isinstance(payload["enabled"], bool):
-            raise ValueError(f"'enabled' must be true or false, got {payload['enabled']!r}")
+        for key in ("enabled", "greedy"):
+            if not isinstance(payload[key], bool):
+                raise ValueError(f"'{key}' must be true or false, got {payload[key]!r}")
 
-        settings = {"enabled": payload["enabled"], **WeekWindow.validate(payload).as_dict(), **NightWindow.validate(payload).as_dict()}
+        settings = {"enabled": payload["enabled"], "greedy": payload["greedy"], **WeekWindow.validate(payload).as_dict(), **NightWindow.validate(payload).as_dict()}
 
         for key in cls.GPU_KEYS:
             gpus = GpuPoolFile.validate({"gpus": payload[key]})
@@ -181,6 +208,38 @@ class GpuSchedule:
         with self.lock:
             return list(self.settings[f"{phase}_gpus"])
 
+    def _live_jobs(self) -> list[str]:
+        live = []
+
+        for record in self.processes.list_jobs():
+            job_id = record["job_id"]
+            if record["status"] == "running" and self.processes.gpu_pool(job_id).get("live"):
+                live.append(job_id)
+
+        return live
+
+    def _cross(self, job_id: str, phase: str) -> list[str]:
+        target   = self.gpus_for(phase)
+        granted  = self.availability.grant(target)
+        withheld = [gpu for gpu in target if gpu not in granted]
+
+        self.applied[job_id]["withheld"] = withheld
+
+        if not granted:
+            self.logger.warning(f"gpu schedule left job {job_id} where it is: every GPU in the {phase} pool {target} is busy with someone else's work")
+            return []
+
+        result = self.processes.set_gpus(job_id, granted)
+        if not result.get("ok"):
+            return []
+
+        if withheld:
+            self.logger.ok(f"gpu schedule moved job {job_id} onto the {phase} pool {granted}; {withheld} held by someone else")
+            return [job_id]
+
+        self.logger.ok(f"gpu schedule moved job {job_id} onto the {phase} pool {granted}")
+        return [job_id]
+
     def tick(self, moment: datetime) -> list[str]:
         with self.lock:
             enabled        = self.settings["enabled"]
@@ -188,35 +247,76 @@ class GpuSchedule:
 
         phase   = self.phase(moment)
         applied = []
-        seen    = set()
+        live    = self._live_jobs()
 
-        for record in self.processes.list_jobs():
-            job_id = record["job_id"]
-
-            if record["status"] != "running" or not self.processes.gpu_pool(job_id).get("live"):
-                continue
-
-            seen.add(job_id)
+        for job_id in live:
             previous             = self.applied.get(job_id)
-            self.applied[job_id] = phase
+            self.applied[job_id] = {"phase": phase, "withheld": []} if previous is None else {**previous, "phase": phase}
 
-            if not enabled or previous is None or previous == phase:
+            if not enabled or previous is None or previous["phase"] == phase:
                 continue
 
-            gpus   = self.gpus_for(phase)
-            result = self.processes.set_gpus(job_id, gpus)
-            if result.get("ok"):
-                applied.append(job_id)
-                self.logger.ok(f"gpu schedule moved job {job_id} onto the {phase} pool {gpus}")
+            applied += self._cross(job_id, phase)
 
-        self.applied = {job_id: phase for job_id, phase in self.applied.items() if job_id in seen}
+        self.applied = {job_id: record for job_id, record in self.applied.items() if job_id in live}
 
         return applied
+
+    def _claim(self, job_id: str, current: list[int], freed: list[int]) -> list[str]:
+        merged = sorted(set(current) | set(freed))
+        if merged == sorted(current):
+            return []
+
+        result = self.processes.set_gpus(job_id, merged)
+        if not result.get("ok"):
+            return []
+
+        self.logger.ok(f"gpu schedule grew job {job_id} onto {merged}: {freed} came free")
+        return [job_id]
+
+    def sweep(self, moment: datetime) -> list[str]:
+        with self.lock:
+            greedy          = self.settings["enabled"] and self.settings["greedy"]
+            self.last_sweep = moment.isoformat(timespec="seconds")
+
+        if not greedy:
+            return []
+
+        claimed = []
+
+        for job_id in self._live_jobs():
+            record = self.applied.get(job_id)
+            if record is None or not record["withheld"]:
+                continue
+
+            current = self.processes.gpu_pool(job_id).get("gpus", [])
+            if not current:
+                continue
+
+            freed = self.availability.grant(record["withheld"])
+            if not freed:
+                continue
+
+            claimed += self._claim(job_id, current, freed)
+            record["withheld"] = [gpu for gpu in record["withheld"] if gpu not in freed]
+
+        return claimed
+
+    def _due(self, now: float) -> bool:
+        if self.swept_at is None or now - self.swept_at >= self.SWEEP_INTERVAL:
+            self.swept_at = now
+            return True
+
+        return False
 
     def _watch(self) -> None:
         while True:
             try:
-                self.tick(datetime.now())
+                moment = datetime.now()
+                self.tick(moment)
+
+                if self._due(time.monotonic()):
+                    self.sweep(moment)
             except Exception as error:
                 self.logger.error(f"gpu schedule tick failed: {error}")
 
@@ -225,22 +325,26 @@ class GpuSchedule:
     def start(self) -> None:
         worker = threading.Thread(target=self._watch, daemon=True)
         worker.start()
-        self.logger.muted(f"gpu schedule armed from {self.path} (enabled={self.settings['enabled']}, every {self.INTERVAL:.0f}s)")
+        self.logger.muted(f"gpu schedule armed from {self.path} (enabled={self.settings['enabled']}, greedy={self.settings['greedy']}, every {self.INTERVAL:.0f}s)")
 
     def state(self) -> dict:
         with self.lock:
             settings = dict(self.settings)
             last     = self.last_tick
+            swept    = self.last_sweep
 
-        phase = self.phase(datetime.now())
+        phase   = self.phase(datetime.now())
+        waiting = sorted({gpu for record in self.applied.values() for gpu in record["withheld"]})
 
         return {
             **settings,
             "phase"        : phase,
             "gpus_now"     : list(settings[f"{phase}_gpus"]),
+            "waiting"      : waiting,
             "window"       : self.week_window().label(),
             "night_window" : self.night_window().label(),
             "last_tick"    : last,
+            "last_sweep"   : swept,
             "path"         : str(self.path),
         }
 
@@ -256,6 +360,6 @@ class GpuSchedule:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
 
-        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, weekday {settings['weekday_gpus']}, night {settings['night_gpus']}, weekend {settings['weekend_gpus']}")
+        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, greedy {'on' if settings['greedy'] else 'off'}, weekday {settings['weekday_gpus']}, night {settings['night_gpus']}, weekend {settings['weekend_gpus']}")
 
         return {"ok": True, **self.state()}

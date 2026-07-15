@@ -47,6 +47,7 @@ class StubProcesses:
 
     def set_gpus(self, job_id: str, gpus) -> dict:
         self.writes.append((job_id, list(gpus)))
+        self.pools[job_id]["gpus"] = list(gpus)
         return {"ok": True, "gpus": list(gpus), "parked": False}
 
     def add_running_fan_out(self, job_id: str) -> None:
@@ -54,12 +55,31 @@ class StubProcesses:
         self.pools[job_id] = {"ok": True, "supported": True, "live": True, "gpus": [0]}
 
 
+class StubSystem:
+    def __init__(self) -> None:
+        self.user    = "bard"
+        self.holders = {}
+
+    def occupy(self, index: int, user: str) -> None:
+        self.holders.setdefault(index, []).append(user)
+
+    def release(self, index: int) -> None:
+        self.holders.pop(index, None)
+
+    def gpu_occupancy(self) -> list[dict]:
+        return [
+            {"index": index, "procs": [{"pid": 100 + index, "owner": owner} for owner in self.holders.get(index, [])]}
+            for index in range(4)
+        ]
+
+
 @pytest.fixture
 def schedule(tmp_path):
     processes = StubProcesses()
-    schedule  = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes)
+    system    = StubSystem()
+    schedule  = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, system)
     schedule.settings["enabled"] = True
-    return schedule, processes
+    return schedule, processes, system
 
 
 def test_default_window_spans_friday_evening_to_monday_morning():
@@ -107,7 +127,7 @@ def test_default_night_window_spans_the_evening_to_the_next_morning():
 
 
 def test_phase_names_follow_the_window(schedule):
-    scheduler, _processes = schedule
+    scheduler, _processes, _system = schedule
 
     assert scheduler.phase(SATURDAY)         == "weekend"
     assert scheduler.phase(MONDAY_WORKDAY)   == "weekday"
@@ -116,14 +136,14 @@ def test_phase_names_follow_the_window(schedule):
 
 
 def test_the_weekend_window_outranks_the_night_window(schedule):
-    scheduler, _processes = schedule
+    scheduler, _processes, _system = schedule
 
     assert scheduler.phase(SUNDAY_NIGHT)   == "weekend"
     assert scheduler.phase(FRIDAY_EVENING) == "weekend"
 
 
 def test_transition_into_the_night_grows_the_pool_and_the_morning_shrinks_it(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(WEDNESDAY)
@@ -135,17 +155,17 @@ def test_transition_into_the_night_grows_the_pool_and_the_morning_shrinks_it(sch
 
 
 def test_first_tick_records_the_phase_without_touching_the_launch_selection(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(WEDNESDAY)
 
     assert processes.writes    == []
-    assert scheduler.applied   == {"job1": "weekday"}
+    assert scheduler.applied   == {"job1": {"phase": "weekday", "withheld": []}}
 
 
 def test_transition_into_the_weekend_grows_the_pool(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(WEDNESDAY)
@@ -155,7 +175,7 @@ def test_transition_into_the_weekend_grows_the_pool(schedule):
 
 
 def test_transition_back_to_the_week_shrinks_the_pool(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(SATURDAY)
@@ -165,7 +185,7 @@ def test_transition_back_to_the_week_shrinks_the_pool(schedule):
 
 
 def test_ticks_inside_one_phase_never_rewrite_the_pool(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(SATURDAY)
@@ -176,7 +196,7 @@ def test_ticks_inside_one_phase_never_rewrite_the_pool(schedule):
 
 
 def test_a_manual_resize_survives_until_the_next_transition(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(SATURDAY)
@@ -189,8 +209,145 @@ def test_a_manual_resize_survives_until_the_next_transition(schedule):
     assert processes.writes == [("job1", [2, 3])]
 
 
+def test_a_gpu_held_by_another_user_is_left_out_of_the_pool(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes                     == [("job1", [0, 2, 3])]
+    assert scheduler.applied["job1"]["withheld"] == [1]
+
+
+def test_our_own_processes_never_block_the_pool(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(2, "bard")
+    system.occupy(3, "bard")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes                     == [("job1", [0, 1, 2, 3])]
+    assert scheduler.applied["job1"]["withheld"] == []
+
+
+def test_a_pool_held_entirely_by_others_leaves_the_job_untouched(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    for index in (0, 1, 2, 3):
+        system.occupy(index, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes                      == []
+    assert scheduler.applied["job1"]["withheld"] == [0, 1, 2, 3]
+
+
+def test_greedy_picks_up_a_withheld_gpu_once_it_frees(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    assert processes.writes == [("job1", [0, 2, 3])]
+
+    scheduler.sweep(WEDNESDAY_NIGHT)
+    assert processes.writes == [("job1", [0, 2, 3])]
+
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes                      == [("job1", [0, 2, 3]), ("job1", [0, 1, 2, 3])]
+    assert scheduler.applied["job1"]["withheld"] == []
+
+
+def test_greedy_stops_sweeping_once_the_pool_is_whole(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes == [("job1", [0, 2, 3]), ("job1", [0, 1, 2, 3])]
+
+
+def test_greedy_off_never_reclaims_a_withheld_gpu(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["greedy"] = False
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes == [("job1", [0, 2, 3])]
+
+
+def test_greedy_adds_to_a_hand_shrunk_pool_without_undoing_the_resize(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    processes.pools["job1"]["gpus"] = [0]
+
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes[-1] == ("job1", [0, 1])
+
+
+def test_greedy_never_unparks_a_job_and_keeps_waiting_for_it(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    processes.pools["job1"]["gpus"] = []
+
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes                      == [("job1", [0, 2, 3])]
+    assert scheduler.applied["job1"]["withheld"] == [1]
+
+    processes.pools["job1"]["gpus"] = [0]
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes[-1] == ("job1", [0, 1])
+
+
+def test_a_disabled_schedule_sweeps_nothing(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.tick(WEDNESDAY_NIGHT)
+    scheduler.settings["enabled"] = False
+
+    system.release(1)
+    scheduler.sweep(WEDNESDAY_NIGHT)
+
+    assert processes.writes == [("job1", [0, 2, 3])]
+
+
 def test_a_disabled_schedule_tracks_phases_without_writing(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     scheduler.settings["enabled"] = False
     processes.add_running_fan_out("job1")
 
@@ -198,11 +355,11 @@ def test_a_disabled_schedule_tracks_phases_without_writing(schedule):
     scheduler.tick(SATURDAY)
 
     assert processes.writes  == []
-    assert scheduler.applied == {"job1": "weekend"}
+    assert scheduler.applied == {"job1": {"phase": "weekend", "withheld": []}}
 
 
 def test_jobs_without_a_live_pool_are_ignored(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.jobs.append({"job_id": "single", "status": "running", "script": "train_backbone"})
 
     scheduler.tick(WEDNESDAY)
@@ -213,11 +370,11 @@ def test_jobs_without_a_live_pool_are_ignored(schedule):
 
 
 def test_finished_jobs_are_forgotten(schedule):
-    scheduler, processes = schedule
+    scheduler, processes, _system = schedule
     processes.add_running_fan_out("job1")
 
     scheduler.tick(WEDNESDAY)
-    assert scheduler.applied == {"job1": "weekday"}
+    assert scheduler.applied == {"job1": {"phase": "weekday", "withheld": []}}
 
     processes.jobs[0]["status"] = "finished"
     scheduler.tick(SATURDAY)
@@ -229,13 +386,13 @@ def test_update_persists_and_reloads(tmp_path):
     processes = StubProcesses()
     payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "weekday_gpus": [1], "night_gpus": [1, 2], "weekend_gpus": [0, 1, 2]}
 
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes)
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
     result    = scheduler.update(payload)
 
     assert result["ok"] is True
     assert json.loads(scheduler.path.read_text())["weekday_gpus"] == [1]
 
-    reloaded = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes)
+    reloaded = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
 
     assert reloaded.settings["enabled"]      is True
     assert reloaded.settings["weekday_gpus"] == [1]
@@ -244,7 +401,7 @@ def test_update_persists_and_reloads(tmp_path):
 
 
 def test_state_reports_the_pool_that_applies_right_now(schedule):
-    scheduler, _processes = schedule
+    scheduler, _processes, _system = schedule
 
     state = scheduler.state()
 
@@ -256,6 +413,7 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
 
 @pytest.mark.parametrize("payload, reason", [
     ({"enabled": "yes"},                    "true or false"),
+    ({"greedy": "sure"},                    "true or false"),
     ({"weekday_gpus": []},                  "at least one GPU"),
     ({"weekend_gpus": [0, 0]},              "repeat"),
     ({"weekday_gpus": [-1]},                "non-negative"),
@@ -267,7 +425,7 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
     ({"night_start_hour": 20, "night_end_hour": 20}, "never switch"),
 ])
 def test_update_rejects_an_invalid_schedule(tmp_path, payload, reason):
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses())
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem())
     before    = dict(scheduler.settings)
 
     result = scheduler.update({**GpuSchedule.DEFAULTS, **payload})
@@ -279,7 +437,7 @@ def test_update_rejects_an_invalid_schedule(tmp_path, payload, reason):
 
 
 def test_update_rejects_a_partial_schedule(tmp_path):
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses())
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem())
 
     result = scheduler.update({"enabled": True})
 
@@ -292,6 +450,6 @@ def test_an_unreadable_schedule_file_falls_back_to_defaults_loudly(tmp_path):
     paths.logs_dir.mkdir(parents=True)
     (paths.logs_dir / GpuSchedule.FILE_NAME).write_text("{not json")
 
-    scheduler = GpuSchedule(paths, WebLogger(), StubProcesses())
+    scheduler = GpuSchedule(paths, WebLogger(), StubProcesses(), StubSystem())
 
     assert scheduler.settings == GpuSchedule.DEFAULTS
