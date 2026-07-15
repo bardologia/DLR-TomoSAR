@@ -13,6 +13,8 @@ class ConsoleTile {
     const bar = document.createElement("div");
     bar.className = "console-tile__bar";
 
+    this.desc = job.description || "";
+
     this.nameEl = document.createElement("span");
     this.nameEl.className = "console-tile__name";
     this.nameEl.textContent = job.script;
@@ -20,7 +22,8 @@ class ConsoleTile {
 
     this.metaEl = document.createElement("span");
     this.metaEl.className = "console-tile__meta";
-    this.metaEl.textContent = job.pid ? `pid ${job.pid}` : "queued";
+    this.metaEl.textContent = this._meta(job.pid ? `pid ${job.pid}` : "queued");
+    if (this.desc) this.metaEl.title = this.desc;
 
     this.badgeEl = document.createElement("span");
     this.badgeEl.className = `badge badge--${job.status}`;
@@ -97,7 +100,7 @@ class ConsoleTile {
       if (data.status === "running") {
         if (data.adopted) this._note(`adopted process already running under your user (pid ${data.pid}) — output is not captured, stop still kills it`, "33");
         else this._note(data.detached ? `running detached (pid ${data.pid}) — stop still kills it` : `process started (pid ${data.pid})`, "36");
-        this.metaEl.textContent = data.adopted ? `pid ${data.pid} · adopted` : data.detached ? `pid ${data.pid} · detached` : `pid ${data.pid}`;
+        this.metaEl.textContent = this._meta(data.adopted ? `pid ${data.pid} · adopted` : data.detached ? `pid ${data.pid} · detached` : `pid ${data.pid}`);
         this.setStatus("running");
       } else if (data.status === "scheduled") {
         this._note(`scheduled to run after ${data.after || "the current job"}`, "33");
@@ -116,6 +119,10 @@ class ConsoleTile {
     } else if (data.type === "end") {
       this._disconnect();
     }
+  }
+
+  _meta(base) {
+    return this.desc ? `${base} · ${this.desc}` : base;
   }
 
   _note(text, color) {
@@ -262,6 +269,8 @@ class RunConsole {
       if (j.follow_of) followers.set(j.follow_of, j);
     });
 
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
     this.jobs.forEach((job) => {
       if (job.follow_of) return;
       const item = document.createElement("li");
@@ -269,6 +278,7 @@ class RunConsole {
       item.innerHTML =
         `<div class="job-item__top"><span class="job-item__name">${job.script}</span>` +
         `<span class="badge badge--${job.status}">${job.status}</span></div>` +
+        (job.description ? `<div class="job-item__desc" title="${esc(job.description)}">${esc(job.description)}</div>` : "") +
         `<div class="job-item__meta">${job.started.replace("T", " ")}${job.pid ? ` · pid ${job.pid}` : ""}</div>`;
       item.addEventListener("click", () => this.toggle(job.job_id));
 
@@ -276,6 +286,7 @@ class RunConsole {
       if (next) {
         const sub = document.createElement("div");
         sub.className = "job-item__follow" + (this.tiles.has(next.job_id) ? " is-active" : "");
+        sub.title = next.description || "";
         sub.innerHTML =
           `<span class="job-item__arrow" aria-hidden="true">&#8627;</span>` +
           `<span class="job-item__name">${next.script}</span>` +

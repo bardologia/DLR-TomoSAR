@@ -1107,6 +1107,7 @@ main { margin-left: var(--navw); }
 .job-item__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .job-item__name { font-family: var(--display); font-size: 14px; font-weight: 500; }
 .job-item__meta { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
+.job-item__desc { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { font-family: var(--mono); font-size: 10.5px; padding: 2px 8px; border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: 0.06em; }
 .badge--running { background: rgba(29, 79, 216, 0.10); color: var(--accent); }
 .badge--finished { background: rgba(15, 118, 110, 0.12); color: var(--accent-2); }
@@ -1143,7 +1144,7 @@ main { margin-left: var(--navw); }
   border-bottom: 1px solid var(--glass-line); background: var(--glass-bg-2);
 }
 .console-tile__name { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--glass-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.console-tile__meta { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); margin-right: auto; white-space: nowrap; }
+.console-tile__meta { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .console-tile__out { flex: 1; min-height: 0; min-width: 0; padding: 10px 12px; overflow: hidden; }
 .console-tile__out .xterm { height: 100%; }
 

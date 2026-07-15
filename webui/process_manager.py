@@ -15,6 +15,7 @@ from collections import deque
 from datetime    import datetime, timedelta
 from pathlib     import Path
 
+from job_describer import JobDescriber
 from notifier      import JobNotifier
 from proc_stats    import ProcStats
 from project_paths import ProjectPaths
@@ -58,10 +59,11 @@ class ProcessManager:
     ORPHAN_MIN_AGE_S = 15.0
     ORPHAN_RESCAN_S  = 3.0
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, notifier: JobNotifier) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, notifier: JobNotifier, describer: JobDescriber) -> None:
         self.paths         = paths
         self.logger        = logger
         self.notifier      = notifier
+        self.describer     = describer
         self.jobs          = {}
         self.streams       = {}
         self.launch_queue  = deque()
@@ -128,7 +130,7 @@ class ProcessManager:
             position = len(self.launch_queue)
 
         stream.publish({"type": "status", "status": "queued", "position": position})
-        self.logger.muted(f"queued {key} as job {record['job_id']} at position {position}")
+        self.logger.muted(f"queued {key} as job {record['job_id']} at position {position}{self._described(record)}")
 
         self._advance_queue()
 
@@ -141,6 +143,7 @@ class ProcessManager:
             "job_id"      : uuid.uuid4().hex[:12],
             "script"      : key,
             "command"     : self._render_command(interpreter, key, overrides, detach),
+            "description" : self.describer.describe(key, interpreter, overrides),
             "interpreter" : interpreter,
             "overrides"   : overrides,
             "detach"      : detach,
@@ -196,7 +199,7 @@ class ProcessManager:
             record["started"] = datetime.now().isoformat(timespec="seconds")
             snapshot          = dict(record)
 
-        self.logger.ok(f"launched {record['script']} as job {record['job_id']} (pid {process.pid})")
+        self.logger.ok(f"launched {record['script']} as job {record['job_id']} (pid {process.pid}){self._described(record)}")
         stream.publish({"type": "status", "status": "running", "pid": process.pid})
         self.notifier.job_started(snapshot)
 
@@ -217,7 +220,11 @@ class ProcessManager:
             self.jobs[record["job_id"]]    = record
             self.streams[record["job_id"]] = stream
 
-        self.logger.muted(f"scheduled {key} as job {record['job_id']} after {parent['script']} ({parent['job_id']})")
+        self.logger.muted(f"scheduled {key} as job {record['job_id']} after {parent['script']} ({parent['job_id']}){self._described(record)}")
+
+    def _described(self, record: dict) -> str:
+        description = record.get("description") or ""
+        return f" — {description}" if description else ""
 
     def _resolve_follow_up(self, follow_id: str, code: int) -> None:
         with self.lock:
@@ -428,7 +435,7 @@ class ProcessManager:
             if self.job_for_pid(pid) is not None:
                 continue
 
-            found[pid] = {"script": script, "cmd": " ".join(tokens), "interpreter": tokens[0], "age_s": age}
+            found[pid] = {"script": script, "cmd": " ".join(tokens), "tokens": tokens, "interpreter": tokens[0], "age_s": age}
 
         return {pid: info for pid, info in found.items() if self._orphan_ancestor(pid, set(found)) is None}
 
@@ -470,13 +477,37 @@ class ProcessManager:
             hops  += 1
         return None
 
+    def _orphan_overrides(self, tokens: list[str]) -> dict:
+        args = []
+        for index, token in enumerate(tokens):
+            if token.endswith(".py"):
+                args = tokens[index + 1 :]
+                break
+
+        overrides = {}
+        index     = 0
+        while index < len(args):
+            if not args[index].startswith("--"):
+                index += 1
+                continue
+            name = args[index][2:]
+            if index + 1 < len(args) and not args[index + 1].startswith("--"):
+                overrides[name] = args[index + 1]
+                index += 2
+            else:
+                overrides[name] = "True"
+                index += 1
+        return overrides
+
     def _adopt_orphan(self, pid: int, info: dict) -> None:
+        overrides = self._orphan_overrides(info["tokens"])
         record = {
             "job_id"           : uuid.uuid4().hex[:12],
             "script"           : info["script"],
             "command"          : info["cmd"],
+            "description"      : self.describer.describe(info["script"], info["interpreter"], overrides),
             "interpreter"      : info["interpreter"],
-            "overrides"        : {},
+            "overrides"        : overrides,
             "detach"           : False,
             "status"           : "running",
             "pid"              : pid,

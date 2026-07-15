@@ -77,9 +77,9 @@ def _drain(calls: list, count: int, timeout: float = 5.0) -> list:
     return calls
 
 
-def _record(status: str = "finished", exit_code: int | None = 0, ago_s: float = 3600.0, stopped: bool = False) -> dict:
+def _record(status: str = "finished", exit_code: int | None = 0, ago_s: float = 3600.0, stopped: bool = False, description: str = "") -> dict:
     started = (datetime.now() - timedelta(seconds=ago_s)).isoformat(timespec="seconds")
-    record  = {"job_id": "abc123def456", "script": "train_backbone", "status": status, "exit_code": exit_code, "started": started, "pid": 4242}
+    record  = {"job_id": "abc123def456", "script": "train_backbone", "status": status, "exit_code": exit_code, "started": started, "pid": 4242, "description": description}
     if stopped:
         record["stopped"] = True
     return record
@@ -138,6 +138,34 @@ def test_start_notifies(notifier, sent):
     assert priority == "default"
     assert "abc123def456" in body
     assert "4242" in body
+
+
+def test_start_body_carries_description(notifier, sent):
+    _arm(notifier)
+    notifier.job_started(_record(status="running", description="presence trials experiment · resunet-conv"))
+
+    assert len(_drain(sent, 1)) == 1
+    body = sent[0][1]
+    assert body.startswith("presence trials experiment · resunet-conv\n")
+    assert "abc123def456" in body
+
+
+def test_finish_body_carries_description(notifier, sent):
+    _arm(notifier)
+    notifier.job_finished(_record(ago_s=600.0, description="single training · resunet-conv"))
+
+    assert len(_drain(sent, 1)) == 1
+    body = sent[0][1]
+    assert body.startswith("single training · resunet-conv\n")
+    assert "10m 00s" in body
+
+
+def test_record_without_description_keeps_plain_body(notifier, sent):
+    _arm(notifier)
+    notifier.job_finished({key: value for key, value in _record(ago_s=600.0).items() if key != "description"})
+
+    assert len(_drain(sent, 1)) == 1
+    assert sent[0][1].startswith("runtime 10m 00s")
 
 
 def test_quick_success_notifies(notifier, sent):

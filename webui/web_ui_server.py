@@ -10,6 +10,7 @@ from dataset_browser                    import DatasetBrowser
 from equation_library                   import EquationLibrary
 from flow_library                       import FlowLibrary
 from gpu_watchdog                       import GpuWatchdog
+from job_describer                      import JobDescriber
 from launch_layout                      import LaunchLayout
 from backbone_model_library             import BackboneModelLibrary
 from image_autoencoder_model_library    import ImageAutoencoderModelLibrary
@@ -76,7 +77,8 @@ class WebUIServer:
         self.pipelines         = PipelineLibrary()
         self.repomap           = RepoMapLibrary()
         self.notifier          = JobNotifier(self.paths, self.logger)
-        self.processes         = ProcessManager(self.paths, self.logger, self.notifier)
+        self.describer         = JobDescriber(self.paths, self.resolver)
+        self.processes         = ProcessManager(self.paths, self.logger, self.notifier, self.describer)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)

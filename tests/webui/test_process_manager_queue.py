@@ -38,6 +38,12 @@ class StubPaths:
         return {"path": path, "rel": f"main/analysis/{key}.py", "args": []}
 
 
+class StubDescriber:
+
+    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
+        return f"stub description for {key}"
+
+
 @pytest.fixture
 def manager(tmp_path):
     scripts = tmp_path / "main" / "analysis"
@@ -51,7 +57,7 @@ def manager(tmp_path):
 
     paths  = StubPaths(tmp_path)
     logger = WebLogger()
-    yield ProcessManager(paths, logger, JobNotifier(paths, logger))
+    yield ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
 
 
 def _record(manager: ProcessManager, job_id: str) -> dict:

@@ -29,12 +29,18 @@ class StubPaths:
         self.logs_dir  = root / "logs"
 
 
+class StubDescriber:
+
+    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
+        return ""
+
+
 @pytest.fixture
 def manager(tmp_path):
     (tmp_path / "main" / "analysis").mkdir(parents=True)
     paths                     = StubPaths(tmp_path)
     logger                    = WebLogger()
-    instance                  = ProcessManager(paths, logger, JobNotifier(paths, logger))
+    instance                  = ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
     instance.ORPHAN_MIN_AGE_S = 0.0
     instance.ORPHAN_RESCAN_S  = 0.0
     return instance

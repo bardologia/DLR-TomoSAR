@@ -95,8 +95,12 @@ class JobNotifier:
             title    = f"{script} finished" + ("" if code == 0 else " (exit status unknown)")
             priority = "default"
 
-        body = f"runtime {self._runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})"
+        body = self._with_description(record, f"runtime {self._runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})")
         return title, body, priority
+
+    def _with_description(self, record: dict, body: str) -> str:
+        description = record.get("description") or ""
+        return f"{description}\n{body}" if description else body
 
     def _send(self, title: str, body: str, priority: str) -> str | None:
         with self.lock:
@@ -130,7 +134,7 @@ class JobNotifier:
             return
 
         script = record.get("script") or "job"
-        body   = f"running on {socket.gethostname()} (job {record['job_id']}, pid {record.get('pid')})"
+        body   = self._with_description(record, f"running on {socket.gethostname()} (job {record['job_id']}, pid {record.get('pid')})")
         self._dispatch(f"{script} started", body, "default")
 
     def job_finished(self, record: dict) -> None:
