@@ -25,6 +25,10 @@ def make_planner(tmp_path: Path, datasets: list[str], selection: list[str] | Non
     return PatchSweepPlanner(config)
 
 
+def test_sweep_default_pins_no_dataset_name():
+    assert PatchSweepConfig().dataset_filter == []
+
+
 def test_step_derives_from_the_resunet_feature_pyramid():
     assert ArchitecturePatchStep("resunet", "conv", {}).resolve() == 16
 

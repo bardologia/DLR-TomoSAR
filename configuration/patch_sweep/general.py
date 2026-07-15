@@ -27,7 +27,7 @@ class PatchSweepConfig:
     model_overrides : dict = field(default_factory=lambda: {"features": [64, 128, 256]})
 
     dataset_base_path : Path = Path("/ste/rnd/User/vice_vi/Dataset")
-    dataset_filter    : list = field(default_factory=lambda: ["base_dataset_w20_10"])
+    dataset_filter    : list = field(default_factory=list)
 
     patch : PatchGridConfig = field(default_factory=PatchGridConfig)
 

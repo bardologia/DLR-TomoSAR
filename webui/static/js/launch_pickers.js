@@ -27,6 +27,7 @@ class DatasetPicker {
     this.items = [];
     this.options = [];
     this.selected = new Set();
+    this.stale = [];
     this.reloadTimer = null;
     this.baseLabel = "";
   }
@@ -297,9 +298,20 @@ class DatasetPicker {
     this.baseLabel = res.base || bases.join(", ");
 
     this.items = (res[mode.key] || []).filter((d) => (this.spec.validOnly ? d.is_dataset : true));
-    this.selected = new Set(this._selectedNames());
+
+    this._syncSelection();
     this._renderItems();
-    this._paintSummary();
+
+    if (this.stale.length) this._commitMulti();
+    else this._paintSummary();
+  }
+
+  _syncSelection() {
+    const listed   = new Set(this.items.map((d) => d.name));
+    const selected = this._selectedNames();
+
+    this.stale    = selected.filter((n) => !listed.has(n));
+    this.selected = new Set(selected.filter((n) => listed.has(n)));
   }
 
   _renderItems() {
@@ -379,9 +391,8 @@ class DatasetPicker {
   }
 
   _commitMulti() {
-    const listed = new Set(this.items.map((d) => d.name));
-    const kept   = this._selectedNames().filter((n) => !listed.has(n));
-    const names  = [...kept, ...this.items.map((d) => d.name).filter((n) => this.selected.has(n))];
+    const names = this.items.map((d) => d.name).filter((n) => this.selected.has(n));
+
     this.view._setValue(this.leaf, window.PythonLiteral.render(names));
     this._paintSummary();
   }
@@ -391,13 +402,13 @@ class DatasetPicker {
     const picked = this.items.filter((d) => this.selected.has(d.name)).length;
 
     this.count.textContent = picked ? `${picked} of ${this.items.length} selected` : `all ${this.items.length} ${mode.noun}`;
-    this.hint.textContent = picked ? "" : mode.hint;
+    this.hint.textContent = this.stale.length ? `dropped ${this.stale.join(", ")}: not under ${this.baseLabel}` : picked ? "" : mode.hint;
     this.board.classList.toggle("is-dirty", this.view.dirty[this.leaf.path] !== undefined);
   }
 
   _reset() {
     if (this.spec.multi) {
-      this.selected = new Set(this._selectedNames());
+      this._syncSelection();
       this._renderItems();
       this._paintSummary();
       return;
