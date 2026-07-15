@@ -1143,6 +1143,7 @@
         "ablation_features": "Ordered list of feature-toggle dicts (label, enable, degrade overrides) forming the cumulative ablation ladder from the full model down to the baseline",
         "ablation_include_full": "Include the full-model variant (all ablation features enabled) as an extra run alongside the ablation ladder",
         "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory",
         "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed trial jobs"
       }
     },
@@ -2238,6 +2239,7 @@
         "trials_mode": "Sweep dimension the dual trial scheduler varies; input is the only mode and trains one run per trunk-input assignment under logdir/input",
         "input_trials": "DualInputTrialsConfig sub-config defining the trunk-input experiment: the fixed trunk feature ladders shared by every trial and the named params/existence channel-group assignments",
         "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory",
         "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed trial jobs"
       }
     },

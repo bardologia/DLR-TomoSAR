@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import codecs
+import json
 import os
 import queue
 import re
@@ -14,6 +15,8 @@ import uuid
 from collections import deque
 from datetime    import datetime, timedelta
 from pathlib     import Path
+
+from tools.orchestration.gpu_queue import GpuPoolFile
 
 from job_describer import JobDescriber
 from notifier      import JobNotifier
@@ -58,6 +61,8 @@ class ProcessManager:
     DETACHED_PID     = re.compile(r"detached .* as pid (\d+)")
     ORPHAN_MIN_AGE_S = 15.0
     ORPHAN_RESCAN_S  = 3.0
+    POOL_SCRIPTS     = ("train_backbone", "train_dual")
+    POOL_FIELD       = "gpus_file"
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger, notifier: JobNotifier, describer: JobDescriber) -> None:
         self.paths         = paths
@@ -139,8 +144,11 @@ class ProcessManager:
         return {"ok": True, "job_id": record["job_id"], "queued": still_queued}
 
     def _make_record(self, key: str, interpreter: str, overrides: dict, detach: bool = False) -> dict:
+        job_id    = uuid.uuid4().hex[:12]
+        overrides = self._with_pool_file(key, overrides, job_id)
+
         return {
-            "job_id"      : uuid.uuid4().hex[:12],
+            "job_id"      : job_id,
             "script"      : key,
             "command"     : self._render_command(interpreter, key, overrides, detach),
             "description" : self.describer.describe(key, interpreter, overrides),
@@ -155,6 +163,12 @@ class ProcessManager:
             "follow_up"   : None,
             "queue_follow": None,
         }
+
+    def _with_pool_file(self, key: str, overrides: dict, job_id: str) -> dict:
+        if key not in self.POOL_SCRIPTS or overrides.get(self.POOL_FIELD):
+            return overrides
+
+        return {**overrides, self.POOL_FIELD: str(self.paths.gpu_pools_dir / f"{job_id}.json")}
 
     def _runtime_env(self, interpreter: str) -> dict:
         env = dict(os.environ)
@@ -588,6 +602,59 @@ class ProcessManager:
         self._signal_group(record["pid"], signal.SIGTERM)
         self.logger.warning(f"stop requested for job {job_id}")
         return {"ok": True}
+
+    def gpu_pool(self, job_id: str) -> dict:
+        with self.lock:
+            record = self.jobs.get(job_id)
+
+        if record is None:
+            return {"ok": False, "error": "unknown job"}
+
+        path = record["overrides"].get(self.POOL_FIELD)
+        if not path:
+            return {"ok": True, "supported": False, "live": False}
+
+        pool = Path(path)
+        if not pool.is_file():
+            return {"ok": True, "supported": True, "live": False, "path": str(pool)}
+
+        try:
+            gpus = GpuPoolFile.validate(json.loads(pool.read_text(encoding="utf-8")))
+        except (ValueError, TypeError, json.JSONDecodeError, OSError) as error:
+            return {"ok": False, "error": f"unreadable GPU pool file: {error}", "path": str(pool)}
+
+        return {"ok": True, "supported": True, "live": True, "gpus": gpus, "path": str(pool)}
+
+    def set_gpus(self, job_id: str, gpus) -> dict:
+        with self.lock:
+            record = self.jobs.get(job_id)
+
+        if record is None:
+            return {"ok": False, "error": "unknown job"}
+
+        if record["status"] != "running":
+            return {"ok": False, "error": "job is not running"}
+
+        path = record["overrides"].get(self.POOL_FIELD)
+        if not path:
+            return {"ok": False, "error": f"{record['script']} was not launched with a live GPU pool"}
+
+        pool = Path(path)
+        if not pool.is_file():
+            return {"ok": False, "error": "this job has no live GPU pool yet; only a running fan-out over trials can be resized"}
+
+        try:
+            requested = GpuPoolFile.validate({"gpus": gpus})
+        except (ValueError, TypeError) as error:
+            return {"ok": False, "error": str(error)}
+
+        if not requested:
+            return {"ok": False, "error": "select at least one GPU; an empty pool would park the experiment"}
+
+        GpuPoolFile(pool, self.logger).write(requested)
+        self.logger.ok(f"job {job_id} GPU pool set to {requested}")
+
+        return {"ok": True, "gpus": requested}
 
     def clear_queue(self) -> int:
         with self.lock:

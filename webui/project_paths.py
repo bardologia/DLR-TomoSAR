@@ -78,6 +78,7 @@ class ProjectPaths:
         self.static_dir  = self.webui_root / "static"
         self.logs_dir    = self.repo_root / "logs"
         self.gpu_guard_dir = self.logs_dir / "gpu_guard"
+        self.gpu_pools_dir = self.logs_dir / "gpu_pools"
 
     SCRIPT_DIRS = {
         "pre_process"               : "processing",

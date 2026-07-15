@@ -397,6 +397,11 @@ class RequestRouter:
             self.processes.adopt_orphans()
             self._send_json(handler, {"jobs": self.processes.list_jobs()})
             return
+        if path.startswith("/api/jobs/") and path.endswith("/gpus"):
+            job_id = path[len("/api/jobs/"):-len("/gpus")]
+            result = self.processes.gpu_pool(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/tensorboard":
             self._send_json(handler, {"instances": self.tensorboard.list_instances()})
             return
@@ -458,6 +463,12 @@ class RequestRouter:
         if path.startswith("/api/jobs/") and path.endswith("/stop"):
             job_id = path[len("/api/jobs/"):-len("/stop")]
             result = self.processes.stop(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path.startswith("/api/jobs/") and path.endswith("/gpus"):
+            job_id = path[len("/api/jobs/"):-len("/gpus")]
+            result = self.processes.set_gpus(job_id, body.get("gpus"))
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

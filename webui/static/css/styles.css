@@ -1147,6 +1147,14 @@ main { margin-left: var(--navw); }
 .console-tile__meta { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .console-tile__out { flex: 1; min-height: 0; min-width: 0; padding: 10px 12px; overflow: hidden; }
 .console-tile__out .xterm { height: 100%; }
+.console-tile__gpus {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  border-bottom: 1px solid var(--glass-line); background: var(--glass-bg-2);
+}
+.console-tile__gpus[hidden] { display: none; }
+.console-tile__gpuactions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.console-tile__gpunote { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); overflow-wrap: anywhere; }
+.console-tile .btn[hidden] { display: none; }
 
 /* ---------- TensorBoard ---------- */
 .page--tb { max-width: none; height: 100dvh; min-height: 0; padding: 84px 18px 18px; }

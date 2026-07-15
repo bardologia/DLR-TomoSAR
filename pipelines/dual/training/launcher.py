@@ -47,7 +47,7 @@ class DualSingleTrainRunner(SingleTrainRunner):
 
 class DualTrainScheduler(TrainScheduler):
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "input_trials", "gpus", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "input_trials", "gpus", "gpus_file", "poll_interval_s")
 
     MODE_SUBDIRS = {
         "input" : "input",

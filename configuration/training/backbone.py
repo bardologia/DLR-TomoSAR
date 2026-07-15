@@ -247,4 +247,5 @@ class BackboneEntryConfig:
     ablation_include_full : bool = True
 
     gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
+    gpus_file        : str                   = ""
     poll_interval_s  : float                 = 5.0

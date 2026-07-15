@@ -47,7 +47,8 @@ class GpuPoolFile:
         self.write(gpus)
         self.logger.info(f"GPU pool is live-editable at {self.path} — write {{\"gpus\": [...]}} to resize this experiment while it runs")
 
-    def _validate(self, payload) -> list[int]:
+    @staticmethod
+    def validate(payload) -> list[int]:
         if not isinstance(payload, dict) or "gpus" not in payload:
             raise ValueError(f"expected an object holding a 'gpus' key, got {payload!r}")
 
@@ -75,7 +76,7 @@ class GpuPoolFile:
         self.stamp = stamp
 
         try:
-            return self._validate(FileIO.load_json(self.path))
+            return self.validate(FileIO.load_json(self.path))
         except (ValueError, TypeError, json.JSONDecodeError, OSError) as error:
             self.logger.error(f"Rejected the GPU pool edit in {self.path}: {error}. The pool is unchanged; fix the file to resize the experiment.")
             return None

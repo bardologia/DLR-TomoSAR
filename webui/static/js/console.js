@@ -1,6 +1,8 @@
 "use strict";
 
 class ConsoleTile {
+  static GPU_POLL_MS = 4000;
+
   constructor(job, manager, host) {
     this.job = job;
     this.manager = manager;
@@ -29,6 +31,13 @@ class ConsoleTile {
     this.badgeEl.className = `badge badge--${job.status}`;
     this.badgeEl.textContent = job.status;
 
+    this.gpuBtn = document.createElement("button");
+    this.gpuBtn.className = "btn btn--mini";
+    this.gpuBtn.textContent = "GPUs";
+    this.gpuBtn.hidden = true;
+    this.gpuBtn.title = "Resize the GPU pool of this running fan-out";
+    this.gpuBtn.addEventListener("click", () => this._toggleGpus());
+
     this.stopBtn = document.createElement("button");
     this.stopBtn.className = "btn btn--mini btn--danger";
     this.stopBtn.addEventListener("click", () => this.manager.stop(this.job.job_id));
@@ -38,12 +47,36 @@ class ConsoleTile {
     this.closeBtn.textContent = "Close";
     this.closeBtn.addEventListener("click", () => this.manager.close(this.job.job_id));
 
-    bar.append(this.nameEl, this.metaEl, this.badgeEl, this.stopBtn, this.closeBtn);
+    bar.append(this.nameEl, this.metaEl, this.badgeEl, this.gpuBtn, this.stopBtn, this.closeBtn);
+
+    this.poolGpus = [];
+    this.gpuCards = null;
+    this.gpuTimer = null;
+
+    this.gpuPanel = document.createElement("div");
+    this.gpuPanel.className = "console-tile__gpus";
+    this.gpuPanel.hidden = true;
+
+    this.gpuBoard = document.createElement("div");
+
+    this.gpuNote = document.createElement("span");
+    this.gpuNote.className = "console-tile__gpunote";
+
+    this.gpuApply = document.createElement("button");
+    this.gpuApply.className = "btn btn--mini btn--primary";
+    this.gpuApply.textContent = "Apply";
+    this.gpuApply.addEventListener("click", () => this._applyGpus());
+
+    const gpuActions = document.createElement("div");
+    gpuActions.className = "console-tile__gpuactions";
+    gpuActions.append(this.gpuNote, this.gpuApply);
+
+    this.gpuPanel.append(this.gpuBoard, gpuActions);
 
     this.outEl = document.createElement("div");
     this.outEl.className = "console-tile__out";
 
-    this.root.append(bar, this.outEl);
+    this.root.append(bar, this.gpuPanel, this.outEl);
     host.appendChild(this.root);
 
     this.term = new Terminal({
@@ -135,6 +168,102 @@ class ConsoleTile {
     this.badgeEl.textContent = status;
     this.stopBtn.textContent = status === "scheduled" || status === "queued" ? "Cancel" : "Stop";
     this.stopBtn.disabled = status !== "running" && status !== "scheduled" && status !== "queued";
+
+    if (status === "running") this._watchGpus();
+    else this._unwatchGpus();
+  }
+
+  _watchGpus() {
+    if (this.gpuTimer) return;
+    this._pollGpus();
+    this.gpuTimer = setInterval(() => this._pollGpus(), ConsoleTile.GPU_POLL_MS);
+  }
+
+  _unwatchGpus() {
+    clearInterval(this.gpuTimer);
+    this.gpuTimer = null;
+    this.gpuBtn.hidden = true;
+    this.gpuPanel.hidden = true;
+  }
+
+  async _pollGpus() {
+    let data = null;
+    try {
+      data = await window.apiGet(`/api/jobs/${this.job.job_id}/gpus`);
+    } catch (e) {
+      return;
+    }
+
+    const live = Boolean(data && data.ok && data.live);
+    this.gpuBtn.hidden = !live;
+    if (!live) {
+      this.gpuPanel.hidden = true;
+      return;
+    }
+
+    this.poolGpus = data.gpus || [];
+    this.gpuBtn.textContent = `GPUs ${this.poolGpus.join(",") || "none"}`;
+    if (this.gpuPanel.hidden) return;
+    this._paintGpuNote();
+  }
+
+  _toggleGpus() {
+    if (!this.gpuPanel.hidden) {
+      this.gpuPanel.hidden = true;
+      return;
+    }
+
+    this.gpuPanel.hidden = false;
+
+    if (!this.gpuCards) {
+      this.gpuCards = new window.GpuCardSelect(this.gpuBoard, {
+        multi: true,
+        initial: this.poolGpus,
+        onChange: () => this._paintGpuNote(),
+      });
+      this.gpuCards.load().then(() => this._paintGpuNote());
+      return;
+    }
+
+    this.gpuCards.set(this.poolGpus);
+    this._paintGpuNote();
+  }
+
+  _paintGpuNote() {
+    const chosen = this.gpuCards ? this.gpuCards.value() : [];
+    const added = chosen.filter((g) => !this.poolGpus.includes(g));
+    const dropped = this.poolGpus.filter((g) => !chosen.includes(g));
+
+    this.gpuApply.disabled = !chosen.length || (!added.length && !dropped.length);
+
+    if (!chosen.length) {
+      this.gpuNote.textContent = "select at least one GPU — an empty pool would park the experiment";
+      return;
+    }
+    if (!added.length && !dropped.length) {
+      this.gpuNote.textContent = `pool: ${this.poolGpus.join(", ") || "none"}`;
+      return;
+    }
+
+    const bits = [];
+    if (added.length) bits.push(`+${added.join(",")} start queued runs within seconds`);
+    if (dropped.length) bits.push(`-${dropped.join(",")} retire once the run in flight ends`);
+    this.gpuNote.textContent = bits.join(" · ");
+  }
+
+  async _applyGpus() {
+    const chosen = this.gpuCards ? this.gpuCards.value() : [];
+    const res = await window.apiPost(`/api/jobs/${this.job.job_id}/gpus`, { gpus: chosen });
+
+    if (!res.ok) {
+      window.toast(res.error || "Could not resize the GPU pool", "error");
+      return;
+    }
+
+    this.poolGpus = res.gpus || [];
+    this.gpuPanel.hidden = true;
+    window.toast(`GPU pool set to ${this.poolGpus.join(", ")}`, "ok");
+    this._pollGpus();
   }
 
   fit() {
@@ -164,6 +293,7 @@ class ConsoleTile {
 
   dispose() {
     this._disconnect();
+    this._unwatchGpus();
     this.term.dispose();
     this.root.remove();
   }
