@@ -425,6 +425,31 @@ def test_pool_shrink_mid_run_stops_dispatching_to_the_removed_gpu(tmp_path):
     assert by_name["j3"].gpu == 0
 
 
+def test_parked_pool_holds_queued_jobs_until_a_gpu_returns(tmp_path):
+    capture = tmp_path / "gpu_seen.txt"
+    command = _sleeper_command(capture, 0.3)
+    jobs    = [_job(tmp_path, f"j{i}", [*command]) for i in range(2)]
+
+    queue, pool = _pool_queue(tmp_path, [0], poll_interval_s=0.02)
+
+    def park_then_resume() -> None:
+        time.sleep(0.15)
+        _write_pool(pool, [])
+        time.sleep(1.0)
+        _write_pool(pool, [0])
+
+    thread  = threading.Thread(target=park_then_resume, daemon=True)
+    started = time.monotonic()
+    thread.start()
+    results = queue.run(jobs)
+    elapsed = time.monotonic() - started
+    thread.join()
+
+    assert len(results) == 2
+    assert all(result.status == "DONE" for result in results)
+    assert elapsed > 1.15
+
+
 def test_signal_handlers_restored_after_run(tmp_path):
     before_term = signal.getsignal(signal.SIGTERM)
     before_int  = signal.getsignal(signal.SIGINT)

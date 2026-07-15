@@ -202,7 +202,7 @@ class ConsoleTile {
     }
 
     this.poolGpus = data.gpus || [];
-    this.gpuBtn.textContent = `GPUs ${this.poolGpus.join(",") || "none"}`;
+    this.gpuBtn.textContent = this.poolGpus.length ? `GPUs ${this.poolGpus.join(",")}` : "GPUs parked";
     if (this.gpuPanel.hidden) return;
     this._paintGpuNote();
   }
@@ -233,15 +233,21 @@ class ConsoleTile {
     const chosen = this.gpuCards ? this.gpuCards.value() : [];
     const added = chosen.filter((g) => !this.poolGpus.includes(g));
     const dropped = this.poolGpus.filter((g) => !chosen.includes(g));
+    const parking = !chosen.length;
 
-    this.gpuApply.disabled = !chosen.length || (!added.length && !dropped.length);
+    this.gpuApply.disabled = !added.length && !dropped.length;
+    this.gpuApply.textContent = parking ? "Park" : "Apply";
+    this.gpuApply.classList.toggle("btn--danger", parking);
+    this.gpuApply.classList.toggle("btn--primary", !parking);
 
-    if (!chosen.length) {
-      this.gpuNote.textContent = "select at least one GPU — an empty pool would park the experiment";
+    if (parking) {
+      this.gpuNote.textContent = this.poolGpus.length
+        ? `park: runs in flight on ${this.poolGpus.join(",")} finish, nothing new starts until you add a GPU back`
+        : "parked — nothing new starts until you add a GPU back";
       return;
     }
     if (!added.length && !dropped.length) {
-      this.gpuNote.textContent = `pool: ${this.poolGpus.join(", ") || "none"}`;
+      this.gpuNote.textContent = `pool: ${this.poolGpus.join(", ") || "parked"}`;
       return;
     }
 
@@ -253,7 +259,11 @@ class ConsoleTile {
 
   async _applyGpus() {
     const chosen = this.gpuCards ? this.gpuCards.value() : [];
-    const res = await window.apiPost(`/api/jobs/${this.job.job_id}/gpus`, { gpus: chosen });
+    const parking = !chosen.length;
+
+    if (parking && !window.confirm(`Park ${this.job.script}?\n\nThe runs in flight will finish, then the experiment holds without starting anything new. It stays parked until you add a GPU back.`)) return;
+
+    const res = await window.apiPost(`/api/jobs/${this.job.job_id}/gpus`, { gpus: chosen, park: parking });
 
     if (!res.ok) {
       window.toast(res.error || "Could not resize the GPU pool", "error");
@@ -262,7 +272,7 @@ class ConsoleTile {
 
     this.poolGpus = res.gpus || [];
     this.gpuPanel.hidden = true;
-    window.toast(`GPU pool set to ${this.poolGpus.join(", ")}`, "ok");
+    window.toast(res.parked ? "Experiment parked — no new runs will start" : `GPU pool set to ${this.poolGpus.join(", ")}`, res.parked ? "warn" : "ok");
     this._pollGpus();
   }
 

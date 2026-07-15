@@ -468,7 +468,7 @@ class RequestRouter:
 
         if path.startswith("/api/jobs/") and path.endswith("/gpus"):
             job_id = path[len("/api/jobs/"):-len("/gpus")]
-            result = self.processes.set_gpus(job_id, body.get("gpus"))
+            result = self.processes.set_gpus(job_id, body.get("gpus"), park=bool(body.get("park")))
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

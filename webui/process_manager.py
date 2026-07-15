@@ -625,7 +625,7 @@ class ProcessManager:
 
         return {"ok": True, "supported": True, "live": True, "gpus": gpus, "path": str(pool)}
 
-    def set_gpus(self, job_id: str, gpus) -> dict:
+    def set_gpus(self, job_id: str, gpus, park: bool = False) -> dict:
         with self.lock:
             record = self.jobs.get(job_id)
 
@@ -648,13 +648,17 @@ class ProcessManager:
         except (ValueError, TypeError) as error:
             return {"ok": False, "error": str(error)}
 
-        if not requested:
-            return {"ok": False, "error": "select at least one GPU; an empty pool would park the experiment"}
+        if not requested and not park:
+            return {"ok": False, "error": "select at least one GPU, or confirm parking to hold the experiment"}
 
         GpuPoolFile(pool, self.logger).write(requested)
-        self.logger.ok(f"job {job_id} GPU pool set to {requested}")
 
-        return {"ok": True, "gpus": requested}
+        if requested:
+            self.logger.ok(f"job {job_id} GPU pool set to {requested}")
+        else:
+            self.logger.warning(f"job {job_id} parked — no GPUs left in the pool, runs in flight will finish and nothing new starts")
+
+        return {"ok": True, "gpus": requested, "parked": not requested}
 
     def clear_queue(self) -> int:
         with self.lock:

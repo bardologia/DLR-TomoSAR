@@ -1787,6 +1787,7 @@ main { margin-left: var(--navw); }
 }
 .toast.is-show { opacity: 1; transform: translate(-50%, 0); }
 .toast.is-error { border-color: var(--danger); color: #ffc4cb; }
+.toast.is-warn { border-color: var(--dk-warn); color: #fde68a; }
 .toast.is-ok { border-color: var(--accent-2); }
 
 /* ---------- Nav active ---------- */

@@ -146,7 +146,7 @@ def test_set_gpus_writes_the_pool_file_of_a_running_fan_out(manager):
 
     applied = manager.set_gpus(job_id, [0, 2, 3])
 
-    assert applied == {"ok": True, "gpus": [0, 2, 3]}
+    assert applied == {"ok": True, "gpus": [0, 2, 3], "parked": False}
     assert json.loads(pool.read_text()) == {"gpus": [0, 2, 3]}
     assert manager.gpu_pool(job_id)["gpus"] == [0, 2, 3]
 
@@ -168,8 +168,37 @@ def test_set_gpus_refuses_a_job_that_seeded_no_pool(manager):
     manager.stop(job_id)
 
 
+def test_set_gpus_parks_only_when_parking_is_confirmed(manager):
+    result = manager.launch("train_backbone", sys.executable)
+    job_id = result["job_id"]
+
+    assert _wait_running(manager, job_id)
+
+    pool = _pool_path(manager, job_id)
+    pool.parent.mkdir(parents=True, exist_ok=True)
+    pool.write_text(json.dumps({"gpus": [0, 1]}))
+
+    refused = manager.set_gpus(job_id, [])
+
+    assert refused["ok"] is False
+    assert "confirm parking" in refused["error"]
+    assert json.loads(pool.read_text()) == {"gpus": [0, 1]}
+
+    parked = manager.set_gpus(job_id, [], park=True)
+
+    assert parked == {"ok": True, "gpus": [], "parked": True}
+    assert json.loads(pool.read_text()) == {"gpus": []}
+    assert manager.gpu_pool(job_id)["gpus"] == []
+
+    resumed = manager.set_gpus(job_id, [2])
+
+    assert resumed == {"ok": True, "gpus": [2], "parked": False}
+    assert json.loads(pool.read_text()) == {"gpus": [2]}
+
+    manager.stop(job_id)
+
+
 @pytest.mark.parametrize("gpus, reason", [
-    ([],           "at least one"),
     ([0, 0],       "repeat"),
     ([-1],         "non-negative"),
     (["0"],        "non-negative"),
