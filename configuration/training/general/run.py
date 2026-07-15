@@ -6,14 +6,18 @@ from pathlib     import Path
 from configuration.training.general.optimization import ClipMode, SchedulerType, WarmupMode
 
 
+DEFAULT_DATASET_DIR = Path("/ste/rnd/User/vice_vi/Dataset/17sartom-traun_L_az1000-16000_rg500-4000_w26_12_hv_1_20260714_195834")
+DEFAULT_PARAMS_RUN  = "params_k2_lam0_sig4_sigma_mu_amp"
+
+
 def standard_seeds() -> list[int]:
     return [0, 1, 2, 3, 4]
 
 
 @dataclass
 class TrainingPathsConfig:
-    dataset_path     : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10")
-    parameters_path  : Path  = Path("/ste/rnd/User/vice_vi/Dataset/base_dataset_w20_10/params/params_Ng3_sigonly_k5/parameters_Ng3_sigonly_k5.npy")
+    dataset_path     : Path  = DEFAULT_DATASET_DIR
+    parameters_path  : Path  = DEFAULT_DATASET_DIR / "params" / DEFAULT_PARAMS_RUN / "parameters.npy"
     secondary_labels : tuple = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
 
 
