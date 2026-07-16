@@ -15,13 +15,13 @@ summary: Shallow full-resolution CNN control baseline; a fixed small receptive f
 
 # Local CNN
 
-`LocalCNN` (`models/backbone/pixel_baselines.py`) is the local-context control of the zoo: a stack of standard `ConvBlock`s (two $3\times3$ convolutions each) applied at full resolution with no downsampling, followed by a $1\times1$ `output_head`. Its receptive field is fixed and small by construction, so it measures how much of the task is solved by a pixel's immediate neighbourhood.
+`LocalCNN` (`models/backbone/pixel_baselines.py`) is the local-context control of the zoo: a stack of standard `ConvBlock`s (two convolutions each, per-block kernel size from `block_kernels`, default $3\times3$ everywhere) applied at full resolution with no downsampling, followed by a $1\times1$ `output_head`. Its receptive field is fixed and small by construction, so it measures how much of the task is solved by a pixel's immediate neighbourhood.
 
 ---
 
 ## Summary
 
-The trunk chains $B$ `ConvBlock`s — the same double-conv block used by the [[UNet]] family — at constant resolution, each block widening (or keeping) the channel count per `features`. With two $3\times3$ convolutions per block, the receptive field after $B$ blocks is $(4B+1)\times(4B+1)$: the default `features = [832, 832, 832]` gives a $13\times13$ window. Together with [[PixelMLP]] it brackets the spatial-context question: PixelMLP has none, LocalCNN has a fixed local window, and the encode-decode backbones aggregate context across the whole patch. Comparing the three at matched capacity decomposes backbone performance into per-pixel mapping, local smoothing, and long-range context.
+The trunk chains $B$ `ConvBlock`s — the same double-conv block used by the [[UNet]] family — at constant resolution, each block widening (or keeping) the channel count per `features` and carrying its own kernel size per `block_kernels` (default $3\times3$ everywhere). Each block contributes $2(k-1)$ pixels of receptive field, so a pure $3\times3$ stack gives $(4B+1)\times(4B+1)$ — the default `features = [1072, 1072]` gives a $9\times9$ window — while mixing $3\times3$ and $1\times1$ blocks sets the receptive field at constant depth: the context-ladder rungs (RF 1/9/29/41, widths 1277/848/502/426, ten blocks each) hold depth, parameters, and compute fixed so only spatial reach varies. An all-$1\times1$ stack degenerates to a per-pixel MLP, so the ladder's floor lives in the same family. Comparing the rungs against the encode-decode backbones at matched capacity decomposes performance into per-pixel mapping, local smoothing, and long-range context.
 
 ---
 
@@ -60,7 +60,7 @@ No pooling, striding, or upsampling appears anywhere: spatial resolution is pres
 
 ## Parameter Reference
 
-See [[Configuration Layer]] → `LocalCNNConfig` (`features` — channel width per `ConvBlock`, receptive field $4B+1$; `activation`, `normalization`, `dropout`).
+See [[Configuration Layer]] → `LocalCNNConfig` (`features` — channel width per `ConvBlock`; `block_kernels` — per-block kernel size, receptive field $1 + \sum_b 2(k_b - 1)$; `activation`, `normalization`, `dropout`).
 
 ---
 

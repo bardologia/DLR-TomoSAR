@@ -293,20 +293,45 @@ def test_context_planner_default_walks_the_context_ladder():
     plans = planner.plan()
 
     assert plans == [
-        ("ctx-mlp",   {"backbone_name": "pixel_mlp"}),
-        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [1072] * 2}}),
-        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [515] * 7}}),
+        ("ctx-cnn01", {"backbone_name": "local_cnn", "model_overrides": {"features": [1277] * 10, "block_kernels": [1] * 10}}),
+        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [848]  * 10, "block_kernels": [3] * 2 + [1] * 8}}),
+        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [502]  * 10, "block_kernels": [3] * 7 + [1] * 3}}),
+        ("ctx-cnn41", {"backbone_name": "local_cnn", "model_overrides": {"features": [426]  * 10, "block_kernels": [3] * 10}}),
     ]
     assert planner.summary() == {
-        "Rungs"      : ["mlp:pixel_mlp", "cnn09:local_cnn", "cnn29:local_cnn"],
-        "Total runs" : 3,
+        "Rungs"      : ["cnn01:local_cnn", "cnn09:local_cnn", "cnn29:local_cnn", "cnn41:local_cnn"],
+        "Total runs" : 4,
     }
 
 
 def test_context_ladder_receptive_fields_bracket_the_label_window():
-    fields = [1 + 4 * len(trial["features"]) for trial in _default_context_trials() if "features" in trial]
+    trials = _default_context_trials()
 
-    assert fields == [9, 29]
+    fields = [1 + sum(2 * (kernel - 1) for kernel in trial["block_kernels"]) for trial in trials]
+    depths = [len(trial["features"]) for trial in trials]
+    labels = [trial["label"] for trial in trials]
+
+    assert fields == [1, 9, 29, 41]
+    assert depths == [10] * 4
+    assert labels == [f"cnn{field:02d}" for field in fields]
+
+
+def test_context_default_rungs_are_size_matched_at_constant_depth():
+    import torch.nn as nn
+
+    from models import get_backbone
+
+    unet, _ = get_backbone("unet", in_channels=9, out_channels=6)
+    target  = sum(p.numel() for p in unet.parameters())
+
+    for trial in _default_context_trials():
+        model, _ = get_backbone(trial["backbone"], in_channels=9, out_channels=6, features=trial["features"], block_kernels=trial["block_kernels"])
+
+        params = sum(p.numel() for p in model.parameters())
+        convs  = sum(1 for m in model.trunk.modules() if isinstance(m, nn.Conv2d))
+
+        assert abs(params - target) / target < 0.005, trial["label"]
+        assert convs == 20, trial["label"]
 
 
 def test_context_planner_rejects_a_rung_without_a_label():

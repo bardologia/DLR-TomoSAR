@@ -130,9 +130,10 @@ def test_context_scheduler_plans_the_receptive_field_ladder(tmp_path):
     plans = scheduler.planner().plan()
 
     assert plans == [
-        ("ctx-mlp",   {"backbone_name": "pixel_mlp"}),
-        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [1072] * 2}}),
-        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [515] * 7}}),
+        ("ctx-cnn01", {"backbone_name": "local_cnn", "model_overrides": {"features": [1277] * 10, "block_kernels": [1] * 10}}),
+        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [848]  * 10, "block_kernels": [3] * 2 + [1] * 8}}),
+        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [502]  * 10, "block_kernels": [3] * 7 + [1] * 3}}),
+        ("ctx-cnn41", {"backbone_name": "local_cnn", "model_overrides": {"features": [426]  * 10, "block_kernels": [3] * 10}}),
     ]
 
 
@@ -149,8 +150,9 @@ def test_reach_scheduler_houses_runs_and_plans_the_size_matched_arms(tmp_path):
 
     assert list(plans) == ["reach-cnn33", "reach-unet"]
     assert plans["reach-cnn33"]["backbone_name"]   == "local_cnn"
-    assert plans["reach-cnn33"]["model_overrides"] == {"features": [479] * 8}
+    assert plans["reach-cnn33"]["model_overrides"] == {"features": [479] * 8, "dropout": 0.15, "trunk_wd": 1e-4}
     assert plans["reach-unet"]["backbone_name"]    == "unet"
+    assert plans["reach-unet"]["model_overrides"]  == {"dropout": 0.15}
     assert all(overrides["training.patch_size"] == (32, 32) for overrides in plans.values())
 
 

@@ -99,16 +99,17 @@ def _default_presence_trials() -> dict:
 
 def _default_context_trials() -> list:
     return [
-        {"label" : "mlp",   "backbone" : "pixel_mlp"},
-        {"label" : "cnn09", "backbone" : "local_cnn", "features" : [1072] * 2},
-        {"label" : "cnn29", "backbone" : "local_cnn", "features" : [515]  * 7},
+        {"label" : "cnn01", "backbone" : "local_cnn", "features" : [1277] * 10, "block_kernels" : [1] * 10},
+        {"label" : "cnn09", "backbone" : "local_cnn", "features" : [848]  * 10, "block_kernels" : [3] * 2 + [1] * 8},
+        {"label" : "cnn29", "backbone" : "local_cnn", "features" : [502]  * 10, "block_kernels" : [3] * 7 + [1] * 3},
+        {"label" : "cnn41", "backbone" : "local_cnn", "features" : [426]  * 10, "block_kernels" : [3] * 10},
     ]
 
 
 def _default_reach_rungs() -> list:
     return [
-        {"label" : "cnn33", "backbone" : "local_cnn", "features" : [479] * 8},
-        {"label" : "unet",  "backbone" : "unet"},
+        {"label" : "cnn33", "backbone" : "local_cnn", "features" : [479] * 8, "dropout" : 0.15, "trunk_wd" : 1e-4},
+        {"label" : "unet",  "backbone" : "unet",      "dropout" : 0.15},
     ]
 
 

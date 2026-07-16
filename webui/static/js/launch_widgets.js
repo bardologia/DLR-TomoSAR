@@ -1702,7 +1702,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "One training run per rung on the shared base config, walking the spatial-context ladder (pixel MLP, then a 9x9 and a 29x29 local CNN by default, each size matched to the default UNet). Every rung is a label plus a backbone from the registry and optional model overrides; add rungs by editing context_trials, use reset backbones to restore the default.";
+    note.textContent = "One training run per rung on the shared base config, walking the spatial-context ladder at constant depth: ten-block local CNNs whose 3x3 / 1x1 block mix sets the receptive field (RF 1, 9, 29, 41 by default), every rung size matched to the default UNet. Every rung is a label plus a backbone from the registry and model overrides; add rungs by editing context_trials, use reset backbones to restore the default.";
 
     const cellHead       = document.createElement("div");
     cellHead.className    = "exp-presence__sub";
