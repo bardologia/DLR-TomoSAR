@@ -249,6 +249,11 @@ class DatasetPicker {
       pending.title = "select runs with a checkpoint and no inference yet";
       head.appendChild(pending);
     }
+    if (this.spec.seedButton) {
+      const seeds = window.LaunchWidgetDom.mini("Seeds", () => this._setSeeds());
+      seeds.title = "select only multi-seed run groups";
+      head.appendChild(seeds);
+    }
     head.appendChild(window.LaunchWidgetDom.mini("Reload", () => this._loadMulti()));
 
     this.body = document.createElement("div");
@@ -387,6 +392,17 @@ class DatasetPicker {
     this.items.forEach((d) => {
       if (!visible.has(d.name)) return;
       if (d.has_checkpoint && !d.has_inference) this.selected.add(d.name);
+      else this.selected.delete(d.name);
+    });
+    this._renderItems();
+    this._commitMulti();
+  }
+
+  _setSeeds() {
+    const visible = new Set(this._visibleNames());
+    this.items.forEach((d) => {
+      if (!visible.has(d.name)) return;
+      if (d.n_seeds) this.selected.add(d.name);
       else this.selected.delete(d.name);
     });
     this._renderItems();

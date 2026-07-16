@@ -1001,7 +1001,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Runs", "fields": [
                             "runs_dir",
-                            {"path": "run_tags", "widget": {"kind": "dataset", "mode": "runs_compare", "multi": True, "baseFrom": "runs_dir"}},
+                            {"path": "run_tags", "widget": {"kind": "dataset", "mode": "runs_compare", "multi": True, "baseFrom": "runs_dir", "seedButton": True}},
                         ]},
                         {"title": "Report", "fields": ["compare_images", "compare_gifs", "embed_images", "output_dir"]},
                     ]},
@@ -1095,7 +1095,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Runs", "fields": [
                             "runs_dir",
-                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "units": True}},
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "units": True, "seedButton": True}},
                         ]},
                         {"title": "Collection", "fields": ["collector_dir", "inference_dirname", "report_filename", "latest_only", "embed_images"]},
                     ]},
