@@ -64,6 +64,46 @@ def test_walk_prunes_at_run_boundary_and_skips_hidden(tmp_path):
     assert not any("inference" in name for name in names)
 
 
+def test_seed_units_are_offered_with_aggregate_flags(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "group_a" / "trial_x" / "seed0", checkpoint=True, inference=True)
+    _make_run(runs / "group_a" / "trial_x" / "seed1", checkpoint=True, inference=True)
+    _make_run(runs / "group_a" / "trial_y" / "seed0", checkpoint=True)
+    _make_run(runs / "group_a" / "trial_y" / "seed1", checkpoint=True, inference=True)
+    _make_run(runs / "run_top", checkpoint=True)
+
+    result  = DatasetBrowser(WebLogger()).runs([str(runs)], seed_units=True)
+    entries = {entry["name"]: entry for entry in result["runs"]}
+
+    assert entries["group_a/trial_x"]["n_seeds"] == 2
+    assert entries["group_a/trial_x"]["has_inference"] is True
+    assert entries["group_a/trial_x"]["has_checkpoint"] is True
+    assert entries["group_a/trial_y"]["has_inference"] is False
+    assert "n_seeds" not in entries["run_top"]
+
+
+def test_seed_unit_rows_precede_their_seed_runs(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "trial_x" / "seed0")
+    _make_run(runs / "trial_x" / "seed1")
+
+    names = [entry["name"] for entry in DatasetBrowser(WebLogger()).runs([str(runs)], seed_units=True)["runs"]]
+
+    assert names == ["trial_x", "trial_x/seed0", "trial_x/seed1"]
+
+
+def test_seed_units_absent_by_default_and_for_base_level_seeds(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "trial_x" / "seed0")
+    _make_run(runs / "seed0")
+
+    default_names = [entry["name"] for entry in DatasetBrowser(WebLogger()).runs([str(runs)])["runs"]]
+    unit_names    = [entry["name"] for entry in DatasetBrowser(WebLogger()).runs([str(runs)], seed_units=True)["runs"]]
+
+    assert default_names == ["seed0", "trial_x/seed0"]
+    assert unit_names    == ["seed0", "trial_x", "trial_x/seed0"]
+
+
 def test_run_groups_lists_parent_dirs_of_runs_with_counts(tmp_path):
     runs = tmp_path / "runs"
     _make_run(runs / "group_a" / "seed0")

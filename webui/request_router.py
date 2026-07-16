@@ -118,7 +118,7 @@ class RequestRouter:
             return
         if path == "/api/fs/runs":
             query  = parse_qs(urlparse(handler.path).query)
-            result = self.datasets.runs(query.get("base") or [])
+            result = self.datasets.runs(query.get("base") or [], seed_units=(query.get("units") or ["0"])[0] == "1")
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path == "/api/fs/run_groups":

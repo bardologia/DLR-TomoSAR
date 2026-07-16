@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from pathlib import Path
 
 from web_logger import WebLogger
@@ -7,6 +9,7 @@ from web_logger import WebLogger
 
 class DatasetBrowser:
 
+    SEED_DIR        = re.compile(r"seed\d+")
     DATA_MARKER     = "data"
     PARAMS_DIR      = "params"
     PARAM_SUFFIX    = ".npy"
@@ -45,24 +48,56 @@ class DatasetBrowser:
         self.logger.info(f"datasets: listed {len(entries)} under {base}")
         return {"ok": True, "base": str(base), "datasets": entries}
 
-    def runs(self, raw_bases: list[str]) -> dict:
+    def runs(self, raw_bases: list[str], seed_units: bool = False) -> dict:
         roots = [resolved for resolved in (self._directory(raw) for raw in raw_bases) if resolved is not None]
         if not roots:
             return {"ok": False, "error": f"no run roots: {raw_bases}"}
 
         entries = []
         for base in roots:
+            base_entries = []
             for run_dir in self._run_dirs(base):
-                entries.append({
+                base_entries.append({
                     "name"           : str(run_dir.relative_to(base)),
                     "path"           : str(run_dir),
                     "has_checkpoint" : (run_dir / self.CHECKPOINT_NAME).is_file(),
                     "has_inference"  : self._has_inference(run_dir),
                 })
 
+            entries += self._with_seed_units(base, base_entries) if seed_units else base_entries
+
         base_label = ", ".join(str(root) for root in roots)
         self.logger.info(f"runs: listed {len(entries)} under {base_label}")
         return {"ok": True, "base": base_label, "runs": entries}
+
+    def _with_seed_units(self, base: Path, run_entries: list[dict]) -> list[dict]:
+        units = {}
+        for entry in run_entries:
+            run_dir = Path(entry["path"])
+            if self.SEED_DIR.fullmatch(run_dir.name) is None or run_dir.parent == base:
+                continue
+
+            unit = units.setdefault(str(run_dir.parent), {
+                "name"           : str(run_dir.parent.relative_to(base)),
+                "path"           : str(run_dir.parent),
+                "has_checkpoint" : True,
+                "has_inference"  : True,
+                "n_seeds"        : 0,
+            })
+            unit["has_checkpoint"] = unit["has_checkpoint"] and entry["has_checkpoint"]
+            unit["has_inference"]  = unit["has_inference"] and entry["has_inference"]
+            unit["n_seeds"]       += 1
+
+        merged  = []
+        emitted = set()
+        for entry in run_entries:
+            parent = str(Path(entry["path"]).parent)
+            if parent in units and parent not in emitted:
+                merged.append(units[parent])
+                emitted.add(parent)
+            merged.append(entry)
+
+        return merged
 
     def run_groups(self, raw_bases: list[str]) -> dict:
         roots = [resolved for resolved in (self._directory(raw) for raw in raw_bases) if resolved is not None]
