@@ -603,6 +603,7 @@ class ExperimentBuilder {
     if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
     if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
     if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
+    if (this.modeLeaf && this.reach.size)         body.appendChild(this._reachPanel());
     if (this.modeLeaf && this.headTrials.size)    body.appendChild(this._headPanel());
     if (this.modeLeaf && this.augTrialsLeaf)      body.appendChild(this._augmentationPanel());
     if (this.modeLeaf && this.normTrials.size)    body.appendChild(this._normalizationPanel());
@@ -638,6 +639,7 @@ class ExperimentBuilder {
     this._paintPresence();
     this._paintInput();
     this._paintContext();
+    this._paintReach();
     this._paintHead();
     this._paintAugmentation();
     this._paintNormalization();
@@ -1762,6 +1764,124 @@ class ExperimentBuilder {
     this._paintNames();
   }
 
+  _reachPanel() {
+    const panel     = document.createElement("div");
+    panel.className = "exp-secondary exp-presence";
+
+    const head     = document.createElement("div");
+    head.className = "exp-col__head";
+    head.innerHTML = `<span class="exp-col__name">reach comparison</span>`;
+    const reset    = LaunchWidgetDom.mini("reset arms", () => this._resetReach());
+    reset.classList.add("exp-presence__reset");
+    head.appendChild(reset);
+
+    const note       = document.createElement("p");
+    note.className   = "exp-secondary__note";
+    note.textContent = "Size-matched architecture comparison at fixed reach: every arm trains on the same square patch with the same parameter budget (default a 33x33 local CNN against a UNet, both about 31.0 M), so the architecture is the only free variable. The scheduler counts every arm before launching and refuses the sweep when they drift beyond the match tolerance.";
+
+    const cellHead      = document.createElement("div");
+    cellHead.className  = "exp-presence__sub";
+    cellHead.textContent = "arms";
+
+    const cells       = document.createElement("div");
+    cells.className   = "exp-builder__names exp-presence__cells";
+    this.reachCellsEl = cells;
+
+    const grid     = document.createElement("div");
+    grid.className = "exp-secondary__grid";
+    ["patch_size", "patch_stride", "in_channels", "match_tolerance"].forEach((key) => {
+      const leaf = this.reach.get(key);
+      if (leaf) grid.appendChild(this._reachRow(key, leaf));
+    });
+
+    panel.appendChild(head);
+    panel.appendChild(note);
+    panel.appendChild(cellHead);
+    panel.appendChild(cells);
+    panel.appendChild(grid);
+    this.reachEl = panel;
+
+    const rungsLeaf = this.reach.get("rungs");
+    if (rungsLeaf) this.view.controls[rungsLeaf.path] = { leaf: rungsLeaf, reset: () => this._repaintReach() };
+
+    this._paintReach();
+    return panel;
+  }
+
+  _reachRow(key, leaf) {
+    const row     = document.createElement("div");
+    row.className = "cfg-edit__row";
+    row.title     = `--${leaf.path}`;
+
+    const name     = document.createElement("div");
+    name.className = "cfg-edit__name";
+    name.innerHTML = `${key}<span>${leaf.type}</span>`;
+
+    const numeric    = key === "in_channels" || key === "match_tolerance";
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input";
+    input.type       = numeric ? "number" : "text";
+    if (numeric) input.step = key === "in_channels" ? "1" : "any";
+    input.value      = leaf.value;
+    input.spellcheck = false;
+    input.addEventListener("input", () => {
+      input.classList.toggle("is-dirty", input.value !== leaf.value && input.value !== "");
+      this.view._setValue(leaf, input.value);
+      this._paintSummary();
+    });
+
+    row.appendChild(name);
+    row.appendChild(input);
+
+    this.view.controls[leaf.path] = { leaf, reset: () => {
+      input.value = leaf.value;
+      input.classList.remove("is-dirty");
+    } };
+    return row;
+  }
+
+  _paintReach() {
+    if (!this.reachCellsEl) return;
+    this.reachCellsEl.innerHTML = "";
+    this._reachRungs().forEach((rung) => this.reachCellsEl.appendChild(this._reachChip(rung)));
+  }
+
+  _reachChip(rung) {
+    const chip     = document.createElement("span");
+    chip.className = "exp-name exp-presence__cell";
+
+    const label       = document.createElement("span");
+    label.textContent = `${rung.label} · ${rung.backbone}`;
+    chip.appendChild(label);
+
+    const remove = LaunchWidgetDom.mini("×", () => this._removeReachCell(rung.label));
+    remove.classList.add("exp-presence__remove");
+    remove.title = "Remove arm";
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _removeReachCell(label) {
+    const leaf = this.reach.get("rungs");
+    if (!leaf) return;
+    const raw = this._reachRungs();
+    if (raw.length <= 2) return;
+    this.view._setValue(leaf, PythonLiteral.render(raw.filter((entry) => entry.label !== label)));
+    this._repaintReach();
+  }
+
+  _resetReach() {
+    const leaf = this.reach.get("rungs");
+    if (leaf) this.view._setValue(leaf, leaf.value);
+    this._repaintReach();
+  }
+
+  _repaintReach() {
+    this._paintReach();
+    this._paintSummary();
+    this._paintNames();
+  }
+
   _augDefaults() {
     if (!this.augTrialsLeaf) return {};
     try {
@@ -2117,6 +2237,7 @@ class ExperimentBuilder {
     if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
     if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
     if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
+    if (this.reachEl)            this.reachEl.hidden            = mode !== "reach";
     if (this.headEl)             this.headEl.hidden             = mode !== "head";
     if (this.augEl)              this.augEl.hidden              = mode !== "augmentation";
     if (this.normEl)             this.normEl.hidden             = mode !== "normalization";
