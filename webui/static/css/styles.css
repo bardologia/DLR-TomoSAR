@@ -1599,7 +1599,7 @@ main { margin-left: var(--navw); }
 .exp-name { font-family: var(--mono); font-size: 11.5px; color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 9px; background: var(--bg-1); }
 .exp-name--more { color: var(--ink-dim); border-style: dashed; }
 
-.exp-mode { display: flex; border: 1px solid var(--line); border-radius: var(--r-pill); overflow: hidden; }
+.exp-mode { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--r-input); overflow: hidden; }
 .exp-mode__btn { font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); padding: 5px 12px; background: var(--bg-1); border: 0; cursor: pointer; transition: color 0.15s var(--ease), background 0.15s var(--ease); }
 .exp-mode__btn + .exp-mode__btn { border-left: 1px solid var(--line); }
 .exp-mode__btn:hover { color: var(--ink); }
