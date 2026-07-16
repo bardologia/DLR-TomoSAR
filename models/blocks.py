@@ -146,14 +146,19 @@ class ConvBlock(nn.Module):
         activation:      str   = "relu",
         normalization:   str   = "batch",
         bias:            bool  = False,
+        kernel_size:     int   = 3,
     ):
         super().__init__()
-        layers = [
+        if kernel_size < 1 or kernel_size % 2 == 0:
+            raise ValueError(f"ConvBlock kernel_size={kernel_size} must be a positive odd integer so padding preserves the spatial shape")
+
+        padding = kernel_size // 2
+        layers  = [
             nn.Conv2d(
                 in_channels  = input_channels,
                 out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
+                kernel_size  = kernel_size,
+                padding      = padding,
                 bias         = bias,
             ),
             build_norm2d(normalization, output_channels),
@@ -161,8 +166,8 @@ class ConvBlock(nn.Module):
             nn.Conv2d(
                 in_channels  = output_channels,
                 out_channels = output_channels,
-                kernel_size  = 3,
-                padding      = 1,
+                kernel_size  = kernel_size,
+                padding      = padding,
                 bias         = bias,
             ),
             build_norm2d(normalization, output_channels),

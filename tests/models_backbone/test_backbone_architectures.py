@@ -145,3 +145,48 @@ def test_param_groups_cover_every_parameter(name, head):
 def test_unknown_head_raises(name):
     with pytest.raises(ValueError):
         _build(name, head="dense")
+
+
+def test_local_cnn_block_kernels_control_the_receptive_field():
+    torch.manual_seed(0)
+    model, _ = get_backbone("local_cnn", in_channels=3, out_channels=6, features=[8, 8], block_kernels=[3, 1])
+    model    = model.eval()
+
+    base  = torch.zeros(1, 3, 17, 17)
+    poked = base.clone()
+    poked[0, :, 0, 0] = 5.0
+
+    with torch.no_grad():
+        delta = (model(base) - model(poked)).abs()
+
+    assert delta[0, :, 8, 8].max().item() == 0.0
+    assert delta.max().item() > 0.0
+
+
+def test_local_cnn_all_1x1_kernels_are_pixelwise():
+    torch.manual_seed(0)
+    model, _ = get_backbone("local_cnn", in_channels=3, out_channels=6, features=[8, 8], block_kernels=[1, 1])
+    model    = model.eval()
+
+    base  = torch.zeros(1, 3, 5, 5)
+    poked = base.clone()
+    poked[0, :, 1, 1] = 5.0
+
+    with torch.no_grad():
+        delta = (model(base) - model(poked)).abs().amax(dim=1)
+
+    assert delta[0, 1, 1].item() > 0.0
+    delta[0, 1, 1] = 0.0
+    assert delta.max().item() == 0.0
+
+
+def test_local_cnn_rejects_mismatched_block_kernels():
+    with pytest.raises(ValueError, match="exactly one kernel size"):
+        get_backbone("local_cnn", features=[8, 8], block_kernels=[3])
+
+
+def test_conv_block_rejects_even_kernels():
+    from models.blocks import ConvBlock
+
+    with pytest.raises(ValueError, match="positive odd"):
+        ConvBlock(input_channels=4, output_channels=4, kernel_size=2)

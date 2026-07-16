@@ -1244,16 +1244,17 @@ class PixelMLPNetConfig:
 
 @dataclass
 class LocalCNNConfig:
-    in_channels         : int       = 1
-    out_channels        : int       = 6
-    params_per_gaussian : int       = 3
-    head                : str       = "conv"
-    features            : list[int] = field(default_factory=lambda: [1072, 1072])
-    dropout             : float     = 0.30
-    activation          : str       = "relu"
-    normalization       : str       = "batch"
-    conv_bias           : bool      = False
-    init_mode           : str       = "default"
+    in_channels         : int              = 1
+    out_channels        : int              = 6
+    params_per_gaussian : int              = 3
+    head                : str              = "conv"
+    features            : list[int]        = field(default_factory=lambda: [1072, 1072])
+    block_kernels       : list[int] | None = None
+    dropout             : float            = 0.30
+    activation          : str              = "relu"
+    normalization       : str              = "batch"
+    conv_bias           : bool             = False
+    init_mode           : str              = "default"
 
     trunk_lr       : float = 3e-4
     output_head_lr : float = 1e-3

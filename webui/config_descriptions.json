@@ -784,9 +784,9 @@
       }
     },
     "architectures/backbone::LocalCNNConfig": {
-      "summary": "Shallow full-resolution CNN control baseline: a stack of 3x3 ConvBlocks with no downsampling, providing local-context-only inversion between the pixel-wise MLP (no context) and the encode-decode backbones (global context)",
+      "summary": "Full-resolution CNN control baseline: a stack of ConvBlocks with no downsampling whose per-block kernel sizes set the receptive field, providing local-context-only inversion between per-pixel processing (all 1x1) and the encode-decode backbones (global context)",
       "fields": {
-        "features": "Channel widths of the full-resolution trunk, one entry per ConvBlock (two 3x3 convolutions each); receptive field grows by 4 pixels per block (4L+1 total, always odd); default [1072, 1072] = 9x9 (~31.1M, capacity-matched to the pixel MLP and the encode-decode backbones). The 9x9 field is chosen to sit strictly inside the label's w_a x w_r boxcar so the context ladder isolates receptive field rather than capacity; keep the trunk at two blocks (a third would give 13x13 and exceed w_r)",
+        "features": "Channel widths of the full-resolution trunk, one entry per ConvBlock (two convolutions each); default [1072, 1072] is the bare two-block 9x9 baseline (~31.1M, capacity-matched to the default unet). The context-ladder rungs override features and block_kernels together so every rung keeps the same depth and parameter budget while only the receptive field varies",
         "in_channels": "Number of input feature-map channels fed to the network, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
         "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
@@ -800,7 +800,8 @@
         "output_head_lr": "AdamW learning rate for the final 1x1 output convolution",
         "trunk_wd": "Weight decay for the trunk parameter group; default 1e-2, raised from the backbones' 1e-4 to curb overfitting at matched capacity",
         "output_head_wd": "Weight decay for the final 1x1 output convolution",
-        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence"
+        "shape_logger_types": "Module types the shape logger hooks into when tracing tensor shapes through the network; excluded from config persistence",
+        "block_kernels": "Per-block convolution kernel sizes (odd, one entry per features entry); None means 3x3 everywhere. Each 3x3 block adds 4 px of receptive field while a 1x1 block adds none (RF = 1 + sum of 2*(k-1) per block), so mixing 3x3 and 1x1 blocks sets the receptive field at constant depth and near-constant width instead of coupling small fields to shallow-wide pancake stacks"
       }
     },
     "architectures/backbone::NAFNetConfig": {

@@ -43,9 +43,13 @@ class LocalCNN(nn.Module, OutputHeadsMixin):
         if len(self.config.features) == 0:
             raise ValueError("features must contain at least one channel size")
 
+        kernels = self.config.block_kernels if self.config.block_kernels is not None else [3] * len(self.config.features)
+        if len(kernels) != len(self.config.features):
+            raise ValueError(f"block_kernels has {len(kernels)} entries but features has {len(self.config.features)}; every block needs exactly one kernel size")
+
         blocks   = []
         channels = self.config.in_channels
-        for feature_size in self.config.features:
+        for feature_size, kernel_size in zip(self.config.features, kernels):
             blocks.append(
                 ConvBlock(
                     input_channels  = channels,
@@ -54,6 +58,7 @@ class LocalCNN(nn.Module, OutputHeadsMixin):
                     activation      = self.config.activation,
                     normalization   = self.config.normalization,
                     bias            = self.config.conv_bias,
+                    kernel_size     = kernel_size,
                 )
             )
             channels = feature_size
