@@ -338,12 +338,17 @@ class ContextTrialPlanner:
     RESERVED_KEYS = ("label", "backbone")
 
     def __init__(self, trials: list, registry_names: tuple) -> None:
-        self.trials         = [dict(trial) for trial in trials]
+        self.raw_trials     = list(trials)
+        self.trials         = [dict(trial) for trial in trials if isinstance(trial, dict)]
         self.registry_names = tuple(registry_names)
 
         self._validate()
 
     def _validate(self) -> None:
+        malformed = [trial for trial in self.raw_trials if not isinstance(trial, dict)]
+        if malformed:
+            raise ValueError(f"context_trials rungs must be dicts of label, backbone and model overrides, got {malformed}; bare backbone names are the pre-rung format and must be rewritten")
+
         if not self.trials:
             raise ValueError("context_trials must list at least one rung")
 
@@ -387,11 +392,12 @@ class ReachTrialPlanner:
 
     RESERVED_KEYS = ("label", "backbone")
 
-    def __init__(self, trials, registry_names: tuple, head: str) -> None:
-        self.trials         = trials
-        self.rungs          = [dict(rung) for rung in trials.rungs]
-        self.registry_names = tuple(registry_names)
-        self.head           = head
+    def __init__(self, trials, registry_names: tuple, head: str, expected_in_channels: int) -> None:
+        self.trials               = trials
+        self.rungs                = [dict(rung) for rung in trials.rungs if isinstance(rung, dict)]
+        self.registry_names       = tuple(registry_names)
+        self.head                 = head
+        self.expected_in_channels = expected_in_channels
 
         self._validate()
 
@@ -400,6 +406,10 @@ class ReachTrialPlanner:
         self._verify_capacity_match()
 
     def _validate(self) -> None:
+        malformed = [rung for rung in self.trials.rungs if not isinstance(rung, dict)]
+        if malformed:
+            raise ValueError(f"reach_trials.rungs must be dicts of label, backbone and model overrides, got {malformed}")
+
         if len(self.rungs) < 2:
             raise ValueError("reach_trials.rungs must list at least two architectures; a reach comparison needs something to compare against")
 
@@ -422,6 +432,9 @@ class ReachTrialPlanner:
 
         if self.trials.match_tolerance <= 0:
             raise ValueError(f"reach_trials.match_tolerance={self.trials.match_tolerance} must be positive; the arms are only comparable when their capacity is matched to a stated tolerance")
+
+        if self.trials.in_channels != self.expected_in_channels:
+            raise ValueError(f"reach_trials.in_channels={self.trials.in_channels} but the input configuration yields {self.expected_in_channels} channels; training builds every arm at the dataset width, so the capacity check would count the wrong first layer")
 
     def _overrides(self, rung: dict) -> dict:
         return {key: value for key, value in rung.items() if key not in self.RESERVED_KEYS}
