@@ -44,15 +44,21 @@ class TrialCollector(BaseTrialCollector):
 
     def _expand_tags(self) -> list[tuple[str, Path]]:
         expanded = []
+        seen     = set()
+
         for tag in self.run_tags:
             run_dir   = self.runs_dir / tag
             seed_dirs = self._nested_seed_dirs(run_dir)
 
             if seed_dirs:
                 self.logger.ok(f"'{tag}' expanded to {len(seed_dirs)} seed run(s)")
-                expanded += [(f"{tag}/{seed_dir.name}", seed_dir) for seed_dir in seed_dirs]
-            else:
-                expanded.append((tag, run_dir))
+
+            pairs = [(f"{tag}/{seed_dir.name}", seed_dir) for seed_dir in seed_dirs] if seed_dirs else [(tag, run_dir)]
+            for name, path in pairs:
+                if str(path) in seen:
+                    continue
+                seen.add(str(path))
+                expanded.append((name, path))
 
         return expanded
 

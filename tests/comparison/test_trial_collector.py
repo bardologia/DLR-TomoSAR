@@ -58,6 +58,18 @@ def test_explicit_seed_run_tags_aggregate_into_one_trial(tmp_path):
     assert records[0].metrics["curve_rmse_gt"] == 3.0
 
 
+def test_duplicate_unit_and_seed_tags_collapse_once(tmp_path):
+    _run_with_metrics(tmp_path / "trial_a" / "seed0", 2.0)
+    _run_with_metrics(tmp_path / "trial_a" / "seed1", 4.0)
+
+    collector = TrialCollector(runs_dir=tmp_path, run_tags=["trial_a", "trial_a/seed0"], logger=RecordingLogger())
+    records   = collector.collect()
+
+    assert [record.name for record in records] == ["trial_a"]
+    assert records[0].metrics["curve_rmse_gt"] == 3.0
+    assert collector.seed_dispersion["trial_a"]["n_seeds"] == 2
+
+
 def test_flat_runs_pass_through_unchanged(tmp_path):
     _run_with_metrics(tmp_path / "run_x", 1.0)
     _run_with_metrics(tmp_path / "run_y", 2.0)
