@@ -120,7 +120,7 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
     assert job.log_path        == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
 
 
-def test_context_scheduler_plans_one_trial_per_registered_backbone(tmp_path):
+def test_context_scheduler_plans_the_receptive_field_ladder(tmp_path):
     config             = BackboneEntryConfig()
     config.logdir      = tmp_path
     config.trials_mode = "context"
@@ -130,10 +130,28 @@ def test_context_scheduler_plans_one_trial_per_registered_backbone(tmp_path):
     plans = scheduler.planner().plan()
 
     assert plans == [
-        ("ctx-pixel_mlp", {"backbone_name": "pixel_mlp"}),
-        ("ctx-local_cnn", {"backbone_name": "local_cnn"}),
-        ("ctx-unet",      {"backbone_name": "unet"}),
+        ("ctx-mlp",   {"backbone_name": "pixel_mlp"}),
+        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [1072] * 2}}),
+        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [515] * 7}}),
     ]
+
+
+def test_reach_scheduler_houses_runs_and_plans_the_size_matched_arms(tmp_path):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "reach"
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    assert scheduler.runs_root == tmp_path / "reach"
+
+    plans = dict(scheduler.planner().plan())
+
+    assert list(plans) == ["reach-cnn33", "reach-unet"]
+    assert plans["reach-cnn33"]["backbone_name"]   == "local_cnn"
+    assert plans["reach-cnn33"]["model_overrides"] == {"features": [479] * 8}
+    assert plans["reach-unet"]["backbone_name"]    == "unet"
+    assert all(overrides["training.patch_size"] == (32, 32) for overrides in plans.values())
 
 
 def test_head_scheduler_plans_the_head_matching_grid(tmp_path):

@@ -5,7 +5,7 @@ import pytest
 from configuration.normalization import Presets
 from configuration.sar.geometry_config import GeometryConfig
 from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
+from configuration.training.backbone        import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, ReachTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
@@ -18,6 +18,7 @@ from pipelines.backbone.training.experiments import (
     PatchSizeTrialPlanner,
     PairLossTrialPlanner,
     PhysicsLossTrialPlanner,
+    ReachTrialPlanner,
     SecondaryTrialPlanner,
     SlotPresenceTrialPlanner,
     WarmupTrialPlanner,
@@ -292,11 +293,32 @@ def test_context_planner_default_walks_the_context_ladder():
     plans = planner.plan()
 
     assert plans == [
-        ("ctx-pixel_mlp", {"backbone_name": "pixel_mlp"}),
-        ("ctx-local_cnn", {"backbone_name": "local_cnn"}),
-        ("ctx-unet",      {"backbone_name": "unet"}),
+        ("ctx-mlp",   {"backbone_name": "pixel_mlp"}),
+        ("ctx-cnn09", {"backbone_name": "local_cnn", "model_overrides": {"features": [1072] * 2}}),
+        ("ctx-cnn29", {"backbone_name": "local_cnn", "model_overrides": {"features": [515] * 7}}),
     ]
-    assert planner.summary() == {"Backbones": ["pixel_mlp", "local_cnn", "unet"], "Total runs": 3}
+    assert planner.summary() == {
+        "Rungs"      : ["mlp:pixel_mlp", "cnn09:local_cnn", "cnn29:local_cnn"],
+        "Total runs" : 3,
+    }
+
+
+def test_context_ladder_receptive_fields_bracket_the_label_window():
+    fields = [1 + 4 * len(trial["features"]) for trial in _default_context_trials() if "features" in trial]
+
+    assert fields == [9, 29]
+
+
+def test_context_planner_rejects_a_rung_without_a_label():
+    with pytest.raises(ValueError, match="missing required keys"):
+        ContextTrialPlanner([{"backbone": "unet"}], REGISTRY_NAMES)
+
+
+def test_context_planner_rejects_duplicate_labels():
+    trials = [{"label": "a", "backbone": "unet"}, {"label": "a", "backbone": "pixel_mlp"}]
+
+    with pytest.raises(ValueError, match="labels must be unique"):
+        ContextTrialPlanner(trials, REGISTRY_NAMES)
 
 
 def test_context_default_backbones_are_registered():
@@ -305,15 +327,77 @@ def test_context_default_backbones_are_registered():
     ContextTrialPlanner(_default_context_trials(), tuple(BACKBONE_CONFIG_REGISTRY))
 
 
-def test_context_planner_rejects_empty_duplicate_and_unknown_backbones():
-    with pytest.raises(ValueError):
+def test_context_planner_rejects_empty_and_unknown_backbones():
+    with pytest.raises(ValueError, match="at least one rung"):
         ContextTrialPlanner([], REGISTRY_NAMES)
 
-    with pytest.raises(ValueError):
-        ContextTrialPlanner(["unet", "unet"], REGISTRY_NAMES)
+    with pytest.raises(ValueError, match="Unknown context_trials backbones"):
+        ContextTrialPlanner([{"label": "a", "backbone": "voxel_gnn"}], REGISTRY_NAMES)
 
-    with pytest.raises(ValueError):
-        ContextTrialPlanner(["unet", "voxel_gnn"], REGISTRY_NAMES)
+
+def _reach_config(**overrides) -> ReachTrialsConfig:
+    rungs = [
+        {"label" : "a", "backbone" : "local_cnn", "features" : [8] * 2},
+        {"label" : "b", "backbone" : "local_cnn", "features" : [8] * 2},
+    ]
+
+    return ReachTrialsConfig(rungs=overrides.pop("rungs", rungs), **overrides)
+
+
+def test_reach_planner_pins_every_arm_to_the_same_patch():
+    planner = ReachTrialPlanner(_reach_config(), REGISTRY_NAMES, "conv")
+
+    plans = planner.plan()
+
+    assert plans == [
+        ("reach-a", {"backbone_name": "local_cnn", "training.patch_size": (32, 32), "training.patch_stride": (16, 16), "model_overrides": {"features": [8] * 2}}),
+        ("reach-b", {"backbone_name": "local_cnn", "training.patch_size": (32, 32), "training.patch_stride": (16, 16), "model_overrides": {"features": [8] * 2}}),
+    ]
+
+
+def test_reach_default_arms_are_size_matched_and_reach_the_whole_patch():
+    from models import BACKBONE_CONFIG_REGISTRY
+
+    trials  = ReachTrialsConfig()
+    planner = ReachTrialPlanner(trials, tuple(BACKBONE_CONFIG_REGISTRY), "conv")
+
+    counts    = planner.parameter_counts
+    deviation = (max(counts.values()) - min(counts.values())) / min(counts.values())
+
+    assert set(counts) == {"cnn33", "unet"}
+    assert deviation <= trials.match_tolerance
+
+    local = next(rung for rung in trials.rungs if rung["backbone"] == "local_cnn")
+    field = 1 + 4 * len(local["features"])
+
+    assert field == 33
+    assert all(field >= size for size in trials.patch_size)
+
+
+def test_reach_planner_rejects_arms_that_are_not_size_matched():
+    rungs = [
+        {"label" : "narrow", "backbone" : "local_cnn", "features" : [8]  * 2},
+        {"label" : "wide",   "backbone" : "local_cnn", "features" : [64] * 2},
+    ]
+
+    with pytest.raises(ValueError, match="in parameter count"):
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv")
+
+
+def test_reach_planner_rejects_a_lone_arm_and_unknown_backbones():
+    with pytest.raises(ValueError, match="at least two architectures"):
+        ReachTrialPlanner(_reach_config(rungs=[{"label": "a", "backbone": "unet"}]), REGISTRY_NAMES, "conv")
+
+    rungs = [{"label": "a", "backbone": "voxel_gnn"}, {"label": "b", "backbone": "unet"}]
+    with pytest.raises(ValueError, match="Unknown reach_trials backbones"):
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv")
+
+
+def test_reach_planner_rejects_duplicate_labels():
+    rungs = [{"label": "a", "backbone": "unet"}, {"label": "a", "backbone": "local_cnn"}]
+
+    with pytest.raises(ValueError, match="labels must be unique"):
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv")
 
 
 HEAD_NAMES     = ("conv", "multihead", "per_gaussian", "set_pred")

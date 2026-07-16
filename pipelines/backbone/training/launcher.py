@@ -13,7 +13,7 @@ from configuration.training import BackboneEntryConfig, CurriculumInheritance, L
 from configuration.training.general.loss import ParamMatching
 from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_HEADS
 from pipelines.backbone.inference.pipeline   import InferencePipeline
-from pipelines.backbone.training.experiments import AblationTrialPlanner, AugmentationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, HeadMatchingTrialPlanner, InputTrialPlanner, NormalizationTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
+from pipelines.backbone.training.experiments import AblationTrialPlanner, AugmentationTrialPlanner, ContextTrialPlanner, CurriculumTrialPlanner, HeadMatchingTrialPlanner, InputTrialPlanner, NormalizationTrialPlanner, PairLossTrialPlanner, PatchSizeTrialPlanner, PhysicsLossTrialPlanner, ReachTrialPlanner, SecondaryTrialPlanner, SlotPresenceTrialPlanner, WarmupTrialPlanner
 from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
@@ -112,7 +112,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "head_trials", "augmentation_trials", "normalization_trials", "ablation_features", "ablation_include_full", "gpus", "gpus_file", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "reach_trials", "head_trials", "augmentation_trials", "normalization_trials", "ablation_features", "ablation_include_full", "gpus", "gpus_file", "poll_interval_s")
 
     MODE_SUBDIRS = {
         "curriculum"    : "curriculum",
@@ -124,6 +124,7 @@ class TrainScheduler:
         "patch"         : "patch",
         "input"         : "input",
         "context"       : "context",
+        "reach"         : "reach",
         "head"          : "head",
         "augmentation"  : "augmentation",
         "normalization" : "normalization",
@@ -166,6 +167,8 @@ class TrainScheduler:
             return InputTrialPlanner.from_dataset(self.config.input_trials, self.config.geometry, self.config.paths.dataset_path)
         if mode == "context":
             return ContextTrialPlanner(self.config.context_trials, tuple(BACKBONE_CONFIG_REGISTRY))
+        if mode == "reach":
+            return ReachTrialPlanner(self.config.reach_trials, tuple(BACKBONE_CONFIG_REGISTRY), self.config.backbone_head)
         if mode == "head":
             return HeadMatchingTrialPlanner(self.config.head_trials, tuple(BACKBONE_CONFIG_REGISTRY), BACKBONE_HEADS, tuple(matching.value for matching in ParamMatching))
         if mode == "augmentation":
@@ -175,7 +178,7 @@ class TrainScheduler:
         if mode == "ablation":
             return AblationTrialPlanner(self.config.ablation_features, self.config.ablation_include_full)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'head', 'augmentation', 'normalization' or 'ablation'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'reach', 'head', 'augmentation', 'normalization' or 'ablation'")
 
     def _seed_units(self, experiments: list[tuple[str, dict]], seeds: list[int]) -> list[tuple[str, dict]]:
         if len(seeds) == 1:

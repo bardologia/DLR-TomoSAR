@@ -408,6 +408,7 @@ class ExperimentBuilder {
     { key: "presence",   label: "slot presence", hint: "active-normalization x presence-balance matrix (none, A, B, AB), curriculum disabled, one trial per cell" },
     { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
     { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
+    { key: "reach",      label: "reach", hint: "size-matched architecture comparison at fixed reach: a 33x33 local CNN against a UNet, same 32x32 patch and same parameter count, one trial per arm" },
     { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
     { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state" },
     { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output sigma switch from initial to final strategy" },
@@ -490,6 +491,7 @@ class ExperimentBuilder {
     this.patch      = new Map();
     this.physics    = new Map();
     this.pair       = new Map();
+    this.reach      = new Map();
     this.headTrials = new Map();
     this.normTrials = new Map();
     byPath.forEach((leaf) => {
@@ -497,6 +499,7 @@ class ExperimentBuilder {
       if (leaf.section === "patch_trials")         this.patch.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "physics_trials")       this.physics.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "pair_trials")          this.pair.set(leaf.path.split(".").pop(), leaf);
+      if (leaf.section === "reach_trials")         this.reach.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "head_trials")          this.headTrials.set(leaf.path.split(".").pop(), leaf);
       if (leaf.section === "normalization_trials") this.normTrials.set(leaf.path.split(".").pop(), leaf);
     });
@@ -507,6 +510,7 @@ class ExperimentBuilder {
     this.patch.forEach((leaf) => this.claimed.push(leaf.path));
     this.physics.forEach((leaf) => this.claimed.push(leaf.path));
     this.pair.forEach((leaf) => this.claimed.push(leaf.path));
+    this.reach.forEach((leaf) => this.claimed.push(leaf.path));
     this.headTrials.forEach((leaf) => this.claimed.push(leaf.path));
     this.normTrials.forEach((leaf) => this.claimed.push(leaf.path));
     if (this.presenceTrialsLeaf)   this.claimed.push(this.presenceTrialsLeaf.path);
@@ -1661,6 +1665,28 @@ class ExperimentBuilder {
     }
   }
 
+  _reachRungs() {
+    const leaf = this.reach.get("rungs");
+    if (!leaf) return [];
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(leaf));
+      return Array.isArray(raw) ? raw.filter((rung) => rung && rung.label && rung.backbone) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _reachPatch() {
+    const leaf = this.reach.get("patch_size");
+    if (!leaf) return "";
+    try {
+      const raw = PythonLiteral.parse(this.view._effective(leaf));
+      return Array.isArray(raw) ? `${raw[0]}x${raw[1]}` : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   _contextPanel() {
     const panel     = document.createElement("div");
     panel.className = "exp-secondary exp-presence";
@@ -1674,7 +1700,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "One training run per backbone architecture on the shared base config, walking the spatial-context ladder (pixel MLP, local CNN, UNet by default). Every name must exist in the backbone registry; add architectures by editing context_trials, use reset backbones to restore the default.";
+    note.textContent = "One training run per rung on the shared base config, walking the spatial-context ladder (pixel MLP, then a 9x9 and a 29x29 local CNN by default, each size matched to the default UNet). Every rung is a label plus a backbone from the registry and optional model overrides; add rungs by editing context_trials, use reset backbones to restore the default.";
 
     const cellHead       = document.createElement("div");
     cellHead.className    = "exp-presence__sub";
@@ -1699,29 +1725,29 @@ class ExperimentBuilder {
   _paintContext() {
     if (!this.contextCellsEl) return;
     this.contextCellsEl.innerHTML = "";
-    this._contextTrials().forEach((name) => this.contextCellsEl.appendChild(this._contextChip(name)));
+    this._contextTrials().forEach((rung) => this.contextCellsEl.appendChild(this._contextChip(rung)));
   }
 
-  _contextChip(name) {
+  _contextChip(rung) {
     const chip     = document.createElement("span");
     chip.className = "exp-name exp-presence__cell";
 
     const label       = document.createElement("span");
-    label.textContent = name;
+    label.textContent = `${rung.label} · ${rung.backbone}`;
     chip.appendChild(label);
 
-    const remove = LaunchWidgetDom.mini("×", () => this._removeContextCell(name));
+    const remove = LaunchWidgetDom.mini("×", () => this._removeContextCell(rung.label));
     remove.classList.add("exp-presence__remove");
-    remove.title = "Remove backbone";
+    remove.title = "Remove rung";
     chip.appendChild(remove);
     return chip;
   }
 
-  _removeContextCell(name) {
+  _removeContextCell(label) {
     if (!this.contextTrialsLeaf) return;
     const raw = this._contextTrials();
     if (raw.length <= 1) return;
-    this.view._setValue(this.contextTrialsLeaf, PythonLiteral.render(raw.filter((entry) => entry !== name)));
+    this.view._setValue(this.contextTrialsLeaf, PythonLiteral.render(raw.filter((entry) => entry.label !== label)));
     this._repaintContext();
   }
 
@@ -2629,6 +2655,14 @@ class ExperimentBuilder {
       return;
     }
 
+    if (mode === "reach") {
+      const rungs = this._reachRungs();
+      const n     = rungs.length;
+      const patch = this._reachPatch();
+      this.summaryEl.textContent = `${n} size-matched arm${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} on a shared ${patch} patch${this._seedsSuffix(n)}${gpus}`;
+      return;
+    }
+
     if (mode === "head") {
       const nHeads     = this._headList("heads").length;
       const nMatchings = this._headList("matchings").length;
@@ -2692,7 +2726,9 @@ class ExperimentBuilder {
     } else if (mode === "input") {
       this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
     } else if (mode === "context") {
-      this._contextTrials().forEach((name) => names.push(`${name}_ctx-${name}`));
+      this._contextTrials().forEach((rung) => names.push(`${rung.backbone}_ctx-${rung.label}`));
+    } else if (mode === "reach") {
+      this._reachRungs().forEach((rung) => names.push(`${rung.backbone}_reach-${rung.label}`));
     } else if (mode === "head") {
       const backbone = this._headBackbone();
       this._headList("heads").forEach((headKey) => {

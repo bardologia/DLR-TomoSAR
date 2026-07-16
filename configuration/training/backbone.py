@@ -98,7 +98,18 @@ def _default_presence_trials() -> dict:
 
 
 def _default_context_trials() -> list:
-    return ["pixel_mlp", "local_cnn", "unet"]
+    return [
+        {"label" : "mlp",   "backbone" : "pixel_mlp"},
+        {"label" : "cnn09", "backbone" : "local_cnn", "features" : [1072] * 2},
+        {"label" : "cnn29", "backbone" : "local_cnn", "features" : [515]  * 7},
+    ]
+
+
+def _default_reach_rungs() -> list:
+    return [
+        {"label" : "cnn33", "backbone" : "local_cnn", "features" : [479] * 8},
+        {"label" : "unet",  "backbone" : "unet"},
+    ]
 
 
 def _default_augmentation_trials() -> dict:
@@ -139,6 +150,15 @@ class PairTrialsConfig:
     components       : list[str]   = field(default_factory=lambda: ["cosine_curve", "coherence_resyn", "covariance_match"])
     weights          : list[float] = field(default_factory=lambda: [0.01, AblationCatalog.PHYSICS_WEIGHT, 0.25])
     include_baseline : bool        = True
+
+
+@dataclass
+class ReachTrialsConfig:
+    rungs           : list            = field(default_factory=_default_reach_rungs)
+    patch_size      : tuple[int, int] = (32, 32)
+    patch_stride    : tuple[int, int] = (16, 16)
+    in_channels     : int             = 9
+    match_tolerance : float           = 0.01
 
 
 @dataclass
@@ -239,6 +259,7 @@ class BackboneEntryConfig:
     patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
     input_trials     : dict                  = field(default_factory=_default_input_trials)
     context_trials   : list                  = field(default_factory=_default_context_trials)
+    reach_trials     : ReachTrialsConfig     = field(default_factory=ReachTrialsConfig)
     head_trials      : HeadMatchingTrialsConfig = field(default_factory=HeadMatchingTrialsConfig)
     augmentation_trials : dict               = field(default_factory=_default_augmentation_trials)
     normalization_trials : NormalizationTrialsConfig = field(default_factory=NormalizationTrialsConfig)

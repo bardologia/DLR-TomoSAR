@@ -4,7 +4,9 @@ from pathlib import Path
 
 import numpy as np
 
+from models import get_backbone
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
+from pipelines.shared.model.model_builder import ModelBuilder
 from tools.baselines import TrackBaselines
 
 
@@ -333,32 +335,134 @@ class AblationTrialPlanner:
 
 class ContextTrialPlanner:
 
-    def __init__(self, backbones: list, registry_names: tuple) -> None:
-        self.backbones      = list(backbones)
+    RESERVED_KEYS = ("label", "backbone")
+
+    def __init__(self, trials: list, registry_names: tuple) -> None:
+        self.trials         = [dict(trial) for trial in trials]
         self.registry_names = tuple(registry_names)
 
         self._validate()
 
     def _validate(self) -> None:
-        if not self.backbones:
-            raise ValueError("context_trials must list at least one backbone")
+        if not self.trials:
+            raise ValueError("context_trials must list at least one rung")
 
-        duplicates = sorted({name for name in self.backbones if self.backbones.count(name) > 1})
+        for trial in self.trials:
+            missing = [key for key in self.RESERVED_KEYS if key not in trial]
+            if missing:
+                raise ValueError(f"context_trials rung {trial} is missing required keys {missing}")
+
+        labels     = [trial["label"] for trial in self.trials]
+        duplicates = sorted({label for label in labels if labels.count(label) > 1})
         if duplicates:
-            raise ValueError(f"context_trials must be unique, duplicated: {duplicates}")
+            raise ValueError(f"context_trials labels must be unique, duplicated: {duplicates}")
 
-        unknown = [name for name in self.backbones if name not in self.registry_names]
+        unknown = sorted({trial["backbone"] for trial in self.trials if trial["backbone"] not in self.registry_names})
         if unknown:
             raise ValueError(f"Unknown context_trials backbones {unknown}; registered backbones are {sorted(self.registry_names)}")
 
+    def _overrides(self, trial: dict) -> dict:
+        return {key: value for key, value in trial.items() if key not in self.RESERVED_KEYS}
+
+    def _settings(self, trial: dict) -> dict:
+        overrides = self._overrides(trial)
+        settings  = {"backbone_name": trial["backbone"]}
+
+        if overrides:
+            settings["model_overrides"] = overrides
+
+        return settings
+
     def summary(self) -> dict:
         return {
-            "Backbones"  : list(self.backbones),
-            "Total runs" : len(self.backbones),
+            "Rungs"      : [f"{trial['label']}:{trial['backbone']}" for trial in self.trials],
+            "Total runs" : len(self.trials),
         }
 
     def plan(self) -> list[tuple[str, dict]]:
-        return [(f"ctx-{name}", {"backbone_name": name}) for name in self.backbones]
+        return [(f"ctx-{trial['label']}", self._settings(trial)) for trial in self.trials]
+
+
+class ReachTrialPlanner:
+
+    RESERVED_KEYS = ("label", "backbone")
+
+    def __init__(self, trials, registry_names: tuple, head: str) -> None:
+        self.trials         = trials
+        self.rungs          = [dict(rung) for rung in trials.rungs]
+        self.registry_names = tuple(registry_names)
+        self.head           = head
+
+        self._validate()
+
+        self.parameter_counts = {rung["label"]: self._parameters(rung) for rung in self.rungs}
+
+        self._verify_capacity_match()
+
+    def _validate(self) -> None:
+        if len(self.rungs) < 2:
+            raise ValueError("reach_trials.rungs must list at least two architectures; a reach comparison needs something to compare against")
+
+        for rung in self.rungs:
+            missing = [key for key in self.RESERVED_KEYS if key not in rung]
+            if missing:
+                raise ValueError(f"reach_trials rung {rung} is missing required keys {missing}")
+
+        labels     = [rung["label"] for rung in self.rungs]
+        duplicates = sorted({label for label in labels if labels.count(label) > 1})
+        if duplicates:
+            raise ValueError(f"reach_trials labels must be unique, duplicated: {duplicates}")
+
+        unknown = sorted({rung["backbone"] for rung in self.rungs if rung["backbone"] not in self.registry_names})
+        if unknown:
+            raise ValueError(f"Unknown reach_trials backbones {unknown}; registered backbones are {sorted(self.registry_names)}")
+
+        if any(size < 1 for size in self.trials.patch_size) or any(stride < 1 for stride in self.trials.patch_stride):
+            raise ValueError(f"reach_trials.patch_size={tuple(self.trials.patch_size)} and patch_stride={tuple(self.trials.patch_stride)} must be positive")
+
+        if self.trials.match_tolerance <= 0:
+            raise ValueError(f"reach_trials.match_tolerance={self.trials.match_tolerance} must be positive; the arms are only comparable when their capacity is matched to a stated tolerance")
+
+    def _overrides(self, rung: dict) -> dict:
+        return {key: value for key, value in rung.items() if key not in self.RESERVED_KEYS}
+
+    def _parameters(self, rung: dict) -> int:
+        sizing   = ModelBuilder.image_size_override(rung["backbone"], self.trials.patch_size)
+        model, _ = get_backbone(rung["backbone"], in_channels=self.trials.in_channels, head=self.head, **sizing, **self._overrides(rung))
+
+        return sum(parameter.numel() for parameter in model.parameters())
+
+    def _verify_capacity_match(self) -> None:
+        low, high = min(self.parameter_counts.values()), max(self.parameter_counts.values())
+        deviation = (high - low) / low
+
+        if deviation > self.trials.match_tolerance:
+            counts = {label: f"{count:,}" for label, count in self.parameter_counts.items()}
+            raise ValueError(f"reach_trials arms differ by {100 * deviation:.2f} % in parameter count ({counts}) at head '{self.head}', exceeding the {100 * self.trials.match_tolerance:.1f} % match tolerance; the comparison only isolates architecture from capacity when the arms are size matched, so retune the rung widths")
+
+    def _settings(self, rung: dict) -> dict:
+        overrides = self._overrides(rung)
+        settings  = {
+            "backbone_name"         : rung["backbone"],
+            "training.patch_size"   : tuple(self.trials.patch_size),
+            "training.patch_stride" : tuple(self.trials.patch_stride),
+        }
+
+        if overrides:
+            settings["model_overrides"] = overrides
+
+        return settings
+
+    def summary(self) -> dict:
+        return {
+            "Rungs"      : [f"{rung['label']}:{rung['backbone']}" for rung in self.rungs],
+            "Parameters" : {label: f"{count:,}" for label, count in self.parameter_counts.items()},
+            "Patch"      : f"{tuple(self.trials.patch_size)} stride {tuple(self.trials.patch_stride)}",
+            "Total runs" : len(self.rungs),
+        }
+
+    def plan(self) -> list[tuple[str, dict]]:
+        return [(f"reach-{rung['label']}", self._settings(rung)) for rung in self.rungs]
 
 
 class HeadMatchingTrialPlanner:
