@@ -141,24 +141,24 @@
       "num_parameters": 31048414
     },
     "local_cnn": {
-      "signature": "ebdc9cdc95b684493c0b1c89f55aa17deaf40197fe929d7696c0480c8d1d8353",
-      "num_keys": 38,
-      "num_parameters": 31172550
+      "signature": "aa053da8d6353bf52ee9dea66d77c8ad902ce56a28e205868dc6572c6503e2bf",
+      "num_keys": 26,
+      "num_parameters": 31052630
     },
     "local_cnn-multihead": {
-      "signature": "44872ef98bd362b286e24ade18e998b270b44a20cde37edc9d8d8ee1aae73512",
-      "num_keys": 48,
-      "num_parameters": 32209638
+      "signature": "b9977c2b9755df5d961733d4468b832876e77fc32d176f3014042a8e3b4a3bd6",
+      "num_keys": 36,
+      "num_parameters": 32774798
     },
     "local_cnn-per_gaussian": {
-      "signature": "5b936d4a686eb7e89ce1dd65b76bddad641a4b439ebbb4bcca18ccea7a8b6f61",
-      "num_keys": 44,
-      "num_parameters": 31863110
+      "signature": "f8287174448ceef757b7f20593e9dc9658b9dd206b07a6b1157c3dea4a741734",
+      "num_keys": 32,
+      "num_parameters": 32199670
     },
     "local_cnn-set_pred": {
-      "signature": "9d72b34ffebd86ea4b1bc38693e1b4e995b564753215adee26fa493b96169583",
-      "num_keys": 49,
-      "num_parameters": 32210474
+      "signature": "3558eec08ee72ec6455e8ec77c1f930554b0b74490568a23ad6f66cb8a5e0878",
+      "num_keys": 37,
+      "num_parameters": 32775874
     },
     "multires_unet": {
       "signature": "8cec14f9728bc829dea3a3b96017ef185db0f0fb8a117668122c1a30c33a19a9",

@@ -1248,7 +1248,7 @@ class LocalCNNConfig:
     out_channels        : int       = 6
     params_per_gaussian : int       = 3
     head                : str       = "conv"
-    features            : list[int] = field(default_factory=lambda: [832, 832, 832])
+    features            : list[int] = field(default_factory=lambda: [1072, 1072])
     dropout             : float     = 0.30
     activation          : str       = "relu"
     normalization       : str       = "batch"
@@ -1280,7 +1280,7 @@ class LocalCNNConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"      : {"type": "indexed_categorical", "choices": [[512, 512, 512], [832, 832, 832], [704, 704, 704, 704]]},
+            "features"      : {"type": "indexed_categorical", "choices": [[512, 512], [1072, 1072], [1408, 1408]]},
             "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }
