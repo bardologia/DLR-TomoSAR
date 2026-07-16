@@ -3666,6 +3666,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-row.is-selected td { border-bottom-color: var(--line-strong); }
 .lb-run__name { display: block; font: 600 0.72rem/1.35 var(--mono); color: var(--ink); word-break: break-all; white-space: normal; max-width: 34ch; }
 .lb-run__stamp { display: block; font: 500 0.62rem/1.4 var(--mono); color: var(--ink-faint); }
+.lb-row--unit .lb-run__stamp { color: var(--accent); font-weight: 600; }
 .lb-axis { font: 500 0.72rem/1 var(--mono); }
 .lb-val { position: relative; font: 500 0.74rem/1 var(--mono); min-width: 62px; }
 .lb-val span { position: relative; z-index: 1; }

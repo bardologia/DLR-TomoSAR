@@ -292,6 +292,78 @@ def test_trials_ignores_unseeded_runs(tmp_path):
     assert result["ok"] and result["experiments"] == []
 
 
+def test_table_adds_seed_unit_rows(tmp_path):
+    _make_seed_run(tmp_path, "exp", "unit-A", 0, "20260701_000000", {"curve_mse_gt": 1.0, "overall_r2_gt": 0.5})
+    _make_seed_run(tmp_path, "exp", "unit-A", 1, "20260701_000000", {"curve_mse_gt": 3.0})
+    _make_run(tmp_path, STANDARD_NAME)
+
+    rows = RunLeaderboard(WebLogger()).table(str(tmp_path))["rows"]
+
+    unit = next(row for row in rows if row.get("n_seeds"))
+    assert unit["run"]     == "unit-A"
+    assert unit["group"]   == "exp"
+    assert unit["stamp"]   == "mean of 2 seeds"
+    assert unit["n_seeds"] == 2
+    assert unit["metrics"]["curve_mse_gt"]  == 2.0
+    assert unit["metrics"]["overall_r2_gt"] == 0.5
+    assert Path(unit["id"]) == tmp_path / "exp" / "unit-A"
+
+    assert sum(1 for row in rows if row.get("n_seeds")) == 1
+    assert len(rows) == 4
+
+
+def test_table_unit_row_uses_latest_stamp_per_seed(tmp_path):
+    older = _make_seed_run(tmp_path, "exp", "unit", 0, "20260701_000000", {"curve_mse_gt": 9.0})
+    newer = _make_seed_run(tmp_path, "exp", "unit", 0, "20260702_000000", {"curve_mse_gt": 1.0})
+
+    os.utime(older, (1000, 1000))
+    os.utime(newer, (2000, 2000))
+
+    rows = RunLeaderboard(WebLogger()).table(str(tmp_path))["rows"]
+
+    unit = next(row for row in rows if row.get("n_seeds"))
+    assert unit["metrics"]["curve_mse_gt"] == 1.0
+    assert unit["mtime"] == 2000
+
+
+def test_diff_accepts_unit_dirs_as_seed_means(tmp_path):
+    _make_seed_run(tmp_path, "exp", "unit-A", 0, "20260701_000000", {"curve_mse_gt": 1.0})
+    _make_seed_run(tmp_path, "exp", "unit-A", 1, "20260701_000000", {"curve_mse_gt": 3.0})
+    stamp = _make_run(tmp_path, STANDARD_NAME, metrics={"curve_mse_gt": 0.5}, trainer={"seed": 99})
+
+    seed0 = tmp_path / "exp" / "unit-A" / "seed0"
+    (seed0 / "docs").mkdir()
+    (seed0 / "docs" / "trainer_config.json").write_text(json.dumps({"seed": 0}))
+
+    board = RunLeaderboard(WebLogger())
+    assert board.table(str(tmp_path))["ok"]
+
+    result = board.diff([str(tmp_path / "exp" / "unit-A"), str(stamp)])
+    assert result["ok"]
+
+    unit_side, stamp_side = result["sides"]
+    assert unit_side["run"]     == "unit-A"
+    assert unit_side["stamp"]   == "mean of 2 seeds"
+    assert unit_side["n_seeds"] == 2
+    assert unit_side["metrics"]["curve_mse_gt"] == 2.0
+    assert unit_side["config"]["trainer.seed"]  == 0
+
+    assert stamp_side["metrics"]["curve_mse_gt"] == 0.5
+
+
+def test_diff_rejects_dir_without_metrics_or_seeds(tmp_path):
+    _make_run(tmp_path, STANDARD_NAME)
+    bare = tmp_path / "bare"
+    bare.mkdir()
+
+    board = RunLeaderboard(WebLogger())
+    assert board.table(str(tmp_path))["ok"]
+
+    result = board.diff([str(bare), str(bare)])
+    assert not result["ok"]
+    assert "no seeded inference results" in result["error"]
+
+
 def test_direction_heuristic():
     assert RunLeaderboard._direction("pixel_r2_gt_mean")            == 1
     assert RunLeaderboard._direction("relative_mse_reduction")      == 1

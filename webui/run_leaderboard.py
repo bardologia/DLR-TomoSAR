@@ -104,6 +104,7 @@ class RunLeaderboard:
         self.roots.add(str(root))
 
         rows, errors = [], []
+        seed_latest  = {}
         for metrics_path in sorted(root.rglob("inference/*/metrics.json")):
             stamp_dir = metrics_path.parent
             run_dir   = stamp_dir.parent.parent
@@ -115,21 +116,55 @@ class RunLeaderboard:
                 continue
 
             values = {c["key"]: metrics[c["key"]] for c in self.COLUMNS if self._is_number(metrics.get(c["key"]))}
+            mtime  = stamp_dir.stat().st_mtime
 
             rows.append({
                 "id"      : str(stamp_dir),
                 "run"     : run_dir.name,
                 "group"   : str(run_dir.relative_to(root).parent),
                 "stamp"   : stamp_dir.name,
-                "mtime"   : stamp_dir.stat().st_mtime,
+                "mtime"   : mtime,
                 "axes"    : self._run_axes(run_dir, root),
                 "metrics" : values,
             })
 
+            seed_match = self.SEED_DIR.match(run_dir.name)
+            if seed_match is not None and run_dir.parent != root:
+                key = (run_dir.parent, int(seed_match.group(1)))
+                if key not in seed_latest or mtime > seed_latest[key][1]:
+                    seed_latest[key] = (values, mtime)
+
+        rows += self._unit_rows(root, seed_latest)
         rows.sort(key=lambda row: row["mtime"], reverse=True)
         self.logger.info(f"leaderboard: {len(rows)} inference results under {root}")
 
         return {"ok": True, "root": str(root), "columns": [dict(c) for c in self.COLUMNS], "rows": rows, "errors": errors}
+
+    def _unit_rows(self, root: Path, seed_latest: dict) -> list[dict]:
+        units = {}
+        for (unit_dir, _), member in seed_latest.items():
+            units.setdefault(unit_dir, []).append(member)
+
+        rows = []
+        for unit_dir, members in sorted(units.items()):
+            aggregated = {}
+            for column in self.COLUMNS:
+                samples = [values[column["key"]] for values, _ in members if column["key"] in values]
+                if samples:
+                    aggregated[column["key"]] = statistics.fmean(samples)
+
+            rows.append({
+                "id"      : str(unit_dir),
+                "run"     : unit_dir.name,
+                "group"   : str(unit_dir.relative_to(root).parent),
+                "stamp"   : f"mean of {len(members)} seed{'s' if len(members) > 1 else ''}",
+                "mtime"   : max(mtime for _, mtime in members),
+                "axes"    : self._run_axes(unit_dir, root),
+                "n_seeds" : len(members),
+                "metrics" : aggregated,
+            })
+
+        return rows
 
     def _run_axes(self, run_dir: Path, root: Path) -> dict | None:
         node = run_dir
@@ -222,10 +257,15 @@ class RunLeaderboard:
         return {"ok": True, "sides": sides, "directions": directions, "sections": sections}
 
     def _side(self, raw: str) -> dict:
-        stamp_dir = self._stamp_dir(raw)
-        if stamp_dir is None:
+        target = self._target_dir(raw)
+        if target is None:
             return {"error": f"unknown leaderboard entry: {raw}"}
 
+        if (target / "metrics.json").is_file():
+            return self._stamp_side(target)
+        return self._unit_side(target)
+
+    def _stamp_side(self, stamp_dir: Path) -> dict:
         try:
             metrics = json.loads((stamp_dir / "metrics.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
@@ -234,6 +274,47 @@ class RunLeaderboard:
         run_dir = stamp_dir.parent.parent
         numeric = {key: value for key, value in metrics.items() if self._is_number(value)}
 
+        config = self._run_config(run_dir)
+        if "error" in config:
+            return config
+
+        return {"id": str(stamp_dir), "run": run_dir.name, "stamp": stamp_dir.name, "axes": RunAxes.parse(run_dir.name), "metrics": numeric, "config": config["config"]}
+
+    def _unit_side(self, unit_dir: Path) -> dict:
+        latest = {}
+        for metrics_path in sorted(unit_dir.glob("seed*/inference/*/metrics.json")):
+            run_dir    = metrics_path.parent.parent.parent
+            seed_match = self.SEED_DIR.match(run_dir.name)
+            if seed_match is None:
+                continue
+
+            seed  = int(seed_match.group(1))
+            mtime = metrics_path.parent.stat().st_mtime
+            if seed not in latest or mtime > latest[seed][1]:
+                latest[seed] = (metrics_path, mtime)
+
+        if not latest:
+            return {"error": f"no seeded inference results under {unit_dir}"}
+
+        per_seed = []
+        for seed, (metrics_path, _) in sorted(latest.items()):
+            try:
+                metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                return {"error": f"could not read metrics for {metrics_path.parent}: {exc}"}
+            per_seed.append((seed, {key: value for key, value in metrics.items() if self._is_number(value)}))
+
+        keys  = set().union(*(set(metrics) for _, metrics in per_seed))
+        means = {key: statistics.fmean([metrics[key] for _, metrics in per_seed if key in metrics]) for key in sorted(keys)}
+
+        config = self._run_config(unit_dir / f"seed{per_seed[0][0]}")
+        if "error" in config:
+            return config
+
+        stamp = f"mean of {len(per_seed)} seed{'s' if len(per_seed) > 1 else ''}"
+        return {"id": str(unit_dir), "run": unit_dir.name, "stamp": stamp, "axes": RunAxes.parse(unit_dir.name), "n_seeds": len(per_seed), "metrics": means, "config": config["config"]}
+
+    def _run_config(self, run_dir: Path) -> dict:
         config = {}
         for label, rel in self.CONFIG_FILES:
             path = run_dir / rel
@@ -245,7 +326,7 @@ class RunLeaderboard:
                 return {"error": f"could not read {path}: {exc}"}
             self._flatten(label, payload, config)
 
-        return {"id": str(stamp_dir), "run": run_dir.name, "stamp": stamp_dir.name, "axes": RunAxes.parse(run_dir.name), "metrics": numeric, "config": config}
+        return {"config": config}
 
     def _flatten(self, prefix: str, value, out: dict) -> None:
         if isinstance(value, dict):
@@ -255,16 +336,16 @@ class RunLeaderboard:
 
         out[prefix] = json.dumps(value) if isinstance(value, list) else value
 
-    def _stamp_dir(self, raw: str) -> Path | None:
+    def _target_dir(self, raw: str) -> Path | None:
         if not raw:
             return None
 
-        stamp_dir = Path(raw).resolve()
-        if not any(stamp_dir.is_relative_to(root) for root in self.roots):
+        target = Path(raw).resolve()
+        if not any(target.is_relative_to(root) for root in self.roots):
             return None
-        if not (stamp_dir / "metrics.json").is_file():
+        if not target.is_dir():
             return None
-        return stamp_dir
+        return target
 
     @classmethod
     def _direction(cls, key: str) -> int:

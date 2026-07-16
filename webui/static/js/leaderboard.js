@@ -249,7 +249,7 @@ class LeaderboardView {
 
     rows.forEach((row) => {
       const selected = this.selected.includes(row.id);
-      html += `<tr class="lb-row${selected ? " is-selected" : ""}" data-id="${this._esc(row.id)}" title="${this._esc(row.id)}">`;
+      html += `<tr class="lb-row${row.n_seeds ? " lb-row--unit" : ""}${selected ? " is-selected" : ""}" data-id="${this._esc(row.id)}" title="${this._esc(row.id)}">`;
       html += `<td class="lb-run"><span class="lb-run__name">${this._esc(row.run)}</span><span class="lb-run__stamp">${this._esc(row.group !== "." ? row.group + " / " : "")}${this._esc(row.stamp)}</span></td>`;
 
       LeaderboardView.AXIS_COLS.forEach((col) => {
