@@ -145,7 +145,7 @@ class ScriptCatalog:
         "collect_reports": {
             "title"     : "Collect Reports",
             "category"  : "Analysis",
-            "purpose"   : "Scan a runs directory for training runs with inference reports, select one or more, and gather each run's report into a single collector directory, renamed after the run (seed runs as <trial>_seed<N>). Filtering by a trial directory name selects every seed run nested beneath it. Image links are rewritten to absolute paths into the original run figures, or embedded to make each report self-contained.",
+            "purpose"   : "Scan a runs directory for training runs with inference reports, select one or more, and gather each run's report into a single collector directory, renamed after the run (seed runs as <trial>_seed<N>). Selecting a trial directory collects its seed-comparison report when one exists (run Compare Seeds first), and otherwise falls back to every seed run nested beneath it. Image links are rewritten to absolute paths into the original run figures, or embedded to make each report self-contained.",
         },
     }
 
