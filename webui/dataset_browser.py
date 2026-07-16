@@ -77,13 +77,18 @@ class DatasetBrowser:
             if self.SEED_DIR.fullmatch(run_dir.name) is None or run_dir.parent == base:
                 continue
 
-            unit = units.setdefault(str(run_dir.parent), {
-                "name"           : str(run_dir.parent.relative_to(base)),
-                "path"           : str(run_dir.parent),
-                "has_checkpoint" : True,
-                "has_inference"  : True,
-                "n_seeds"        : 0,
-            })
+            parent = str(run_dir.parent)
+            if parent not in units:
+                units[parent] = {
+                    "name"           : str(run_dir.parent.relative_to(base)),
+                    "path"           : parent,
+                    "has_checkpoint" : True,
+                    "has_inference"  : True,
+                    "own_inference"  : self._has_inference(run_dir.parent),
+                    "n_seeds"        : 0,
+                }
+
+            unit = units[parent]
             unit["has_checkpoint"] = unit["has_checkpoint"] and entry["has_checkpoint"]
             unit["has_inference"]  = unit["has_inference"] and entry["has_inference"]
             unit["n_seeds"]       += 1

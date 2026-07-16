@@ -1095,7 +1095,7 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [
                         {"title": "Runs", "fields": [
                             "runs_dir",
-                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "units": True}},
                         ]},
                         {"title": "Collection", "fields": ["collector_dir", "inference_dirname", "report_filename", "latest_only", "embed_images"]},
                     ]},

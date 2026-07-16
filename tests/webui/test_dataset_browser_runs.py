@@ -82,6 +82,18 @@ def test_seed_units_are_offered_with_aggregate_flags(tmp_path):
     assert "n_seeds" not in entries["run_top"]
 
 
+def test_seed_units_report_their_own_inference(tmp_path):
+    runs = tmp_path / "runs"
+    _make_run(runs / "trial_x" / "seed0", inference=True)
+    _make_run(runs / "trial_y" / "seed0", inference=True)
+    (runs / "trial_x" / "inference" / "seed_comparison").mkdir(parents=True)
+
+    entries = {entry["name"]: entry for entry in DatasetBrowser(WebLogger()).runs([str(runs)], seed_units=True)["runs"]}
+
+    assert entries["trial_x"]["own_inference"] is True
+    assert entries["trial_y"]["own_inference"] is False
+
+
 def test_seed_unit_rows_precede_their_seed_runs(tmp_path):
     runs = tmp_path / "runs"
     _make_run(runs / "trial_x" / "seed0")
