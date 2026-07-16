@@ -22,7 +22,7 @@ def default_curriculum() -> LossCurriculumConfig:
         weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = False,
+        presence_balance         = True,
         use_cosine_curve         = True,
         weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
     )
@@ -32,7 +32,7 @@ def default_curriculum() -> LossCurriculumConfig:
         weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = False,
+        presence_balance         = True,
         use_cosine_curve         = True,
         weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
         use_coherence_resyn      = True,
@@ -223,7 +223,7 @@ class BackboneTrainerConfig:
 class BackboneEntryConfig:
     run_name        : str | None = None
     backbone_name   : str        = "resunet"
-    backbone_head   : str        = "conv"
+    backbone_head   : str        = "set_pred"
     gpu             : int        = 0
     seed            : int        = 0
     seeds           : list[int]  = field(default_factory=standard_seeds)
