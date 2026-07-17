@@ -68,11 +68,11 @@ class JobNotifier:
             return {"ok": False, "error": error}
         return {"ok": True}
 
-    def _runtime_s(self, record: dict) -> float:
+    def runtime_s(self, record: dict) -> float:
         started = datetime.fromisoformat(record["started"])
         return max(0.0, (datetime.now() - started).total_seconds())
 
-    def _runtime_label(self, seconds: float) -> str:
+    def runtime_label(self, seconds: float) -> str:
         minutes, secs  = divmod(int(seconds), 60)
         hours, minutes = divmod(minutes, 60)
         if hours:
@@ -95,7 +95,7 @@ class JobNotifier:
             title    = f"{script} finished" + ("" if code == 0 else " (exit status unknown)")
             priority = "default"
 
-        body = self._with_description(record, f"runtime {self._runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})")
+        body = self._with_description(record, f"runtime {self.runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})")
         return title, body, priority
 
     def _with_description(self, record: dict, body: str) -> str:
@@ -129,6 +129,13 @@ class JobNotifier:
         with self.lock:
             return self.settings["enabled"] and bool(self.settings["topic"])
 
+    def push(self, title: str, body: str, priority: str = "default") -> None:
+        with self.lock:
+            if not self.settings["topic"]:
+                return
+
+        self._deliver(title, body, priority)
+
     def job_started(self, record: dict) -> None:
         if not self._enabled():
             return
@@ -143,6 +150,6 @@ class JobNotifier:
         if record["status"] not in ("failed", "finished"):
             return
 
-        runtime_s             = self._runtime_s(record)
+        runtime_s             = self.runtime_s(record)
         title, body, priority = self._describe(record, runtime_s)
         self._dispatch(title, body, priority)

@@ -9,6 +9,7 @@ import threading
 from pathlib      import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from command_listener       import CommandListener
 from config_registry        import ConfigRegistry
 from cube_explorer          import CubeExplorer
 from dataset_browser        import DatasetBrowser
@@ -48,7 +49,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, commands: CommandListener, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -66,6 +67,7 @@ class RequestRouter:
         self.repomap     = repomap
         self.processes   = processes
         self.notifier    = notifier
+        self.commands    = commands
         self.nuke        = nuke
         self.detacher    = detacher
         self.system      = system
@@ -426,6 +428,7 @@ class RequestRouter:
             payload["gpu_schedule"] = self.gpu_schedule.state()
             payload["server"]    = self.detacher.state()
             payload["notify"]    = self.notifier.state()
+            payload["commands"]  = self.commands.state()
             self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):
@@ -500,6 +503,11 @@ class RequestRouter:
 
         if path == "/api/notify/test":
             result = self.notifier.test()
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/commands/config":
+            result = self.commands.configure(body or {})
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

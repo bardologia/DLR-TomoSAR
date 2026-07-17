@@ -256,6 +256,19 @@ class StatusBoard {
       `</div>` +
       `</section>` +
 
+      `<section class="sboard sboard--strip sboard--ntf" aria-label="Remote commands">` +
+      `<div class="strip__seg">` +
+      `<i class="wd__light" id="sb-cmd-light" aria-hidden="true"></i><span class="wd__label">remote</span><span class="wd__mode" id="sb-cmd-mode">--</span></div>` +
+      `<i class="strip__div" aria-hidden="true"></i>` +
+      `<label class="ntf__field"><span class="ntf__key">command topic</span><input class="ntf__input" id="sb-cmd-topic" type="text" placeholder="another-secret-topic" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">server</span><input class="ntf__input ntf__input--server" id="sb-cmd-server" type="text" spellcheck="false" autocomplete="off"></label>` +
+      `<span class="ntf__hint" title="Publish messages to this topic from the ntfy app to drive the console: 'status', 'stop <job>', 'gpus <job> 0,1', 'stop all', 'nuke', 'help'. Replies arrive on the notify topic. 'nuke' and 'stop all' only fire after a '... confirm' reply within 60 seconds. The command topic is the only credential — pick a long random name and keep it distinct from the notify topic.">control the console from your phone via ntfy</span>` +
+      `<div class="strip__actions">` +
+      `<button type="button" class="impact__arm" id="sb-cmd-save" title="Save command topic and server">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-cmd-toggle" title="Toggle the remote command listener">remote: --</button>` +
+      `</div>` +
+      `</section>` +
+
       `<section class="sboard sboard--strip sboard--sched" aria-label="GPU week schedule">` +
       `<div class="strip__seg">` +
       `<i class="wd__light" id="sb-sch-light" aria-hidden="true"></i><span class="wd__label">gpu week</span><span class="wd__mode" id="sb-sch-mode">--</span></div>` +
@@ -380,6 +393,7 @@ class StatusBoard {
     this._wireImpactArm();
     this._wireDetach();
     this._wireNotify();
+    this._wireCommands();
 
     this.schedule = new GpuWeekPanel();
     this.schedule.wire();
@@ -512,6 +526,60 @@ class StatusBoard {
     }
   }
 
+  _wireCommands() {
+    const save   = document.getElementById("sb-cmd-save");
+    const toggle = document.getElementById("sb-cmd-toggle");
+    if (!save || !toggle) return;
+
+    const submit = async (enabled) => {
+      const topic = document.getElementById("sb-cmd-topic");
+      const server = document.getElementById("sb-cmd-server");
+      const payload = {
+        enabled,
+        topic: topic ? topic.value.trim() : "",
+        server: server ? server.value.trim() : "",
+      };
+      const res = await window.apiPost("/api/commands/config", payload);
+      if (res && res.ok) {
+        this._cmdSeeded = false;
+        this._renderCommands(res);
+        window.toast(`remote commands ${res.enabled ? "on" : "off"} — settings saved`, "ok");
+      } else {
+        window.toast(`command settings rejected: ${(res && res.error) || "network error"}`, "error");
+      }
+    };
+
+    save.addEventListener("click", () => submit(!!(this._cmdState || {}).enabled));
+    toggle.addEventListener("click", () => submit(!(this._cmdState || {}).enabled));
+  }
+
+  _renderCommands(cmd) {
+    if (!cmd) return;
+    this._cmdState = cmd;
+
+    const light  = document.getElementById("sb-cmd-light");
+    const mode   = document.getElementById("sb-cmd-mode");
+    const toggle = document.getElementById("sb-cmd-toggle");
+    const on     = !!cmd.enabled;
+    if (light) light.classList.toggle("is-armed", on);
+    if (mode) {
+      mode.textContent = on ? "armed" : "off";
+      mode.classList.toggle("is-off", !on);
+    }
+    if (toggle) {
+      toggle.textContent = on ? "remote: ON" : "remote: off";
+      toggle.classList.toggle("is-safe", on);
+    }
+
+    if (!this._cmdSeeded) {
+      this._cmdSeeded = true;
+      const topic = document.getElementById("sb-cmd-topic");
+      const server = document.getElementById("sb-cmd-server");
+      if (topic) topic.value = cmd.topic || "";
+      if (server) server.value = cmd.server || "";
+    }
+  }
+
   _wireImpactArm() {
     const btn = document.getElementById("sb-impact-arm");
     if (!btn) return;
@@ -545,6 +613,7 @@ class StatusBoard {
     this._renderGpuGuard(sys.gpu_guard || {});
     this._renderDetach(sys.server);
     this._renderNotify(sys.notify);
+    this._renderCommands(sys.commands);
     if (this.schedule) this.schedule.render(sys.gpu_schedule);
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};

@@ -4,6 +4,7 @@ import threading
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from command_listener                   import CommandListener
 from config_registry                    import ConfigRegistry
 from cube_explorer                      import CubeExplorer
 from dataset_browser                    import DatasetBrowser
@@ -83,6 +84,7 @@ class WebUIServer:
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)
+        self.commands          = CommandListener(self.paths, self.logger, self.notifier, self.processes, self.nuke, self.system)
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard         = GpuWatchdog(self.system, self.paths, self.logger, self.processes)
@@ -112,6 +114,7 @@ class WebUIServer:
             repomap           = self.repomap,
             processes         = self.processes,
             notifier          = self.notifier,
+            commands          = self.commands,
             nuke              = self.nuke,
             detacher          = self.detacher,
             system            = self.system,
@@ -133,6 +136,7 @@ class WebUIServer:
         self.contention.start()
         self.gpu_guard.start()
         self.gpu_schedule.start()
+        self.commands.start()
 
         server        = _Server((self.host, self.port), _Handler)
         server.router = self.router
