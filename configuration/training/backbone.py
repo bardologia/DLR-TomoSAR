@@ -22,7 +22,7 @@ def default_curriculum() -> LossCurriculumConfig:
         weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = True,
+        presence_balance         = False,
         use_cosine_curve         = True,
         weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
     )
@@ -32,7 +32,7 @@ def default_curriculum() -> LossCurriculumConfig:
         weight_param_l1          = 1.0,
         param_matching           = AblationCatalog.PARAM_MATCH_FULL,
         use_active_normalization = True,
-        presence_balance         = True,
+        presence_balance         = False,
         use_cosine_curve         = True,
         weight_cosine_curve      = AblationCatalog.COSINE_WEIGHT,
         use_coherence_resyn      = True,

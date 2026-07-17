@@ -9,7 +9,7 @@ class AblationCatalog:
 
     CURRICULUM_SWAP_EPOCH = 15
 
-    PARAM_MATCH_FULL = ParamMatching.SORTED_GT
+    PARAM_MATCH_FULL = ParamMatching.HUNGARIAN
 
     GROUP_LR_DEFAULTS = (
         ("encoder_lr",     3e-4),

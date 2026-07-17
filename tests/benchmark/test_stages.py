@@ -218,7 +218,7 @@ def test_training_seed_sweep_job_uses_base_model_and_seed(data_config, logger_st
     data_config.seeds = [7]
     stage = TrainingStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    unit = "unet-conv-sorted_gt-K_5-hv-A__param_l1"
+    unit = "unet-conv-hungarian-K_5-hv-A__param_l1"
     assert stage.items == [f"{unit}/seed7"]
 
     job = stage._job(f"{unit}/seed7")
@@ -233,7 +233,7 @@ def test_inference_seed_sweep_matches_training_run_names(data_config, logger_stu
     data_config.seeds = [3, 4]
     stage = InferenceStage(config=data_config, entry_script=ENTRY, run_tag="t", models=["unet"], logger=logger_stub)
 
-    unit = "unet-conv-sorted_gt-K_5-hv-A__param_l1"
+    unit = "unet-conv-hungarian-K_5-hv-A__param_l1"
     assert stage.items == [f"{unit}/seed3", f"{unit}/seed4"]
 
     job = stage._job(f"{unit}/seed4")
@@ -246,4 +246,4 @@ def test_inference_seed_sweep_matches_training_run_names(data_config, logger_stu
 def test_unit_base_names_model_head_stem_and_component(data_config):
     unit = SeedExpandedStage.unit_base(data_config, "resunet-set_pred", "mse_curve")
 
-    assert unit == "resunet-set_pred-sorted_gt-K_5-hv-A__mse_curve"
+    assert unit == "resunet-set_pred-hungarian-K_5-hv-A__mse_curve"
