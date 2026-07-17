@@ -19,19 +19,29 @@ def _planner(trials_config=None, model_overrides=None):
     return DualInputTrialPlanner(trials_config or DualInputTrialsConfig(), model_overrides or {}, TrunkChannelMap.GROUPS)
 
 
-def test_dual_input_planner_default_catalog_covers_the_grid():
+def test_dual_input_planner_default_catalog_covers_the_seven_ordered_pairs():
     plans = dict(_planner().plan())
 
-    assert list(plans) == ["di-red-red", "di-red-ifg", "di-amp-ifg", "di-amp-red"]
+    assert list(plans) == ["di-full-full", "di-amp-full", "di-full-amp", "di-phase-full", "di-full-phase", "di-phase-amp", "di-amp-phase"]
 
-    assert plans["di-red-red"]["params_input"]    == ["pass", "ifg", "dem"]
-    assert plans["di-red-red"]["existence_input"] == ["pass", "ifg", "dem"]
-    assert plans["di-red-ifg"]["params_input"]    == ["pass", "ifg", "dem"]
-    assert plans["di-red-ifg"]["existence_input"] == ["ifg"]
-    assert plans["di-amp-ifg"]["params_input"]    == ["pass"]
-    assert plans["di-amp-ifg"]["existence_input"] == ["ifg"]
-    assert plans["di-amp-red"]["params_input"]    == ["pass"]
-    assert plans["di-amp-red"]["existence_input"] == ["pass", "ifg", "dem"]
+    full  = ["pass", "ifg", "dem"]
+    amp   = ["pass"]
+    phase = ["ifg"]
+
+    assert plans["di-full-full"]["params_input"]     == full
+    assert plans["di-full-full"]["existence_input"]  == full
+    assert plans["di-amp-full"]["params_input"]      == amp
+    assert plans["di-amp-full"]["existence_input"]   == full
+    assert plans["di-full-amp"]["params_input"]      == full
+    assert plans["di-full-amp"]["existence_input"]   == amp
+    assert plans["di-phase-full"]["params_input"]    == phase
+    assert plans["di-phase-full"]["existence_input"] == full
+    assert plans["di-full-phase"]["params_input"]    == full
+    assert plans["di-full-phase"]["existence_input"] == phase
+    assert plans["di-phase-amp"]["params_input"]     == phase
+    assert plans["di-phase-amp"]["existence_input"]  == amp
+    assert plans["di-amp-phase"]["params_input"]     == amp
+    assert plans["di-amp-phase"]["existence_input"]  == phase
 
 
 def test_dual_input_planner_fixes_half_width_trunks_on_every_trial():
@@ -97,7 +107,7 @@ def test_dual_input_planner_paths_are_entry_config_leaves():
 
 
 def test_dual_trial_overrides_round_trip_through_the_cli():
-    _, overrides = _planner().plan()[1]
+    _, overrides = _planner().plan()[4]
 
     config = ConfigCli(DualEntryConfig()).apply(ConfigCli.to_argv(overrides))
 
@@ -119,10 +129,10 @@ def test_dual_scheduler_houses_runs_in_input_dir(tmp_path):
     assert scheduler.runs_root == tmp_path / "input"
     assert scheduler.log_dir   == tmp_path / "input" / "batch_train_logs"
 
-    job = scheduler._job("di-red-ifg", {})
+    job = scheduler._job("di-full-phase", {})
 
     assert job.command[-2:] == ["--logdir", str(tmp_path / "input")]
-    assert job.log_path     == tmp_path / "input" / "batch_train_logs" / "di-red-ifg.log"
+    assert job.log_path     == tmp_path / "input" / "batch_train_logs" / "di-full-phase.log"
 
 
 def test_dual_scheduler_plans_the_trunk_input_grid(tmp_path):
@@ -133,8 +143,8 @@ def test_dual_scheduler_plans_the_trunk_input_grid(tmp_path):
 
     plans = dict(scheduler.planner().plan())
 
-    assert list(plans) == ["di-red-red", "di-red-ifg", "di-amp-ifg", "di-amp-red"]
-    assert plans["di-red-ifg"]["model_overrides"]["params_features"] == HALF_FEATURES
+    assert list(plans) == ["di-full-full", "di-amp-full", "di-full-amp", "di-phase-full", "di-full-phase", "di-phase-amp", "di-amp-phase"]
+    assert plans["di-full-phase"]["model_overrides"]["params_features"] == HALF_FEATURES
 
 
 def test_dual_scheduler_rejects_unknown_mode(tmp_path):

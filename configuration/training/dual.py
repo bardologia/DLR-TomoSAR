@@ -28,11 +28,18 @@ def _half_resunet_features() -> list[int]:
 
 
 def _default_dual_input_trials() -> dict:
+    full  = ["pass", "ifg", "dem"]
+    amp   = ["pass"]
+    phase = ["ifg"]
+
     return {
-        "red-red" : {"params": ["pass", "ifg", "dem"], "existence": ["pass", "ifg", "dem"]},
-        "red-ifg" : {"params": ["pass", "ifg", "dem"], "existence": ["ifg"]},
-        "amp-ifg" : {"params": ["pass"],               "existence": ["ifg"]},
-        "amp-red" : {"params": ["pass"],               "existence": ["pass", "ifg", "dem"]},
+        "full-full"  : {"params": full,  "existence": full},
+        "amp-full"   : {"params": amp,   "existence": full},
+        "full-amp"   : {"params": full,  "existence": amp},
+        "phase-full" : {"params": phase, "existence": full},
+        "full-phase" : {"params": full,  "existence": phase},
+        "phase-amp"  : {"params": phase, "existence": amp},
+        "amp-phase"  : {"params": amp,   "existence": phase},
     }
 
 
