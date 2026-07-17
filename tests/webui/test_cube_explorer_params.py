@@ -258,19 +258,20 @@ def test_points_bin_thresholds_and_subsamples(tmp_path):
     assert explorer.points_bin("wrong", "pred", 1e-3, 100) is None
 
 
-def test_dem_points_absent_without_artifact(tmp_path):
+def test_dem_grid_absent_without_artifact(tmp_path):
     explorer, cube_id = _loaded_explorer(tmp_path)
 
     assert explorer.load_status()["cube"]["dem"] is False
-    assert explorer.dem_points_bin(cube_id, stride=2) is None
+    assert explorer.dem_grid_bin(cube_id) is None
 
 
-def test_dem_points_with_artifact(tmp_path):
+def test_dem_grid_with_artifact(tmp_path):
     stamp   = _make_cube_run(tmp_path)
     preproc = tmp_path / "preproc"
     layout  = json.loads((preproc / "data" / "dataset.json").read_text())
 
-    dem = np.linspace(600.0, 700.0, N_AZ * N_RG).reshape(N_AZ, N_RG).astype(np.float32)
+    dem          = np.linspace(600.0, 700.0, N_AZ * N_RG).reshape(N_AZ, N_RG).astype(np.float32)
+    dem[2, 3]    = np.nan
     np.save(preproc / "data" / "dem.npy", dem)
     layout["artifacts"]["dem_full"] = "dem.npy"
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
@@ -285,13 +286,16 @@ def test_dem_points_with_artifact(tmp_path):
     assert explorer.load_status()["state"] == "ready"
     assert explorer.load_status()["cube"]["dem"] is True
 
-    raw = np.frombuffer(explorer.dem_points_bin(cube_id, stride=2), dtype=np.float32)
-    n_sent, median = int(raw[0]), float(raw[1])
-    rows           = raw[4:].reshape(n_sent, 4)
+    raw    = np.frombuffer(explorer.dem_grid_bin(cube_id), dtype=np.float32)
+    header = raw[:4]
+    grid   = raw[4:].reshape(N_AZ, N_RG)
 
-    assert n_sent == len(range(0, N_AZ, 2)) * len(range(0, N_RG, 2))
-    assert abs(median - float(np.median(dem[::2, ::2]))) < 1e-3
-    assert abs(float(rows[:, 2].mean())) < 30.0
+    median = float(np.median(dem[np.isfinite(dem)]))
+
+    assert header[0] == N_AZ and header[1] == N_RG
+    assert abs(float(header[2]) - median) < 1e-3
+    assert np.isnan(grid[2, 3])
+    assert np.allclose(grid[0, 0], dem[0, 0] - median, atol=1e-3)
 
 
 def test_params_with_nan_survive_load_and_lookup(tmp_path):

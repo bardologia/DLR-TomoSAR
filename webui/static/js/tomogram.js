@@ -876,7 +876,7 @@ class TomogramCloud {
     this.colorBy = "mu";
     this.points = null;
     this.total = 0;
-    this.demPoints = null;
+    this.demGrid = null;
     this.debounceTimer = null;
 
     this.yaw = 0.7;
@@ -909,7 +909,7 @@ class TomogramCloud {
     this.available = sources.length > 0;
     if (!sources.includes(this.source)) this.source = sources[0] || "pred";
     this.points = null;
-    this.demPoints = null;
+    this.demGrid = null;
     this.demWrap.hidden = !meta.dem;
     this.demEl.checked = false;
     this.scaleWrap.hidden = !meta.spacing;
@@ -959,8 +959,8 @@ class TomogramCloud {
   }
 
   async _onDem() {
-    if (this.demEl.checked && !this.demPoints) {
-      this.demPoints = await this._fetchBinary(`/api/cubes/dem_points?id=${encodeURIComponent(this.host.selectedId)}&stride=4`);
+    if (this.demEl.checked && !this.demGrid) {
+      this.demGrid = await this._fetchBinary(`/api/cubes/dem_grid?id=${encodeURIComponent(this.host.selectedId)}`);
     }
     this._draw();
   }
@@ -1004,7 +1004,7 @@ class TomogramCloud {
     this.scaleEl.disabled = binAxis;
     this.demEl.disabled = binAxis;
     this.scaleWrap.title = binAxis ? "The raw Capon cube has a bin elevation axis; 1:1 applies to metric sources only" : "Metres on all three axes — no height exaggeration";
-    this.demWrap.title = binAxis ? "The DEM overlay needs a metric elevation axis" : "";
+    this.demWrap.title = binAxis ? "The DEM drape needs a metric elevation axis" : "Drape the cloud on the terrain: point height = DEM + elevation";
   }
 
   async _fetchBinary(url) {
@@ -1129,10 +1129,15 @@ class TomogramCloud {
       buf[(sy + 1) * W + sx + 1] = color;
     };
 
-    if (this.demEl.checked && !this.demEl.disabled && this.demPoints) {
-      const dem = this.demPoints.rows;
-      for (let i = 0; i < dem.length; i += 4) {
-        plot((dem[i + 1] - cx) * rgStep, (dem[i] - cy) * azStep, dem[i + 2] * zScale, [110, 116, 122]);
+    const grid = this.demEl.checked && !this.demEl.disabled && this.demGrid ? this.demGrid.rows : null;
+
+    if (grid) {
+      for (let az = 0; az < meta.n_az; az += 4) {
+        for (let rg = 0; rg < meta.n_rg; rg += 4) {
+          const g = grid[az * meta.n_rg + rg];
+          if (!Number.isFinite(g)) continue;
+          plot((rg - cx) * rgStep, (az - cy) * azStep, (g - zMid) * zScale, [110, 116, 122]);
+        }
       }
     }
 
@@ -1150,10 +1155,18 @@ class TomogramCloud {
     for (let i = 0; i < rows.length; i += 4) {
       const mu = rows[i + 2];
       const amp = rows[i + 3];
+
+      let z = mu - zMid;
+      if (grid) {
+        const g = grid[rows[i] * meta.n_rg + rows[i + 1]];
+        if (!Number.isFinite(g)) continue;
+        z += g;
+      }
+
       const t = this.colorBy === "amp"
         ? ((logAmp ? Math.log(Math.max(amp, 1e-6)) : amp) - ampLo) / Math.max(ampHi - ampLo, 1e-6)
         : (mu - muLo) / zSpan;
-      plot((rows[i + 1] - cx) * rgStep, (rows[i] - cy) * azStep, (mu - zMid) * zScale, this._palette(t));
+      plot((rows[i + 1] - cx) * rgStep, (rows[i] - cy) * azStep, z * zScale, this._palette(t));
     }
 
     ctx.putImageData(image, 0, 0);

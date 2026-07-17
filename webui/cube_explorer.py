@@ -568,7 +568,7 @@ class CubeExplorer:
         header = np.array([rows.shape[0], total, 0.0, 0.0], dtype=np.float32)
         return header.tobytes() + np.ascontiguousarray(rows).tobytes()
 
-    def dem_points_bin(self, cube_id: str, stride: int) -> bytes | None:
+    def dem_grid_bin(self, cube_id: str) -> bytes | None:
         with self.lock:
             if self.loaded is None or self.loaded["id"] != cube_id:
                 return None
@@ -577,24 +577,12 @@ class CubeExplorer:
         if dem is None:
             return None
 
-        stride = max(1, int(stride))
-        az     = np.arange(0, dem.shape[0], stride)
-        rg     = np.arange(0, dem.shape[1], stride)
-        grid   = dem[np.ix_(az, rg)]
+        finite = np.isfinite(dem)
+        median = float(np.median(dem[finite])) if finite.any() else 0.0
+        grid   = (dem - median).astype(np.float32)
 
-        az_mesh, rg_mesh = np.meshgrid(az, rg, indexing="ij")
-        finite           = np.isfinite(grid)
-        median           = float(np.median(grid[finite])) if finite.any() else 0.0
-
-        rows = np.stack([
-            az_mesh[finite].astype(np.float32),
-            rg_mesh[finite].astype(np.float32),
-            (grid[finite] - median).astype(np.float32),
-            np.zeros(int(finite.sum()), dtype=np.float32),
-        ], axis=1)
-
-        header = np.array([rows.shape[0], median, 0.0, 0.0], dtype=np.float32)
-        return header.tobytes() + np.ascontiguousarray(rows).tobytes()
+        header = np.array([dem.shape[0], dem.shape[1], median, 0.0], dtype=np.float32)
+        return header.tobytes() + np.ascontiguousarray(grid).tobytes()
 
     def metric_overlay_png(self, cube_id: str, key: str, vmin: float, vmax: float, keep_min: float, keep_max: float, alpha: float) -> bytes | None:
         resolved = self._metric_state(cube_id, key)

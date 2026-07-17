@@ -240,12 +240,9 @@ class RequestRouter:
             )
             self._send_bytes(handler, blob)
             return
-        if path == "/api/cubes/dem_points":
+        if path == "/api/cubes/dem_grid":
             query = parse_qs(urlparse(handler.path).query)
-            blob  = self.cubes.dem_points_bin(
-                cube_id = (query.get("id") or [""])[0],
-                stride  = int((query.get("stride") or ["4"])[0]),
-            )
+            blob  = self.cubes.dem_grid_bin(cube_id=(query.get("id") or [""])[0])
             self._send_bytes(handler, blob)
             return
         if path == "/api/cubes/transect":
