@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuQueue, GpuJobResult
+from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuProgressFile, GpuQueue, GpuJobResult
 
 
 class NullLogger:
@@ -448,6 +448,94 @@ def test_parked_pool_holds_queued_jobs_until_a_gpu_returns(tmp_path):
     assert len(results) == 2
     assert all(result.status == "DONE" for result in results)
     assert elapsed > 1.15
+
+
+def _progress_result(name: str, status: str, duration_s: float) -> GpuJobResult:
+    return GpuJobResult(name=name, gpu=0, status=status, returncode=0 if status == "DONE" else 1, duration_s=duration_s, log_file="")
+
+
+def test_progress_file_resolves_next_to_the_pool_file():
+    assert GpuProgressFile.resolve(Path("/x/logs/gpu_pools/abc.json")) == Path("/x/logs/gpu_pools/abc_progress.json")
+
+
+def test_run_writes_a_final_progress_snapshot_next_to_the_pool_file(tmp_path, logger):
+    queue, _pool = _pool_queue(tmp_path, [0])
+    queue.run([_job(tmp_path, "a", _ok_command()), _job(tmp_path, "b", _fail_command(3))])
+
+    progress = json.loads((tmp_path / "gpu_pool_progress.json").read_text())
+
+    assert progress["total"]        == 2
+    assert progress["done"]         == 1
+    assert progress["failed"]       == 1
+    assert progress["failed_units"] == ["b"]
+    assert progress["queued"]       == 0
+    assert progress["running"]      == []
+    assert progress["eta_s"]        == 0.0
+    assert progress["average_s"]    >= 0.0
+    assert progress["total_s"]      >= progress["elapsed_s"]
+
+
+def test_queue_without_pool_file_writes_no_progress_file(tmp_path, logger):
+    queue = GpuQueue(gpus=[0], logger=logger, poll_interval_s=0.0, handle_signals=False)
+    queue.run([_job(tmp_path, "a", _ok_command())])
+
+    assert not list(tmp_path.glob("*_progress.json"))
+
+
+def test_progress_eta_unknown_until_the_first_unit_completes(tmp_path):
+    progress = GpuProgressFile(tmp_path / "p.json", total=4, logger=NullLogger())
+    snapshot = progress.snapshot([{"name": "a", "gpu": 0, "elapsed_s": 5.0}], queued=3, workers=1)
+
+    assert snapshot["eta_s"]     is None
+    assert snapshot["total_s"]   is None
+    assert snapshot["finish_at"] is None
+
+
+def test_progress_eta_splits_remaining_work_across_workers(tmp_path):
+    progress = GpuProgressFile(tmp_path / "p.json", total=8, logger=NullLogger())
+    progress.record(_progress_result("a", "DONE", 80.0))
+    progress.record(_progress_result("b", "DONE", 120.0))
+
+    running  = [{"name": "c", "gpu": 0, "elapsed_s": 40.0}, {"name": "d", "gpu": 1, "elapsed_s": 160.0}]
+    snapshot = progress.snapshot(running, queued=3, workers=2)
+
+    assert snapshot["average_s"] == 100.0
+    assert snapshot["eta_s"]     == 180.0
+    assert snapshot["done"]      == 2
+    assert snapshot["failed"]    == 0
+
+
+def test_progress_eta_is_bounded_below_by_the_longest_running_unit(tmp_path):
+    progress = GpuProgressFile(tmp_path / "p.json", total=3, logger=NullLogger())
+    progress.record(_progress_result("a", "DONE", 100.0))
+
+    running  = [{"name": "b", "gpu": 0, "elapsed_s": 10.0}, {"name": "c", "gpu": 1, "elapsed_s": 95.0}]
+    snapshot = progress.snapshot(running, queued=0, workers=2)
+
+    assert snapshot["eta_s"] == 90.0
+
+
+def test_progress_write_is_throttled_between_completions(tmp_path):
+    progress = GpuProgressFile(tmp_path / "p.json", total=2, logger=NullLogger())
+
+    progress.write(progress.snapshot([], 2, 1))
+    stamp = (tmp_path / "p.json").stat().st_mtime_ns
+
+    progress.write(progress.snapshot([], 1, 1))
+    assert (tmp_path / "p.json").stat().st_mtime_ns == stamp
+
+    progress.write(progress.snapshot([], 1, 1), force=True)
+    assert json.loads((tmp_path / "p.json").read_text())["queued"] == 1
+
+
+def test_completion_logs_a_progress_line_with_eta(tmp_path):
+    recorder     = RecordingLogger()
+    queue, _pool = _pool_queue(tmp_path, [0], recorder)
+    queue.run([_job(tmp_path, f"j{i}", _ok_command()) for i in range(2)])
+
+    lines = [line for line in recorder.infos if line.startswith("[")]
+    assert any(line.startswith("[1/2]") for line in lines)
+    assert any(line.startswith("[2/2]") and "ETA" in line for line in lines)
 
 
 def test_signal_handlers_restored_after_run(tmp_path):

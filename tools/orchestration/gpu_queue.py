@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime    import datetime, timedelta
 from pathlib     import Path
 
 from tools.data.io           import FileIO
@@ -88,6 +89,108 @@ class GpuPoolFile:
             return None
 
 
+class GpuProgressFile:
+
+    SUFFIX           = "_progress.json"
+    WRITE_INTERVAL_S = 15.0
+
+    def __init__(self, path: Path, total: int, logger: Logger) -> None:
+        self.path         = Path(path)
+        self.total        = total
+        self.logger       = logger
+        self.started_mono = time.monotonic()
+        self.started_at   = datetime.now()
+        self.durations    : list[float] = []
+        self.done         = 0
+        self.failed       = 0
+        self.failed_units : list[str] = []
+        self.last_write   = float("-inf")
+
+    @classmethod
+    def resolve(cls, pool_file: Path) -> Path:
+        pool = Path(pool_file)
+        return pool.with_name(pool.stem + cls.SUFFIX)
+
+    @property
+    def completed(self) -> int:
+        return self.done + self.failed
+
+    def record(self, result: GpuJobResult) -> None:
+        if result.status == "DONE":
+            self.done += 1
+        else:
+            self.failed += 1
+            self.failed_units.append(result.name)
+
+        self.durations.append(result.duration_s)
+
+    def _average_s(self) -> float | None:
+        return sum(self.durations) / len(self.durations) if self.durations else None
+
+    def _eta_s(self, running: list[dict], queued: int, workers: int) -> float | None:
+        average = self._average_s()
+        if average is None:
+            return None
+
+        remaining = [max(average - unit["elapsed_s"], 0.0) for unit in running]
+        pooled    = (queued * average + sum(remaining)) / max(workers, 1)
+
+        return max(pooled, max(remaining, default=0.0))
+
+    def snapshot(self, running: list[dict], queued: int, workers: int) -> dict:
+        elapsed = time.monotonic() - self.started_mono
+        eta     = self._eta_s(running, queued, workers)
+
+        return {
+            "total"        : self.total,
+            "done"         : self.done,
+            "failed"       : self.failed,
+            "queued"       : queued,
+            "running"      : running,
+            "workers"      : workers,
+            "failed_units" : list(self.failed_units),
+            "average_s"    : self._average_s(),
+            "elapsed_s"    : elapsed,
+            "eta_s"        : eta,
+            "total_s"      : elapsed + eta if eta is not None else None,
+            "started_at"   : self.started_at.isoformat(timespec="seconds"),
+            "finish_at"    : (datetime.now() + timedelta(seconds=eta)).isoformat(timespec="seconds") if eta is not None else None,
+            "updated_at"   : datetime.now().isoformat(timespec="seconds"),
+        }
+
+    def _label(self, seconds: float) -> str:
+        minutes, _     = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        if minutes:
+            return f"{minutes} min"
+        return "<1 min"
+
+    def log_progress(self, snapshot: dict) -> None:
+        share  = f"[{self.completed}/{self.total}]"
+        failed = f" · {self.failed} FAILED" if self.failed else ""
+
+        if snapshot["eta_s"] is None:
+            self.logger.info(f"{share} units finished{failed}")
+            return
+
+        average = self._label(snapshot["average_s"])
+        eta     = self._label(snapshot["eta_s"])
+        finish  = snapshot["finish_at"][11:16]
+
+        self.logger.info(f"{share} avg {average}/unit · ETA {eta} · finish ≈ {finish}{failed}")
+
+    def write(self, snapshot: dict, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and now - self.last_write < self.WRITE_INTERVAL_S:
+            return
+
+        self.last_write = now
+        FileIO.save_json(snapshot, self.path, indent=2, atomic=True)
+
+
 class GpuQueue:
     def __init__(self, gpus: list[int], logger: Logger, poll_interval_s: float = 5.0, handle_signals: bool = True, terminate_deadline_s: float = 30.0, pool_file: Path | None = None) -> None:
         if not gpus:
@@ -99,6 +202,7 @@ class GpuQueue:
         self.handle_signals       = handle_signals
         self.terminate_deadline_s = terminate_deadline_s
         self.pool                 = GpuPoolFile(pool_file, logger) if pool_file is not None else None
+        self.progress             : GpuProgressFile | None = None
         self.running              : list[dict] = []
         self.retiring             : set[int] = set()
 
@@ -219,6 +323,23 @@ class GpuQueue:
 
         return {"job": job, "gpu": gpu_id, "process": process, "log_fh": log_fh, "started": time.monotonic()}
 
+    def _publish_progress(self, queue: list[GpuJob], gpu_pool: list[int], results: list[GpuJobResult]) -> None:
+        if self.progress is None:
+            return
+
+        announce = len(results) > self.progress.completed
+        for result in results[self.progress.completed:]:
+            self.progress.record(result)
+
+        running  = [{"name": record["job"].name, "gpu": record["gpu"], "elapsed_s": round(time.monotonic() - record["started"], 1)} for record in self.running]
+        workers  = max(1, len(gpu_pool) + len(self.running) - len(self.retiring))
+        snapshot = self.progress.snapshot(running, len(queue), workers)
+
+        if announce:
+            self.progress.log_progress(snapshot)
+
+        self.progress.write(snapshot, force=announce)
+
     def _restore_signal_handlers(self, previous: dict) -> None:
         for signum, handler in previous.items():
             signal.signal(signum, handler)
@@ -233,6 +354,7 @@ class GpuQueue:
 
         if self.pool is not None and jobs:
             self.pool.seed(self.gpus)
+            self.progress = GpuProgressFile(GpuProgressFile.resolve(self.pool.path), len(jobs), self.logger)
 
         previous_handlers = self._install_signal_handlers() if self.handle_signals else {}
 
@@ -245,6 +367,8 @@ class GpuQueue:
                     job    = queue.pop(0)
                     gpu_id = gpu_pool.pop(0)
                     self.running.append(self._launch(job, gpu_id))
+
+                self._publish_progress(queue, gpu_pool, results)
 
                 if queue or self.running:
                     time.sleep(self.poll_interval_s)
