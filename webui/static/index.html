@@ -478,13 +478,15 @@
             <div class="cube-spaces" id="cube-cloud-source" role="group" aria-label="Point cloud source">
               <button type="button" class="cube-space is-active" data-source="pred">pred</button>
               <button type="button" class="cube-space" data-source="gt">gt</button>
+              <button type="button" class="cube-space" data-source="reduced" title="Capon reduced tomogram (metric elevation axis)">capon</button>
+              <button type="button" class="cube-space" data-source="full" title="Capon full raw tomogram (bin elevation axis)">full</button>
             </div>
             <div class="cube-spaces" id="cube-cloud-color" role="group" aria-label="Colour by">
               <button type="button" class="cube-space is-active" data-color="mu">colour: elevation</button>
               <button type="button" class="cube-space" data-color="amp">colour: amplitude</button>
             </div>
             <div class="cube-mctl" role="group" aria-label="Amplitude threshold">
-              <label for="cube-cloud-thr">amp &ge;</label>
+              <label for="cube-cloud-thr" id="cube-cloud-thr-label">amp &ge;</label>
               <input type="range" id="cube-cloud-thr" min="0" max="100" value="0" />
               <span class="cube-mctl__val" id="cube-cloud-thr-val"></span>
             </div>

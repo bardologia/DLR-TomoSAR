@@ -84,10 +84,11 @@ class SliceFigureArchiver(PlotBase):
 
 class CubeExplorer:
 
-    SOURCES       = ("pred", "predb", "diff", "gt", "reduced", "full")
-    PARAM_SOURCES = ("pred", "gt")
-    PARAM_FIELDS  = {"amp": 0, "mu": 1, "sigma": 2}
-    PARAM_BAD     = "#10151a"
+    SOURCES             = ("pred", "predb", "diff", "gt", "reduced", "full")
+    PARAM_SOURCES       = ("pred", "gt")
+    CLOUD_CURVE_SOURCES = ("reduced", "full")
+    PARAM_FIELDS        = {"amp": 0, "mu": 1, "sigma": 2}
+    PARAM_BAD           = "#10151a"
 
     CMAPS = ("jet", "viridis", "inferno", "turbo", "gray")
 
@@ -202,9 +203,10 @@ class CubeExplorer:
             self.loaded["entries"]["diff"]  = diff
 
             meta = dict(self.loaded["meta"])
-            meta["sources"]  = [s for s in self.SOURCES if s in self.loaded["entries"]]
-            meta["n_elev"]   = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
-            meta["attached"] = {"id": other_id, "run": run_dir.name, "stamp": other_dir.name}
+            meta["sources"]   = [s for s in self.SOURCES if s in self.loaded["entries"]]
+            meta["n_elev"]    = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
+            meta["intensity"] = {s: [e["vmin"], e["vmax"]] for s, e in self.loaded["entries"].items()}
+            meta["attached"]  = {"id": other_id, "run": run_dir.name, "stamp": other_dir.name}
             self.loaded["meta"] = meta
 
         self.logger.ok(f"attached comparison cube: {other_id}")
@@ -219,9 +221,10 @@ class CubeExplorer:
             self.loaded["entries"].pop("diff", None)
 
             meta = dict(self.loaded["meta"])
-            meta["sources"]  = [s for s in self.SOURCES if s in self.loaded["entries"]]
-            meta["n_elev"]   = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
-            meta["attached"] = None
+            meta["sources"]   = [s for s in self.SOURCES if s in self.loaded["entries"]]
+            meta["n_elev"]    = {s: int(self.loaded["entries"][s]["cube"].shape[0]) for s in self.loaded["entries"]}
+            meta["intensity"] = {s: [e["vmin"], e["vmax"]] for s, e in self.loaded["entries"].items()}
+            meta["attached"]  = None
             self.loaded["meta"] = meta
 
         return {"ok": True, "cube": meta}
@@ -489,8 +492,16 @@ class CubeExplorer:
         return None
 
     def points_bin(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
+        if source in self.PARAM_SOURCES:
+            return self._param_points(cube_id, source, amp_min, max_points)
+        if source in self.CLOUD_CURVE_SOURCES:
+            entry = self._entry(cube_id, source)
+            return None if entry is None else self._curve_points(entry, amp_min, max_points)
+        return None
+
+    def _param_points(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
         resolved = self._param_state(cube_id)
-        if resolved is None or source not in self.PARAM_SOURCES:
+        if resolved is None:
             return None
 
         params, _ = resolved
@@ -518,6 +529,42 @@ class CubeExplorer:
             amps[k_idx, az_idx, rg_idx].astype(np.float32),
         ], axis=1)
 
+        return self._points_blob(rows, total)
+
+    @classmethod
+    def _curve_points(cls, entry: dict, amp_min: float, max_points: int) -> bytes:
+        cube   = entry["cube"]
+        x_axis = np.asarray(entry["x_axis"], dtype=np.float32)
+        n_rg   = cube.shape[2]
+
+        counts = np.array([int((np.isfinite(plane) & (plane >= amp_min)).sum()) for plane in cube], dtype=np.int64)
+        total  = int(counts.sum())
+        starts = np.concatenate([[0], np.cumsum(counts)])
+
+        n_keep = min(total, max_points) if max_points > 0 else total
+        picks  = np.linspace(0, total - 1, n_keep).astype(np.int64) if total else np.empty(0, dtype=np.int64)
+
+        chunks = []
+        for k, plane in enumerate(cube):
+            lo, hi = np.searchsorted(picks, [starts[k], starts[k + 1]])
+            if lo == hi:
+                continue
+
+            hits = np.flatnonzero(np.isfinite(plane) & (plane >= amp_min))[picks[lo:hi] - starts[k]]
+            vals = plane.ravel()[hits]
+
+            chunks.append(np.stack([
+                (hits // n_rg).astype(np.float32),
+                (hits %  n_rg).astype(np.float32),
+                np.full(hits.size, x_axis[k], dtype=np.float32),
+                vals.astype(np.float32),
+            ], axis=1))
+
+        rows = np.concatenate(chunks, axis=0) if chunks else np.zeros((0, 4), dtype=np.float32)
+        return cls._points_blob(rows, total)
+
+    @staticmethod
+    def _points_blob(rows: np.ndarray, total: int) -> bytes:
         header = np.array([rows.shape[0], total, 0.0, 0.0], dtype=np.float32)
         return header.tobytes() + np.ascontiguousarray(rows).tobytes()
 
@@ -811,6 +858,7 @@ class CubeExplorer:
             "n_elev"      : {s: int(entries[s]["cube"].shape[0]) for s in entries},
             "x_min"       : float(curve_axis[0]),
             "x_max"       : float(curve_axis[-1]),
+            "intensity"   : {s: [entries[s]["vmin"], entries[s]["vmax"]] for s in entries},
             "params"      : self._params_meta(params, curve_axis),
             "metric_maps" : self._metric_maps_meta(metric_maps),
             "attached"    : None,

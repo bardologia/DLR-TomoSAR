@@ -281,6 +281,7 @@ class App {
         source    : document.getElementById("cube-cloud-source"),
         color     : document.getElementById("cube-cloud-color"),
         thr       : document.getElementById("cube-cloud-thr"),
+        thrLabel  : document.getElementById("cube-cloud-thr-label"),
         thrVal    : document.getElementById("cube-cloud-thr-val"),
         max       : document.getElementById("cube-cloud-max"),
         demWrap   : document.getElementById("cube-cloud-dem-wrap"),

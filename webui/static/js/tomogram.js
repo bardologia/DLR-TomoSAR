@@ -850,12 +850,19 @@ class TomogramTransect {
 
 class TomogramCloud {
   static VIRIDIS = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
+  static CURVE_SOURCES = ["reduced", "full"];
+  static MISSING = {
+    gt      : "This run has no ground-truth parameter cube.",
+    reduced : "This run has no Capon reduced cube.",
+    full    : "The raw Capon tomogram is not available for this run.",
+  };
 
   constructor(refs, host) {
     this.host = host;
     this.sourceEl = refs.source;
     this.colorEl = refs.color;
     this.thrEl = refs.thr;
+    this.thrLabel = refs.thrLabel;
     this.thrValEl = refs.thrVal;
     this.maxEl = refs.max;
     this.demWrap = refs.demWrap;
@@ -898,7 +905,9 @@ class TomogramCloud {
   }
 
   configure(meta) {
-    this.available = !!meta.params && meta.params.sources.includes("pred");
+    const sources = this._sources(meta);
+    this.available = sources.length > 0;
+    if (!sources.includes(this.source)) this.source = sources[0] || "pred";
     this.points = null;
     this.demPoints = null;
     this.demWrap.hidden = !meta.dem;
@@ -906,6 +915,16 @@ class TomogramCloud {
     this.scaleWrap.hidden = !meta.spacing;
     this._resetView(false);
     this._syncThresholdLabel();
+  }
+
+  _sources(meta = this.host.meta) {
+    const out = meta.params ? meta.params.sources.slice() : [];
+    TomogramCloud.CURVE_SOURCES.forEach((s) => { if (meta.sources.includes(s)) out.push(s); });
+    return out;
+  }
+
+  _isParam() {
+    return this.source === "pred" || this.source === "gt";
   }
 
   render() {
@@ -916,12 +935,13 @@ class TomogramCloud {
 
   _setSource(source) {
     if (source === this.source) return;
-    if (source === "gt" && !this.host.meta.params.sources.includes("gt")) {
-      window.toast("This run has no ground-truth parameter cube.", "warn");
+    if (!this._sources().includes(source)) {
+      window.toast(TomogramCloud.MISSING[source] || "This source is not available.", "warn");
       return;
     }
     this.source = source;
     this._syncBtns();
+    this._syncThresholdLabel();
     this._fetch();
   }
 
@@ -951,26 +971,40 @@ class TomogramCloud {
   }
 
   _ampMin() {
-    const params = this.host.meta.params;
-    const thr = params.threshold;
-    const top = Math.max(params.ranges.amp[1], thr * 10);
     const frac = Number(this.thrEl.value) / 100;
-    return thr * Math.pow(top / thr, frac);
+
+    if (this._isParam()) {
+      const params = this.host.meta.params;
+      const top = Math.max(params.ranges.amp[1], params.threshold * 10);
+      return params.threshold * Math.pow(top / params.threshold, frac);
+    }
+
+    const [lo, hi] = this.host.meta.intensity[this.source];
+    return lo + frac * (hi - lo);
   }
 
   _syncThresholdLabel() {
-    if (!this.host.meta || !this.host.meta.params) return;
+    const meta = this.host.meta;
+    if (!meta || (this._isParam() && !meta.params)) return;
+    this.thrLabel.textContent = this._isParam() ? "amp ≥" : "int ≥";
     this.thrValEl.textContent = this.host._fmt(this._ampMin());
   }
 
   _syncBtns() {
+    const sources = this._sources();
     this.sourceEl.querySelectorAll(".cube-space").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.source === this.source);
-      if (btn.dataset.source === "gt") btn.disabled = !this.host.meta.params.sources.includes("gt");
+      btn.disabled = !sources.includes(btn.dataset.source);
     });
     this.colorEl.querySelectorAll(".cube-space").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.color === this.colorBy);
     });
+
+    const binAxis = this.source === "full";
+    this.scaleEl.disabled = binAxis;
+    this.demEl.disabled = binAxis;
+    this.scaleWrap.title = binAxis ? "The raw Capon cube has a bin elevation axis; 1:1 applies to metric sources only" : "Metres on all three axes — no height exaggeration";
+    this.demWrap.title = binAxis ? "The DEM overlay needs a metric elevation axis" : "";
   }
 
   async _fetchBinary(url) {
@@ -1072,7 +1106,7 @@ class TomogramCloud {
     const zMid = (muLo + muHi) / 2;
     const zSpan = (muHi - muLo) || 1;
 
-    const spacing = this.scaleEl.checked && meta.spacing ? meta.spacing : null;
+    const spacing = this.scaleEl.checked && !this.scaleEl.disabled && meta.spacing ? meta.spacing : null;
     const azStep = spacing ? spacing.az : 1;
     const rgStep = spacing ? spacing.rg : 1;
     const zScale = spacing ? 1 : (Math.max(meta.n_az, meta.n_rg) * 0.35) / (zSpan / 2);
@@ -1095,7 +1129,7 @@ class TomogramCloud {
       buf[(sy + 1) * W + sx + 1] = color;
     };
 
-    if (this.demEl.checked && this.demPoints) {
+    if (this.demEl.checked && !this.demEl.disabled && this.demPoints) {
       const dem = this.demPoints.rows;
       for (let i = 0; i < dem.length; i += 4) {
         plot((dem[i + 1] - cx) * rgStep, (dem[i] - cy) * azStep, dem[i + 2] * zScale, [110, 116, 122]);
@@ -1103,15 +1137,21 @@ class TomogramCloud {
     }
 
     const rows = this.points;
-    const params = meta.params;
-    const ampLo = Math.log(Math.max(params.threshold, 1e-6));
-    const ampHi = Math.log(Math.max(params.ranges.amp[1], params.threshold * 10));
+    const logAmp = this._isParam();
+    let ampLo, ampHi;
+    if (logAmp) {
+      const params = meta.params;
+      ampLo = Math.log(Math.max(params.threshold, 1e-6));
+      ampHi = Math.log(Math.max(params.ranges.amp[1], params.threshold * 10));
+    } else {
+      [ampLo, ampHi] = meta.intensity[this.source];
+    }
 
     for (let i = 0; i < rows.length; i += 4) {
       const mu = rows[i + 2];
       const amp = rows[i + 3];
       const t = this.colorBy === "amp"
-        ? (Math.log(Math.max(amp, 1e-6)) - ampLo) / Math.max(ampHi - ampLo, 1e-6)
+        ? ((logAmp ? Math.log(Math.max(amp, 1e-6)) : amp) - ampLo) / Math.max(ampHi - ampLo, 1e-6)
         : (mu - muLo) / zSpan;
       plot((rows[i + 1] - cx) * rgStep, (rows[i] - cy) * azStep, (mu - zMid) * zScale, this._palette(t));
     }
@@ -1119,10 +1159,11 @@ class TomogramCloud {
     ctx.putImageData(image, 0, 0);
 
     const shown = rows.length / 4;
+    const unit = logAmp ? "scatterers" : "voxels";
     const scaleNote = spacing
       ? ` · 1:1 in metres · az ${Math.round(meta.n_az * azStep)} m × rg ${Math.round(meta.n_rg * rgStep)} m`
       : "";
-    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers${scaleNote} · drag to orbit · wheel to zoom · double-click to reset`;
+    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} ${unit}${scaleNote} · drag to orbit · wheel to zoom · double-click to reset`;
   }
 }
 

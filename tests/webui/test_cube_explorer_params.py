@@ -20,7 +20,7 @@ from web_logger    import WebLogger
 N_ELEV, N_AZ, N_RG, N_SLOTS = 5, 8, 6, 2
 
 
-def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False) -> Path:
+def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False) -> Path:
     rng     = np.random.default_rng(0)
     preproc = base / "preproc"
     (preproc / "data").mkdir(parents=True)
@@ -53,6 +53,12 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing
     for source in ("pred", "gt"):
         np.save(stamp / "cubes" / f"{source}_curves.npy", rng.random((N_ELEV, N_AZ, N_RG)).astype(np.float32))
 
+    if with_reduced:
+        reduced           = np.zeros((N_ELEV, N_AZ, N_RG), dtype=np.float32)
+        reduced[2, 3, 4]  = 2.0
+        reduced[4, 5, 1]  = 1.0
+        np.save(stamp / "cubes" / "reduced_curves.npy", reduced)
+
     for source in with_params:
         block = rng.random((3 * N_SLOTS, N_AZ, N_RG)).astype(np.float32)
         block[3] = 0.0
@@ -61,8 +67,8 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing
     return stamp
 
 
-def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False) -> tuple[CubeExplorer, str]:
-    _make_cube_run(base, with_params, with_spacing)
+def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False) -> tuple[CubeExplorer, str]:
+    _make_cube_run(base, with_params, with_spacing, with_reduced)
     explorer = CubeExplorer(paths=None, logger=WebLogger())
 
     listing = explorer.list_cubes(str(base))
@@ -111,6 +117,47 @@ def test_meta_spacing_from_reference_track(tmp_path):
     explorer, _ = _loaded_explorer(tmp_path, with_spacing=True)
 
     assert explorer.load_status()["cube"]["spacing"] == {"az": 0.4, "rg": 0.6}
+
+
+def test_meta_intensity_ranges_per_source(tmp_path):
+    explorer, _ = _loaded_explorer(tmp_path, with_reduced=True)
+
+    intensity = explorer.load_status()["cube"]["intensity"]
+
+    assert set(intensity) == {"pred", "gt", "reduced"}
+    assert all(np.isfinite(v) for bounds in intensity.values() for v in bounds)
+
+
+def test_curve_points_threshold_and_values(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path, with_reduced=True)
+
+    raw    = np.frombuffer(explorer.points_bin(cube_id, "reduced", amp_min=0.9, max_points=100), dtype=np.float32)
+    header = raw[:4]
+    rows   = raw[4:].reshape(-1, 4)
+
+    heights = np.linspace(-10.0, 30.0, N_ELEV)
+
+    assert header[0] == 2 and header[1] == 2
+    assert rows[0].tolist() == [3.0, 4.0, float(heights[2]), 2.0]
+    assert rows[1].tolist() == [5.0, 1.0, float(heights[4]), 1.0]
+
+
+def test_curve_points_subsample_cap(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path, with_reduced=True)
+
+    raw    = np.frombuffer(explorer.points_bin(cube_id, "reduced", amp_min=-1.0, max_points=50), dtype=np.float32)
+    header = raw[:4]
+    rows   = raw[4:].reshape(-1, 4)
+
+    assert header[0] == 50
+    assert header[1] == N_ELEV * N_AZ * N_RG
+    assert rows.shape == (50, 4)
+
+
+def test_curve_points_absent_source_is_none(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path)
+
+    assert explorer.points_bin(cube_id, "full", amp_min=0.0, max_points=100) is None
 
 
 def test_param_map_png_for_all_fields(tmp_path):
