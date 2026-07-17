@@ -242,19 +242,17 @@ class StatusBoard {
       `</div>` +
       `</section>` +
 
-      `<section class="sboard sboard--strip sboard--ntf" aria-label="Telegram bot">` +
+      `<section class="sboard sboard--strip sboard--ntf" aria-label="Job notifications">` +
       `<div class="strip__seg">` +
-      `<i class="wd__light" id="sb-tg-light" aria-hidden="true"></i><span class="wd__label">telegram</span><span class="wd__mode" id="sb-tg-mode">--</span></div>` +
+      `<i class="wd__light" id="sb-ntf-light" aria-hidden="true"></i><span class="wd__label">notify</span><span class="wd__mode" id="sb-ntf-mode">--</span></div>` +
       `<i class="strip__div" aria-hidden="true"></i>` +
-      `<label class="ntf__field"><span class="ntf__key">bot token</span><input class="ntf__input" id="sb-tg-token" type="password" placeholder="from @BotFather" spellcheck="false" autocomplete="off"></label>` +
-      `<label class="ntf__field"><span class="ntf__key">chat id</span><input class="ntf__input ntf__input--gpus" id="sb-tg-chat" type="text" placeholder="detect" spellcheck="false" autocomplete="off"></label>` +
-      `<span class="ntf__hint" title="Create a bot with @BotFather, paste its token, save, send the bot any message from your phone, then press detect to pair your chat. notify pushes job start/end into the chat; remote lets you drive the console by messaging the bot: 'status', 'stop <job>', 'gpus <job> 0,1', 'stop all', 'nuke', 'help'. 'nuke' and 'stop all' only fire after a '... confirm' reply within 60 seconds. Only the paired chat is obeyed.">job pushes and remote commands through a Telegram chat</span>` +
+      `<label class="ntf__field"><span class="ntf__key">ntfy topic</span><input class="ntf__input" id="sb-ntf-topic" type="text" placeholder="pick-a-secret-topic" spellcheck="false" autocomplete="off"></label>` +
+      `<label class="ntf__field"><span class="ntf__key">server</span><input class="ntf__input ntf__input--server" id="sb-ntf-server" type="text" spellcheck="false" autocomplete="off"></label>` +
+      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Every job notifies when it starts and when it ends — direct launches, queued runs and follow-ups alike. Failures arrive high-priority.">push to your phone when a job starts and ends</span>` +
       `<div class="strip__actions">` +
-      `<button type="button" class="impact__arm" id="sb-tg-detect" title="Find the chat that messaged the bot and pair it">detect</button>` +
-      `<button type="button" class="impact__arm" id="sb-tg-test" title="Send a test message to the paired chat now">test</button>` +
-      `<button type="button" class="impact__arm" id="sb-tg-save" title="Save token and chat id">save</button>` +
-      `<button type="button" class="impact__arm" id="sb-tg-notify" title="Toggle job start/end messages">notify: --</button>` +
-      `<button type="button" class="impact__arm" id="sb-tg-remote" title="Toggle the remote command listener">remote: --</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-test" title="Send a test notification to the topic now">test</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-save" title="Save topic and server">save</button>` +
+      `<button type="button" class="impact__arm" id="sb-ntf-toggle" title="Toggle job start/end notifications">notify: --</button>` +
       `</div>` +
       `</section>` +
 
@@ -381,7 +379,7 @@ class StatusBoard {
     this._wireNuke();
     this._wireImpactArm();
     this._wireDetach();
-    this._wireTelegram();
+    this._wireNotify();
 
     this.schedule = new GpuWeekPanel();
     this.schedule.wire();
@@ -448,100 +446,69 @@ class StatusBoard {
     if (srv.detached) btn.title = `backend detached (pid ${srv.pid}) — output continues in ${srv.log_path}`;
   }
 
-  _wireTelegram() {
-    const save   = document.getElementById("sb-tg-save");
-    const notify = document.getElementById("sb-tg-notify");
-    const remote = document.getElementById("sb-tg-remote");
-    const test   = document.getElementById("sb-tg-test");
-    const detect = document.getElementById("sb-tg-detect");
-    if (!save || !notify || !remote || !test || !detect) return;
+  _wireNotify() {
+    const save   = document.getElementById("sb-ntf-save");
+    const toggle = document.getElementById("sb-ntf-toggle");
+    const test   = document.getElementById("sb-ntf-test");
+    if (!save || !toggle || !test) return;
 
-    const submit = async (notifyOn, remoteOn) => {
-      const token = document.getElementById("sb-tg-token");
-      const chat = document.getElementById("sb-tg-chat");
+    const submit = async (enabled) => {
+      const topic = document.getElementById("sb-ntf-topic");
+      const server = document.getElementById("sb-ntf-server");
       const payload = {
-        notify_enabled: notifyOn,
-        commands_enabled: remoteOn,
-        token: token ? token.value.trim() : "",
-        chat_id: chat ? chat.value.trim() : "",
+        enabled,
+        topic: topic ? topic.value.trim() : "",
+        server: server ? server.value.trim() : "",
       };
-      const res = await window.apiPost("/api/telegram/config", payload);
+      const res = await window.apiPost("/api/notify/config", payload);
       if (res && res.ok) {
-        this._tgSeeded = false;
-        this._renderTelegram(res);
-        window.toast(`telegram saved — notify ${res.notify_enabled ? "on" : "off"}, remote ${res.commands_enabled ? "on" : "off"}`, "ok");
+        this._ntfSeeded = false;
+        this._renderNotify(res);
+        window.toast(`notifications ${res.enabled ? "on" : "off"} — settings saved`, "ok");
       } else {
-        window.toast(`telegram settings rejected: ${(res && res.error) || "network error"}`, "error");
+        window.toast(`notify settings rejected: ${(res && res.error) || "network error"}`, "error");
       }
     };
 
-    const flags = () => this._tgState || {};
-    save.addEventListener("click", () => submit(!!flags().notify_enabled, !!flags().commands_enabled));
-    notify.addEventListener("click", () => submit(!flags().notify_enabled, !!flags().commands_enabled));
-    remote.addEventListener("click", () => submit(!!flags().notify_enabled, !flags().commands_enabled));
+    save.addEventListener("click", () => submit(!!(this._ntfState || {}).enabled));
+    toggle.addEventListener("click", () => submit(!(this._ntfState || {}).enabled));
 
     test.addEventListener("click", async () => {
       test.disabled = true;
       try {
-        const res = await window.apiPost("/api/telegram/test");
-        if (res && res.ok) window.toast("test message sent — check the chat", "ok");
+        const res = await window.apiPost("/api/notify/test");
+        if (res && res.ok) window.toast("test notification sent — check your device", "ok");
         else window.toast(`test failed: ${(res && res.error) || "network error"}`, "error");
       } finally {
         test.disabled = false;
       }
     });
-
-    detect.addEventListener("click", async () => {
-      detect.disabled = true;
-      try {
-        const res = await window.apiPost("/api/telegram/detect");
-        const chats = (res && res.chats) || [];
-        if (!res || !res.ok) {
-          window.toast(`detect failed: ${(res && res.error) || "network error"}`, "error");
-        } else if (!chats.length) {
-          window.toast("no chats found — send the bot any message first, then detect again", "warn");
-        } else {
-          const chat = document.getElementById("sb-tg-chat");
-          if (chat) chat.value = String(chats[0].id);
-          window.toast(`paired chat ${chats[0].id} (${chats[0].name})${chats.length > 1 ? ` — ${chats.length - 1} more found` : ""} — press save`, "ok");
-        }
-      } finally {
-        detect.disabled = false;
-      }
-    });
   }
 
-  _renderTelegram(tg) {
-    if (!tg) return;
-    this._tgState = tg;
+  _renderNotify(ntf) {
+    if (!ntf) return;
+    this._ntfState = ntf;
 
-    const light  = document.getElementById("sb-tg-light");
-    const mode   = document.getElementById("sb-tg-mode");
-    const notify = document.getElementById("sb-tg-notify");
-    const remote = document.getElementById("sb-tg-remote");
-    const notifyOn = !!tg.notify_enabled;
-    const remoteOn = !!tg.commands_enabled;
-    const on       = notifyOn || remoteOn;
+    const light  = document.getElementById("sb-ntf-light");
+    const mode   = document.getElementById("sb-ntf-mode");
+    const toggle = document.getElementById("sb-ntf-toggle");
+    const on     = !!ntf.enabled;
     if (light) light.classList.toggle("is-armed", on);
     if (mode) {
-      mode.textContent = on ? [notifyOn ? "notify" : null, remoteOn ? "remote" : null].filter(Boolean).join("+") : "off";
+      mode.textContent = on ? "armed" : "off";
       mode.classList.toggle("is-off", !on);
     }
-    if (notify) {
-      notify.textContent = notifyOn ? "notify: ON" : "notify: off";
-      notify.classList.toggle("is-safe", notifyOn);
-    }
-    if (remote) {
-      remote.textContent = remoteOn ? "remote: ON" : "remote: off";
-      remote.classList.toggle("is-safe", remoteOn);
+    if (toggle) {
+      toggle.textContent = on ? "notify: ON" : "notify: off";
+      toggle.classList.toggle("is-safe", on);
     }
 
-    if (!this._tgSeeded) {
-      this._tgSeeded = true;
-      const token = document.getElementById("sb-tg-token");
-      const chat = document.getElementById("sb-tg-chat");
-      if (token) token.value = tg.token || "";
-      if (chat) chat.value = tg.chat_id || "";
+    if (!this._ntfSeeded) {
+      this._ntfSeeded = true;
+      const topic = document.getElementById("sb-ntf-topic");
+      const server = document.getElementById("sb-ntf-server");
+      if (topic) topic.value = ntf.topic || "";
+      if (server) server.value = ntf.server || "";
     }
   }
 
@@ -577,7 +544,7 @@ class StatusBoard {
     this._renderImpact(sys.impact || {});
     this._renderGpuGuard(sys.gpu_guard || {});
     this._renderDetach(sys.server);
-    this._renderTelegram(sys.telegram);
+    this._renderNotify(sys.notify);
     if (this.schedule) this.schedule.render(sys.gpu_schedule);
     const cpu = sys.cpu || {};
     const mem = sys.mem || {};

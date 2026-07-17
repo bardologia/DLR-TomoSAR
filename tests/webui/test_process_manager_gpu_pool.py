@@ -15,7 +15,6 @@ if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
 from notifier        import JobNotifier
-from telegram_bot    import TelegramBot
 from process_manager import ProcessManager
 from web_logger      import WebLogger
 
@@ -74,7 +73,7 @@ def manager(tmp_path):
 
     paths  = StubPaths(tmp_path)
     logger = WebLogger()
-    yield ProcessManager(paths, logger, JobNotifier(TelegramBot(paths, logger), logger), StubDescriber())
+    yield ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
 
 
 def _wait_running(manager: ProcessManager, job_id: str, timeout: float = 10.0) -> bool:
