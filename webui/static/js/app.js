@@ -168,6 +168,8 @@ class App {
 
     this.ablationView = new window.AblationView(this.runConsole, this.project || {});
 
+    this.savedRunsView = new window.SavedRunsView(this.runConsole, document.getElementById("saved-grid"));
+
     this.equationView = new window.EquationView(
       document.getElementById("eq-tabs"),
       document.getElementById("eq-grid")
@@ -374,6 +376,7 @@ class App {
       this.launchView.leave();
     }
     if (route === "ablation") this.ablationView.enter();
+    if (route === "saved") this.savedRunsView.enter();
     if (route === "physics") this.physicsLossView.load();
     if (route === "model" && document.querySelector("#model-mode .model-mode__btn.is-active")?.dataset.mode === "walkthrough") this.flowView.load();
     if (route === "repomap") this.repoMap.enter();

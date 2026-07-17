@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260716" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260717" />
 </head>
 <body>
 
@@ -31,6 +31,7 @@
     <a href="#/repomap" data-route="repomap">Repo Map</a>
     <a href="#/physics" data-route="physics">Physics Loss</a>
     <a href="#/scripts" data-route="scripts">Scripts</a>
+    <a href="#/saved" data-route="saved">Saved</a>
     <a href="#/configuration" data-route="configuration">Configuration</a>
     <a href="#/console" data-route="console">Console</a>
     <a href="#/results" data-route="results">Results</a>
@@ -139,6 +140,19 @@
     </div>
     <div class="filter-row" id="script-filters"></div>
     <div class="script-grid" id="script-grid"></div>
+  </section>
+
+  <!-- SAVED RUNS -->
+  <section class="page page--pad" data-page="saved">
+    <div class="page__head">
+      <h2 class="page__title">Saved runs</h2>
+      <p class="page__lead">
+        Experiment configurations stored from launch pages. Each card carries the exact
+        overrides captured at save time: launch it now, queue it after the current job,
+        or delete it.
+      </p>
+    </div>
+    <div class="saved-grid" id="saved-grid"></div>
   </section>
 
   <!-- ABLATION -->
@@ -889,9 +903,10 @@
 <script src="/static/js/models.js?v=20260616a"></script>
 <script src="/static/js/configs.js?v=20260606r"></script>
 <script src="/static/js/scripts.js?v=20260625a"></script>
+<script src="/static/js/saved_runs.js?v=20260717a"></script>
 <script src="/static/js/launch_widgets.js?v=20260625e"></script>
 <script src="/static/js/launch_pickers.js?v=20260716a"></script>
-<script src="/static/js/launch.js?v=20260625e"></script>
+<script src="/static/js/launch.js?v=20260717a"></script>
 <script src="/static/js/ablation.js?v=20260625e"></script>
 <script src="/static/js/console.js?v=20260715b"></script>
 <script src="/static/js/results.js?v=20260714a"></script>
@@ -899,6 +914,6 @@
 <script src="/static/js/tomogram.js?v=20260714f"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260714e"></script>
+<script src="/static/js/app.js?v=20260717a"></script>
 </body>
 </html>

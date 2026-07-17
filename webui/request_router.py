@@ -30,6 +30,7 @@ from project_paths          import ProjectPaths
 from resource_watchdog      import ResourceWatchdog
 from results_browser        import ResultsBrowser
 from run_leaderboard        import RunLeaderboard
+from saved_run_store        import SavedRunStore
 from script_catalog         import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor         import SystemMonitor
@@ -48,7 +49,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -65,6 +66,7 @@ class RequestRouter:
         self.pipelines   = pipelines
         self.repomap     = repomap
         self.processes   = processes
+        self.saved_runs  = saved_runs
         self.notifier    = notifier
         self.nuke        = nuke
         self.detacher    = detacher
@@ -396,6 +398,9 @@ class RequestRouter:
             self.processes.adopt_orphans()
             self._send_json(handler, {"jobs": self.processes.list_jobs()})
             return
+        if path == "/api/saved-runs":
+            self._send_json(handler, self.saved_runs.list())
+            return
         if path.startswith("/api/jobs/") and path.endswith("/gpus"):
             job_id = path[len("/api/jobs/"):-len("/gpus")]
             result = self.processes.gpu_pool(job_id)
@@ -444,19 +449,33 @@ class RequestRouter:
                 self._send_json(handler, {"error": f"unknown script '{key}'"}, 404)
                 return
             interpreter = body.get("interpreter") or self._preferred_interpreter(key)
-            overrides   = body.get("overrides", {})
-            follow_up   = body.get("follow_up") or None
-            detach      = bool(body.get("detach"))
-            queue       = bool(body.get("queue"))
+            result      = self._execute_run(key, interpreter, body.get("overrides", {}), body.get("follow_up") or None, bool(body.get("detach")), bool(body.get("queue")))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
 
-            if queue:
-                result = self.processes.enqueue(key, interpreter, overrides, follow_up, detach)
-            else:
-                result = self.processes.launch(key, interpreter, overrides, follow_up, detach)
+        if path == "/api/saved-runs":
+            key         = body.get("script_key", "")
+            interpreter = body.get("interpreter", "")
+            if not interpreter and self.paths.has_script(key):
+                interpreter = self._preferred_interpreter(key)
 
-            if result.get("ok") and self.tensorboard.logdir_keys(key):
-                threading.Thread(target=self._autostart_tensorboard, args=(key, overrides, interpreter), daemon=True).start()
+            result = self.saved_runs.save({**body, "interpreter": interpreter})
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
 
+        if path.startswith("/api/saved-runs/") and path.endswith("/run"):
+            saved_id = path[len("/api/saved-runs/"):-len("/run")]
+            entry    = self.saved_runs.get(saved_id)
+            if entry is None:
+                self._send_json(handler, {"ok": False, "error": "saved run not found"}, 404)
+                return
+            result = self._execute_run(entry["script"], entry["interpreter"], entry["overrides"], entry["follow_up"], entry["detach"], bool(body.get("queue")))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path.startswith("/api/saved-runs/") and path.endswith("/delete"):
+            saved_id = path[len("/api/saved-runs/"):-len("/delete")]
+            result   = self.saved_runs.delete(saved_id)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
@@ -561,6 +580,17 @@ class RequestRouter:
             return
 
         self._send_json(handler, {"error": "not found"}, 404)
+
+    def _execute_run(self, key: str, interpreter: str, overrides: dict, follow_up: str | None, detach: bool, queue: bool) -> dict:
+        if queue:
+            result = self.processes.enqueue(key, interpreter, overrides, follow_up, detach)
+        else:
+            result = self.processes.launch(key, interpreter, overrides, follow_up, detach)
+
+        if result.get("ok") and self.tensorboard.logdir_keys(key):
+            threading.Thread(target=self._autostart_tensorboard, args=(key, overrides, interpreter), daemon=True).start()
+
+        return result
 
     def _autostart_tensorboard(self, key: str, overrides: dict, interpreter: str) -> None:
         try:

@@ -1012,6 +1012,33 @@ main { margin-left: var(--navw); }
 .script-card__foot .arrow { color: var(--accent); transition: transform 0.3s var(--ease); }
 .script-card:hover .arrow { transform: translateX(4px); }
 
+/* ---------- Saved runs ---------- */
+.saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.saved-empty { font-size: 14px; color: var(--ink-dim); }
+
+.saved-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 22px;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.saved-card:hover { transform: translateY(-3px); border-color: var(--line-strong); box-shadow: 0 12px 32px rgba(20, 25, 30, 0.10); }
+.saved-card__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.saved-card__script { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.saved-card__delete { background: none; border: none; font-size: 18px; line-height: 1; color: var(--ink-faint); cursor: pointer; transition: color 0.2s var(--ease); }
+.saved-card__delete:hover { color: var(--danger); }
+.saved-card__name { font-family: var(--display); font-size: 19px; font-weight: 600; margin: 0 0 12px; }
+.saved-card__overrides { display: grid; gap: 6px; margin-bottom: 14px; }
+.saved-card__override { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.saved-card__override b { color: var(--warn); font-weight: 500; overflow-wrap: anywhere; text-align: right; }
+.saved-card__path { overflow-wrap: anywhere; }
+.saved-card__none { font-size: 13px; color: var(--ink-faint); margin: 0; }
+.saved-card__facts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+.saved-card__facts span { border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 10px; }
+.saved-card__actions { display: flex; gap: 8px; }
+.saved-card__actions .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; padding: 10px 14px; }
+
 /* ---------- Pipelines flow ---------- */
 .flow { display: grid; gap: 14px; }
 .flow-row {
@@ -1321,6 +1348,13 @@ main { margin-left: var(--navw); }
 }
 .rail-schedule small { font-family: var(--mono); font-size: 11.5px; font-weight: 400; opacity: 0.75; }
 .rail-schedule.is-armed { border-color: var(--warn); }
+.rail-save {
+  width: 100%; margin-top: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 14px; padding: 11px 16px;
+}
+.rail-save small { font-family: var(--mono); font-size: 11.5px; font-weight: 400; opacity: 0.75; }
+.rail-save.is-armed { border-color: var(--accent-2); }
 
 .launch__tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .launch__tab { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--ink-dim); font-family: var(--sans); font-size: 15px; padding: 8px 14px; cursor: pointer; transition: color 0.2s var(--ease), border-color 0.2s var(--ease); }

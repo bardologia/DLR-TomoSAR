@@ -28,6 +28,7 @@ from resource_watchdog                  import ResourceWatchdog
 from contention_monitor                 import ContentionMonitor
 from results_browser                    import ResultsBrowser
 from run_leaderboard                    import RunLeaderboard
+from saved_run_store                    import SavedRunStore
 from script_catalog                     import ScriptCatalog
 from script_config_resolver             import ScriptConfigResolver
 from system_monitor                     import SystemMonitor
@@ -80,6 +81,7 @@ class WebUIServer:
         self.notifier          = JobNotifier(self.paths, self.logger)
         self.describer         = JobDescriber(self.paths, self.resolver)
         self.processes         = ProcessManager(self.paths, self.logger, self.notifier, self.describer)
+        self.saved_runs        = SavedRunStore(self.paths, self.logger)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)
@@ -111,6 +113,7 @@ class WebUIServer:
             pipelines         = self.pipelines,
             repomap           = self.repomap,
             processes         = self.processes,
+            saved_runs        = self.saved_runs,
             notifier          = self.notifier,
             nuke              = self.nuke,
             detacher          = self.detacher,

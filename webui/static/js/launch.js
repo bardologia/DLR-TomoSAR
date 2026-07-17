@@ -145,6 +145,7 @@ class LaunchView extends ConfigForm {
     this.manifestEl = null;
     this.launchBtn = null;
     this.scheduleBtn = null;
+    this.saveBtn = null;
     this.active = false;
     this.loadSeq = 0;
     this._wireTabs();
@@ -705,6 +706,13 @@ class LaunchView extends ConfigForm {
     this.scheduleBtn = schedule;
     actions.appendChild(schedule);
 
+    const save = document.createElement("button");
+    save.className = "btn btn--ghost rail-save";
+    save.title = "Store this exact configuration in the Saved tab, to launch or schedule any time later";
+    save.addEventListener("click", () => this._save());
+    this.saveBtn = save;
+    actions.appendChild(save);
+
     host.appendChild(interp);
     if (follow) host.appendChild(follow);
     host.appendChild(detach);
@@ -799,6 +807,13 @@ class LaunchView extends ConfigForm {
         : `&#8627;&nbsp; Schedule after current <small>all defaults</small>`;
     }
 
+    if (this.saveBtn) {
+      this.saveBtn.classList.toggle("is-armed", n > 0);
+      this.saveBtn.innerHTML = n
+        ? `&#10515;&nbsp; Save for later <small>${n} override${n > 1 ? "s" : ""}</small>`
+        : `&#10515;&nbsp; Save for later <small>all defaults</small>`;
+    }
+
     if (this.manifestEl) this._renderManifest();
     if (this.builder) this.builder.refreshFromView();
     this._refreshBadges();
@@ -848,6 +863,30 @@ class LaunchView extends ConfigForm {
       this.launching = false;
       if (this.launchBtn) this.launchBtn.disabled = false;
       if (this.scheduleBtn) this.scheduleBtn.disabled = false;
+    }
+  }
+
+  async _save() {
+    if (!this.detail || this.saving) return;
+    const name = window.prompt("Name this saved run (optional):", "");
+    if (name === null) return;
+
+    const interp = document.getElementById("launch-interpreter").value;
+    const followEl = document.getElementById("launch-follow");
+    const follow = this.detach ? "" : (followEl ? followEl.value : "");
+
+    this.saving = true;
+    if (this.saveBtn) this.saveBtn.disabled = true;
+    try {
+      const res = await window.apiPost("/api/saved-runs", { script_key: this.detail.key, title: this.detail.title, name: name.trim(), interpreter: interp, overrides: { ...this.dirty }, follow_up: follow || null, detach: this.detach });
+      if (!res.ok) {
+        window.toast(res.error || "Save failed", "error");
+        return;
+      }
+      window.toast(`Saved ${res.entry.name || this.detail.title} to the Saved tab`, "ok");
+    } finally {
+      this.saving = false;
+      if (this.saveBtn) this.saveBtn.disabled = false;
     }
   }
 

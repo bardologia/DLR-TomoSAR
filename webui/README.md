@@ -28,7 +28,8 @@ CDN, so a network connection is needed for equation typesetting and syntax highl
 | Pipelines | `/api/pipelines` | The six pipelines as a staged flow; each maps to a launchable entry point. |
 | Architectures | `/api/models` | Ten backbones across three families, with selection guidance. |
 | Scripts | `/api/scripts` | The nine `main/*.py` entry points as cards; each opens its launch page. |
-| Launch | `/api/scripts/<key>/config` | Full-screen launch control per script: config sections grouped by dataclass, typed controls, override manifest, command preview, interpreter, launch. |
+| Launch | `/api/scripts/<key>/config` | Full-screen launch control per script: config sections grouped by dataclass, typed controls, override manifest, command preview, interpreter, then launch now, queue after the current job, or save for later. |
+| Saved | `/api/saved-runs` | Experiment configurations stored from launch pages as one JSON file each under `logs/saved_runs/`; every card can be launched immediately, queued after the current job, or deleted. |
 | Configuration | `/api/configs` | Every configuration dataclass, field, type, and default, parsed live from `configuration/*.py`. |
 | Console | `/api/jobs/<id>/stream` | Real-time stdout of launched jobs over SSE, with stop control. |
 | Leaderboard | `/api/leaderboard` | Three modes. Runs: every saved inference `metrics.json` as one sortable, filterable table with run-name axes parsed into filter dropdowns and a two-row metric plus resolved-config diff; seeded `<unit>/seed<N>/` layouts additionally get one seed-mean unit row per unit (latest stamp per seed), selectable into the comparison like any stamp row. Trials: seeded runs aggregated to mean-and-std bars per experiment. Curves: native overlay of tensorboard scalar curves across selected training runs. |

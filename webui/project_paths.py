@@ -77,8 +77,9 @@ class ProjectPaths:
         self.config_dir  = self.repo_root / "configuration"
         self.static_dir  = self.webui_root / "static"
         self.logs_dir    = self.repo_root / "logs"
-        self.gpu_guard_dir = self.logs_dir / "gpu_guard"
-        self.gpu_pools_dir = self.logs_dir / "gpu_pools"
+        self.gpu_guard_dir  = self.logs_dir / "gpu_guard"
+        self.gpu_pools_dir  = self.logs_dir / "gpu_pools"
+        self.saved_runs_dir = self.logs_dir / "saved_runs"
 
     SCRIPT_DIRS = {
         "pre_process"               : "processing",
