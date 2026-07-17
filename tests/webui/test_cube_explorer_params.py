@@ -20,7 +20,7 @@ from web_logger    import WebLogger
 N_ELEV, N_AZ, N_RG, N_SLOTS = 5, 8, 6, 2
 
 
-def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt")) -> Path:
+def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False) -> Path:
     rng     = np.random.default_rng(0)
     preproc = base / "preproc"
     (preproc / "data").mkdir(parents=True)
@@ -30,6 +30,17 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt")) -> Path:
 
     layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": {"primary": "primary.npy"}}
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
+
+    if with_spacing:
+        payload = {
+            "labels"      : ["T01", "T02"],
+            "reference"   : "T01",
+            "shared"      : {"ps_rg": 0.6},
+            "per_track"   : {"T01": {"ps_az": 0.4}, "T02": {"ps_az": 0.41}},
+            "track_files" : [],
+        }
+        (preproc / "meta").mkdir()
+        (preproc / "meta" / "track_parameters.json").write_text(json.dumps(payload))
 
     run   = base / "group" / "run_a"
     stamp = run / "inference" / "stamp_1"
@@ -50,8 +61,8 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt")) -> Path:
     return stamp
 
 
-def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt")) -> tuple[CubeExplorer, str]:
-    _make_cube_run(base, with_params)
+def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False) -> tuple[CubeExplorer, str]:
+    _make_cube_run(base, with_params, with_spacing)
     explorer = CubeExplorer(paths=None, logger=WebLogger())
 
     listing = explorer.list_cubes(str(base))
@@ -88,6 +99,18 @@ def test_meta_without_params_is_none(tmp_path):
     explorer, _ = _loaded_explorer(tmp_path, with_params=())
 
     assert explorer.load_status()["cube"]["params"] is None
+
+
+def test_meta_spacing_absent_without_track_parameters(tmp_path):
+    explorer, _ = _loaded_explorer(tmp_path)
+
+    assert explorer.load_status()["cube"]["spacing"] is None
+
+
+def test_meta_spacing_from_reference_track(tmp_path):
+    explorer, _ = _loaded_explorer(tmp_path, with_spacing=True)
+
+    assert explorer.load_status()["cube"]["spacing"] == {"az": 0.4, "rg": 0.6}
 
 
 def test_param_map_png_for_all_fields(tmp_path):

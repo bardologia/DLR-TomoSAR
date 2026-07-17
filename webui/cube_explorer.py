@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from project_paths            import ProjectPaths
-from tools.loss.param_loss    import ParamMatcher
-from tools.reporting.plotting import PlotBase
-from web_logger               import WebLogger
+from project_paths              import ProjectPaths
+from tools.loss.param_loss      import ParamMatcher
+from tools.reporting.plotting   import PlotBase
+from tools.sar.track_parameters import TrackParameters
+from web_logger                 import WebLogger
 
 
 class SliceFigureArchiver(PlotBase):
@@ -814,8 +815,23 @@ class CubeExplorer:
             "metric_maps" : self._metric_maps_meta(metric_maps),
             "attached"    : None,
             "dem"         : dem is not None,
+            "spacing"     : self._load_spacing(stamp_dir),
         }
         return entries, meta, primary, params, metric_maps, dem
+
+    def _load_spacing(self, stamp_dir: Path) -> dict | None:
+        resolved = self._preproc_layout(stamp_dir)
+        if resolved is None:
+            return None
+
+        preproc_dir, _ = resolved
+
+        params_path = preproc_dir / "meta" / TrackParameters.FILENAME
+        if not params_path.is_file():
+            return None
+
+        reference = TrackParameters.load(params_path).parameters[0]
+        return {"az": float(reference["ps_az"]), "rg": float(reference["ps_rg"])}
 
     def _load_dem(self, stamp_dir: Path, n_az: int, n_rg: int) -> np.ndarray | None:
         resolved = self._preproc_layout(stamp_dir)

@@ -860,6 +860,8 @@ class TomogramCloud {
     this.maxEl = refs.max;
     this.demWrap = refs.demWrap;
     this.demEl = refs.dem;
+    this.scaleWrap = refs.scaleWrap;
+    this.scaleEl = refs.scale;
     this.atEl = refs.at;
     this.canvas = refs.canvas;
 
@@ -881,9 +883,12 @@ class TomogramCloud {
     this.colorEl.querySelectorAll(".cube-space").forEach((btn) => {
       btn.addEventListener("click", () => this._setColor(btn.dataset.color));
     });
+    this.scaleEl.checked = localStorage.getItem("cube-cloud-scale") === "1";
+
     this.thrEl.addEventListener("input", () => this._onThreshold());
     this.maxEl.addEventListener("change", () => this._fetch());
     this.demEl.addEventListener("change", () => this._onDem());
+    this.scaleEl.addEventListener("change", () => this._onScale());
 
     this.canvas.addEventListener("mousedown", (ev) => { this.dragging = { x: ev.clientX, y: ev.clientY }; });
     window.addEventListener("mousemove", (ev) => this._onDrag(ev));
@@ -898,6 +903,7 @@ class TomogramCloud {
     this.demPoints = null;
     this.demWrap.hidden = !meta.dem;
     this.demEl.checked = false;
+    this.scaleWrap.hidden = !meta.spacing;
     this._resetView(false);
     this._syncThresholdLabel();
   }
@@ -936,6 +942,11 @@ class TomogramCloud {
     if (this.demEl.checked && !this.demPoints) {
       this.demPoints = await this._fetchBinary(`/api/cubes/dem_points?id=${encodeURIComponent(this.host.selectedId)}&stride=4`);
     }
+    this._draw();
+  }
+
+  _onScale() {
+    localStorage.setItem("cube-cloud-scale", this.scaleEl.checked ? "1" : "0");
     this._draw();
   }
 
@@ -1060,11 +1071,16 @@ class TomogramCloud {
     const [muLo, muHi] = this.muRange || [meta.x_min, meta.x_max];
     const zMid = (muLo + muHi) / 2;
     const zSpan = (muHi - muLo) || 1;
-    const zScale = (Math.max(meta.n_az, meta.n_rg) * 0.35) / (zSpan / 2);
+
+    const spacing = this.scaleEl.checked && meta.spacing ? meta.spacing : null;
+    const azStep = spacing ? spacing.az : 1;
+    const rgStep = spacing ? spacing.rg : 1;
+    const zScale = spacing ? 1 : (Math.max(meta.n_az, meta.n_rg) * 0.35) / (zSpan / 2);
+    const extent = Math.max(meta.n_az * azStep, meta.n_rg * rgStep);
 
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
     const sinP = Math.sin(this.pitch), cosP = Math.cos(this.pitch);
-    const fit = (Math.min(W, H) / (Math.max(meta.n_az, meta.n_rg) * 1.9)) * this.zoom;
+    const fit = (Math.min(W, H) / (extent * 1.9)) * this.zoom;
 
     const plot = (x, y, z, rgb) => {
       const rx = x * cosY - y * sinY;
@@ -1082,7 +1098,7 @@ class TomogramCloud {
     if (this.demEl.checked && this.demPoints) {
       const dem = this.demPoints.rows;
       for (let i = 0; i < dem.length; i += 4) {
-        plot(dem[i + 1] - cx, dem[i] - cy, dem[i + 2] * zScale, [110, 116, 122]);
+        plot((dem[i + 1] - cx) * rgStep, (dem[i] - cy) * azStep, dem[i + 2] * zScale, [110, 116, 122]);
       }
     }
 
@@ -1097,13 +1113,16 @@ class TomogramCloud {
       const t = this.colorBy === "amp"
         ? (Math.log(Math.max(amp, 1e-6)) - ampLo) / Math.max(ampHi - ampLo, 1e-6)
         : (mu - muLo) / zSpan;
-      plot(rows[i + 1] - cx, rows[i] - cy, (mu - zMid) * zScale, this._palette(t));
+      plot((rows[i + 1] - cx) * rgStep, (rows[i] - cy) * azStep, (mu - zMid) * zScale, this._palette(t));
     }
 
     ctx.putImageData(image, 0, 0);
 
     const shown = rows.length / 4;
-    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers · drag to orbit · wheel to zoom · double-click to reset`;
+    const scaleNote = spacing
+      ? ` · 1:1 in metres · az ${Math.round(meta.n_az * azStep)} m × rg ${Math.round(meta.n_rg * rgStep)} m`
+      : "";
+    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers${scaleNote} · drag to orbit · wheel to zoom · double-click to reset`;
   }
 }
 
