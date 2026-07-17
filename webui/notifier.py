@@ -4,6 +4,7 @@ import json
 import re
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -95,8 +96,20 @@ class JobNotifier:
             title    = f"{script} finished" + ("" if code == 0 else " (exit status unknown)")
             priority = "default"
 
-        body = self._with_description(record, f"runtime {self._runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})")
+        units = self._units_label(record.get("progress"))
+        base  = f"runtime {self._runtime_label(runtime_s)} on {socket.gethostname()} (job {record['job_id']})"
+        body  = self._with_description(record, f"{units}\n{base}" if units else base)
         return title, body, priority
+
+    def _units_label(self, progress: dict | None) -> str:
+        if not progress:
+            return ""
+
+        label = f"{progress['done']}/{progress['total']} units done"
+        return label + (f", {progress['failed']} FAILED" if progress["failed"] else "")
+
+    def _clock_label(self, stamp: str) -> str:
+        return stamp[11:16]
 
     def _with_description(self, record: dict, body: str) -> str:
         description = record.get("description") or ""
@@ -146,3 +159,93 @@ class JobNotifier:
         runtime_s             = self._runtime_s(record)
         title, body, priority = self._describe(record, runtime_s)
         self._dispatch(title, body, priority)
+
+    def experiment_progress(self, record: dict, progress: dict) -> None:
+        if not self._enabled():
+            return
+
+        script    = record.get("script") or "job"
+        completed = progress["done"] + progress["failed"]
+        percent   = round(100.0 * completed / progress["total"])
+        title     = f"{script} {completed}/{progress['total']} units ({percent}%)"
+
+        if progress["eta_s"] is None:
+            detail = "first units still running, no ETA yet"
+        else:
+            detail = f"ETA {self._runtime_label(progress['eta_s'])} · finish ≈ {self._clock_label(progress['finish_at'])} · avg {self._runtime_label(progress['average_s'])}/unit"
+
+        failed = f" · {progress['failed']} FAILED" if progress["failed"] else ""
+        body   = self._with_description(record, f"{detail}{failed} · on {socket.gethostname()}")
+        self._dispatch(title, body, "default")
+
+    def experiment_unit_failed(self, record: dict, progress: dict, units: list[str]) -> None:
+        if not self._enabled():
+            return
+
+        script = record.get("script") or "job"
+        title  = f"{script} unit FAILED: {units[-1]}" if len(units) == 1 else f"{script}: {len(units)} units FAILED"
+        body   = self._with_description(record, f"{', '.join(units)} — {progress['failed']} of {progress['total']} units failed so far, the experiment continues")
+        self._dispatch(title, body, "high")
+
+
+class ExperimentProgressWatcher:
+
+    INTERVAL_S = 10.0
+    MILESTONES = (0.25, 0.50, 0.75)
+
+    def __init__(self, processes, notifier: JobNotifier, logger: WebLogger) -> None:
+        self.processes = processes
+        self.notifier  = notifier
+        self.logger    = logger
+        self.tracked   : dict[str, dict] = {}
+
+    def start(self) -> None:
+        worker = threading.Thread(target=self._watch, daemon=True)
+        worker.start()
+
+    def _watch(self) -> None:
+        while True:
+            time.sleep(self.INTERVAL_S)
+            try:
+                self.scan()
+            except Exception as exc:
+                self.logger.error(f"progress watcher error: {exc}")
+
+    def _fraction(self, progress: dict) -> float:
+        return (progress["done"] + progress["failed"]) / max(progress["total"], 1)
+
+    def _baseline(self, progress: dict) -> dict:
+        return {
+            "failed"     : progress["failed"],
+            "eta_pushed" : progress["eta_s"] is not None,
+            "milestones" : {milestone for milestone in self.MILESTONES if self._fraction(progress) >= milestone},
+        }
+
+    def _evaluate(self, record: dict, progress: dict) -> None:
+        state = self.tracked.get(record["job_id"])
+        if state is None:
+            self.tracked[record["job_id"]] = self._baseline(progress)
+            return
+
+        if progress["failed"] > state["failed"]:
+            self.notifier.experiment_unit_failed(record, progress, progress["failed_units"][state["failed"]:])
+            state["failed"] = progress["failed"]
+
+        crossed = [milestone for milestone in self.MILESTONES if milestone not in state["milestones"] and self._fraction(progress) >= milestone]
+
+        if crossed:
+            state["milestones"].update(crossed)
+            state["eta_pushed"] = True
+            self.notifier.experiment_progress(record, progress)
+        elif not state["eta_pushed"] and progress["eta_s"] is not None:
+            state["eta_pushed"] = True
+            self.notifier.experiment_progress(record, progress)
+
+    def scan(self) -> None:
+        live = {record["job_id"]: record for record in self.processes.list_jobs() if record["status"] == "running" and record["progress"]}
+
+        for job_id in [job_id for job_id in self.tracked if job_id not in live]:
+            self.tracked.pop(job_id)
+
+        for record in live.values():
+            self._evaluate(record, record["progress"])

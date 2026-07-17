@@ -15,7 +15,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from notifier   import JobNotifier
+from notifier   import ExperimentProgressWatcher, JobNotifier
 from web_logger import WebLogger
 
 
@@ -250,3 +250,194 @@ def test_test_message_is_delivered(notifier, capture_server):
     assert notifier.test()["ok"]
     assert len(CaptureHandler.requests) == 1
     assert CaptureHandler.requests[0]["title"] == "DLR-TomoSAR test notification"
+
+
+def _progress(total: int = 30, done: int = 15, failed: int = 0, eta_s: float | None = 9000.0, failed_units: list | None = None) -> dict:
+    return {
+        "total"        : total,
+        "done"         : done,
+        "failed"       : failed,
+        "queued"       : max(0, total - done - failed - 2),
+        "running"      : [{"name": "aug-on/seed3", "gpu": 0, "elapsed_s": 310.0}],
+        "workers"      : 2,
+        "failed_units" : failed_units if failed_units is not None else [],
+        "average_s"    : 600.0 if eta_s is not None else None,
+        "elapsed_s"    : 4200.0,
+        "eta_s"        : eta_s,
+        "total_s"      : 4200.0 + eta_s if eta_s is not None else None,
+        "started_at"   : "2026-07-17T10:00:00",
+        "finish_at"    : "2026-07-17T19:13:00" if eta_s is not None else None,
+        "updated_at"   : "2026-07-17T14:00:00",
+    }
+
+
+def test_experiment_progress_notifies_with_eta(notifier, sent):
+    _arm(notifier)
+    notifier.experiment_progress(_record(status="running"), _progress(total=30, done=15))
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, priority = sent[0]
+    assert title    == "train_backbone 15/30 units (50%)"
+    assert priority == "default"
+    assert "ETA 2h 30m" in body
+    assert "finish ≈ 19:13" in body
+    assert "avg 10m 00s/unit" in body
+
+
+def test_experiment_progress_without_eta_says_so(notifier, sent):
+    _arm(notifier)
+    notifier.experiment_progress(_record(status="running"), _progress(done=0, eta_s=None))
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, _priority = sent[0]
+    assert title == "train_backbone 0/30 units (0%)"
+    assert "no ETA yet" in body
+
+
+def test_experiment_progress_counts_failed_units(notifier, sent):
+    _arm(notifier)
+    notifier.experiment_progress(_record(status="running"), _progress(done=14, failed=1, failed_units=["aug-on/seed3"]))
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, _priority = sent[0]
+    assert title == "train_backbone 15/30 units (50%)"
+    assert "1 FAILED" in body
+
+
+def test_experiment_unit_failure_notifies_high_priority(notifier, sent):
+    _arm(notifier)
+    notifier.experiment_unit_failed(_record(status="running"), _progress(done=10, failed=1, failed_units=["aug-on/seed3"]), ["aug-on/seed3"])
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, priority = sent[0]
+    assert title    == "train_backbone unit FAILED: aug-on/seed3"
+    assert priority == "high"
+    assert "1 of 30 units failed" in body
+
+
+def test_several_unit_failures_notify_as_one_push(notifier, sent):
+    _arm(notifier)
+    notifier.experiment_unit_failed(_record(status="running"), _progress(done=10, failed=2, failed_units=["a", "b"]), ["a", "b"])
+
+    assert len(_drain(sent, 1)) == 1
+    title, body, _priority = sent[0]
+    assert title == "train_backbone: 2 units FAILED"
+    assert "a, b" in body
+
+
+def test_finish_body_reports_the_unit_tally(notifier, sent):
+    _arm(notifier)
+    record             = _record(ago_s=600.0)
+    record["progress"] = _progress(total=30, done=28, failed=2, eta_s=0.0, failed_units=["a", "b"])
+    notifier.job_finished(record)
+
+    assert len(_drain(sent, 1)) == 1
+    body = sent[0][1]
+    assert "28/30 units done, 2 FAILED" in body
+
+
+class StubProcesses:
+
+    def __init__(self) -> None:
+        self.records = []
+
+    def list_jobs(self) -> list[dict]:
+        return [dict(record) for record in self.records]
+
+
+def _running_job(progress: dict | None, job_id: str = "abc123def456") -> dict:
+    return {**_record(status="running"), "job_id": job_id, "progress": progress}
+
+
+@pytest.fixture
+def watched(notifier):
+    processes = StubProcesses()
+    return ExperimentProgressWatcher(processes, notifier, WebLogger()), processes
+
+
+def test_watcher_pushes_once_when_the_first_eta_appears(notifier, sent, watched):
+    _arm(notifier)
+    watcher, processes = watched
+
+    processes.records = [_running_job(_progress(done=0, eta_s=None))]
+    watcher.scan()
+    time.sleep(0.1)
+    assert sent == []
+
+    processes.records = [_running_job(_progress(done=1))]
+    watcher.scan()
+    assert len(_drain(sent, 1)) == 1
+    assert sent[0][0] == "train_backbone 1/30 units (3%)"
+
+    watcher.scan()
+    time.sleep(0.1)
+    assert len(sent) == 1
+
+
+def test_watcher_pushes_a_single_milestone_when_several_are_crossed(notifier, sent, watched):
+    _arm(notifier)
+    watcher, processes = watched
+
+    processes.records = [_running_job(_progress(done=1))]
+    watcher.scan()
+
+    processes.records = [_running_job(_progress(done=16))]
+    watcher.scan()
+
+    assert len(_drain(sent, 1)) == 1
+    assert sent[0][0] == "train_backbone 16/30 units (53%)"
+
+
+def test_watcher_baselines_a_job_already_mid_run(notifier, sent, watched):
+    _arm(notifier)
+    watcher, processes = watched
+
+    processes.records = [_running_job(_progress(done=20))]
+    watcher.scan()
+    processes.records = [_running_job(_progress(done=21))]
+    watcher.scan()
+    time.sleep(0.1)
+    assert sent == []
+
+    processes.records = [_running_job(_progress(done=23))]
+    watcher.scan()
+    assert len(_drain(sent, 1)) == 1
+    assert "(77%)" in sent[0][0]
+
+
+def test_watcher_pushes_new_unit_failures_once(notifier, sent, watched):
+    _arm(notifier)
+    watcher, processes = watched
+
+    processes.records = [_running_job(_progress(done=5))]
+    watcher.scan()
+
+    processes.records = [_running_job(_progress(done=5, failed=2, failed_units=["a", "b"]))]
+    watcher.scan()
+    assert len(_drain(sent, 1)) == 1
+    assert sent[0][0] == "train_backbone: 2 units FAILED"
+
+    watcher.scan()
+    time.sleep(0.1)
+    assert len(sent) == 1
+
+
+def test_watcher_forgets_jobs_that_stop_running(notifier, watched):
+    watcher, processes = watched
+
+    processes.records = [_running_job(_progress(done=5))]
+    watcher.scan()
+    assert watcher.tracked
+
+    processes.records = []
+    watcher.scan()
+    assert watcher.tracked == {}
+
+
+def test_watcher_ignores_jobs_without_progress(notifier, watched):
+    watcher, processes = watched
+
+    processes.records = [_running_job(None)]
+    watcher.scan()
+
+    assert watcher.tracked == {}

@@ -803,6 +803,8 @@ main { margin-left: var(--navw); }
   .sboard__job.is-run .sboard__jdot { animation: pulse 2s var(--ease) infinite; }
 }
 .sboard__jname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dk-ink); }
+.sboard__jprog { color: var(--dk-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62%; }
+.sboard__jprog.is-failing { color: var(--dk-warn); }
 .sboard__jstate { color: var(--dk-faint); white-space: nowrap; }
 
 /* ---------- Buttons ---------- */
@@ -1142,6 +1144,10 @@ main { margin-left: var(--navw); }
 .job-item__name { font-family: var(--display); font-size: 14px; font-weight: 500; }
 .job-item__meta { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
 .job-item__desc { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-item__prog { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-item__pbar { flex: 0 0 52px; height: 4px; border-radius: var(--r-pill); background: rgba(20, 30, 40, 0.10); overflow: hidden; }
+.job-item__pbar i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--accent); transition: width 0.6s var(--ease); }
+.job-item__pbar i.is-failing { background: var(--warn); }
 .badge { font-family: var(--mono); font-size: 10.5px; padding: 2px 8px; border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: 0.06em; }
 .badge--running { background: rgba(29, 79, 216, 0.10); color: var(--accent); }
 .badge--finished { background: rgba(15, 118, 110, 0.12); color: var(--accent-2); }
@@ -1186,6 +1192,15 @@ main { margin-left: var(--navw); }
   border-bottom: 1px solid var(--glass-line); background: var(--glass-bg-2);
 }
 .console-tile__gpus[hidden] { display: none; }
+.console-tile__progress {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  border-bottom: 1px solid var(--glass-line); background: var(--glass-bg-2);
+}
+.console-tile__progress[hidden] { display: none; }
+.console-tile__ptrack { flex: 0 0 130px; height: 5px; border-radius: var(--r-pill); background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.console-tile__pfill { display: block; height: 100%; border-radius: var(--r-pill); background: #6f9bff; transition: width 0.6s var(--ease); }
+.console-tile__pfill.is-failing { background: #fbbf24; }
+.console-tile__ptext { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .console-tile__gpuactions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .console-tile__gpunote { font-family: var(--mono); font-size: 11px; color: var(--glass-dim); overflow-wrap: anywhere; }
 .console-tile .btn[hidden] { display: none; }

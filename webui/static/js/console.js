@@ -73,10 +73,26 @@ class ConsoleTile {
 
     this.gpuPanel.append(this.gpuBoard, gpuActions);
 
+    this.progWrap = document.createElement("div");
+    this.progWrap.className = "console-tile__progress";
+    this.progWrap.hidden = true;
+
+    this.progFill = document.createElement("i");
+    this.progFill.className = "console-tile__pfill";
+
+    const progTrack = document.createElement("span");
+    progTrack.className = "console-tile__ptrack";
+    progTrack.appendChild(this.progFill);
+
+    this.progText = document.createElement("span");
+    this.progText.className = "console-tile__ptext";
+
+    this.progWrap.append(progTrack, this.progText);
+
     this.outEl = document.createElement("div");
     this.outEl.className = "console-tile__out";
 
-    this.root.append(bar, this.gpuPanel, this.outEl);
+    this.root.append(bar, this.progWrap, this.gpuPanel, this.outEl);
     host.appendChild(this.root);
 
     this.term = new Terminal({
@@ -170,13 +186,21 @@ class ConsoleTile {
     this.stopBtn.disabled = status !== "running" && status !== "scheduled" && status !== "queued";
 
     if (status === "running") this._watchGpus();
-    else this._unwatchGpus();
+    else {
+      const hadTimer = Boolean(this.gpuTimer);
+      this._unwatchGpus();
+      if (hadTimer) this._pollProgress();
+    }
   }
 
   _watchGpus() {
     if (this.gpuTimer) return;
     this._pollGpus();
-    this.gpuTimer = setInterval(() => this._pollGpus(), ConsoleTile.GPU_POLL_MS);
+    this._pollProgress();
+    this.gpuTimer = setInterval(() => {
+      this._pollGpus();
+      this._pollProgress();
+    }, ConsoleTile.GPU_POLL_MS);
   }
 
   _unwatchGpus() {
@@ -205,6 +229,34 @@ class ConsoleTile {
     this.gpuBtn.textContent = this.poolGpus.length ? `GPUs ${this.poolGpus.join(",")}` : "GPUs parked";
     if (this.gpuPanel.hidden) return;
     this._paintGpuNote();
+  }
+
+  async _pollProgress() {
+    let data = null;
+    try {
+      data = await window.apiGet(`/api/jobs/${this.job.job_id}/progress`);
+    } catch (e) {
+      return;
+    }
+
+    const prog = data && data.ok && data.progress;
+    if (!prog || !prog.total) return;
+    this._renderProgress(prog);
+  }
+
+  _renderProgress(p) {
+    const done = p.done + p.failed;
+    const bits = [`${done}/${p.total} units`];
+    if (p.eta_s != null) bits.push(`avg ${window.fmtDuration(p.average_s)}/unit`, `ETA ${window.fmtDuration(p.eta_s)}`, `finish ≈ ${p.finish_at.slice(11, 16)}`);
+    else if (done < p.total) bits.push("estimating ETA");
+    if (p.failed) bits.push(`${p.failed} FAILED`);
+    if (p.running && p.running.length) bits.push(`${p.running.length} on GPU now`);
+
+    this.progWrap.hidden = false;
+    this.progFill.style.width = `${Math.round((100 * done) / p.total)}%`;
+    this.progFill.classList.toggle("is-failing", p.failed > 0);
+    this.progText.textContent = bits.join(" · ");
+    this.progText.title = p.failed ? `failed: ${p.failed_units.join(", ")}` : (p.running || []).map((r) => `GPU ${r.gpu}: ${r.name}`).join("\n");
   }
 
   _toggleGpus() {
@@ -310,6 +362,8 @@ class ConsoleTile {
 }
 
 class RunConsole {
+  static LIST_POLL_MS = 5000;
+
   constructor(refs) {
     this.listEl = refs.list;
     this.tilesEl = refs.tiles;
@@ -320,6 +374,9 @@ class RunConsole {
     this._fitTimer = null;
 
     window.addEventListener("resize", () => this._queueFit());
+    setInterval(() => {
+      if (!document.hidden && this.jobs.some((j) => j.status === "running")) this.refresh();
+    }, RunConsole.LIST_POLL_MS);
   }
 
   async refresh() {
@@ -415,10 +472,16 @@ class RunConsole {
       if (job.follow_of) return;
       const item = document.createElement("li");
       item.className = "job-item" + (this.tiles.has(job.job_id) ? " is-active" : "");
+      const prog = job.progress && job.progress.total ? job.progress : null;
+      const progBits = prog ? window.fmtProgressBits(prog).join(" · ") : "";
+      const progLine = prog
+        ? `<div class="job-item__prog" title="${esc(progBits)}"><span class="job-item__pbar"><i style="width:${Math.round((100 * (prog.done + prog.failed)) / prog.total)}%" class="${prog.failed ? "is-failing" : ""}"></i></span>${esc(progBits)}</div>`
+        : "";
       item.innerHTML =
         `<div class="job-item__top"><span class="job-item__name">${job.script}</span>` +
         `<span class="badge badge--${job.status}">${job.status}</span></div>` +
         (job.description ? `<div class="job-item__desc" title="${esc(job.description)}">${esc(job.description)}</div>` : "") +
+        progLine +
         `<div class="job-item__meta">${job.started.replace("T", " ")}${job.pid ? ` · pid ${job.pid}` : ""}</div>`;
       item.addEventListener("click", () => this.toggle(job.job_id));
 

@@ -20,7 +20,7 @@ from pipeline_library                   import PipelineLibrary
 from repomap_library                    import RepoMapLibrary
 from profile_autoencoder_model_library  import ProfileAutoencoderModelLibrary
 from jepa_model_library                 import JepaModelLibrary
-from notifier                           import JobNotifier
+from notifier                           import ExperimentProgressWatcher, JobNotifier
 from process_manager                    import ProcessManager, ProcessNuke, ServerDetacher
 from project_paths                      import ProjectPaths
 from request_router                     import RequestRouter
@@ -81,6 +81,7 @@ class WebUIServer:
         self.notifier          = JobNotifier(self.paths, self.logger)
         self.describer         = JobDescriber(self.paths, self.resolver)
         self.processes         = ProcessManager(self.paths, self.logger, self.notifier, self.describer)
+        self.progress_watch    = ExperimentProgressWatcher(self.processes, self.notifier, self.logger)
         self.saved_runs        = SavedRunStore(self.paths, self.logger)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
@@ -136,6 +137,7 @@ class WebUIServer:
         self.contention.start()
         self.gpu_guard.start()
         self.gpu_schedule.start()
+        self.progress_watch.start()
 
         server        = _Server((self.host, self.port), _Handler)
         server.router = self.router

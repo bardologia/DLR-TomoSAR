@@ -248,7 +248,7 @@ class StatusBoard {
       `<i class="strip__div" aria-hidden="true"></i>` +
       `<label class="ntf__field"><span class="ntf__key">ntfy topic</span><input class="ntf__input" id="sb-ntf-topic" type="text" placeholder="pick-a-secret-topic" spellcheck="false" autocomplete="off"></label>` +
       `<label class="ntf__field"><span class="ntf__key">server</span><input class="ntf__input ntf__input--server" id="sb-ntf-server" type="text" spellcheck="false" autocomplete="off"></label>` +
-      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Every job notifies when it starts and when it ends — direct launches, queued runs and follow-ups alike. Failures arrive high-priority.">push to your phone when a job starts and ends</span>` +
+      `<span class="ntf__hint" title="Install the ntfy app (or open ntfy.sh in a browser) and subscribe to the same topic. Every job notifies when it starts and when it ends — direct launches, queued runs and follow-ups alike. Fan-out experiments additionally push the first ETA, 25/50/75% progress milestones and per-unit failures. Failures arrive high-priority.">push to your phone when a job starts, progresses and ends</span>` +
       `<div class="strip__actions">` +
       `<button type="button" class="impact__arm" id="sb-ntf-test" title="Send a test notification to the topic now">test</button>` +
       `<button type="button" class="impact__arm" id="sb-ntf-save" title="Save topic and server">save</button>` +
@@ -1033,7 +1033,10 @@ class StatusBoard {
         j.status === "scheduled" || j.status === "queued" ? "is-sched" :
         j.status === "cancelled" ? "is-cancel" : "is-done";
       const mark = follow ? `<span class="sboard__jarrow" aria-hidden="true">&#8627;</span>` : "";
-      return `<li class="sboard__job ${cls}${follow ? " sboard__job--follow" : ""}">${mark}<span class="sboard__jdot" aria-hidden="true"></span><span class="sboard__jname">${name}</span><span class="sboard__jstate">${this._esc(j.status)}</span></li>`;
+      const prog = j.progress && j.progress.total
+        ? `<span class="sboard__jprog${j.progress.failed ? " is-failing" : ""}">${this._esc(window.fmtProgressBits(j.progress).join(" · "))}</span>`
+        : "";
+      return `<li class="sboard__job ${cls}${follow ? " sboard__job--follow" : ""}">${mark}<span class="sboard__jdot" aria-hidden="true"></span><span class="sboard__jname">${name}</span>${prog}<span class="sboard__jstate">${this._esc(j.status)}</span></li>`;
     };
 
     list.innerHTML = jobs.filter((j) => !j.follow_of).slice(0, 8).map((j) => {

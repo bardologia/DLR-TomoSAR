@@ -16,7 +16,7 @@ from collections import deque
 from datetime    import datetime, timedelta
 from pathlib     import Path
 
-from tools.orchestration.gpu_queue import GpuPoolFile
+from tools.orchestration.gpu_queue import GpuPoolFile, GpuProgressFile
 
 from job_describer import JobDescriber
 from notifier      import JobNotifier
@@ -359,6 +359,7 @@ class ProcessManager:
         stream.publish({"type": "end"})
 
         if snapshot is not None:
+            snapshot["progress"] = self._final_progress(job_id)
             self.notifier.job_finished(snapshot)
 
         self._advance_queue()
@@ -403,9 +404,14 @@ class ProcessManager:
         stream.publish({"type": "status", "status": "finished", "code": None, "verdict": "unknown"})
         stream.publish({"type": "end"})
 
+        snapshot["progress"] = self._final_progress(job_id)
         self.notifier.job_finished(snapshot)
 
         self._advance_queue()
+
+    def _final_progress(self, job_id: str) -> dict | None:
+        info = self.progress(job_id)
+        return info["progress"] if info.get("ok") and "progress" in info else None
 
     def adopt_orphans(self) -> int:
         now = time.monotonic()
@@ -625,6 +631,28 @@ class ProcessManager:
 
         return {"ok": True, "supported": True, "live": True, "gpus": gpus, "path": str(pool)}
 
+    def progress(self, job_id: str) -> dict:
+        with self.lock:
+            record = self.jobs.get(job_id)
+
+        if record is None:
+            return {"ok": False, "error": "unknown job"}
+
+        path = record["overrides"].get(self.POOL_FIELD)
+        if not path:
+            return {"ok": True, "supported": False, "live": False}
+
+        progress_path = GpuProgressFile.resolve(Path(path))
+        if not progress_path.is_file():
+            return {"ok": True, "supported": True, "live": False, "path": str(progress_path)}
+
+        try:
+            snapshot = json.loads(progress_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as error:
+            return {"ok": False, "error": f"unreadable progress file: {error}", "path": str(progress_path)}
+
+        return {"ok": True, "supported": True, "live": record["status"] == "running", "progress": snapshot, "path": str(progress_path)}
+
     def set_gpus(self, job_id: str, gpus, park: bool = False) -> dict:
         with self.lock:
             record = self.jobs.get(job_id)
@@ -748,7 +776,13 @@ class ProcessManager:
 
     def list_jobs(self) -> list[dict]:
         with self.lock:
-            return sorted(self.jobs.values(), key=lambda r: r["started"], reverse=True)
+            records = [dict(record) for record in sorted(self.jobs.values(), key=lambda r: r["started"], reverse=True)]
+
+        for record in records:
+            info               = self.progress(record["job_id"]) if record["status"] == "running" else None
+            record["progress"] = info["progress"] if info is not None and info.get("ok") and info.get("live") and "progress" in info else None
+
+        return records
 
     def get_stream(self, job_id: str) -> JobStream | None:
         with self.lock:

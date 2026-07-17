@@ -23,6 +23,25 @@ window.apiPost = async function (url, body) {
   }
 };
 
+window.fmtDuration = function (seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m) return `${m}m`;
+  return `${total}s`;
+};
+
+window.fmtProgressBits = function (p) {
+  const done = p.done + p.failed;
+  const pct = Math.round((100 * done) / p.total);
+  const bits = [`${done}/${p.total}`, `${pct}%`];
+  if (p.eta_s != null) bits.push(`ETA ${window.fmtDuration(p.eta_s)}`, `≈ ${p.finish_at.slice(11, 16)}`);
+  else if (done < p.total) bits.push("estimating ETA");
+  if (p.failed) bits.push(`${p.failed} FAILED`);
+  return bits;
+};
+
 let _toastTimer = null;
 window.toast = function (message, kind) {
   const el = document.getElementById("toast");

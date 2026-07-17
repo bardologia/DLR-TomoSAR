@@ -406,6 +406,11 @@ class RequestRouter:
             result = self.processes.gpu_pool(job_id)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
+        if path.startswith("/api/jobs/") and path.endswith("/progress"):
+            job_id = path[len("/api/jobs/"):-len("/progress")]
+            result = self.processes.progress(job_id)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/tensorboard":
             self._send_json(handler, {"instances": self.tensorboard.list_instances()})
             return
