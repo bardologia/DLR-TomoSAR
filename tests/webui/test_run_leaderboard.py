@@ -230,7 +230,7 @@ def test_table_axes_fall_back_to_ancestor_names(tmp_path):
     board = RunLeaderboard(WebLogger())
     rows  = board.table(str(tmp_path))["rows"]
 
-    for run_name in ("seed3", "warm"):
+    for run_name in (unit, "warm"):
         row = next(r for r in rows if r["run"] == run_name)
         assert row["axes"]["model"] == "resunet"
         assert row["axes"]["k"]     == 5
@@ -292,7 +292,7 @@ def test_trials_ignores_unseeded_runs(tmp_path):
     assert result["ok"] and result["experiments"] == []
 
 
-def test_table_adds_seed_unit_rows(tmp_path):
+def test_table_collapses_seed_runs_into_unit_rows(tmp_path):
     _make_seed_run(tmp_path, "exp", "unit-A", 0, "20260701_000000", {"curve_mse_gt": 1.0, "overall_r2_gt": 0.5})
     _make_seed_run(tmp_path, "exp", "unit-A", 1, "20260701_000000", {"curve_mse_gt": 3.0})
     _make_run(tmp_path, STANDARD_NAME)
@@ -308,8 +308,8 @@ def test_table_adds_seed_unit_rows(tmp_path):
     assert unit["metrics"]["overall_r2_gt"] == 0.5
     assert Path(unit["id"]) == tmp_path / "exp" / "unit-A"
 
-    assert sum(1 for row in rows if row.get("n_seeds")) == 1
-    assert len(rows) == 4
+    assert not any(row["run"].startswith("seed") for row in rows)
+    assert len(rows) == 2
 
 
 def test_table_unit_row_uses_latest_stamp_per_seed(tmp_path):

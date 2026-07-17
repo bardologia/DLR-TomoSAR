@@ -118,6 +118,13 @@ class RunLeaderboard:
             values = {c["key"]: metrics[c["key"]] for c in self.COLUMNS if self._is_number(metrics.get(c["key"]))}
             mtime  = stamp_dir.stat().st_mtime
 
+            seed_match = self.SEED_DIR.match(run_dir.name)
+            if seed_match is not None and run_dir.parent != root:
+                key = (run_dir.parent, int(seed_match.group(1)))
+                if key not in seed_latest or mtime > seed_latest[key][1]:
+                    seed_latest[key] = (values, mtime)
+                continue
+
             rows.append({
                 "id"      : str(stamp_dir),
                 "run"     : run_dir.name,
@@ -127,12 +134,6 @@ class RunLeaderboard:
                 "axes"    : self._run_axes(run_dir, root),
                 "metrics" : values,
             })
-
-            seed_match = self.SEED_DIR.match(run_dir.name)
-            if seed_match is not None and run_dir.parent != root:
-                key = (run_dir.parent, int(seed_match.group(1)))
-                if key not in seed_latest or mtime > seed_latest[key][1]:
-                    seed_latest[key] = (values, mtime)
 
         rows += self._unit_rows(root, seed_latest)
         rows.sort(key=lambda row: row["mtime"], reverse=True)
