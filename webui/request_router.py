@@ -24,7 +24,6 @@ from pipeline_library       import PipelineLibrary
 from repomap_library        import RepoMapLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
 from jepa_model_library               import JepaModelLibrary
-from notifier               import JobNotifier
 from physics_loss_library   import PhysicsLossLibrary
 from process_manager        import ProcessManager, ProcessNuke, ServerDetacher
 from project_paths          import ProjectPaths
@@ -34,6 +33,7 @@ from run_leaderboard        import RunLeaderboard
 from script_catalog         import ScriptCatalog
 from script_config_resolver import ScriptConfigResolver
 from system_monitor         import SystemMonitor
+from telegram_bot           import TelegramBot
 from contention_monitor      import ContentionMonitor
 from tensorboard_manager    import TensorboardManager
 from training_curves        import TrainingCurves
@@ -49,7 +49,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, notifier: JobNotifier, commands: CommandListener, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, telegram: TelegramBot, commands: CommandListener, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves) -> None:
         self.paths       = paths
         self.logger      = logger
         self.catalog     = catalog
@@ -66,7 +66,7 @@ class RequestRouter:
         self.pipelines   = pipelines
         self.repomap     = repomap
         self.processes   = processes
-        self.notifier    = notifier
+        self.telegram    = telegram
         self.commands    = commands
         self.nuke        = nuke
         self.detacher    = detacher
@@ -427,8 +427,7 @@ class RequestRouter:
             payload["gpu_guard"]    = self.gpu_guard.state()
             payload["gpu_schedule"] = self.gpu_schedule.state()
             payload["server"]    = self.detacher.state()
-            payload["notify"]    = self.notifier.state()
-            payload["commands"]  = self.commands.state()
+            payload["telegram"]  = {**self.telegram.state(), **self.commands.state()}
             self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):
@@ -496,18 +495,21 @@ class RequestRouter:
             self._send_json(handler, result)
             return
 
-        if path == "/api/notify/config":
-            result = self.notifier.configure(body or {})
+        if path == "/api/telegram/config":
+            result = self.telegram.configure(body or {})
+            if result.get("ok"):
+                self.commands.apply()
+                result = {**result, **self.commands.state()}
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
-        if path == "/api/notify/test":
-            result = self.notifier.test()
+        if path == "/api/telegram/test":
+            result = self.telegram.test()
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
-        if path == "/api/commands/config":
-            result = self.commands.configure(body or {})
+        if path == "/api/telegram/detect":
+            result = self.telegram.detect_chats()
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

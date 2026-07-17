@@ -32,6 +32,7 @@ from run_leaderboard                    import RunLeaderboard
 from script_catalog                     import ScriptCatalog
 from script_config_resolver             import ScriptConfigResolver
 from system_monitor                     import SystemMonitor
+from telegram_bot                       import TelegramBot
 from tensorboard_manager                import TensorboardManager
 from training_curves                    import TrainingCurves
 from web_logger                         import WebLogger
@@ -78,13 +79,14 @@ class WebUIServer:
         self.jepa_models       = JepaModelLibrary()
         self.pipelines         = PipelineLibrary()
         self.repomap           = RepoMapLibrary()
-        self.notifier          = JobNotifier(self.paths, self.logger)
+        self.telegram          = TelegramBot(self.paths, self.logger)
+        self.notifier          = JobNotifier(self.telegram, self.logger)
         self.describer         = JobDescriber(self.paths, self.resolver)
         self.processes         = ProcessManager(self.paths, self.logger, self.notifier, self.describer)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
         self.system            = SystemMonitor(self.paths)
-        self.commands          = CommandListener(self.paths, self.logger, self.notifier, self.processes, self.nuke, self.system)
+        self.commands          = CommandListener(self.telegram, self.logger, self.notifier, self.processes, self.nuke, self.system)
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard         = GpuWatchdog(self.system, self.paths, self.logger, self.processes)
@@ -113,7 +115,7 @@ class WebUIServer:
             pipelines         = self.pipelines,
             repomap           = self.repomap,
             processes         = self.processes,
-            notifier          = self.notifier,
+            telegram          = self.telegram,
             commands          = self.commands,
             nuke              = self.nuke,
             detacher          = self.detacher,
