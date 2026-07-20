@@ -66,7 +66,7 @@ def test_preflight_writes_inside_the_run_directory(tmp_path, monkeypatch):
     PretrainPreflight(
         pretrain_config = _pretrain(find_batch_size=True),
         training_config = _training(),
-        build_context   = lambda logger, device: None,
+        build_trainer   = lambda logger: None,
         run_directory   = run_directory,
         label           = "image_ae",
     ).run()
@@ -84,7 +84,7 @@ def test_disabled_preflight_creates_nothing(tmp_path, monkeypatch):
     PretrainPreflight(
         pretrain_config = _pretrain(),
         training_config = _training(),
-        build_context   = lambda logger, device: None,
+        build_trainer   = lambda logger: None,
         run_directory   = run_directory,
         label           = "image_ae",
     ).run()
