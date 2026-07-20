@@ -128,6 +128,37 @@ def test_batch_without_kz_field_fails_loudly(tmp_path, force_cpu):
         trainer.train(loader, loader, loader)
 
 
+def test_lr_scales_linearly_with_batch_size(tmp_path, force_cpu):
+    reference = _entry_config(epochs=1)
+    reference.training.scale_lr_with_batch = False
+
+    scaled = _entry_config(epochs=1)
+    scaled.training.batch_size              = 512
+    scaled.training.lr_reference_batch_size = 256
+    scaled.training.scale_lr_with_batch     = True
+
+    base_lrs   = _build_trainer(tmp_path / "reference", reference).base_lrs
+    scaled_lrs = _build_trainer(tmp_path / "scaled", scaled).base_lrs
+
+    assert scaled_lrs == [lr * 2.0 for lr in base_lrs]
+
+
+def test_compute_loss_satisfies_the_probe_contract(tmp_path, force_cpu):
+    trainer = _build_trainer(tmp_path, _entry_config(epochs=1))
+    batch   = next(iter(_loader()))
+
+    trainer.model.train()
+    losses = trainer._compute_loss(batch)
+    loss   = losses["total_loss"]
+
+    assert trainer.use_amp is False
+    assert loss.requires_grad
+    assert torch.isfinite(loss).item()
+
+    loss.backward()
+    trainer.optimizer.step()
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="VRAM reservation requires CUDA")
 def test_fit_with_vram_reservation_on_gpu(tmp_path):
     trainer = _build_trainer(tmp_path, _entry_config(epochs=1, reserve_vram=True))

@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.dataset                  import AugmentationConfig
-from configuration.normalization.general    import NormalizationConfig
-from configuration.training.general.run     import TrainingPathsConfig, standard_seeds
-from configuration.training.general.runtime import OverfitCheckConfig
-from configuration.sar.geometry_config      import GeometryConfig
+from configuration.dataset                      import AugmentationConfig
+from configuration.normalization.general        import NormalizationConfig
+from configuration.training.general.pretraining import PretrainConfig
+from configuration.training.general.run         import TrainingPathsConfig, standard_seeds
+from configuration.training.general.runtime     import OverfitCheckConfig
+from configuration.sar.geometry_config          import GeometryConfig
 
 
 @dataclass
@@ -32,6 +33,9 @@ class UnrolledTrainingConfig:
     num_workers     : int = 4
     prefetch_factor : int = 2
 
+    scale_lr_with_batch     : bool = True
+    lr_reference_batch_size : int  = 256
+
     patch_size    : tuple[int, int] = (64, 32)
     patch_stride  : tuple[int, int] = (32, 16)
     train_azimuth : tuple[int, int] = (1000, 13000)
@@ -51,6 +55,7 @@ class UnrolledEntryConfig:
 
     paths         : TrainingPathsConfig    = field(default_factory=TrainingPathsConfig)
     training      : UnrolledTrainingConfig = field(default_factory=UnrolledTrainingConfig)
+    pretrain      : PretrainConfig         = field(default_factory=PretrainConfig)
     geometry      : GeometryConfig         = field(default_factory=GeometryConfig)
     normalization : NormalizationConfig    = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig     = field(default_factory=AugmentationConfig)

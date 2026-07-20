@@ -12,10 +12,11 @@ from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.training                     import UnrolledEntryConfig
 from models.unrolled                            import UNROLLED_MODEL_REGISTRY, get_unrolled
 from pipelines.backbone.dataset.pipeline        import DatasetPipeline
-from pipelines.shared.config.config_factory     import ConfigFactory
-from pipelines.shared.config.config_persistence import UnrolledModelConfigIO
-from pipelines.shared.training.overfit_check    import OverfitCheck
-from pipelines.shared.training.seed_sweep       import SeedSweepRunner
+from pipelines.shared.config.config_factory       import ConfigFactory
+from pipelines.shared.config.config_persistence   import UnrolledModelConfigIO
+from pipelines.shared.training.overfit_check      import OverfitCheck
+from pipelines.shared.training.pretrain_preflight import PretrainPreflight
+from pipelines.shared.training.seed_sweep         import SeedSweepRunner
 from pipelines.unrolled.training.trainer        import UnrolledTrainer
 from tools.data.gaussians          import GaussianAxis
 from tools.monitoring.logger       import Logger
@@ -124,11 +125,38 @@ class UnrolledTrainingPipeline:
 
         return model, model_cfg
 
+    def build_pretrain_trainer(self, work_dir: Path, logger) -> tuple:
+        work_dir     = Path(work_dir)
+        gaussian_cfg = GaussianConfig.from_dataset(self.config.paths.dataset_path, self.config.paths.parameters_path)
+
+        dataset_pipeline, dataset_config = self._build_dataset_pipeline(work_dir, logger, gaussian_cfg)
+        _train_loader, _val_loader, _test_loader, datasets = dataset_pipeline.run()
+
+        dataset = datasets["train"]
+        x_axis  = np.asarray(dataset_config.x_axis, dtype=np.float32)
+
+        model, model_cfg = self._build_model(logger)
+
+        trainer = UnrolledTrainer(model, model_cfg, x_axis, self.config, gaussian_cfg.params_per_gaussian, work_dir, logger, dataset.normalizer)
+
+        return trainer, dataset, model
+
+    def _pretrain_preflight(self, run_directory: Path) -> None:
+        PretrainPreflight(
+            pretrain_config = self.config.pretrain,
+            training_config = self.config.training,
+            build_trainer   = lambda logger: self.build_pretrain_trainer(run_directory / "pretrain" / "context", logger),
+            run_directory   = run_directory,
+            label           = self.config.model_name,
+        ).run()
+
     def run(self) -> dict:
         run_directory = self._run_directory()
         logger        = Logger(log_dir=str(run_directory / "logs"), name="unrolled_training")
 
         logger.section("[Unrolled Training Pipeline Execution]")
+
+        self._pretrain_preflight(run_directory)
 
         ConfigCli.save_resolved(self.config, run_directory / "docs" / "resolved_entry_config.json")
 

@@ -33,14 +33,22 @@ class UnrolledTrainer:
         if entry_config.curve_loss not in self.LOSS_KINDS:
             raise ValueError(f"Unknown curve_loss '{entry_config.curve_loss}'. Available: {self.LOSS_KINDS}")
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model  = model.to(self.device)
-        self.x_axis = torch.as_tensor(x_axis, dtype=torch.float32, device=self.device)
+        self.device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model   = model.to(self.device)
+        self.x_axis  = torch.as_tensor(x_axis, dtype=torch.float32, device=self.device)
+        self.use_amp = False
 
         self.synthesiser = MeasurementSynthesiser(self.x_axis, ppg, entry_config.power_floor, entry_config.measurement_noise_std)
 
         self.optimizer = torch.optim.AdamW(model_cfg.get_param_groups(self.model), betas=(0.9, 0.999), eps=1e-8)
-        self.base_lrs  = [float(group["lr"]) for group in self.optimizer.param_groups]
+
+        lr_scale = self.training.batch_size / self.training.lr_reference_batch_size if self.training.scale_lr_with_batch else 1.0
+        if lr_scale != 1.0:
+            for group in self.optimizer.param_groups:
+                group["lr"] = float(group["lr"]) * lr_scale
+            self.logger.subsection(f"Linear LR scaling x{lr_scale:.4f} applied to {len(self.optimizer.param_groups)} param groups (batch-size rule).")
+
+        self.base_lrs = [float(group["lr"]) for group in self.optimizer.param_groups]
 
         schedules = ScheduleSettings(
             warmup    = WarmupConfig(warmup_steps=self.training.warmup_steps, warmup_start_factor=0.1, warmup_enabled=self.training.warmup_enabled, warmup_mode="linear"),
@@ -102,6 +110,15 @@ class UnrolledTrainer:
 
         return gt_params, kz_map
 
+    def _compute_loss(self, batch) -> dict:
+        gt_params, kz_map = self._unpack(batch)
+        measurements, target, mask = self._synthesise_measurements(gt_params, kz_map)
+
+        pred = self.model(measurements, kz_map, self.x_axis)
+        loss = self._curve_loss(pred, target, mask)
+
+        return {"total_loss": loss, "pred": pred, "target": target, "mask": mask}
+
     def _apply_lrs(self, lrs: list[float]) -> None:
         for group, lr in zip(self.optimizer.param_groups, lrs):
             group["lr"] = lr
@@ -114,12 +131,9 @@ class UnrolledTrainer:
         n_batches  = 0
 
         for batch in loader:
-            gt_params, kz_map = self._unpack(batch)
-            measurements, target, mask = self._synthesise_measurements(gt_params, kz_map)
-
             with torch.set_grad_enabled(train):
-                pred = self.model(measurements, kz_map, self.x_axis)
-                loss = self._curve_loss(pred, target, mask)
+                losses = self._compute_loss(batch)
+                loss   = losses["total_loss"]
 
             if train:
                 self.optimizer.zero_grad(set_to_none=True)
@@ -131,7 +145,7 @@ class UnrolledTrainer:
                 self._apply_lrs(self.lr_scheduler.effective_lrs())
 
             total_loss += float(loss.detach())
-            total_peak += float(self._peak_error_m(pred.detach(), target, mask))
+            total_peak += float(self._peak_error_m(losses["pred"].detach(), losses["target"], losses["mask"]))
             n_batches  += 1
 
         denominator = max(n_batches, 1)
