@@ -189,6 +189,8 @@ class LaunchLayout:
                 {"path": "batch_size", "widget": NUM_BATCH},
                 {"path": "num_workers", "widget": NUM_WORKERS},
                 {"path": "prefetch_factor", "widget": NUM_PREFETCH},
+                "scale_lr_with_batch",
+                {"path": "lr_reference_batch_size", "widget": NUM_BATCH},
             ]},
             {"title": "Gradient clipping", "fields": [
                 "max_grad_norm",
@@ -700,6 +702,7 @@ class LaunchLayout:
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_unrolled", "at": "training"},
+                    {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
                 ]},
                 {"key": "physics", "title": "Physics", "panels": [
