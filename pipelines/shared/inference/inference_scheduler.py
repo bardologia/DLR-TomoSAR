@@ -5,7 +5,7 @@ from pathlib  import Path
 
 from pipelines.shared.inference.run_classifier import RunClassifier, RunDirectoryWalk
 from tools.monitoring.logger                   import Logger
-from tools.orchestration.gpu_queue             import GpuJob, GpuJobResult, GpuQueue
+from tools.orchestration.gpu_queue             import GpuJob, GpuJobResult, GpuPoolFile, GpuQueue
 from tools.runtime.config_cli                  import ConfigCli
 from tools.runtime.run_tag                     import RunTag
 
@@ -18,6 +18,7 @@ class InferenceScheduler:
         self.run_type     = run_type
         self.runs_dir     = Path(config.runs_dir)
         self.work_dir     = Path("logs") / "inference" / run_type / RunTag.now()
+        self.pool_file    = GpuPoolFile.resolve(config.gpus_file, self.work_dir)
 
     def _root(self, logger: Logger) -> Path | None:
         if self.runs_dir.is_dir():
@@ -78,15 +79,16 @@ class InferenceScheduler:
             jobs        = self._jobs(run_dirs, config_path)
 
             logger.kv_table({
-                "Run type"  : self.run_type,
-                "Runs"      : len(run_dirs),
-                "GPUs"      : self.config.gpus,
-                "Runs dir"  : str(self.runs_dir),
-                "Filter"    : self.config.run_filter or "all run directories",
-                "Workers"   : str(self.work_dir),
+                "Run type"      : self.run_type,
+                "Runs"          : len(run_dirs),
+                "GPUs"          : self.config.gpus,
+                "GPU pool file" : str(self.pool_file),
+                "Runs dir"      : str(self.runs_dir),
+                "Filter"        : self.config.run_filter or "all run directories",
+                "Workers"       : str(self.work_dir),
             }, title="Configuration")
 
-            queue   = GpuQueue(gpus=self.config.gpus, logger=logger, poll_interval_s=self.config.poll_interval_s)
+            queue   = GpuQueue(gpus=self.config.gpus, logger=logger, poll_interval_s=self.config.poll_interval_s, pool_file=self.pool_file)
             results = queue.run(jobs)
 
             self._report(logger, results)

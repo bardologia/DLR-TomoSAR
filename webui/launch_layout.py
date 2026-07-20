@@ -370,6 +370,8 @@ class LaunchLayout:
         "sections": [
             {"key": "backbone", "title": "Backbone", "panels": [
                 {"kind": "fields", "title": "Backbone inference", "template": "inference_full", "at": "inference"},
+
+                {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
         ],
     }
@@ -379,6 +381,8 @@ class LaunchLayout:
         "sections": [
             {"key": "profile-ae", "title": "Profile AE", "panels": [
                 {"kind": "fields", "title": "Profile autoencoder inference", "template": "profile_inference", "at": "profile_inference"},
+
+                {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
         ],
     }
@@ -388,6 +392,8 @@ class LaunchLayout:
         "sections": [
             {"key": "image-ae", "title": "Image AE", "panels": [
                 {"kind": "fields", "title": "Image autoencoder inference", "template": "image_inference", "at": "image_inference"},
+
+                {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
         ],
     }
@@ -397,6 +403,8 @@ class LaunchLayout:
         "sections": [
             {"key": "unrolled", "title": "Unrolled", "panels": [
                 {"kind": "fields", "title": "Unrolled physics-network inference", "template": "unrolled_inference", "at": "unrolled_inference"},
+
+                {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
         ],
     }
@@ -406,6 +414,8 @@ class LaunchLayout:
         "sections": [
             {"key": "dual", "title": "Dual", "panels": [
                 {"kind": "fields", "title": "Dual-input ResUNet inference", "template": "inference_full", "at": "inference"},
+
+                {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
         ],
     }

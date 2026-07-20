@@ -14,6 +14,7 @@ class BackboneInferenceEntryConfig:
     runs_dir        : str       = _RUNS_ROOT
     run_filter      : List[str] = field(default_factory=list)
     gpus            : List[int] = field(default_factory=lambda: [0])
+    gpus_file       : str       = ""
     poll_interval_s : float     = 5.0
 
     inference : InferenceConfig = field(default_factory=lambda: InferenceConfig(

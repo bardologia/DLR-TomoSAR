@@ -17,8 +17,8 @@ def _make_run(directory: Path, config_name: str) -> None:
     (directory / "meta" / config_name).write_text("{}")
 
 
-def _scheduler(runs: Path, run_filter, run_type: str) -> InferenceScheduler:
-    config = SimpleNamespace(runs_dir=str(runs), run_filter=run_filter, gpus=[0], poll_interval_s=1)
+def _scheduler(runs: Path, run_filter, run_type: str, gpus_file: str = "") -> InferenceScheduler:
+    config = SimpleNamespace(runs_dir=str(runs), run_filter=run_filter, gpus=[0], gpus_file=gpus_file, poll_interval_s=1)
     return InferenceScheduler(config, Path("main/x.py"), run_type)
 
 
@@ -44,3 +44,16 @@ def test_filter_resolves_nested_relative_names(tmp_path):
     selected  = [str(directory.relative_to(runs)) for directory in scheduler._candidate_dirs(_SilentLogger())]
 
     assert selected == ["group_a/run_a1"]
+
+
+def test_pool_file_defaults_into_the_work_directory(tmp_path):
+    scheduler = _scheduler(tmp_path / "runs", [], RunType.BACKBONE)
+
+    assert scheduler.pool_file == scheduler.work_dir / "gpu_pool.json"
+
+
+def test_pool_file_honors_configured_gpus_file(tmp_path):
+    configured = tmp_path / "pools" / "job42.json"
+    scheduler  = _scheduler(tmp_path / "runs", [], RunType.BACKBONE, gpus_file=str(configured))
+
+    assert scheduler.pool_file == configured

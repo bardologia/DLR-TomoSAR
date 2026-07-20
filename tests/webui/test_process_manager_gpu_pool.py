@@ -20,6 +20,7 @@ from web_logger      import WebLogger
 
 from configuration.benchmark.general        import BenchmarkConfig
 from configuration.cross_validation.general import CrossValidationConfig
+from configuration.inference               import BackboneInferenceEntryConfig, DualInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
 from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, ImageAeEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
@@ -37,6 +38,11 @@ _SCHEDULING_PAGES = [
     ("cross_validate",            CrossValidationConfig),
     ("sweep_patches",             PatchSweepConfig),
     ("tune",                      TuningEntryConfig),
+    ("infer_backbone",            BackboneInferenceEntryConfig),
+    ("infer_profile_autoencoder", ProfileAeInferenceEntryConfig),
+    ("infer_image_autoencoder",   ImageAeInferenceEntryConfig),
+    ("infer_unrolled",            UnrolledInferenceEntryConfig),
+    ("infer_dual",                DualInferenceEntryConfig),
 ]
 
 
