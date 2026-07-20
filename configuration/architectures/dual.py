@@ -13,7 +13,7 @@ class DualResUNetConfig:
     head                : str       = "set_pred"
     params_backbone     : str       = "resunet"
     existence_backbone  : str       = "resunet"
-    params_input        : tuple     = ("pass", "ifg", "dem")
+    params_input        : tuple     = ("pass", "ifg")
     existence_input     : tuple     = ("ifg",)
     params_channels     : tuple     = (0, 1, 2, 3, 4, 5, 6, 7, 8)
     existence_channels  : tuple     = (5, 6, 7, 8)

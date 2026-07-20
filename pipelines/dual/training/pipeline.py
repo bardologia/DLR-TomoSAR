@@ -9,7 +9,7 @@ from pipelines.shared.config.config_persistence import DualModelConfigIO
 class TrunkChannelMap:
 
     MAX_TRACKS = 64
-    GROUPS     = ("pass", "ifg", "dem")
+    GROUPS     = ("pass", "ifg")
 
     @classmethod
     def resolve(cls, input_config, in_channels: int, groups: tuple) -> tuple[int, ...]:
@@ -41,6 +41,9 @@ class DualTrainingPipeline(TrainingPipeline):
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         model_config = self.model_config if self.model_config is not None else DualResUNetConfig()
         input_config = self.dataset_config.input_config
+
+        if input_config.use_dem:
+            raise ValueError("The dual model never uses the DEM channel; disable input.use_dem")
 
         overrides                       = super()._model_overrides(in_channels, out_channels)
         overrides["params_channels"]    = TrunkChannelMap.resolve(input_config, in_channels, model_config.params_input)

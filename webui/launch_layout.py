@@ -48,7 +48,6 @@ class LaunchLayout:
     MULTI_TRUNK_INPUT = {"kind": "multi", "empty": "select at least one channel group", "choices": [
         {"value": "pass", "label": "Passes (amplitudes)"},
         {"value": "ifg",  "label": "Interferograms"},
-        {"value": "dem",  "label": "DEM"},
     ]}
 
     MULTI_FIT_MODES = {"kind": "multi", "empty": "select at least one fit mode", "choices": [
@@ -219,6 +218,11 @@ class LaunchLayout:
             {"title": "Secondaries", "fields": [{"gate": "use_secondaries", "fields": ["secondaries_representation"]}]},
             {"title": "Interferograms", "fields": [{"gate": "use_interferograms", "fields": ["interferograms_representation"]}]},
             {"title": "DEM", "fields": ["use_dem"]},
+        ],
+        "input_dual": [
+            {"title": "Primary", "fields": [{"gate": "use_primary", "fields": ["primary_representation"]}]},
+            {"title": "Secondaries", "fields": [{"gate": "use_secondaries", "fields": ["secondaries_representation"]}]},
+            {"title": "Interferograms", "fields": [{"gate": "use_interferograms", "fields": ["interferograms_representation"]}]},
         ],
         "normalization": [
             {"title": "Strategy", "fields": [
@@ -643,9 +647,10 @@ class LaunchLayout:
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
-                    {"kind": "fields", "title": "Input channels", "template": "input", "at": "input"},
+                    {"kind": "fields", "title": "Input channels", "template": "input_dual", "at": "input"},
                     {"kind": "fields", "title": "Normalization", "template": "normalization", "at": "normalization"},
                     {"kind": "fields", "title": "Augmentation", "template": "augmentation", "at": "augmentation"},
+                    {"kind": "hidden", "fields": ["input.use_dem"]},
                 ]},
                 {"key": "training", "title": "Training", "panels": [
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},

@@ -855,8 +855,8 @@
         "head": "Fixed to set_pred: the model exists to split the set-prediction head across two trunks and rejects any other head",
         "params_backbone": "Trunk architecture of the full-input parameter branch: resunet (strided residual), unet_skip (maxpool residual), or unet (classic conv encoder-decoder); all three are headless encode-decode trunks from the backbone zoo",
         "existence_backbone": "Trunk architecture of the existence branch: resunet (strided residual), unet_skip (maxpool residual), or unet (classic conv encoder-decoder)",
-        "params_input": "Channel groups fed to the parameter trunk (pass, ifg, dem), matched against the dataset's channel labels; groups absent from the dataset are simply not present, but the selection must resolve to at least one channel",
-        "existence_input": "Channel groups fed to the existence trunk (pass, ifg, dem); defaults to interferograms only so the presence gate judges from interferometric phase alone",
+        "params_input": "Channel groups fed to the parameter trunk (pass, ifg), matched against the dataset's channel labels; the selection must resolve to at least one channel. The DEM is never an input to the dual model",
+        "existence_input": "Channel groups fed to the existence trunk (pass, ifg); defaults to interferograms only so the presence gate judges from interferometric phase alone",
         "params_channels": "Resolved input-tensor channel indices feeding the parameter trunk; overridden at build time from params_input and the dataset's input configuration, and persisted with the model config",
         "existence_channels": "Resolved input-tensor channel indices feeding the existence trunk; overridden at build time from existence_input and the dataset's input configuration, and persisted with the model config",
         "params_features": "Per-level residual-block channel widths of the full-stack parameter trunk, one entry per resolution stage; default [64, 128, 256] (three levels)",
@@ -2246,8 +2246,8 @@
         "model_overrides": "Dict of architecture-config field overrides applied to the dual model config before instantiation",
         "params_backbone": "Trunk architecture of the full-input parameter branch (resunet, unet_skip, or unet), applied to the model config before instantiation",
         "existence_backbone": "Trunk architecture of the existence branch (resunet, unet_skip, or unet), applied to the model config before instantiation",
-        "params_input": "Channel groups (pass, ifg, dem) the parameter trunk receives, resolved to concrete channel indices against the assembled dataset stack at build time",
-        "existence_input": "Channel groups (pass, ifg, dem) the existence trunk receives; defaults to interferograms only",
+        "params_input": "Channel groups (pass, ifg) the parameter trunk receives, resolved to concrete channel indices against the assembled dataset stack at build time; the DEM is never an input to the dual model",
+        "existence_input": "Channel groups (pass, ifg) the existence trunk receives; defaults to interferograms only",
         "paths": "TrainingPathsConfig sub-config holding filesystem locations for the dataset, extracted parameters, and secondary-track labels",
         "training": "TrainingQueueConfig sub-config bundling training-loop and queue settings (epochs, batch size, workers, AMP, EMA, resume, scheduler/warmup/clip knobs)",
         "pretrain": "PretrainConfig sub-config for optional pre-training preflight (batch-size search, dataloader tuning, VRAM budget)",
@@ -2276,7 +2276,7 @@
       "fields": {
         "params_features": "Encoder feature widths of the parameter trunk used for every trial; defaults to the four-level half-width ladder 32-64-128-256, half the standard four-level resunet widths",
         "existence_features": "Encoder feature widths of the existence trunk used for every trial; defaults to the same four-level half-width ladder 32-64-128-256",
-        "trials": "Named trunk-input assignments, each mapping a label to the channel groups (pass, ifg, dem) fed to the params and existence trunks; both keys are required in every spec. Defaults cover the seven ordered pairs over full (pass+ifg+dem), amp (pass) and phase (ifg): full/full plus both orders of amp+full, phase+full and phase+amp, run as di-<label> with the params trunk named first"
+        "trials": "Named trunk-input assignments, each mapping a label to the channel groups (pass, ifg) fed to the params and existence trunks; both keys are required in every spec. Defaults cover the seven ordered pairs over full (pass+ifg), pass (amplitudes only) and ifg (interferograms only): full/full plus both orders of pass+full, ifg+full and ifg+pass, run as di-<label> with the params trunk named first"
       }
     },
     "patch_sweep/general::PatchGridConfig": {

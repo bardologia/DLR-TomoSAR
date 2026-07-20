@@ -28,18 +28,18 @@ def _half_resunet_features() -> list[int]:
 
 
 def _default_dual_input_trials() -> dict:
-    full  = ["pass", "ifg", "dem"]
-    amp   = ["pass"]
-    phase = ["ifg"]
+    full   = ["pass", "ifg"]
+    passes = ["pass"]
+    ifg    = ["ifg"]
 
     return {
-        "full-full"  : {"params": full,  "existence": full},
-        "amp-full"   : {"params": amp,   "existence": full},
-        "full-amp"   : {"params": full,  "existence": amp},
-        "phase-full" : {"params": phase, "existence": full},
-        "full-phase" : {"params": full,  "existence": phase},
-        "phase-amp"  : {"params": phase, "existence": amp},
-        "amp-phase"  : {"params": amp,   "existence": phase},
+        "full-full" : {"params": full,   "existence": full},
+        "pass-full" : {"params": passes, "existence": full},
+        "full-pass" : {"params": full,   "existence": passes},
+        "ifg-full"  : {"params": ifg,    "existence": full},
+        "full-ifg"  : {"params": full,   "existence": ifg},
+        "pass-ifg"  : {"params": passes, "existence": ifg},
+        "ifg-pass"  : {"params": ifg,    "existence": passes},
     }
 
 
@@ -63,7 +63,7 @@ class DualEntryConfig:
 
     params_backbone    : str       = "resunet"
     existence_backbone : str       = "resunet"
-    params_input       : list[str] = field(default_factory=lambda: ["pass", "ifg", "dem"])
+    params_input       : list[str] = field(default_factory=lambda: ["pass", "ifg"])
     existence_input    : list[str] = field(default_factory=lambda: ["ifg"])
 
     paths         : TrainingPathsConfig  = field(default_factory=TrainingPathsConfig)

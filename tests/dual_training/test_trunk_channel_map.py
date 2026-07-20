@@ -15,7 +15,7 @@ def test_full_stack_four_tracks_maps_trailing_ifg_block():
 def test_all_groups_select_the_whole_stack():
     input_config = InputConfig.full_stack()
 
-    assert TrunkChannelMap.resolve(input_config, in_channels=9, groups=("pass", "ifg", "dem")) == tuple(range(9))
+    assert TrunkChannelMap.resolve(input_config, in_channels=9, groups=("pass", "ifg")) == tuple(range(9))
 
 
 def test_pass_group_selects_amplitudes_only():
@@ -30,12 +30,19 @@ def test_primary_and_ifgs_only_maps_after_primary():
     assert TrunkChannelMap.resolve(input_config, in_channels=5, groups=("ifg",)) == (1, 2, 3, 4)
 
 
-def test_dem_channel_stays_outside_the_ifg_block():
+def test_dem_bearing_stack_never_reaches_a_trunk():
     input_config         = InputConfig.full_stack()
     input_config.use_dem = True
 
-    assert TrunkChannelMap.resolve(input_config, in_channels=10, groups=("ifg",))  == (5, 6, 7, 8)
-    assert TrunkChannelMap.resolve(input_config, in_channels=10, groups=("dem",))  == (9,)
+    assert TrunkChannelMap.resolve(input_config, in_channels=10, groups=("ifg",))        == (5, 6, 7, 8)
+    assert TrunkChannelMap.resolve(input_config, in_channels=10, groups=("pass", "ifg")) == tuple(range(9))
+
+
+def test_dem_group_rejected():
+    input_config = InputConfig.full_stack()
+
+    with pytest.raises(ValueError, match="Unknown input groups"):
+        TrunkChannelMap.resolve(input_config, in_channels=9, groups=("dem",))
 
 
 def test_multi_channel_ifg_representation_expands_the_block():
