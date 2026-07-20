@@ -40,6 +40,7 @@ class ProfileAeTrainerConfig(SharedSubConfigInheritance):
 @dataclass
 class ProfileAeEntryConfig:
     run_name    : str | None = None
+    resume      : bool       = True
     gpu         : int        = 0
     seed        : int        = 0
     seeds       : list[int]  = field(default_factory=standard_seeds)

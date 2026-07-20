@@ -1115,6 +1115,7 @@
       "summary": "Top-level entry config launching one backbone training run or fanning out a multi-trial GPU sweep",
       "fields": {
         "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion), rerunning inference only if it is missing; an unfinished run directory is deleted and restarted from scratch. Lets interrupted trials sweeps and seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "backbone_name": "Backbone architecture key looked up in the model registry (unet, resunet, swin_unet, transunet, unetr, and others), default resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Primary GPU device index on which a single run executes",
@@ -1430,6 +1431,7 @@
       "summary": "Top-level entry point launching a single or multi-seed image-autoencoder training run",
       "fields": {
         "run_name": "optional human-readable label for the run directory; None auto-generates a name",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion); an unfinished run directory is deleted and restarted from scratch. Lets interrupted seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "gpu": "CUDA device index used for a single training run",
         "seed": "random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
@@ -1496,6 +1498,7 @@
       "summary": "Top-level entry point wiring one JEPA backbone-training run, its coupled autoencoders, and optional inference",
       "fields": {
         "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion), rerunning inference only if it is missing; an unfinished run directory is deleted and restarted from scratch. Lets interrupted trials sweeps and seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "backbone_name": "Registry key of the backbone architecture that predicts Gaussian parameters or profile embeddings from the input SAR patch, default resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Single GPU device index on which the run executes",
@@ -1557,6 +1560,7 @@
       "summary": "Top-level entry point launching one or more profile-autoencoder training runs",
       "fields": {
         "run_name": "Optional human-readable label for the run directory; None auto-generates a name",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion); an unfinished run directory is deleted and restarted from scratch. Lets interrupted seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "gpu": "GPU device index the run is launched on, passed through as the script's --gpu argument to pin CUDA_VISIBLE_DEVICES",
         "seed": "Random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
@@ -2225,6 +2229,7 @@
       "summary": "Top-level entry config launching one dual-input ResUNet training run through the shared backbone dataset, curriculum, and trainer machinery",
       "fields": {
         "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion), rerunning inference only if it is missing; an unfinished run directory is deleted and restarted from scratch. Lets interrupted trials sweeps and seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "model_name": "Dual-family model key looked up in the dual registry, default dual_resunet",
         "gpu": "Primary GPU device index on which a single run executes",
         "seed": "Base random seed for a single training run, controlling weight init, shuffling, and augmentation",

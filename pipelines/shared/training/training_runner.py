@@ -6,6 +6,7 @@ import torch
 
 from pipelines.shared.config.run_metadata         import TrainingRunMetadata
 from pipelines.shared.training.pretrain_preflight import PretrainPreflight
+from pipelines.shared.training.unit_resume        import UnitResume
 from tools.training.pretraining          import PretrainContext, TrainStepMemoryProbe, TrainerFeed
 
 
@@ -13,6 +14,11 @@ class SingleTrainRunner:
     def __init__(self, config) -> None:
         self.config        = config
         self.run_directory = None
+        self.unit_resume   = None
+
+    def _build_unit_resume(self) -> UnitResume:
+        self.unit_resume = UnitResume(self.run_directory, enabled=self.config.resume, trainer_resume=self.config.training.resume)
+        return self.unit_resume
 
     @property
     def label(self) -> str:
@@ -76,8 +82,15 @@ class EntryConfigTrainRunner(SingleTrainRunner):
 
         return self.pipeline_class(self.config).build_pretrain_trainer(work_dir, logger)
 
+    def _skipped_result(self):
+        return None
+
     def run(self):
         self._resolve_run_directory()
+
+        if self._build_unit_resume().skip_training():
+            return self._skipped_result()
+
         self._pretrain_preflight()
 
         return self.pipeline_class(self.config).run()

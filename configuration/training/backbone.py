@@ -222,6 +222,7 @@ class BackboneTrainerConfig:
 @dataclass
 class BackboneEntryConfig:
     run_name        : str | None = None
+    resume          : bool       = True
     backbone_name   : str        = "resunet"
     backbone_head   : str        = "set_pred"
     gpu             : int        = 0

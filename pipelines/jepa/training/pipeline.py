@@ -309,10 +309,13 @@ class SingleTrainRunner(EntryConfigTrainRunner):
         components       = InferenceComponentsResolver.for_run(Path(run_directory))
         InferencePipeline(inference_config, components=components).run()
 
+    def _skipped_result(self):
+        return None, self.run_directory
+
     def run(self):
         results, run_directory = super().run()
 
-        if self.config.infer_after:
+        if self.config.infer_after and not self.unit_resume.skip_inference():
             self._run_inference(run_directory)
 
         return results

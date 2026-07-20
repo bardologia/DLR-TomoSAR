@@ -17,7 +17,7 @@ def _pretrain(**overrides):
 
 
 def _training():
-    return SimpleNamespace(batch_size=1, num_workers=0, prefetch_factor=2)
+    return SimpleNamespace(batch_size=1, num_workers=0, prefetch_factor=2, resume=False)
 
 
 class _FakeOrchestrator:
@@ -95,7 +95,7 @@ def test_disabled_preflight_creates_nothing(tmp_path, monkeypatch):
 def test_runner_resolves_run_directory_before_the_preflight(tmp_path, monkeypatch):
     monkeypatch.setattr(runner_module, "PretrainPreflight", _FakePreflight)
 
-    config = SimpleNamespace(logdir=str(tmp_path), run_name=None, pretrain=_pretrain(find_batch_size=True), training=_training())
+    config = SimpleNamespace(logdir=str(tmp_path), run_name=None, resume=True, pretrain=_pretrain(find_batch_size=True), training=_training())
     runner = _Runner(config)
 
     result, resolved_name = runner.run()
@@ -110,7 +110,7 @@ def test_runner_resolves_run_directory_before_the_preflight(tmp_path, monkeypatc
 def test_runner_keeps_an_explicit_run_name(tmp_path, monkeypatch):
     monkeypatch.setattr(runner_module, "PretrainPreflight", _FakePreflight)
 
-    config = SimpleNamespace(logdir=str(tmp_path), run_name="my_run", pretrain=_pretrain(), training=_training())
+    config = SimpleNamespace(logdir=str(tmp_path), run_name="my_run", resume=True, pretrain=_pretrain(), training=_training())
 
     result, resolved_name = _Runner(config).run()
 

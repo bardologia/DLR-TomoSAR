@@ -349,6 +349,7 @@ class LaunchLayout:
 
     TRAIN_ESSENTIALS = [
         "run_name",
+        "resume",
         {"path": "gpu", "widget": GPU_ONE},
         "logdir",
         {"path": "paths.dataset_path", "widget": PICK_DATASET},
@@ -534,6 +535,7 @@ class LaunchLayout:
         "train_image_autoencoder": {
             "essentials": [
                 "run_name",
+                "resume",
                 {"path": "gpu", "widget": GPU_ONE},
                 "logdir",
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},

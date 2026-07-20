@@ -99,13 +99,16 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
     def run(self):
         self._resolve_run_directory()
-        self._pretrain_preflight()
 
-        pipeline = self._pipeline(self.config.logdir)
-        results  = pipeline.run(probe_config=self._probe_config(), resolved_entry_config=self.config)
+        if self._build_unit_resume().skip_training():
+            results = None
+        else:
+            self._pretrain_preflight()
+            pipeline = self._pipeline(self.config.logdir)
+            results  = pipeline.run(probe_config=self._probe_config(), resolved_entry_config=self.config)
 
-        if self.config.infer_after:
-            self._run_inference(pipeline.run_metadata.run_directory)
+        if self.config.infer_after and not self.unit_resume.skip_inference():
+            self._run_inference(self.run_directory)
 
         return results
 
@@ -216,6 +219,7 @@ class TrainScheduler:
             "GPUs"          : self.config.gpus,
             "GPU pool file" : str(self.stage.pool_file),
             "Infer after"   : self.config.infer_after,
+            "Resume"        : self.config.resume,
             "CLI overrides" : self.forward_overrides or "—",
             "Log dir"       : str(self.log_dir),
         }, title="Configuration")

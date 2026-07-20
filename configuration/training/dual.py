@@ -53,6 +53,7 @@ class DualInputTrialsConfig:
 @dataclass
 class DualEntryConfig:
     run_name        : str | None = None
+    resume          : bool       = True
     model_name      : str        = "dual_resunet"
     gpu             : int        = 0
     seed            : int        = 0

@@ -95,6 +95,7 @@ class JepaDefaults:
 @dataclass
 class JepaEntryConfig:
     run_name        : str | None = None
+    resume          : bool       = True
     backbone_name   : str        = "resunet"
     backbone_head   : str        = "conv"
     gpu             : int        = 0
