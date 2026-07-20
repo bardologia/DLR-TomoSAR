@@ -175,6 +175,7 @@ def test_run_passing_writes_report_and_cleans_work_directory(tmp_path):
     check.work_directory.mkdir(parents=True)
     (check.work_directory / "best_model.pt").write_bytes(b"x")
     (check.work_directory / "last.pt").write_bytes(b"x")
+    (check.work_directory / "complete.json").write_text("{}")
 
     verdict = check.run(trainer, _TensorDataset(n=6))
 

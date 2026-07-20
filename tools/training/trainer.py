@@ -17,6 +17,7 @@ from tools.training.stopping         import EarlyStopping
 from tools.training.gradients        import GradientClipper
 from tools.training.checkpoint       import Checkpoint, TrainerState, WeightEma
 from tools.training.vram_reservation import VramReservation
+from tools.runtime.completion        import CompletionMarker
 
 
 class BaseTrainer:
@@ -336,6 +337,7 @@ class BaseTrainer:
         self.logger.section(self.section_title)
         self._log_train_banner(train_loader, val_loader, test_loader)
 
+        CompletionMarker.clear(self.run_dir)
         self._clear_cuda_cache()
 
         if self.resource_monitor is not None:
@@ -344,6 +346,7 @@ class BaseTrainer:
             loader_generator = getattr(train_loader, "generator", None)
             start_epoch      = self._maybe_resume(loader_generator)
             last_epoch       = max(start_epoch - 1, 0)
+            stop             = False
 
             self._before_training(train_loader)
             self.vram_reservation.fill()
@@ -408,6 +411,15 @@ class BaseTrainer:
                 self.checkpoint.restore_best(self.model, self.device)
 
             self.test_metrics = self._evaluate_test(test_loader, last_epoch)
+
+            CompletionMarker.stamp(self.run_dir, {
+                "stage"            : "training",
+                "epochs_completed" : last_epoch + 1,
+                "epochs_total"     : self.epochs,
+                "early_stopped"    : bool(stop),
+                "best_val_loss"    : float(self.checkpoint.best_val_loss),
+                "best_epoch"       : self.checkpoint.best_epoch + 1,
+            })
 
             return self.train_losses, self.val_losses, self.checkpoint.best_val_loss
         finally:

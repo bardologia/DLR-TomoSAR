@@ -18,6 +18,7 @@ from pipelines.backbone.inference.reduced     import ReducedTomogramSynthesizer
 from pipelines.backbone.inference.report      import Report, ReportPayloadBuilder
 from tools.monitoring.logger                  import Logger
 from tools.reporting.plotting                 import PlotBase
+from tools.runtime.completion                 import CompletionMarker
 
 
 @dataclass(frozen=True)
@@ -221,6 +222,7 @@ class InferencePipeline:
     def run(self) -> Path:
         cfg                    = self.config
         meta, logger, plotter  = self._setup(cfg)
+        CompletionMarker.clear(meta.output_dir)
         run    = self._load_run(cfg, logger)
         result = self._predict(cfg, meta, run, logger)
 
@@ -266,6 +268,11 @@ class InferencePipeline:
             figure_paths   = figure_paths,
             gif_paths      = gif_paths,
         )
+
+        CompletionMarker.stamp(meta.output_dir, {
+            "stage" : "inference",
+            "split" : run.split_name,
+        })
 
         logger.section("[Inference Pipeline Done]")
         logger.subsection(f"Report  : {report_path}")

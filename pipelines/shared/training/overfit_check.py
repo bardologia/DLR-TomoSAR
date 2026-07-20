@@ -10,6 +10,7 @@ from torch.utils.data import default_collate
 
 from configuration.training.general.runtime import IOConfig
 from tools.data.io                 import FileIO
+from tools.runtime.completion      import CompletionMarker
 from tools.runtime.reproducibility import RngSnapshot
 
 
@@ -133,7 +134,7 @@ class OverfitCheck:
         FileIO.save_json(report, self.report_path)
 
     def _cleanup(self) -> None:
-        for name in ("best_model.pt", "last.pt"):
+        for name in ("best_model.pt", "last.pt", CompletionMarker.FILENAME):
             (self.work_directory / name).unlink(missing_ok=True)
 
         if self.work_directory.is_dir() and not any(self.work_directory.iterdir()):

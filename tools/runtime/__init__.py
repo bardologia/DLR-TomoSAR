@@ -2,6 +2,7 @@ import importlib
 
 _EXPORTS = {
     "Detacher": "detacher",
+    "CompletionMarker": "completion",
     "ConfigCli": "config_cli",
     "CondaEnv": "conda_env",
     "CondaJobDispatcher": "conda_env",
@@ -11,6 +12,7 @@ _EXPORTS = {
 
 __all__ = [
     "Detacher",
+    "CompletionMarker",
     "ConfigCli",
     "CondaEnv",
     "CondaJobDispatcher",
