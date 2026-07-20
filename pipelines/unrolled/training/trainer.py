@@ -8,6 +8,7 @@ import torch
 from configuration.training           import SchedulerConfig, WarmupConfig
 from pipelines.unrolled.synthesis     import MeasurementSynthesiser
 from tools.data.io                    import FileIO
+from tools.runtime.completion         import CompletionMarker
 from tools.training                   import WeightEma
 from tools.training.scheduling        import Scheduler, Warmup
 from tools.training.vram_reservation  import VramReservation
@@ -140,6 +141,7 @@ class UnrolledTrainer:
         torch.save(self.model.state_dict(), self.checkpoint_dir / f"{name}.pt")
 
     def train(self, train_loader, val_loader, test_loader) -> dict:
+        CompletionMarker.clear(self.run_dir)
         self.vram_reservation.fill()
 
         epochs_without_improvement = 0
@@ -185,5 +187,12 @@ class UnrolledTrainer:
         self.logger.kv_table(self.test_metrics)
 
         FileIO.save_json({"history": history, "test": self.test_metrics, "best_val_loss": self.best_val_loss}, self.run_dir / "training_summary.json")
+
+        CompletionMarker.stamp(self.run_dir, {
+            "stage"            : "training",
+            "epochs_completed" : len(history),
+            "epochs_total"     : self.training.epochs,
+            "best_val_loss"    : float(self.best_val_loss),
+        })
 
         return {"history": history, "test": self.test_metrics}
