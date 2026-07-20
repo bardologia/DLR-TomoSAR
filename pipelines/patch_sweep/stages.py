@@ -43,16 +43,6 @@ class SweepTrainingStage(QueuedTrainingStage):
             log_path = self.stage_dir / item / self.worker_logname,
         )
 
-    def _has_checkpoint(self, item: str) -> bool:
-        if not self.config.resume:
-            return False
-
-        item_dir = self.stage_dir / item
-        if not item_dir.is_dir():
-            return False
-
-        return next(item_dir.rglob("best_model.pt"), None) is not None
-
 
 class SweepReportStage(ExperimentStage):
     def __init__(self, config: PatchSweepConfig, run_tag: str, planner: PatchSweepPlanner, logger: Logger) -> None:

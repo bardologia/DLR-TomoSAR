@@ -7,6 +7,7 @@ from types   import SimpleNamespace
 import pytest
 
 from tools.orchestration.stages import QueuedInferenceStage, QueuedTrainingStage
+from tools.runtime.completion   import CompletionMarker
 
 
 class NullLogger:
@@ -31,8 +32,13 @@ def _config(tmp_path: Path, resume: bool = False) -> SimpleNamespace:
         resume          = resume,
         paths           = SimpleNamespace(log_base_dir=str(tmp_path / "runs")),
         training        = SimpleNamespace(epochs=3, batch_size=8),
-        inference       = SimpleNamespace(split="val", checkpoint_name="best.pt"),
+        inference       = SimpleNamespace(split="val"),
     )
+
+
+def _mark_complete(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    CompletionMarker.stamp(directory, {"stage": "test"})
 
 
 def _ran_result(name: str, gpu: int = 0, status: str = "DONE", returncode: int = 0) -> dict:
@@ -91,14 +97,12 @@ def test_training_writes_results_json(tmp_path, logger):
     assert [r["name"] for r in saved] == items
 
 
-def test_training_skips_items_with_existing_checkpoint_on_resume(tmp_path, logger):
+def test_training_skips_completed_items_on_resume(tmp_path, logger):
     items  = ["done_model", "todo_model"]
     config = _config(tmp_path, resume=True)
     stage  = QueuedTrainingStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt_dir = stage.stage_dir / "done_model" / "ckpts"
-    ckpt_dir.mkdir(parents=True)
-    (ckpt_dir / "best.pt").write_text("x")
+    _mark_complete(stage.stage_dir / "done_model")
 
     recorder = []
     _patch_queue(stage, recorder)
@@ -114,20 +118,55 @@ def test_training_skips_items_with_existing_checkpoint_on_resume(tmp_path, logge
     assert [r["name"] for r in results] == items
 
 
-def test_training_no_resume_ignores_existing_checkpoint(tmp_path, logger):
+def test_training_checkpoint_without_marker_is_not_finished(tmp_path, logger):
     items  = ["m"]
-    config = _config(tmp_path, resume=False)
+    config = _config(tmp_path, resume=True)
     stage  = QueuedTrainingStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt_dir = stage.stage_dir / "m" / "ckpts"
-    ckpt_dir.mkdir(parents=True)
-    (ckpt_dir / "best.pt").write_text("x")
+    item_dir = stage.stage_dir / "m"
+    item_dir.mkdir(parents=True)
+    (item_dir / "best_model.pt").write_text("x")
 
     recorder = []
     _patch_queue(stage, recorder)
 
     stage.run()
     assert recorder == [["m"]]
+
+
+def test_training_purges_unfinished_run_dir_on_resume(tmp_path, logger):
+    items  = ["m"]
+    config = _config(tmp_path, resume=True)
+    stage  = QueuedTrainingStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
+
+    item_dir = stage.stage_dir / "m"
+    (item_dir / "tensorboard").mkdir(parents=True)
+    (item_dir / "best_model.pt").write_text("x")
+    (item_dir / "last.pt").write_text("x")
+
+    recorder = []
+    _patch_queue(stage, recorder)
+
+    stage.run()
+
+    assert recorder == [["m"]]
+    assert not item_dir.exists()
+
+
+def test_training_no_resume_ignores_completion_marker_and_keeps_dir(tmp_path, logger):
+    items  = ["m"]
+    config = _config(tmp_path, resume=False)
+    stage  = QueuedTrainingStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
+
+    _mark_complete(stage.stage_dir / "m")
+
+    recorder = []
+    _patch_queue(stage, recorder)
+
+    stage.run()
+
+    assert recorder == [["m"]]
+    assert (stage.stage_dir / "m").exists()
 
 
 def test_training_job_command_carries_run_metadata(tmp_path, logger):
@@ -143,24 +182,26 @@ def test_training_job_command_carries_run_metadata(tmp_path, logger):
     assert "rt"        in job.command
 
 
-def test_inference_skips_items_without_checkpoint(tmp_path, logger):
-    items = ["has_ckpt", "no_ckpt"]
+def test_inference_skips_items_without_completed_training(tmp_path, logger):
+    items = ["trained", "interrupted"]
     stage = QueuedInferenceStage(config=_config(tmp_path), entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt_dir = stage.stage_dir / "has_ckpt" / "ckpts"
-    ckpt_dir.mkdir(parents=True)
-    (ckpt_dir / "best.pt").write_text("x")
+    _mark_complete(stage.stage_dir / "trained")
+
+    interrupted_dir = stage.stage_dir / "interrupted"
+    interrupted_dir.mkdir(parents=True)
+    (interrupted_dir / "best_model.pt").write_text("x")
 
     recorder = []
     _patch_queue(stage, recorder)
 
     results = stage.run()
 
-    assert recorder == [["has_ckpt"]]
+    assert recorder == [["trained"]]
 
     by_name = {r["name"]: r for r in results}
-    assert by_name["has_ckpt"]["status"] == "DONE"
-    assert by_name["no_ckpt"]["status"]  == "SKIPPED"
+    assert by_name["trained"]["status"]     == "DONE"
+    assert by_name["interrupted"]["status"] == "SKIPPED"
     assert [r["name"] for r in results] == items
 
 
@@ -169,13 +210,8 @@ def test_inference_reuses_existing_inference_on_resume(tmp_path, logger):
     config = _config(tmp_path, resume=True)
     stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt_dir = stage.stage_dir / "model" / "ckpts"
-    ckpt_dir.mkdir(parents=True)
-    (ckpt_dir / "best.pt").write_text("x")
-
-    inf_dir = stage.stage_dir / "model" / "inference" / "run0"
-    inf_dir.mkdir(parents=True)
-    (inf_dir / "metrics.json").write_text("{}")
+    _mark_complete(stage.stage_dir / "model")
+    _mark_complete(stage.stage_dir / "model" / "inference" / "run0")
 
     recorder = []
     _patch_queue(stage, recorder)
@@ -187,14 +223,12 @@ def test_inference_reuses_existing_inference_on_resume(tmp_path, logger):
     assert results[0]["returncode"] == 0
 
 
-def test_inference_no_resume_reruns_despite_existing_inference(tmp_path, logger):
+def test_inference_unfinished_output_is_not_reused_and_gets_purged(tmp_path, logger):
     items  = ["model"]
-    config = _config(tmp_path, resume=False)
+    config = _config(tmp_path, resume=True)
     stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt_dir = stage.stage_dir / "model" / "ckpts"
-    ckpt_dir.mkdir(parents=True)
-    (ckpt_dir / "best.pt").write_text("x")
+    _mark_complete(stage.stage_dir / "model")
 
     inf_dir = stage.stage_dir / "model" / "inference" / "run0"
     inf_dir.mkdir(parents=True)
@@ -204,7 +238,25 @@ def test_inference_no_resume_reruns_despite_existing_inference(tmp_path, logger)
     _patch_queue(stage, recorder)
 
     stage.run()
+
     assert recorder == [["model"]]
+    assert not inf_dir.exists()
+
+
+def test_inference_no_resume_reruns_despite_existing_inference(tmp_path, logger):
+    items  = ["model"]
+    config = _config(tmp_path, resume=False)
+    stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
+
+    _mark_complete(stage.stage_dir / "model")
+    _mark_complete(stage.stage_dir / "model" / "inference" / "run0")
+
+    recorder = []
+    _patch_queue(stage, recorder)
+
+    stage.run()
+    assert recorder == [["model"]]
+    assert (stage.stage_dir / "model" / "inference" / "run0").exists()
 
 
 def test_inference_mixed_skip_cached_pending(tmp_path, logger):
@@ -213,13 +265,9 @@ def test_inference_mixed_skip_cached_pending(tmp_path, logger):
     stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
     for name in ("pending", "cached"):
-        ckpt = stage.stage_dir / name / "ckpts"
-        ckpt.mkdir(parents=True)
-        (ckpt / "best.pt").write_text("x")
+        _mark_complete(stage.stage_dir / name)
 
-    inf = stage.stage_dir / "cached" / "inference" / "r0"
-    inf.mkdir(parents=True)
-    (inf / "metrics.json").write_text("{}")
+    _mark_complete(stage.stage_dir / "cached" / "inference" / "r0")
 
     recorder = []
     _patch_queue(stage, recorder)
@@ -240,9 +288,7 @@ def test_no_pending_items_does_not_invoke_queue(tmp_path, logger):
     config = _config(tmp_path, resume=True)
     stage  = QueuedTrainingStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
-    ckpt = stage.stage_dir / "only" / "ckpts"
-    ckpt.mkdir(parents=True)
-    (ckpt / "best.pt").write_text("x")
+    _mark_complete(stage.stage_dir / "only")
 
     recorder = []
     _patch_queue(stage, recorder)

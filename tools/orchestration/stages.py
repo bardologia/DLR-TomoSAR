@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import shutil
 import sys
 from dataclasses import asdict
 from pathlib     import Path
 
-from tools.data.io           import FileIO
-from tools.monitoring.logger import Logger
+from tools.data.io            import FileIO
+from tools.monitoring.logger  import Logger
+from tools.runtime.completion import CompletionMarker
 
 from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuQueue
 
@@ -77,15 +79,19 @@ class QueuedTrainingStage(QueuedStage):
             "Stage dir"  : str(self.stage_dir),
         }
 
-    def _has_checkpoint(self, item: str) -> bool:
+    def _is_complete(self, item: str) -> bool:
         if not self.config.resume:
             return False
 
-        item_dir = self.stage_dir / item
-        if not item_dir.is_dir():
-            return False
+        return CompletionMarker.is_complete(self.stage_dir / item)
 
-        return next(item_dir.rglob(self.config.inference.checkpoint_name), None) is not None
+    def _purge_unfinished(self, item: str) -> None:
+        item_dir = self.stage_dir / item
+        if not self.config.resume or not item_dir.is_dir():
+            return
+
+        self.logger.warning(f"{item}: unfinished run detected, deleting and restarting")
+        shutil.rmtree(item_dir)
 
     def _cached_result(self, item: str) -> dict:
         return {
@@ -114,11 +120,14 @@ class QueuedTrainingStage(QueuedStage):
         self.logger.section("Training queue")
         self.logger.kv_table(self._config_kv(), title="Configuration")
 
-        cached  = [item for item in self.items if self._has_checkpoint(item)]
+        cached  = [item for item in self.items if self._is_complete(item)]
         pending = [item for item in self.items if item not in cached]
 
         for item in cached:
-            self.logger.info(f"{item}: existing checkpoint reused")
+            self.logger.info(f"{item}: completed run reused")
+
+        for item in pending:
+            self._purge_unfinished(item)
 
         ran = []
         if pending:
@@ -148,12 +157,8 @@ class QueuedInferenceStage(QueuedStage):
     def _include_item(self, item: str) -> bool:
         return True
 
-    def _has_checkpoint(self, item: str) -> bool:
-        item_dir = self.stage_dir / item
-        if not item_dir.is_dir():
-            return False
-
-        return next(item_dir.rglob(self.config.inference.checkpoint_name), None) is not None
+    def _training_complete(self, item: str) -> bool:
+        return CompletionMarker.is_complete(self.stage_dir / item)
 
     def _has_inference(self, item: str) -> bool:
         if not self.config.resume:
@@ -163,7 +168,17 @@ class QueuedInferenceStage(QueuedStage):
         if not inference_dir.is_dir():
             return False
 
-        return next(inference_dir.glob("*/metrics.json"), None) is not None
+        return any(CompletionMarker.is_complete(candidate) for candidate in inference_dir.iterdir() if candidate.is_dir())
+
+    def _purge_unfinished(self, item: str) -> None:
+        inference_dir = self.stage_dir / item / "inference"
+        if not self.config.resume or not inference_dir.is_dir():
+            return
+
+        for candidate in inference_dir.iterdir():
+            if candidate.is_dir() and not CompletionMarker.is_complete(candidate):
+                self.logger.warning(f"{item}: unfinished inference '{candidate.name}' deleted before rerun")
+                shutil.rmtree(candidate)
 
     def _static_result(self, item: str, status: str) -> dict:
         return {
@@ -194,15 +209,18 @@ class QueuedInferenceStage(QueuedStage):
         self.logger.kv_table(self._config_kv(), title="Configuration")
 
         eligible = [item for item in self.items if self._include_item(item)]
-        skipped  = [item for item in eligible if not self._has_checkpoint(item)]
+        skipped  = [item for item in eligible if not self._training_complete(item)]
         cached   = [item for item in eligible if item not in skipped and self._has_inference(item)]
         pending  = [item for item in eligible if item not in skipped and item not in cached]
 
         for item in skipped:
-            self.logger.warning(f"{item}: no checkpoint, inference skipped")
+            self.logger.warning(f"{item}: training incomplete, inference skipped")
 
         for item in cached:
             self.logger.info(f"{item}: existing inference reused")
+
+        for item in pending:
+            self._purge_unfinished(item)
 
         ran = []
         if pending:

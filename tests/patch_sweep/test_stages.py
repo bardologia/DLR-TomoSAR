@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import torch
-
 from configuration.patch_sweep import PatchSweepConfig
 from pipelines.patch_sweep.planner import PatchSweepPlanner
 from pipelines.patch_sweep.stages import SweepTrainingStage
 from tools.monitoring.logger import Logger
+from tools.runtime.completion import CompletionMarker
 
 
 def make_logger(tmp_path: Path) -> Logger:
@@ -51,25 +50,36 @@ def test_job_carries_the_unit_and_run_context(tmp_path):
     assert "--run-tag" in job.command and "rt" in job.command
 
 
-def test_resume_reuses_units_with_a_checkpoint(tmp_path):
+def mark_complete(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    CompletionMarker.stamp(directory, {"stage": "test"})
+
+
+def test_resume_reuses_completed_units(tmp_path):
     stage = make_stage(tmp_path, resume=True)
 
-    checkpoint_dir = stage.stage_dir / "w20_10-p016x008" / "checkpoints"
-    checkpoint_dir.mkdir(parents=True)
-    torch.save({}, checkpoint_dir / "best_model.pt")
+    mark_complete(stage.stage_dir / "w20_10-p016x008")
 
-    assert stage._has_checkpoint("w20_10-p016x008")
-    assert not stage._has_checkpoint("w20_10-p032x008")
+    assert stage._is_complete("w20_10-p016x008")
+    assert not stage._is_complete("w20_10-p032x008")
 
 
-def test_resume_off_ignores_existing_checkpoints(tmp_path):
+def test_resume_ignores_units_with_only_a_checkpoint(tmp_path):
+    stage = make_stage(tmp_path, resume=True)
+
+    unit_dir = stage.stage_dir / "w20_10-p016x008"
+    unit_dir.mkdir(parents=True)
+    (unit_dir / "best_model.pt").write_text("x")
+
+    assert not stage._is_complete("w20_10-p016x008")
+
+
+def test_resume_off_ignores_completion_markers(tmp_path):
     stage = make_stage(tmp_path, resume=False)
 
-    checkpoint_dir = stage.stage_dir / "w20_10-p016x008" / "checkpoints"
-    checkpoint_dir.mkdir(parents=True)
-    torch.save({}, checkpoint_dir / "best_model.pt")
+    mark_complete(stage.stage_dir / "w20_10-p016x008")
 
-    assert not stage._has_checkpoint("w20_10-p016x008")
+    assert not stage._is_complete("w20_10-p016x008")
 
 
 def test_stage_expands_units_by_seed(tmp_path):
@@ -88,12 +98,10 @@ def test_seeded_job_carries_the_unit_base_and_seed(tmp_path):
     assert "w20_10-p032x016/seed1" not in job.command
 
 
-def test_resume_sees_seed_run_checkpoints(tmp_path):
+def test_resume_sees_seed_run_completion(tmp_path):
     stage = make_stage(tmp_path, resume=True, seeds=[0, 1])
 
-    checkpoint_dir = stage.stage_dir / "w20_10-p016x008" / "seed1" / "checkpoints"
-    checkpoint_dir.mkdir(parents=True)
-    torch.save({}, checkpoint_dir / "best_model.pt")
+    mark_complete(stage.stage_dir / "w20_10-p016x008" / "seed1")
 
-    assert stage._has_checkpoint("w20_10-p016x008/seed1")
-    assert not stage._has_checkpoint("w20_10-p016x008/seed0")
+    assert stage._is_complete("w20_10-p016x008/seed1")
+    assert not stage._is_complete("w20_10-p016x008/seed0")

@@ -13,6 +13,7 @@ from pipelines.cross_validation.stages import (
 )
 import pipelines.cross_validation.stages as stages_module
 from tools.monitoring.logger import Logger
+from tools.runtime.completion import CompletionMarker
 
 
 def make_logger(tmp_path: Path) -> Logger:
@@ -31,6 +32,11 @@ def stage_config(tmp_path: Path, resume: bool = False) -> CrossValidationConfig:
 
 def make_planner(config: CrossValidationConfig) -> FoldPlanner:
     return FoldPlanner(config, range_start=500, range_end=1000)
+
+
+def mark_complete(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    CompletionMarker.stamp(directory, {"stage": "test"})
 
 
 def queue_result(name: str, status: str = "DONE") -> dict:
@@ -108,14 +114,13 @@ def test_training_stage_job_command_carries_fold_flag(tmp_path):
     assert command[command.index("--fold") + 1] == "3"
 
 
-def test_inference_stage_one_job_per_fold_split_with_checkpoint(tmp_path):
+def test_inference_stage_one_job_per_fold_split_with_completed_training(tmp_path):
     config  = stage_config(tmp_path)
     planner = make_planner(config)
     stage   = FoldInferenceStage(config=config, entry_script=Path("e.py"), run_tag="rt", planner=planner, logger=make_logger(tmp_path))
 
     for name in ("fold_0", "fold_1"):
-        (stage.stage_dir / name).mkdir(parents=True)
-        (stage.stage_dir / name / "best_model.pt").write_text("x")
+        mark_complete(stage.stage_dir / name)
 
     captured = install_fake_queue(stage)
     results  = stage.run()
@@ -127,10 +132,14 @@ def test_inference_stage_one_job_per_fold_split_with_checkpoint(tmp_path):
     assert statuses["fold_2:test"] == "SKIPPED"
 
 
-def test_inference_stage_skips_folds_without_checkpoint(tmp_path):
+def test_inference_stage_skips_folds_without_completed_training(tmp_path):
     config  = stage_config(tmp_path)
     planner = make_planner(config)
     stage   = FoldInferenceStage(config=config, entry_script=Path("e.py"), run_tag="rt", planner=planner, logger=make_logger(tmp_path))
+
+    interrupted_dir = stage.stage_dir / "fold_0"
+    interrupted_dir.mkdir(parents=True)
+    (interrupted_dir / "best_model.pt").write_text("x")
 
     captured = install_fake_queue(stage)
     results  = stage.run()
@@ -146,13 +155,10 @@ def test_inference_stage_reuses_existing_inference_on_resume(tmp_path):
     stage   = FoldInferenceStage(config=config, entry_script=Path("e.py"), run_tag="rt", planner=planner, logger=make_logger(tmp_path))
 
     fold_dir = stage.stage_dir / "fold_0"
-    (fold_dir).mkdir(parents=True)
-    (fold_dir / "best_model.pt").write_text("x")
+    mark_complete(fold_dir)
 
     for split in ("val", "test"):
-        metrics_dir = fold_dir / "inference" / split
-        metrics_dir.mkdir(parents=True)
-        (metrics_dir / "metrics.json").write_text("{}")
+        mark_complete(fold_dir / "inference" / split)
 
     captured = install_fake_queue(stage)
     results  = stage.run()
@@ -163,13 +169,31 @@ def test_inference_stage_reuses_existing_inference_on_resume(tmp_path):
     assert statuses["fold_0:test"] == "DONE"
 
 
+def test_inference_stage_purges_unfinished_split_on_resume(tmp_path):
+    config  = stage_config(tmp_path, resume=True)
+    planner = make_planner(config)
+    stage   = FoldInferenceStage(config=config, entry_script=Path("e.py"), run_tag="rt", planner=planner, logger=make_logger(tmp_path))
+
+    fold_dir = stage.stage_dir / "fold_0"
+    mark_complete(fold_dir)
+
+    unfinished = fold_dir / "inference" / "val"
+    unfinished.mkdir(parents=True)
+    (unfinished / "metrics.json").write_text("{}")
+
+    captured = install_fake_queue(stage)
+    stage.run()
+
+    assert "fold_0:val" in [job.name for job in captured["jobs"]]
+    assert not unfinished.exists()
+
+
 def test_inference_stage_job_command_carries_split(tmp_path):
     config  = stage_config(tmp_path)
     planner = make_planner(config)
     stage   = FoldInferenceStage(config=config, entry_script=Path("e.py"), run_tag="rt", planner=planner, logger=make_logger(tmp_path))
 
-    (stage.stage_dir / "fold_0").mkdir(parents=True)
-    (stage.stage_dir / "fold_0" / "best_model.pt").write_text("x")
+    mark_complete(stage.stage_dir / "fold_0")
 
     captured = install_fake_queue(stage)
     stage.run()

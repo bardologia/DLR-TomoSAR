@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from pipelines.cross_validation.workers                import FoldCollector
 from pipelines.shared.training.seed_sweep                       import SeedSet
 from tools                                             import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.monitoring.logger                           import Logger
+from tools.runtime.completion                          import CompletionMarker
 from tools.runtime.run_tag                             import RunTag
 
 
@@ -72,7 +74,15 @@ class FoldInferenceStage(QueuedInferenceStage):
         if not self.config.resume:
             return False
 
-        return (self.stage_dir / run_name / "inference" / split / "metrics.json").exists()
+        return CompletionMarker.is_complete(self.stage_dir / run_name / "inference" / split)
+
+    def _purge_unfinished_split(self, run_name: str, split: str) -> None:
+        split_dir = self.stage_dir / run_name / "inference" / split
+        if not self.config.resume or not split_dir.is_dir():
+            return
+
+        self.logger.warning(f"{run_name}:{split}: unfinished inference deleted before rerun")
+        shutil.rmtree(split_dir)
 
     def _split_job(self, fold_index: int, seed: int | None, run_name: str, split: str) -> GpuJob:
         return GpuJob(
@@ -98,8 +108,8 @@ class FoldInferenceStage(QueuedInferenceStage):
             fold_index, seed = self._unit[run_name]
             plan             = self.planner.plan(fold_index)
 
-            if not self._has_checkpoint(run_name):
-                self.logger.warning(f"{run_name}: no checkpoint, inference skipped")
+            if not self._training_complete(run_name):
+                self.logger.warning(f"{run_name}: training incomplete, inference skipped")
                 for split in self.splits:
                     results.append(self._split_result(run_name, split, "SKIPPED"))
                 continue
@@ -115,6 +125,7 @@ class FoldInferenceStage(QueuedInferenceStage):
                     results.append(self._split_result(run_name, split, "DONE"))
                     continue
 
+                self._purge_unfinished_split(run_name, split)
                 jobs.append(self._split_job(fold_index, seed, run_name, split))
 
         if jobs:

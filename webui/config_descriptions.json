@@ -1880,7 +1880,7 @@
         "heads": "Output heads crossed with every backbone in the sweep; each backbone x head pair runs as its own unit (default [conv])",
         "skip_models": "model names excluded from the training_type's registry before the sweep is expanded",
         "run_tag": "optional identifier tagging this benchmark's run directory and output artifacts; None auto-generates one",
-        "resume": "whether to skip stage units whose cached PASS result already exists under the run directory instead of rerunning them",
+        "resume": "Whether to reuse stage results that finished in a prior run of the same run_tag: max-batch units with a cached PASS result, and training/inference units whose directory holds a complete.json marker stamped only at successful completion; unfinished unit directories are deleted and restarted",
         "infer_after": "Whether to run the inference stage automatically after training; only applies when training_type is backbone or jepa, and off leaves the comparison report without inference galleries",
         "seed": "base random seed used for the max-batch probe and as the default per-unit seed when seeds is empty",
         "seeds": "List of seeds expanded across every (model, loss-component) pair, one run per seed nested as seed<N> inside each unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
@@ -1933,7 +1933,7 @@
         "gpus": "List of GPU device indices across which fold training/inference jobs are distributed and launched in parallel",
         "gpus_file": "Path of the live GPU pool control file for this queue; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it is in flight (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the run directory",
         "run_tag": "Optional label identifying this cross-validation run's output subdirectory; None auto-generates one",
-        "resume": "Whether to skip a fold's training job or inference split that already has a matching checkpoint or metrics.json from a prior run, letting an interrupted CV sweep continue without retraining finished folds (distinct from training.resume, which resumes a single run's own training mid-epoch)",
+        "resume": "Whether to skip a fold's training job or inference split whose directory holds a complete.json marker stamped only at successful completion, letting an interrupted CV sweep continue without retraining finished folds while unfinished ones are deleted and restarted (distinct from training.resume, which resumes a single run's own training mid-epoch)",
         "seed": "Base random seed used for a fold when no per-seed override is given, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one run per fold and seed nested as seed<N> inside each fold directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "poll_interval_s": "Seconds between successive polls of the fold job queue while waiting for GPUs or completed jobs"
@@ -2295,7 +2295,7 @@
         "gpus": "GPU ids the training queue fans units out across",
         "gpus_file": "Path of the live GPU pool control file for this queue; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it is in flight (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the run directory",
         "run_tag": "Name of the sweep run directory under paths.log_base_dir; empty generates a timestamp",
-        "resume": "When true, units whose run directory already holds a best_model.pt checkpoint are reused instead of retrained",
+        "resume": "When true, units whose run directory holds a complete.json marker stamped only at successful completion are reused instead of retrained; unfinished unit directories are deleted and restarted",
         "seed": "Fallback seed when seeds is empty, so the patch size and dataset remain the only varied factors",
         "seeds": "List of seeds swept per (dataset, patch size) unit, one training run per seed nested as seed<N> inside the unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field, and the report ranks on the seed-mean test loss",
         "poll_interval_s": "Seconds between GPU-queue polls while training runs are in flight"
