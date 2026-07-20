@@ -28,6 +28,7 @@ class LaunchLayout:
     NUM_FRACTION = {"kind": "number", "min": 0, "max": 1, "step": 0.01, "presets": [0.05, 0.1, 0.25, 0.5, 1.0]}
     NUM_PROB     = {"kind": "number", "min": 0, "max": 1, "step": 0.05, "presets": [0, 0.25, 0.5, 0.75, 1.0]}
     NUM_DPI      = {"kind": "number", "int": True, "min": 72, "max": 600, "presets": [110, 150, 300, 600]}
+    NUM_CELLS    = {"kind": "number", "int": True, "min": 10_000, "max": 100_000_000, "presets": [250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000]}
 
     CH_AE_MODE      = {"kind": "choice", "options": ["frozen", "finetune"]}
     CH_TRUNK        = {"kind": "choice", "options": ["resunet", "unet_skip", "unet"]}
@@ -312,7 +313,7 @@ class LaunchLayout:
         ],
         "unrolled_inference": [
             {"title": "Run", "fields": ["run_directory", "output_subdir", "device", "log_level", {"path": "seed", "widget": NUM_SEED}]},
-            {"title": "Execution", "fields": ["split", "checkpoint_name", "measurement_noise_std", "chunk_cells"]},
+            {"title": "Execution", "fields": ["split", "checkpoint_name", "measurement_noise_std", {"path": "chunk_cells", "widget": NUM_CELLS}]},
             {"title": "Report", "fields": ["save_plots", "n_example_profiles", "save_profile_cube"]},
             {"title": "Figures", "fields": [{"path": "fig_dpi", "widget": NUM_DPI}, {"path": "save_dpi", "widget": NUM_DPI}, {"path": "figure_style", "widget": CH_FIGSTYLE}]},
             {"title": "Output layout", "fields": ["paths.figures_subdir", "paths.logs_subdir", "paths.metrics_filename", "paths.report_filename"]},
