@@ -162,6 +162,13 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
     assert "CUDA_VISIBLE_DEVICES" not in os.environ
 
 
+@pytest.mark.parametrize("name", ("train_jepa", "train_profile_autoencoder", "train_image_autoencoder"))
+def test_seed_sweep_entries_hand_their_script_to_the_fanout(name, main_on_path, frozen_env):
+    source = _script_path(name).read_text()
+
+    assert "entry_script=pathlib.Path(__file__).resolve()" in source
+
+
 @pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder", "train_unrolled", "train_dual"))
 def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
     source = _script_path(name).read_text()

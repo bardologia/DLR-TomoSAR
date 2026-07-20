@@ -61,7 +61,7 @@ class ProcessManager:
     DETACHED_PID     = re.compile(r"detached .* as pid (\d+)")
     ORPHAN_MIN_AGE_S = 15.0
     ORPHAN_RESCAN_S  = 3.0
-    POOL_SCRIPTS     = ("train_backbone", "train_dual", "sweep_patches", "benchmark", "cross_validate", "tune", "infer_backbone", "infer_profile_autoencoder", "infer_image_autoencoder", "infer_unrolled", "infer_dual")
+    POOL_SCRIPTS     = ("train_backbone", "train_dual", "train_jepa", "train_image_autoencoder", "train_profile_autoencoder", "train_unrolled", "sweep_patches", "benchmark", "cross_validate", "tune", "infer_backbone", "infer_profile_autoencoder", "infer_image_autoencoder", "infer_unrolled", "infer_dual")
     POOL_FIELD       = "gpus_file"
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger, notifier: JobNotifier, describer: JobDescriber) -> None:
@@ -669,7 +669,7 @@ class ProcessManager:
 
         pool = Path(path)
         if not pool.is_file():
-            return {"ok": False, "error": "this job has no live GPU pool yet; only a running fan-out over trials can be resized"}
+            return {"ok": False, "error": "this job has no live GPU pool yet; the pool appears once a fan-out over trials or seeds starts dispatching"}
 
         try:
             requested = GpuPoolFile.validate({"gpus": gpus})

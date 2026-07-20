@@ -1,21 +1,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib     import Path
 
-from pipelines.shared.training.seed_sweep import SeedSweepRunner
+import pytest
+
+import pipelines.shared.training.seed_sweep as mod
+from pipelines.shared.training.seed_sweep import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 
 
 @dataclass
 class _Config:
-    run_name : str | None = None
-    seed     : int        = 0
-    seeds    : list[int]  = field(default_factory=list)
+    run_name        : str | None = None
+    seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=list)
+    logdir          : Path       = Path("/logs")
+    gpus            : list[int]  = field(default_factory=lambda: [0, 1])
+    gpus_file       : str        = ""
+    poll_interval_s : float      = 5.0
 
 
 def _factory(record):
     class _Runner:
         def __init__(self, config):
             self.config = config
+        def _resolve_run_name(self):
+            return f"label_{self.config.run_name}"
         def run(self):
             record.append((self.config.seed, self.config.run_name))
             return self.config.seed
@@ -47,35 +57,110 @@ def test_single_explicit_seed_runs_once_with_that_seed():
     assert record == [(5, "exp")]
 
 
-def test_explicit_seeds_run_in_listed_order():
-    record = []
-
-    SeedSweepRunner(_Config(run_name="exp", seeds=[3, 0, 17]), _factory(record)).run()
-
-    assert [seed for seed, _ in record] == [3, 0, 17]
+def test_multi_seed_config_is_rejected_loudly():
+    with pytest.raises(ValueError, match="exactly one seed"):
+        SeedSweepRunner(_Config(seeds=[0, 1, 2]), _factory([])).run()
 
 
-def test_explicit_seeds_nest_run_name_per_seed():
-    record = []
-
-    SeedSweepRunner(_Config(run_name="exp", seeds=[3, 0, 17]), _factory(record)).run()
-
-    assert [name for _, name in record] == ["exp/seed3", "exp/seed0", "exp/seed17"]
+def test_base_run_name_prefers_the_explicit_run_name():
+    assert SeedSweepRunner.base_run_name(_Config(run_name="exp"), base_label="model") == "exp"
 
 
-def test_explicit_seeds_return_results_keyed_by_seed():
-    record = []
+def test_base_run_name_stamps_a_label_prefix(monkeypatch):
+    monkeypatch.setattr(mod.RunTag, "now", staticmethod(lambda: "STAMP"))
 
-    result = SeedSweepRunner(_Config(seeds=[4, 5]), _factory(record)).run()
+    assert SeedSweepRunner.base_run_name(_Config(), base_label="model") == "model_STAMP"
+    assert SeedSweepRunner.base_run_name(_Config())                     == "STAMP"
 
-    assert result == {4: 4, 5: 5}
+
+def _scheduler(tmp_path, config=None, overrides=None):
+    config = config or _Config(run_name="exp", seeds=[3, 0, 17], logdir=tmp_path)
+    return SeedFanoutScheduler.for_runner(config, overrides or {}, Path("/entry/train.py"), _factory([]))
 
 
-def test_explicit_seeds_without_run_name_group_under_shared_base():
-    record = []
+def test_for_runner_resolves_the_run_dir_through_the_runner(tmp_path):
+    scheduler = _scheduler(tmp_path)
 
-    SeedSweepRunner(_Config(seeds=[0, 1]), _factory(record)).run()
+    assert scheduler.base_name == "exp"
+    assert scheduler.run_dir   == tmp_path / "label_exp"
+    assert scheduler.log_dir   == tmp_path / "label_exp" / "batch_train_logs"
 
-    bases = {name.rsplit("/seed", 1)[0] for _, name in record}
-    assert len(bases) == 1
-    assert sorted(name.rsplit("/seed", 1)[1] for _, name in record) == ["0", "1"]
+
+def test_for_runner_stamps_a_shared_base_when_run_name_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod.RunTag, "now", staticmethod(lambda: "STAMP"))
+
+    config    = _Config(seeds=[0, 1], logdir=tmp_path)
+    scheduler = SeedFanoutScheduler.for_runner(config, {}, Path("/entry/train.py"), _factory([]), base_label="model")
+
+    assert scheduler.base_name == "model_STAMP"
+    assert scheduler.run_dir   == tmp_path / "label_model_STAMP"
+
+
+def test_jobs_pin_each_seed_and_nest_run_names(tmp_path):
+    scheduler = _scheduler(tmp_path)
+    job       = scheduler._job(SeedSet.run_name("exp", 17), 17)
+
+    assert job.name     == "exp/seed17"
+    assert job.log_path == scheduler.log_dir / "seed17.log"
+
+    argv = job.command
+    assert argv[1] == "/entry/train.py"
+    assert argv[argv.index("--run_name") + 1] == "exp/seed17"
+    assert argv[argv.index("--seed") + 1]     == "17"
+    assert argv[argv.index("--seeds") + 1]    == "[17]"
+    assert argv[argv.index("--logdir") + 1]   == str(tmp_path)
+
+
+def test_jobs_forward_overrides_but_hold_back_scheduler_fields(tmp_path):
+    overrides = {
+        "training.epochs" : "3",
+        "gpus"            : "[0, 1]",
+        "gpus_file"       : "/pool.json",
+        "poll_interval_s" : "1.0",
+        "gpu"             : "2",
+        "seed"            : "9",
+        "seeds"           : "[9, 10]",
+        "run_name"        : "cli-name",
+    }
+
+    scheduler = _scheduler(tmp_path, overrides=overrides)
+
+    assert scheduler.forward_overrides == {"training.epochs": "3"}
+
+    argv = scheduler._job("exp/seed0", 0).command
+    assert "--gpus" not in argv
+    assert "--gpus_file" not in argv
+    assert "--poll_interval_s" not in argv
+    assert "--gpu" not in argv
+    assert argv[argv.index("--training.epochs") + 1] == "3"
+
+
+def test_run_fans_out_one_job_per_seed_and_writes_ordered_results(tmp_path):
+    scheduler = _scheduler(tmp_path)
+    captured  = {}
+
+    def fake_queue(jobs):
+        captured["names"] = [job.name for job in jobs]
+        return list(reversed([{"name": job.name, "gpu": 0, "status": "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]))
+
+    scheduler.stage._run_queue = fake_queue
+    scheduler.run()
+
+    assert captured["names"] == ["exp/seed3", "exp/seed0", "exp/seed17"]
+    assert scheduler.results_path.is_file()
+
+    import json
+    results = json.loads(scheduler.results_path.read_text())
+    assert [r["name"] for r in results] == ["exp/seed3", "exp/seed0", "exp/seed17"]
+
+
+def test_run_raises_when_a_seed_fails(tmp_path):
+    scheduler = _scheduler(tmp_path)
+
+    def fake_queue(jobs):
+        return [{"name": job.name, "gpu": 0, "status": "FAILED", "returncode": 1, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    scheduler.stage._run_queue = fake_queue
+
+    with pytest.raises(SystemExit, match="3 of 3 seed runs failed"):
+        scheduler.run()

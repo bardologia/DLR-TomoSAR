@@ -19,7 +19,7 @@ def main() -> None:
     from pipelines.profile_autoencoder.training.pipeline import SingleTrainRunner
     from pipelines.shared.training.training_launcher              import SeedSweepLauncher
 
-    SeedSweepLauncher(ProfileAeEntryConfig(), SingleTrainRunner, "Profile autoencoder training", base_attr="ae_model_name").run()
+    SeedSweepLauncher(ProfileAeEntryConfig(), SingleTrainRunner, "Profile autoencoder training", entry_script=pathlib.Path(__file__).resolve(), base_attr="ae_model_name").run()
 
 
 if __name__ == "__main__":

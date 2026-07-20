@@ -49,7 +49,7 @@ def manager(tmp_path):
     scripts = tmp_path / "main" / "analysis"
     scripts.mkdir(parents=True)
     (scripts / "train_backbone.py").write_text(SLEEP_LONG)
-    (scripts / "train_jepa.py").write_text(SLEEP_LONG)
+    (scripts / "tune_dataloader.py").write_text(SLEEP_LONG)
 
     paths  = StubPaths(tmp_path)
     logger = WebLogger()
@@ -101,7 +101,7 @@ def _snapshot(done: int = 12, failed: int = 1, total: int = 30) -> dict:
 
 
 def test_progress_reports_unsupported_for_non_pool_scripts(manager):
-    result = manager.launch("train_jepa", sys.executable)
+    result = manager.launch("tune_dataloader", sys.executable)
 
     assert manager.progress(result["job_id"]) == {"ok": True, "supported": False, "live": False}
 
@@ -162,7 +162,7 @@ def test_list_jobs_embeds_the_progress_of_running_fan_outs(manager):
 
 
 def test_list_jobs_leaves_other_jobs_without_progress(manager):
-    result = manager.launch("train_jepa", sys.executable)
+    result = manager.launch("tune_dataloader", sys.executable)
     job_id = result["job_id"]
 
     assert _wait_running(manager, job_id)

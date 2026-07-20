@@ -76,6 +76,7 @@ def manager(tmp_path):
     (scripts / "train_dual.py").write_text(SLEEP_LONG)
     (scripts / "sweep_patches.py").write_text(SLEEP_LONG)
     (scripts / "train_jepa.py").write_text(SLEEP_LONG)
+    (scripts / "tune_dataloader.py").write_text(SLEEP_LONG)
 
     paths  = StubPaths(tmp_path)
     logger = WebLogger()
@@ -117,7 +118,7 @@ def test_launch_injects_a_per_job_pool_file_for_fan_out_scripts(manager):
 
 
 def test_launch_leaves_other_scripts_without_a_pool_file(manager):
-    result = manager.launch("train_jepa", sys.executable)
+    result = manager.launch("tune_dataloader", sys.executable)
 
     with manager.lock:
         record = dict(manager.jobs[result["job_id"]])

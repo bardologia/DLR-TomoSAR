@@ -11,7 +11,7 @@ from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS
 from pipelines.dual.training.experiments  import DualInputTrialPlanner
 from pipelines.dual.training.pipeline     import DualTrainingPipeline, TrunkChannelMap
 from pipelines.shared.model.model_builder import ModelBuilder
-from pipelines.shared.training.seed_sweep import SeedSweepRunner
+from pipelines.shared.training.seed_sweep import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from tools.runtime.config_cli             import ConfigCli
 
 
@@ -81,7 +81,12 @@ class DualTrainingLauncher:
         trial, _ = trial_parser.parse_known_args(argv)
 
         if trial.trial or not config.trials_enabled:
-            SeedSweepRunner(config, DualSingleTrainRunner).run()
+            seeds = SeedSet.resolve(config.seeds, config.seed)
+
+            if trial.trial or len(seeds) == 1:
+                SeedSweepRunner(config, DualSingleTrainRunner).run()
+            else:
+                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, DualSingleTrainRunner).run()
             return
 
         DualTrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script).run()

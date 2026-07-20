@@ -16,7 +16,7 @@ from pipelines.shared.config.config_factory       import ConfigFactory
 from pipelines.shared.config.config_persistence   import UnrolledModelConfigIO
 from pipelines.shared.training.overfit_check      import OverfitCheck
 from pipelines.shared.training.pretrain_preflight import PretrainPreflight
-from pipelines.shared.training.seed_sweep         import SeedSweepRunner
+from pipelines.shared.training.seed_sweep         import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from pipelines.unrolled.training.trainer        import UnrolledTrainer
 from tools.data.gaussians          import GaussianAxis
 from tools.monitoring.logger       import Logger
@@ -83,11 +83,12 @@ class UnrolledTrainingPipeline:
 
         Reproducibility.seed_everything(config.seed)
 
-    def _run_directory(self) -> Path:
+    def _resolve_run_name(self) -> str:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name  = self.config.run_name if self.config.run_name else f"{self.config.model_name}_{stamp}"
+        return self.config.run_name if self.config.run_name else f"{self.config.model_name}_{stamp}"
 
-        run_directory = Path(self.config.logdir) / name
+    def _run_directory(self) -> Path:
+        run_directory = Path(self.config.logdir) / self._resolve_run_name()
         run_directory.mkdir(parents=True, exist_ok=True)
 
         return run_directory
@@ -207,4 +208,9 @@ class UnrolledTrainingLauncher:
         cli    = ConfigCli(UnrolledEntryConfig(), description="Train the unrolled physics network on synthesised per-pixel coherence measurements")
         config = cli.apply(argv)
 
-        SeedSweepRunner(config, UnrolledTrainingPipeline, base_label=config.model_name).run()
+        seeds = SeedSet.resolve(config.seeds, config.seed)
+        if len(seeds) == 1:
+            SeedSweepRunner(config, UnrolledTrainingPipeline).run()
+            return
+
+        SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, UnrolledTrainingPipeline, base_label=config.model_name).run()

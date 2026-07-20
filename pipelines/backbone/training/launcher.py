@@ -18,7 +18,7 @@ from pipelines.backbone.training.pipeline    import TrainingPipeline
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.model.model_builder    import ModelBuilder
 from pipelines.shared.training.run_naming      import RunNaming
-from pipelines.shared.training.seed_sweep      import SeedSet, SeedSweepRunner
+from pipelines.shared.training.seed_sweep      import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
 from tools.orchestration      import ExperimentStage, GpuJob
 from tools.monitoring.logger  import Logger
@@ -261,7 +261,12 @@ class BackboneTrainingLauncher:
         trial, _ = trial_parser.parse_known_args(argv)
 
         if trial.trial or not config.trials_enabled:
-            SeedSweepRunner(config, SingleTrainRunner).run()
+            seeds = SeedSet.resolve(config.seeds, config.seed)
+
+            if trial.trial or len(seeds) == 1:
+                SeedSweepRunner(config, SingleTrainRunner).run()
+            else:
+                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, SingleTrainRunner).run()
             return
 
         TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script).run()

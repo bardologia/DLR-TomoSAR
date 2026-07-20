@@ -9,17 +9,23 @@ from pipelines.shared.training import training_launcher as mod
 
 def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
     captured = {}
-    resolved = object()
+
+    class Resolved:
+        seed  = 4
+        seeds = [4]
+
+    resolved = Resolved()
 
     class FakeCli:
         def __init__(self, config, description):
             captured["description"] = description
+            self.overrides          = {}
         def apply(self, argv):
             captured["argv"] = argv
             return resolved
 
     class FakeSweep:
-        def __init__(self, config, runner_class, base_label=None):
+        def __init__(self, config, runner_class):
             captured["sweep"] = (config, runner_class)
         def run(self):
             captured["ran"] = True
@@ -29,11 +35,46 @@ def test_seed_sweep_launcher_runs_runner_over_resolved_config(monkeypatch):
     monkeypatch.setattr(mod, "ConfigCli", FakeCli)
     monkeypatch.setattr(mod, "SeedSweepRunner", FakeSweep)
 
-    mod.SeedSweepLauncher(object(), runner, "desc").run([])
+    mod.SeedSweepLauncher(object(), runner, "desc", entry_script=Path("/entry/train.py")).run([])
 
     assert captured["description"] == "desc"
     assert captured["sweep"]       == (resolved, runner)
     assert captured["ran"]         is True
+
+
+def test_seed_sweep_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
+    captured = {}
+
+    class Resolved:
+        seed       = 0
+        seeds      = [0, 1, 2]
+        base_field = "conv2d_ae"
+
+    resolved = Resolved()
+
+    class FakeCli:
+        def __init__(self, config, description):
+            self.overrides = {"training.epochs": "3"}
+        def apply(self, argv):
+            return resolved
+
+    class FakeScheduler:
+        @classmethod
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+            captured["for_runner"] = (config, cli_overrides, entry_script, runner_factory, base_label)
+            return cls()
+        def run(self):
+            captured["ran"] = True
+
+    runner = object()
+
+    monkeypatch.setattr(mod, "ConfigCli", FakeCli)
+    monkeypatch.setattr(mod, "SeedFanoutScheduler", FakeScheduler)
+
+    mod.SeedSweepLauncher(object(), runner, "desc", entry_script=Path("/entry/train.py"), base_attr="base_field").run([])
+
+    assert captured["for_runner"] == (resolved, {"training.epochs": "3"}, Path("/entry/train.py"), runner, "conv2d_ae")
+    assert captured["ran"]        is True
 
 
 def test_backbone_launcher_trial_runs_single_runner(monkeypatch):
@@ -55,7 +96,9 @@ def test_backbone_launcher_trial_runs_single_runner(monkeypatch):
         def __init__(self, config, description):
             self.overrides = {}
         def apply(self, argv):
-            return BackboneEntryConfig()
+            config       = BackboneEntryConfig()
+            config.seeds = [0]
+            return config
 
     monkeypatch.setattr(backbone_pipeline, "SingleTrainRunner", FakeSingleRunner)
     monkeypatch.setattr(backbone_pipeline, "TrainScheduler", FakeScheduler)
@@ -65,6 +108,41 @@ def test_backbone_launcher_trial_runs_single_runner(monkeypatch):
 
     assert ran.get("ran") is True
     assert "scheduler" not in ran
+
+
+def test_backbone_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
+    ran = {}
+
+    class FakeSingleRunner:
+        def __init__(self, cfg):
+            ran["single"] = True
+        def run(self):
+            ran["single_ran"] = True
+
+    class FakeFanout:
+        @classmethod
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+            ran["for_runner"] = (entry_script, runner_factory)
+            return cls()
+        def run(self):
+            ran["fanout_ran"] = True
+
+    class FakeCli:
+        def __init__(self, config, description):
+            self.overrides = {}
+        def apply(self, argv):
+            return BackboneEntryConfig()
+
+    monkeypatch.setattr(backbone_pipeline, "SingleTrainRunner", FakeSingleRunner)
+    monkeypatch.setattr(backbone_pipeline, "SeedFanoutScheduler", FakeFanout)
+    monkeypatch.setattr(backbone_pipeline, "ConfigCli", FakeCli)
+
+    entry = Path("/entry/train_backbone.py")
+    backbone_pipeline.BackboneTrainingLauncher(entry_script=entry).run([])
+
+    assert ran.get("fanout_ran") is True
+    assert ran["for_runner"]     == (entry, FakeSingleRunner)
+    assert "single_ran" not in ran
 
 
 def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):

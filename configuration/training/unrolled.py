@@ -48,6 +48,9 @@ class UnrolledEntryConfig:
     run_name        : str | None = None
     model_name      : str        = "gamma_net"
     gpu             : int        = 0
+    gpus            : list[int]  = field(default_factory=lambda: [0, 1, 3])
+    gpus_file       : str        = ""
+    poll_interval_s : float      = 5.0
     seed            : int        = 0
     seeds           : list[int]  = field(default_factory=standard_seeds)
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/unrolled")

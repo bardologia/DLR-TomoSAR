@@ -205,7 +205,9 @@ def test_dual_launcher_trial_flag_runs_single_runner(monkeypatch):
         def __init__(self, config, description):
             self.overrides = {}
         def apply(self, argv):
-            return DualEntryConfig()
+            config       = DualEntryConfig()
+            config.seeds = [0]
+            return config
 
     monkeypatch.setattr(dual_launcher, "DualSingleTrainRunner", FakeSingleRunner)
     monkeypatch.setattr(dual_launcher, "DualTrainScheduler", FakeScheduler)
@@ -215,6 +217,41 @@ def test_dual_launcher_trial_flag_runs_single_runner(monkeypatch):
 
     assert ran.get("ran") is True
     assert "scheduler" not in ran
+
+
+def test_dual_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
+    ran = {}
+
+    class FakeSingleRunner:
+        def __init__(self, cfg):
+            ran["single"] = True
+        def run(self):
+            ran["single_ran"] = True
+
+    class FakeFanout:
+        @classmethod
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+            ran["for_runner"] = (entry_script, runner_factory)
+            return cls()
+        def run(self):
+            ran["fanout_ran"] = True
+
+    class FakeCli:
+        def __init__(self, config, description):
+            self.overrides = {}
+        def apply(self, argv):
+            return DualEntryConfig()
+
+    monkeypatch.setattr(dual_launcher, "DualSingleTrainRunner", FakeSingleRunner)
+    monkeypatch.setattr(dual_launcher, "SeedFanoutScheduler", FakeFanout)
+    monkeypatch.setattr(dual_launcher, "ConfigCli", FakeCli)
+
+    entry = Path("/entry/train_dual.py")
+    dual_launcher.DualTrainingLauncher(entry_script=entry).run([])
+
+    assert ran.get("fanout_ran") is True
+    assert ran["for_runner"]     == (entry, FakeSingleRunner)
+    assert "single_ran" not in ran
 
 
 def test_dual_launcher_fans_out_when_trials_enabled(monkeypatch):
