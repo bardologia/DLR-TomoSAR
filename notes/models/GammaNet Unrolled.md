@@ -27,7 +27,7 @@ Per pixel $p$, the forward model maps the reflectivity profile $\mathbf{s}_p \in
 - $L$ iterations of gradient step → learned per-pixel 1D convolutional prox along $z$ → nonnegative soft-threshold,
 - learned per-iteration step sizes $\alpha_l$ and thresholds $\theta_l$ (softplus-reparameterised to stay positive).
 
-The gradient is Lipschitz-normalised by $T N \, dz^2$ (the bound on $\lVert\mathbf{A}^H\mathbf{A}\rVert$), so `step_init = 1.0` is a stable normalised step for any track count or grid length. The network is track-count- and grid-length-agnostic (the operator is built from the batch's kz map and x-axis at run time) and tiny — about 1.4k parameters at defaults — because the physics carries the inductive bias.
+The gradient is normalised by $T N \, dz^2$. Note the code applies the adjoint **without** the $dz$ weight (the $dz$-weighted-inner-product adjoint the operator test locks), so the iteration's gradient operator is $\tfrac{1}{dz}\mathrm{Re}[\mathbf{A}^H\mathbf{A}]$ with norm bound $T N \, dz$ — the normaliser therefore leaves a residual factor of at most $1/dz$ rather than being a strict Lipschitz bound. On the project geometry (dz ≈ 0.4–0.6 m, five-track subset including the $k_z = 0$ primary) the measured normalised operator norm is 0.34–0.53, so `step_init = 1.0` starts stable with 2–3× margin, and the per-iteration steps are learned anyway. The network is track-count- and grid-length-agnostic (the operator is built from the batch's kz map and x-axis at run time) and tiny — about 1.4k parameters at defaults — because the physics carries the inductive bias.
 
 ---
 
@@ -40,7 +40,7 @@ The gradient is Lipschitz-normalised by $T N \, dz^2$ (the bound on $\lVert\math
 | $\mathbf{A}$ | Per-pixel steering operator, $A_{tn} = e^{i k_{z,t} z_n}\, dz$ |
 | $\alpha_l, \theta_l$ | Learned step size and soft-threshold of iteration $l$ |
 | $\mathcal{P}_l$ | Learned prox of iteration $l$: residual 1D conv block along $z$ |
-| $L_{\text{lip}}$ | Lipschitz normaliser $T N \, dz^2$ |
+| $L_{\text{lip}}$ | Gradient normaliser $T N \, dz^2$ (see Summary: bounds the true-adjoint operator; the implemented $dz$-less adjoint retains a $\le 1/dz$ residual factor) |
 | $K_z$ | Per-pixel vertical wavenumber map (from the [[TomoSAR track acquisition parameters|geometry field]]) |
 
 ---
@@ -85,7 +85,9 @@ See [[Configuration Layer]] → `GammaNetConfig` (`n_iterations`, `prox_hidden`,
 
 ## Provenance
 
-Formulation adapted from γ-Net (Qian, Zhu et al., IEEE TGRS 2022, unrolled CS TomoSAR inversion), LISTA (Gregor & LeCun, ICML 2010, learned step/threshold unrolling), and ISTA-Net (Zhang & Ghanem, CVPR 2018, learned proximal operators). Behavioural contract verified by `tests/models_unrolled/test_gamma_net.py`: forward/adjoint operator identity ($\langle \mathbf{A}\mathbf{s}, \mathbf{y}\rangle = \langle \mathbf{s}, \mathbf{A}^H\mathbf{y}\rangle$), matched-filter peak localisation, output nonnegativity, gradient flow to both parameter groups; a 60-step synthetic overfit drives peak error below 0.5 m.
+Formulation adapted from γ-Net (Qian, Zhu et al., IEEE TGRS 2022, unrolled CS TomoSAR inversion), LISTA (Gregor & LeCun, ICML 2010, learned step/threshold unrolling), and ISTA-Net (Zhang & Ghanem, CVPR 2018, learned proximal operators).
+
+Deviations from γ-Net proper, all deliberate: γ-Net solves for the **complex single-look reflectivity** $\boldsymbol{\gamma}$ from stacked SLC measurements with one fixed steering matrix $\mathbf{R}$, which lets it *learn* per-layer weight matrices under the coupling structure $\mathbf{W}_2 = \mathbf{I} - \mathbf{W}_1\mathbf{R}$; here the operator varies per pixel (per-pixel $k_z$), so learned matrices are infeasible and the exact operator with learned scalar steps is used instead. γ-Net's two shrinkage accelerations — **support selection** (top-$\rho\%$ magnitude entries bypass thresholding each layer) and the **piecewise-linear thresholding function** (its replacement for soft-thresholding, credited with ~10 dB NMSE and faster convergence) — are not carried over; the residual CNN prox before the nonnegative threshold is this implementation's learned-shrinkage counterpart. γ-Net's downstream BIC model-order selection is likewise out of scope (peak/parameter extraction is handled by this project's own machinery). γ-Net converged at ~12 layers (Fig. 6 of the paper); the default here is `n_iterations = 8` with 12/16 reachable through `tunable_arch_params`. Behavioural contract verified by `tests/models_unrolled/test_gamma_net.py`: forward/adjoint operator identity ($\langle \mathbf{A}\mathbf{s}, \mathbf{y}\rangle = \langle \mathbf{s}, \mathbf{A}^H\mathbf{y}\rangle$), matched-filter peak localisation, output nonnegativity, gradient flow to both parameter groups; a 60-step synthetic overfit drives peak error below 0.5 m.
 
 ---
 
