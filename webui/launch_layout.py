@@ -357,6 +357,7 @@ class LaunchLayout:
         "run_name",
         "resume",
         {"path": "gpu", "widget": GPU_ONE},
+        {"path": "gpus", "widget": GPU_MANY},
         "logdir",
         {"path": "paths.dataset_path", "widget": PICK_DATASET},
         {"path": "paths.parameters_path", "widget": PICK_PARAMS},
@@ -507,7 +508,7 @@ class LaunchLayout:
                         "reach_trials.rungs", "reach_trials.patch_size", "reach_trials.patch_stride", "reach_trials.in_channels", "reach_trials.match_tolerance",
                     ]},
                     {"kind": "fields", "groups": [
-                        {"title": "Fan-out execution", "fields": [{"path": "gpus", "widget": GPU_MANY}, "poll_interval_s"]},
+                        {"title": "Fan-out execution", "fields": ["poll_interval_s"]},
                     ]},
                     {"kind": "hidden", "fields": ["ablation_features", "ablation_include_full", "gpus_file"]},
                 ]},
@@ -539,6 +540,8 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
+                    {"kind": "fields", "groups": [{"title": "Fan-out execution", "fields": ["poll_interval_s"]}]},
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_profile", "at": "ae_loss"},
@@ -549,16 +552,7 @@ class LaunchLayout:
             ],
         },
         "train_image_autoencoder": {
-            "essentials": [
-                "run_name",
-                "resume",
-                {"path": "gpu", "widget": GPU_ONE},
-                "logdir",
-                {"path": "paths.dataset_path", "widget": PICK_DATASET},
-                {"path": "paths.parameters_path", "widget": PICK_PARAMS},
-                {"path": "seed", "widget": NUM_SEED},
-                "seeds",
-            ],
+            "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["ae_model_name"]},
@@ -573,6 +567,8 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
+                    {"kind": "fields", "groups": [{"title": "Fan-out execution", "fields": ["poll_interval_s"]}]},
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Autoencoder loss", "template": "ae_loss_image", "at": "ae_loss"},
@@ -615,6 +611,8 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Training", "template": "training_queue", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
+                    {"kind": "fields", "groups": [{"title": "Fan-out execution", "fields": ["poll_interval_s"]}]},
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
                 {"key": "loss", "title": "Loss", "panels": [
                     {"kind": "fields", "title": "Embedding loss", "template": "embedding_loss", "at": "embedding_loss"},
@@ -676,7 +674,7 @@ class LaunchLayout:
                         ]}]},
                     ]},
                     {"kind": "fields", "groups": [
-                        {"title": "Fan-out execution", "fields": [{"path": "gpus", "widget": GPU_MANY}, "poll_interval_s"]},
+                        {"title": "Fan-out execution", "fields": ["poll_interval_s"]},
                     ]},
                     {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
@@ -690,6 +688,7 @@ class LaunchLayout:
             "essentials": [
                 "run_name",
                 {"path": "gpu", "widget": GPU_ONE},
+                {"path": "gpus", "widget": GPU_MANY},
                 "logdir",
                 {"path": "paths.dataset_path", "widget": PICK_DATASET},
                 {"path": "paths.parameters_path", "widget": PICK_PARAMS},
@@ -709,6 +708,8 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Training", "template": "training_unrolled", "at": "training"},
                     {"kind": "fields", "title": "Pre-run tuning", "template": "pretrain", "at": "pretrain"},
                     {"kind": "fields", "title": "Overfit check", "template": "overfit_check", "at": "overfit_check"},
+                    {"kind": "fields", "groups": [{"title": "Fan-out execution", "fields": ["poll_interval_s"]}]},
+                    {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
                 {"key": "physics", "title": "Physics", "panels": [
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},

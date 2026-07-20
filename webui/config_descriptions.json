@@ -1155,9 +1155,9 @@
         "normalization_trials": "NormalizationTrialsConfig sub-config for the cumulative normalization ladder walking pass amplitude, then ifg phase, then output amp, then output sigma from their initial to their final strategies (out_mu untouched), one run per rung plus the all-initial baseline",
         "ablation_features": "Ordered list of feature-toggle dicts (label, enable, degrade overrides) forming the cumulative ablation ladder from the full model down to the baseline",
         "ablation_include_full": "Include the full-model variant (all ablation features enabled) as an extra run alongside the ablation ladder",
-        "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
-        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory",
-        "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed trial jobs"
+        "gpus": "List of GPU device indices across which queued runs are distributed and launched in parallel; feeds the trials fan-out when trials are enabled and the per-seed fan-out of a plain multi-seed run otherwise",
+        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory for trials, or the base run directory for a multi-seed fan-out",
+        "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed jobs"
       }
     },
     "training/general/loss::LossConfig": {
@@ -1433,6 +1433,9 @@
         "run_name": "optional human-readable label for the run directory; None auto-generates a name",
         "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion); an unfinished run directory is deleted and restarted from scratch. Lets interrupted seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "gpu": "CUDA device index used for a single training run",
+        "gpus": "GPU pool across which the seeds of a multi-seed run are fanned out, one training job per seed launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for the seed fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it executes (added devices pick up queued seeds, removed devices retire once the seed in flight ends). Empty places gpu_pool.json inside the base run directory",
+        "poll_interval_s": "Seconds between successive polls of the seed queue while waiting for GPUs or completed seed runs",
         "seed": "random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "base directory under which this run's output subdirectory and TensorBoard logs are written",
@@ -1502,6 +1505,9 @@
         "backbone_name": "Registry key of the backbone architecture that predicts Gaussian parameters or profile embeddings from the input SAR patch, default resunet",
         "backbone_head": "Output head built on the selected backbone (conv, multihead, per_gaussian, or set_pred); stored in the model config and restored at inference",
         "gpu": "Single GPU device index on which the run executes",
+        "gpus": "GPU pool across which the seeds of a multi-seed run are fanned out, one training job per seed launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for the seed fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it executes (added devices pick up queued seeds, removed devices retire once the seed in flight ends). Empty places gpu_pool.json inside the base run directory",
+        "poll_interval_s": "Seconds between successive polls of the seed queue while waiting for GPUs or completed seed runs",
         "seed": "Random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this JEPA run's output subdirectory and TensorBoard logs are written",
@@ -1562,6 +1568,9 @@
         "run_name": "Optional human-readable label for the run directory; None auto-generates a name",
         "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion); an unfinished run directory is deleted and restarted from scratch. Lets interrupted seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
         "gpu": "GPU device index the run is launched on, passed through as the script's --gpu argument to pin CUDA_VISIBLE_DEVICES",
+        "gpus": "GPU pool across which the seeds of a multi-seed run are fanned out, one training job per seed launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for the seed fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it executes (added devices pick up queued seeds, removed devices retire once the seed in flight ends). Empty places gpu_pool.json inside the base run directory",
+        "poll_interval_s": "Seconds between successive polls of the seed queue while waiting for GPUs or completed seed runs",
         "seed": "Random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this run's timestamped output subdirectory and TensorBoard logs are written",
@@ -2190,6 +2199,9 @@
         "run_name": "Optional run directory name; defaults to <model_name>_<timestamp> under logdir",
         "model_name": "Key into the unrolled model registry (gamma_net)",
         "gpu": "CUDA device index pinned before torch import",
+        "gpus": "GPU pool across which the seeds of a multi-seed run are fanned out, one training job per seed launched in parallel",
+        "gpus_file": "Path of the live GPU pool control file for the seed fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the run while it executes (added devices pick up queued seeds, removed devices retire once the seed in flight ends). Empty places gpu_pool.json inside the base run directory",
+        "poll_interval_s": "Seconds between successive polls of the seed queue while waiting for GPUs or completed seed runs",
         "seed": "Global random seed for reproducibility",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory that receives one subdirectory per training run",
@@ -2266,9 +2278,9 @@
         "trials_enabled": "Enable the multi-trial GPU sweep (DualTrainScheduler) that fans one training run per trunk-input trial out across GPUs instead of launching a single run",
         "trials_mode": "Sweep dimension the dual trial scheduler varies; input is the only mode and trains one run per trunk-input assignment under logdir/input",
         "input_trials": "DualInputTrialsConfig sub-config defining the trunk-input experiment: the fixed trunk feature ladders shared by every trial and the named params/existence channel-group assignments",
-        "gpus": "List of GPU device indices across which queued trial runs are distributed and launched in parallel",
-        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory",
-        "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed trial jobs"
+        "gpus": "List of GPU device indices across which queued runs are distributed and launched in parallel; feeds the trials fan-out when trials are enabled and the per-seed fan-out of a plain multi-seed run otherwise",
+        "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory for trials, or the base run directory for a multi-seed fan-out",
+        "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed jobs"
       }
     },
     "training/dual::DualInputTrialsConfig": {
