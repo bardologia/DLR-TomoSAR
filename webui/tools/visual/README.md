@@ -28,9 +28,11 @@ the port and its log goes to `/tmp/tomosar-webui-<port>.log`.
 node snap_ui.js --port 8765 --out /tmp/tomosar-ui [--settle 1800] [--width 1600] [--height 950] [routes...]
 ```
 
-It loads the SPA once, then per route sets the hash, waits for network idle,
-`document.fonts.ready`, and a settle delay (for GSAP entrances and KaTeX typesetting),
-and takes a `fullPage` screenshot.
+It loads the SPA once, then per route sets the hash, waits for the route's page
+section to become active, `document.fonts.ready`, and a settle delay (for GSAP
+entrances, route API fetches, and KaTeX typesetting), and takes a `fullPage`
+screenshot. Network-idle waits are deliberately avoided: the status board polls
+`/api/system` every 250 ms from app boot, so the network never idles.
 
 ## Repo-map diagram harness
 

@@ -47,7 +47,7 @@ class UiSnapper {
 
   async snapRoute(page, route) {
     await page.evaluate((r) => { window.location.hash = "#/" + r; }, route);
-    await page.waitForLoadState("networkidle");
+    await page.waitForSelector(`.page[data-page="${route.split("/")[0]}"].is-active`);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(this.settle);
 
@@ -65,7 +65,7 @@ class UiSnapper {
     const page    = await browser.newPage({ viewport: { width: this.width, height: this.height } });
 
     const base = `http://127.0.0.1:${this.port}/`;
-    await page.goto(base, { waitUntil: "networkidle" });
+    await page.goto(base, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#view");
 
     for (const route of this.routes) await this.snapRoute(page, route);
