@@ -23,8 +23,8 @@ def dual_curriculum() -> LossCurriculumConfig:
     return curriculum
 
 
-def _half_resunet_features() -> list[int]:
-    return [32, 64, 128, 256]
+def _parity_resunet_features() -> list[int]:
+    return [48, 96, 184, 352]
 
 
 def _default_dual_input_trials() -> dict:
@@ -45,8 +45,8 @@ def _default_dual_input_trials() -> dict:
 
 @dataclass
 class DualInputTrialsConfig:
-    params_features    : list[int] = field(default_factory=_half_resunet_features)
-    existence_features : list[int] = field(default_factory=_half_resunet_features)
+    params_features    : list[int] = field(default_factory=_parity_resunet_features)
+    existence_features : list[int] = field(default_factory=_parity_resunet_features)
     trials             : dict      = field(default_factory=_default_dual_input_trials)
 
 

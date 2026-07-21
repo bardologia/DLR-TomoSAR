@@ -12,7 +12,7 @@ from pipelines.dual.training.pipeline import TrunkChannelMap
 from tools.runtime.config_cli import ConfigCli
 
 
-HALF_FEATURES = [32, 64, 128, 256]
+PARITY_FEATURES = [48, 96, 184, 352]
 
 
 def _planner(trials_config=None, model_overrides=None):
@@ -52,13 +52,13 @@ def test_dual_input_planner_default_catalog_never_selects_the_dem():
 
 def test_dual_input_planner_fixes_half_width_trunks_on_every_trial():
     for _, overrides in _planner().plan():
-        assert overrides["model_overrides"] == {"params_features": HALF_FEATURES, "existence_features": HALF_FEATURES}
+        assert overrides["model_overrides"] == {"params_features": PARITY_FEATURES, "existence_features": PARITY_FEATURES}
 
 
 def test_dual_input_planner_merges_entry_model_overrides():
     for _, overrides in _planner(model_overrides={"dropout": 0.3}).plan():
         assert overrides["model_overrides"]["dropout"]         == 0.3
-        assert overrides["model_overrides"]["params_features"] == HALF_FEATURES
+        assert overrides["model_overrides"]["params_features"] == PARITY_FEATURES
 
 
 def test_dual_input_planner_rejects_feature_keys_in_model_overrides():
@@ -124,7 +124,7 @@ def test_dual_trial_overrides_round_trip_through_the_cli():
 
     assert config.params_input    == ["pass", "ifg"]
     assert config.existence_input == ["ifg"]
-    assert config.model_overrides == {"params_features": HALF_FEATURES, "existence_features": HALF_FEATURES}
+    assert config.model_overrides == {"params_features": PARITY_FEATURES, "existence_features": PARITY_FEATURES}
 
 
 def test_dual_default_trials_match_the_config_factory():
@@ -155,7 +155,7 @@ def test_dual_scheduler_plans_the_trunk_input_grid(tmp_path):
     plans = dict(scheduler.planner().plan())
 
     assert list(plans) == ["di-full-full", "di-pass-full", "di-full-pass", "di-ifg-full", "di-full-ifg", "di-pass-ifg", "di-ifg-pass"]
-    assert plans["di-full-ifg"]["model_overrides"]["params_features"] == HALF_FEATURES
+    assert plans["di-full-ifg"]["model_overrides"]["params_features"] == PARITY_FEATURES
 
 
 def test_dual_scheduler_rejects_unknown_mode(tmp_path):

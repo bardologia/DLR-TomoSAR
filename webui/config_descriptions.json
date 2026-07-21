@@ -2308,8 +2308,8 @@
     "training/dual::DualInputTrialsConfig": {
       "summary": "Trunk-input trial catalog for the dual model: a fixed pair of trunk feature ladders applied to every trial, and named trials assigning input channel groups to the parameter and existence trunks",
       "fields": {
-        "params_features": "Encoder feature widths of the parameter trunk used for every trial; defaults to the four-level half-width ladder 32-64-128-256, half the standard four-level resunet widths",
-        "existence_features": "Encoder feature widths of the existence trunk used for every trial; defaults to the same four-level half-width ladder 32-64-128-256",
+        "params_features": "Encoder feature widths of the parameter trunk used for every trial; defaults to the four-level parity ladder 48-96-184-352, sized so the two symmetric trunks together match the benchmark's size-matched single-trunk resunet budget",
+        "existence_features": "Encoder feature widths of the existence trunk used for every trial; defaults to the same four-level parity ladder 48-96-184-352",
         "trials": "Named trunk-input assignments, each mapping a label to the channel groups (pass, ifg) fed to the params and existence trunks; both keys are required in every spec. Defaults cover the seven ordered pairs over full (pass+ifg), pass (amplitudes only) and ifg (interferograms only): full/full plus both orders of pass+full, ifg+full and ifg+pass, run as di-<label> with the params trunk named first"
       }
     },
