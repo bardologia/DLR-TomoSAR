@@ -18,16 +18,14 @@ class TomoOperator:
         self.steering = torch.polar(torch.ones_like(phase), phase)
 
     def forward(self, profiles: torch.Tensor) -> torch.Tensor:
-        pixels       = profiles.permute(0, 2, 3, 1).to(self.steering.dtype).unsqueeze(-1)
-        measurements = (self.steering @ pixels).squeeze(-1)
+        pixels = profiles.to(self.steering.dtype).unsqueeze(-1)
 
-        return measurements.permute(0, 3, 1, 2) * self.dx
+        return (self.steering @ pixels).squeeze(-1) * self.dx
 
     def adjoint(self, measurements: torch.Tensor) -> torch.Tensor:
-        pixels   = measurements.permute(0, 2, 3, 1).unsqueeze(-1)
-        profiles = (self.steering.mH @ pixels).real.squeeze(-1)
+        pixels = measurements.unsqueeze(-1)
 
-        return profiles.permute(0, 3, 1, 2)
+        return (self.steering.mH @ pixels).real.squeeze(-1)
 
 
 class ProfileProx(nn.Module):
@@ -50,13 +48,13 @@ class ProfileProx(nn.Module):
         return padded.as_strided((pixels, self.kernel_size, half_length), (width, 1, 2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, N, H, W = x.shape
+        B, H, W, N = x.shape
 
-        flat       = x.permute(0, 2, 3, 1).reshape(B * H * W, 1, N)
+        flat       = x.reshape(B * H * W, 1, N)
         correction = self.up(self.activation(self.down(self._strided_windows(flat))))
         refined    = flat + functional.interpolate(correction, size=N, mode="linear", align_corners=False)
 
-        return refined.reshape(B, H, W, N).permute(0, 3, 1, 2)
+        return refined.reshape(B, H, W, N)
 
 
 class GammaNet(nn.Module):
@@ -91,14 +89,15 @@ class GammaNet(nn.Module):
         thresholds = functional.softplus(self.raw_thresholds)
 
         operator = TomoOperator(kz_map, x_axis, dx)
-        profile  = functional.relu(operator.adjoint(measurements) / n_tracks)
+        measured = measurements.permute(0, 2, 3, 1).contiguous()
+        profile  = functional.relu(operator.adjoint(measured) / n_tracks)
 
         for iteration in range(self.config.n_iterations):
-            residual = measurements - operator.forward(profile)
+            residual = measured - operator.forward(profile)
             gradient = operator.adjoint(residual) / lipschitz
 
             profile = profile + steps[iteration] * gradient
             profile = self.prox_blocks[iteration](profile)
             profile = functional.relu(profile - thresholds[iteration])
 
-        return profile
+        return profile.permute(0, 3, 1, 2)

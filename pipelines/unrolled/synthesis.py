@@ -22,7 +22,7 @@ class MeasurementSynthesiser:
         mask  = power > self.power_floor
 
         target       = curves / power.clamp(min=self.power_floor).unsqueeze(1)
-        measurements = TomoOperator(kz_map, self.x_axis, self.dx).forward(target)
+        measurements = TomoOperator(kz_map, self.x_axis, self.dx).forward(target.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
         if self.noise_std > 0.0:
             shape        = measurements.real.shape

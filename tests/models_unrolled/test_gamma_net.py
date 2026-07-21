@@ -29,6 +29,10 @@ def _gaussian_profiles(mu: float = 12.0, sigma: float = 3.0):
     return curve.reshape(1, POINTS, 1, 1).expand(BATCH, POINTS, WINDOW, WINDOW).contiguous()
 
 
+def _synthesise(profiles, kz):
+    return TomoOperator(kz, X_AXIS, DX).forward(profiles.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+
+
 def test_registries_share_keys():
     assert set(UNROLLED_MODEL_REGISTRY) == set(UNROLLED_CONFIG_REGISTRY)
 
@@ -40,11 +44,11 @@ def test_operator_adjoint_identity():
     coherent = torch.randn(BATCH, TRACKS, WINDOW, WINDOW) + 1j * torch.randn(BATCH, TRACKS, WINDOW, WINDOW)
 
     operator = TomoOperator(kz, X_AXIS, DX)
-    forward  = operator.forward(profiles)
-    adjoint  = operator.adjoint(coherent)
+    forward  = operator.forward(profiles.permute(0, 2, 3, 1))
+    adjoint  = operator.adjoint(coherent.permute(0, 2, 3, 1))
 
-    lhs = (forward * coherent.conj()).real.sum()
-    rhs = (profiles * adjoint).sum() * DX
+    lhs = (forward * coherent.permute(0, 2, 3, 1).conj()).real.sum()
+    rhs = (profiles.permute(0, 2, 3, 1) * adjoint).sum() * DX
 
     assert torch.allclose(lhs, rhs, rtol=1e-4, atol=1e-4)
 
@@ -54,10 +58,10 @@ def test_matched_filter_init_peaks_at_true_height():
     profiles = _gaussian_profiles(mu=12.0)
 
     operator     = TomoOperator(kz, X_AXIS, DX)
-    measurements = operator.forward(profiles)
+    measurements = operator.forward(profiles.permute(0, 2, 3, 1))
     beamformed   = operator.adjoint(measurements)
 
-    peak_positions = X_AXIS[beamformed.argmax(dim=1)]
+    peak_positions = X_AXIS[beamformed.argmax(dim=-1)]
 
     assert (peak_positions - 12.0).abs().max() < 3.0
 
@@ -66,7 +70,7 @@ def test_forward_shape_and_nonnegativity():
     model = get_unrolled("gamma_net", n_iterations=3, prox_hidden=4)[0].eval()
 
     kz           = _kz_map()
-    measurements = TomoOperator(kz, X_AXIS, DX).forward(_gaussian_profiles())
+    measurements = _synthesise(_gaussian_profiles(), kz)
 
     with torch.no_grad():
         out = model(measurements, kz, X_AXIS)
@@ -81,7 +85,7 @@ def test_backward_reaches_all_parameter_groups():
     model.train()
 
     kz           = _kz_map()
-    measurements = TomoOperator(kz, X_AXIS, DX).forward(_gaussian_profiles())
+    measurements = _synthesise(_gaussian_profiles(), kz)
 
     out  = model(measurements, kz, X_AXIS)
     loss = out.pow(2).mean() + out.mean()
@@ -98,7 +102,7 @@ def test_backward_reaches_all_parameter_groups():
 def test_sixty_step_overfit_drives_peak_error_below_half_metre():
     kz           = _kz_map()
     profiles     = _gaussian_profiles(mu=12.0)
-    measurements = TomoOperator(kz, X_AXIS, DX).forward(profiles)
+    measurements = _synthesise(profiles, kz)
 
     torch.manual_seed(3)
     model, config = get_unrolled("gamma_net", n_iterations=2, prox_hidden=4)
@@ -138,7 +142,7 @@ def test_rejects_mismatched_shapes():
     model = get_unrolled("gamma_net", n_iterations=1)[0]
 
     kz           = _kz_map()
-    measurements = TomoOperator(kz, X_AXIS, DX).forward(_gaussian_profiles())
+    measurements = _synthesise(_gaussian_profiles(), kz)
 
     with pytest.raises(ValueError):
         model(measurements[:, :2], kz, X_AXIS)
