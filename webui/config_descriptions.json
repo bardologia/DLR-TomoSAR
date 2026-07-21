@@ -2297,9 +2297,10 @@
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "infer_after": "Run the shared inference pipeline with the dual components automatically on the trained checkpoint once training completes",
         "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after is set",
-        "trials_enabled": "Enable the multi-trial GPU sweep (DualTrainScheduler) that fans one training run per trunk-input trial out across GPUs instead of launching a single run",
-        "trials_mode": "Sweep dimension the dual trial scheduler varies; input is the only mode and trains one run per trunk-input assignment under logdir/input",
+        "trials_enabled": "Enable the multi-trial GPU sweep (DualTrainScheduler) that fans one training run per trial out across GPUs instead of launching a single run",
+        "trials_mode": "Sweep dimension the dual trial scheduler varies: input trains one run per trunk-input assignment under logdir/input; ratio trains one run per arm-capacity split under logdir/ratio with the trunk inputs held fixed at the entry's params_input/existence_input selection",
         "input_trials": "DualInputTrialsConfig sub-config defining the trunk-input experiment: the fixed trunk feature ladders shared by every trial and the named params/existence channel-group assignments",
+        "ratio_trials": "DualRatioTrialsConfig sub-config defining the arm-ratio experiment: per-trial params/existence feature ladders that redistribute one fixed parameter budget between the two trunks, verified by building each model at launch",
         "gpus": "List of GPU device indices across which queued runs are distributed and launched in parallel; feeds the trials fan-out when trials are enabled and the per-seed fan-out of a plain multi-seed run otherwise",
         "gpus_file": "Path of the live GPU pool control file for this fan-out; the scheduler seeds it from the gpus selection and re-reads it on every poll, so writing {\"gpus\": [...]} into it resizes the experiment while it runs (added devices pick up queued jobs, removed devices retire once the job in flight ends). Empty places gpu_pool.json inside the trials directory for trials, or the base run directory for a multi-seed fan-out",
         "poll_interval_s": "Seconds between successive polls of the run queue while waiting for GPUs or completed jobs"
@@ -2311,6 +2312,13 @@
         "params_features": "Encoder feature widths of the parameter trunk used for every trial; defaults to the four-level parity ladder 48-96-184-352, sized so the two symmetric trunks together match the benchmark's size-matched single-trunk resunet budget",
         "existence_features": "Encoder feature widths of the existence trunk used for every trial; defaults to the same four-level parity ladder 48-96-184-352",
         "trials": "Named trunk-input assignments, each mapping a label to the channel groups (pass, ifg) fed to the params and existence trunks; both keys are required in every spec. Defaults cover the seven ordered pairs over full (pass+ifg), pass (amplitudes only) and ifg (interferograms only): full/full plus both orders of pass+full, ifg+full and ifg+pass, run as di-<label> with the params trunk named first"
+      }
+    },
+    "training/dual::DualRatioTrialsConfig": {
+      "summary": "Arm-ratio trial catalog for the dual model: named '<params>-<existence>' percentage splits, each carrying the params and existence feature ladders that realize the split while the two arms together keep the 50/50 parity budget",
+      "fields": {
+        "trials": "Named arm splits, each label a '<params>-<existence>' percentage pair summing to 100 with the detection (existence) arm never larger, mapped to the params/existence feature ladders realizing it; every ladder keeps the same four-level depth so only width moves. Defaults cover 50-50 (the parity twins 48-96-184-352), 60-40, 70-30, 80-20 and 90-10, all tuned to the 31.19M parity total, run as dr-<label>",
+        "match_tolerance": "Maximum accepted deviation, both of each trial's realized params share from its declared split (in share points) and of the total parameter spread across trials (relative); the scheduler builds every model at launch and refuses the sweep beyond it"
       }
     },
     "patch_sweep/general::PatchGridConfig": {

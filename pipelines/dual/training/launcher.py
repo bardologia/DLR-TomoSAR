@@ -8,7 +8,7 @@ from configuration.training import CurriculumInheritance, DualEntryConfig, dual_
 from models.dual                          import DUAL_CONFIG_REGISTRY
 from pipelines.backbone.training.launcher import SingleTrainRunner, TrainScheduler
 from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS
-from pipelines.dual.training.experiments  import DualInputTrialPlanner
+from pipelines.dual.training.experiments  import DualInputTrialPlanner, DualRatioTrialPlanner
 from pipelines.dual.training.pipeline     import DualTrainingPipeline, TrunkChannelMap
 from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.shared.training.seed_sweep import SeedFanoutScheduler, SeedSet, SeedSweepRunner
@@ -47,17 +47,33 @@ class DualSingleTrainRunner(SingleTrainRunner):
 
 class DualTrainScheduler(TrainScheduler):
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "input_trials", "gpus", "gpus_file", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "input_trials", "ratio_trials", "gpus", "gpus_file", "poll_interval_s")
 
     MODE_SUBDIRS = {
         "input" : "input",
+        "ratio" : "ratio",
     }
 
     def planner(self):
         if self.config.trials_mode == "input":
             return DualInputTrialPlanner(self.config.input_trials, self.config.model_overrides, TrunkChannelMap.GROUPS)
 
-        raise ValueError(f"Unknown trials_mode '{self.config.trials_mode}', expected 'input'")
+        if self.config.trials_mode == "ratio":
+            n_secondaries      = len(self.config.paths.secondary_labels)
+            in_channels        = self.config.input.total_channels(n_secondaries, n_secondaries)
+            params_channels    = TrunkChannelMap.resolve(self.config.input, in_channels, self.config.params_input)
+            existence_channels = TrunkChannelMap.resolve(self.config.input, in_channels, self.config.existence_input)
+
+            return DualRatioTrialPlanner(
+                trials_config   = self.config.ratio_trials,
+                model_overrides = self.config.model_overrides,
+                model_name      = self.config.model_name,
+                backbones       = (self.config.params_backbone, self.config.existence_backbone),
+                trunk_channels  = (params_channels, existence_channels),
+                in_channels     = in_channels,
+            )
+
+        raise ValueError(f"Unknown trials_mode '{self.config.trials_mode}', expected 'input' or 'ratio'")
 
     def _model_key(self) -> str:
         return ModelBuilder.model_key(self.config.model_name, "set_pred")

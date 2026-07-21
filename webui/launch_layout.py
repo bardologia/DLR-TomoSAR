@@ -679,11 +679,12 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
                 {"key": "experiments", "title": "Experiments", "panels": [
-                    {"kind": "fields", "title": "Trunk-input trials", "groups": [
+                    {"kind": "fields", "title": "Trunk trials", "groups": [
                         {"title": None, "fields": [{"gate": "trials_enabled", "fields": [
                             "trials_mode",
                             "input_trials.params_features", "input_trials.existence_features",
                             "input_trials.trials",
+                            "ratio_trials.trials", "ratio_trials.match_tolerance",
                         ]}]},
                     ]},
                     {"kind": "fields", "groups": [

@@ -5,18 +5,36 @@ from pathlib import Path
 import pytest
 
 import pipelines.dual.training.launcher as dual_launcher
-from configuration.training import DualEntryConfig, DualInputTrialsConfig, dual_curriculum
-from configuration.training.dual import _default_dual_input_trials
-from pipelines.dual.training.experiments import DualInputTrialPlanner
+from configuration.training import DualEntryConfig, DualInputTrialsConfig, DualRatioTrialsConfig, dual_curriculum
+from configuration.training.dual import _default_dual_input_trials, _default_dual_ratio_trials
+from pipelines.dual.training.experiments import DualInputTrialPlanner, DualRatioTrialPlanner
 from pipelines.dual.training.pipeline import TrunkChannelMap
 from tools.runtime.config_cli import ConfigCli
 
 
 PARITY_FEATURES = [48, 96, 184, 352]
 
+TINY_LADDER = [8, 16, 24, 32]
+
 
 def _planner(trials_config=None, model_overrides=None):
     return DualInputTrialPlanner(trials_config or DualInputTrialsConfig(), model_overrides or {}, TrunkChannelMap.GROUPS)
+
+
+def _tiny_ratio_trials(**overrides) -> DualRatioTrialsConfig:
+    defaults = {"trials": {"50-50": {"params": list(TINY_LADDER), "existence": list(TINY_LADDER)}}, "match_tolerance": 0.1}
+    return DualRatioTrialsConfig(**{**defaults, **overrides})
+
+
+def _ratio_planner(trials_config=None, model_overrides=None):
+    return DualRatioTrialPlanner(
+        trials_config or _tiny_ratio_trials(),
+        model_overrides or {},
+        "dual_resunet",
+        ("resunet", "resunet"),
+        ((0, 1, 2, 3, 4, 5, 6, 7, 8), (5, 6, 7, 8)),
+        9,
+    )
 
 
 def test_dual_input_planner_default_catalog_covers_the_seven_ordered_pairs():
@@ -131,6 +149,102 @@ def test_dual_default_trials_match_the_config_factory():
     assert DualInputTrialsConfig().trials == _default_dual_input_trials()
 
 
+def test_dual_ratio_planner_emits_ladder_overrides_and_leaves_inputs_alone():
+    plans = _ratio_planner().plan()
+
+    assert [name for name, _ in plans] == ["dr-50-50"]
+    assert plans[0][1] == {"model_overrides": {"params_features": TINY_LADDER, "existence_features": TINY_LADDER}}
+
+
+def test_dual_ratio_planner_merges_entry_model_overrides():
+    _, overrides = _ratio_planner(model_overrides={"dropout": 0.3}).plan()[0]
+
+    assert overrides["model_overrides"]["dropout"]         == 0.3
+    assert overrides["model_overrides"]["params_features"] == TINY_LADDER
+
+
+def test_dual_ratio_planner_rejects_feature_keys_in_model_overrides():
+    with pytest.raises(ValueError, match="ratio_trials ladders"):
+        _ratio_planner(model_overrides={"existence_features": [8, 16]})
+
+
+def test_dual_ratio_planner_rejects_empty_trials_and_bad_tolerance():
+    with pytest.raises(ValueError, match="at least one arm-split variant"):
+        _ratio_planner(_tiny_ratio_trials(trials={}))
+
+    with pytest.raises(ValueError, match="match_tolerance"):
+        _ratio_planner(_tiny_ratio_trials(match_tolerance=0.0))
+
+
+def test_dual_ratio_planner_rejects_missing_or_unknown_arm_keys():
+    with pytest.raises(ValueError, match="must set \\['existence'\\]"):
+        _ratio_planner(_tiny_ratio_trials(trials={"50-50": {"params": TINY_LADDER}}))
+
+    with pytest.raises(ValueError, match="unknown keys \\['gate'\\]"):
+        _ratio_planner(_tiny_ratio_trials(trials={"50-50": {"params": TINY_LADDER, "existence": TINY_LADDER, "gate": TINY_LADDER}}))
+
+
+def test_dual_ratio_planner_rejects_empty_or_invalid_ladders():
+    with pytest.raises(ValueError, match="lists no feature widths"):
+        _ratio_planner(_tiny_ratio_trials(trials={"50-50": {"params": TINY_LADDER, "existence": []}}))
+
+    with pytest.raises(ValueError, match="positive integers"):
+        _ratio_planner(_tiny_ratio_trials(trials={"50-50": {"params": [8, 0, 24, 32], "existence": TINY_LADDER}}))
+
+
+def test_dual_ratio_planner_rejects_mixed_ladder_depths():
+    with pytest.raises(ValueError, match="mix ladder depths"):
+        _ratio_planner(_tiny_ratio_trials(trials={"50-50": {"params": TINY_LADDER, "existence": [8, 16, 24]}}))
+
+
+def test_dual_ratio_planner_rejects_malformed_share_labels():
+    with pytest.raises(ValueError, match="percentage shares"):
+        _ratio_planner(_tiny_ratio_trials(trials={"half": {"params": TINY_LADDER, "existence": TINY_LADDER}}))
+
+    with pytest.raises(ValueError, match="sum to 100"):
+        _ratio_planner(_tiny_ratio_trials(trials={"60-41": {"params": TINY_LADDER, "existence": TINY_LADDER}}))
+
+    with pytest.raises(ValueError, match="detection arm is always the smaller"):
+        _ratio_planner(_tiny_ratio_trials(trials={"40-60": {"params": TINY_LADDER, "existence": TINY_LADDER}}))
+
+
+def test_dual_ratio_planner_rejects_a_split_the_ladders_do_not_realize():
+    with pytest.raises(ValueError, match="match tolerance; retune the ladders"):
+        _ratio_planner(_tiny_ratio_trials(trials={"90-10": {"params": list(TINY_LADDER), "existence": list(TINY_LADDER)}}, match_tolerance=0.01))
+
+
+def test_dual_ratio_planner_rejects_trials_with_unequal_budgets():
+    trials = {
+        "50-50" : {"params": list(TINY_LADDER), "existence": list(TINY_LADDER)},
+        "60-40" : {"params": [48, 96, 144, 192], "existence": [40, 80, 120, 160]},
+    }
+
+    with pytest.raises(ValueError, match="total parameter count"):
+        _ratio_planner(_tiny_ratio_trials(trials=trials, match_tolerance=0.2))
+
+
+def test_dual_ratio_overrides_round_trip_through_the_cli():
+    _, overrides = _ratio_planner().plan()[0]
+
+    config = ConfigCli(DualEntryConfig()).apply(ConfigCli.to_argv(overrides))
+
+    assert config.model_overrides == {"params_features": TINY_LADDER, "existence_features": TINY_LADDER}
+    assert config.params_input    == ["pass", "ifg"]
+    assert config.existence_input == ["ifg"]
+
+
+def test_dual_ratio_default_catalog_holds_the_parity_budget_at_every_split():
+    planner = _ratio_planner(DualRatioTrialsConfig())
+
+    assert DualRatioTrialsConfig().trials == _default_dual_ratio_trials()
+    assert [name for name, _ in planner.plan()] == ["dr-50-50", "dr-60-40", "dr-70-30", "dr-80-20", "dr-90-10"]
+    assert planner.arm_counts["50-50"]["params"] + planner.arm_counts["50-50"]["existence"] == 31_189_858
+
+    for spec in _default_dual_ratio_trials().values():
+        assert len(spec["params"])    == 4
+        assert len(spec["existence"]) == 4
+
+
 def test_dual_scheduler_houses_runs_in_input_dir(tmp_path):
     config        = DualEntryConfig()
     config.logdir = tmp_path
@@ -158,6 +272,24 @@ def test_dual_scheduler_plans_the_trunk_input_grid(tmp_path):
     assert plans["di-full-ifg"]["model_overrides"]["params_features"] == PARITY_FEATURES
 
 
+def test_dual_scheduler_houses_ratio_runs_in_ratio_dir_and_plans_the_split_grid(tmp_path):
+    config             = DualEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "ratio"
+
+    scheduler = dual_launcher.DualTrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_dual.py"))
+
+    assert scheduler.runs_root == tmp_path / "ratio"
+
+    plans = dict(scheduler.planner().plan())
+
+    assert list(plans) == ["dr-50-50", "dr-60-40", "dr-70-30", "dr-80-20", "dr-90-10"]
+    assert plans["dr-50-50"]["model_overrides"]["params_features"]    == PARITY_FEATURES
+    assert plans["dr-50-50"]["model_overrides"]["existence_features"] == PARITY_FEATURES
+    assert plans["dr-90-10"]["model_overrides"]["params_features"]    == [64, 128, 248, 472]
+    assert plans["dr-90-10"]["model_overrides"]["existence_features"] == [24, 48, 84, 156]
+
+
 def test_dual_scheduler_rejects_unknown_mode(tmp_path):
     config             = DualEntryConfig()
     config.logdir      = tmp_path
@@ -175,6 +307,7 @@ def test_dual_scheduler_forwards_only_non_scheduler_overrides(tmp_path):
         "trials_enabled"                  : True,
         "trials_mode"                     : "input",
         "input_trials.params_features"    : [16, 32],
+        "ratio_trials.match_tolerance"    : 0.02,
         "gpus"                            : [0, 1],
         "poll_interval_s"                 : 1.0,
         "training.max_epochs"             : 5,

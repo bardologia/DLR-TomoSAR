@@ -43,11 +43,27 @@ def _default_dual_input_trials() -> dict:
     }
 
 
+def _default_dual_ratio_trials() -> dict:
+    return {
+        "50-50" : {"params": _parity_resunet_features(), "existence": _parity_resunet_features()},
+        "60-40" : {"params": [60, 108, 204, 384],        "existence": [56, 92, 168, 312]},
+        "70-30" : {"params": [48, 116, 220, 416],        "existence": [36, 76, 144, 272]},
+        "80-20" : {"params": [60, 124, 236, 444],        "existence": [28, 52, 116, 224]},
+        "90-10" : {"params": [64, 128, 248, 472],        "existence": [24, 48, 84, 156]},
+    }
+
+
 @dataclass
 class DualInputTrialsConfig:
     params_features    : list[int] = field(default_factory=_parity_resunet_features)
     existence_features : list[int] = field(default_factory=_parity_resunet_features)
     trials             : dict      = field(default_factory=_default_dual_input_trials)
+
+
+@dataclass
+class DualRatioTrialsConfig:
+    trials          : dict  = field(default_factory=_default_dual_ratio_trials)
+    match_tolerance : float = 0.01
 
 
 @dataclass
@@ -88,6 +104,7 @@ class DualEntryConfig:
     trials_enabled : bool                  = False
     trials_mode    : str                   = "input"
     input_trials   : DualInputTrialsConfig = field(default_factory=DualInputTrialsConfig)
+    ratio_trials   : DualRatioTrialsConfig = field(default_factory=DualRatioTrialsConfig)
 
     gpus             : list[int] = field(default_factory=lambda: [0, 1, 3])
     gpus_file        : str       = ""
