@@ -544,7 +544,7 @@
               "label": "SigmaFittingExtractor",
               "module": "pipelines/processing/param_extraction/sigma/extractor.py",
               "role": "orchestrator",
-              "fn": "Streams range-bin batches and sequences the shared three-phase fit: one CPU peak init per batch, one GPU Adam scan per fit mode, and per-lambda best-K selection reusing the mode's fits, accumulating parameter and diagnostic maps per permutation.",
+              "fn": "Sequences the shared three-phase fit over range-bin batches: one CPU peak init per batch, one GPU Adam scan per fit mode, and per-lambda best-K selection reusing the mode's fits; scoring and map accumulation run on a background thread so the next mode's GPU fit starts immediately.",
               "col": 3,
               "reads": [
                 "tomogram_full.npy"

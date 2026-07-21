@@ -33,12 +33,9 @@ class BestKSelector:
 
         mse_all = np.empty((N_act, self.k_max), dtype=np.float64)
 
-        with self.logger.track(transient=True) as progress:
-            bar = progress.add_task("  [section]Scoring K values[/section]", total=self.k_max)
-            with ThreadPoolExecutor(max_workers=self.k_max) as tpool:
-                for K, mse in tpool.map(lambda K: self._mse_K(K, gpu_results, prof_norm_all, height_axis), range(1, self.k_max + 1)):
-                    mse_all[:, K - 1] = mse
-                    progress.advance(bar)
+        with ThreadPoolExecutor(max_workers=self.k_max) as tpool:
+            for K, mse in tpool.map(lambda K: self._mse_K(K, gpu_results, prof_norm_all, height_axis), range(1, self.k_max + 1)):
+                mse_all[:, K - 1] = mse
 
         return mse_all
 

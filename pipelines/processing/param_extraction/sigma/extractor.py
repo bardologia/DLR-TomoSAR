@@ -20,6 +20,9 @@ from .selection   import BestKSelector, KernelBackendSelector
 
 
 class SigmaFittingExtractor:
+
+    MAX_PENDING_SCORINGS = 2
+
     def __init__(
         self,
         logger              : Logger,
@@ -225,9 +228,9 @@ class SigmaFittingExtractor:
             final_mus  = np.empty((N_act, K), dtype=np.float32)
             final_sigs = np.empty((N_act, K), dtype=np.float32)
 
+            pending = None
             for i_start in range(0, N_act, B):
-                i_end   = min(i_start + B, N_act)
-                n_chunk = i_end - i_start
+                i_end = min(i_start + B, N_act)
                 out_a, out_m, out_s = self._kernel(
                     jnp.array(self._pad_rows(amps_norm    [i_start:i_end], B)),
                     jnp.array(self._pad_rows(mus          [i_start:i_end], B)),
@@ -247,10 +250,12 @@ class SigmaFittingExtractor:
                     self.adam_b2,
                 )
 
-                final_amps[i_start:i_end] = np.array(out_a[:n_chunk], dtype=np.float32)
-                final_mus [i_start:i_end] = np.array(out_m[:n_chunk], dtype=np.float32)
-                final_sigs[i_start:i_end] = np.array(out_s[:n_chunk], dtype=np.float32)
-                del out_a, out_m, out_s
+                if pending is not None:
+                    self._materialize_chunk(pending, final_amps, final_mus, final_sigs)
+                pending = (out_a, out_m, out_s, i_start, i_end)
+
+            if pending is not None:
+                self._materialize_chunk(pending, final_amps, final_mus, final_sigs)
 
             gpu_results[K] = (final_amps, final_mus, final_sigs)
             self.logger.subsection(f"K={K} done")
@@ -259,40 +264,34 @@ class SigmaFittingExtractor:
 
         return gpu_results
 
-    def _fit_batch(
+    @staticmethod
+    def _materialize_chunk(pending : tuple, final_amps : np.ndarray, final_mus : np.ndarray, final_sigs : np.ndarray) -> None:
+        out_a, out_m, out_s, i_start, i_end = pending
+        n_chunk = i_end - i_start
+
+        final_amps[i_start:i_end] = np.array(out_a[:n_chunk], dtype=np.float32)
+        final_mus [i_start:i_end] = np.array(out_m[:n_chunk], dtype=np.float32)
+        final_sigs[i_start:i_end] = np.array(out_s[:n_chunk], dtype=np.float32)
+
+    def _init_batch(
         self,
         profiles_flat : np.ndarray,
         profiles_norm : np.ndarray,
         active        : np.ndarray,
         safe_scale    : np.ndarray,
         height_axis   : np.ndarray,
-        height_ax_j   : jnp.ndarray,
-        sigma_lower_j : jnp.ndarray,
-        sigma_upper_j : jnp.ndarray,
-        mu_lower_j    : jnp.ndarray,
-        mu_upper_j    : jnp.ndarray,
-        n_params_out  : int,
         batch_tag     : str,
-    ) -> Dict[tuple, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    ) -> Optional[tuple]:
 
-        N          = profiles_flat.shape[0]
         active_idx = np.where(active)[0]
+        N_act      = len(active_idx)
 
-        def _empty():
-            return (
-                np.zeros((N, n_params_out),            dtype=np.float32),
-                np.full ((N, self.k_max), np.nan,      dtype=np.float32),
-                np.full ((N, self.k_max), np.nan,      dtype=np.float32),
-                np.zeros(N,                            dtype=np.int16),
-            )
-
-        if len(active_idx) == 0:
-            return {(mode, lambda_k): _empty() for mode in self.modes for lambda_k in self.lambda_values}
+        if N_act == 0:
+            return None
 
         prof_raw_all  = profiles_flat[active_idx]
         prof_norm_all = profiles_norm[active_idx].astype(np.float32)
         scale_all     = safe_scale[active_idx, 0]
-        N_act         = len(active_idx)
 
         n_cpus = os.cpu_count() or 1
         self.logger.section(f"[{batch_tag} | Phase 1 — CPU Initialisation]")
@@ -305,26 +304,53 @@ class SigmaFittingExtractor:
 
         self.logger.subsection(f"Init shared for all {self.k_max} K values and {len(self.modes)} modes")
 
-        batch_results = {}
-        for mode in self.modes:
-            gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j, N_act, mode, batch_tag)
-            mse_all     = self._best_k_selector.score(gpu_results, prof_norm_all, height_axis, batch_tag=f"{batch_tag} | mode {mode}")
+        return inits, prof_norm_all, scale_all, active_idx, N_act
 
-            for lambda_k in self.lambda_values:
-                best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, mse_all, scale_all, lambda_k, n_params_out, batch_tag=f"{batch_tag} | mode {mode}")
+    def _score_and_store(
+        self,
+        mode          : str,
+        gpu_results   : dict,
+        prof_norm_all : np.ndarray,
+        scale_all     : np.ndarray,
+        active_idx    : np.ndarray,
+        n_total       : int,
+        height_axis   : np.ndarray,
+        n_params_out  : int,
+        outputs       : Dict[tuple, dict],
+        r_start       : int,
+        r_end         : int,
+        Az            : int,
+        batch_tag     : str,
+    ) -> None:
 
-                output, mse_out, pen_out, best_k_out = _empty()
-                output    [active_idx] = best_params
-                mse_out   [active_idx] = mse_act
-                pen_out   [active_idx] = pen_act
-                best_k_out[active_idx] = best_idx_act + 1
+        r_count = r_end - r_start
+        mse_all = self._best_k_selector.score(gpu_results, prof_norm_all, height_axis, batch_tag=f"{batch_tag} | mode {mode}")
 
-                batch_results[(mode, lambda_k)] = (output, mse_out, pen_out, best_k_out)
+        for lambda_k in self.lambda_values:
+            best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, mse_all, scale_all, lambda_k, n_params_out, batch_tag=f"{batch_tag} | mode {mode}")
 
-            del gpu_results, mse_all
-            gc.collect()
+            output     = np.zeros((n_total, n_params_out),       dtype=np.float32)
+            mse_out    = np.full ((n_total, self.k_max), np.nan, dtype=np.float32)
+            pen_out    = np.full ((n_total, self.k_max), np.nan, dtype=np.float32)
+            best_k_out = np.zeros(n_total,                       dtype=np.int16)
 
-        return batch_results
+            output    [active_idx] = best_params
+            mse_out   [active_idx] = mse_act
+            pen_out   [active_idx] = pen_act
+            best_k_out[active_idx] = best_idx_act + 1
+
+            maps = outputs[(mode, lambda_k)]
+            maps["params"][:, :, r_start:r_end] = output.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
+            maps["mse"   ][:, :, r_start:r_end] = mse_out.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+            maps["pen"   ][:, :, r_start:r_end] = pen_out.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+            maps["best_k"][:,    r_start:r_end] = best_k_out.reshape(r_count, Az).T
+
+    @staticmethod
+    def _throttle_scorings(futures : list, max_pending : int) -> None:
+        pending = [future for future in futures if not future.done()]
+        while len(pending) >= max_pending:
+            pending[0].result()
+            pending = [future for future in futures if not future.done()]
 
     def _run_fitting(
         self,
@@ -345,18 +371,19 @@ class SigmaFittingExtractor:
         n_batches = -(-R // self.range_batch_size)
 
         self.logger.section("[Range Bin Loading]")
-        self.logger.subsection("Streaming range batches (load fused with fitting)")
-        self.logger.subsection(f"Range batches : {n_batches} x {self.range_batch_size} bins, phases 1-3 repeat once per batch")
+        self.logger.subsection("Monolithic range batches, scoring runs in background while the next mode fits")
+        self.logger.subsection(f"Range batches : {n_batches} x {self.range_batch_size} bins")
 
         total_attempted = 0
 
         with self.logger.track(transient=True) as progress:
             bar_task = progress.add_task("  [section]Processing range bins[/section]", total=R,)
 
-            with ThreadPoolExecutor(max_workers=2) as pool:
+            with ThreadPoolExecutor(max_workers=1) as load_pool, ThreadPoolExecutor(max_workers=1) as score_pool:
                 r               = 0
                 batch_index     = 0
-                prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H)
+                score_futures   = []
+                prefetch_future = load_pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H)
 
                 try:
                     while r < R:
@@ -368,37 +395,37 @@ class SigmaFittingExtractor:
                         batch_tag    = f"Batch {batch_index}/{n_batches}"
 
                         if r_end < R:
-                            prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H)
+                            prefetch_future = load_pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H)
 
                         total_attempted += int(active.sum())
 
-                        batch_results = self._fit_batch(
-                            profiles_flat, profiles_norm,
-                            active, safe_scale,
-                            height_axis, height_ax_j,
-                            sigma_lower_j, sigma_upper_j,
-                            mu_lower_j, mu_upper_j,
-                            n_params_out,
-                            batch_tag,
-                        )
+                        batch = self._init_batch(profiles_flat, profiles_norm, active, safe_scale, height_axis, batch_tag)
 
-                        for key, (fitted, mse_batch, pen_batch, best_k_batch) in batch_results.items():
-                            maps = outputs[key]
-                            maps["params"][:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
-                            maps["mse"   ][:, :, r_start:r_end] = mse_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
-                            maps["pen"   ][:, :, r_start:r_end] = pen_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
-                            maps["best_k"][:,    r_start:r_end] = best_k_batch.reshape(r_count, Az).T
+                        if batch is not None:
+                            inits, prof_norm_all, scale_all, active_idx, N_act = batch
+                            n_total                                            = profiles_flat.shape[0]
 
-                        del profiles_flat, profiles_norm, safe_scale, active, batch_results
+                            for mode in self.modes:
+                                gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j, N_act, mode, batch_tag)
+
+                                self._throttle_scorings(score_futures, self.MAX_PENDING_SCORINGS)
+                                score_futures.append(score_pool.submit(self._score_and_store, mode, gpu_results, prof_norm_all, scale_all, active_idx, n_total, height_axis, n_params_out, outputs, r_start, r_end, Az, batch_tag))
+
+                        del profiles_flat, profiles_norm, safe_scale, active, batch
                         gc.collect()
 
-                        self.logger.subsection(f"{batch_tag} complete — range bins {r_start}-{r_end} of {R}")
+                        self.logger.subsection(f"{batch_tag} dispatched — range bins {r_start}-{r_end} of {R}")
 
                         progress.advance(bar_task, advance=r_count)
                         r = r_end
 
+                    for future in score_futures:
+                        future.result()
+
                 except Exception:
                     prefetch_future.cancel()
+                    for future in score_futures:
+                        future.cancel()
                     raise
 
         self.logger.subsection(f"Total pixels   : {R * Az:,}")
