@@ -3950,13 +3950,15 @@ class GpuCardSelect {
 
 class GpuPicker {
   constructor(view, leaf) {
-    this.view  = view;
-    this.leaf  = leaf;
-    this.multi = leaf.type === "list";
-    this.el    = null;
-    this.note  = null;
-    this.cards = null;
-    this.reset = () => this._syncFromLeaf();
+    this.view     = view;
+    this.leaf     = leaf;
+    this.multi    = leaf.type === "list";
+    this.el       = null;
+    this.note     = null;
+    this.cards    = null;
+    this.inactive = false;
+    this.why      = "";
+    this.reset    = () => this._syncFromLeaf();
   }
 
   build() {
@@ -3979,7 +3981,14 @@ class GpuPicker {
     });
     this.cards.load().then(() => this._paintNote());
 
-    return { el: this.el, input: this.el, reset: this.reset };
+    return { el: this.el, input: this.el, reset: this.reset, setInactive: (on, why) => this.setInactive(on, why) };
+  }
+
+  setInactive(on, why) {
+    this.inactive = Boolean(on);
+    this.why      = why || "";
+    if (this.el) this.el.classList.toggle("is-inactive", this.inactive);
+    this._paintNote();
   }
 
   _parse(raw) {
@@ -4008,6 +4017,13 @@ class GpuPicker {
 
   _paintNote() {
     if (!this.note) return;
+
+    if (this.inactive) {
+      this.note.textContent = this.why;
+      this.note.classList.remove("is-dirty");
+      return;
+    }
+
     const ordered = this.cards ? this.cards.value() : [];
     const head    = this.multi ? `${ordered.length} GPU${ordered.length === 1 ? "" : "s"}` : `GPU ${ordered[0]}`;
     this.note.textContent = ordered.length
@@ -4526,7 +4542,7 @@ class ConfigForm {
     }
 
     row.appendChild(control.el);
-    this.controls[leaf.path] = { leaf, reset: control.reset, input: control.input };
+    this.controls[leaf.path] = { leaf, reset: control.reset, input: control.input, setInactive: control.setInactive };
     this.states.push({ leaf, row, sectionKey: sectionKey !== undefined ? sectionKey : this._section, pinned });
     return row;
   }
@@ -4749,7 +4765,32 @@ class ConfigForm {
     this._applyVisibility();
   }
 
+  _refreshGpuRegime() {
+    const control = this.controls["gpu"];
+    const seeds   = this.byPath.get("seeds");
+    if (!control || !control.setInactive || !seeds) return;
+
+    let parsed = [];
+    try {
+      const value = PythonLiteral.parse(this._effective(seeds));
+      if (Array.isArray(value)) parsed = value;
+    } catch (e) {
+      parsed = [];
+    }
+
+    const fanout = parsed.length > 1;
+    control.setInactive(fanout, `unused with ${parsed.length} seeds · each seed trains on its own GPU from the gpus pool`);
+
+    this.states.forEach(({ leaf, row }) => {
+      if (leaf.path !== "gpu") return;
+      row.classList.toggle("cfg-edit__row--inactive", fanout);
+      row.title = fanout ? "--gpu · unused: multi-seed runs fan out across the gpus pool" : `--${leaf.path}`;
+    });
+  }
+
   _refreshGates() {
+    this._refreshGpuRegime();
+
     this.states.forEach(({ row }) => {
       delete row.dataset.gated;
     });

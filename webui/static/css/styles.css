@@ -1647,6 +1647,8 @@ main { margin-left: var(--navw); }
 .model-chip__meta { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
 
 .gpu-picker { display: flex; flex-direction: column; gap: 8px; }
+.cfg-edit__row--inactive { opacity: 0.45; }
+.cfg-edit__row--inactive .gpu-picker.is-inactive { pointer-events: none; }
 .gpu-picker__board--chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .gpu-chip { display: flex; flex-direction: column; gap: 2px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg-1); cursor: pointer; text-align: left; opacity: 0.5; transition: border-color 0.15s var(--ease), opacity 0.15s var(--ease); }
 .gpu-chip:hover { border-color: var(--ink-dim); }
