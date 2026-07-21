@@ -53,6 +53,27 @@ def test_operator_adjoint_identity():
     assert torch.allclose(lhs, rhs, rtol=1e-4, atol=1e-4)
 
 
+def test_gram_matches_adjoint_of_forward():
+    torch.manual_seed(2)
+    kz       = _kz_map()
+    profiles = torch.rand(BATCH, WINDOW, WINDOW, POINTS)
+
+    operator = TomoOperator(kz, X_AXIS, DX)
+    gram     = operator.gram(profiles)
+    exact    = operator.adjoint(operator.forward(profiles))
+
+    assert torch.allclose(gram, exact, rtol=1e-4, atol=1e-4)
+
+
+def test_rejects_nonuniform_axis():
+    kz     = _kz_map()
+    warped = X_AXIS.clone()
+    warped[POINTS // 2] += 2.0 * DX
+
+    with pytest.raises(ValueError):
+        TomoOperator(kz, warped, DX)
+
+
 def test_matched_filter_init_peaks_at_true_height():
     kz       = _kz_map()
     profiles = _gaussian_profiles(mu=12.0)

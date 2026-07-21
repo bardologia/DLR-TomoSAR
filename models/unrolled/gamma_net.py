@@ -12,9 +12,16 @@ from ..blocks                    import build_activation
 
 class TomoOperator:
     def __init__(self, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float) -> None:
-        self.dx = dx
+        spacings = torch.diff(x_axis)
+        if not torch.allclose(spacings, torch.full_like(spacings, dx), rtol=1e-3, atol=0.0):
+            raise ValueError("TomoOperator requires a uniform elevation axis; the Toeplitz gram kernel is only valid when x_axis spacing is constant")
 
-        phase         = kz_map.permute(0, 2, 3, 1).unsqueeze(-1) * x_axis.reshape(1, 1, 1, 1, -1)
+        self.dx     = dx
+        self.length = int(x_axis.shape[0])
+        self.pixels = kz_map.permute(0, 2, 3, 1)
+        self.kernel = None
+
+        phase         = self.pixels.unsqueeze(-1) * x_axis.reshape(1, 1, 1, 1, -1)
         self.steering = torch.polar(torch.ones_like(phase), phase)
 
     def forward(self, profiles: torch.Tensor) -> torch.Tensor:
@@ -26,6 +33,27 @@ class TomoOperator:
         pixels = measurements.unsqueeze(-1)
 
         return (self.steering.mH @ pixels).real.squeeze(-1)
+
+    def _toeplitz_kernel(self) -> torch.Tensor:
+        if self.kernel is None:
+            offsets = torch.arange(-(self.length - 1), self.length, device=self.pixels.device, dtype=self.pixels.dtype) * self.dx
+
+            accumulated = None
+            for track in range(self.pixels.shape[-1]):
+                term        = torch.cos(self.pixels[..., track].unsqueeze(-1) * offsets)
+                accumulated = term if accumulated is None else accumulated + term
+
+            self.kernel = accumulated
+
+        return self.kernel
+
+    def gram(self, profiles: torch.Tensor) -> torch.Tensor:
+        B, H, W, L = profiles.shape
+
+        flat   = profiles.reshape(1, B * H * W, L)
+        weight = self._toeplitz_kernel().reshape(B * H * W, 1, 2 * L - 1)
+
+        return functional.conv1d(flat, weight, padding=L - 1, groups=B * H * W).reshape(B, H, W, L) * self.dx
 
 
 class ProfileProx(nn.Module):
@@ -88,13 +116,13 @@ class GammaNet(nn.Module):
         steps      = functional.softplus(self.raw_steps)
         thresholds = functional.softplus(self.raw_thresholds)
 
-        operator = TomoOperator(kz_map, x_axis, dx)
-        measured = measurements.permute(0, 2, 3, 1).contiguous()
-        profile  = functional.relu(operator.adjoint(measured) / n_tracks)
+        operator       = TomoOperator(kz_map, x_axis, dx)
+        measured       = measurements.permute(0, 2, 3, 1).contiguous()
+        backprojection = operator.adjoint(measured)
+        profile        = functional.relu(backprojection / n_tracks)
 
         for iteration in range(self.config.n_iterations):
-            residual = measured - operator.forward(profile)
-            gradient = operator.adjoint(residual) / lipschitz
+            gradient = (backprojection - operator.gram(profile)) / lipschitz
 
             profile = profile + steps[iteration] * gradient
             profile = self.prox_blocks[iteration](profile)
