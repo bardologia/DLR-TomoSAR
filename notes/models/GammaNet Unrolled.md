@@ -21,7 +21,7 @@ summary: Unrolled LISTA-style proximal-gradient inversion of the tomographic for
 
 ## Summary
 
-Per pixel $p$, the forward model maps the reflectivity profile $\mathbf{s}_p \in \mathbb{R}_{\ge 0}^N$ on the elevation grid to complex coherence measurements over $T$ tracks through the steering operator $\mathbf{A}_p$ with entries $e^{i k_{z,t}(p) z_n} \, dz$ — the same operator the physics losses use (`PhysicalLoss.synthesise_track`). GammaNet inverts it by unrolling:
+Per pixel $p$, the forward model maps the reflectivity profile $\mathbf{s}_p \in \mathbb{R}_{\ge 0}^N$ on the elevation grid to complex coherence measurements over $T$ tracks through the steering operator $\mathbf{A}_p$ with entries $e^{i k_{z,t}(p) z_n} \, dz$ — the same operator the physics losses apply per track (`PhysicalLoss.synthesise_track`); `TomoOperator` builds it once per forward pass as a per-pixel steering tensor and applies forward and adjoint as batched matrix products reused across all iterations. GammaNet inverts it by unrolling:
 
 - matched-filter initialisation $\mathbf{s}^0 = \max(0, \mathbf{A}^H \mathbf{y} / T)$,
 - $L$ iterations of gradient step → learned per-pixel 1D convolutional prox along $z$ → nonnegative soft-threshold,

@@ -7,30 +7,27 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import GammaNetConfig
-from tools.loss.physical_loss    import PhysicalLoss
 from ..blocks                    import build_activation
 
 
 class TomoOperator:
-    @staticmethod
-    def forward(profiles: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
-        tracks = [PhysicalLoss.synthesise_track(profiles, kz_map[:, track], x_axis, dx) for track in range(kz_map.shape[1])]
+    def __init__(self, kz_map: torch.Tensor, x_axis: torch.Tensor, dx: float) -> None:
+        self.dx = dx
 
-        return torch.stack(tracks, dim=1)
+        phase         = kz_map.permute(0, 2, 3, 1).unsqueeze(-1) * x_axis.reshape(1, 1, 1, 1, -1)
+        self.steering = torch.polar(torch.ones_like(phase), phase)
 
-    @staticmethod
-    def adjoint(measurements: torch.Tensor, kz_map: torch.Tensor, x_axis: torch.Tensor) -> torch.Tensor:
-        n_tracks = kz_map.shape[1]
+    def forward(self, profiles: torch.Tensor) -> torch.Tensor:
+        pixels       = profiles.permute(0, 2, 3, 1).to(self.steering.dtype).unsqueeze(-1)
+        measurements = (self.steering @ pixels).squeeze(-1)
 
-        accumulated = None
-        for track in range(n_tracks):
-            phase    = kz_map[:, track].unsqueeze(1) * x_axis.reshape(1, -1, 1, 1)
-            steering = torch.polar(torch.ones_like(phase), phase)
-            term     = (steering.conj() * measurements[:, track].unsqueeze(1)).real
+        return measurements.permute(0, 3, 1, 2) * self.dx
 
-            accumulated = term if accumulated is None else accumulated + term
+    def adjoint(self, measurements: torch.Tensor) -> torch.Tensor:
+        pixels   = measurements.permute(0, 2, 3, 1).unsqueeze(-1)
+        profiles = (self.steering.mH @ pixels).real.squeeze(-1)
 
-        return accumulated
+        return profiles.permute(0, 3, 1, 2)
 
 
 class ProfileProx(nn.Module):
@@ -84,11 +81,12 @@ class GammaNet(nn.Module):
         steps      = functional.softplus(self.raw_steps)
         thresholds = functional.softplus(self.raw_thresholds)
 
-        profile = functional.relu(TomoOperator.adjoint(measurements, kz_map, x_axis) / n_tracks)
+        operator = TomoOperator(kz_map, x_axis, dx)
+        profile  = functional.relu(operator.adjoint(measurements) / n_tracks)
 
         for iteration in range(self.config.n_iterations):
-            residual = measurements - TomoOperator.forward(profile, kz_map, x_axis, dx)
-            gradient = TomoOperator.adjoint(residual, kz_map, x_axis) / lipschitz
+            residual = measurements - operator.forward(profile)
+            gradient = operator.adjoint(residual) / lipschitz
 
             profile = profile + steps[iteration] * gradient
             profile = self.prox_blocks[iteration](profile)
