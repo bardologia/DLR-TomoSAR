@@ -13,7 +13,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from system_monitor import SystemHistory, SystemMonitor
+from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
 
 
 class StubPaths:
@@ -26,6 +26,7 @@ class StubPaths:
 def monitor(tmp_path, monkeypatch):
     monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
     monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
+    monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
     return SystemMonitor(StubPaths(tmp_path))
 
 

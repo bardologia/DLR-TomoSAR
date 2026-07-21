@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import pwd
 import shutil
 import socket
 import subprocess
@@ -25,15 +24,17 @@ class SystemMonitor:
         self.prev_proc   = {}
         self.prev_proc_t = 0.0
         self.uid         = os.getuid()
-        self.user        = pwd.getpwuid(self.uid).pw_name
+        self.user        = ProcStats.username(self.uid)
         self.clk         = os.sysconf("SC_CLK_TCK")
         self.page        = os.sysconf("SC_PAGE_SIZE")
         self.user_root   = self._user_root()
         self.du_usage    = {"user": None, "repo": None}
         self.history     = SystemHistory(self)
+        self.users       = ActiveUsers(self)
 
         threading.Thread(target=self._du_loop, daemon=True).start()
         threading.Thread(target=self.history.sample_loop, daemon=True).start()
+        threading.Thread(target=self.users.sample_loop, daemon=True).start()
 
     @staticmethod
     def _cpu_counters() -> dict:
@@ -204,10 +205,7 @@ class SystemMonitor:
         if state == "Z":
             return None
 
-        try:
-            return pwd.getpwuid(uid).pw_name
-        except KeyError:
-            return str(uid)
+        return ProcStats.username(uid)
 
     def _pid_cmd(self, pid: int) -> str:
         try:
@@ -358,6 +356,7 @@ class SystemMonitor:
             "disk"    : self._disk(),
             "gpus"    : self._gpu_cards(occupancy),
             "procs"   : procs,
+            "users"   : self.users.state(),
             "history" : self.history.state(),
         }
 
@@ -414,6 +413,129 @@ class SystemHistory:
                 "ram"         : list(self.ram),
                 "gpus"        : {key: {"util": list(track["util"]), "mem": list(track["mem"])} for key, track in self.gpus.items()},
             }
+
+    def sample_loop(self) -> None:
+        while True:
+            self.sample()
+            time.sleep(self.SAMPLE_PERIOD_S)
+
+
+class ActiveUsers:
+
+    SAMPLE_PERIOD_S = 2.0
+    MIN_UID         = 1000
+    CPU_FLOOR_PCT   = 1.0
+    MEM_FLOOR       = 1 << 30
+
+    def __init__(self, monitor: SystemMonitor) -> None:
+        self.monitor = monitor
+        self.lock    = threading.Lock()
+        self.prev    = {}
+        self.prev_t  = 0.0
+        self.rows    = []
+
+    def _scan(self) -> tuple[dict, float]:
+        now   = time.monotonic()
+        dt    = now - self.prev_t
+        prev  = self.prev
+        cur   = {}
+        users = {}
+
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            try:
+                uid  = os.stat(f"/proc/{pid}").st_uid
+                stat = open(f"/proc/{pid}/stat").read()
+            except OSError:
+                continue
+
+            try:
+                fields = stat[stat.rindex(")") + 2 :].split()
+                jiff   = int(fields[11]) + int(fields[12])
+                rss    = int(fields[21]) * self.monitor.page
+            except (ValueError, IndexError):
+                continue
+
+            cur[pid] = jiff
+            agg      = users.setdefault(uid, {"nproc": 0, "mem": 0, "jdelta": 0})
+
+            agg["nproc"] += 1
+            agg["mem"]   += rss
+            if pid in prev:
+                agg["jdelta"] += max(0, jiff - prev[pid])
+
+        self.prev   = cur
+        self.prev_t = now
+        return users, dt
+
+    def _sessions(self) -> dict:
+        try:
+            out = subprocess.run(["who"], capture_output=True, text=True, timeout=3)
+        except (OSError, subprocess.TimeoutExpired):
+            return {}
+
+        if out.returncode != 0:
+            return {}
+
+        counts = {}
+        for line in out.stdout.splitlines():
+            parts = line.split()
+            if parts:
+                counts[parts[0]] = counts.get(parts[0], 0) + 1
+        return counts
+
+    def _gpu_by_user(self) -> dict:
+        usage = {}
+        for device in self.monitor.gpu_occupancy():
+            for proc in device["procs"]:
+                if proc["owner"] is None:
+                    continue
+                held         = usage.setdefault(proc["owner"], {"mem": 0.0, "gpus": set()})
+                held["mem"] += proc["mem"]
+                held["gpus"].add(device["index"])
+        return usage
+
+    def _rows(self, users: dict, dt: float, sessions: dict, gpu: dict) -> list[dict]:
+        mem_total = self.monitor._memory().get("total", 0)
+        rows      = []
+
+        for uid, agg in users.items():
+            name = ProcStats.username(uid)
+            held = gpu.get(name, {"mem": 0.0, "gpus": set()})
+            sess = sessions.get(name, 0)
+            cpu  = round(100.0 * agg["jdelta"] / self.monitor.clk / dt, 1) if dt > 0 else 0.0
+
+            if sess == 0 and uid < self.MIN_UID and cpu < self.CPU_FLOOR_PCT and held["mem"] <= 0 and agg["mem"] < self.MEM_FLOOR:
+                continue
+
+            rows.append({
+                "user"      : name,
+                "uid"       : uid,
+                "me"        : uid == self.monitor.uid,
+                "sessions"  : sess,
+                "nproc"     : agg["nproc"],
+                "cpu"       : cpu,
+                "mem"       : agg["mem"],
+                "mem_share" : round(100.0 * agg["mem"] / mem_total, 1) if mem_total else 0.0,
+                "gpu_mem"   : held["mem"],
+                "gpus"      : sorted(held["gpus"]),
+            })
+
+        rows.sort(key=lambda r: (-r["cpu"], -r["gpu_mem"], -r["mem"]))
+        return rows
+
+    def sample(self) -> None:
+        users, dt = self._scan()
+        rows      = self._rows(users, dt, self._sessions(), self._gpu_by_user())
+
+        with self.lock:
+            self.rows = rows
+
+    def state(self) -> list[dict]:
+        with self.lock:
+            return [dict(row) for row in self.rows]
 
     def sample_loop(self) -> None:
         while True:

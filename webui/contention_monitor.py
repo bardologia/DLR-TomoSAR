@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import pwd
 import threading
 import time
 from collections import deque
@@ -304,21 +303,15 @@ class ContentionMonitor:
         top_rss, top_pid, top_comm, top_uid = top
 
         return {
-            "user"        : self._username(lead_uid),
+            "user"        : ProcStats.username(lead_uid),
             "rss_gb"      : user_rss[lead_uid] / (1024.0 ** 3),
             "nproc"       : user_n[lead_uid],
             "is_mine"     : lead_uid == self.uid,
             "proc_pid"    : top_pid,
-            "proc_user"   : self._username(top_uid),
+            "proc_user"   : ProcStats.username(top_uid),
             "proc_comm"   : top_comm,
             "proc_rss_gb" : top_rss / (1024.0 ** 3),
         }
-
-    def _username(self, uid: int) -> str:
-        try:
-            return pwd.getpwuid(uid).pw_name
-        except KeyError:
-            return str(uid)
 
     def _growth_candidate(self, now: float, per_mem: dict, per_comm: dict) -> dict | None:
         for pid in [p for p in self.proc_hist if p not in per_mem]:

@@ -11,7 +11,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from system_monitor import SystemHistory, SystemMonitor
+from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
 
 FAKE_DEVICES = [
     {"index": 0, "util": 50,   "mem_used": 8000, "mem_total": 16000, "name": "GPU A", "temp": 40, "power": 30, "power_limit": 90, "uuid": "GPU-a"},
@@ -29,6 +29,7 @@ class StubPaths:
 def monitor(tmp_path, monkeypatch):
     monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
     monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
+    monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
     instance = SystemMonitor(StubPaths(tmp_path))
     monkeypatch.setattr(instance, "_gpu_devices", lambda: FAKE_DEVICES)
     return instance

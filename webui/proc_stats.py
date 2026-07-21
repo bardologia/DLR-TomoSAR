@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import pwd
+
 
 class ProcStats:
+
+    @staticmethod
+    def username(uid: int) -> str:
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return str(uid)
 
     @staticmethod
     def pss(pid: int) -> int | None:

@@ -338,6 +338,14 @@ class StatusBoard {
       `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
 
+      `<section class="sboard sboard--users" aria-label="Active users">` +
+      `<header class="sboard__cap"><span>active users</span><span class="sboard__n" id="sb-users-n">--</span></header>` +
+      `<div class="utable">` +
+      `<div class="utable__row utable__row--head"><span>user</span><span title="summed over all the user's processes; 100% = one full core">cpu%</span><span title="resident memory summed over the user's processes (shared pages counted once per process)">ram</span><span title="share of total system RAM">ram%</span><span class="utable__gpu" title="GPU memory the user has allocated across all CUDA devices">gpu mem</span><span title="CUDA devices the user holds memory on">gpus</span><span title="processes owned by the user">procs</span><span title="open login sessions">ssh</span></div>` +
+      `<div class="utable__body" id="sb-users"></div>` +
+      `</div>` +
+      `</section>` +
+
       `<section class="sboard sboard--procs" aria-label="Processes">` +
       `<header class="sboard__cap"><span>processes &middot; ${this._esc(sys.user || "user")}</span><span class="sboard__n" id="sb-proc-n"></span></header>` +
       `<div class="ptable">` +
@@ -653,6 +661,7 @@ class StatusBoard {
       this._bar("sb-disk-repo-bar", disk.repo_used ? (100 * disk.repo_used) / disk.total : 0);
     }
 
+    this._renderUsers(sys.users || []);
     this._renderProcs(sys.procs || []);
   }
 
@@ -978,6 +987,35 @@ class StatusBoard {
         osc.stop(t0 + dt + 0.15);
       });
     } catch (e) {}
+  }
+
+  _renderUsers(users) {
+    const body = document.getElementById("sb-users");
+    const n = document.getElementById("sb-users-n");
+    if (!body) return;
+    if (n) n.textContent = `${users.length} user${users.length === 1 ? "" : "s"}`;
+
+    if (!users.length) {
+      body.innerHTML = `<div class="sboard__empty">measuring user activity&hellip;</div>`;
+      return;
+    }
+
+    body.innerHTML = users.map((u) => {
+      const cls = u.cpu >= 100 ? "is-hot" : u.cpu >= 25 ? "is-mid" : "";
+      const gpus = (u.gpus || []).length ? u.gpus.join(",") : "--";
+      return (
+        `<div class="utable__row${u.me ? " is-me" : ""}">` +
+        `<span class="utable__user">${this._esc(u.user)}${u.me ? `<i class="utable__me">you</i>` : ""}</span>` +
+        `<span class="utable__cpu ${cls}">${u.cpu.toFixed(1)}</span>` +
+        `<span>${this._mb(u.mem)}</span>` +
+        `<span class="utable__share">${u.mem_share.toFixed(1)}%</span>` +
+        `<span class="utable__gpu">${u.gpu_mem ? this._mb(u.gpu_mem * 1048576) : "--"}</span>` +
+        `<span class="utable__gpus">${gpus}</span>` +
+        `<span>${u.nproc}</span>` +
+        `<span class="utable__sess">${u.sessions || "--"}</span>` +
+        `</div>`
+      );
+    }).join("");
   }
 
   _renderProcs(procs) {
