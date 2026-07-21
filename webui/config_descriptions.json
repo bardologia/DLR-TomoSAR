@@ -154,7 +154,7 @@
         "height_range": "reconstruction height-axis extent in meters as (min, max); None reads it from meta/config_state.json",
         "fit_settings": "FitSettings sub-config bundling the iteration cap and Gaussian-fit hyperparameters (k_max, lambda_k, sigma_init_divisor, free-parameter flags)",
         "parameter_workers": "number of CPU worker processes in the PeakInitialiser pool used for per-pixel peak-based initial guesses",
-        "range_batch_size": "number of range bins loaded and fit together per batch while streaming the tomogram; the next batch's load and CPU peak init are prefetched while the current batch occupies the GPUs, so several batches per dataset keep the GPUs continuously fed",
+        "range_batch_size": "number of range bins loaded and fit together per batch while streaming the tomogram",
         "gpu_pixel_batch_size": "fixed number of pixels per GPU batch the JAX Adam-fit kernel is compiled and iterated over, with padding to keep every batch this size",
         "adam_steps": "number of Adam optimizer steps run per pixel batch during Gaussian curve fitting",
         "adam_lr": "Adam learning rate for the per-pixel Gaussian curve-fitting optimizer",
@@ -182,7 +182,7 @@
         "adam_steps": "number of Adam optimizer steps run per pixel batch during Gaussian curve fitting, shared across the sweep",
         "adam_lr": "Adam learning rate for the per-pixel Gaussian curve-fitting optimizer, shared across the sweep",
         "gpu_device_ids": "GPU indices pinned via EnvironmentPinner.gpus before extraction runs",
-        "range_batch_size": "number of range bins loaded and fit together per batch, shared across the sweep; the next batch's load and CPU peak init run in a prefetch thread while the current batch occupies the GPUs, so several batches per dataset keep the GPUs continuously fed",
+        "range_batch_size": "number of range bins loaded and fit together per batch, shared across the sweep",
         "gpu_pixel_batch_size": "fixed number of pixels per GPU batch the JAX Adam-fit kernel is compiled and iterated over, shared across the sweep",
         "parameter_workers": "CPU worker count for the shared PeakInitialiser pool, defaulting to min(64, cpu_count)"
       }

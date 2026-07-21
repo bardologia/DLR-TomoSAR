@@ -544,7 +544,7 @@
               "label": "SigmaFittingExtractor",
               "module": "pipelines/processing/param_extraction/sigma/extractor.py",
               "role": "orchestrator",
-              "fn": "Pipelines range-bin batches: a prefetch thread loads and peak-inits the next batch while the GPUs fit the current one (one Adam scan per fit mode on the shared init, chunks double-buffered), and a background thread runs per-lambda best-K scoring and writes the permutation maps.",
+              "fn": "Streams range-bin batches and sequences the shared three-phase fit: one CPU peak init per batch, one GPU Adam scan per fit mode, and per-lambda best-K selection reusing the mode's fits, accumulating parameter and diagnostic maps per permutation.",
               "col": 3,
               "reads": [
                 "tomogram_full.npy"
@@ -557,7 +557,7 @@
               "label": "PeakInitialiser",
               "module": "pipelines/processing/param_extraction/sigma/initialiser.py",
               "role": "transform",
-              "fn": "CPU prominence peak-finder (scipy find_peaks over a process pool) that seeds per-pixel amplitude, mean and sigma initial guesses shared across all K; runs inside the batch prefetch so init overlaps GPU fitting of the previous batch.",
+              "fn": "CPU prominence peak-finder (scipy find_peaks over a process pool) that seeds per-pixel amplitude, mean and sigma initial guesses shared across all K.",
               "col": 4,
               "reads": [],
               "writes": [],
